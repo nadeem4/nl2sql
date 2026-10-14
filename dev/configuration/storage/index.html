@@ -1946,6 +1946,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4629,6 +4640,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4769,15 +4791,7 @@ store. Installed: local."</p>
 <p>The store interfaces are in <a href="../../adapters/sdk/#interfaces-the-stores"><code>nl2sql_sdk.stores</code></a>.
 A plugin registers a store in the <code>nl2sql.stores</code> entry point group, or in
 code with <code>registry.add_store(name, cls)</code>.</p>
-<div class="admonition note">
-<p class="admonition-title">The state slot takes the built-in only, for now</p>
-<p>0.6 moves the engine onto the four store interfaces one slot at a time.
-The engine reads its index, traces and results through <code>IndexStore</code>,
-<code>TraceStore</code> and <code>ResultStore</code>, so any store works in those slots. Until
-the state slot's move lands, the engine reads <code>state</code> through the
-built-in <code>sqlite</code> store only, and refuses any other store there with a
-problem at <code>storage.state</code>.</p>
-</div>
+<p>Every slot is read through its interface, so a plugin store works in any slot it fills.</p>
 <h2 id="retention">Retention</h2>
 <p>The <code>files</code> trace store and the <code>local</code> results store take <code>max_age_days</code>,
 14 and 7 by default (at least 1). It is a key of those two stores, not of
@@ -4797,8 +4811,8 @@ rule, say). Three things call it:</p>
 <li>your own code.</li>
 </ul>
 <p>Feedback and schema snapshots have no age limit: feedback is cleared by hand
-(<code>nl2sql feedback clear</code>), and old snapshots are evicted by
-<code>settings.schema.max_versions</code>.</p>
+(<code>nl2sql feedback clear</code>), and after each index build the snapshots nothing can
+read any more are deleted (see <a href="#the-state">The state</a>).</p>
 <h2 id="what-is-where-enginestorageinfo">What is where: <code>engine.storage.info()</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span><span class="o">.</span><span class="n">info</span><span class="p">()</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># {"index":   {"type": "chroma", "location": ".../.nl2sql/index"},</span>
@@ -4809,6 +4823,12 @@ rule, say). Three things call it:</p>
 </code></pre></div>
 <p><code>type</code> is the store's name, or the class name of a store object; <code>location</code>
 is its folder or file, or <code>None</code> for a store that does not have one.</p>
+<h2 id="the-state">The state</h2>
+<p>The state store keeps the schema snapshots (immutable, one row per version),
+the plan cache, the playground's feedback, and the lock that lets one index
+build run at a time. The engine applies the store's pending migrations when it
+starts; the built-in <code>sqlite</code> store adopts a 0.5 <code>state.db</code> as it is. See
+<a href="../../schema/store/#the-state-store">The state store</a>.</p>
 <h2 id="the-index">The index</h2>
 <p>The engine embeds; the index store keeps entries and vectors in a
 <strong>namespace</strong> per embedding model, <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code> (for

@@ -2346,12 +2346,12 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="indexing-chunking-and-retrieval-architecture">Indexing, Chunking, and Retrieval Architecture</h1>
-<p>This document describes <strong>current indexing behavior</strong> as implemented in code. Indexing transforms <strong>schema snapshots</strong> into <strong>typed chunks</strong> that the engine embeds and writes to the <strong>index store</strong> (<code>storage.index</code>, the built-in <code>chroma</code> store by default; see <a href="../../configuration/storage/">Storage</a>). Retrieval uses these entries as candidates and then resolves authoritative schema details from <code>SchemaStore</code> (see <code>../schema/store.md</code> for schema contracts and store behavior).</p>
+<p>This document describes <strong>current indexing behavior</strong> as implemented in code. Indexing transforms <strong>schema snapshots</strong> into <strong>typed chunks</strong> that the engine embeds and writes to the <strong>index store</strong> (<code>storage.index</code>, the built-in <code>chroma</code> store by default; see <a href="../../configuration/storage/">Storage</a>). Retrieval uses these entries as candidates and then resolves authoritative schema details from the state store (<code>storage.state</code>; see <code>../schema/store.md</code> for schema contracts and store behavior).</p>
 <h2 id="indexing-flow">Indexing flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Adapter[Datasource Adapter] --&gt; Snapshot[Schema Snapshot]
     Snapshot --&gt; Enrich[LLM Enrichment - optional]
-    Enrich --&gt; Register[SchemaStore.register_snapshot]
+    Enrich --&gt; Register[StateStore.put_snapshot]
     Register --&gt; Chunker[SchemaChunkBuilder]
     Curated[curated.yaml] --&gt; CChunker[CuratedChunkBuilder]
     Chunker --&gt; Embed[The engine's embedder]
@@ -2457,7 +2457,8 @@ namespace; the <code>chroma</code> store keeps one collection per namespace.</p>
     B --&gt; C{All entries written?}
     C --&gt;|no| D[Raise: the pointer still names the previous build and v1]
     C --&gt;|yes| E[set_pointers: datasource to the new build and v2]
-    E --&gt; F[Delete the datasource's builds older than the one replaced]</code></pre>
+    E --&gt; F[Delete the datasource's builds older than the one replaced]
+    F --&gt; G[keep_snapshots: delete the snapshots nothing can read any more]</code></pre>
 <ul>
 <li>Each datasource's <code>BuildPointer</code> names its live <code>build_id</code> and the
   <code>schema_version</code> the build was made from, with <code>built_at</code> and <code>curated_hash</code>.
@@ -2481,6 +2482,14 @@ namespace; the <code>chroma</code> store keeps one collection per namespace.</p>
   playground's Rebuild and the REST index routes. Its <code>on_datasource</code> callback
   gets an <code>IndexProgress</code> per datasource (<code>started</code>, then <code>done</code> with the entry
   counts or <code>failed</code> with the reason): <code>nl2sql index</code> prints a line from it.</li>
+<li><strong>One build at a time.</strong> <code>rebuild_index</code> holds the state store's <code>index</code>
+  lock (a lease that expires after an hour), so <code>nl2sql index</code> is safe while
+  <code>nl2sql-api</code> serves the same <code>storage.path</code>. A build started while another
+  holds it fails every datasource at once, with the reason.</li>
+<li><strong>Snapshots are immutable</strong>, and after a build only the snapshots a pointer
+  names (in any namespace), the one just replaced and the newest
+  <code>settings.schema.max_versions</code> are kept. See
+  <a href="../../schema/store/#which-snapshots-are-kept">The state store</a>.</li>
 <li><code>engine.datasources.schema()</code>, <code>engine.curated.validate()</code> and the benchmark's
   database identity read the snapshot the live pointer names too.</li>
 </ul>

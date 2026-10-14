@@ -4731,9 +4731,12 @@ produced. A run the playground did not answer is refused with <code>404</code>.<
 default. <code>settings.feedback.enabled: false</code> turns it off: the control then says so and
 <code>POST /api/feedback</code> answers <code>403</code>.</p>
 <h2 id="what-is-stored">What is stored</h2>
-<p>One row per run in a <code>feedback</code> table inside the SQLite schema store
-(<code>&lt;storage.path&gt;/state.db</code>, <code>nl2sql-demo/.nl2sql/state.db</code> in the demo), beside the schema
-snapshots and the plan cache. No new service or file.</p>
+<p>One row per run, kept by the engine's state store (<code>storage.state</code>) beside the
+schema snapshots and the plan cache. The built-in <code>sqlite</code> state store keeps it
+in a <code>feedback</code> table of <code>&lt;storage.path&gt;/state.db</code> (<code>nl2sql-demo/.nl2sql/state.db</code>
+in the demo). No new service or file. The engine builds each row
+(<code>nl2sql.feedback.rated_row</code>) and hands it to <code>StateStore.add_feedback</code>, so a
+plugin state store keeps the same row.</p>
 <table>
 <thead>
 <tr>
@@ -4789,8 +4792,10 @@ snapshots and the plan cache. No new service or file.</p>
 </tbody>
 </table>
 <p><code>datasource_ids</code> and <code>source</code> were added after the table first shipped. A
-store from before them gains both columns, empty, the next time it is opened;
-the rows already in it keep their ratings and read the two as <code>null</code>.</p>
+<code>state.db</code> from before them gains both columns, empty, through the state
+store's migrations when the engine next starts; the rows already in it keep
+their ratings and read the two as <code>null</code>. See
+<a href="../../schema/store/#migrations">The state store → Migrations</a>.</p>
 <p><strong>Privacy.</strong> A row never holds result rows, the written answer, sample values,
 error messages or keys. It holds only what the run showed the role it ran as:
 the SQL of a refused run is dropped, and error messages (which can name a

@@ -5485,7 +5485,7 @@ The storage config names one per slot by <code>type</code> (see
 </tr>
 <tr>
 <td style="text-align: left;"><code>StateStore</code></td>
-<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>keep_snapshots(datasource_id, keep)</code>, <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>lock(name, ttl_s)</code>, <code>close()</code></td>
+<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code>, <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>lock(name, ttl_s)</code>, <code>close()</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>TraceStore</code></td>

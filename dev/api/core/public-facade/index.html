@@ -4895,8 +4895,8 @@ embedder (from <code>embeddings</code>, or the <code>instance</code> given), and
 <td><code>&lt;storage.path&gt;/index/</code></td>
 </tr>
 <tr>
-<td>Schema snapshots, plan cache, feedback</td>
-<td><code>&lt;storage.path&gt;/state.db</code></td>
+<td>Schema snapshots, plan cache, feedback, the index lock</td>
+<td>the state store, <code>&lt;storage.path&gt;/state.db</code> by default</td>
 </tr>
 <tr>
 <td>Run traces</td>
@@ -4943,6 +4943,10 @@ the environment, so two engines in one process share nothing. The CLI,
 <td>Disposes each adapter's connection pool (an adapter's optional <code>close()</code>) and closes the state store and the vector store client. <code>run_query</code>, <code>stream_query</code> and <code>check</code> raise afterwards. Calling it twice is fine.</td>
 </tr>
 <tr>
+<td><code>clear_plan_cache() -&gt; int</code></td>
+<td>Removes every cached plan from the state store and returns how many there were. Schema snapshots and feedback stay; the next run of each question calls the planner. <code>nl2sql cache clear</code> calls it.</td>
+</tr>
+<tr>
 <td><code>with NL2SQL(...) as engine:</code></td>
 <td><code>__exit__</code> calls <code>close()</code>.</td>
 </tr>
@@ -4969,7 +4973,7 @@ datasource fails.</p>
 <h2 id="the-shape">The shape</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">close</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">config</span><span class="p">;</span> <span class="n">engine</span><span class="o">.</span><span class="n">about</span><span class="p">()</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">close</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">config</span><span class="p">;</span> <span class="n">engine</span><span class="o">.</span><span class="n">about</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">clear_plan_cache</span><span class="p">()</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span>   <span class="c1"># list, get, add, remove, schema, test</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span>         <span class="c1"># build, health, clear, inspect, inspect_defaults</span>
@@ -5054,7 +5058,7 @@ configured to run on; never a key. The playground's Pipeline page reads it.</p>
 </code></pre></div>
 <h3 id="feedback">Feedback</h3>
 <p>Ratings of answered runs, and the guardrail rates over recorded runs. They live
-in the <code>feedback</code> table of <code>&lt;storage.path&gt;/state.db</code>; the rates also read the
+in the state store (<code>&lt;storage.path&gt;/state.db</code> by default); the rates also read the
 traces in <code>&lt;storage.path&gt;/traces</code>. <code>nl2sql feedback</code> and the playground's
 thumbs up and down are built on it. See
 <a href="../../../observability/feedback/">Feedback and signals</a> for what is stored.</p>

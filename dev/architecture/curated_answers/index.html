@@ -2933,7 +2933,7 @@ from.</p>
 </ul>
 <h2 id="feedback-proposals">Feedback proposals</h2>
 <p>A thumbs-up on a generated answer is already stored, one row per run, in the
-<code>feedback</code> table (<code>nl2sql/feedback/store.py</code>), with the question, role, status
+<code>feedback</code> table of the state store (<code>nl2sql/storage/sqlite.py</code>), with the question, role, status
 and SQL. That row is the proposal; nothing new is stored and nothing writes
 <code>curated.yaml</code>.</p>
 <p><code>nl2sql curated proposals export --out curated.proposals.yaml</code> turns

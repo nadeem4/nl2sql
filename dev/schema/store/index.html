@@ -2466,24 +2466,74 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#snapshotting-and-fingerprinting" class="md-nav__link">
+  <a href="#the-state-store" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Snapshotting and fingerprinting
+        The state store
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The state store">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#snapshots-are-immutable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshots are immutable
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#schema-store-backends" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#which-snapshots-are-kept" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schema store backends
+        Which snapshots are kept
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-plan-cache-and-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The plan cache and feedback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The lock
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -4618,24 +4668,74 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#snapshotting-and-fingerprinting" class="md-nav__link">
+  <a href="#the-state-store" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Snapshotting and fingerprinting
+        The state store
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The state store">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#snapshots-are-immutable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshots are immutable
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#schema-store-backends" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#which-snapshots-are-kept" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schema store backends
+        Which snapshots are kept
       
     </span>
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-plan-cache-and-feedback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The plan cache and feedback
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-lock" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The lock
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -4694,7 +4794,7 @@
 <ul>
 <li><strong>Schema contracts</strong>: structural schema (tables, columns, foreign keys).</li>
 <li><strong>Schema metadata</strong>: descriptive enrichment and statistics.</li>
-<li><strong>Schema store</strong>: versioned persistence with fingerprinting.</li>
+<li><strong>The state store</strong>: immutable, versioned snapshots, kept by <code>storage.state</code>.</li>
 <li><strong>Schema retrieval</strong>: staged lookup via schema chunks.</li>
 </ul>
 <h2 id="schema-contracts-and-metadata">Schema contracts and metadata</h2>
@@ -4717,22 +4817,64 @@
   with the datasource's <code>index.sample_values</code>. See
   <a href="../../adapters/sqlalchemy/#reading-a-schema">Reading a schema</a></li>
 </ul>
-<h2 id="snapshotting-and-fingerprinting">Snapshotting and fingerprinting</h2>
-<p>Each <code>SchemaSnapshot</code> (contract + metadata) is versioned using a <strong>deterministic fingerprint</strong>:</p>
+<h2 id="the-state-store">The state store</h2>
+<p>Snapshots are kept by the engine's <strong>state store</strong>, the <code>storage.state</code> slot
+(see <a href="../../configuration/storage/">Storage</a>). The built-in one is <code>sqlite</code>, a
+file at <code>&lt;storage.path&gt;/state.db</code>; any store implementing
+<code>nl2sql_sdk.stores.StateStore</code> can take its place. The same store holds the
+plan cache, the playground's answer ratings and the index build lock.</p>
+<h3 id="snapshots-are-immutable">Snapshots are immutable</h3>
+<p><code>put_snapshot(snapshot)</code> stores a snapshot as a new row and returns its
+<code>schema_version</code>, <code>YYYYMMDDhhmmss_&lt;hash8&gt;</code> (the time it was stored, and a hash
+of its contract and metadata). A stored snapshot is never changed: in the
+<code>sqlite</code> store a trigger refuses any <code>UPDATE</code> of the <code>schema_snapshots</code> table.</p>
 <ul>
-<li>Fingerprint uses datasource ID, engine type, sorted tables, sorted columns, and sorted foreign keys.</li>
-<li>Resulting hash is used to deduplicate identical snapshots.</li>
+<li>Storing a snapshot whose contract and metadata are identical to a stored one
+  returns that version, and writes nothing.</li>
+<li>A snapshot with the same structure but new metadata (statistics,
+  descriptions, enrichment) is a <strong>new version</strong>. A run that pinned the old
+  version keeps reading exactly the snapshot its index build was made from.</li>
 </ul>
-<h2 id="schema-store-backends">Schema store backends</h2>
-<p><code>build_schema_store()</code> constructs a store based on settings:</p>
+<p>The structural fingerprint (<code>nl2sql.schema.generate_schema_fingerprint</code>:
+datasource ID, engine type, sorted tables, columns and foreign keys) is still
+stored beside each row, and benchmark records use it to identify a database.</p>
+<h3 id="which-snapshots-are-kept">Which snapshots are kept</h3>
+<p>After each build of a datasource, indexing calls
+<code>keep_snapshots(datasource_id, keep)</code>, which deletes every other snapshot of
+the datasource and the plans cached on them. <code>keep</code> is:</p>
 <ul>
-<li><code>InMemorySchemaStore</code>: in-memory, versioned snapshots.</li>
-<li><code>SqliteSchemaStore</code>: persistent storage with indexes on fingerprint and timestamps. One connection serves every thread, and each use of it holds one lock, so a server reading the schema and the index health on two workers at once is safe.</li>
+<li>every version a build pointer names, in <strong>every</strong> index namespace, so
+  switching back to an earlier embedding model still finds its snapshot;</li>
+<li>the version the build just replaced, which runs in flight may have pinned;</li>
+<li>the newest <code>settings.schema.max_versions</code> (default 3).</li>
 </ul>
-<p>Schema versions are timestamped and include a fingerprint prefix (e.g., <code>YYYYMMDDhhmmss_&lt;fp8&gt;</code>). Old versions are evicted beyond <code>schema_store_max_versions</code>.</p>
-<p>The store also holds the <strong>plan cache</strong>: validated, executed plans keyed by <code>(normalised sub-query intent, run date and planner model, datasource_id, schema_version)</code>, in the <code>plan_cache</code> table of the SQLite store (a dict in the in-memory one). Evicting a schema version deletes its cached plans; <code>nl2sql cache clear</code> deletes them all and keeps the snapshots. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
-<p>The same SQLite file holds the playground's answer ratings, in a <code>feedback</code> table (one row per rated run; questions and SQL, never rows). It is written whatever <code>SCHEMA_STORE_BACKEND</code> is, at <code>SCHEMA_STORE_PATH</code>; <code>nl2sql feedback clear</code> empties it and nothing else. See <a href="../../observability/feedback/">Feedback and Signals</a>.</p>
-<p>The fingerprint covers <strong>structure only</strong> (tables, columns, keys). Registering a snapshot whose structure matches an existing version returns that version unchanged, so anything keyed on it (the plan cache) stays valid, but the stored <strong>metadata</strong> (statistics, descriptions, enrichment) is replaced by the new snapshot's. The snapshot store and the chunks built from the same snapshot therefore always agree.</p>
+<p>Nothing else deletes a snapshot; there is no age limit.</p>
+<h3 id="the-plan-cache-and-feedback">The plan cache and feedback</h3>
+<p>The <strong>plan cache</strong> holds validated, executed plans keyed by <code>(normalised
+sub-query intent, run date and planner model, datasource_id, schema_version)</code>
+(<code>get_plan</code>, <code>put_plan</code>). Deleting a snapshot deletes its cached plans;
+<code>nl2sql cache clear</code> (<code>engine.clear_plan_cache()</code>) deletes them all and keeps
+the snapshots. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
+<p>The playground's <strong>answer ratings</strong> are kept too (<code>add_feedback</code>,
+<code>list_feedback</code>, <code>clear_feedback</code>): one row per rated run, questions and SQL,
+never rows. <code>nl2sql feedback clear</code> empties them and nothing else. See
+<a href="../../observability/feedback/">Feedback and Signals</a>.</p>
+<h3 id="migrations">Migrations</h3>
+<p>The <code>sqlite</code> store records each migration it has applied in a <code>nl2sql_meta</code>
+table, and the engine applies the pending ones when it starts
+(<code>StateStore.migrate()</code>). Migration 1 creates 0.5's three tables
+(<code>schema_snapshots</code>, <code>plan_cache</code>, <code>feedback</code>) if they are missing, so a 0.5
+<code>state.db</code> is adopted as it is; migration 2 adds the feedback columns that
+came later; migration 3 adds the immutability trigger and the <code>locks</code> table.</p>
+<h3 id="the-lock">The lock</h3>
+<p><code>lock(name, ttl_s)</code> is a lease held for a <code>with</code> block: in the <code>sqlite</code> store,
+a <code>locks</code> row taken in a <code>BEGIN IMMEDIATE</code> transaction, with an expiry. Every
+<code>engine.index.build()</code> holds the <code>index</code> lock, so <code>nl2sql index</code> is safe to run
+while <code>nl2sql-api</code> serves the same <code>storage.path</code>: a second build started
+meanwhile fails at once and says until when the lease runs. The lease expires
+after an hour, so a build that died cannot block forever.</p>
+<p>The <code>sqlite</code> store opens its file on first use, never when it is built, and
+is safe to share between threads: each use of its one connection holds a lock.</p>
 <h2 id="which-version-is-live">Which version is live</h2>
 <p>There is no "latest snapshot" to read. Indexing stores a datasource's
 snapshot first and its index entries second; the index store's
@@ -4745,14 +4887,16 @@ schema_version)</code>. A run reads the pointers once, when it starts. A snapsho
 stored by a build that then failed is named by no pointer, so nothing reads
 it. See <a href="../../architecture/indexing/#the-build-pointer-is-the-commit">Indexing → The build pointer is the commit</a>.</p>
 <h2 id="retrieval-and-authority">Retrieval and authority</h2>
-<p>Schema retrieval resolves <strong>authoritative</strong> tables/columns from <code>SchemaStore</code>, not from the index. Index entries are only used to identify candidates; final schema is resolved via the snapshot the live pointer names. If retrieval yields no candidates, the retriever falls back to the full snapshot. The entries and the snapshot come from the same build, so their versions cannot disagree.</p>
+<p>Schema retrieval resolves <strong>authoritative</strong> tables/columns from the state store, not from the index. Index entries are only used to identify candidates; final schema is resolved via the snapshot the live pointer names. If retrieval yields no candidates, the retriever falls back to the full snapshot. The entries and the snapshot come from the same build, so their versions cannot disagree.</p>
 <p>See <code>../architecture/indexing.md</code> for retrieval stages, chunk types, and vector store behavior.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Contracts and metadata: <code>packages/sdk/src/nl2sql_sdk/schema.py</code></li>
-<li>Fingerprinting: <code>packages/nl2sql/src/nl2sql/schema/protocol.py</code></li>
-<li>Schema store factory: <code>packages/nl2sql/src/nl2sql/schema/store.py</code></li>
-<li>Sqlite store: <code>packages/nl2sql/src/nl2sql/schema/sqlite_store.py</code></li>
+<li>Fingerprinting: <code>packages/nl2sql/src/nl2sql/schema/fingerprint.py</code></li>
+<li>The <code>StateStore</code> interface: <code>packages/sdk/src/nl2sql_sdk/stores.py</code></li>
+<li>The <code>sqlite</code> state store: <code>packages/nl2sql/src/nl2sql/storage/sqlite.py</code></li>
+<li>Which snapshots are kept: <code>packages/nl2sql/src/nl2sql/indexing/orchestrator.py</code></li>
+<li>The index lock: <code>packages/nl2sql/src/nl2sql/indexing/rebuild.py</code></li>
 <li>Schema retriever: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
 </ul>
 
