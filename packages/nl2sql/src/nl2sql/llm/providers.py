@@ -256,7 +256,11 @@ class _PresetProvider:
 
     interface_version: ClassVar[int] = 1
     name: str
-    preset: ProviderPreset
+
+    @property
+    def preset(self) -> ProviderPreset:
+        # Read on every use: PROVIDER_PRESETS stays the one table.
+        return PROVIDER_PRESETS[self.name]
 
     @property
     def label(self) -> str:
@@ -288,8 +292,7 @@ class _PresetProvider:
 
 
 # The built-in providers, one per preset: the ``nl2sql.llms`` entry points name these.
-LLM_PROVIDERS: Dict[str, LLMProvider] = {name: _PresetProvider(name, preset)
-                                         for name, preset in PROVIDER_PRESETS.items()}
+LLM_PROVIDERS: Dict[str, LLMProvider] = {name: _PresetProvider(name) for name in PROVIDER_PRESETS}
 OPENAI = LLM_PROVIDERS["openai"]
 ANTHROPIC = LLM_PROVIDERS["anthropic"]
 OPENROUTER = LLM_PROVIDERS["openrouter"]

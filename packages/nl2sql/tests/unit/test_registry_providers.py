@@ -22,6 +22,16 @@ def test_one_llm_provider_per_preset():
         assert provider.label
 
 
+def test_a_provider_reads_its_preset_when_used(monkeypatch):
+    preset = PROVIDER_PRESETS["openrouter"]
+    monkeypatch.setitem(PROVIDER_PRESETS, "openrouter", preset._replace(base_url="http://127.0.0.1:9/v1"))
+
+    client = LLM_PROVIDERS["openrouter"].create(ResolvedAgent(name="default", model="m", temperature=None,
+                                                              api_key=FAKE_KEY))
+
+    assert client.openai_api_base == "http://127.0.0.1:9/v1"
+
+
 def test_the_registry_hands_out_the_preset_providers():
     assert Registry.default().load("llm", "anthropic") is LLM_PROVIDERS["anthropic"]
 
