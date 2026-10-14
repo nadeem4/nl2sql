@@ -12,8 +12,9 @@ the datasources.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/policy_api.py` (`PoliciesAPI`, internal)
-- `packages/nl2sql/src/nl2sql/policies/models.py` (`UserContext`)
+- `packages/sdk/src/nl2sql_sdk/policy.py` (`UserContext`, `Grant`, `PolicyCheck`)
 - `packages/nl2sql/src/nl2sql/policies/scope.py` (`PolicyEngine`, `Scope`)
+- `packages/nl2sql/src/nl2sql/policies/check.py` (building a `policies.check` block)
 - `packages/nl2sql/src/nl2sql/policies/patterns.py` (the pattern rules)
 - `packages/nl2sql/src/nl2sql/config/models.py` (`Policies`, `Role`)
 
@@ -21,8 +22,9 @@ the datasources.
 
 ### UserContext
 
-Exported from `nl2sql`. Fields: `user_id` (optional), `tenant_id` (optional)
-and `roles` (a list).
+Exported from `nl2sql`; defined in `nl2sql_sdk.policy`, so a policy check
+needs only the SDK. Fields: `user_id` (optional), `tenant_id` (optional) and
+`roles` (a list).
 
 | method | returns | meaning |
 | --- | --- | --- |
@@ -35,9 +37,9 @@ and `roles` (a list).
 
 | method | returns | meaning |
 | --- | --- | --- |
-| `reaches_datasource()` | `bool` | Whether any role reaches the datasource: one of its allow patterns can match inside it. |
+| `reaches_datasource()` | `bool` | Whether any role reaches the datasource (one of its allow patterns can match inside it) and, with a policy check, the check's grant does too. |
 | `allows(schema, table)` | `bool` | Whether `schema.table` may be read; a `None` schema is the default schema. |
-| `rule_for(schema, table)` | `str` or `None` | Why it may not be read (the deny pattern, or the missing allow), for the log; `None` when it may. |
+| `rule_for(schema, table)` | `str` or `None` | Why it may not be read (the deny pattern, or the missing allow, of a role or of the policy check), for the log; `None` when it may. |
 
 `datasource_id` and `default_schema` are attributes.
 
@@ -65,3 +67,7 @@ engine.policies.roles()["analyst"].description
   architecture test `test_every_access_decision_goes_through_scope` holds it.
 - Inside a run, `PolicyEngine.scope` builds each datasource's scope once and
   returns the same one, so every step of the run decides the same way.
+- With a policy check, the check's `Grant` is intersected with the roles, it
+  is asked once per caller and datasource per run (and on every `scope()`
+  call outside a run), and any exception from it denies the datasource. See
+  [A policy check](../../configuration/policies.md#a-policy-check).

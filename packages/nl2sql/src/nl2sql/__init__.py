@@ -24,7 +24,7 @@ _EXPORTS = {
     "nl2sql.common.logger": ("configure_logging",),
     "nl2sql.common.errors": ("ErrorSeverity", "ErrorCode", "PipelineError"),
     "nl2sql.common.cancellation": ("CancellationToken",),
-    "nl2sql.policies.models": ("UserContext",),
+    "nl2sql_sdk.policy": ("UserContext",),
     "nl2sql.registry": ("Registry",),
     # The config, and what building an engine from it reports.
     "nl2sql.config": ("Config", "load_config", "load_env_file", "ConfigError", "Datasource", "Limits", "LLM", "AgentLLM",
