@@ -4,7 +4,8 @@
 (as JSON), and from the run's trace when there is one. ``run_record`` adds the
 question, role, status, SQL, the datasources it ran on, where the answer came
 from (a verified query or generated SQL), the model per node and the engine
-version.
+version. ``rated_row`` is that record with its rating, as the state store
+keeps it (``StateStore.add_feedback``).
 
 Privacy: a record never holds result rows, the written answer, sample values,
 error messages or keys; only error *codes*. It holds only what the run showed
@@ -13,9 +14,13 @@ keeps no SQL.
 """
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Mapping, Optional
 
 from nl2sql.llm.providers import LLM_AGENTS
+
+RATINGS = ("up", "down")
+NOTE_MAX_CHARS = 280
 
 # The error codes that mean the engine refused the question, rather than failed.
 REFUSAL_CODES = ("SECURITY_VIOLATION", "QUESTION_NOT_ANSWERABLE")
@@ -96,4 +101,33 @@ def run_record(result: Mapping[str, Any], *, question: str, role: str,
         "models": models_by_node(result, llm_configs),
         "engine_version": engine_version,
         **signals,
+    }
+
+
+def rated_row(record: Mapping[str, Any], rating: str, note: Optional[str]) -> Dict[str, Any]:
+    """The feedback row the state store keeps for ``record`` rated ``rating``, its note cut to size.
+
+    Raises:
+        ValueError: ``rating`` is not ``"up"`` or ``"down"``.
+    """
+    if rating not in RATINGS:
+        raise ValueError(f"A rating is 'up' or 'down', not {rating!r}.")
+    return {
+        "trace_id": record["trace_id"],
+        "created_at": int(time.time()),
+        "rating": rating,
+        "note": (note or "").strip()[:NOTE_MAX_CHARS] or None,
+        "question": record.get("question") or "",
+        "role": record.get("role") or "",
+        "status": record.get("status") or "",
+        "sql": list(record.get("sql") or []),
+        "error_codes": list(record.get("error_codes") or []),
+        "retries": int(record.get("retries") or 0),
+        "validator_failures": int(record.get("validator_failures") or 0),
+        "plan_cache_hits": int(record.get("plan_cache_hits") or 0),
+        "sub_queries": int(record.get("sub_queries") or 0),
+        "models": dict(record.get("models") or {}),
+        "engine_version": record.get("engine_version") or "",
+        "datasource_ids": None if record.get("datasource_ids") is None else list(record["datasource_ids"]),
+        "source": record.get("source") or None,
     }

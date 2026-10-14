@@ -18,7 +18,7 @@ import pytest
 pytest.importorskip("fastapi")
 
 from nl2sql.cli.demo.llm_config import point_llm_config_at  # noqa: E402
-from nl2sql.schema import SqliteSchemaStore  # noqa: E402
+from nl2sql.storage.sqlite import SqliteState  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
 from .conftest import _base_env, run_cli  # noqa: E402
@@ -37,9 +37,10 @@ def test_after_cache_clear_the_playground_reports_a_planner_call(demo_project, t
     # copy), emptied of any plan another test cached in the shared project
     # before it was copied. The demo's own config leaves the plan cache on.
     store_path = project / ".nl2sql" / "state.db"
-    store = SqliteSchemaStore(path=store_path)
+    store = SqliteState(store_path)
+    store.migrate()
     try:
-        store.clear_plan_cache()
+        store.clear_plans()
     finally:
         store.close()
     server = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()

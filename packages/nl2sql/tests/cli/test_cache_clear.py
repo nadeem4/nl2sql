@@ -1,4 +1,4 @@
-"""``nl2sql cache clear``: empties the plan cache in the state store (``<storage.path>/state.db``), and nothing else."""
+"""``nl2sql cache clear``: empties the plan cache in the state store, and nothing else."""
 from __future__ import annotations
 
 import re
@@ -6,10 +6,11 @@ import re
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
+from nl2sql.feedback import rated_row
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.plan_cache import PlanCache
-from nl2sql.schema import SqliteSchemaStore
+from nl2sql.storage.sqlite import SqliteState
 
 runner = CliRunner()
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -27,12 +28,18 @@ def _sq(intent: str) -> SubQuery:
     return SubQuery(id="sq1", datasource_id="chinook", intent=intent, schema_version="v1")
 
 
-def test_cache_clear_removes_the_cached_plans_and_keeps_the_schema(project_stores, monkeypatch):
-    path = project_stores.state
-    store = SqliteSchemaStore(path=path)
+def _opened(path) -> SqliteState:
+    state = SqliteState(path)
+    state.migrate()
+    return state
+
+
+def test_cache_clear_removes_the_cached_plans_and_keeps_the_feedback(project_stores):
+    store = _opened(project_stores.state)
     cache = PlanCache(store)
     cache.put(_sq("How many customers are there?"), _plan())
     cache.put(_sq("How many albums are there?"), _plan())
+    store.add_feedback(rated_row({"trace_id": "t1"}, "up", None))
     store.close()
 
     result = runner.invoke(app, ["cache", "clear"])
@@ -40,22 +47,17 @@ def test_cache_clear_removes_the_cached_plans_and_keeps_the_schema(project_store
     out = ANSI.sub("", result.output)
     assert result.exit_code == 0, out
     assert "Cleared 2 cached plans" in out
-    reopened = SqliteSchemaStore(path=path)
+    reopened = _opened(project_stores.state)
     try:
         assert PlanCache(reopened).get(_sq("How many customers are there?")) is None
-        # The schema tables are untouched.
-        assert reopened.list_versions("chinook") == []
-        assert reopened._connection.execute("SELECT name FROM sqlite_master WHERE name='schema_snapshots'").fetchone()
+        assert len(reopened.list_feedback()) == 1
     finally:
         reopened.close()
 
 
-def test_cache_clear_without_a_store_file_creates_nothing(project_stores):
-    path = project_stores.state
-
+def test_cache_clear_on_a_new_project_clears_nothing(project_stores):
     result = runner.invoke(app, ["cache", "clear"])
 
     out = ANSI.sub("", result.output)
     assert result.exit_code == 0, out
-    assert "No plan cache" in out
-    assert not path.exists()
+    assert "Cleared 0 cached plans" in out

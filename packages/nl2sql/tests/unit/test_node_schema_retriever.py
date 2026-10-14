@@ -61,7 +61,7 @@ def _schema_store() -> SimpleNamespace:
     return SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot())
 
 
-def test_schema_retriever_falls_back_to_schema_store():
+def test_schema_retriever_falls_back_to_the_state_store():
     # Validates fallback logic because schema store is used without planning docs.
     # Arrange
     vector_store = SimpleNamespace(
@@ -70,7 +70,7 @@ def test_schema_retriever_falls_back_to_schema_store():
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store(), policies={"allow_all": True})
+    ctx = fake_runtime(vector_store=vector_store, state=_schema_store(), policies={"allow_all": True})
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -112,7 +112,7 @@ def test_schema_retriever_builds_tables_from_docs():
         retrieve_planning_context=lambda *_a, **_k: [doc_col, doc_rel],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store(), policies={"allow_all": True})
+    ctx = fake_runtime(vector_store=vector_store, state=_schema_store(), policies={"allow_all": True})
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -145,7 +145,7 @@ def test_schema_retriever_uses_column_fallback():
         retrieve_planning_context=lambda *_a, **_k: [doc_col],
         retrieve_column_candidates=lambda *_a, **_k: [doc_col],
     )
-    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store(), policies={"allow_all": True})
+    ctx = fake_runtime(vector_store=vector_store, state=_schema_store(), policies={"allow_all": True})
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -196,7 +196,7 @@ def retriever_with_snapshot():
             retrieve_column_candidates=MagicMock(return_value=[]),
         )
         schema_store = SimpleNamespace(get_snapshot=lambda _id, _version: snapshot)
-        ctx = fake_runtime(vector_store=vector_store, schema_store=schema_store, policies={"allow_all": True},
+        ctx = fake_runtime(vector_store=vector_store, state=schema_store, policies={"allow_all": True},
                            settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}})
         node = SchemaRetrieverNode(ctx)
         return node, vector_store, {ref.table_name for ref in refs}

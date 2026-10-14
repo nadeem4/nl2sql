@@ -11,7 +11,7 @@ import yaml
 from typer.testing import CliRunner
 
 from nl2sql.config import Curated
-from nl2sql.feedback import FeedbackStore
+from nl2sql.feedback import rated_row
 from nl2sql.feedback.proposals import build_proposals, render_proposals, write_proposals
 
 runner = CliRunner()
@@ -112,11 +112,13 @@ def store(tmp_path, monkeypatch):
     (tmp_path / "curated.yaml").write_text("datasources: {}\n", encoding="utf-8")
     make_config(tmp_path, curated={"file": "curated.yaml"})
     monkeypatch.setenv("NL2SQL_CONFIG", str(tmp_path / "nl2sql.yaml"))
+    from nl2sql.storage.sqlite import SqliteState
+
     path = tmp_path / ".nl2sql" / "state.db"
-    path.parent.mkdir(parents=True)
-    feedback = FeedbackStore(path)
-    feedback.save(_row(), rating="up", note=None)
-    feedback.save(_row("t2", "Which genre sells best?", source="verified"), rating="up", note=None)
+    feedback = SqliteState(path)
+    feedback.migrate()
+    feedback.add_feedback(rated_row(_row(), "up", None))
+    feedback.add_feedback(rated_row(_row("t2", "Which genre sells best?", source="verified"), "up", None))
     feedback.close()
     return path
 

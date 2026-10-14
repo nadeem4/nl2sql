@@ -53,8 +53,8 @@ class _Context:
     """
 
     def __init__(self, tmp_path, snapshot=None, llm_registry=None):
-        self.schema_store = _SchemaStore(snapshot)
-        self.test_index = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=self.schema_store)
+        self.state = _SchemaStore(snapshot)
+        self.test_index = TestIndex(tmp_path, FakeEmbeddings(size=8), state=self.state)
         for key, value in vars(self.test_index.ctx).items():
             setattr(self, key, value)
         if snapshot is not None:

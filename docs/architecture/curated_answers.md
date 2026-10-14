@@ -512,7 +512,7 @@ Every answer says where it came from:
 ## Feedback proposals
 
 A thumbs-up on a generated answer is already stored, one row per run, in the
-`feedback` table (`nl2sql/feedback/store.py`), with the question, role, status
+`feedback` table of the state store (`nl2sql/storage/sqlite.py`), with the question, role, status
 and SQL. That row is the proposal; nothing new is stored and nothing writes
 `curated.yaml`.
 

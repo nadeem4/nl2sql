@@ -3,7 +3,7 @@
 A hit replaces only the planner's LLM call. The validator, generator and
 executor still run on the cached plan, so the cache can never become a way
 around the policy. These tests pin the key, the normalisation, the storage in
-the schema store, and what the planner node and the subgraph wrapper do with it.
+the state store, and what the planner node and the subgraph wrapper do with it.
 """
 from __future__ import annotations
 
@@ -22,18 +22,22 @@ from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuer
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.plan_cache import PlanCache, normalize_question, plan_cache_for
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.schema import InMemorySchemaStore, SqliteSchemaStore
+from nl2sql.storage.sqlite import SqliteState
 from nl2sql.testing.runtime import fake_runtime
 
 
-@pytest.fixture(params=["sqlite", "memory"])
+def _opened(path) -> SqliteState:
+    """The built-in state store on ``path``, migrated."""
+    state = SqliteState(path)
+    state.migrate()
+    return state
+
+
+@pytest.fixture(params=["file", "memory"])
 def store(request, tmp_path):
-    if request.param == "sqlite":
-        s = SqliteSchemaStore(path=tmp_path / "schema_store.db")
-        yield s
-        s.close()
-    else:
-        yield InMemorySchemaStore()
+    s = _opened(tmp_path / "state.db" if request.param == "file" else ":memory:")
+    yield s
+    s.close()
 
 
 def _plan(reasoning="Count rows in Customer.") -> PlanModel:
@@ -158,8 +162,8 @@ def test_the_disable_setting_turns_off_reads_and_writes(store):
 def test_the_planner_and_the_wrapper_take_the_cache_setting_from_the_runtime(store):
     PlanCache(store).put(_sq(), _plan("cached"))
 
-    assert plan_cache_for(fake_runtime(schema_store=store)).get(_sq()).reasoning == "cached"
-    off = fake_runtime(schema_store=store, settings={"pipeline": {"plan_cache": False}})
+    assert plan_cache_for(fake_runtime(state=store)).get(_sq()).reasoning == "cached"
+    off = fake_runtime(state=store, settings={"pipeline": {"plan_cache": False}})
     assert plan_cache_for(off).get(_sq()) is None
 
 
@@ -168,9 +172,9 @@ def test_clear_removes_every_cached_plan(store):
     cache.put(_sq(), _plan())
     cache.put(_sq(intent="Other question", ds="sales"), _plan())
 
-    assert cache.clear() == 2
+    assert store.clear_plans() == 2
     assert cache.get(_sq()) is None
-    assert cache.clear() == 0
+    assert store.clear_plans() == 0
 
 
 def test_a_cache_without_a_store_is_a_no_op():
@@ -178,16 +182,15 @@ def test_a_cache_without_a_store_is_a_no_op():
 
     assert cache.put(_sq(), _plan()) is False
     assert cache.get(_sq()) is None
-    assert cache.clear() == 0
 
 
-def test_the_sqlite_cache_lives_in_the_schema_store_file_and_survives_a_reopen(tmp_path):
-    path = tmp_path / "schema_store.db"
-    first = SqliteSchemaStore(path=path)
+def test_the_sqlite_cache_lives_in_the_state_file_and_survives_a_reopen(tmp_path):
+    path = tmp_path / "state.db"
+    first = _opened(path)
     PlanCache(first).put(_sq(), _plan())
     first.close()
 
-    reopened = SqliteSchemaStore(path=path)
+    reopened = _opened(path)
     try:
         assert PlanCache(reopened).get(_sq()) == _plan()
     finally:
@@ -195,9 +198,9 @@ def test_the_sqlite_cache_lives_in_the_schema_store_file_and_survives_a_reopen(t
 
 
 def test_an_unreadable_cached_plan_is_a_miss(tmp_path):
-    store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
+    store = _opened(tmp_path / "state.db")
     try:
-        store.put_cached_plan(*PlanCache(store)._key(_sq()), "{not json")
+        store.put_plan(*PlanCache(store)._key(_sq()), "{not json")
         assert PlanCache(store).get(_sq()) is None
     finally:
         store.close()
@@ -216,10 +219,10 @@ def test_a_plan_cached_before_the_ordinal_fields_were_dropped_is_a_miss(tmp_path
         "select_items": [{"ordinal": 0, "alias": "n",
                           "expr": {"kind": "column", "alias": "t1", "column_name": "CustomerId"}}],
     })
-    store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
+    store = _opened(tmp_path / "state.db")
     try:
         cache = PlanCache(store)
-        store.put_cached_plan(*PlanCache(store)._key(_sq()), stale)
+        store.put_plan(*PlanCache(store)._key(_sq()), stale)
 
         assert cache.get(_sq()) is None
 
@@ -235,7 +238,7 @@ def test_a_plan_cached_before_the_ordinal_fields_were_dropped_is_a_miss(tmp_path
 def _planner(store):
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = fake_runtime(llm_registry=MagicMock(), schema_store=store)
+    ctx = fake_runtime(llm_registry=MagicMock(), state=store)
     ctx.llm_registry.get_llm.return_value = llm
     ctx.llm_registry.effective.return_value = None  # the plans below are cached without a planner model
     node = ASTPlannerNode(ctx)
@@ -287,7 +290,7 @@ def test_a_retry_asks_the_model_even_when_a_plan_is_cached(store):
     assert out["ast_planner_response"].plan_source == "llm"
 
 
-def test_a_planner_built_without_a_schema_store_still_plans():
+def test_a_planner_built_without_a_state_store_still_plans():
     node = _planner(None)
     out = node(SubgraphExecutionState(trace_id="t", sub_query=_sq()))
     assert out["ast_planner_response"].plan_source == "llm"
@@ -323,7 +326,7 @@ def _executed(artifact=None, errors=()):
 
 
 def _run_wrapped(store, returned, execute=True):
-    ctx = fake_runtime(schema_store=store)
+    ctx = fake_runtime(state=store)
     return wrap_subgraph(_Sub(returned), "sql_agent", ctx, execute=execute)(_wrapper_state())
 
 

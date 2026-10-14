@@ -69,7 +69,7 @@ def _node(preferred, vector_store=None, allowed=("*",), settings=None):
     ctx = fake_runtime(
         settings=settings,
         vector_store=vector_store if vector_store is not None else _live(),
-        schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
+        state=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
         policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": list(allowed)}}},
         ds_registry=_Registry({"ds1": preferred}),
     )
@@ -197,7 +197,7 @@ def test_retrieval_leaves_out_a_missed_preferred_table_beyond_the_margin(retriev
 def test_a_context_without_a_registry_still_retrieves():
     ctx = fake_runtime(
         vector_store=_live(),
-        schema_store=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
+        state=SimpleNamespace(get_snapshot=lambda _id, _version: _snapshot()),
         policies={"allow_all": True},
     )
 

@@ -45,7 +45,7 @@ class _Engine(NL2SQL):
         self._runtime.index = store.index
         self._runtime.namespace = store.namespace
         self._runtime.embedding_info = EmbeddingInfo("test", "test", 11)
-        self._runtime.schema_store = _Snapshots()
+        self._runtime.state = _Snapshots()
         self._runtime.ds_registry = _Registry()
         self._runtime.curated = None
 

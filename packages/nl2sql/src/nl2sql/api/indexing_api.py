@@ -72,7 +72,7 @@ class IndexAPI:
         ids = registry.list_ids()
         info = ctx.embedding_info
         health = index_health(
-            ctx.index, ctx.namespace, ctx.schema_store, ids,
+            ctx.index, ctx.namespace, ctx.state, ids,
             embedding_model=f"{info.provider}/{info.model}",
             curated_hashes=curated_hashes(getattr(ctx, "curated", None), ids),
             preferred_tables={ds: registry.get_preferred_tables(ds) for ds in ids},

@@ -11,7 +11,7 @@ import json
 import pytest
 import yaml
 
-from nl2sql.schema import SqliteSchemaStore
+from nl2sql.storage.sqlite import SqliteState
 
 from .conftest import _base_env, private_storage, run_cli
 from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS
@@ -25,8 +25,9 @@ TOP = "Who are the top customers by total spend?"
 def store(demo_project, tmp_path):
     """A private copy of the demo's index and state store (snapshots included, no cached plans)."""
     path = private_storage(demo_project, tmp_path / "store")
-    copy = SqliteSchemaStore(path=path / "state.db")
-    copy.clear_plan_cache()
+    copy = SqliteState(path / "state.db")
+    copy.migrate()
+    copy.clear_plans()
     copy.close()
     return path
 

@@ -8,7 +8,7 @@ from nl2sql.api.types import DatasourceInfo
 
 
 class StubDatasources(DatasourcesAPI):
-    """``engine.datasources`` listing ``ids`` as ready; ``schema`` reads the runtime's schema store."""
+    """``engine.datasources`` listing ``ids`` as ready; ``schema`` reads the runtime's state store."""
 
     def __init__(self, ctx: Any, ids: Union[Iterable[str], Callable[[], Iterable[str]]]):
         super().__init__(ctx)

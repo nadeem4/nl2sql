@@ -35,9 +35,12 @@ default. `settings.feedback.enabled: false` turns it off: the control then says 
 
 ## What is stored
 
-One row per run in a `feedback` table inside the SQLite schema store
-(`<storage.path>/state.db`, `nl2sql-demo/.nl2sql/state.db` in the demo), beside the schema
-snapshots and the plan cache. No new service or file.
+One row per run, kept by the engine's state store (`storage.state`) beside the
+schema snapshots and the plan cache. The built-in `sqlite` state store keeps it
+in a `feedback` table of `<storage.path>/state.db` (`nl2sql-demo/.nl2sql/state.db`
+in the demo). No new service or file. The engine builds each row
+(`nl2sql.feedback.rated_row`) and hands it to `StateStore.add_feedback`, so a
+plugin state store keeps the same row.
 
 | Column | Holds |
 | --- | --- |
@@ -54,8 +57,10 @@ snapshots and the plan cache. No new service or file.
 | `source` | Where the answer came from: `verified` (a verified query from [`curated.yaml`](../configuration/curated.md)) or `generated`. |
 
 `datasource_ids` and `source` were added after the table first shipped. A
-store from before them gains both columns, empty, the next time it is opened;
-the rows already in it keep their ratings and read the two as `null`.
+`state.db` from before them gains both columns, empty, through the state
+store's migrations when the engine next starts; the rows already in it keep
+their ratings and read the two as `null`. See
+[The state store → Migrations](../schema/store.md#migrations).
 
 **Privacy.** A row never holds result rows, the written answer, sample values,
 error messages or keys. It holds only what the run showed the role it ran as:

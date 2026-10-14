@@ -1,9 +1,9 @@
 """``engine.feedback``: answer ratings, the guardrail rates, and draft gold entries.
 
-The ratings live in the ``feedback`` table of the engine's state store,
-``<storage.path>/state.db``; the rates also read the run traces under
-``<storage.path>/traces``. ``nl2sql.feedback`` is imported inside each method,
-so answering a question never loads it.
+The ratings live in the engine's state store (``storage.state``,
+``<storage.path>/state.db`` by default); the rates also read the run traces
+under ``<storage.path>/traces``. ``nl2sql.feedback`` is imported inside each
+method, so answering a question never loads it.
 """
 
 from __future__ import annotations
@@ -19,11 +19,6 @@ class FeedbackAPI:
 
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
-
-    def _store(self):
-        from nl2sql.feedback import FeedbackStore
-
-        return FeedbackStore(self._ctx.stores.state)
 
     def record(self, result: Union[Mapping[str, Any], Any], *, question: str, role: str, rating: str,
                note: Optional[str] = None) -> Dict[str, Any]:
@@ -44,7 +39,7 @@ class FeedbackAPI:
         Raises:
             ValueError: ``rating`` is not ``"up"`` or ``"down"``, or the result has no ``trace_id``.
         """
-        from nl2sql.feedback import run_record, run_signals
+        from nl2sql.feedback import rated_row, run_record, run_signals
         from nl2sql.tracing.trace import engine_info
 
         body = result.model_dump(mode="json") if hasattr(result, "model_dump") else dict(result)
@@ -59,19 +54,11 @@ class FeedbackAPI:
             row.update(run_signals(trace.get("result") or {}, trace))
             if "SECURITY_VIOLATION" in row["error_codes"]:
                 row["sql"] = []
-        store = self._store()
-        try:
-            return store.save(row, rating=rating, note=note)
-        finally:
-            store.close()
+        return self._ctx.state.add_feedback(rated_row(row, rating, note))
 
     def list(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Every rating, newest first; at most ``limit`` of them."""
-        store = self._store()
-        try:
-            return store.list(limit=limit)
-        finally:
-            store.close()
+        return self._ctx.state.list_feedback(limit=limit)
 
     def stats(self, *, traces: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
         """Rates over recorded runs: the ratings plus the run traces in ``traces``.
@@ -111,11 +98,7 @@ class FeedbackAPI:
 
     def clear(self) -> int:
         """Delete every rating; returns how many. Schema snapshots and the plan cache stay."""
-        store = self._store()
-        try:
-            return store.clear()
-        finally:
-            store.close()
+        return self._ctx.state.clear_feedback()
 
     def _llm_configs(self) -> Dict[str, Any]:
         """Provider and model per agent, by the name each model step asks for."""

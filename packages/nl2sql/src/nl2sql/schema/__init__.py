@@ -1,4 +1,4 @@
-"""Core schema models and stores."""
+"""The schema models (from the SDK) and the structural fingerprint. Snapshots are kept by the state store."""
 
 from nl2sql_sdk.schema import (
     TableRef,
@@ -12,10 +12,7 @@ from nl2sql_sdk.schema import (
     SchemaMetadata,
     SchemaSnapshot,
 )
-from .protocol import SchemaStore
-from .in_memory_store import SchemaContractStore, SchemaMetadataStore, InMemorySchemaStore
-from .sqlite_store import SqliteSchemaStore
-from .store import build_schema_store
+from .fingerprint import generate_schema_fingerprint
 
 __all__ = [
     "TableRef",
@@ -28,10 +25,5 @@ __all__ = [
     "SchemaContract",
     "SchemaMetadata",
     "SchemaSnapshot",
-    "SchemaContractStore",
-    "SchemaMetadataStore",
-    "SchemaStore",
-    "InMemorySchemaStore",
-    "SqliteSchemaStore",
-    "build_schema_store",
+    "generate_schema_fingerprint",
 ]
