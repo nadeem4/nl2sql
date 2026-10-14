@@ -31,6 +31,7 @@ The section is flat: its keys are the top-level agent's.
 | `api_key` | none | Without it, the provider's standard variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`) is read. With it, a `${env:VAR}` or `${provider:key}` reference (or a literal, which is not recommended). The reference is resolved when the client is built, never at load. |
 | `base_url` | the provider's | An endpoint override. Required for `openai_compatible`; see [Any other OpenAI-style server](#any-other-openai-style-server-openai_compatible). |
 | `structured_output` | the provider's | `tool_calling`, `json_schema` or `json_mode`: how structured answers are asked for. See [Structured output](#structured-output). |
+| `parse_retries` | `1` | How many times a structured answer that does not parse is asked for again, with what was wrong. `0` asks once. See [Parse-and-retry](#parse-and-retry). |
 | `max_tokens` | the provider's | The most tokens one answer may use. Unset, Anthropic gets 16,000 and the other providers send none. |
 | `timeout_s` | the client library's | Seconds one request may take. |
 | `max_retries` | the client library's | Network and rate-limit retries, done by the client library. |
@@ -311,7 +312,7 @@ an agent. An agent not under `agents` runs on the top level:
 
 Any other key is an error with "did you mean". An agent takes every field it
 sets (`provider`, `model`, `temperature`, `api_key`, `base_url`,
-`structured_output`, `max_tokens`, `timeout_s`, `max_retries`, `headers`) and
+`structured_output`, `parse_retries`, `max_tokens`, `timeout_s`, `max_retries`, `headers`) and
 inherits the rest from the top level. Inheritance follows which fields were written, so
 `temperature: null` on an agent still means "send none". Each node can be on a
 different provider, and so a different wire type. For example, plan on Claude
@@ -438,6 +439,29 @@ Every node asks for a typed answer (the plan, the decomposition, the answer).
 Unset, an agent uses its provider's default (the table under
 [Providers](#providers-and-wire-types)). The method is never switched
 automatically: the agent's setting is what runs.
+
+### Parse-and-retry
+
+An answer that does not parse (the parser fails, it does not validate against
+the schema, or the model made no tool call) is asked for again, up to the
+agent's `parse_retries` times (default `1`). Each retry adds the model's answer
+and what was wrong with it to the messages:
+
+```text
+Your answer did not match the schema: `steps[0].op`: Field required. Answer again with only PlanModel.
+```
+
+If the last answer still does not parse, the node reports
+`MODEL_OUTPUT_INVALID`, whose message names the agent and suggests another
+`structured_output` or a stronger model; see
+[Error handling](../observability/error-handling.md#model-output-invalid).
+
+- Each retry is a model call of its own, so it is in the run's trace (one more
+  entry in the node's `llm_calls`) and in its token usage and cost.
+- A streamed answer (the answer synthesizer's, when the run streams) that does
+  not parse is retried without streaming.
+- `parse_retries` is separate from `max_retries`, which is the client
+  library's retry of network errors and rate limits.
 
 ## Timeouts, retries and headers
 

@@ -22,6 +22,7 @@ from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
 from nl2sql.config import Config, ConfigError
 from nl2sql.config.errors import Problem
+from nl2sql.config.models import PolicyCheckConfig
 from nl2sql.policies import PolicyEngine
 from nl2sql.registry import Registry, RegistryError
 
@@ -77,7 +78,7 @@ class Runtime:
         """Step 2b of loading without opening the stores: what ``nl2sql config check`` builds.
 
         Loads every name ``config`` uses through the registry and builds the
-        secret manager, the policy engine, the adapters (not connected), the
+        secret manager, the policy engine (with its policy check), the adapters (not connected), the
         LLM clients (no model call), the embedder and the four stores
         named in ``storage`` (they open nothing yet). Nothing is written
         under ``storage.path`` and no process global is touched. The result
@@ -145,12 +146,21 @@ class Runtime:
                 problem(f"curated.datasources.{issue.datasource_id}", str(issue))
 
         stores = self._resolve_stores(config, problem)
+        self.policy_check = None
+        if isinstance(config.policies.check, PolicyCheckConfig):
+            from nl2sql.policies.check import build_check
+
+            try:
+                self.policy_check = build_check(config.policies.check, registry=self.registry,
+                                                secrets=self.secret_manager)
+            except (RegistryError, ValueError) as e:
+                problem("policies.check", str(e))
         if problems:
             self.llm_registry.close()
             raise ConfigError(problems, source=source)
 
         self._config = config
-        self.policy_engine = PolicyEngine(config.policies, self.ds_registry)
+        self.policy_engine = PolicyEngine(config.policies, self.ds_registry, self.policy_check)
         self.index, self.state, self.traces, self.results = stores
         self.stores = StorePaths.under(config.storage.path)
         return self
@@ -372,7 +382,7 @@ class Runtime:
         run._lock = RLock()
         run._config = config
         run.curated = config.curated
-        run.policy_engine = PolicyEngine(config.policies, self.ds_registry)
+        run.policy_engine = PolicyEngine(config.policies, self.ds_registry, self.policy_check)
         run.llm_registry = self.llm_registry.derive(config.llm)
         return run
 

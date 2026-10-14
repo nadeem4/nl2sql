@@ -6,6 +6,9 @@ extension implements. It depends on pydantic and the standard library only.
 - Adapters: `nl2sql_sdk.protocols.DatasourceAdapterProtocol`, with
   `nl2sql_sdk.contracts.AdapterRequest` and `nl2sql_sdk.contracts.ResultFrame`
 - Secret providers: `nl2sql_sdk.secrets.SecretProvider`
+- Stores: the four protocols in `nl2sql_sdk.stores`
+- Policy checks: `nl2sql_sdk.policy.PolicyCheck`, with `UserContext` and
+  `Grant`
 
 Everything is also exported from `nl2sql_sdk` itself.
 
@@ -298,6 +301,27 @@ bucket: nl2sql-results}`.
     The engine moves onto these interfaces one slot at a time during 0.6
     (the index, then the state, then the traces and results). Until a slot's
     move lands, the engine refuses a plugin store in that slot.
+
+---
+
+## Interface: `PolicyCheck`
+
+A policy check asks an outside service what a caller may read. The policies
+config names one by `type` in its `check` block (see
+[A policy check](../configuration/policies.md#a-policy-check)). It lives in
+`nl2sql_sdk.policy`, with `UserContext` (who is asking) and `Grant` (`allow`
+and `deny` patterns, written like a role's).
+
+| Member | Description |
+| :--- | :--- |
+| `interface_version` | `1`. The engine accepts exactly the version it was built for. |
+| `config_model` | A pydantic model for the `check` block apart from `type`. Set `extra="forbid"`, so a misspelt key is an error. |
+| `from_config(cfg)` | Builds the check from a validated `config_model` instance, after the engine has resolved any `${provider:key}` in it. |
+| `grant(user, datasource_id)` | Returns the `Grant` for `user` in `datasource_id`. Asked once per caller and datasource per run. Intersected with the roles; any exception denies the datasource for the run. |
+
+Declare it in the `nl2sql.policy_checks` entry point group, or register it in
+code with `registry.add_policy_check(name, cls)` or
+`@registry.policy_check(name)`. No check is built in.
 
 ---
 

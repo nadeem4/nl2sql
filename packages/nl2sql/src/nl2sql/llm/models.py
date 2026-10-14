@@ -33,6 +33,7 @@ class AgentConfig(BaseModel):
     )
     structured_output: Optional[Literal["tool_calling", "json_schema", "json_mode"]] = Field(
         None, description="How structured answers are asked for. None: the provider's default.")
+    parse_retries: NonNegativeInt = Field(1, description="Retries of a malformed structured answer.")
     max_tokens: Optional[PositiveInt] = Field(None, description="None: the provider's default.")
     timeout_s: Optional[PositiveFloat] = Field(None, description="Per request. None: the client library's.")
     max_retries: Optional[NonNegativeInt] = Field(

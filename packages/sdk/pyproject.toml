@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nl2sql-sdk"
 version = "0.5.0" # x-release-please-version
-description = "Interfaces for nl2sql extensions: adapters and secret providers"
+description = "Interfaces for nl2sql extensions: adapters, secret providers, stores and policy checks"
 readme = "README.md"
 license = "MIT"
-keywords = ["nl2sql", "text-to-sql", "sql", "database", "adapter", "secrets", "sdk"]
+keywords = ["nl2sql", "text-to-sql", "sql", "database", "adapter", "secrets", "policy", "sdk"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

@@ -52,6 +52,8 @@ class ErrorCode(str, Enum):
     PROVIDER_TIMEOUT = "PROVIDER_TIMEOUT"
     PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
     PROVIDER_MODEL_UNAVAILABLE = "PROVIDER_MODEL_UNAVAILABLE"
+    # The model's structured answer still did not parse after the agent's parse_retries.
+    MODEL_OUTPUT_INVALID = "MODEL_OUTPUT_INVALID"
 
 
 
