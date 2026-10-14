@@ -5236,7 +5236,7 @@ Windows and Linux; it finds <code>gcloud</code> on <code>PATH</code>.</p>
 <tbody>
 <tr>
 <td><code>up</code></td>
-<td>Reads the three passwords from Secret Manager into memory, starts the VM, copies <code>testbed/</code> to it (never a local <code>testbed/.env</code>), runs <code>docker compose up -d --wait</code> there with <code>TESTBED_BIND=0.0.0.0</code>, then opens the three IAP tunnels in the background and waits until <code>localhost:15432</code>, <code>13306</code> and <code>11433</code> answer. The first session loads the samples, which takes several minutes.</td>
+<td>Reads the three passwords from Secret Manager into memory, starts the VM, copies <code>testbed/</code> to it (never a local <code>testbed/.env</code>), waits up to five minutes for Docker (the first boot installs it), runs <code>docker compose up -d --wait</code> there with <code>TESTBED_BIND=0.0.0.0</code>, then opens the three IAP tunnels in the background and waits until <code>localhost:15432</code>, <code>13306</code> and <code>11433</code> answer. The first session loads the samples, which takes several minutes.</td>
 </tr>
 <tr>
 <td><code>run -- &lt;cmd&gt;</code></td>
@@ -5259,6 +5259,18 @@ its own environment. They are never written to a file, put on a command line
 or printed, and the script never changes its own environment. The tunnels'
 process ids are kept in <code>nl2sql-testbed/tunnels.json</code> in the system's
 temporary folder, so a later <code>down</code> can close them.</p>
+<p>Every <code>gcloud compute ssh</code> and <code>scp</code> call passes <code>--strict-host-key-checking=no</code>
+and <code>--tunnel-through-iap</code>. Right after a start, the first connection can fail
+while the VM boots and its new SSH key propagates (plink says <code>Remote side
+unexpectedly closed network connection</code>); the copy and the Docker wait retry
+such a connection failure, and only that, up to five times about a minute in
+all, then give up, and <code>run</code> still stops the VM.</p>
+<p>On Windows, <code>gcloud</code> uses PuTTY's <code>plink</code> and <code>pscp</code>, and by default answers
+their host-key question by feeding them <code>y</code> on stdin instead of passing the
+caller's stdin on. The copy and the Docker wait keep that default, which
+stores the VM's host key in PuTTY's cache; the <code>docker compose</code> step sets
+<code>CLOUDSDK_SSH_PUTTY_FORCE_CONNECT=false</code> in <code>gcloud</code>'s environment only, so
+the passwords on its stdin reach the VM. OpenSSH ignores the setting.</p>
 <p>After <code>up</code> on its own, remember <code>down</code>: a running VM bills by the hour. If
 the script is killed hard or the VM is started by hand, the nightly stop job
 below stops it at 03:00 UTC.</p>
