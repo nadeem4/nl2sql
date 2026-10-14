@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4613,7 +4725,7 @@
 <td><code>config</code></td>
 <td><code>Dict[str, Any]</code></td>
 <td>yes</td>
-<td>Datasource config payload.</td>
+<td>One datasource, in the shape of a <code>datasources</code> entry of <code>nl2sql.yaml</code>: <code>id</code>, <code>type</code>, <code>connection</code>, and optionally <code>description</code>, <code>limits</code>, <code>preferred_tables</code>, <code>sample_questions</code>, <code>required</code>. See <a href="../../../configuration/datasources/">Datasources</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -4655,9 +4767,11 @@
 <p>Response model: <code>DatasourceResponse</code></p>
 <p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
 <p>Execution flow:
-- Delegates to <code>engine.add_datasource(...)</code>.</p>
+- Validates <code>config</code> as a <code>Datasource</code> and delegates to <code>engine.add_datasource(...)</code>:
+  the adapter is built (not connected) and the datasource joins <code>engine.config</code>.
+  Nothing is written to the config files and nothing is indexed.</p>
 <p>Errors:
-- No role -&gt; <code>HTTP 401</code>; a role not in <code>NL2SQL_API_ADMIN_ROLES</code> -&gt; <code>HTTP 403</code>.
+- No role -&gt; <code>HTTP 401</code>; a role not in <code>policies.admin_roles</code> -&gt; <code>HTTP 403</code>.
 - A failure to add -&gt; <code>HTTP 500</code> with a generic message. The exception, which can
   hold the connection string, is logged server-side and never returned.</p>
 <h3 id="get-apiv1datasource"><code>GET /api/v1/datasource</code></h3>

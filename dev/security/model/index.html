@@ -792,6 +792,30 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/secrets/">
 <span class="md-ellipsis">
     
@@ -809,6 +833,30 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -2044,12 +2092,12 @@ from depends on the client:</p>
 <li>Python API: <code>UserContext(roles=[...])</code>, whatever the calling code passes.</li>
 <li>REST API: the <code>get_user_context</code> dependency
   (<code>packages/api/src/nl2sql_api/auth.py</code>). It reads a header set by a trusted
-  proxy (<code>NL2SQL_API_ROLE_HEADER</code>) or a static role (<code>NL2SQL_API_ROLE</code>), and
+  proxy (<code>api.role_header</code> in <code>nl2sql.yaml</code>) or a static role (<code>api.role</code>), and
   answers <code>HTTP 401</code> when neither gives one. The body's <code>user_context</code> counts
-  only with the dev flag <code>NL2SQL_API_TRUST_BODY_ROLE=true</code>, which logs a
+  only with the dev flag <code>api.trust_body_role: true</code>, which logs a
   warning at startup. See <a href="../../api/rest/#caller-role">Caller role</a>.
   The routes that change datasources, LLMs or the index also need one of the
-  roles in <code>NL2SQL_API_ADMIN_ROLES</code> (default <code>admin</code>), else <code>HTTP 403</code>; with no
+  roles in <code>policies.admin_roles</code> (default <code>[admin]</code>), else <code>HTTP 403</code>; with no
   role source configured they answer loopback clients only. See
   <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
 </ul>
@@ -2090,10 +2138,10 @@ refuses the plan before any SQL exists, and the run ends there.</p>
   <code>details</code> (<code>datasource_id</code>, <code>table</code>, <code>roles</code>), which the run trace keeps and
   the <code>QueryResult</code> error summary does not carry. The validator's <code>policy</code> check
   is still present with <code>passed: false</code>, so a UI can show the gate firing.</li>
-<li><strong>Naming tables is an opt-in.</strong> Set <code>RBAC_REFUSAL_NAMES_TABLES=true</code> to put
-  the role and table in the user-facing message ("Role 'viewer' denied access
-  to 'chinook.Customer'. ..."). The generated demo's <code>.env.demo</code> sets it,
-  because showing the refusal is the demo's point.</li>
+<li><strong>Naming tables is an opt-in.</strong> Set <code>policies.refusal_names_tables: true</code> to
+  put the role and table in the user-facing message ("Role 'viewer' denied
+  access to 'chinook.Customer'. ..."). The demo's config (<code>nl2sql init --demo</code>)
+  sets it, because showing the refusal is the demo's point.</li>
 <li><strong>The decision is deterministic code.</strong> Only the validator decides, from the
   policy and the plan's table list. Nothing the model writes (its reasoning, a
   claim that the role is allowed) is read by the policy check, so a crafted
@@ -2106,7 +2154,7 @@ rows, and the playground serves any trace by id with no login, so restricting a
 trace to the user who produced it is left to a multi-user deployment.</p>
 <h2 id="security-controls">Security controls</h2>
 <ul>
-<li><strong>RBAC policies</strong> loaded from <code>configs/policies.json</code> and evaluated by <code>RBAC</code>.
+<li><strong>RBAC policies</strong>: the <code>policies</code> section of <code>nl2sql.yaml</code>, evaluated by <code>RBAC</code>.
   A policy is a per-role allowlist of datasources and of tables
   (<code>datasource.schema.table</code>, with schema and datasource wildcards) — nothing
   finer. There is no column masking and no row-level security.</li>

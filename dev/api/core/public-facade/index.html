@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4683,8 +4795,8 @@ references only; <code>add_datasource</code> is the one call that changes it.</p
 <code>settings</code>, and building an engine copies its config into it. Two engines
 in one process therefore share those values until the last migration pull
 request (configuration v2, section 8). The CLI, <code>nl2sql-api</code> and the
-playground still start from the 0.4 files through a private constructor
-until they move onto <code>nl2sql.yaml</code>.</p>
+playground build their engine from <code>nl2sql.yaml</code> and call <code>check()</code> at
+startup.</p>
 </div>
 <h2 id="lifecycle">Lifecycle</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
@@ -4787,7 +4899,7 @@ to that.</p>
 <tr>
 <td><code>reload_llm_config(config_path)</code></td>
 <td><code>None</code></td>
-<td>Replaces every configured LLM with the file's, as one step: agents the file no longer names fall back to <code>default</code>. An invalid file leaves the current configuration in place.</td>
+<td>Replaces every configured LLM with the <code>llm</code> section of the <code>nl2sql.yaml</code> at <code>config_path</code>, as one step: agents the section no longer names fall back to the top level. An invalid file leaves the current configuration in place.</td>
 </tr>
 </tbody>
 </table>

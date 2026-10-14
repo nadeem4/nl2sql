@@ -792,6 +792,30 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/secrets/">
 <span class="md-ellipsis">
     
@@ -809,6 +833,30 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -2204,7 +2252,7 @@
 databases</strong>, where the server holds no API key and every visitor brings their
 own.</p>
 <p>It is a third state, not a loosened <code>--allow-settings</code>. Locally, <code>nl2sql demo</code>
-saves your key to the demo project's <code>.env.demo</code> and spends it on your
+saves your key to the demo project's <code>.env</code> and spends it on your
 questions; that is right on your own machine and wrong on a shared address.
 Hosted mode removes the key from the server entirely instead of relaxing the
 gate that protects it.</p>
@@ -2219,17 +2267,17 @@ gate that protects it.</p>
 <tbody>
 <tr>
 <td>the API keys</td>
-<td>saved to <code>.env.demo</code>, used by the process</td>
+<td>saved to the project's <code>.env</code>, used by the process</td>
 <td>one per provider, held by the browser tab, sent per request, used in memory, dropped</td>
 </tr>
 <tr>
 <td>a model per step</td>
-<td>written to <code>configs/llm.demo.yaml</code></td>
+<td>written to the project's <code>llm.yaml</code></td>
 <td>chosen in the browser tab, sent per request, saved nowhere</td>
 </tr>
 <tr>
 <td>Settings</td>
-<td>writes <code>.env.demo</code> and <code>configs/llm.demo.yaml</code></td>
+<td>writes <code>.env</code> and <code>llm.yaml</code></td>
 <td>writes nothing; the page keeps the keys and the choices</td>
 </tr>
 <tr>
@@ -2274,10 +2322,10 @@ gate that protects it.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>nl2sql<span class="w"> </span>demo<span class="w"> </span>--hosted<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">7860</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>nl2sql<span class="w"> </span>demo<span class="w"> </span>--hosted<span class="w"> </span>--host<span class="w"> </span><span class="m">0</span>.0.0.0<span class="w"> </span>--port<span class="w"> </span><span class="m">7860</span><span class="w"> </span>--questions-per-minute<span class="w"> </span><span class="m">6</span><span class="w"> </span>--questions-per-session<span class="w"> </span><span class="m">30</span>
 </code></pre></div>
-<p><code>NL2SQL_DEMO_HOSTED=1</code> does the same thing without a command line, which is how
-a container turns it on.</p>
+<p>There is no environment variable for it: hosted mode and its limits are flags
+on the command, and the container's <code>CMD</code> passes them.</p>
 <h2 id="recorded-answers-without-a-key">Recorded answers without a key</h2>
 <p>A visitor does not need a key to see the demo work. The guided questions are
 answered from <strong>recordings of real runs</strong>: every model step's actual reply to
@@ -2314,7 +2362,7 @@ that model on each model step, tagged <strong>recorded</strong>, until the visit
 key; then it shows the models their run will use, as before. Local replay mode
 (<code>nl2sql demo</code> with no key) does the same.</p>
 <p><strong>Verified answers replay too.</strong> The image's demo project has the six
-verified queries of <code>configs/curated.demo.yaml</code> indexed (see
+verified queries of its <code>curated.yaml</code> indexed (see
 <a href="../../configuration/curated/#in-the-demo">Curated answers</a>), so every question
 first asks the curated matcher's model call, <code>VerifiedQueryChoice</code>. The shipped
 recordings hold that call for every guided question, so a guided question a
@@ -2443,9 +2491,9 @@ a single key has always worked.</p>
 <li>It does not reach a trace. Run traces are written as usual (that is what the
   playground's <strong>Debug</strong> drill-down reads), and the trace redactor is told about
   the request's key along with every other credential, so it is masked if it ever
-  reaches a prompt or an error. The demo project ships <code>TRACE_MODE=always</code>, so
-  every question leaves a file on the container's own disk; <code>TRACE_MODE=on_failure</code>
-  keeps only the runs that went wrong.</li>
+  reaches a prompt or an error. The demo project's <code>settings.yaml</code> sets
+  <code>traces: { mode: always }</code>, so every question leaves a file on the
+  container's own disk; <code>mode: on_failure</code> keeps only the runs that went wrong.</li>
 <li>It does not reach the log. Nothing logs the header, and errors about a key
   report its type, never its value.</li>
 <li>It does not reach your data. The hosted demo answers only from the three
@@ -2464,7 +2512,7 @@ no storage.</p>
 <tr>
 <th>Limit</th>
 <th>Default</th>
-<th>Environment variable</th>
+<th>Set by</th>
 <th>Keyed by</th>
 </tr>
 </thead>
@@ -2472,25 +2520,25 @@ no storage.</p>
 <tr>
 <td>Questions per minute</td>
 <td>6</td>
-<td><code>NL2SQL_DEMO_QUESTIONS_PER_MINUTE</code></td>
+<td><code>--questions-per-minute</code></td>
 <td>client address (a token bucket)</td>
 </tr>
 <tr>
 <td>Questions per session</td>
 <td>30</td>
-<td><code>NL2SQL_DEMO_QUESTIONS_PER_SESSION</code></td>
+<td><code>--questions-per-session</code></td>
 <td>a random session cookie</td>
 </tr>
 <tr>
 <td>Query timeout</td>
 <td>300s</td>
-<td><code>GLOBAL_TIMEOUT_SEC</code></td>
+<td><code>settings.pipeline.timeout_s</code> in the demo's <code>settings.yaml</code></td>
 <td>the run</td>
 </tr>
 <tr>
 <td>Rows returned</td>
 <td>10,000</td>
-<td>the demo datasources' <code>row_limit</code> option, bounded by <code>RESULT_ROW_LIMIT</code></td>
+<td>the demo datasources' <code>limits.row_limit</code>, bounded by <code>settings.results.row_limit</code></td>
 <td>the query</td>
 </tr>
 </tbody>
@@ -2541,11 +2589,13 @@ that is always <strong>a released version from PyPI</strong>,
 release pushes. The checked-in default is a GitHub archive of the tip of
 <code>main</code>, which is only what a local <code>docker build</code> gets; pass
 <code>--build-arg NL2SQL_SPEC="nl2sql-engine[demo]==X.Y.Z"</code> to build a release
-locally. Then it runs <code>nl2sql setup --demo</code> <strong>at build time</strong>. That bakes three
+locally. Then it runs <code>nl2sql init --demo /home/demo/demo</code> and <code>nl2sql index</code>
+<strong>at build time</strong>, with <code>NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml</code> set in the
+image so every command and the server read that config. That bakes three
 things into the image so the container reaches nothing but the model at run
 time and the first question is answered at once:</p>
 <ul>
-<li>the three sample databases and their configs,</li>
+<li>the three sample databases and their config,</li>
 <li>their vector index, built with the local embedder,</li>
 <li>the local embedding model itself, roughly 79 MB of ONNX <code>all-MiniLM-L6-v2</code>
   that chromadb would otherwise download on the first question. The 83 MB
@@ -2557,8 +2607,9 @@ default, which is what a Space routes to), and carries a healthcheck that polls
 <code>/api/health</code>. That route reads nothing but process state and answers
 <code>{"status": "ok", "version": "X.Y.Z"}</code>, the installed <code>nl2sql-engine</code>
 version, in every mode; the release pipeline polls it on the live Space to
-know the new version is the one being served. <code>NL2SQL_DEMO_HOSTED=1</code> is set in
-the image, so hosted mode holds even if the command is overridden.</p>
+know the new version is the one being served. Its <code>CMD</code> runs
+<code>nl2sql demo --hosted --questions-per-minute 6 --questions-per-session 30</code>;
+a public demo must never be started without <code>--hosted</code>.</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>deploy/huggingface
 <a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>nl2sql-demo<span class="w"> </span>.
 <a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">7860</span>:7860<span class="w"> </span>nl2sql-demo

@@ -792,6 +792,30 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/secrets/">
 <span class="md-ellipsis">
     
@@ -809,6 +833,30 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -2080,8 +2128,8 @@ markers. A test may carry both.</p>
 <tbody>
 <tr>
 <td><code>integration</code></td>
-<td>Needs external resources: the demo project's SQLite databases - vendored Chinook and the generated <code>support</code> and <code>webanalytics</code> - or the downloaded ONNX embedding model.</td>
-<td><code>nl2sql setup --demo</code></td>
+<td>Needs external resources: the demo's SQLite databases - vendored Chinook and the generated <code>support</code> and <code>webanalytics</code>, read from the installed package (<code>nl2sql.testing.config.make_demo_config</code>) - or the downloaded ONNX embedding model.</td>
+<td>The package; <code>tests/e2e</code> writes its own project with <code>nl2sql init --demo</code></td>
 </tr>
 <tr>
 <td><code>llm</code></td>
@@ -2104,8 +2152,9 @@ data run key-free.</p>
 <li><strong><code>test</code></strong> runs <code>pytest -m "not integration"</code> across Python 3.12 and 3.13.
   This is the fast job and must stay fast.</li>
 <li><strong><code>integration</code></strong> runs <code>pytest -m "integration and not llm"</code> on one Python
-  version, after generating the demo with <code>nl2sql setup --demo</code> and with
-  <code>EMBEDDING_PROVIDER=local</code>. The ONNX model is cached across runs. That
+  version, after writing and indexing a demo project (<code>nl2sql init --demo
+  demo-ci</code> and <code>nl2sql --config demo-ci/nl2sql.yaml index</code>), key-free with the
+  local embedder. The ONNX model is cached across runs. That
   subset covers schema indexing, datasource resolution, schema retrieval,
   aggregation and the local embedder against the real Chinook database; run
   it with <code>--collect-only -q</code> for the current list.</li>
@@ -2148,8 +2197,7 @@ data run key-free.</p>
   as <code>--url</code> (see
   <a href="../../development/releasing/">Releasing</a>).</p>
 <p>Nothing selects <code>llm</code>. Those tests are run by hand with a key:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo
-<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="nv">EMBEDDING_PROVIDER</span><span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>integration
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="nv">OPENAI_API_KEY</span><span class="o">=</span>sk-...<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>integration
 </code></pre></div>
 <p>Collection is not enough to keep these honest. Every test in the directory
 imports cleanly even when it calls a method that no longer exists, so rot shows

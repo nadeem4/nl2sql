@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4635,32 +4747,30 @@ one is still set from by the CLI and the playground is in brackets.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>settings.traces.mode</code> (<code>TRACE_MODE</code>)</td>
+<td><code>settings.traces.mode</code></td>
 <td><code>on_failure</code></td>
 <td><code>off</code>, <code>on_failure</code> or <code>always</code>.</td>
 </tr>
 <tr>
-<td><code>settings.traces.sample_rows</code> (<code>TRACE_SAMPLE_ROWS</code>)</td>
+<td><code>settings.traces.sample_rows</code></td>
 <td><code>50</code></td>
 <td>Result rows kept in the trace.</td>
 </tr>
 <tr>
-<td><code>settings.traces.max_field_chars</code> (<code>TRACE_MAX_FIELD_CHARS</code>)</td>
+<td><code>settings.traces.max_field_chars</code></td>
 <td><code>20000</code></td>
 <td>Longest string kept in a node's recorded inputs and outputs.</td>
 </tr>
 </tbody>
 </table>
-<p>Traces go to the engine's trace folder, <code>traces/</code> under <code>storage.path</code>
-(<code>TRACE_DIR</code> for the CLI and the playground, default <code>traces</code> relative to the
-working directory). Add it to <code>.gitignore</code> (this repository does).</p>
+<p>Traces are written to <code>&lt;storage.path&gt;/traces/</code> (see
+<a href="../../configuration/storage/">Storage</a>); <code>nl2sql init</code> puts <code>storage.path</code> in
+<code>.gitignore</code>.</p>
 <p><code>on_failure</code> writes a trace when the run returned errors, needed a retry in any
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
 A run that recovered on retry therefore still leaves a trace.</p>
-<p><code>nl2sql demo</code> writes <code>TRACE_MODE=always</code> into the demo's generated <code>.env.demo</code>,
-so every playground question is traced. A demo project generated before this
-setting existed does not have the line; add <code>TRACE_MODE=always</code> to its
-<code>.env.demo</code>, or regenerate it.</p>
+<p>The demo's config (<code>nl2sql init --demo</code>) sets <code>settings.traces.mode: always</code>
+in its <code>settings.yaml</code>, so every playground question is traced.</p>
 <p>The trace is recorded by a callback that <code>run_with_graph</code> attaches to every
 run, so the CLI, the Python API, the REST API and the playground all produce it.
 Writing a trace never fails a run; a write error is logged as a warning.</p>
@@ -4827,14 +4937,14 @@ prompts, schema and a sample of result rows.</p>
 <h3 id="capping">Capping</h3>
 <p>Node inputs and outputs, and the result, are capped so a trace stays readable:
 result rows (<code>rows</code>, and the aggregator's <code>terminal_results</code>) keep
-<code>settings.traces.sample_rows</code> rows, other lists keep 200 items, and strings
-keep <code>settings.traces.max_field_chars</code> characters. Every cut leaves a <code>[truncated]</code> marker
+<code>settings.traces.sample_rows</code> rows, other lists keep 200 items, and strings keep
+<code>settings.traces.max_field_chars</code> characters. Every cut leaves a <code>[truncated]</code> marker
 saying how much was dropped. <strong>LLM messages and raw responses are never cut</strong>,
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.</p>
 <h2 id="reading-a-trace-nl2sql-trace-show">Reading a trace: <code>nl2sql trace show</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in TRACE_DIR</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in &lt;storage.path&gt;/traces</span>
 </code></pre></div>
 <p>It prints the question, then one row per node execution (nested SQL agent
 nodes indented) with sub-query, attempt, duration, tokens and status, then
@@ -4842,7 +4952,7 @@ each error or warning, and marks the first failing node with <code>&gt;</code>. 
 failing node but a retry marks the first warning instead, since that is what
 set the retry off.</p>
 <h2 id="replaying-a-trace-nl2sql-trace-replay">Replaying a trace: <code>nl2sql trace replay</code></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>trace<span class="w"> </span>replay<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql-demo/nl2sql.yaml<span class="w"> </span>trace<span class="w"> </span>replay<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665
 </code></pre></div>
 <p>Replay runs the real pipeline again for the recorded question, roles and
 datasource, but every LLM call is answered from the trace. The engine's chat
@@ -4888,7 +4998,7 @@ served. It then compares the replayed <code>QueryResult</code> with the recorded
 <li>After a <strong>prompt change</strong> the recorded response is stale. Replay reports the
   node where the prompt diverged; one real run is needed to record a new trace.</li>
 <li>The datasource must be reachable from where you replay, with the same
-  configuration (run it from the same project and <code>--env</code>). Replay says so and
+  configuration (the same <code>--config</code>). Replay says so and
   stops if it is not. Queries run again, so a database whose data changed
   gives a different result, and replay reports the difference.</li>
 <li>The datasource resolver and schema retriever still run their vector search,
@@ -4911,11 +5021,11 @@ naming the entries MMR passed over because they repeat an earlier pick. The <str
 runs the same search for any text (see the
 <a href="../../getting_started/demo/#the-retrieval-inspector">demo guide</a>). The page
 fetches the file from <code>GET /api/trace/{trace_id}</code>, which serves only files
-directly inside <code>TRACE_DIR</code> and rejects any id that is not a plain token, so
+directly inside the traces folder and rejects any id that is not a plain token, so
 <code>../</code> or an absolute path never reaches the filesystem.</p>
 <p>Below the run, <strong>Was this answer right?</strong> records a rating keyed by the same
 trace id; <code>nl2sql feedback stats</code> reads the ratings together with the traces in
-<code>TRACE_DIR</code>. See <a href="../feedback/">Feedback and Signals</a>.</p>
+<code>&lt;storage.path&gt;/traces</code>. See <a href="../feedback/">Feedback and Signals</a>.</p>
 
 
 

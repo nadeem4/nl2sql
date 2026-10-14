@@ -1622,10 +1622,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-the-api" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run the API
+        Configuration
       
     </span>
   </a>
@@ -1633,10 +1633,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
+  <a href="#run-the-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration
+        Run the API
       
     </span>
   </a>
@@ -1899,6 +1899,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1935,6 +1991,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4450,10 +4562,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-the-api" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run the API
+        Configuration
       
     </span>
   </a>
@@ -4461,10 +4573,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
+  <a href="#run-the-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration
+        Run the API
       
     </span>
   </a>
@@ -4519,32 +4631,44 @@ needs - it drops <code>.git</code>, virtualenvs, <code>docs/</code>, <code>site/
 the <code>nl2sql-engine</code> distribution; an extra only adds the driver it needs, so add another
 extra to the <code>pip install</code> line in <code>packages/api/Dockerfile</code> to include one -
 for example <code>"./packages/nl2sql[postgres,mysql,mssql]"</code>.</p>
-<h2 id="run-the-api">Run the API</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
+<h2 id="configuration">Configuration</h2>
+<p>The image sets <code>NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml</code>. Mount a config folder
+there: <code>nl2sql.yaml</code>, the files it includes, and optionally a <code>.env</code> next to
+it, which the API loads at startup without overriding variables already set.
+Write one with <code>nl2sql init</code> (see
+<a href="../#start-a-config-with-nl2sql-init">Start a config</a>).</p>
+<p>Keep the index, state, traces and results on a volume: write
+<code>storage.path</code> from an environment variable, and mount the volume there.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># storage.yaml</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
 </code></pre></div>
-<p>To set environment selection:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-e<span class="w"> </span><span class="nv">ENV</span><span class="o">=</span>demo<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_API_ROLE</span><span class="o">=</span>admin<span class="w"> </span>nl2sql-api
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># api.yaml (nl2sql.yaml has  api: { file: api.yaml })</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin</span><span class="w">             </span><span class="c1"># one static role for every request</span>
 </code></pre></div>
-<p><code>NL2SQL_API_ROLE</code> pins the RBAC role for every request; without a role setting
-the query route answers HTTP 401. See <a href="../../api/rest/#caller-role">Caller role</a>.</p>
+<p><code>api.role</code> pins the RBAC role for every request; without a role source the
+query route answers HTTP 401. See <a href="../../api/rest/#caller-role">Caller role</a>
+and <a href="../../configuration/api/">API settings</a>.</p>
 <p>The routes that register datasources or LLMs and build or clear the index need a
-role listed in <code>NL2SQL_API_ADMIN_ROLES</code> (default <code>admin</code>), so <code>NL2SQL_API_ROLE=admin</code>
+role listed in <code>policies.admin_roles</code> (default <code>[admin]</code>), so <code>role: admin</code>
 above allows them. Without any role setting they answer loopback clients only,
 and a request through a published Docker port does not come from loopback: it
 gets HTTP 403. See <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
-<h2 id="configuration">Configuration</h2>
-<p>Mount or bake your config files into the container:</p>
-<ul>
-<li><code>configs/datasources.yaml</code></li>
-<li><code>configs/llm.yaml</code></li>
-<li><code>configs/policies.json</code></li>
-<li><code>configs/secrets.yaml</code> (optional)</li>
-</ul>
-<p>See <code>configuration/system.md</code> for environment variables and defaults.</p>
+<h2 id="run-the-api">Run the API</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/my-project:/etc/nl2sql:ro"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-v<span class="w"> </span>nl2sql-data:/data<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_DATA_DIR</span><span class="o">=</span>/data<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>nl2sql-api
+</code></pre></div>
+<p>Provider keys come from the environment (<code>-e OPENAI_API_KEY=...</code>) or from the
+mounted <code>.env</code>. Before it serves, the API calls <code>engine.check()</code>: a datasource
+with <code>required: true</code> that cannot connect stops the container, and any other
+that fails is logged and left out. Build the index once with
+<code>POST /api/v1/index-all</code>, or with <code>nl2sql --config my-project/nl2sql.yaml index</code>
+against the same storage.</p>
 <h2 id="api-usage">API usage</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"natural_language":"Top 5 customers by revenue last quarter?"}'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"natural_language":"Top 5 customers by revenue last quarter?"}'</span>
 </code></pre></div>
 
 

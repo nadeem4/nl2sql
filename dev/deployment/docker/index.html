@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -2915,6 +3027,17 @@
     <span class="md-ellipsis">
       
         Persistence mounts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup
       
     </span>
   </a>
@@ -4450,6 +4573,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Startup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#api-roles" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4506,33 +4640,55 @@ visitor brings their own API key, see <a href="../hosted-demo/">Hosted demo</a>.
 <h2 id="container-requirements">Container requirements</h2>
 <ul>
 <li>Install <code>nl2sql-engine</code> and add adapters via extras (e.g. <code>nl2sql-engine[postgres]</code>).</li>
-<li>Provide configuration files under <code>configs/</code> (or configure paths via env vars).</li>
-<li>Set required environment variables (LLM keys, config paths, storage paths).</li>
+<li>Provide the config: <code>nl2sql.yaml</code> and the files it includes, at the path
+  <code>NL2SQL_CONFIG</code> names. <code>packages/api/Dockerfile</code> sets
+  <code>NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml</code>, so mount a config folder there.</li>
+<li>Provide the provider keys and any variable the config reads as <code>${env:VAR}</code>,
+  in the environment or in a <code>.env</code> next to <code>nl2sql.yaml</code> (loaded at startup,
+  never overriding a variable already set).</li>
 </ul>
 <h2 id="persistence-mounts">Persistence mounts</h2>
-<p>If using persistent stores, mount these paths:</p>
-<ul>
-<li><code>VECTOR_STORE</code> for the Chroma vector store.</li>
-<li><code>SCHEMA_STORE_PATH</code> for the SQLite schema store.</li>
-<li><code>RESULT_ARTIFACT_BASE_URI</code> for artifact storage (local backend).</li>
-</ul>
+<p>Everything the engine writes lives under <code>storage.path</code>: the vector index
+(<code>index/</code>), the state store (<code>state.db</code>: schema snapshots, the plan cache and
+feedback), run traces (<code>traces/</code>) and result files (<code>results/</code>). Mount one
+volume and point <code>storage.path</code> at it, typically from the environment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># storage.yaml</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/config:/etc/nl2sql:ro"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-v<span class="w"> </span>nl2sql-data:/data<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_DATA_DIR</span><span class="o">=</span>/data<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>-e<span class="w"> </span>OPENAI_API_KEY<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>nl2sql-api
+</code></pre></div>
+<p>See <a href="../../configuration/storage/">Storage</a>.</p>
+<h2 id="startup">Startup</h2>
+<p>The API builds the engine from the config and calls <code>engine.check()</code> before it
+accepts a request. A datasource with <code>required: true</code> that cannot connect stops
+the container (<code>EngineNotReady</code> in the log); any other one that fails is logged
+and left out of routing. Mark the datasources the service cannot run without
+<code>required: true</code>, so the orchestrator restarts a container that started broken.</p>
 <h2 id="api-roles">API roles</h2>
-<p><code>nl2sql-api</code> does not authenticate callers. Set where the RBAC role comes from
-(<code>NL2SQL_API_ROLE_HEADER</code> from an authenticating proxy, or a static
-<code>NL2SQL_API_ROLE</code>) and which roles may change datasources, LLMs and the index
-(<code>NL2SQL_API_ADMIN_ROLES</code>, default <code>admin</code>). With no role setting, queries answer
-HTTP 401 and the admin routes answer HTTP 403, because a request through a
-published port does not come from loopback. See
+<p><code>nl2sql-api</code> does not authenticate callers. Its <code>api</code> section says where the
+RBAC role comes from (<code>api.role_header</code>, a header an authenticating proxy sets,
+or a static <code>api.role</code>), and <code>policies.admin_roles</code> (default <code>[admin]</code>) says
+which roles may change datasources, LLMs and the index. With no role source,
+queries answer HTTP 401 and the admin routes answer HTTP 403, because a request
+through a published port does not come from loopback. See
+<a href="../../configuration/api/">API settings</a>,
 <a href="../../api/rest/#caller-role">Caller role</a> and
 <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
 <h2 id="notes">Notes</h2>
 <ul>
-<li>Schema indexing is not automatic; you must run indexing in your operational flow.
-  Through the API, <code>POST /api/v1/index-all</code> needs an admin role.</li>
-<li>Observability exporters require network access and corresponding env vars.</li>
+<li>Schema indexing is not automatic; you must run indexing in your operational
+  flow: <code>nl2sql --config /etc/nl2sql/nl2sql.yaml index</code> against the same
+  storage, or <code>POST /api/v1/index-all</code> (admin role).</li>
+<li>Observability exporters require network access; set
+  <code>settings.observability</code> in the config.</li>
 </ul>
 <h2 id="reference-configuration">Reference configuration</h2>
-<p>See <code>configuration/system.md</code> for settings and defaults.</p>
+<p>See <a href="../../configuration/system/">Configuration</a> for the whole config and the
+environment variables it reads.</p>
 
 
 

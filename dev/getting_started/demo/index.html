@@ -2070,6 +2070,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -2106,6 +2162,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4861,12 +4973,14 @@ The tables, columns and row counts are in
 <ol>
 <li><strong>No questions at the terminal.</strong> The command does not prompt. It looks for
    a model key -- <code>--api-key</code>, then <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or
-   <code>ANTHROPIC_API_KEY</code>, then a key saved in <code>.env.demo</code>, then an Ollama daemon
+   <code>ANTHROPIC_API_KEY</code>, then a key saved in the project's <code>.env</code>, then an Ollama daemon
    on <code>localhost:11434</code> -- and says which mode it chose: <strong>Live mode</strong> with
    the provider, or <strong>Replay mode</strong> when it finds none.</li>
-<li><strong>A project folder and an index.</strong> It writes <code>./nl2sql-demo</code> (<code>--dir</code>
-   changes it), copies in the three databases above and indexes their schemas
-   on your machine. The first run downloads a ~79 MB embedding model; indexing
+<li><strong>A project folder and an index.</strong> The first time, it writes
+   <code>./nl2sql-demo</code> (<code>--dir</code> changes it) with <code>nl2sql init --demo</code>, which copies
+   in the three databases above; every start then builds the engine, calls
+   <code>engine.check()</code>, and indexes the schemas on your machine when the index is
+   missing, empty or out of date. The first run downloads a ~79 MB embedding model; indexing
    needs no key.</li>
 <li><strong>A local page.</strong> It prints <code>Playground ready at http://127.0.0.1:8765/</code> and
    opens that address in your browser (<code>--no-browser</code> skips it, <code>--port</code>
@@ -4894,37 +5008,32 @@ from a clone with <code>pip install -e packages/sdk -e "packages/nl2sql[demo]"</
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"packages/nl2sql[all,demo]"</span>
 </code></pre></div>
 <h2 id="2-write-the-demo-project">2. Write the demo project</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>setup<span class="w"> </span>--demo
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>init<span class="w"> </span>--demo<span class="w"> </span>nl2sql-demo
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql-demo/nl2sql.yaml<span class="w"> </span>index
 </code></pre></div>
-<p>This writes the following, relative to the directory you run the command in:</p>
-<ul>
-<li><code>data/chinook.sqlite</code>, <code>data/support.sqlite</code>, <code>data/webanalytics.sqlite</code></li>
-<li><code>configs/datasources.demo.yaml</code></li>
-<li><code>configs/llm.demo.yaml</code></li>
-<li><code>configs/policies.demo.json</code></li>
-<li><code>configs/sample_questions.demo.yaml</code></li>
-<li><code>configs/curated.demo.yaml</code>, six verified queries on Chinook (see
-  <a href="#verified-answers">Verified answers</a>)</li>
-<li><code>configs/secrets.demo.yaml</code></li>
-<li><code>.env.demo</code></li>
-<li><code>nl2sql-demo.json</code>, a small stamp recording which engine version wrote the
-  folder (see <a href="#old-demo-folders">Old demo folders</a>)</li>
-</ul>
-<p>Setup then runs schema indexing once, automatically, and exits <code>1</code> if it fails.</p>
-<div class="admonition note">
-<p class="admonition-title">0.5: <code>nl2sql init --demo</code></p>
-<p><code>nl2sql init --demo DIR</code> writes the demo as a 0.5 config: <code>nl2sql.yaml</code>,
-one file per datasource under <code>datasources/</code> (each with its description,
-read-only connection, 10,000-row limit and sample questions),
-<code>policies.yaml</code> with the admin, analyst and viewer roles below,
-<code>curated.yaml</code> with the verified queries, and the three databases in
-<code>data/</code>. It is the same config <code>nl2sql.config.demo_config()</code> builds in
-code. In 0.5 it replaces <code>nl2sql setup --demo</code>; until then the engine
-reads the files listed above. See
-<a href="../#start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code></a>.</p>
-</div>
-<p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
-scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
+<p><code>init --demo</code> writes a complete config, relative to the folder you name:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql.yaml            # the table of contents
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>datasources/
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  chinook.yaml         # each with its description, read-only connection,
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  support.yaml         # 10,000-row limit and sample questions
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  webanalytics.yaml
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>llm.yaml               # the provider and model; no key
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>embeddings.yaml        # provider: local
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>policies.yaml          # the admin, analyst and viewer roles below
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>storage.yaml           # path: .nl2sql (index, state.db, traces, results)
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>curated.yaml           # six verified queries on Chinook
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>settings.yaml          # a 300 s timeout and a trace for every run
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>data/                  # chinook.sqlite, support.sqlite, webanalytics.sqlite
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>.gitignore             # .nl2sql/ and .env
+</code></pre></div>
+<p>It is the same config <code>nl2sql.config.demo_config()</code> (and <code>NL2SQL.demo()</code>)
+builds in code. <code>nl2sql index</code> then builds the index, and exits <code>1</code> if any
+datasource fails. See
+<a href="../#start-a-config-with-nl2sql-init">Start a config with <code>nl2sql init</code></a>.</p>
+<p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does both steps in
+<code>./nl2sql-demo</code> the first time (and adds a <code>nl2sql-demo.json</code> stamp recording
+which engine version wrote the folder; see <a href="#old-demo-folders">Old demo folders</a>),
+then serves a page over it. See the
 <a href="https://github.com/nadeem4/nl2sql#quickstart-run-it-locally">README</a> for its flags, and
 <a href="#the-settings-page">the Settings page</a> for entering a key and choosing
 models from the page.</p>
@@ -4949,15 +5058,16 @@ resolver took the only datasource and skipped the vector search; with three, the
 datasource search and the LLM answerability judge run on every question, so the
 demo exercises the part of the pipeline a single-dataset demo never reached.
 Indexing all three writes 186 entries - 111 for <code>chinook</code> (24 of them the verified queries' phrasings and descriptions), 36 for <code>support</code> and
-39 for <code>webanalytics</code> - and the build <code>nl2sql setup --demo</code> runs takes about
+39 for <code>webanalytics</code> - and <code>nl2sql index</code> takes about
 seven or eight seconds once the embedding model is cached; the first run on a
 machine still downloads the model.</p>
 <h3 id="verified-answers">Verified answers</h3>
-<p><code>configs/curated.demo.yaml</code> holds six verified queries on Chinook: SQL written
+<p><code>curated.yaml</code> holds six verified queries on Chinook: SQL written
 and reviewed in advance, with typed params, and the questions each answers
 (top customers by revenue in a year, revenue by year, monthly revenue in a
 year, sales by country, best-selling genres, top artists by tracks sold).
-<code>.env.demo</code> points <code>CURATED_CONFIG</code> at it, and indexing embeds their questions
+<code>nl2sql.yaml</code> includes it as the <code>curated</code> section, so curated answers are
+on, and indexing embeds their questions
 beside the schema. A question one of them answers runs its SQL with the values
 bound instead of a generated plan, and the playground labels the answer
 <strong>Verified ·</strong> and the query's id. "What is the total revenue per year?" and
@@ -4966,7 +5076,7 @@ them. See <a href="../../configuration/curated/#in-the-demo">Curated answers</a>
 <p>The keyless replay includes the matcher's recorded choices, so the badge
 appears without a key too, on the guided questions a verified query answers.</p>
 <h3 id="the-roles">The roles</h3>
-<p><code>configs/policies.demo.json</code> is generated with three roles, spanning all three
+<p><code>policies.yaml</code> is written with three roles, spanning all three
 datasources, so the RBAC check is visible without editing anything:</p>
 <table>
 <thead>
@@ -4993,25 +5103,27 @@ datasources, so the RBAC check is visible without editing anything:</p>
 <p>Ask the <code>viewer</code> role about customers and the logical validator refuses the plan
 with a <code>SECURITY_VIOLATION</code> before any SQL is generated. The planner saw the
 <code>Customer</code> and <code>Invoice</code> tables' columns but none of their sample values or
-statistics. <code>.env.demo</code> sets <code>RBAC_REFUSAL_NAMES_TABLES=true</code>, so the demo's
+statistics. <code>policies.yaml</code> sets <code>refusal_names_tables: true</code>, so the demo's
 refusal names the role and table; outside the demo the message is the generic
 "You do not have permission to see the data this question requires." See
 <a href="../../security/model/#strict-refusal">Security Model</a>.</p>
 <h3 id="api-keys-in-the-demo">API keys in the demo</h3>
-<p><code>.env.demo</code> is generated with <code>EMBEDDING_PROVIDER=local</code>, so schema chunks are
+<p><code>embeddings.yaml</code> says <code>provider: local</code>, so schema chunks are
 embedded with the key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb
 instead of the OpenAI embeddings API. The first indexing run downloads roughly
 79 MB of model files into a local cache, which can take a few minutes.</p>
 <p>This covers the embedding step only. The demo is <strong>not</strong> key-free end to end:</p>
 <ul>
-<li><code>nl2sql --env demo run "..."</code> calls a chat model, so it needs a working LLM key
-  (<code>OPENAI_API_KEY</code>, or an OpenRouter key with <code>configs/llm.demo.yaml</code> pointed at
-  <code>provider: openrouter</code>).</li>
+<li><code>nl2sql run "..."</code> calls a chat model, so it needs a working LLM key
+  (<code>OPENAI_API_KEY</code>, or an OpenRouter key with <code>llm.yaml</code> pointed at
+  <code>provider: openrouter</code>). Keep it in the environment, or in a <code>.env</code> file next
+  to <code>nl2sql.yaml</code>, which the CLI loads without overriding a variable already
+  set.</li>
 <li>The demo's model is <code>gpt-5.4</code> with <code>temperature: 0.0</code>. It replaced <code>gpt-4o</code>,
   whose 30,000 tokens-per-minute limit on the owner's account was below one
   question with a single retry; <code>gpt-5.4</code> had 500,000 and accepts
   <code>temperature: 0</code>. To use a model that rejects it (<code>gpt-5.5</code>, <code>gpt-5-mini</code>),
-  set <code>temperature: null</code> in <code>configs/llm.demo.yaml</code> - see
+  set <code>temperature: null</code> in <code>llm.yaml</code> - see
   <a href="../../configuration/llm/#temperature">LLM configuration â†’ Temperature</a>. With an
   OpenRouter key or Ollama, change <code>model</code> to one that provider serves: live
   mode switches the provider, not the model name.</li>
@@ -5024,24 +5136,23 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   run, the startup repair and the playground's Rebuild) leaves enrichment
   <strong>off</strong>, because it spends tokens on your key; the playground offers it as an
   explicit checkbox. When it is on, the demo's indexing uses a key exported in
-  your shell, or one saved in <code>.env.demo</code>; the file's empty <code>OPENAI_API_KEY=</code>
-  placeholder no longer blanks an exported key while indexing runs.</li>
-<li>Both <code>nl2sql setup --api-key &lt;key&gt;</code> and <code>nl2sql demo --api-key &lt;key&gt;</code> take the
-  key on the command line and write it into the generated env file. The provider
-  follows the key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored
-  as <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; a key beginning <code>sk-ant-</code>
+  your shell, or one saved in the project's <code>.env</code>.</li>
+<li><code>nl2sql demo --api-key &lt;key&gt;</code> takes the key on the command line and writes it
+  into the project's <code>.env</code>, never into a YAML file. The provider follows the
+  key's shape: a key beginning <code>sk-or-</code> is OpenRouter and is stored as
+  <code>OPENROUTER_API_KEY</code> with <code>provider: openrouter</code>; a key beginning <code>sk-ant-</code>
   is Anthropic and is stored as <code>ANTHROPIC_API_KEY</code> with <code>provider: anthropic</code>,
   model <code>claude-opus-5</code> and <code>temperature: null</code> (install
-  <code>nl2sql-engine[anthropic]</code>); anything else is OpenAI.
-  <code>.env</code> and <code>.env.*</code> are covered by <code>.gitignore</code>, but a key passed on the
-  command line is visible in shell history and to <code>ps</code>, so the environment
-  variable remains the more private route.</li>
-<li>So <code>nl2sql setup --demo</code> and <code>nl2sql --env demo index</code> complete with no chat
-  key at all, and <code>nl2sql index</code> exits <code>0</code>. It exits <code>1</code> if any datasource
-  actually fails to index, which is safe to rely on in a script. A missing key
-  surfaces when a chat model is first called. Fill in <code>OPENAI_API_KEY</code> in
-  <code>.env.demo</code> before running a query.</li>
-<li>Pointing <code>configs/llm.demo.yaml</code> at <code>provider: ollama</code> removes the chat key
+  <code>nl2sql-engine[anthropic]</code>); anything else is OpenAI. <code>llm.yaml</code> names no
+  key, so the provider's own variable is read. <code>.env</code> is covered by
+  <code>.gitignore</code>, but a key passed on the command line is visible in shell
+  history and to <code>ps</code>, so the environment variable remains the more private
+  route.</li>
+<li>So <code>nl2sql init --demo</code> and <code>nl2sql index</code> complete with no chat key at all,
+  and <code>nl2sql index</code> exits <code>0</code>. It exits <code>1</code> if any datasource actually fails
+  to index, which is safe to rely on in a script. A missing key surfaces when a
+  chat model is first called (<code>nl2sql doctor</code> names it before that).</li>
+<li>Pointing <code>llm.yaml</code> at <code>provider: ollama</code> removes the chat key
   requirement, but a local model's ability to satisfy the pipeline's structured
   output is model-dependent - see
   <a href="../../configuration/llm/#ollama">LLM configuration â†’ Ollama</a>.</li>
@@ -5051,10 +5162,10 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 all</strong>, and each visitor pastes their own into the page; a visitor without one
 can replay the guided questions from recorded runs. See
 <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
-<p>Because the demo indexes with <code>local</code> and the default environment indexes with
-<code>openai</code>, the two use different vector dimensions. <code>.env.demo</code> keeps its own
-<code>VECTOR_STORE=data/vector_store_demo</code> directory, so they do not collide. If you
-change <code>EMBEDDING_PROVIDER</code> for an existing store, run <code>nl2sql index --full</code>:
+<p>Each project keeps its index under its own <code>storage.path</code> (the demo's is
+<code>nl2sql-demo/.nl2sql/index</code>), so projects that embed differently never share a
+collection. If you change the <code>embeddings</code> section of an existing project, run
+<code>nl2sql index --full</code>:
 every datasource in a collection must share one embedding model, so the store
 otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
 <code>EmbeddingModelMismatchError</code> for a different model of the same size).</p>
@@ -5062,9 +5173,9 @@ otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
 indexing records reaches an existing demo folder only when it is indexed again.
 After 0.2.2, a text column with at most 50 distinct values keeps all of them
 rather than five. <code>nl2sql demo</code> does not re-index a folder whose index is
-healthy, so run <code>nl2sql --env demo index</code> in the folder, or start a fresh one
-with <code>nl2sql setup --demo</code>, which always re-indexes. The hosted image builds
-its index with <code>nl2sql setup --demo</code>, so a new image picks the change up.</p>
+healthy, so run <code>nl2sql index</code> in the folder, or start a fresh one with
+<code>nl2sql demo --dir &lt;new folder&gt;</code>. The hosted image builds its index with
+<code>nl2sql init --demo</code> and <code>nl2sql index</code>, so a new image picks the change up.</p>
 <h3 id="index-health-and-repair">Index health and repair</h3>
 <p>The playground's schema panel reads the schema snapshot, for whichever database
 its <strong>Showing</strong> switcher names; the resolver, which
@@ -5075,9 +5186,9 @@ can disagree: a folder once had its snapshot intact and 0 entries in its index,
 so the page looked fine while every question failed with
 <code>SCHEMA_RETRIEVAL_FAILED</code>. Three things now guard against that:</p>
 <ul>
-<li><strong>Startup repair.</strong> Every <code>nl2sql demo</code> start checks what the index
-  <em>contains</em>: it rebuilds when the index is missing or empty, or was built from
-  an older schema version than the latest snapshot. A failed rebuild is
+<li><strong>Startup repair.</strong> Every <code>nl2sql demo</code> start calls <code>engine.check()</code>, which
+  reports what the index <em>contains</em>: the demo rebuilds it when it is missing or
+  empty, or was built from an older schema version than the latest snapshot. A failed rebuild is
   reported (the playground still starts, and offers Rebuild) rather than
   ignored.</li>
 <li><strong>Rebuilds never leave an empty index.</strong> A datasource's new entries are
@@ -5086,9 +5197,7 @@ so the page looked fine while every question failed with
   <a href="../../architecture/indexing/#rebuilding-without-an-empty-index">Indexing</a>.</li>
 <li><strong>Actionable errors.</strong> With an empty index the resolver says
   "The vector index is empty ... Re-index with <code>nl2sql index</code>", and
-  <code>nl2sql --env demo doctor</code> reports the index under <strong>Index</strong>: entries by type,
-  whether each datasource's schema version matches the latest snapshot, and
-  when it was built.</li>
+  <code>nl2sql doctor</code> prints the engine's check, the index status included.</li>
 </ul>
 <h3 id="the-search-index-panel">The search index panel</h3>
 <p>The playground's left rail opens with the <strong>Database</strong> panel, and with the
@@ -5110,7 +5219,7 @@ demand.</p>
   entries beside the current ones; questions keep using the current entries
   until the new ones are complete, and questions in flight finish before the
   switch. That database is the demo's own, named in the button's help;
-  <code>nl2sql --env demo index</code> rebuilds all three.</li>
+  <code>nl2sql index</code> rebuilds all three.</li>
 <li>It shows each step as it runs. The first run downloads the 79 MB embedding
   model, so it can take a few minutes.</li>
 <li><strong>Write descriptions with the LLM</strong> is off by default because it spends
@@ -5126,8 +5235,9 @@ demand.</p>
 </ul>
 <h3 id="old-demo-folders">Old demo folders</h3>
 <p>Demo folders are not upgraded in place: a folder written by an older engine
-keeps that engine's defaults (for example an older default model, or no
-<code>TRACE_MODE</code> line). New folders get a <code>nl2sql-demo.json</code> stamp; when <code>nl2sql demo</code>
+keeps that engine's defaults (for example an older default model). A folder
+written by a 0.4 engine (<code>configs/</code>, <code>.env.demo</code>) has no <code>nl2sql.yaml</code> and
+cannot be read by 0.5: start a new <code>--dir</code>. New folders get a <code>nl2sql-demo.json</code> stamp; when <code>nl2sql demo</code>
 starts in a folder stamped by an older engine, or in one with no stamp at all,
 it warns and suggests a fresh <code>--dir</code>. The playground's index panel repeats the
 warning.</p>
@@ -5250,27 +5360,27 @@ second settings store, and the browser keeps nothing but UI conveniences.</p>
 <li><strong>API keys, one per provider.</strong> Paste a key and press <strong>Save key</strong>. The
   provider follows the key's shape by the same rule as <code>--api-key</code> (<code>sk-ant-</code>
   is Anthropic, <code>sk-or-</code> is OpenRouter, anything else OpenAI). The key is
-  written to the demo project's <code>.env.demo</code>, replacing that provider's previous
+  written to the demo project's <code>.env</code>, replacing that provider's previous
   key and keeping the others, and the default moves to that provider. The
   running demo switches from replay to live <strong>without a restart</strong>: questions
   already running finish on the model client they started with, then the
-  engine's LLM clients are rebuilt from <code>configs/llm.demo.yaml</code>. Keys are
+  engine's LLM clients are rebuilt from the project's <code>nl2sql.yaml</code> (its
+  <code>llm.yaml</code>). Keys are
   write-only: no response, log line, trace or error carries one, only a masked
   form such as <code>sk-...4f2a</code> per provider. On a later start the precedence above
   still holds, so <code>--api-key</code> or a key exported in your shell wins over a saved
   one, and every saved key is loaded so each step finds its own.</li>
 <li>
 <p><strong>A provider and a model for each LLM step.</strong> One selector each for the
-  answerability check (<code>datasourceresolver</code>), question splitter (<code>decomposer</code>),
-  query planner (<code>astplanner</code>), plan repair (<code>refiner</code>) and answer writer
-  (<code>answersynthesizer</code>). Each has a "Default" option that uses the <code>default</code>
-  agent, then one group of models per provider. A provider with no saved key is
+  answerability check (<code>datasource_resolver</code>), question splitter (<code>decomposer</code>),
+  query planner (<code>ast_planner</code>), plan repair (<code>refiner</code>) and answer writer
+  (<code>answer_synthesizer</code>). Each has a "Default" option that uses the top-level
+  provider and model, then one group of models per provider. A provider with no saved key is
   listed but cannot be chosen, and a step already on a provider whose key is
   gone says so under its selector. A choice is written to
-  <code>configs/llm.demo.yaml</code> under <code>agents:</code> with its <code>provider</code>, <code>model</code> and
-  temperature. It takes the default's endpoint and key reference when it is on
-  the default's provider, and its own provider's <code>${env:...}</code> reference
-  otherwise. It takes effect on the next question, and a step put on another
+  <code>llm.yaml</code> under <code>agents:</code> with its <code>provider</code>, <code>model</code> and temperature. It
+  takes the top level's endpoint and key when it is on the same provider, and
+  names no key otherwise, so its own provider's variable is read. It takes effect on the next question, and a step put on another
   provider stays there when the default moves. The list is short on purpose. On
   2026-09-20 each OpenAI model was sent the engine's parameters of the time
   (<code>temperature=0</code>, <code>seed=42</code>, strict <code>json_schema</code>) and worked with them, two
@@ -5379,63 +5489,69 @@ re-ranking model; the "re-ranking" is MMR, explained in
 <p>Below <strong>Cost &amp; time</strong>, each answer asks <strong>Was this answer right?</strong>: <strong>ðŸ‘ Right</strong>
 or <strong>ðŸ‘Ž Wrong</strong>, with an optional note (<strong>Wrong number</strong>, <strong>Wrong table</strong>,
 <strong>Wrong filter</strong>, <strong>Missing rows</strong>, or your own words). The rating is saved in
-the demo's <code>data/schema_store.db</code> with the question, role, SQL, the model per
+the demo's state store (<code>.nl2sql/state.db</code>) with the question, role, SQL, the model per
 step and the engine version; never the rows. It is local only, like Settings:
 on a non-loopback <code>--host</code> it is off unless <code>--allow-settings</code>.
-<code>FEEDBACK_ENABLED=false</code> in <code>.env.demo</code> turns it off. Read the ratings back, with
+<code>settings.feedback.enabled: false</code> in the project's config turns it off. Read the ratings back, with
 the refusal, retry, error and plan-cache rates, from the CLI (below). See
 <a href="../../observability/feedback/">Feedback and Signals</a>.</p>
 <h2 id="3-use-the-demo-from-the-cli">3. Use the demo from the CLI</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Run a query against the demo</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Plan and validate without touching the database</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># Re-index after regenerating or editing the demo configs</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
-<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="c1"># After changing the embedding model: rebuild every datasource, then switch</span>
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>index<span class="w"> </span>--full
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="c1"># Check the index: entries by type, schema version, when built</span>
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>doctor
+<p>Every command reads one config: <code>--config PATH</code>, else <code>NL2SQL_CONFIG</code>, else
+<code>./nl2sql.yaml</code>. Paths inside it are relative to <code>nl2sql.yaml</code>, so from the demo
+folder (<code>cd nl2sql-demo</code>) no flag is needed; from anywhere else, add
+<code>--config nl2sql-demo/nl2sql.yaml</code> before the command.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Run a query against the demo</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Plan and validate without touching the database</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1"># Re-index after editing the demo's config</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>nl2sql<span class="w"> </span>index
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># After changing the embedding model: rebuild every datasource, then switch</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--full
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="c1"># Check the install, the keys, and the engine: each datasource, each key, the index</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>nl2sql<span class="w"> </span>doctor
 </code></pre></div>
 <p>The two flags that name a datasource are not the same flag: <code>run</code> takes
 <code>--ds-id</code>, which pins the datasource and makes the resolver skip its search;
 <code>index</code> takes <code>--datasource</code> (<code>-d</code>), which chooses what to re-index.</p>
-<p>The demo's <code>.env.demo</code> sets <code>TRACE_MODE=always</code>, so every run also writes a
-trace to <code>traces/</code> and prints its path. Inspect one with
-<code>nl2sql --env demo trace show &lt;file&gt;</code>, or re-run it on the recorded model
-answers with <code>nl2sql --env demo trace replay &lt;file&gt;</code>. See
+<p>The demo's <code>settings.yaml</code> sets <code>traces: { mode: always }</code>, so every run also
+writes a trace to <code>.nl2sql/traces/</code> and prints its path. Inspect one with
+<code>nl2sql trace show &lt;file or trace id&gt;</code>, or re-run it on the recorded model
+answers with <code>nl2sql trace replay &lt;file&gt;</code>. See
 <a href="../../observability/debugging/">Debugging a Run</a>.</p>
 <p>Asking a question a second time on the same day reuses the first run's validated plan from the
-plan cache (in <code>data/schema_store.db</code>), so the SQL and rows are the same and the
+plan cache (in <code>.nl2sql/state.db</code>), so the SQL and rows are the same and the
 planner is not called; the playground's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>cache<span class="w"> </span>clear
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>cache<span class="w"> </span>clear
 </code></pre></div>
 <p>The playground's ratings, and the guardrail rates over every rated run and
 kept trace:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft gold entries, for review</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft gold entries, for review</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
 </code></pre></div>
 <p><code>export --good</code> writes <code>feedback_gold_drafts.yaml</code>, never the gold set itself. A
 person must review each draft and run <code>python -m nl2sql.evaluation.gold</code> before
 adding it; see
 <a href="../../observability/feedback/#growing-the-gold-set-nl2sql-feedback-export-good">Feedback and Signals</a>.</p>
-<p><code>nl2sql demo --record</code> turns the cache off while recording, so every planner
+<p><code>nl2sql demo --record</code> turns the cache off while recording
+(<code>settings.pipeline.plan_cache</code> is off in the engine it builds; the files are
+not changed), so every planner
 answer is captured. It also stops with exit <code>1</code>, recording nothing, when the
 demo's indexing fails: a plain <code>nl2sql demo</code> keeps going and offers Rebuild,
 but answers recorded against no index would be the wrong ones. Only a
@@ -5446,18 +5562,15 @@ the provider and the model that answered, and a replay reports that model --
 in the usage ledger, the Debug pane and on the Pipeline page, tagged recorded --
 rather than the one the replaying config names. See
 <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism â†’ The plan cache</a>.</p>
-<p><code>--env &lt;name&gt;</code> loads <code>.env.&lt;name&gt;</code>. To point at an exact file instead, use
-<code>--env-file &lt;path&gt;</code>, which takes precedence over <code>--env</code>. Either flag also
-loads the file's variables into the process environment, so <code>doctor</code> and <code>run</code>
-find a key kept only in <code>.env.demo</code>; a variable already exported in your shell
-wins over the file. The equivalent environment variables (<code>ENV</code> and
-<code>ENV_FILE_PATH</code>) still work, but setting them yourself only feeds the settings
-object; use the flags when the file holds your key.</p>
-<p>Note: the demo datasource config uses relative database paths
-(<code>data/chinook.sqlite</code>, <code>data/support.sqlite</code>, <code>data/webanalytics.sqlite</code>), so
-run the CLI from the directory you ran <code>nl2sql setup --demo</code> in.</p>
+<p>The <code>.env</code> next to <code>nl2sql.yaml</code> is loaded by the CLI, <code>nl2sql-api</code> and
+<code>nl2sql demo</code> at startup, so <code>doctor</code> and <code>run</code> find a key kept only there; a
+variable already exported in your shell wins over the file. There is no
+<code>--env</code> flag and no <code>.env.&lt;name&gt;</code> lookup: one config folder, one <code>.env</code>.</p>
+<p><code>run</code>, <code>index</code> and <code>benchmark</code> call <code>engine.check()</code> first. A datasource marked
+<code>required: true</code> that cannot connect stops them with the report (exit <code>1</code>); any
+other one that fails is printed and left out of routing.</p>
 <h2 id="sample-questions">Sample questions</h2>
-<p><code>configs/sample_questions.demo.yaml</code> is written with twenty questions, the same
+<p>The demo's datasource files carry twenty questions (<code>sample_questions</code>), the same
 ones the playground offers as guided questions -- a few as chips for the
 database the rail is showing, and all twenty behind <strong>N more</strong>, in one pile per
 database, each headed by the datasource id. Chinook's twelve come first, so the demo opens on familiar
@@ -5497,17 +5610,19 @@ question from another pile moves the switcher to that database, so the schema
 on the left is the one the question is about.</p>
 <p>They are also indexed, per datasource: the <code>schema.datasource</code> entry the
 resolver matches every question against carries that datasource's configured
-description and its own questions (<code>.env.demo</code> points <code>SAMPLE_QUESTIONS</code> at the
-file), which is how the resolver tells the three apart. Folders generated before
-that was fixed wrote the setting as <code>ROUTING_EXAMPLES</code>, which nothing read; the engine now accepts that name too, so re-index such a folder
-(<code>nl2sql --env demo index</code>) to pick the questions up.</p>
+description and its own questions (<code>sample_questions</code> in its datasource
+file), which is how the resolver tells the three apart. Re-index
+(<code>nl2sql index</code>) after editing them.</p>
 <p>Whether a given question is answered correctly depends on the model; see
 <a href="https://github.com/nadeem4/nl2sql#known-limitations">Known limitations</a>.</p>
 <h2 id="regenerating-the-demo">Regenerating the demo</h2>
-<p>Re-running <code>nl2sql setup --demo</code> overwrites all three databases under <code>data/</code>
-and the <code>configs/*.demo.*</code> files with fresh copies. An existing <code>.env.demo</code> is
-overwritten too, so a key recorded there is lost - pass <code>--api-key</code> again, save it on the playground's Settings page, or
-re-add it afterwards.</p>
+<p><code>nl2sql init --demo DIR --force</code> overwrites the config files and all three
+databases under <code>data/</code> with fresh copies; without <code>--force</code> it names the files
+that exist and writes nothing. It never touches <code>.env</code>, so a saved key
+survives, and it leaves the index under <code>.nl2sql/</code> alone: run <code>nl2sql index</code>
+afterwards. <code>nl2sql demo</code> never rewrites an existing project's config (only
+<code>llm.yaml</code>, to point it at the mode it starts in); start a new <code>--dir</code> for a
+fresh one.</p>
 <h2 id="the-datasets-that-are-not-here">The datasets that are not here</h2>
 <p><code>--lite</code> and <code>--docker</code> chose between a generated manufacturing dataset in
 SQLite and the same data in a Postgres/MySQL/MSSQL Compose stack. Both are gone:

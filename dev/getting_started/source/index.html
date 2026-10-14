@@ -1877,6 +1877,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1913,6 +1969,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4476,30 +4588,29 @@ library. <code>pip install --group dev</code> (pip 25.1 or newer) installs the P
 <code>dev</code> group from the root <code>pyproject.toml</code>: <code>pytest</code>, <code>pytest-randomly</code>,
 <code>pytest-timeout</code> and <code>httpx</code>.</p>
 <h2 id="configuration">Configuration</h2>
-<p>Create config files in your working directory:</p>
-<ul>
-<li><code>configs/datasources.yaml</code></li>
-<li><code>configs/llm.yaml</code></li>
-<li><code>configs/policies.json</code></li>
-<li><code>configs/secrets.yaml</code> (optional)</li>
-</ul>
-<p>Start from <code>configs/datasources.example.yaml</code> and <code>configs/policies.example.json</code>.</p>
-<div class="admonition note">
-<p class="admonition-title">0.5: <code>nl2sql init</code></p>
-<p>From 0.5 the engine reads one <code>nl2sql.yaml</code> instead. <code>nl2sql init</code> writes
-it, with each section in its own file, and <code>nl2sql init --demo</code> writes the
-demo's. See <a href="../#start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code></a>.</p>
-</div>
+<p>The engine reads one <code>nl2sql.yaml</code>. <code>nl2sql init</code> writes it, with each section
+in its own file, and <code>nl2sql init --demo</code> writes the demo's. See
+<a href="../#start-a-config-with-nl2sql-init">Start a config with <code>nl2sql init</code></a>
+and <a href="../../configuration/system/">Configuration</a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span>init<span class="w"> </span>my-demo<span class="w"> </span>--demo
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>my-demo/nl2sql.yaml<span class="w"> </span>index
+</code></pre></div>
 <h2 id="run-locally">Run locally</h2>
+<p>CLI:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>my-demo/nl2sql.yaml<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers are there?"</span>
+</code></pre></div>
 <p>Python API:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from nl2sql import NL2SQL, UserContext; print(NL2SQL.from_config('nl2sql.yaml').run_query('hello', user_context=UserContext(roles=['admin'])))"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from nl2sql import NL2SQL, UserContext; print(NL2SQL.from_config('my-demo/nl2sql.yaml').run_query('How many customers are there?', user_context=UserContext(roles=['admin'])))"</span>
 </code></pre></div>
-<p>API service (Docker):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>nl2sql-api
+<p>API service:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>my-demo/nl2sql.yaml<span class="w"> </span>nl2sql-api<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span>
 </code></pre></div>
-<p>See <a href="../docker/">Docker (REST API)</a> for adapter extras, environment selection
-and mounting config files.</p>
+<p>or in Docker:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-f<span class="w"> </span>packages/api/Dockerfile<span class="w"> </span>-t<span class="w"> </span>nl2sql-api<span class="w"> </span>.
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/my-demo:/etc/nl2sql"</span><span class="w"> </span>nl2sql-api
+</code></pre></div>
+<p>See <a href="../docker/">Docker (REST API)</a> for adapter extras, the role settings and
+the data volume.</p>
 
 
 

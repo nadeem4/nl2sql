@@ -16,7 +16,7 @@
         <link rel="prev" href="../llm/">
       
       
-        <link rel="next" href="../secrets/">
+        <link rel="next" href="../embeddings/">
       
       
         
@@ -1829,17 +1829,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#file-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File structure
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#fields" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1889,10 +1878,77 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#checking-the-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking the policies
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1941,6 +1997,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4434,17 +4546,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#file-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        File structure
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#fields" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4494,6 +4595,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#checking-the-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking the policies
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4512,30 +4624,64 @@
 
 
 <h1 id="policies-configuration">Policies Configuration</h1>
-<p>Policies live in <code>configs/policies.json</code> and define role-based access rules for
-datasources and tables.</p>
-<h2 id="file-structure">File structure</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"roles"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">"admin"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"System Administrator"</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">"role"</span><span class="p">:</span><span class="w"> </span><span class="s2">"admin"</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">"allowed_datasources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">],</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="nt">"allowed_tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">}</span>
+<p>The <code>policies</code> section of <a href="../system/"><code>nl2sql.yaml</code></a> decides who may read
+what. <code>nl2sql init</code> writes it to <code>policies.yaml</code>.</p>
+<p>On your own machine, one line is enough: every caller may read everything.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># policies.yaml</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">allow_all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<p>For anything shared, write roles:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># policies.yaml</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">default_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">viewer</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">admin_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">admin</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">refusal_names_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">roles</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">admin</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Every table in every database</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">allowed_datasources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">analyst</span><span class="p">:</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sales, except the audit schema</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">allowed_datasources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"sales.public.*"</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <h2 id="fields">Fields</h2>
-<ul>
-<li><code>version</code>: schema version (currently <code>1</code>)</li>
-<li><code>roles</code>: map of role name → policy</li>
-<li><code>description</code>: human-readable role description</li>
-<li><code>role</code>: role ID used for logging and auditing</li>
-<li><code>allowed_datasources</code>: list of datasource IDs or <code>*</code></li>
-<li><code>allowed_tables</code>: list of table entries (see below)</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>allow_all</code></td>
+<td><code>false</code></td>
+<td>Every caller may read everything. It cannot be combined with <code>default_role</code> or <code>roles</code>. <code>Policies.allow_all()</code> is the Python shorthand.</td>
+</tr>
+<tr>
+<td><code>default_role</code></td>
+<td>none</td>
+<td>The role used when the caller gives none. It must name one of <code>roles</code>. Without it, a question with no role is refused.</td>
+</tr>
+<tr>
+<td><code>admin_roles</code></td>
+<td><code>[admin]</code></td>
+<td>The roles <code>nl2sql-api</code> lets through on the routes that change datasources, LLMs or the index. See <a href="../api/">REST API</a>.</td>
+</tr>
+<tr>
+<td><code>refusal_names_tables</code></td>
+<td><code>false</code></td>
+<td>Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. The demo (<code>nl2sql init --demo</code>) sets it, since showing a refusal is its point. See <a href="../../security/model/#strict-refusal">Security Model</a>.</td>
+</tr>
+<tr>
+<td><code>roles</code></td>
+<td><code>{}</code></td>
+<td>Role name to policy: <code>description</code>, <code>allowed_datasources</code> (ids or <code>*</code>) and <code>allowed_tables</code> (entries below).</td>
+</tr>
+</tbody>
+</table>
 <h2 id="table-entries">Table entries</h2>
 <table>
 <thead>
@@ -4570,10 +4716,10 @@ datasources and tables.</p>
 <p>Access is decided on the schema as well as the table. The plan names the
 schema a table is read from, and the SQL is written with it, so a grant of
 <code>sales.orders</code> does not let a plan read <code>audit.orders</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">"allowed_tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"warehouse.sales.orders"</span><span class="p">,</span><span class="w"> </span><span class="s2">"warehouse.reference.*"</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">warehouse.sales.orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"warehouse.reference.*"</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <h3 id="two-part-entries-and-the-default-schema">Two-part entries and the default schema</h3>
-<p>A two-part <code>datasource.table</code> entry predates schemas in the policy file. It is
+<p>A two-part <code>datasource.table</code> entry predates schemas in policies. It is
 read as that table in the datasource's default schema, never in any schema:</p>
 <ul>
 <li>The default schema is the one the adapter reports: the schema an unqualified
@@ -4591,7 +4737,7 @@ read as the default schema. To grant a table outside the default schema, write
 the three-part form.</p>
 <p>An entry has two or three dot-separated parts (or is <code>*</code>), no part is empty,
 and <code>*</code> may only be the last part: <code>datasource.*.orders</code> is rejected when the
-file is loaded.</p>
+config is loaded.</p>
 <h2 id="one-rule-everywhere">One rule everywhere</h2>
 <p><code>table_allowed()</code> in <code>nl2sql/auth/rbac.py</code> is the only place an entry is
 matched. The logical validator (which refuses the plan), the schema retriever
@@ -4599,6 +4745,15 @@ matched. The logical validator (which refuses the plan), the schema retriever
 value check (which only probes readable tables) and the curated matcher (which
 only answers with a verified query whose tables are all readable) call it with
 the same datasource, schema and table, so they cannot disagree.</p>
+<h2 id="checking-the-policies">Checking the policies</h2>
+<p><code>nl2sql policy validate</code> checks that every datasource and table rule a role
+names is a configured datasource, against the config <code>--config</code> names:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql.yaml<span class="w"> </span>policy<span class="w"> </span>validate
+</code></pre></div>
+<p>A role naming a datasource that is not configured is <code>MISSING</code>, and the
+command exits 1. From Python, <code>engine.policy.validate_policies()</code> returns the
+same report; after <code>engine.check()</code>, a role naming a datasource that failed to
+connect is <code>UNAVAILABLE</code>.</p>
 
 
 

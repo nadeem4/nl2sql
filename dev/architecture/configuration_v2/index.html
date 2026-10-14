@@ -1320,6 +1320,30 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/secrets/">
 <span class="md-ellipsis">
     
@@ -1337,6 +1361,30 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -2923,12 +2971,12 @@
 <article class="md-content__inner md-typeset">
 <h1 id="configuration-v2-and-the-extension-registry-phase-1-design">Configuration v2 and the extension registry (Phase 1 design)</h1>
 <div class="admonition note">
-<p class="admonition-title">Status: design, not built</p>
+<p class="admonition-title">Status: being built</p>
 <p>This page is the design for Phase 1 of the redesign, which ships as
-release 0.5. Nothing on it is built yet. Each pull request in
-<a href="#11-pr-plan">the PR plan</a> updates this page and the reference pages it
-touches. Until then, the <a href="../../configuration/system/">Configuration</a>
-pages describe how 0.4 works.</p>
+release 0.5. Each pull request in <a href="#11-pr-plan">the PR plan</a> adds a
+"Built" note to the sections it built, and updates the reference pages it
+touches. Since PR 7b the <a href="../../configuration/system/">Configuration</a>
+pages describe the 0.5 config.</p>
 </div>
 <h2 id="principles">Principles</h2>
 <p><strong>There are no users yet, so nothing we change can break anyone.</strong> This
@@ -3107,8 +3155,9 @@ written into the section it affects:</p>
 <p>The models, <code>load_config</code>, <code>ConfigError</code>, <code>load_env_file</code> and the
 <code>nl2sql.testing.config.make_config</code> test helper are in <code>nl2sql.config</code>.
 The engine is built from them since PR 7a, and they
-are exported from <code>nl2sql</code>. Until PR 7b this section stays the
-reference. Building them settled these details:</p>
+are exported from <code>nl2sql</code>. Since PR 7b the
+<a href="../../configuration/system/">Configuration</a> pages are the reference.
+Building them settled these details:</p>
 <ul>
 <li>In <code>Settings</code>, the <code>schema</code> group is the attribute <code>schema_</code> in Python,
   because <code>schema</code> would shadow a pydantic method. The YAML key is
@@ -4149,13 +4198,9 @@ these details:</p>
 <li><strong>Datasources.</strong> <code>engine.add_datasource(Datasource)</code> builds the adapter
   (not connected) and swaps in a new <code>engine.config</code> under the engine's
   lock. Indexing reads a datasource's description and sample questions
-  from its <code>Datasource</code>, so one added in code keeps both (bug B9).
-  <code>sample_questions.yaml</code> is read only by the 0.4 entry points.</li>
-<li><strong>The 0.4 entry points.</strong> The CLI, <code>nl2sql-api</code> and the playground
-  still start from the 0.4 files: <code>nl2sql._legacy</code> reads them into a
-  <code>Config</code> (<code>_legacy_config</code>) and keeps their stores where the 0.4
-  variables put them; the facade's private <code>NL2SQL._legacy(**paths)</code> is
-  what <code>nl2sql-api</code> and the playground call. PR 7b deletes the module.</li>
+  from its <code>Datasource</code>, so one added in code keeps both (bug B9).</li>
+<li><strong>The 0.4 entry points</strong> (<code>nl2sql._legacy</code>, <code>NL2SQL._legacy()</code>) lived
+  for one PR; PR 7b deleted them with the 0.4 files.</li>
 <li><strong>Tests.</strong> <code>nl2sql.testing.config.make_demo_config(folder)</code> is
   <code>make_config</code> with the demo's databases and roles; the integration and
   end-to-end fixtures build their runtime from it.</li>
@@ -5193,8 +5238,44 @@ users, yanking it adds nothing.</p>
 <h2 id="10-cli-demo-docker-and-docs">10. CLI, demo, Docker and docs</h2>
 <h3 id="cli">CLI</h3>
 <div class="admonition note">
+<p class="admonition-title">Built: the callers on the new config (PR 7b)</p>
+<p>The CLI takes one global <code>--config</code>; <code>--env</code>, <code>--env-file</code>, every
+per-command path flag and <code>nl2sql setup</code> are gone. The CLI, <code>nl2sql-api</code>
+and <code>nl2sql demo</code> load the <code>.env</code> next to <code>nl2sql.yaml</code>
+(<code>nl2sql.config.load_env_file</code>, never overriding a set variable) and call
+<code>engine.check()</code> at startup. <code>ConfigManager</code>, the <code>nl2sql/configs/</code> file
+envelopes, <code>sample_questions.py</code>, <code>nl2sql._legacy</code> and every 0.4 file in
+the repository's <code>configs/</code> are deleted. Building it settled these
+details:</p>
+<ul>
+<li><code>load_env_file</code> is exported from <code>nl2sql</code> too: <code>nl2sql-api</code> imports only
+  the top-level package.</li>
+<li>The curated checks that need the datasources (<code>check_curated</code>,
+  <code>inspect_verified_sql</code>) moved to <code>nl2sql/config/curated.py</code>, with
+  sqlglot imported inside them. <code>AgentConfig</code> and <code>LLMFileConfig</code> (the
+  set of agents the benchmark compares, now built with
+  <code>LLMFileConfig.from_llm(llm)</code>) moved to <code>nl2sql/llm/models.py</code>.</li>
+<li>A command that only needs the stores (<code>trace show</code>, <code>cache clear</code>,
+  <code>feedback</code>, <code>curated proposals export</code>) reads <code>storage.path</code> from the
+  config without building the engine. <code>run</code>, <code>index</code>, <code>trace replay</code> and
+  <code>benchmark</code> build it and <code>check()</code> it; <code>policy validate</code> and <code>curated
+  validate</code>/<code>test</code> build it without connecting first. <code>curated proposals
+  export</code> refuses to write <code>nl2sql.yaml</code> or any file it includes.</li>
+<li><code>nl2sql doctor</code> reports Python, the adapters' drivers, which provider key
+  variables are set, and the configured engine's <code>check()</code> report.</li>
+<li><code>BenchmarkConfig</code> lost its path fields. A <code>--llm PATH.yaml</code> file, the
+  built-in presets and <code>--bench-config-path</code> hold <code>llm</code> sections.</li>
+<li><code>configure_llm_from_config(path)</code> and <code>reload_llm_config(path)</code> take an
+  <code>nl2sql.yaml</code> and replace every agent with its <code>llm</code> section, until PR 9
+  and 10 bring <code>llm.replace</code>. <code>add_datasource</code> takes a <code>Datasource</code> only,
+  and so does <code>POST /api/v1/datasource</code>.</li>
+<li><code>nl2sql-api</code> reads <code>api.cors_origins</code> per request from the engine's
+  config: the engine is built in the lifespan, after the middleware stack.</li>
+</ul>
+</div>
+<div class="admonition note">
 <p class="admonition-title">Built: <code>nl2sql init</code> (PR 6)</p>
-<p><code>nl2sql init</code> is in the CLI, and <code>setup</code> stays until PR 7b. The engine
+<p><code>nl2sql init</code> is in the CLI (PR 7b removed <code>setup</code>). The engine
 writes the files: <code>nl2sql.config.init_project(folder, demo=, provider=,
 force=)</code> returns the paths it wrote, after loading them with
 <code>load_config</code>. <code>nl2sql.config.demo_config(llm=, path=, data_dir=)</code> builds
@@ -5274,6 +5355,31 @@ these details:</p>
 <a href="#__codelineno-25-10" id="__codelineno-25-10" name="__codelineno-25-10"></a>.gitignore             # .nl2sql/ and .env
 </code></pre></div>
 <h3 id="demo-and-playground">Demo and playground</h3>
+<div class="admonition note">
+<p class="admonition-title">Built (PR 7b)</p>
+<p>As designed, with these details:</p>
+<ul>
+<li>The demo writes the <code>llm</code> section to its own <code>llm.yaml</code> rather than
+  building the <code>LLM</code> in code: the playground's settings panel edits that
+  file and reloads the engine's LLMs from it, so the two must agree. In
+  replay and record mode it points <code>base_url</code> at the local replay server
+  or the recording proxy with the placeholder <code>api_key</code> that endpoint
+  takes (<code>replay</code>, <code>proxy</code>); live, it names no key, so the provider's
+  variable is read. A real key is never written into YAML.</li>
+<li>Keys still reach <code>os.environ</code> in two places until PR 10 and 13: a key
+  from <code>--api-key</code> or the demo's <code>.env</code>, and one saved in the settings
+  panel. <code>--record</code> turns the plan cache off in the engine's own config
+  (<code>settings.pipeline.plan_cache</code>), not through the environment; hosted
+  mode never turned it off, so nothing changes there.</li>
+<li>What 0.4's <code>.env.demo</code> set is now in the demo's config:
+  <code>demo_config()</code>, and so <code>init --demo</code> (which writes it as
+  <code>settings.yaml</code>), carries <code>settings.pipeline.timeout_s: 300</code>,
+  <code>settings.traces.mode: always</code> and <code>policies.refusal_names_tables: true</code>.</li>
+<li><code>--questions-per-minute</code> and <code>--questions-per-session</code> replace the
+  <code>NL2SQL_DEMO_*</code> variables, and <code>NL2SQL_DEMO_HOSTED</code> is gone: <code>--hosted</code>
+  is the only switch.</li>
+</ul>
+</div>
 <ul>
 <li><code>nl2sql demo</code> runs <code>init --demo</code> into <code>nl2sql-demo/</code> the first time, builds
   the index if <code>check()</code> reports it missing, then serves the playground on

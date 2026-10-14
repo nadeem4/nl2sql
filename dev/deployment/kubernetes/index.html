@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4478,32 +4590,45 @@
 
 
 <h1 id="kubernetes-deployment">Kubernetes Deployment</h1>
-<p>Kubernetes deployment depends on the service you build around <code>run_with_graph()</code>. The core engine expects configuration files and environment variables to be available to the runtime container.</p>
+<p>Kubernetes deployment depends on the service you build around the engine, or on
+<code>nl2sql-api</code>. The engine expects one config, <code>nl2sql.yaml</code>, and the variables it
+names to be available to the runtime container.</p>
 <h2 id="configuration-and-secrets">Configuration and secrets</h2>
-<p>Mount <code>configs/</code> and inject secrets so that:</p>
+<p>Mount the config folder (a ConfigMap of <code>nl2sql.yaml</code> and the files it
+includes) and inject secrets so that:</p>
 <ul>
-<li><code>LLM_CONFIG</code>, <code>DATASOURCE_CONFIG</code>, <code>POLICIES_CONFIG</code>, <code>SECRETS_CONFIG</code> resolve correctly.</li>
-<li>provider keys (e.g., <code>OPENAI_API_KEY</code>) are injected into env.</li>
+<li><code>NL2SQL_CONFIG</code> names the mounted <code>nl2sql.yaml</code> (the API image defaults to
+  <code>/etc/nl2sql/nl2sql.yaml</code>);</li>
+<li>provider keys (e.g., <code>OPENAI_API_KEY</code>) and every variable the config reads as
+  <code>${env:VAR}</code> (database passwords, <code>NL2SQL_DATA_DIR</code>) are injected into env,
+  or a secret provider in the <code>secrets</code> section reaches them.</li>
 </ul>
+<p>Keys never go in the ConfigMap: the config holds references
+(<code>password: "${env:SALES_DB_PASSWORD}"</code>), not values.</p>
 <h2 id="persistence">Persistence</h2>
-<p>If you persist schema/vector stores or artifacts, mount volumes for:</p>
-<ul>
-<li><code>VECTOR_STORE</code> (Chroma persistence directory)</li>
-<li><code>SCHEMA_STORE_PATH</code> (SQLite schema store)</li>
-<li><code>RESULT_ARTIFACT_BASE_URI</code> (artifact storage base path)</li>
-</ul>
+<p>Everything the engine writes lives under <code>storage.path</code>: the vector index
+(<code>index/</code>), the state store (<code>state.db</code>), run traces (<code>traces/</code>) and result
+files (<code>results/</code>). Mount one persistent volume and point <code>storage.path</code> at it
+(<code>path: "${env:NL2SQL_DATA_DIR}"</code>). See <a href="../../configuration/storage/">Storage</a>.</p>
 <h2 id="operational-considerations">Operational considerations</h2>
 <ul>
-<li>Run schema indexing as a separate job or init container.</li>
-<li>If you run <code>nl2sql-api</code>, set the role source (<code>NL2SQL_API_ROLE_HEADER</code> behind an
-  authenticating ingress, or <code>NL2SQL_API_ROLE</code>) and the admin roles
-  (<code>NL2SQL_API_ADMIN_ROLES</code>, default <code>admin</code>): pod traffic is not loopback, so
-  without them the admin routes answer HTTP 403. See
+<li>Run schema indexing as a separate job or init container:
+  <code>nl2sql --config /etc/nl2sql/nl2sql.yaml index</code>, on the same volume.</li>
+<li>The API calls <code>engine.check()</code> before it serves. A datasource with
+  <code>required: true</code> that cannot connect stops the pod, so a readiness gate on
+  the process is enough; any other datasource that fails is logged and left
+  out.</li>
+<li>If you run <code>nl2sql-api</code>, set the role source in the <code>api</code> section
+  (<code>api.role_header</code> behind an authenticating ingress, or <code>api.role</code>) and the
+  admin roles (<code>policies.admin_roles</code>, default <code>[admin]</code>): pod traffic is not
+  loopback, so without them the admin routes answer HTTP 403. See
   <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
-<li>Configure observability exporters via env (<code>OBSERVABILITY_EXPORTER</code>, <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>).</li>
+<li>Configure observability exporters in <code>settings.observability</code> (<code>exporter</code>,
+  <code>otlp_endpoint</code>).</li>
 </ul>
 <h2 id="reference-configuration">Reference configuration</h2>
-<p>See <code>configuration/system.md</code> for settings and defaults.</p>
+<p>See <a href="../../configuration/system/">Configuration</a> for the whole config and the
+environment variables it reads.</p>
 
 
 

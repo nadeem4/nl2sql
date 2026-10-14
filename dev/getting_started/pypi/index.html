@@ -1688,10 +1688,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-configure-index-query" class="md-nav__link">
+  <a href="#lifecycle-configure-check-index-query" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lifecycle (configure → index → query)
+        Lifecycle (configure → check → index → query)
       
     </span>
   </a>
@@ -1993,6 +1993,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -2029,6 +2085,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4638,10 +4750,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-configure-index-query" class="md-nav__link">
+  <a href="#lifecycle-configure-check-index-query" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lifecycle (configure → index → query)
+        Lifecycle (configure → check → index → query)
       
     </span>
   </a>
@@ -4709,109 +4821,87 @@ See the Core API documentation at <a href="../../api/">docs/api/index.md</a>.</p
 <p>Running a query needs an LLM key; only indexing is key-free. See
 <a href="https://github.com/nadeem4/nl2sql#known-limitations">Known limitations</a>.</p>
 <h2 id="configure">Configure</h2>
-<p>Create config files in your working directory:</p>
-<ul>
-<li><code>configs/datasources.yaml</code></li>
-<li><code>configs/llm.yaml</code></li>
-<li><code>configs/policies.json</code></li>
-<li><code>configs/secrets.yaml</code> (optional)</li>
-</ul>
-<p>Start from <code>configs/datasources.example.yaml</code> and <code>configs/policies.example.json</code>.
-There is no example LLM or secrets file; their schemas are linked below.
-Detailed schemas for each file:</p>
+<p>The engine reads one config, <code>nl2sql.yaml</code>, and the files it includes.
+<code>nl2sql init</code> writes it (in Python, <code>nl2sql.config.init_project("my-project")</code>
+writes the same files); see
+<a href="../#start-a-config-with-nl2sql-init">Start a config with <code>nl2sql init</code></a>.
+Each section has its own page:</p>
 <ul>
 <li><a href="../../configuration/datasources/">Datasources</a></li>
 <li><a href="../../configuration/llm/">LLMs</a></li>
+<li><a href="../../configuration/embeddings/">Embeddings</a></li>
 <li><a href="../../configuration/policies/">Policies</a></li>
+<li><a href="../../configuration/storage/">Storage</a></li>
 <li><a href="../../configuration/secrets/">Secrets</a></li>
+<li><a href="../../configuration/settings/">Settings</a></li>
 </ul>
-<div class="admonition note">
-<p class="admonition-title">0.5: <code>nl2sql init</code></p>
-<p>From 0.5 the engine reads one <code>nl2sql.yaml</code> instead of these files.
-<code>nl2sql init</code> writes it, and in Python
-<code>nl2sql.config.init_project("my-project")</code> writes the same files. See
-<a href="../#start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code></a>.</p>
-</div>
 <h3 id="building-the-engine-in-python">Building the engine in Python</h3>
-<p>In Python the engine is built from one <code>nl2sql.yaml</code> (which <code>nl2sql init</code>
-writes), or from a <code>Config</code> built in code. The <code>configs/</code> files above are what
-the CLI commands still read until they move onto <code>nl2sql.yaml</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>   <span class="c1"># or $NL2SQL_CONFIG, then ./nl2sql.yaml</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>                               <span class="c1"># connects, and reports what is ready</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>   <span class="c1"># or $NL2SQL_CONFIG, then ./nl2sql.yaml</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">report</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>                         <span class="c1"># connects, and reports what is ready</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
 </code></pre></div>
-<p>See <a href="../../api/core/public-facade/#creating-an-engine">Public Facade</a> for every
-way to build it. Use the config for fixed, app-wide settings. Use runtime registration when
-you need to add or override datasources/LLMs per request, per tenant, or on a
-long-running process without restart.</p>
+<p>Building the engine never connects to a datasource or calls a model.
+<code>engine.check()</code> does: it raises <code>EngineNotReady</code> when a datasource with
+<code>required: true</code> fails, and otherwise leaves a failed datasource out of
+routing. The library never reads a <code>.env</code> file; call <code>python-dotenv</code> yourself
+before <code>from_config</code> if you keep keys in one. See
+<a href="../../api/core/public-facade/#creating-an-engine">Public Facade</a> for every way
+to build it, including a <code>Config</code> built in code and <code>NL2SQL.demo()</code>. Use the
+config for fixed, app-wide settings. Use runtime registration when you need to
+add datasources on a long-running process without restart.</p>
 <h3 id="datasource-configuration">Datasource configuration</h3>
-<p><code>configs/datasources.yaml</code> defines one or more database connections and limits:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">datasources</span><span class="p">:</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_postgres</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Primary</span><span class="nv"> </span><span class="s">analytics</span><span class="nv"> </span><span class="s">DB."</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">connection</span><span class="p">:</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">localhost</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:POSTGRES_USER}</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:POSTGRES_PASSWORD}</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">analytics</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">statement_timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
+<p><code>datasources/</code> holds one file per datasource; the file name is its id:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># datasources/my_postgres.yaml</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Primary analytics DB.</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nt">connection</span><span class="p">:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">localhost</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:POSTGRES_USER}"</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:POSTGRES_PASSWORD}"</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">analytics</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="nt">limits</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> row_limit</span><span class="p">:</span><span class="w"> </span><span class="nv">100</span><span class="p p-Indicator">,</span><span class="nt"> timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="nv">8000</span><span class="p p-Indicator">,</span><span class="nt"> max_bytes</span><span class="p">:</span><span class="w"> </span><span class="nv">10485760</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
-<p>Install the adapter extras that match <code>connection.type</code>:</p>
+<p>Install the adapter extras that match <code>type</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[postgres]"</span>
 </code></pre></div>
 <p>See <a href="../../adapters/">Adapters</a> for the full list of available adapters.
 See <a href="../../configuration/datasources/">Datasource config</a> for field definitions.</p>
 <h3 id="llm-configuration">LLM configuration</h3>
-<p><code>configs/llm.yaml</code> selects the default model and any per-agent overrides:</p>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.2</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.2</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENAI_API_KEY}</span>
+<p><code>llm.yaml</code> selects the model and any per-agent overrides:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># llm.yaml</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># api_key is optional: without it OPENAI_API_KEY is read.</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> model</span><span class="p">:</span><span class="w"> </span><span class="nv">gpt-5.4-mini</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
-To route chat through <a href="https://openrouter.ai">OpenRouter</a> instead — one key for
+<p>To route chat through <a href="https://openrouter.ai">OpenRouter</a> instead — one key for
 Anthropic, Google, Meta and hundreds of other models, with no extra dependency:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:OPENROUTER_API_KEY}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openrouter</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic/claude-sonnet-4.5</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 </code></pre></div>
 <p>To use Claude on Anthropic's own API, with the system prompts prompt-cached,
 install the <code>anthropic</code> extra and point the config at it:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[anthropic]"</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">default</span><span class="p">:</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># Claude Opus 5 rejects a temperature</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${env:ANTHROPIC_API_KEY}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anthropic</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">claude-opus-5</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># Claude Opus 5 rejects a temperature</span>
 </code></pre></div>
 <p>See <a href="../../configuration/llm/#anthropic-claude">LLM configuration → Anthropic</a>.</p>
 <p>A local <a href="https://ollama.com">Ollama</a> daemon is configured the same way, with
-<code>provider: ollama</code> and no <code>api_key</code>; how well a given local model handles the
-pipeline's structured output varies by model, so see
+<code>provider: ollama</code>; how well a given local model handles the pipeline's
+structured output varies by model, so see
 <a href="../../configuration/llm/#ollama">LLM configuration → Ollama</a> first.</p>
-<p>Note that OpenRouter serves chat completions only. Embeddings are selected
-separately with <code>EMBEDDING_PROVIDER</code>: the default <code>openai</code> means <code>nl2sql index</code>
-needs <code>OPENAI_API_KEY</code> set as well, while <code>EMBEDDING_PROVIDER=local</code> embeds with
-a key-free ONNX model (see
-<a href="../../configuration/system/#embeddings">System configuration → Embeddings</a>).</p>
+<p>Note that OpenRouter serves chat completions only. Embeddings are their own
+section: <code>embeddings: { provider: local }</code> (what <code>nl2sql init</code> writes) embeds
+with a key-free ONNX model, and <code>provider: openai</code> needs <code>OPENAI_API_KEY</code>. See
+<a href="../../configuration/embeddings/">Embeddings</a>.</p>
 <p>See <a href="../../configuration/llm/">LLM config</a> for full schema details.</p>
 <h3 id="add-a-datasource-at-runtime">Add a datasource at runtime</h3>
 <p>You can register a datasource programmatically without editing config files:</p>
@@ -4859,36 +4949,43 @@ database left without a comment.</p>
 <a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="s2">"api_key"</span><span class="p">:</span> <span class="s2">"${env:OPENAI_API_KEY}"</span>
 <a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="p">})</span>
 </code></pre></div>
-<p>You can also load LLMs from a config file at runtime:</p>
+<p>You can also replace every LLM with the <code>llm</code> section of another config at
+runtime:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
 <a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">configure_llm_from_config</span><span class="p">(</span><span class="s2">"configs/llm.yaml"</span><span class="p">)</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">configure_llm_from_config</span><span class="p">(</span><span class="s2">"other/nl2sql.yaml"</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="policies-configuration-rbac">Policies configuration (RBAC)</h3>
-<p><code>configs/policies.json</code> defines which roles can access which datasources/tables:</p>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="p">{</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">"roles"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">    </span><span class="nt">"admin"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">      </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"System Administrator"</span><span class="p">,</span>
-<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">      </span><span class="nt">"role"</span><span class="p">:</span><span class="w"> </span><span class="s2">"admin"</span><span class="p">,</span>
-<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">      </span><span class="nt">"allowed_datasources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">],</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">      </span><span class="nt">"allowed_tables"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"*"</span><span class="p">]</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="p">}</span>
+<p><code>policies.yaml</code> defines which roles can access which datasources and tables:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># policies.yaml</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nt">default_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">viewer</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nt">admin_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">admin</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nt">roles</span><span class="p">:</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">  </span><span class="nt">admin</span><span class="p">:</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">System Administrator</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="w">    </span><span class="nt">allowed_datasources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="w">    </span><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="w">  </span><span class="nt">viewer</span><span class="p">:</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Read-only access to the catalogue</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a><span class="w">    </span><span class="nt">allowed_datasources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">my_postgres</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a><span class="w">    </span><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"my_postgres.public.products"</span><span class="p p-Indicator">]</span>
 </code></pre></div>
-See <a href="../../configuration/policies/">Policies config</a> for allowed table formats and wildcards.</p>
+<p><code>{allow_all: true}</code> (what <code>nl2sql init</code> writes) lets every caller read
+everything, for local use only. See
+<a href="../../configuration/policies/">Policies config</a> for allowed table formats and
+wildcards.</p>
 <h3 id="secrets-configuration-optional">Secrets configuration (optional)</h3>
-<p><code>configs/secrets.yaml</code> is only needed when you want to pull secrets from a provider:</p>
-<p><div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<p>A <code>secrets</code> section is only needed when you want to pull secrets from a
+provider other than the environment:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># secrets.yaml</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="nt">providers</span><span class="p">:</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="c1"># - id: azure-prod</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="c1">#   type: azure</span>
-<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">  </span><span class="c1">#   vault_url: "https://my-vault.vault.azure.net/"</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">azure-prod</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">azure</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">vault_url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://my-vault.vault.azure.net/"</span>
 </code></pre></div>
-See <a href="../../configuration/secrets/">Secrets config</a> for supported providers and fields.</p>
+<p>A datasource then writes <code>password: "${azure-prod:db-password}"</code>. See
+<a href="../../configuration/secrets/">Secrets config</a> for supported providers and fields.</p>
 <h2 id="run-a-query">Run a query</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
 <a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.auth.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserContext</span>
@@ -4912,11 +5009,12 @@ full result set lives in artifact storage and is addressed through <code>artifac
 <p>A question repeated on the same day reuses its validated plan from the plan cache (no planner
 call, same SQL and rows; still validated every time), and
 <code>sub_query.plan_source</code> says <code>"cache"</code>. Turn it off with
-<code>PLAN_CACHE_ENABLED=false</code>; empty it with <code>nl2sql cache clear</code>. See
+<code>settings.pipeline.plan_cache: false</code>; empty it with <code>nl2sql cache clear</code>. See
 <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>
-<h2 id="lifecycle-configure-index-query">Lifecycle (configure → index → query)</h2>
+<h2 id="lifecycle-configure-check-index-query">Lifecycle (configure → check → index → query)</h2>
 <ol>
-<li>Configure datasources, LLMs, and policies.</li>
+<li>Configure datasources, LLMs, and policies (<code>nl2sql init</code>).</li>
+<li>Build the engine and call <code>engine.check()</code>.</li>
 <li>Index schemas at least once (and after schema changes).</li>
 <li>Run queries.</li>
 </ol>
@@ -4925,12 +5023,13 @@ call, same SQL and rows; still validated every time), and
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_all_datasources</span><span class="p">()</span>
 </code></pre></div>
 <h2 id="configure-providers">Configure providers</h2>
-<p>Secrets providers are installed via extras and selected in <code>configs/secrets.yaml</code>:</p>
+<p>Secrets providers are installed via extras and selected in the <code>secrets</code> section:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[aws]"</span>
 <a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[azure]"</span>
 <a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[hashicorp]"</span>
 </code></pre></div>
-<p>See <a href="../../configuration/system/">Configuration system</a> for environment variables and defaults.</p>
+<p>See <a href="../../configuration/system/">Configuration</a> for the whole config, the
+environment variables it reads, and where each 0.4 file and variable went.</p>
 
 
 

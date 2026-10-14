@@ -1555,10 +1555,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration-prerequisites" class="md-nav__link">
+  <a href="#one-config-nl2sqlyaml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration prerequisites
+        One config: nl2sql.yaml
       
     </span>
   </a>
@@ -1566,10 +1566,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#start-a-config-with-nl2sql-init-05" class="md-nav__link">
+  <a href="#start-a-config-with-nl2sql-init" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start a config with nl2sql init (0.5)
+        Start a config with nl2sql init
       
     </span>
   </a>
@@ -1877,6 +1877,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../configuration/secrets/" class="md-nav__link">
         
   
@@ -1913,6 +1969,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4417,10 +4529,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration-prerequisites" class="md-nav__link">
+  <a href="#one-config-nl2sqlyaml" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configuration prerequisites
+        One config: nl2sql.yaml
       
     </span>
   </a>
@@ -4428,10 +4540,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#start-a-config-with-nl2sql-init-05" class="md-nav__link">
+  <a href="#start-a-config-with-nl2sql-init" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Start a config with nl2sql init (0.5)
+        Start a config with nl2sql init
       
     </span>
   </a>
@@ -4470,26 +4582,13 @@ to use the platform:</p>
 <li><a href="source/">From Source (Development)</a></li>
 <li><a href="demo/">Demo Data (CLI-first)</a></li>
 </ul>
-<h2 id="configuration-prerequisites">Configuration prerequisites</h2>
-<p>All paths require configuration files. Start with the example configs:</p>
-<ul>
-<li><code>configs/datasources.example.yaml</code> → copy to <code>configs/datasources.yaml</code></li>
-<li><code>configs/policies.example.json</code> → copy to <code>configs/policies.json</code></li>
-</ul>
-<p><code>configs/llm.yaml</code> and <code>configs/secrets.yaml</code> are tracked in the repository as
-examples: an OpenAI default agent, and a secrets file whose providers are all
-commented out. Edit them against the schemas in <a href="../configuration/llm/">LLMs</a>
-and <a href="../configuration/secrets/">Secrets</a>, or let <code>nl2sql setup</code> generate your
-own.</p>
-<p>See <code>configuration/system.md</code> for environment variables and defaults.</p>
-<h2 id="start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code> (0.5)</h2>
-<div class="admonition note">
-<p class="admonition-title">0.5</p>
-<p><code>nl2sql init</code> writes the 0.5 config, <code>nl2sql.yaml</code>. The engine reads it
-from release 0.5 on (see
-<a href="../architecture/configuration_v2/">Configuration v2</a>); until then the
-files above are what it reads.</p>
-</div>
+<h2 id="one-config-nl2sqlyaml">One config: <code>nl2sql.yaml</code></h2>
+<p>Every path reads the same config, <code>nl2sql.yaml</code>, and the files it includes. The
+CLI takes it from <code>--config PATH</code>, then the <code>NL2SQL_CONFIG</code> variable, then
+<code>./nl2sql.yaml</code>; <code>nl2sql-api</code> from <code>NL2SQL_CONFIG</code>, then <code>./nl2sql.yaml</code>; Python
+from <code>NL2SQL.from_config(path)</code>. The sections, their fields and every 0.4 file
+and variable they replace are in <a href="../configuration/system/">Configuration</a>.</p>
+<h2 id="start-a-config-with-nl2sql-init">Start a config with <code>nl2sql init</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>init<span class="w"> </span>my-project<span class="w">                       </span><span class="c1"># writes my-project/nl2sql.yaml and its files</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nl2sql<span class="w"> </span>init<span class="w"> </span>my-project<span class="w"> </span>--provider<span class="w"> </span>anthropic<span class="w">  </span><span class="c1"># llm.yaml names Anthropic and its default model</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nl2sql<span class="w"> </span>init<span class="w"> </span>my-demo<span class="w"> </span>--demo<span class="w">                   </span><span class="c1"># the demo: three sample databases, roles, verified queries</span>
@@ -4504,14 +4603,17 @@ each section in its own file:</p>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>policies.yaml          # allow_all: true      (--demo: admin, analyst and viewer roles)
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>storage.yaml           # path: .nl2sql
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>curated.yaml           # --demo only: the demo's verified queries
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>data/                  # --demo only: the three sample SQLite files
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>.gitignore             # .nl2sql/ and .env are added to it
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>settings.yaml          # --demo only: a 300 s timeout and a trace for every run
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>data/                  # --demo only: the three sample SQLite files
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>.gitignore             # .nl2sql/ and .env are added to it
 </code></pre></div>
 <ul>
 <li><strong>No key is written.</strong> <code>llm.yaml</code> names no <code>api_key</code>, so the provider's
   standard variable (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>,
-  <code>OPENROUTER_API_KEY</code>) is read. To read another variable, write
-  <code>api_key: "${env:MY_KEY}"</code>.</li>
+  <code>OPENROUTER_API_KEY</code>) is read. Put it in your environment or in a <code>.env</code>
+  file next to <code>nl2sql.yaml</code>: the CLI, <code>nl2sql-api</code> and <code>nl2sql demo</code> load that
+  file at startup and never let it override a variable that is already set. To
+  read another variable, write <code>api_key: "${env:MY_KEY}"</code>.</li>
 <li><strong>Nothing is overwritten</strong> unless you pass <code>--force</code>. If any file <code>init</code>
   would write already exists, it names the files and writes nothing.
   <code>.gitignore</code> is never replaced; the lines it lacks are added.</li>
@@ -4519,6 +4621,16 @@ each section in its own file:</p>
   before it reports success, then prints the next steps.</li>
 <li><strong><code>--provider</code></strong> is <code>openai</code> (the default), <code>anthropic</code> or <code>openrouter</code>.</li>
 </ul>
+<p>Then point <code>datasources/example.yaml</code> at your database (or rename it: the file
+name is the datasource id), and build the index:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>my-project
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>index<span class="w">                                 </span><span class="c1"># or, from elsewhere: nl2sql --config my-project/nl2sql.yaml index</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers are there?"</span>
+</code></pre></div>
+<p><code>nl2sql index</code> and <code>nl2sql run</code> first call <code>engine.check()</code>: each datasource
+connects, or is reported and left out. A datasource with <code>required: true</code> that
+cannot connect stops the command. <code>nl2sql doctor</code> prints the same report
+without running anything.</p>
 <p>From Python, <code>nl2sql.config.init_project(folder, demo=..., provider=..., force=...)</code>
 writes the same files, and <code>nl2sql.config.demo_config()</code> builds the demo's
 <code>Config</code> in code, with the databases opened read-only from the installed

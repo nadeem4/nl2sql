@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -3605,39 +3717,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#connectionconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ConnectionConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datasourceconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DatasourceConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datasourcefileconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DatasourceFileConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#datasourceapiadd_datasource" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4595,39 +4674,6 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#connectionconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ConnectionConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datasourceconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DatasourceConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#datasourcefileconfig" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DatasourceFileConfig
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#datasourceapiadd_datasource" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4742,7 +4788,7 @@
 <p>Register, validate, and inspect datasources backed by adapter implementations.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Register datasources from config or programmatically.</li>
+<li>Register datasources from <code>nl2sql.yaml</code> or programmatically.</li>
 <li>Validate datasource connections via adapters.</li>
 <li>Expose adapter capabilities and details.</li>
 </ul>
@@ -4750,45 +4796,19 @@
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/datasource_api.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/datasources/registry.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/datasources/models.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>Datasource</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/registry.py</code> (adapter lookup by <code>type</code>)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
-<h3 id="connectionconfig">ConnectionConfig</h3>
-<p>Source:
-<code>packages/nl2sql/src/nl2sql/datasources/models.py</code></p>
-<p>Fields:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>type</code> | <code>str</code> | yes | Adapter type (e.g., <code>postgres</code>, <code>mysql</code>). |
-| <code>...</code> | <code>Any</code> | no | Adapter-specific connection fields (allowed via <code>extra</code>). |</p>
-<h3 id="datasourceconfig">DatasourceConfig</h3>
-<p>Source:
-<code>packages/nl2sql/src/nl2sql/datasources/models.py</code></p>
-<p>Fields:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>id</code> | <code>str</code> | yes | Datasource identifier. |
-| <code>description</code> | <code>Optional[str]</code> | no | Human-readable description. |
-| <code>connection</code> | <code>ConnectionConfig</code> | yes | Connection details. |
-| <code>options</code> | <code>Dict[str, Any]</code> | no | Limits and adapter options. |</p>
-<h3 id="datasourcefileconfig">DatasourceFileConfig</h3>
-<p>Source:
-<code>packages/nl2sql/src/nl2sql/configs/datasources.py</code></p>
-<p>Fields:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>version</code> | <code>int</code> | yes | Schema version (defaults to 1). |
-| <code>datasources</code> | <code>List[DatasourceConfig]</code> | yes | Datasource definitions. |</p>
 <h3 id="datasourceapiadd_datasource">DatasourceAPI.add_datasource</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/datasource_api.py</code></p>
 <p>Signature:
-<code>add_datasource(config: Union[Datasource, Dict[str, Any]]) -&gt; None</code></p>
+<code>add_datasource(config: Datasource) -&gt; None</code></p>
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>config</code> | <code>Datasource | Dict[str, Any]</code> | yes | A <code>Datasource</code> (see <a href="../../../architecture/configuration_v2/#datasources-datasource">Configuration v2</a>). The 0.4 dict shape, with <code>connection.type</code>, is still read until the REST API takes the <code>Datasource</code> body. |</p>
+| <code>config</code> | <code>Datasource</code> | yes | A <code>Datasource</code> (see <a href="../../../configuration/datasources/">Datasources</a>). |</p>
 <p>Returns:
 <code>None</code>.</p>
 <p>Raises:
@@ -4807,15 +4827,14 @@
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>config_path</code> | <code>Union[str, pathlib.Path]</code> | yes | Path to <code>datasources.yaml</code>. |</p>
+| <code>config_path</code> | <code>Union[str, pathlib.Path]</code> | yes | Path to another <code>nl2sql.yaml</code>; its datasources are added. |</p>
 <p>Returns:
 <code>None</code>.</p>
 <p>Raises:
-- <code>FileNotFoundError</code> if config is missing.
-- <code>RuntimeError</code> if PyYAML is not installed.
-- <code>ValueError</code> for schema validation or adapter initialization errors.</p>
+- <code>ConfigError</code> if the file does not load, naming every problem.
+- <code>ValueError</code> if an id is already configured or an adapter cannot be built.</p>
 <p>Side Effects:
-- Registers all datasources in registry.</p>
+- Adds each datasource as <code>add_datasource</code> does: built, not connected.</p>
 <p>Idempotency:
 No (registrations happen each call).</p>
 <h3 id="datasourceapilist_datasources">DatasourceAPI.list_datasources</h3>

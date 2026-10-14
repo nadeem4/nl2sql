@@ -445,10 +445,10 @@
 <nav aria-label="Configuration" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#configscuratedyaml">
+<a class="md-nav__link" href="#curatedyaml">
 <span class="md-ellipsis">
       
-        configs/curated.yaml
+        curated.yaml
       
     </span>
 </a>
@@ -1049,6 +1049,30 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/secrets/">
 <span class="md-ellipsis">
     
@@ -1066,6 +1090,30 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -2164,10 +2212,10 @@
 <nav aria-label="Configuration" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#configscuratedyaml">
+<a class="md-nav__link" href="#curatedyaml">
 <span class="md-ellipsis">
       
-        configs/curated.yaml
+        curated.yaml
       
     </span>
 </a>
@@ -2410,19 +2458,19 @@ so. If it has not, run today's pipeline unchanged.</p>
 <tr>
 <td><strong>Verified queries</strong></td>
 <td>A SQL query with typed parameters, and the questions it answers</td>
-<td><code>configs/curated.yaml</code></td>
+<td>the <code>curated</code> section (<code>curated.yaml</code>)</td>
 <td>Built</td>
 </tr>
 <tr>
 <td><strong>Preferred tables</strong></td>
 <td>Views or tables the planner should reach for first</td>
-<td><code>datasources.yaml</code>, <code>preferred_tables:</code></td>
+<td>each datasource's <code>preferred_tables:</code></td>
 <td>Built</td>
 </tr>
 <tr>
 <td><strong>Business metrics</strong></td>
 <td>A named expression (<code>revenue = SUM(...)</code>) the planner refers to by name</td>
-<td><code>configs/curated.yaml</code>, <code>metrics:</code></td>
+<td>the <code>curated</code> section, <code>metrics:</code></td>
 <td>Designed only, <a href="#business-metrics-deferred">deferred</a></td>
 </tr>
 </tbody>
@@ -2443,16 +2491,14 @@ person.</p>
   run time.</li>
 </ul>
 <h2 id="configuration">Configuration</h2>
-<h3 id="configscuratedyaml"><code>configs/curated.yaml</code></h3>
-<p>It follows the pattern of every other config file: a path setting with an
-environment alias (<code>CURATED_CONFIG</code>, default <code>configs/curated.yaml</code>), a
-pydantic file model in <code>nl2sql/configs/curated.py</code> (its models are in
-<code>nl2sql/config/curated.py</code>), and a loader on
-<code>ConfigManager</code> (<code>load_curated()</code>), next to <code>load_datasources()</code> and
-<code>load_policies()</code>.</p>
-<p>The file is optional. When the default path does not exist the feature is off
-and the pipeline is exactly today's. One file covers every datasource, keyed
-by datasource id, the way <code>sample_questions.yaml</code> is.</p>
+<h3 id="curatedyaml"><code>curated.yaml</code></h3>
+<p>Since 0.5 the verified queries are the <code>curated</code> section of <code>nl2sql.yaml</code>,
+usually its own file (<code>curated: { file: curated.yaml }</code>); see
+<a href="../../configuration/curated/">Curated Answers</a>. The models and the checks
+that need the datasources are in <code>nl2sql/config/curated.py</code>.</p>
+<p>The section is optional. When it is absent the feature is off and the
+pipeline is exactly the generated one. One section covers every datasource,
+keyed by datasource id.</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="nt">datasources</span><span class="p">:</span>
 <a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="w">  </span><span class="nt">chinook</span><span class="p">:</span>
 <a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="w">    </span><span class="nt">verified_queries</span><span class="p">:</span>
@@ -2559,11 +2605,10 @@ a <code>ConfigError</code>, as a broken datasource does. These checks need no da
   declared params;</li>
 <li>defaults, examples, <code>min</code>/<code>max</code> and <code>choices</code> agree with the declared type.</li>
 </ul>
-<p>A refinement of the agreed design: when <code>CURATED_CONFIG</code> is <em>set</em> and the file
-it names does not exist, startup fails rather than turning the feature off. A
-typo should not silently turn verified answers off in production. When the
-setting is left at its default and the default file is absent, the feature is
-off.</p>
+<p>A section that includes a file that does not exist (<code>curated: { file: ... }</code>)
+is a config error, so startup fails rather than turning the feature off: a
+typo should not silently turn verified answers off in production. Leaving the
+section out turns the feature off.</p>
 <p><strong><code>nl2sql curated validate</code></strong> runs the startup checks plus the ones that need
 the index: every table the SQL reads (<code>exp.Table</code> nodes, minus CTE names)
 exists in the datasource's latest indexed schema
@@ -2658,8 +2703,7 @@ datasource (<code>GraphState.datasource_id</code>), only that one is searched.</
 and the run continues at <code>datasource_resolver</code> as if it were not there. When
 the run is plan-only (<code>execute=False</code>) the matcher is skipped.</p>
 <p>A refinement made in PR 3: the node is added to the graph only when curated
-answers are on (<code>CURATED_ENABLED</code>, a loaded file with at least one verified
-query) and the run executes. Otherwise <code>datasource_resolver</code> stays the entry
+answers are on (a <code>curated</code> section with at least one verified query) and the run executes. Otherwise <code>datasource_resolver</code> stays the entry
 point, so with no curated file the graph, the trace and the answer are exactly
 what they were before, rather than gaining a node that does nothing. The
 first diamond above is therefore decided once when the graph is built
@@ -2747,7 +2791,7 @@ question, and never sees the SQL.
 <code>policy_denied</code>, <code>capability_missing</code>, <code>execution_failed</code>. A fallback is never
 an error of the run.</p>
 <h3 id="worked-examples">Worked examples</h3>
-<p>All on the demo's Chinook database, with the query in <a href="#configscuratedyaml">the example above</a>.</p>
+<p>All on the demo's Chinook database, with the query in <a href="#curatedyaml">the example above</a>.</p>
 <p><strong>(a) A match.</strong> "Who were our top 5 customers in 2012?" as <code>analyst</code>.
 The best candidate is <code>top_customers_by_revenue</code> (the phrasing "Best 10
 customers in 2012" is close), above the floor. The model picks it with
@@ -2870,7 +2914,7 @@ from.</p>
 <code>feedback</code> table (<code>nl2sql/feedback/store.py</code>), with the question, role, status
 and SQL. That row is the proposal; nothing new is stored and nothing writes
 <code>curated.yaml</code>.</p>
-<p><code>nl2sql curated proposals export --out configs/curated.proposals.yaml</code> turns
+<p><code>nl2sql curated proposals export --out curated.proposals.yaml</code> turns
 thumbs-up runs into draft verified queries in <code>curated.yaml</code>'s shape, under
 the datasource the run used: an id derived from the question (a slug, <code>_2</code>
 on a clash), a description placeholder, the question as the one phrasing,
@@ -2879,8 +2923,8 @@ the reviewer to replace literals with <code>{params}</code>/<code>:params</code>
 <code>LIMIT</code> the generator added, and move the entry into <code>curated.yaml</code>. Without
 <code>--out</code> it prints to stdout. It is modelled on <code>nl2sql feedback export --good</code>
 (<code>feedback/drafts.py</code>), and like it skips runs with no SQL or more than one
-statement, refuses to write over <code>curated.yaml</code> itself (the active file, or
-<code>CURATED_CONFIG</code>), and lives in <code>nl2sql.feedback.proposals</code> (opt-in, imported
+statement, refuses to write over the config's own files (<code>nl2sql.yaml</code> and
+every file it includes), and lives in <code>nl2sql.feedback.proposals</code> (opt-in, imported
 lazily by the command). It also skips runs whose answer was already
 verified, runs that did not succeed, runs on more than one datasource and
 rows rated before the datasource was recorded, and proposes each question
@@ -2899,17 +2943,14 @@ nullable columns, <code>datasource_ids</code> and <code>source</code>, written b
 <p><code>curated.yaml</code> stays the single source of truth, in git. Neither the REST API
 nor the playground ever writes it.</p>
 <h2 id="demo">Demo</h2>
-<p><code>nl2sql demo</code> writes <code>configs/curated.demo.yaml</code>, beside
-<code>sample_questions.demo.yaml</code>, with six Chinook verified queries
-(<code>top_customers_by_revenue</code>, <code>revenue_by_year</code>, <code>monthly_revenue</code>,
-<code>sales_by_country</code>, <code>best_selling_genres</code>, <code>top_artists_by_tracks_sold</code>), and
-the generated <code>.env.demo</code> gains <code>CURATED_CONFIG=configs/curated.demo.yaml</code>
-(<code>cli/generators/env/templates.py</code>). Only the demo's env file sets it: for any
-other environment the file is optional, and a <code>CURATED_CONFIG</code> naming a file
-that does not exist fails startup. The queries are data in
-<code>datasets/chinook.py</code> (<code>CHINOOK_VERIFIED_QUERIES</code>), written by
-<code>DemoManager._write_common_artifacts()</code>, and <code>nl2sql setup --demo</code> indexes
-their questions with the schema, so the hosted Space's image has them too. No
+<p><code>nl2sql init --demo</code> (which <code>nl2sql demo</code> runs the first time) writes
+<code>curated.yaml</code> with six Chinook verified queries (<code>top_customers_by_revenue</code>,
+<code>revenue_by_year</code>, <code>monthly_revenue</code>, <code>sales_by_country</code>,
+<code>best_selling_genres</code>, <code>top_artists_by_tracks_sold</code>), included by its
+<code>nl2sql.yaml</code>; <code>NL2SQL.demo()</code> builds the same section in code. The queries
+are data in <code>datasets/chinook.py</code> (<code>CHINOOK_VERIFIED_QUERIES</code>), and
+<code>nl2sql index</code> indexes their questions with the schema, so the hosted Space's
+image has them too. No
 guided question was added: two of the existing ones ("What is the total
 revenue per year?", "Which genre sells the most tracks?") are phrasings of
 verified queries, and a new guided question would have no recording.</p>
@@ -2927,35 +2968,25 @@ a question whose recorded choice picked a query as covered too.</p>
 <thead>
 <tr>
 <th>Setting</th>
-<th>Env</th>
 <th>Default</th>
 <th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>curated_config_path</code></td>
-<td><code>CURATED_CONFIG</code></td>
-<td><code>configs/curated.yaml</code></td>
-<td>The curated answers file. Absent at the default path: the feature is off. Set and absent: startup fails.</td>
+<td>the <code>curated</code> section</td>
+<td>absent</td>
+<td>Present: curated answers are on. Absent: off. (0.4's <code>CURATED_CONFIG</code> and <code>CURATED_ENABLED</code>.)</td>
 </tr>
 <tr>
-<td><code>curated_enabled</code></td>
-<td><code>CURATED_ENABLED</code></td>
-<td><code>true</code></td>
-<td>Turns matching off without removing the file. Validation commands still run.</td>
-</tr>
-<tr>
-<td><code>curated_match_floor</code></td>
-<td><code>CURATED_MATCH_FLOOR</code></td>
+<td><code>settings.curated.match_floor</code></td>
 <td><code>0.6</code></td>
-<td>Cosine similarity the best candidate must reach before the model is asked.</td>
+<td>Cosine similarity the best candidate must reach before the model is asked (0.4's <code>CURATED_MATCH_FLOOR</code>).</td>
 </tr>
 <tr>
-<td><code>curated_match_top_k</code></td>
-<td><code>CURATED_MATCH_TOP_K</code></td>
+<td><code>settings.curated.match_top_k</code></td>
 <td><code>5</code></td>
-<td>Candidates shown to the model.</td>
+<td>Candidates shown to the model (0.4's <code>CURATED_MATCH_TOP_K</code>).</td>
 </tr>
 </tbody>
 </table>

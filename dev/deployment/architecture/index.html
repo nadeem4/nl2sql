@@ -792,6 +792,30 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/secrets/">
 <span class="md-ellipsis">
     
@@ -809,6 +833,30 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -1268,6 +1316,15 @@
 <span class="md-ellipsis">
       
         Deployment inputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#startup">
+<span class="md-ellipsis">
+      
+        Startup
       
     </span>
 </a>
@@ -1962,6 +2019,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#startup">
+<span class="md-ellipsis">
+      
+        Startup
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#runtime-modes">
 <span class="md-ellipsis">
       
@@ -1996,25 +2062,46 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="deployment-architecture">Deployment Architecture</h1>
-<p>NL2SQL is a Python engine that you embed in a service of your choice. The runtime is a single process that initializes <code>Runtime</code>, loads configuration, and invokes the pipeline per request.</p>
+<p>NL2SQL is a Python engine that you embed in a service of your choice, or run as
+<code>nl2sql-api</code>. The runtime is a single process that builds one engine from one
+config, <code>nl2sql.yaml</code>, checks it, and invokes the pipeline per request.</p>
 <h2 id="runtime-process-layout">Runtime process layout</h2>
 <pre class="mermaid"><code>flowchart TD
-    App[Service Process] --&gt; Context[Runtime]
-    Context --&gt; Registries[Registries + Stores]
-    Context --&gt; Graph[LangGraph Pipeline]
+    Config[nl2sql.yaml and its files] --&gt; App[Service Process]
+    App --&gt; Engine[NL2SQL engine]
+    Engine --&gt; Registries[Registries + Stores]
+    Engine --&gt; Graph[LangGraph Pipeline]
     Graph --&gt; Exec[Executor Services]
     Exec --&gt; DB[(Datasource)]</code></pre>
 <h2 id="deployment-inputs">Deployment inputs</h2>
 <ul>
-<li>Environment variables for <code>Settings</code> (paths and runtime parameters).</li>
-<li>Configuration files under <code>configs/</code>.</li>
-<li>Adapter packages installed in the runtime environment.</li>
-<li>Optional persistence volumes for vector store, schema store, and artifacts.</li>
+<li><strong>The config:</strong> <code>nl2sql.yaml</code> and the files it includes (<code>nl2sql init</code> writes
+  them). The entry point finds it through <code>NL2SQL_CONFIG</code>, else
+  <code>./nl2sql.yaml</code>; the CLI also takes <code>--config</code>. See
+  <a href="../../configuration/system/">Configuration</a>.</li>
+<li><strong>The environment:</strong> provider keys (<code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>,
+  <code>OPENROUTER_API_KEY</code>) and any variable the config names as <code>${env:VAR}</code>. The
+  CLI, <code>nl2sql-api</code> and the demo load the <code>.env</code> next to <code>nl2sql.yaml</code> at
+  startup, never overriding a variable that is already set.</li>
+<li><strong>Adapter packages</strong> installed in the runtime environment.</li>
+<li><strong>A volume for <code>storage.path</code>:</strong> the vector index (<code>index/</code>), the state store
+  (<code>state.db</code>: schema snapshots, the plan cache, feedback), run traces
+  (<code>traces/</code>) and result files (<code>results/</code>).</li>
 </ul>
+<h2 id="startup">Startup</h2>
+<p>Building the engine never connects. The entry points then call
+<code>engine.check()</code>: each datasource connects or is reported as failed and left
+out of routing, and each agent's key is checked without a model call. A
+datasource with <code>required: true</code> that cannot connect makes <code>check()</code> raise
+<code>EngineNotReady</code>, and the entry point refuses to start: <code>nl2sql-api</code> before it
+accepts a request, the CLI before it runs a command, <code>nl2sql demo</code> before it
+serves the playground.</p>
 <h2 id="runtime-modes">Runtime modes</h2>
 <ul>
-<li><strong>Local dev</strong>: local vector store + SQLite schema store + local artifact store.</li>
-<li><strong>Production</strong>: persistent volumes or external stores, stable secret providers, observability exporter enabled.</li>
+<li><strong>Local dev</strong>: <code>nl2sql init</code>, local embeddings, <code>storage.path: .nl2sql</code>.</li>
+<li><strong>Production</strong>: a mounted config, <code>storage.path</code> on a persistent volume,
+  secrets from a secret provider, <code>required: true</code> on the datasources the
+  service cannot run without, an observability exporter enabled.</li>
 <li><strong>Hosted demo</strong>: the playground on the shipped sample databases, holding no
   API key of its own; each visitor brings theirs. See
   <a href="../hosted-demo/">Hosted demo</a>.</li>
@@ -2026,8 +2113,9 @@
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>
-<li>Context initialization: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
-<li>Settings: <code>packages/nl2sql/src/nl2sql/common/settings.py</code></li>
+<li>The engine and its lifecycle: <code>packages/nl2sql/src/nl2sql/public_api.py</code></li>
+<li>Building the runtime from the config: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
+<li>The config models and <code>load_config</code>: <code>packages/nl2sql/src/nl2sql/config/</code></li>
 </ul>
 </article>
 </div>

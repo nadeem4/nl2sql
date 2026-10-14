@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4561,7 +4673,7 @@ default. <code>FEEDBACK_ENABLED=false</code> turns it off: the control then says
 <code>POST /api/feedback</code> answers <code>403</code>.</p>
 <h2 id="what-is-stored">What is stored</h2>
 <p>One row per run in a <code>feedback</code> table inside the SQLite schema store
-(<code>SCHEMA_STORE_PATH</code>, <code>data/schema_store.db</code> in the demo), beside the schema
+(<code>&lt;storage.path&gt;/state.db</code>, <code>nl2sql-demo/.nl2sql/state.db</code> in the demo), beside the schema
 snapshots and the plan cache. No new service or file.</p>
 <table>
 <thead>
@@ -4625,13 +4737,13 @@ error messages or keys. It holds only what the run showed the role it ran as:
 the SQL of a refused run is dropped, and error messages (which can name a
 forbidden table) are not kept. <code>nl2sql feedback clear</code> deletes every row.</p>
 <h2 id="guardrail-rates-nl2sql-feedback-stats">Guardrail rates: <code>nl2sql feedback stats</code></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">          </span><span class="c1"># a table</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w"> </span>--json<span class="w">   </span><span class="c1"># the same numbers as JSON</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w"> </span>--traces<span class="w"> </span>other/traces
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">          </span><span class="c1"># a table</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w"> </span>--json<span class="w">   </span><span class="c1"># the same numbers as JSON</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w"> </span>--traces<span class="w"> </span>other/traces
 </code></pre></div>
 <p><code>stats</code> counts every recorded run once, keyed by trace id: the feedback rows,
-plus every trace in <code>TRACE_DIR</code> when <code>TRACE_MODE</code> kept them (the demo writes
-<code>TRACE_MODE=always</code>). When a run has both, its counters come from the trace,
+plus every trace in <code>&lt;storage.path&gt;/traces</code> when <code>settings.traces.mode</code> kept
+them (the demo's config sets <code>always</code>). When a run has both, its counters come from the trace,
 which also sees a validator rejection a retry then fixed, and its rating from
 the row.</p>
 <table>
@@ -4687,8 +4799,8 @@ more traces):</p>
 </code></pre></div>
 <p><code>nl2sql feedback list</code> prints the ratings, newest first, with their notes.</p>
 <h2 id="growing-the-gold-set-nl2sql-feedback-export-good">Growing the gold set: <code>nl2sql feedback export --good</code></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">                     </span><span class="c1"># feedback_gold_drafts.yaml</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w"> </span>--out<span class="w"> </span>drafts.yaml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">                     </span><span class="c1"># feedback_gold_drafts.yaml</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w"> </span>--out<span class="w"> </span>drafts.yaml
 </code></pre></div>
 <p>Each thumbs-up run becomes a draft entry in the shape of
 <code>chinook_gold.yaml</code> (<code>GoldQuestion</code> in <code>nl2sql/evaluation/gold.py</code>): the
@@ -4708,7 +4820,7 @@ entry into <code>chinook_gold.yaml</code>, and run the gold generator to write i
 <h2 id="proposing-verified-queries-nl2sql-curated-proposals-export">Proposing verified queries: <code>nl2sql curated proposals export</code></h2>
 <p>A thumbs-up on a <em>generated</em> answer can also become a proposed verified query
 for <code>curated.yaml</code>, for a person to review and commit:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--env<span class="w"> </span>demo<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>configs/curated.proposals.yaml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>curated.proposals.yaml
 </code></pre></div>
 <p>Runs answered by a verified query, failed runs, runs on more than one
 datasource and runs with no SQL are skipped, and rows rated before the table

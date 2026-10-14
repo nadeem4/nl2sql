@@ -1794,6 +1794,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/secrets/" class="md-nav__link">
         
   
@@ -1830,6 +1886,62 @@
     
   
     Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
   
 
     
@@ -4677,7 +4789,7 @@
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Replace the engine's whole LLM at runtime (<code>replace</code>).</li>
-<li>Register LLM configs programmatically or from file.</li>
+<li>Register LLM configs programmatically, or replace them all with the <code>llm</code> section of an <code>nl2sql.yaml</code>.</li>
 <li>Provide config lookup and listing.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
@@ -4687,39 +4799,34 @@
 <li><code>packages/nl2sql/src/nl2sql/llm/llm_set.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/client_cache.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/models.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/configs/llm.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>LLM</code>, <code>AgentLLM</code>: the <code>llm</code> section)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <h3 id="agentconfig">AgentConfig</h3>
+<p>One agent's resolved settings, as <code>LLMRegistry</code> builds a client from them.
+<code>agents_from_config(llm)</code> (<code>llm/registry.py</code>) makes one per agent from the
+config's <code>llm</code> section (<a href="../../../configuration/llm/">LLM configuration</a>).</p>
 <p>Source:
-<code>packages/nl2sql/src/nl2sql/configs/llm.py</code></p>
+<code>packages/nl2sql/src/nl2sql/llm/models.py</code></p>
 <p>Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
 | <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>anthropic</code>, <code>openrouter</code> or <code>ollama</code>. |
 | <code>model</code> | <code>str</code> | yes | Model identifier. |
 | <code>temperature</code> | <code>Optional[float]</code> | no | Sampling temperature (default <code>0.0</code>). <code>None</code> (<code>null</code> in YAML) sends no temperature parameter, for models that accept only their default. |
-| <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. Masked in <code>repr</code>, <code>str</code> and JSON dumps; <code>LLMGenerator</code> writes the real value or reference. |
+| <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. Masked in <code>repr</code>, <code>str</code> and JSON dumps. <code>None</code> reads the provider's standard variable. |
 | <code>base_url</code> | <code>Optional[str]</code> | no | Endpoint override; defaults to the provider preset (<code>https://openrouter.ai/api/v1</code> for <code>openrouter</code>, <code>http://localhost:11434/v1</code> for <code>ollama</code>). |
 | <code>name</code> | <code>str</code> | no | Agent name (default <code>default</code>). |</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>There is one definition, in <code>packages/nl2sql/src/nl2sql/configs/llm.py</code>
-(read/written by <code>ConfigManager</code> and <code>LLMGenerator</code>).
-<code>packages/nl2sql/src/nl2sql/llm/models.py</code> re-exports it for <code>LLMRegistry</code>,
-so <code>nl2sql.llm.AgentConfig</code> and <code>nl2sql.configs.AgentConfig</code> are the same
-class. It used to be duplicated, and a fix applied to only one copy
-silently did nothing.</p>
-</div>
 <h3 id="llmfileconfig">LLMFileConfig</h3>
+<p>A set of agents the benchmark compares, one config at a time:
+<code>LLMFileConfig.from_llm(llm)</code> turns an <code>llm</code> section into it.</p>
 <p>Source:
-<code>packages/nl2sql/src/nl2sql/configs/llm.py</code></p>
+<code>packages/nl2sql/src/nl2sql/llm/models.py</code></p>
 <p>Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>version</code> | <code>int</code> | yes | Schema version (defaults to 1). |
-| <code>default</code> | <code>AgentConfig</code> | yes | Default LLM configuration. |
-| <code>agents</code> | <code>Dict[str, AgentConfig]</code> | no | Per-agent overrides. |</p>
+| <code>default</code> | <code>AgentConfig</code> | yes | The top level of the <code>llm</code> section. |
+| <code>agents</code> | <code>Dict[str, AgentConfig]</code> | no | The agents that set their own fields. |</p>
 <h3 id="llm_apireplace">LLM_API.replace</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/llm_api.py</code> (<code>Runtime.replace_llm</code> in
@@ -4769,11 +4876,16 @@ silently did nothing.</p>
 <h3 id="llm_apiconfigure_llm_from_config">LLM_API.configure_llm_from_config</h3>
 <p>Signature:
 <code>configure_llm_from_config(config_path: Union[str, pathlib.Path]) -&gt; None</code></p>
+<p>Parameters:
+| name | type | required | meaning |
+| --- | --- | --- | --- |
+| <code>config_path</code> | <code>Union[str, pathlib.Path]</code> | yes | An <code>nl2sql.yaml</code>; its <code>llm</code> section is used. |</p>
 <p>Raises:
-- <code>FileNotFoundError</code> if config missing.
-- <code>ValueError</code> for schema validation errors.</p>
+- <code>ConfigError</code> if the file does not load, naming every problem.</p>
 <p>Side Effects:
-- Registers all LLMs from file; also registers <code>default</code> from file.</p>
+- Replaces every agent with the file's <code>llm</code> section, as one step; an agent
+  the section no longer names falls back to the top level. An invalid file
+  changes nothing. <code>NL2SQL.reload_llm_config(path)</code> does the same.</p>
 <h3 id="llm_apiget_llm">LLM_API.get_llm</h3>
 <p>Signature:
 <code>get_llm(name: str) -&gt; dict</code></p>
