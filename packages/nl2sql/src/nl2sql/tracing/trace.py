@@ -1,4 +1,4 @@
-"""Assembles one run's trace document and writes it when ``TRACE_MODE`` says so.
+"""Assembles one run's trace document and writes it when ``settings.traces.mode`` says so.
 
 Called by :func:`nl2sql.pipeline.runtime.run_with_graph` on every exit path, so
 the CLI, the Python API, the REST API and the playground all get the same file.
@@ -16,7 +16,6 @@ from importlib import metadata
 from typing import Any, Dict, Iterable, Optional, Set
 
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import secret_value, settings
 from nl2sql.llm.request_key import current_api_keys
 from nl2sql.tracing.document import (
     TRACE_FORMAT_VERSION,
@@ -32,7 +31,6 @@ logger = get_logger("trace")
 
 # Environment variables whose values are credentials, whatever the variable is.
 _SECRET_ENV = re.compile(r"(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|CONNECTION_STRING|AUTH)", re.IGNORECASE)
-_SECRET_SETTING = re.compile(r"(api_key|secret|password|token|connection_string|credential)", re.IGNORECASE)
 
 
 @functools.lru_cache(maxsize=1)
@@ -64,10 +62,6 @@ def collect_secrets(ctx: Any) -> Set[str]:
     for name, value in os.environ.items():
         if value and _SECRET_ENV.search(name):
             found.add(value)
-    for name in ("openai_api_key",):
-        value = secret_value(getattr(settings, name, None))
-        if value:
-            found.add(value)
     for registry_name in ("llm_registry", "ds_registry"):
         registry = getattr(ctx, registry_name, None)
         manager = getattr(registry, "secret_manager", None)
@@ -80,11 +74,9 @@ def collect_secrets(ctx: Any) -> Set[str]:
     return found
 
 
-def settings_snapshot() -> Dict[str, Any]:
-    """The settings in force, without any field that could hold a credential."""
-    # Excluded before dumping, so a secret field is never even serialized.
-    secret_fields = {k for k in type(settings).model_fields if _SECRET_SETTING.search(k)}
-    return settings.model_dump(mode="json", exclude=secret_fields)
+def settings_snapshot(ctx: Any) -> Dict[str, Any]:
+    """The run's ``settings`` section, as written in ``nl2sql.yaml``. It holds no credential."""
+    return ctx.settings.model_dump(mode="json", by_alias=True)
 
 
 def _llm_configs(ctx: Any) -> Dict[str, Any]:
@@ -113,7 +105,8 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
     """The whole trace document, capped and redacted."""
     from nl2sql.api.query_api import result_from_state  # query_api imports the runtime
 
-    limits = Limits(sample_rows=settings.trace_sample_rows, max_field_chars=settings.trace_max_field_chars)
+    traces = ctx.settings.traces
+    limits = Limits(sample_rows=traces.sample_rows, max_field_chars=traces.max_field_chars)
     nodes = recorder.node_executions(usage=usage)
     for node in nodes:
         for key in ("inputs", "outputs", "errors", "warnings"):
@@ -123,7 +116,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
 
     try:
         result = result_from_state(state, artifact_store=getattr(ctx, "artifact_store", None),
-                                   sample_rows=settings.trace_sample_rows).model_dump(mode="json")
+                                   sample_rows=traces.sample_rows).model_dump(mode="json")
         result.pop("trace_path", None)
     except Exception as exc:  # the trace is still worth having without the typed result
         result = {"error": f"Could not build the QueryResult: {exc}"}
@@ -146,7 +139,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
         "request": request,
         "engine": engine_info(),
         "llm": {"configured": _llm_configs(ctx), "by_node": by_node},
-        "settings": settings_snapshot(),
+        "settings": settings_snapshot(ctx),
         "limits": {
             "sample_rows": limits.sample_rows,
             "max_field_chars": limits.max_field_chars,
@@ -169,7 +162,7 @@ def write_run_trace(mode: str, **kwargs: Any) -> Optional[str]:
         doc = build_trace(**kwargs)
         if not should_write(mode, doc["failed"]):
             return None
-        return str(write_trace(doc, pathlib.Path(settings.trace_dir)))
+        return str(write_trace(doc, pathlib.Path(kwargs["ctx"].traces_dir)))
     except Exception:
         logger.warning("Could not write the run trace", exc_info=True)
         return None

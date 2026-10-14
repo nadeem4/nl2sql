@@ -115,15 +115,14 @@ def test_embeddings_refuse_an_empty_secret(monkeypatch):
 
 
 def test_trace_redactor_collects_the_real_value_not_the_mask(monkeypatch):
-    from nl2sql.common.settings import settings
-    from nl2sql.tracing.trace import collect_secrets, settings_snapshot
+    from types import SimpleNamespace
 
-    monkeypatch.setattr(settings, "openai_api_key", SecretStr(FAKE_KEY))
-    found = collect_secrets(object())
+    from nl2sql.tracing.trace import collect_secrets
+
+    client = SimpleNamespace(openai_api_key=SecretStr(FAKE_KEY))
+    found = collect_secrets(SimpleNamespace(llm_registry=SimpleNamespace(llms={"default": client})))
     assert FAKE_KEY in found
     assert "**********" not in found
-    snapshot = str(settings_snapshot())
-    assert FAKE_KEY not in snapshot
 
 
 def _fake_secret_clients(monkeypatch) -> dict:

@@ -193,6 +193,18 @@ class LLMRegistry:
         """A new set from the ``llm`` section. Swaps nothing."""
         return self.build(agents_from_config(llm), llm)
 
+    def derive(self, llm: "LLM") -> "LLMRegistry":
+        """A registry for one run, sharing this one's client cache, its current set built from ``llm``.
+
+        Evaluation and trace replay use it (``Runtime.derive``): swapping its
+        set leaves this registry's alone, while equal agent settings still
+        share one client. It is never closed; this registry owns the cache.
+        """
+        run = LLMRegistry(self.secret_manager, self._registry)
+        run._cache = self._cache
+        run._current = run.build_from(llm)
+        return run
+
     def swap(self, llms: LLMSet) -> LLMSet:
         """Makes ``llms`` the current set and returns the old one. Runs in flight keep theirs."""
         with self._lock:

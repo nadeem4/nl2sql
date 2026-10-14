@@ -59,12 +59,11 @@ def test_sqlalchemy_base_has_no_duplicate_result_models():
         assert name not in sqlalchemy_base.__all__
 
 
-# F19: index health opens the snapshot store through the factory.
-def test_index_health_builds_its_snapshot_store_through_the_factory(tmp_path, monkeypatch):
+# F19: index health reads the snapshot versions from the engine's state store (state.db).
+def test_index_health_reads_snapshot_versions_from_the_state_store(tmp_path, monkeypatch):
     from langchain_core.documents import Document
     from langchain_core.embeddings import FakeEmbeddings
 
-    from nl2sql.common.settings import settings
     from nl2sql.indexing import health
     from nl2sql.indexing.vector_store import VectorStore
 
@@ -78,14 +77,14 @@ def test_index_health_builds_its_snapshot_store_through_the_factory(tmp_path, mo
         def get_latest_version(self, ds_id):
             return "v9"
 
-    def fake_build(backend, max_versions, path=None):
-        calls.append((backend, max_versions, path))
+    def fake_store(path):
+        calls.append(path)
         return _Snapshots()
 
-    monkeypatch.setattr(health, "build_schema_store", fake_build)
+    monkeypatch.setattr(health, "SqliteSchemaStore", fake_store)
     result = health.inspect_index_at(tmp_path / "vs", "nl2sql_store", tmp_path / "schema.db", ["chinook"])
 
-    assert calls == [(settings.schema_store_backend, settings.schema_store_max_versions, tmp_path / "schema.db")]
+    assert calls == [tmp_path / "schema.db"]
     assert result.datasources[0].snapshot_version == "v9"
 
 

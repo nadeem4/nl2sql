@@ -1226,6 +1226,29 @@ Phase 1. OpenTelemetry moves in Phase 3.
     With the pipeline on the runtime, `tests/e2e/test_two_engines_fake_llm.py`
     passes, so it is a normal test from this PR on rather than from PR 13.
 
+!!! note "Built: step 2, indexing and the rest (PR 12)"
+    `indexing`, `services`, `tracing` and `evaluation` no longer read the
+    global; `secrets` and `feedback` already did not, and the embedder and
+    the secret manager have been per runtime since PR 7a. The trace writer
+    takes its sizes and folder from `ctx.settings.traces` and
+    `ctx.traces_dir`, and its `settings` snapshot is the run's `settings`
+    section. `tracing.replay` caps the replayed result with the run's
+    `settings.traces`. The curated search takes `k` from the caller's
+    `settings.curated.match_top_k`, index health reads `state.db` directly,
+    and `PipelineMonitorCallback` takes `settings.observability` as a
+    parameter. `pinned_config` and the `Runtime.config` setter are deleted:
+    evaluation (tiers 1 and 2, retrieval recall) and trace replay call
+    `ctx.derive({"settings.pipeline.plan_cache": False, ...})`, which returns
+    a run-scoped runtime built from `derived_config` (dotted paths over
+    `model_copy`). It shares the adapters, embedder, stores and the engine's
+    `LLMClientCache`, and has its own config, curated answers and `LLMSet`,
+    built through that cache from the derived `llm` section
+    (`LLMRegistry.derive`). An `llm.replace` on the engine is therefore what
+    the next run starts from, equal agent settings share one client, and a
+    run that replaces its LLMs (tier 1's gold-plan fake, tier 2's configs,
+    replay's playback clients) never changes the engine's. `nl2sql.runtime` stays on the ratchet list
+    for the copy step, which PR 13 deletes.
+
 Each step is one green PR, and no release happens in between:
 
 1. **The switch PR (7a in the plan)** introduces `Runtime.from_config(cfg)`.

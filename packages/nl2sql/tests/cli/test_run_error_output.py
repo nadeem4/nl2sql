@@ -13,6 +13,7 @@ import pytest
 from nl2sql.cli.commands import run as run_module
 from nl2sql.cli.types import RunConfig
 from nl2sql.pipeline.pipeline_runner import PipelineResult
+from nl2sql.testing.runtime import fake_runtime
 
 ERROR = "LLM agent 'default' uses provider 'openai', which requires an API key"
 TRACEBACK = (
@@ -41,7 +42,7 @@ def failing_pipeline(monkeypatch):
 def _run(verbose: bool) -> None:
     config = RunConfig(query="How many employees are there?", verbose=verbose)
     with pytest.raises(SystemExit) as exc:
-        run_module.run_pipeline(config, ctx=None)
+        run_module.run_pipeline(config, ctx=fake_runtime())
     assert exc.value.code == 1
 
 

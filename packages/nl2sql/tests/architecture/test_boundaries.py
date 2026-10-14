@@ -599,13 +599,8 @@ READS_THE_SETTINGS_GLOBAL = {
     "nl2sql.cli.demo.playground.app",
     "nl2sql.cli.commands.run",
     "nl2sql.cli.main",
-    "nl2sql.indexing.health",
-    "nl2sql.indexing.vector_store",
-    "nl2sql.services.callbacks.monitor",
     "nl2sql.configs.manager",
     "nl2sql.runtime",
-    "nl2sql.tracing.replay",
-    "nl2sql.tracing.trace",
 }
 
 

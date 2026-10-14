@@ -2,8 +2,9 @@ from nl2sql.services.callbacks.node_handlers import NodeHandler
 from nl2sql.services.callbacks.token_handler import read_usage
 from langchain_core.callbacks import BaseCallbackHandler
 from nl2sql.services.callbacks.presenter import PresenterProtocol
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from langchain_core.outputs import LLMResult
+from nl2sql.config import ObservabilitySettings
 
 class PipelineMonitorCallback(BaseCallbackHandler):
     """Callback handler for CLI progress, node-duration metrics and audit events.
@@ -13,15 +14,13 @@ class PipelineMonitorCallback(BaseCallbackHandler):
     ``QueryResult.usage`` and the ``nl2sql.token.usage`` counter.
     """
     
-    def __init__(self, presenter: PresenterProtocol):
-        from nl2sql.common.settings import settings
-        from nl2sql.common.metrics import configure_metrics
-        
-        configure_metrics(
-            exporter_type=settings.observability_exporter,
-            otlp_endpoint=settings.otlp_endpoint
-        )
-        
+    def __init__(self, presenter: PresenterProtocol, observability: Optional[ObservabilitySettings] = None):
+        """``observability`` is the run's ``settings.observability``; without it no exporter is set up."""
+        if observability is not None:
+            from nl2sql.common.metrics import configure_metrics
+
+            configure_metrics(exporter_type=observability.exporter, otlp_endpoint=observability.otlp_endpoint)
+
         self.node_handler = NodeHandler(presenter)
 
     def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any) -> Any:

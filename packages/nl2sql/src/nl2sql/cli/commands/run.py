@@ -33,7 +33,7 @@ def run_pipeline(
     
     # Setup Monitoring
     from nl2sql.services.callbacks.monitor import PipelineMonitorCallback
-    monitor = PipelineMonitorCallback(presenter)
+    monitor = PipelineMonitorCallback(presenter, ctx.settings.observability)
     
     presenter.start_interactive_status("Thinking...")
     

@@ -16,7 +16,6 @@ import pytest
 import yaml
 
 from nl2sql import BenchmarkAPI, BenchmarkConfig
-from nl2sql.common.settings import settings
 from nl2sql.evaluation.prices import PRICES, call_cost
 from nl2sql.evaluation.tier1 import GoldPlanLLM, load_gold_plans
 from nl2sql.evaluation.tier2 import UnknownPriceError
@@ -74,8 +73,8 @@ def _write_config(path, base_url, helpers="gpt-5.4-mini", planner="gpt-5.4"):
     return path
 
 
-def _run(demo_env, paths, *, servers, max_cost=5.0, passes=1, questions=QUESTIONS, spend=None):
-    api = BenchmarkAPI(demo_env.ctx)
+def _run(demo_env, paths, *, servers, max_cost=5.0, passes=1, questions=QUESTIONS, spend=None, ctx=None):
+    api = BenchmarkAPI(ctx or demo_env.ctx)
     config = BenchmarkConfig(roles=["admin"])
     configs = api.tier2_configs(config, paths)
 
@@ -174,16 +173,16 @@ def test_an_unknown_model_price_fails_before_any_call(demo_env, servers, tmp_pat
     assert good.server.calls == []
 
 
-def test_two_passes_plan_afresh_and_report_determinism(demo_env, servers, tmp_path, monkeypatch):
+def test_two_passes_plan_afresh_and_report_determinism(demo_env, servers, tmp_path):
     # With the cache on, pass 2 would replay pass 1's plans without asking the planner.
-    monkeypatch.setattr(settings, "plan_cache_enabled", True)
+    engine = demo_env.ctx.derive({"settings.pipeline.plan_cache": True})
     good, _ = servers
     paths = {"good": _write_config(tmp_path / "good.yaml", good.server.base_url)}
-    board = _run(demo_env, paths, servers=servers, passes=2)
+    board = _run(demo_env, paths, servers=servers, passes=2, ctx=engine)
 
     answerable = len(QUESTIONS) - 1
     assert sum(call["name"] == "PlanModel" for call in good.server.calls) == 2 * answerable
-    assert settings.plan_cache_enabled is True  # restored after the run
+    assert engine.settings.pipeline.plan_cache is True  # the engine's own config is untouched
     determinism = board["configs"]["good"]["determinism"]
     assert determinism == {"identical": len(QUESTIONS), "questions": len(QUESTIONS), "share": 1.0, "differing": []}
     assert board["configs"]["good"]["completed_cases"] == 2 * len(QUESTIONS)
