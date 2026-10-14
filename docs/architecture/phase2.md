@@ -426,6 +426,33 @@ So even a daily session stays well inside $10.
       still evicts the oldest versions, and an unchanged structure still
       refreshes its stored metadata in place.
 
+!!! note "Built: the trace and result stores, and retention (S4)"
+    `nl2sql/storage/files.py` is the `files` `TraceStore` and
+    `nl2sql/storage/local.py` the `local` `ResultStore`, each with
+    `max_age_days` (14 and 7, at least 1) and `purge`. The run trace is
+    written through `Runtime.traces`, `engine.traces.get` reads through it,
+    and `ArtifactStore(results, path_template)` writes Parquet and the
+    manifest through `Runtime.results`; `ArtifactStoreConfig` and
+    `Runtime.traces_dir` are deleted, and the traces and results slots take
+    any store. `engine.storage.info()` and `purge()`, `nl2sql storage purge`
+    and the API's startup and daily purge are added. No S3 or ADLS store is
+    built in; `storage/artifact-store.md` has an S3 example. Building it
+    settled these details:
+
+    - `ArtifactRef.uri` is the result's key in the results store
+      (`<tenant_id>/<request_id>/<sub_query_id>.parquet`), not a file path,
+      and `ArtifactRef.backend` is deleted.
+    - Reading a result: when `ResultStore.open` returns a local file, as
+      `local` does, polars scans the file in place; any other stream is read
+      into memory first, since a scan outlives the call that opened it.
+    - `purge()` purges a store that has a `max_age_days` attribute and leaves
+      one without it alone; it returns the counts per slot purged.
+    - `QueryResult.trace_path` is the file the `files` store wrote, and None
+      with another trace store; `trace_id` always names the trace.
+    - `nl2sql trace show <id>` reads through `engine.traces.get`.
+      `Runtime.stores` (`StorePaths`) stays for the state store's callers
+      until S3.
+
 ### The config
 
 Every sub-block is optional. A config with only `path` stays valid and means

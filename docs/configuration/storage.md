@@ -18,8 +18,8 @@ Everything the engine writes lives under it:
 | --- | --- | --- |
 | `index/` | The vector index (Chroma), one collection per embedding model: `nl2sql__<model slug>__<dimension>`. | `VECTOR_STORE`, `VECTOR_STORE_COLLECTION` |
 | `state.db` | SQLite: schema snapshots, the plan cache and playground feedback. | `SCHEMA_STORE_PATH` |
-| `traces/` | Run traces (`settings.traces.mode`). | `TRACE_DIR` |
-| `results/` | Result files, `<tenant_id>/<request_id>/<sub_query_id>.parquet`. See [Artifact Store](../storage/artifact-store.md). | `RESULT_ARTIFACT_BASE_URI` |
+| `traces/` | Run traces (`settings.traces.mode`), kept 14 days by default. | `TRACE_DIR` |
+| `results/` | Result files, `<tenant_id>/<request_id>/<sub_query_id>.parquet`. Kept 7 days by default. See [Artifact Store](../storage/artifact-store.md). | `RESULT_ARTIFACT_BASE_URI` |
 
 ## The four stores
 
@@ -31,8 +31,8 @@ section above is the same as:
 path: .nl2sql
 index:   { type: chroma }    # <path>/index/
 state:   { type: sqlite }    # <path>/state.db
-traces:  { type: files }     # <path>/traces/
-results: { type: local }     # <path>/results/
+traces:  { type: files, max_age_days: 14 }    # <path>/traces/
+results: { type: local, max_age_days: 7 }     # <path>/results/
 ```
 
 | Slot | Built-in | Holds |
@@ -62,7 +62,7 @@ In code, a slot takes a `StoreConfig` or a store object, used as given:
 from nl2sql import Storage, StoreConfig
 
 Storage(path=".nl2sql")
-Storage(path=".nl2sql", traces=StoreConfig(type="files"))
+Storage(path=".nl2sql", traces=StoreConfig(type="files", max_age_days=30))
 Storage(path=".nl2sql", index=my_index_store)   # any object whose slot is "index"
 ```
 
@@ -70,12 +70,53 @@ The store interfaces are in [`nl2sql_sdk.stores`](../adapters/sdk.md#interfaces-
 A plugin registers a store in the `nl2sql.stores` entry point group, or in
 code with `registry.add_store(name, cls)`.
 
-!!! note "Built-ins only, for now, except the index"
+!!! note "The state slot takes the built-in only, for now"
     0.6 moves the engine onto the four store interfaces one slot at a time.
-    The engine reads its index through `IndexStore`, so any index store
-    works. Until the other slots' moves land, the engine reads `state`,
-    `traces` and `results` through their built-in stores only, and refuses
-    any other store there with a problem at `storage.<slot>`.
+    The engine reads its index, traces and results through `IndexStore`,
+    `TraceStore` and `ResultStore`, so any store works in those slots. Until
+    the state slot's move lands, the engine reads `state` through the
+    built-in `sqlite` store only, and refuses any other store there with a
+    problem at `storage.state`.
+
+## Retention
+
+The `files` trace store and the `local` results store take `max_age_days`,
+14 and 7 by default (at least 1). It is a key of those two stores, not of
+every store.
+
+```yaml
+traces:  { type: files, max_age_days: 30 }
+results: { type: local, max_age_days: 2 }
+```
+
+`engine.storage.purge()` deletes the traces and result files last written
+before that age and returns the counts, `{"traces": 3, "results": 12}`. A
+plugin trace or results store is purged when it has a `max_age_days`
+attribute, and left alone when it does not (a bucket with its own lifecycle
+rule, say). Three things call it:
+
+- `nl2sql storage purge`, by hand or from cron;
+- `nl2sql-api`, at startup and then once a day while it serves (a failed
+  purge is logged and tried again the next day);
+- your own code.
+
+Feedback and schema snapshots have no age limit: feedback is cleared by hand
+(`nl2sql feedback clear`), and old snapshots are evicted by
+`settings.schema.max_versions`.
+
+## What is where: `engine.storage.info()`
+
+```python
+engine.storage.info()
+# {"index":   {"type": "chroma", "location": ".../.nl2sql/index"},
+#  "state":   {"type": "sqlite", "location": ".../.nl2sql/state.db"},
+#  "traces":  {"type": "files",  "location": ".../.nl2sql/traces", "max_age_days": 14},
+#  "results": {"type": "local",  "location": ".../.nl2sql/results", "max_age_days": 7},
+#  "namespace": "nl2sql__local-all-minilm-l6-v2__384"}
+```
+
+`type` is the store's name, or the class name of a store object; `location`
+is its folder or file, or `None` for a store that does not have one.
 
 ## The index
 
@@ -99,11 +140,13 @@ run reads the pointers once when it starts. See
 ## Sharing
 
 Two engines with different paths share nothing. The commands that only read
-these stores (`nl2sql cache clear`, `nl2sql feedback`, `nl2sql trace show`)
-find them from the same config, so run them with the same `--config`.
+these stores (`nl2sql cache clear`, `nl2sql feedback`, `nl2sql trace show`,
+`nl2sql storage purge`) find them from the same config, so run them with the
+same `--config`.
 
-Results are local files. The S3 and ADLS result backends of 0.4 were removed;
-remote stores come back with the results-store interface in a later release.
+There is no built-in S3 or ADLS results store. The `ResultStore` interface is
+four methods; [Artifact Store](../storage/artifact-store.md#a-results-store-of-your-own)
+has an S3 example.
 
 In a container, mount a volume and point the path at it:
 

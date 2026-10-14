@@ -1,8 +1,8 @@
 # Artifact Store Architecture
 
-Execution results are persisted as **artifacts**. A single `ArtifactStore` writes Parquet files under the engine's results folder, `<storage.path>/results/`, and emits `ArtifactRef` metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.
+Execution results are persisted as **artifacts**. The engine's `ArtifactStore` writes each result as Parquet, and the run's manifest as JSON, through the **results store** in `storage.results` (a `ResultStore`, see [Storage](../configuration/storage.md)), and emits `ArtifactRef` metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.
 
-Results are local files only. The S3 and ADLS backends, and the `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_S3_*` and `RESULT_ARTIFACT_ADLS_*` settings, were removed in 0.5: they were untested and unreachable from the new config. The Phase 2 results-store interface brings remote stores back.
+The engine makes the bytes; the store only keeps them under a key. The built-in `local` store keeps them as files in `<storage.path>/results/`. There is no built-in S3 or ADLS store: a remote store is four methods (see [A results store of your own](#a-results-store-of-your-own)).
 
 ## Storage lifecycle
 
@@ -61,25 +61,102 @@ A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, a
 `ResultReader` (`execution/artifacts/results.py`), behind `engine.results` (`manifest`, `page` and `csv`) (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
 
 1. The request id and the result id must be plain tokens (letters, digits, `_`, `-`; up to 128 characters). Anything else is `ResultNotFound`, before any path is built.
-2. The manifest is read from the path rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No file there is `ResultNotFound`, so another tenant's run is not found, not refused.
-3. The result id must be a `node_id` the manifest lists. The parquet path is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a path.
+2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused.
+3. The result id must be a `node_id` the manifest lists. The parquet key is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a key.
 4. A page is `scan.slice(offset, limit).collect()` on a polars scan, so only that slice is read. A CSV export collects one `CSV_CHUNK_ROWS` (10,000) slice at a time and yields it as CSV text, header first.
 
 ## Where the files go
 
-An artifact's path is `<results folder>/<rendered path>`, and its parent folders are created as it is written. For an engine built from a `Config` the results folder is `<storage.path>/results/` (see [Public Facade → Creating an engine](../api/core/public-facade.md#creating-an-engine)), so the default template gives:
+An artifact's key is the rendered path template, with `/` between its parts: `<tenant_id>/<request_id>/<sub_query_id>.parquet` by default. That key is the `ArtifactRef`'s `uri`. Each Parquet file is written to a temporary folder first and handed to the results store in 1 MiB chunks (`ResultStore.write`); the manifest is handed over in one piece.
+
+The `local` store keeps a key as a file under its folder, `<storage.path>/results/`, so the default template gives:
 
 ```
 <storage.path>/results/<tenant_id>/<request_id>/<sub_query_id>.parquet
 ```
 
-The store is exercised by real read/write round-trip tests (`packages/nl2sql/tests/unit/test_artifact_store.py`).
+It writes each file to a temporary name and renames it, and refuses a key that is absolute or contains `..`.
+
+Reading goes through `ResultStore.open`. When the store opens a local file, as `local` does, polars scans that file in place, so a page or a CSV slice reads only what it needs. Any other store's stream is read into memory first, because a scan outlives the call that opened it.
+
+The store is exercised by real read/write round-trip tests (`packages/nl2sql/tests/unit/test_artifact_store.py`, `test_trace_result_stores.py`).
+
+## Retention
+
+The `local` store takes `max_age_days` (default 7):
+
+```yaml
+# storage.yaml
+results: { type: local, max_age_days: 30 }
+```
+
+`engine.storage.purge()` deletes every result file last written more than `max_age_days` ago, then the run folders it emptied, and returns how many files went. `nl2sql storage purge` calls it, and `nl2sql-api` calls it at startup and once a day. A result past its age is gone: its page and CSV routes then answer `ResultNotFound`, as for an unknown run.
+
+## A results store of your own
+
+There is no built-in S3 or ADLS store (owner decision 6 in [the Phase 2 design](../architecture/phase2.md#owner-decisions)). A results store is the `ResultStore` protocol from `nl2sql_sdk.stores`: bytes in, bytes out, no Parquet knowledge. A sketch on S3 with `boto3`:
+
+```python
+from datetime import datetime
+from pathlib import Path
+from typing import BinaryIO, ClassVar, Iterable
+
+import boto3
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class S3ResultsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    bucket: str
+    prefix: str = "nl2sql/results/"
+    max_age_days: int = Field(7, ge=1)
+
+
+class S3Results:
+    interface_version: ClassVar[int] = 1
+    slot: ClassVar[str] = "results"
+    config_model: ClassVar[type] = S3ResultsConfig
+
+    def __init__(self, cfg: S3ResultsConfig) -> None:
+        self.bucket, self.prefix, self.max_age_days = cfg.bucket, cfg.prefix, cfg.max_age_days
+        self.s3 = boto3.client("s3")
+
+    @classmethod
+    def from_config(cls, cfg: S3ResultsConfig, *, folder: Path) -> "S3Results":
+        return cls(cfg)
+
+    def write(self, key: str, chunks: Iterable[bytes]) -> int:
+        body = b"".join(chunks)          # or a multipart upload for large results
+        self.s3.put_object(Bucket=self.bucket, Key=self.prefix + key, Body=body)
+        return len(body)
+
+    def open(self, key: str) -> BinaryIO:
+        return self.s3.get_object(Bucket=self.bucket, Key=self.prefix + key)["Body"]
+
+    def exists(self, key: str) -> bool:
+        try:
+            self.s3.head_object(Bucket=self.bucket, Key=self.prefix + key)
+            return True
+        except self.s3.exceptions.ClientError:
+            return False
+
+    def purge(self, older_than: datetime) -> int:
+        deleted = 0
+        for page in self.s3.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=self.prefix):
+            for item in page.get("Contents", []):
+                if item["LastModified"] < older_than:
+                    self.s3.delete_object(Bucket=self.bucket, Key=item["Key"])
+                    deleted += 1
+        return deleted
+```
+
+Register it (`registry.add_store("s3", S3Results)`, or the `nl2sql.stores` entry point group) and name it: `results: { type: s3, bucket: my-results }`. Or pass an object: `Storage(path=".nl2sql", results=S3Results(...))`. `engine.storage.purge()` purges a store that has a `max_age_days` attribute; one without it is left alone, for a bucket with its own lifecycle rule. A sketch like this one is not tested here; test yours against your bucket.
 
 ## ArtifactRef fields
 
 `ArtifactRef` contains:
 
-- `uri`, `backend` (always `local`), `format`
+- `uri`, the result's key in the results store, and `format` (`parquet`)
 - `row_count`, `columns`, `bytes`
 - `content_hash`, `created_at`
 - optional `schema_version`
@@ -122,6 +199,8 @@ Because the default template starts with `<tenant_id>`, artifacts are partitione
 ## Source references
 
 - Artifact store: `packages/nl2sql/src/nl2sql/execution/artifacts/store.py`
+- The `local` results store: `packages/nl2sql/src/nl2sql/storage/local.py`
+- The `ResultStore` protocol: `packages/sdk/src/nl2sql_sdk/stores.py`
 - Parquet helpers: `packages/nl2sql/src/nl2sql/execution/artifacts/parquet.py`
 - Manifest models and the result reader: `packages/nl2sql/src/nl2sql/execution/artifacts/results.py`
 - Artifact contracts: `packages/nl2sql/src/nl2sql/execution/contracts.py`

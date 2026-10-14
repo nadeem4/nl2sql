@@ -9,7 +9,7 @@ API for remote clients. Use the links below for the full technical references.
 - **Interface**: the `NL2SQL` class: `run_query` and `stream_query` at the top
   level, everything else in a namespace (`engine.datasources`, `engine.index`,
   `engine.llm`, `engine.policies`, `engine.curated`, `engine.results`,
-  `engine.feedback`, `engine.traces`, `engine.benchmark`), plus
+  `engine.feedback`, `engine.traces`, `engine.storage`, `engine.benchmark`), plus
   `engine.about()`
 - **Use Case**: Embedded/SDK use in Python applications
 - **Reference**: Core API index and per-namespace references:
