@@ -17,7 +17,7 @@ def configure_llm(
     service: LLMSvc,
 ):
     """Register an LLM in this process from `config` (`name` defaults to `default`).
-    It is not written to `configs/llm.yaml`. Admin only.
+    It is not written to the config's `llm.yaml`. Admin only.
     """
     try:
         return service.configure_llm(payload)

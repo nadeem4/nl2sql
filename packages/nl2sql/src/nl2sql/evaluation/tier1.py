@@ -22,7 +22,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
-from nl2sql.configs.llm import AgentConfig
+from nl2sql.llm.models import AgentConfig
 from nl2sql.runtime import Runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkResult, BenchmarkRunner
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset

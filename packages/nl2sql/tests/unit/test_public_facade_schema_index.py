@@ -148,21 +148,20 @@ def test_inspect_retrieval_without_a_vector_store_says_so():
 
 
 def test_reload_llm_config_replaces_every_agent(tmp_path):
-    path = tmp_path / "llm.yaml"
+    from nl2sql import load_config
+    from nl2sql.testing.config import make_config
+
+    path = tmp_path / "nl2sql.yaml"
 
     def _write(agents):
-        path.write_text(yaml.safe_dump({
-            "version": 1,
-            "default": {"provider": "openai", "model": "gpt-5.4", "api_key": "sk-test-000000000000000000"},
-            "agents": agents,
-        }), encoding="utf-8")
+        make_config(tmp_path, llm={"provider": "openai", "model": "gpt-5.4", "api_key": "sk-test-000000000000000000",
+                                   "agents": agents})
 
-    registry = LLMRegistry(SecretManager())
-    engine = _engine(_Context(llm_registry=registry))
-    _write({"astplanner": {"provider": "openai", "model": "gpt-4.1", "api_key": "sk-test-000000000000000000"}})
-    engine.reload_llm_config(path)
-    assert set(registry.list_llms()) == {"default", "astplanner"}
+    _write({"ast_planner": {"model": "gpt-4.1"}})
+    with NL2SQL(load_config(path)) as engine:
+        assert set(engine.list_llms()) == {"default", "astplanner"}
 
-    _write({})
-    engine.reload_llm_config(path)
-    assert set(registry.list_llms()) == {"default"}
+        _write({})
+        engine.reload_llm_config(path)
+        assert set(engine.list_llms()) == {"default"}
+        assert engine.config.llm.agents == {}

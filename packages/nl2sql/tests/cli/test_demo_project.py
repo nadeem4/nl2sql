@@ -1,13 +1,13 @@
-"""`DemoManager.setup_demo` writes a complete three-datasource demo project."""
-import json
+"""``nl2sql demo`` writes its project with ``nl2sql init --demo``: a complete three-datasource project."""
 import sqlite3
 
-import yaml
-from rich.console import Console
+from typer.testing import CliRunner
 
-from nl2sql.cli.demo import DemoManager
+from nl2sql.cli.commands.demo import prepare_project
+from nl2sql.cli.demo.stamp import read_stamp
+from nl2sql.cli.main import app
+from nl2sql.config import load_config
 from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
-from nl2sql.configs import PolicyFileConfig
 
 EXPECTED_TABLES = {
     "chinook.sqlite": {"Album", "Artist", "Customer", "Employee", "Genre", "Invoice",
@@ -25,34 +25,53 @@ def _tables(path):
         con.close()
 
 
-def test_setup_demo_copies_all_three_databases(tmp_path):
-    DemoManager(Console(), tmp_path).setup_demo()
+def test_the_demo_project_is_init_demo_and_stamped(tmp_path):
+    config_path = prepare_project(tmp_path)
+
+    assert config_path == tmp_path / "nl2sql.yaml"
+    assert read_stamp(tmp_path)
     for file_name, expected in EXPECTED_TABLES.items():
         assert expected <= _tables(tmp_path / "data" / file_name), file_name
+    assert not (tmp_path / "configs").exists() and not (tmp_path / ".env.demo").exists()
 
 
-def test_setup_demo_registers_all_three_datasources(tmp_path):
-    DemoManager(Console(), tmp_path).setup_demo()
-    ds = yaml.safe_load((tmp_path / "configs" / "datasources.demo.yaml").read_text())
-    assert [d["id"] for d in ds["datasources"]] == ["chinook", "support", "webanalytics"]
+def test_a_second_start_keeps_the_project_as_it_is(tmp_path):
+    prepare_project(tmp_path)
+    llm = tmp_path / "llm.yaml"
+    llm.write_text(llm.read_text(encoding="utf-8") + "# edited\n", encoding="utf-8")
+
+    prepare_project(tmp_path)
+
+    assert llm.read_text(encoding="utf-8").endswith("# edited\n")
+
+
+def test_a_folder_with_files_in_the_way_is_refused_cleanly(tmp_path):
+    """A 0.4 demo folder has data/*.sqlite but no nl2sql.yaml; init --demo would overwrite them."""
+    import pytest
+
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "chinook.sqlite").write_bytes(b"old")
+
+    with pytest.raises(SystemExit) as exit_info:
+        prepare_project(tmp_path)
+
+    assert exit_info.value.code == 1
+    assert (tmp_path / "data" / "chinook.sqlite").read_bytes() == b"old"
+
+
+def test_the_demo_config_has_three_datasources_with_their_questions(tmp_path):
+    config = load_config(prepare_project(tmp_path))
+
+    assert [d.id for d in config.datasources] == ["chinook", "support", "webanalytics"]
     # The resolver's answerability judge reads the description, so every
     # datasource must carry one.
-    assert all(d.get("description", "").strip() for d in ds["datasources"])
+    assert all((d.description or "").strip() for d in config.datasources)
+    assert {d.id: d.sample_questions for d in config.datasources} == DEMO_QUESTIONS_BY_DATASOURCE
+    assert len(DEMO_QUESTIONS) == sum(len(d.sample_questions) for d in config.datasources)
 
 
-def test_setup_demo_writes_example_questions_per_datasource(tmp_path):
-    DemoManager(Console(), tmp_path).setup_demo()
-    questions = yaml.safe_load((tmp_path / "configs" / "sample_questions.demo.yaml").read_text())
-    assert set(questions) == {"chinook", "support", "webanalytics"}
-    assert len(questions["chinook"]) == 12
-    assert questions == DEMO_QUESTIONS_BY_DATASOURCE
-    assert len(DEMO_QUESTIONS) == sum(len(v) for v in questions.values())
-
-
-def test_setup_demo_writes_policies_covering_every_datasource(tmp_path):
-    DemoManager(Console(), tmp_path).setup_demo()
-    policies = PolicyFileConfig.model_validate(
-        json.loads((tmp_path / "configs" / "policies.demo.json").read_text()))
+def test_the_demo_policies_cover_every_datasource(tmp_path):
+    policies = load_config(prepare_project(tmp_path)).policies
     assert set(policies.roles) == {"admin", "analyst", "viewer"}
 
     admin = policies.roles["admin"]
@@ -74,35 +93,21 @@ def test_setup_demo_writes_policies_covering_every_datasource(tmp_path):
     assert {"chinook.Track", "webanalytics.page_views"} <= set(viewer.allowed_tables)
 
 
-def test_setup_demo_writes_the_env_and_secrets_envelope(tmp_path):
-    DemoManager(Console(), tmp_path).setup_demo()
-    env = (tmp_path / ".env.demo").read_text()
-    assert "EMBEDDING_PROVIDER=local" in env
-    assert (tmp_path / "configs" / "secrets.demo.yaml").exists()
-
-
-def test_setup_demo_writes_verified_queries_that_pass_the_checks_and_run(tmp_path, monkeypatch):
-    from nl2sql import CuratedAPI
-
-    DemoManager(Console(), tmp_path).setup_demo()
-    curated = tmp_path / "configs" / "curated.demo.yaml"
-    assert "CURATED_CONFIG=configs/curated.demo.yaml" in (tmp_path / ".env.demo").read_text()
-
-    queries = yaml.safe_load(curated.read_text(encoding="utf-8"))["datasources"]["chinook"]["verified_queries"]
+def test_the_demo_verified_queries_pass_the_checks_and_run(tmp_path):
+    config_path = prepare_project(tmp_path)
+    queries = load_config(config_path).curated.datasources["chinook"].verified_queries
     assert 4 <= len(queries) <= 6
     for query in queries:
         # Several phrasings each, so a reworded question still finds its query.
-        assert len(query["questions"]) >= 3, query["id"]
-        for name, spec in query.get("params", {}).items():
-            assert spec.get("default") is not None or spec.get("example") is not None, (query["id"], name)
+        assert len(query.questions) >= 3, query.id
+        for name, spec in query.params.items():
+            assert spec.default is not None or spec.example is not None, (query.id, name)
 
     # Every one passes the startup checks and runs against the demo's Chinook,
-    # whose path is relative to the project.
-    monkeypatch.chdir(tmp_path)
-    paths = {"curated_path": curated, "datasources_path": tmp_path / "configs" / "datasources.demo.yaml",
-             "secrets_path": tmp_path / "configs" / "secrets.demo.yaml"}
-    validated = CuratedAPI().validate(**paths)
-    tested = CuratedAPI().test(**paths)
-    assert validated.ok, validated
-    assert tested.ok, tested
-    assert all(e.row_count for e in tested.entries), tested
+    # whose path is relative to nl2sql.yaml, from any working directory.
+    runner = CliRunner()
+    validated = runner.invoke(app, ["--config", str(config_path), "curated", "validate"])
+    tested = runner.invoke(app, ["--config", str(config_path), "curated", "test"])
+    assert validated.exit_code == 0, validated.output
+    assert tested.exit_code == 0, tested.output
+    assert f"{len(queries)} verified queries ran" in tested.output

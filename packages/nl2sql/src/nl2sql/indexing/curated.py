@@ -20,7 +20,8 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Mapping, Optional
 from nl2sql.indexing.models import VerifiedQueryChunk
 
 if TYPE_CHECKING:
-    from nl2sql.configs.curated import CuratedDatasource, CuratedFileConfig, ParamSpec
+    from nl2sql.config import Curated
+    from nl2sql.config.curated import CuratedDatasource, ParamSpec
 
 CURATED_HASH_KEY = "curated_hash:"
 
@@ -79,10 +80,10 @@ def curated_hash(curated: Optional["CuratedDatasource"]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def curated_section(cfg: Optional["CuratedFileConfig"], ds_id: str) -> Optional["CuratedDatasource"]:
+def curated_section(cfg: Optional["Curated"], ds_id: str) -> Optional["CuratedDatasource"]:
     return cfg.datasources.get(ds_id) if cfg is not None else None
 
 
-def curated_hashes(cfg: Optional["CuratedFileConfig"], datasource_ids: Iterable[str]) -> Dict[str, str]:
+def curated_hashes(cfg: Optional["Curated"], datasource_ids: Iterable[str]) -> Dict[str, str]:
     """The current hash of every datasource in ``datasource_ids``."""
     return {ds_id: curated_hash(curated_section(cfg, ds_id)) for ds_id in datasource_ids}

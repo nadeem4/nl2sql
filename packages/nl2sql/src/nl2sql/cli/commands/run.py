@@ -9,34 +9,32 @@ from nl2sql.llm import LLMRegistry
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.cli.reporting import ConsolePresenter
 from nl2sql.pipeline.pipeline_runner import PipelineRunner
-from nl2sql.common.settings import settings
 from nl2sql.cli.types import RunConfig
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.runtime import Runtime
 
 @handle_cli_errors
 def run_pipeline(
-    config: RunConfig, 
-    ctx: Runtime
+    config: RunConfig,
+    engine,
 ) -> None:
-    """Executes the NL2SQL pipeline."""
+    """Runs one question through ``engine``'s pipeline and prints what it did."""
     if not config.query:
         return
-        
+
     presenter = ConsolePresenter()
     presenter.print_info(f"Query: {config.query}")
     if config.no_exec:
         presenter.print_warning("Execution disabled (--no-exec): plan, validation and SQL only.")
-    
+
     # Instantiate Runner
-    runner = PipelineRunner(ctx)
-    
+    runner = PipelineRunner(engine.context)
+
     # Setup Monitoring
     from nl2sql.services.callbacks.monitor import PipelineMonitorCallback
-    monitor = PipelineMonitorCallback(presenter, ctx.settings.observability)
-    
+    monitor = PipelineMonitorCallback(presenter, engine.context.settings.observability)
+
     presenter.start_interactive_status("Thinking...")
-    
+
     # Execution
     result = runner.run(
         query=config.query,
@@ -45,9 +43,9 @@ def run_pipeline(
         execute=not config.no_exec,
         callbacks=[monitor]
     )
-    
+
     presenter.stop_interactive_status()
-    
+
     # Handle Result
     if not result.success:
         # The traceback is a maintainer's debugging aid: printing it by default
@@ -58,9 +56,9 @@ def run_pipeline(
         if result.traceback and not config.verbose:
             presenter.print_info("Re-run with --verbose for the full traceback.")
         sys.exit(1)
-        
+
     final_state = result.final_state
-    
+
 
     query_history = []
     subgraph_outputs = final_state.get("subgraph_outputs") or {}
@@ -87,11 +85,11 @@ def run_pipeline(
             "datasource_id": ds_id,
             "sql": sql_draft,
         })
-    
+
     if config.verbose:
         reasoning = final_state.get("reasoning", [])
         presenter.print_execution_tree(config.query, query_history, top_level_reasoning=reasoning)
-        
+
         try:
             with open("last_reasoning.json", "w") as f:
                 dump_data = {
@@ -120,7 +118,7 @@ def run_pipeline(
                 body.append(f"Datasource: {ds}\n\n", style="bold")
                 body.append(str(sql))
                 presenter.print_sql(body)
-    
+
     elif final_state.get("sql_draft"):
         sql_draft_data = final_state.get("sql_draft")
         sql_draft = sql_draft_data.get("sql") if isinstance(sql_draft_data, dict) else getattr(sql_draft_data, "sql", None)
@@ -155,7 +153,7 @@ def run_pipeline(
         presenter.print_final_answer(final_answer)
     elif type(final_answer) == list and final_answer:
         presenter.print_execution_result(final_answer)
-        
+
     execution = final_state.get("execution")
     if execution:
         row_count = execution.get("row_count", 0) if isinstance(execution, dict) else getattr(execution, "row_count", 0)

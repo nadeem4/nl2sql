@@ -7,7 +7,8 @@ active-build filter, index health and the candidate search read.
 """
 from __future__ import annotations
 
-from nl2sql.configs.curated import CuratedDatasource, CuratedFileConfig
+from nl2sql.config import Curated
+from nl2sql.config.curated import CuratedDatasource
 from nl2sql.indexing.curated import (
     CuratedChunkBuilder,
     curated_hash,
@@ -108,7 +109,7 @@ def test_the_hash_follows_the_section_content_not_its_key_order():
 
 
 def test_curated_hashes_cover_every_datasource_asked_for():
-    cfg = CuratedFileConfig(datasources={"chinook": _section()})
+    cfg = Curated(datasources={"chinook": _section()})
 
     hashes = curated_hashes(cfg, ["chinook", "sales"])
 

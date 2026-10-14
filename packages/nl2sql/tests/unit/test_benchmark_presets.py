@@ -57,12 +57,15 @@ def test_a_bare_yaml_path_and_name_equals_path():
         presets.resolve_llm_spec("=cfg/a.yaml")
 
 
-def test_every_preset_is_a_valid_config_on_priced_models():
-    from nl2sql.configs.manager import ConfigManager
+def test_every_preset_is_an_llm_section_on_priced_models():
+    import yaml
+
+    from nl2sql.config import LLM
     from nl2sql.evaluation.tier2 import check_prices
 
     listed = presets.list_presets()
     assert [name for name, _ in listed] == ["claude-planner", "gpt-5.4", "gpt-5.4-mini-helpers"]
     check_prices({name: cfg for name, cfg in listed})
-    for name, cfg in listed:
-        assert cfg == ConfigManager().load_llm(presets.PRESETS_DIR / f"{name}.yaml")
+    for name, _ in listed:
+        # The same shape as llm.yaml: an llm section, strict keys.
+        LLM.model_validate(yaml.safe_load((presets.PRESETS_DIR / f"{name}.yaml").read_text(encoding="utf-8")))

@@ -22,8 +22,9 @@ def add_datasource(
     service: DatasourceSvc,
 ):
     """Register a datasource in this process from `config`, shaped like one entry of
-    `configs/datasources.yaml`. It is not written to the config file and not indexed:
-    call `POST /api/v1/index/{datasource_id}` next. Admin only.
+    `datasources` in `nl2sql.yaml` (`id`, `type`, `connection`, ...). It is not
+    written to the config file and not indexed: call
+    `POST /api/v1/index/{datasource_id}` next. Admin only.
     """
     try:
         return service.add_datasource(payload)

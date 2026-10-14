@@ -4,6 +4,8 @@ The benchmark API is replaced, so no context or pipeline is built here; the
 real tier 1 run is ``tests/e2e/test_benchmark_tier1.py``.
 """
 import json
+import pathlib
+from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
@@ -30,9 +32,14 @@ class _FakeAPI:
         return _FakeAPI.result
 
 
+def _engine(ctx):
+    """The engine `--config` builds: its benchmark API is the fake, its folder the working directory."""
+    return SimpleNamespace(benchmark=_FakeAPI(), config=SimpleNamespace(folder=pathlib.Path.cwd()))
+
+
 def _run(monkeypatch, tmp_path, *statuses):
     _FakeAPI.result = _result(*statuses)
-    monkeypatch.setattr("nl2sql.cli.commands.benchmark.BenchmarkAPI", _FakeAPI)
+    monkeypatch.setattr("nl2sql.cli.commands.benchmark.build_engine", _engine)
     report = tmp_path / "report.json"
     out = runner.invoke(app, ["benchmark", "--tier", "1", "--export-path", str(report), "--role", "admin"])
     return out, report
@@ -56,7 +63,7 @@ def test_tier1_exits_one_on_any_failure_and_still_writes_the_report(monkeypatch,
 
 
 def test_an_unknown_tier_is_rejected(monkeypatch, tmp_path):
-    monkeypatch.setattr("nl2sql.cli.commands.benchmark.BenchmarkAPI", _FakeAPI)
+    monkeypatch.setattr("nl2sql.cli.commands.benchmark.build_engine", _engine)
     out = runner.invoke(app, ["benchmark", "--tier", "7", "--export-path", str(tmp_path / "r.json")])
     assert out.exit_code == 2
     assert not (tmp_path / "r.json").exists()

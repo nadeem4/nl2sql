@@ -50,6 +50,6 @@ def make_demo_config(folder: Path, **sections: Any) -> Config:
     defaults = {
         "datasources": datasources,
         "llm": {"provider": "openai", "model": demo.llm.model, "api_key": "${env:OPENAI_API_KEY}"},
-        "policies": demo.policies.model_dump(mode="json", exclude_defaults=True),
+        "policies": demo.policies.model_dump(mode="json", exclude_defaults=True, exclude={"refusal_names_tables"}),
     }
     return make_config(folder, **{**defaults, **sections})

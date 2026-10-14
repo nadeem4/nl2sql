@@ -1,11 +1,10 @@
-# Default Configurations for Demo
+"""Hosted mode's default limits, per visitor.
 
-from nl2sql.llm.providers import DEFAULT_OPENAI_MODEL
+Here rather than in ``playground.hosted`` so the CLI can show them in
+``nl2sql demo --help`` without importing the playground's web stack.
+``nl2sql demo --questions-per-minute N --questions-per-session N`` overrides
+them.
+"""
 
-DEMO_LLM_CONFIG = {
-    "default": {
-        "provider": "openai",
-        "model": DEFAULT_OPENAI_MODEL,
-        "api_key": "${env:OPENAI_API_KEY}"
-    }
-}
+DEFAULT_QUESTIONS_PER_MINUTE = 6
+DEFAULT_QUESTIONS_PER_SESSION = 30

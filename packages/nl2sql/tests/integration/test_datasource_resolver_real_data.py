@@ -39,68 +39,11 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
-def _write_empty_secrets(tmp_path: Path) -> Path:
-    secrets_path = tmp_path / "secrets.yaml"
-    secrets_path.write_text("version: 1\nproviders: []\n", encoding="utf-8")
-    return secrets_path
-
-
-def _demo_config_paths(
-    root: Path, secrets_config_path: Path, ds_config_path: Path | None = None
-) -> dict[str, Path]:
-    return {
-        "ds_config_path": ds_config_path or root / "configs" / "datasources.demo.yaml",
-        "llm_config_path": root / "configs" / "llm.demo.yaml",
-        "policies_config_path": root / "configs" / "policies.demo.json",
-        "secrets_config_path": secrets_config_path,
-    }
-
-
-def _load_demo_datasources(root: Path) -> list[dict]:
-    config_path = root / "configs" / "datasources.demo.yaml"
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    return payload.get("datasources", [])
-
-
-def _demo_db_paths(root: Path) -> list[Path]:
-    db_paths = []
-    for datasource in _load_demo_datasources(root):
-        connection = datasource.get("connection") or {}
-        database = connection.get("database")
-        if database:
-            db_paths.append(root / database)
-    return db_paths
-
-
-def _skip_if_missing_demo_dbs(root: Path) -> None:
-    missing = [str(path) for path in _demo_db_paths(root) if not path.exists()]
-    if missing:
-        pytest.skip(f"Missing demo databases: {', '.join(missing)}")
-
-
-def _write_datasource_config(
-    tmp_path: Path, base_datasource: dict, database_path: Path
-) -> Path:
-    datasource = copy.deepcopy(base_datasource)
-    datasource["connection"]["database"] = str(database_path)
-    # A second datasource, so the resolver runs its vector search: the schema
-    # version mismatch is between an index entry and the store, and with one
-    # datasource no index entry is read.
-    second = copy.deepcopy(datasource)
-    second["id"] = "chinook_copy"
-    config = {"version": 1, "datasources": [datasource, second]}
-    config_path = tmp_path / f"datasources_{uuid.uuid4().hex}.yaml"
-    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
-    return config_path
-
-
 @pytest.fixture(scope="module")
 def indexed_env() -> SimpleNamespace:
     root = _project_root()
-    _skip_if_missing_demo_dbs(root)
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="resolver_real_data_"))
-    secrets_path = _write_empty_secrets(tmp_dir)
 
     monkeypatch = pytest.MonkeyPatch()
     collection_name = f"itest_resolver_{uuid.uuid4().hex}"
@@ -185,14 +128,15 @@ def _build_schema_mismatch_context(indexed_env, tmp_path: Path, policy) -> tuple
         conn.commit()
     base_ds["connection"] = {"database": modified_db.as_posix()}
 
-    # The indexed environment's index, with this datasource's own schema store.
-    stores = indexed_env.ctx.stores._replace(state=tmp_path / "schema_store.db")
+    # A copy of the indexed environment's index, with this datasource's own
+    # (empty) state store, both under this test's storage.path.
+    shutil.copytree(indexed_env.ctx.stores.index, tmp_path / ".nl2sql" / "index")
     # A second datasource, so the resolver runs its vector search: the schema
     # version mismatch is between an index entry and the store, and with one
     # datasource no index entry is read.
     datasources = [base_ds, {**base_ds, "id": "chinook_copy"}]
     config = make_demo_config(tmp_path, datasources=datasources, settings={"schema": {"version_mismatch": policy}})
-    ctx = _use_fake_judge(Runtime.from_config(config, stores=stores))
+    ctx = _use_fake_judge(Runtime.from_config(config))
 
     adapter = ctx.ds_registry.get_adapter("chinook")
     snapshot = adapter.fetch_schema_snapshot()

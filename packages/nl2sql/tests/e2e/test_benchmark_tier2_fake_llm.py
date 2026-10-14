@@ -1,6 +1,6 @@
 """Tier 2 end to end against the fake LLM: no key, no spending.
 
-Each config is an ordinary LLM config YAML whose ``base_url`` points at a
+Each config is an ``llm`` section, as ``llm.yaml`` holds one, whose ``base_url`` points at a
 ``FakeLLMServer`` serving the gold plans (``GoldPlanLLM`` from tier 1). The
 "bad" server has one plan deliberately wrong, so its accuracy is below 100%
 and the comparison has a difference to report. Every answer carries canned
@@ -65,11 +65,10 @@ def servers():
 
 
 def _write_config(path, base_url, helpers="gpt-5.4-mini", planner="gpt-5.4"):
-    agent = {"provider": "openai", "model": helpers, "temperature": 0.0, "base_url": base_url,
-             "api_key": "${env:TIER2_FAKE_KEY}"}
-    cfg = {"version": 1, "default": agent,
-           "agents": {"astplanner": {**agent, "model": planner}, "refiner": {**agent, "model": planner}}}
-    path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    llm = {"provider": "openai", "model": helpers, "temperature": 0.0, "base_url": base_url,
+           "api_key": "${env:TIER2_FAKE_KEY}",
+           "agents": {"ast_planner": {"model": planner}, "refiner": {"model": planner}}}
+    path.write_text(yaml.safe_dump(llm), encoding="utf-8")
     return path
 
 

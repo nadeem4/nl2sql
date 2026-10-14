@@ -1,57 +1,76 @@
 # Datasource Configuration
 
-Datasource configuration lives in `configs/datasources.yaml` and declares one or
-more database connections that NL2SQL can query.
-
-## File structure
+The `datasources` section of [`nl2sql.yaml`](system.md) lists the databases
+the engine can query. `nl2sql init` writes it as a folder, one file per
+datasource, so each team can own its own database's file:
 
 ```yaml
-version: 1
-datasources:
-  - id: my_postgres
-    description: "Primary analytics DB."
-    connection:
-      type: postgres
-      host: localhost
-      port: 5432
-      user: ${env:POSTGRES_USER}
-      password: ${env:POSTGRES_PASSWORD}
-      database: analytics
-    statement_timeout_ms: 8000
-    row_limit: 100
-    max_bytes: 10485760
-    preferred_tables: [v_customer_revenue, v_monthly_sales]
+# nl2sql.yaml
+datasources: { file: datasources/ }
 ```
+
+```yaml
+# datasources/sales.yaml   (the id defaults to the file name: "sales")
+type: postgres
+description: Orders, customers and revenue for the EU shop.
+connection:
+  host: db.internal
+  port: 5432
+  database: sales
+  user: nl2sql
+  password: "${env:SALES_DB_PASSWORD}"
+limits: { row_limit: 1000, timeout_ms: 8000, max_bytes: 10485760 }
+preferred_tables: [public.revenue_daily, v_monthly_sales]
+domains: [revenue, customers, orders]
+sample_questions:
+  - What was revenue by region last quarter?
+  - Which customers placed the most orders this year?
+required: true
+```
+
+The section can also be a file holding the list
+(`datasources: {file: datasources.yaml}`), or the list written inline in
+`nl2sql.yaml`. An empty list is valid: the apps add datasources at runtime.
 
 ## Fields
 
-- `version`: schema version (currently `1`)
-- `datasources`: list of datasource definitions
-  - `id`: unique datasource ID
-  - `description`: optional human-readable description
-  - `connection`: connection details
-    - `type`: adapter type (e.g., `postgres`, `mysql`, `mssql`, `sqlite`, `duckdb`)
-    - adapter-specific fields (host, port, database, driver, etc.)
-  - optional limits and metadata (commonly used). The three limits
-    (`statement_timeout_ms`, `row_limit`, `max_bytes`) go beside `connection`, as
-    above, or under an `options:` map; the two spellings are equivalent. If a
-    limit is set in both places, the lower value wins.
-    - `statement_timeout_ms`: the longest one statement may run. Postgres,
-      MySQL, SQL Server and DuckDB enforce it (SQL Server rounds up to whole
-      seconds); SQLite does not, and uses it only as its lock-wait timeout. See
-      each [adapter page](../adapters/index.md) for how.
-    - `row_limit`: the most rows one sub-query returns. Unset, it is
-      `RESULT_ROW_LIMIT` (100,000); set higher, `RESULT_ROW_LIMIT` still bounds it.
-      A result that reaches it is flagged as truncated and the answer says so. It
-      is applied before results are combined, so a join input that reaches it
-      is refused (`RESULT_TRUNCATED`) and a union input that reaches it is
-      flagged with a warning; see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine).
-    - `max_bytes`
-    - `tags`
-  - `preferred_tables`: optional list of tables or views the planner should
-    reach for first, usually views the data team built for common questions.
-    A name is the bare table name or `schema.table`, case ignored. See
-    [Preferred tables](#preferred-tables).
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `id` | the file name in a folder, otherwise required | The datasource's id. In a folder, if it is given it must equal the file name. |
+| `type` | required | The adapter: `sqlite`, `duckdb`, `postgres`, `mysql`, `mssql`, or an adapter a plugin registers. A misspelt or uninstalled one is a `ConfigError` with "did you mean" and the install hint. |
+| `description` | none | What is in the database. The resolver's answerability check reads it, so write one. |
+| `connection` | `{}` | The adapter's own connection settings (host, port, database, driver, `options`, ...), validated by the adapter. Every value may be a `${provider:key}` reference and keeps it until the adapter is built. A relative SQLite or DuckDB `database` is relative to `nl2sql.yaml`. |
+| `limits` | none | `row_limit`, `timeout_ms`, `max_bytes`; see [Limits](#limits). |
+| `preferred_tables` | `[]` | Tables or views the planner should reach for first. See [Preferred tables](#preferred-tables). |
+| `sample_questions` | `[]` | Questions the datasource answers. They are indexed into its `schema.datasource` entry, which routing reads. |
+| `domains` | `[]` | A routing hint written by people. Routing does not read it yet. |
+| `required` | `false` | `engine.check()` fails (`EngineNotReady`) when this datasource cannot connect, and the CLI, `nl2sql-api` and the demo refuse to start. See [Startup](system.md#startup-check-and-required). |
+
+In Python, `Datasource(id=..., adapter=MyAdapter(...))` passes a built adapter
+object instead of `type`.
+
+## Limits
+
+```yaml
+limits:
+  row_limit: 1000       # the most rows one sub-query returns
+  timeout_ms: 8000      # the longest one statement may run
+  max_bytes: 10485760
+```
+
+- `timeout_ms`: Postgres, MySQL, SQL Server and DuckDB enforce it (SQL Server
+  rounds up to whole seconds); SQLite does not, and uses it only as its
+  lock-wait timeout. See each [adapter page](../adapters/index.md) for how.
+- `row_limit`: unset, it is `settings.results.row_limit` (100,000); set higher,
+  `settings.results.row_limit` still bounds it. A result that reaches it is
+  flagged as truncated and the answer says so. It is applied before results
+  are combined, so a join input that reaches it is refused
+  (`RESULT_TRUNCATED`) and a union input that reaches it is flagged with a
+  warning; see [row cap before a combine](../architecture/nodes/engine_aggregator_node.md#row-cap-before-a-combine).
+- `max_bytes`: passed to the adapter.
+
+There is one place for each limit: the 0.4 `options:` bag and the top-level
+spellings are gone.
 
 ## Preferred tables
 
@@ -63,7 +82,7 @@ and marks them `"preferred": true` in the schema the planner sees, and the
 planner is told to plan against a preferred table when it answers the
 question:
 
-- When the whole schema is sent (`SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES`
+- When the whole schema is sent (`settings.retrieval.full_snapshot_max_tables`
   tables or fewer), every preferred table is in it, first.
 - Otherwise the retrieved tables are re-ordered so preferred ones come first,
   and a preferred table the search scored but did not pick is added when its
@@ -102,15 +121,17 @@ broken one is marked unavailable:
 when datasources are configured and none is ready. A later `check()` that
 connects routes the datasource again.
 
-Without the engine, `nl2sql doctor` shows a datasource that cannot start or
-connect as `Failed` in the connectivity table, with the reason, and
-`nl2sql policy validate` reports a role that names it as `UNAVAILABLE`.
+`nl2sql doctor` prints the same `check()` report. After `check()`,
+`engine.policy.validate_policies()` reports a role that names an unavailable
+datasource as `UNAVAILABLE`.
 
-A secret provider in `secrets.yaml` that cannot start is different: it fails
-startup. See [Secrets → When a provider fails to start](secrets.md#when-a-provider-fails-to-start).
+A secret provider that cannot start is different: it fails startup. See [Secrets → When a provider fails to start](secrets.md#when-a-provider-fails-to-start).
 
 ## Notes
 
-- Use `${env:VAR}` for environment variables or `${provider:key}` for secrets
-  resolved via `configs/secrets.yaml`.
-- Adapter-specific fields are passed through to the adapter implementation.
+- Use `${env:VAR}` for environment variables, or `${provider:key}` for a secret
+  from a provider in the [`secrets` section](secrets.md).
+- Adapter-specific fields under `connection` are passed through to the adapter.
+- From Python, `engine.add_datasource(Datasource(...))` adds one to a running
+  engine (built, not connected); `nl2sql-api`'s `POST /api/v1/datasource` takes
+  the same shape as JSON.

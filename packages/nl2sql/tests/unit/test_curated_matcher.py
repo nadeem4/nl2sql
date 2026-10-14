@@ -19,7 +19,7 @@ from nl2sql.auth import UserContext
 from nl2sql.auth.models import RolePolicy
 from nl2sql.auth.rbac import RBAC
 from nl2sql.config import Settings
-from nl2sql.configs.curated import CuratedFileConfig
+from nl2sql.config import Curated
 from nl2sql.indexing.models import VerifiedQueryCandidate
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
@@ -152,7 +152,7 @@ def _ctx(db, server, candidates, capabilities=None, curated=None, settings=None)
     ctx = fake_runtime(
         settings={"tenant_id": "t1", **(settings or {})},
         results=db.parent / "artifacts",
-        curated=CuratedFileConfig.model_validate(curated or CURATED),
+        curated=Curated.model_validate(curated or CURATED),
         vector_store=vector_store,
         rbac=RBAC(POLICIES),
         ds_registry=_Registry(adapter, capabilities),
@@ -419,7 +419,7 @@ def _invoke(graph, question=QUESTION, role="analyst"):
 def test_without_curated_answers_the_graph_is_todays(db, monkeypatch):
     server = _server(CHOOSE_TOP)
     try:
-        for curated in (None, CuratedFileConfig()):
+        for curated in (None, Curated()):
             ctx = _ctx(db, server, [TOP])
             ctx.curated = curated
             graph, ran = _graph(monkeypatch, ctx)

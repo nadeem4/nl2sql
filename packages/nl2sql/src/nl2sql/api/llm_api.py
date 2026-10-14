@@ -62,19 +62,17 @@ class LLM_API:
         config_path: Union[str, pathlib.Path]
     ) -> None:
         """
-        Configure LLMs from a configuration file.
-        
+        Replace every agent with the ``llm`` section of an ``nl2sql.yaml``, as one step.
+
+        Agents the section no longer names fall back to the top level. An
+        invalid file leaves the current LLMs in place.
+
         Args:
-            config_path: Path to the LLM configuration file
+            config_path: Path to the ``nl2sql.yaml`` whose ``llm`` section to use
         """
-        from nl2sql.configs import ConfigManager
-        cm = ConfigManager()
-        config_path = pathlib.Path(config_path)
-        llm_cfg = cm.load_llm(config_path)
-        
-        agents = llm_cfg.agents or {}
-        agents["default"] = llm_cfg.default
-        self._registry.register_llms(agents)
+        from nl2sql.config import load_config
+
+        self.replace(load_config(config_path).llm)
     
     def get_llm(self, name: str):
         """

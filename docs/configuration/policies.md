@@ -1,32 +1,42 @@
 # Policies Configuration
 
-Policies live in `configs/policies.json` and define role-based access rules for
-datasources and tables.
+The `policies` section of [`nl2sql.yaml`](system.md) decides who may read
+what. `nl2sql init` writes it to `policies.yaml`.
 
-## File structure
+On your own machine, one line is enough: every caller may read everything.
 
-```json
-{
-  "version": 1,
-  "roles": {
-    "admin": {
-      "description": "System Administrator",
-      "role": "admin",
-      "allowed_datasources": ["*"],
-      "allowed_tables": ["*"]
-    }
-  }
-}
+```yaml
+# policies.yaml
+allow_all: true
+```
+
+For anything shared, write roles:
+
+```yaml
+# policies.yaml
+default_role: viewer
+admin_roles: [admin]
+refusal_names_tables: false
+roles:
+  admin:
+    description: Every table in every database
+    allowed_datasources: ["*"]
+    allowed_tables: ["*"]
+  analyst:
+    description: Sales, except the audit schema
+    allowed_datasources: [sales]
+    allowed_tables: ["sales.public.*"]
 ```
 
 ## Fields
 
-- `version`: schema version (currently `1`)
-- `roles`: map of role name → policy
-  - `description`: human-readable role description
-  - `role`: role ID used for logging and auditing
-  - `allowed_datasources`: list of datasource IDs or `*`
-  - `allowed_tables`: list of table entries (see below)
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `allow_all` | `false` | Every caller may read everything. It cannot be combined with `default_role` or `roles`. `Policies.allow_all()` is the Python shorthand. |
+| `default_role` | none | The role used when the caller gives none. It must name one of `roles`. Without it, a question with no role is refused. |
+| `admin_roles` | `[admin]` | The roles `nl2sql-api` lets through on the routes that change datasources, LLMs or the index. See [REST API](api.md). |
+| `refusal_names_tables` | `false` | Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. The demo (`nl2sql init --demo`) sets it, since showing a refusal is its point. See [Security Model](../security/model.md#strict-refusal). |
+| `roles` | `{}` | Role name to policy: `description`, `allowed_datasources` (ids or `*`) and `allowed_tables` (entries below). |
 
 ## Table entries
 
@@ -42,13 +52,13 @@ Access is decided on the schema as well as the table. The plan names the
 schema a table is read from, and the SQL is written with it, so a grant of
 `sales.orders` does not let a plan read `audit.orders`:
 
-```json
-"allowed_tables": ["warehouse.sales.orders", "warehouse.reference.*"]
+```yaml
+allowed_tables: [warehouse.sales.orders, "warehouse.reference.*"]
 ```
 
 ### Two-part entries and the default schema
 
-A two-part `datasource.table` entry predates schemas in the policy file. It is
+A two-part `datasource.table` entry predates schemas in policies. It is
 read as that table in the datasource's default schema, never in any schema:
 
 - The default schema is the one the adapter reports: the schema an unqualified
@@ -68,7 +78,7 @@ the three-part form.
 
 An entry has two or three dot-separated parts (or is `*`), no part is empty,
 and `*` may only be the last part: `datasource.*.orders` is rejected when the
-file is loaded.
+config is loaded.
 
 ## One rule everywhere
 
@@ -78,3 +88,17 @@ matched. The logical validator (which refuses the plan), the schema retriever
 value check (which only probes readable tables) and the curated matcher (which
 only answers with a verified query whose tables are all readable) call it with
 the same datasource, schema and table, so they cannot disagree.
+
+## Checking the policies
+
+`nl2sql policy validate` checks that every datasource and table rule a role
+names is a configured datasource, against the config `--config` names:
+
+```bash
+nl2sql --config nl2sql.yaml policy validate
+```
+
+A role naming a datasource that is not configured is `MISSING`, and the
+command exits 1. From Python, `engine.policy.validate_policies()` returns the
+same report; after `engine.check()`, a role naming a datasource that failed to
+connect is `UNAVAILABLE`.

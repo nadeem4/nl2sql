@@ -71,14 +71,26 @@ def test_the_declared_port_is_the_one_the_container_listens_on():
 
 def test_the_container_runs_hosted_mode_as_a_non_root_user():
     dockerfile = (SPACE / "Dockerfile").read_text(encoding="utf-8")
+    command = dockerfile[dockerfile.index("\nCMD "):]
 
-    assert "NL2SQL_DEMO_HOSTED=1" in dockerfile
-    assert "--hosted" in dockerfile
+    assert "--hosted" in command
+    assert "--questions-per-minute 6" in command and "--questions-per-session 30" in command
     assert "USER demo" in dockerfile
     assert "HEALTHCHECK" in dockerfile
     # The sample project and its index are built into the image, so the first
     # question does not wait for indexing or for a 79 MB model download.
-    assert "nl2sql setup --demo" in dockerfile
+    assert "nl2sql init --demo /home/demo/demo" in dockerfile
+    assert "NL2SQL_CONFIG=/home/demo/demo/nl2sql.yaml" in dockerfile
+    assert "nl2sql index" in dockerfile
+
+
+def test_the_space_uses_the_05_config_only():
+    """``nl2sql setup`` and the ``NL2SQL_DEMO_*`` variables are gone in 0.5: flags and nl2sql.yaml say it all."""
+    for name in ("Dockerfile", "docker-compose.yml", "README.md"):
+        text = (SPACE / name).read_text(encoding="utf-8")
+        assert "nl2sql setup" not in text, name
+        assert "NL2SQL_DEMO_" not in text, name
+        assert ".env.demo" not in text, name
 
 
 def test_what_the_engine_is_installed_from_is_one_rewritable_line():

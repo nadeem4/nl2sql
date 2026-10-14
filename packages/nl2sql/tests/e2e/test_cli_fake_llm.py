@@ -19,7 +19,7 @@ from .recordings_chinook import (
 @pytest.mark.e2e
 def test_count_customers_end_to_end(demo_project, fake_llm):
     server, env = fake_llm(RULES_COUNT_CUSTOMERS)
-    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml", "How many customers are there?")
+    r = run_cli(demo_project, env, "run", "How many customers are there?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "COUNT(" in r.stdout and "Customer" in r.stdout
     assert "59" in r.stdout
@@ -34,7 +34,7 @@ def test_count_customers_end_to_end(demo_project, fake_llm):
 @pytest.mark.e2e
 def test_no_exec_prints_sql_and_never_executes(demo_project, fake_llm):
     server, env = fake_llm(RULES_COUNT_CUSTOMERS)
-    r = run_cli(demo_project, env, "run", "--no-exec", "--llm-config", "configs/llm.fake.yaml", "How many customers are there?")
+    r = run_cli(demo_project, env, "run", "--no-exec", "How many customers are there?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "COUNT(" in r.stdout
     # No count may appear, but durations such as "0.59s" legitimately can, and
@@ -53,7 +53,7 @@ def test_a_foreign_key_join_passes_validation_and_executes(demo_project, fake_ll
     a working relationship match from a broken one.
     """
     server, env = fake_llm(RULES_ALBUMS_PER_ARTIST)
-    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+    r = run_cli(demo_project, env, "run", 
                 "How many albums does each artist have?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "JOIN" in r.stdout.upper()
@@ -73,7 +73,7 @@ def test_top_n_by_an_aggregate_validates_and_sorts_descending(demo_project, fake
     the direction, so the answer would have come back ascending anyway.
     """
     server, env = fake_llm(RULES_TOP_GENRE)
-    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+    r = run_cli(demo_project, env, "run", 
                 "Which genre sells the most tracks?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Pipeline Errors" not in r.stdout, r.stdout
@@ -93,7 +93,7 @@ def test_an_equality_filter_on_an_unsampled_value_validates(demo_project, fake_l
     INVALID_PLAN_STRUCTURE, which the refiner could not recover from.
     """
     server, env = fake_llm(RULES_JAZZ_TRACKS)
-    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+    r = run_cli(demo_project, env, "run", 
                 "How many jazz tracks are there?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Pipeline Errors" not in r.stdout, r.stdout
@@ -113,7 +113,7 @@ def test_a_plan_gpt4o_wrote_generates_sql_that_runs(demo_project, fake_llm):
     so SQLite rejected the SQL with ``near "(": syntax error``.
     """
     server, env = fake_llm(RULES_GENRE_SALES_GPT4O)
-    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+    r = run_cli(demo_project, env, "run", 
                 "Which genre sells the most tracks?")
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Pipeline Errors" not in r.stdout, r.stdout
@@ -134,7 +134,7 @@ def test_a_denied_query_stops_before_aggregation_and_synthesis(demo_project, fak
     spent another LLM call. Neither has anything to work on.
     """
     server, env = fake_llm(RULES_TOP_CUSTOMERS)
-    r = run_cli(demo_project, env, "run", "--role", "viewer", "--llm-config", "configs/llm.fake.yaml",
+    r = run_cli(demo_project, env, "run", "--role", "viewer", 
                 "Who are the top customers by total spend?")
     assert "SECURITY_VIOLATION" in r.stdout, r.stdout + r.stderr
     assert "AGGREGATOR_FAILED" not in r.stdout
@@ -153,7 +153,7 @@ def test_a_run_that_ends_with_pipeline_errors_exits_1(demo_project, fake_llm):
     exited 0, so a script calling it saw success.
     """
     server, env = fake_llm([ANSWERABLE, Rule("DecomposerResponse", {"not": "a decomposition"})])
-    r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.fake.yaml",
+    r = run_cli(demo_project, env, "run", 
                 "How many customers are there?")
     assert "ORCHESTRATOR_CRASH" in r.stdout, r.stdout + r.stderr
     assert r.returncode == 1, r.stdout + r.stderr

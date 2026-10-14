@@ -1,40 +1,40 @@
 # LLM Configuration
 
-LLM configuration lives in `configs/llm.yaml` and defines the default model plus
-optional per-agent overrides.
-
-## File structure
+The `llm` section of [`nl2sql.yaml`](system.md) names the model every agent
+uses, and optional per-agent overrides. `nl2sql init` writes it to `llm.yaml`
+with the provider's default model and no key.
 
 ```yaml
-version: 1
-default:
-  provider: openai
-  model: gpt-5.2
-  temperature: 0.0
-  api_key: ${env:OPENAI_API_KEY}
+# llm.yaml
+provider: openai
+model: gpt-5.4
+temperature: 0.0
+# api_key is optional: without it the provider's standard variable
+# (OPENAI_API_KEY) is read. Write it to read another one:
+# api_key: "${env:TEAM_OPENAI_KEY}"
 agents:
-  indexing_enrichment:
-    provider: openai
-    model: gpt-5.2
-    temperature: 0.0
-    api_key: ${env:OPENAI_API_KEY}
+  ast_planner:         { provider: anthropic, model: claude-opus-5, temperature: null }
+  indexing_enrichment: { model: gpt-5.4-mini }
+prices:
+  gpt-4o: { input: 2.5, cached_input: 1.25, output: 10 }
 ```
 
 ## Fields
 
-- `version`: schema version (currently `1`)
-- `default`: LLM configuration used by default
-- `agents`: optional map of agent name → LLM config override
+The section is flat: its keys are the top-level agent's.
 
-Each LLM config supports:
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `provider` | required | `openai`, `anthropic`, `openrouter`, `ollama`, or a provider a plugin registers. A misspelt or uninstalled one is a `ConfigError` with "did you mean". |
+| `model` | required | The model identifier. In Python it may be a LangChain chat model object instead (`LLM(model=ChatOpenAI(...))`), with no `provider`. |
+| `temperature` | `0.0` | A float, or `null` to send no temperature at all; see [Temperature](#temperature). |
+| `api_key` | none | Without it, the provider's standard variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`) is read. With it, a `${env:VAR}` or `${provider:key}` reference (or a literal, which is not recommended). The reference is resolved when the client is built, never at load. |
+| `base_url` | the provider's | An endpoint override; see [Other OpenAI-compatible endpoints](#other-openai-compatible-endpoints). |
+| `agents` | `{}` | Per-node overrides, keyed by node name; see [Per-node models](#per-node-models). |
+| `prices` | `{}` | Per-model prices per million tokens; see [Prices](#prices). |
 
-- `provider`: LLM provider name — `openai`, `anthropic`, `openrouter` or `ollama`
-- `model`: model identifier (required; an empty model is rejected)
-- `temperature`: float, or `null` to send no temperature at all (defaults to
-  `0.0`; see [Temperature](#temperature))
-- `api_key`: optional; can use `${env:VAR}` or `${provider:key}`
-- `base_url`: optional endpoint override (see [Other OpenAI-compatible
-  endpoints](#other-openai-compatible-endpoints))
+`engine.check()` reports every agent whose key does not resolve, without
+calling a model.
 
 ## Providers and wire types
 
@@ -91,7 +91,7 @@ see [Per-node models](#per-node-models).
 
 ### OpenAI
 
-`nl2sql setup` and `nl2sql demo` write `gpt-5.4` as the OpenAI default. On the
+`nl2sql init` and `nl2sql demo` write `gpt-5.4` as the OpenAI default. On the
 owner's account (probed 2026-09-20) it accepted `temperature: 0` with a limit of
 500,000 tokens per minute, against 30,000 for the previous default `gpt-4o` -
 less than one question with a single retry needs (about 33,500 tokens).
@@ -103,18 +103,9 @@ adapter uses for every node, and what OpenRouter's and Ollama's models support
 most widely.
 
 ```yaml
-version: 1
-default:
-  provider: openai
-  model: gpt-5.4
-  temperature: 0.0
-  api_key: ${env:OPENAI_API_KEY}
-agents:
-  indexing_enrichment:
-    provider: openai
-    model: gpt-5.4
-    temperature: 0.0
-    api_key: ${env:OPENAI_API_KEY}
+provider: openai
+model: gpt-5.4
+temperature: 0.0
 ```
 
 ### Anthropic (Claude)
@@ -132,15 +123,12 @@ Selecting `provider: anthropic` without it fails on the first LLM call with
 and `nl2sql doctor` reports the missing extra.
 
 ```yaml
-version: 1
-default:
-  provider: anthropic
-  model: claude-opus-5
-  temperature: null          # Claude Opus 5 and Sonnet 5 reject any temperature
-  api_key: ${env:ANTHROPIC_API_KEY}
+provider: anthropic
+model: claude-opus-5
+temperature: null          # Claude Opus 5 and Sonnet 5 reject any temperature
 ```
 
-`nl2sql setup` and `nl2sql demo` write `claude-opus-5` as the Claude default,
+`nl2sql init --provider anthropic` and `nl2sql demo` write `claude-opus-5` as the Claude default,
 with `temperature: null`. Current models:
 
 | model | `temperature` | minimum cacheable prefix |
@@ -198,7 +186,7 @@ How the engine uses it:
   timeout.
 - **Usage.** Cache reads and writes are reported as `cached_input_tokens` and
   `cache_write_input_tokens`, with each input token counted once (see
-  [Query API → usage](../api/core/query.md)). With `LLM_PRICES` set, a cache
+  [Query API → usage](../api/core/query.md)). With a price in `llm.prices`, a cache
   write costs 1.25x the model's `input` rate (Anthropic's price for a 5-minute
   write, the only kind the engine asks for) unless the price gives its own
   `cache_write`.
@@ -218,37 +206,21 @@ named `<vendor>/<model>`, for example `anthropic/claude-sonnet-4.5` or
 `google/gemini-2.5-pro`.
 
 ```yaml
-version: 1
-default:
-  provider: openrouter
-  model: anthropic/claude-sonnet-4.5
-  temperature: 0.0
-  api_key: ${env:OPENROUTER_API_KEY}
-agents:
-  indexing_enrichment:
-    provider: openrouter
-    model: anthropic/claude-sonnet-4.5
-    temperature: 0.0
-    api_key: ${env:OPENROUTER_API_KEY}
+provider: openrouter
+model: anthropic/claude-sonnet-4.5
+temperature: 0.0
 ```
 
 ### Ollama
 
 [Ollama](https://ollama.com) exposes an OpenAI-compatible API on
 `http://localhost:11434/v1`, so it needs no `api_key` and no `base_url`: start
-the daemon, pull a model, and point `configs/llm.yaml` at it.
+the daemon, pull a model, and point `llm.yaml` at it.
 
 ```yaml
-version: 1
-default:
-  provider: ollama
-  model: llama3.1
-  temperature: 0.0
-agents:
-  indexing_enrichment:
-    provider: ollama
-    model: llama3.1
-    temperature: 0.0
+provider: ollama
+model: llama3.1
+temperature: 0.0
 ```
 
 Set `base_url` if the daemon is not on `localhost:11434` (a remote box, or a
@@ -311,62 +283,58 @@ Nothing is retried without the parameter: what the config says is what is sent.
 
 ## Per-node models
 
-The six pipeline nodes that call a model each ask the registry for their own
-agent name, and fall back to `default` when it is not configured:
+The six pipeline nodes that call a model, and indexing enrichment, each have
+an agent. An agent not under `agents` runs on the top level:
 
-| agent name | node |
+| `agents` key | node |
 | --- | --- |
-| `curatedmatcher` | picks the verified query that answers the question, if any (one short call; only when [curated answers](curated.md) are configured and a candidate clears the floor) |
-| `datasourceresolver` | checks that the connected data can answer the question at all (one short call; refuses with `QUESTION_NOT_ANSWERABLE`) |
+| `curated_matcher` | picks the verified query that answers the question, if any (one short call; only when [curated answers](curated.md) are configured and a candidate clears the floor) |
+| `datasource_resolver` | checks that the connected data can answer the question at all (one short call; refuses with `QUESTION_NOT_ANSWERABLE`) |
 | `decomposer` | splits the question into sub-queries |
-| `astplanner` | writes the query plan (the largest prompt: it carries the schema) |
+| `ast_planner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |
-| `answersynthesizer` | writes the final answer from the rows |
+| `answer_synthesizer` | writes the final answer from the rows |
 | `indexing_enrichment` | writes missing schema descriptions during `nl2sql index --enrich` (optional, off by default) |
 
-The key under `agents` is the agent's name; a `name:` field is not needed. Each
-entry is a complete agent config - nothing is inherited from `default` - so
-`provider` and `model` are required, `temperature` falls back to `0.0` (not to
-the default agent's value), and a missing `api_key` falls back to the provider's
-environment variable. Each node can be on a different provider, and so a
-different wire type. For example, plan on Claude and run everything else on
-OpenAI, with one cheaper node that only accepts its default temperature:
+Any other key is an error with "did you mean". An agent takes every field it
+sets (`provider`, `model`, `temperature`, `api_key`, `base_url`) and inherits
+the rest from the top level. Inheritance follows which fields were written, so
+`temperature: null` on an agent still means "send none". Each node can be on a
+different provider, and so a different wire type. For example, plan on Claude
+and run everything else on OpenAI, with one cheaper node that only accepts its
+default temperature:
 
 ```yaml
-version: 1
-default:
-  provider: openai
-  model: gpt-5.4
-  temperature: 0.0
-  api_key: ${env:OPENAI_API_KEY}
+provider: openai
+model: gpt-5.4
+temperature: 0.0
 agents:
-  astplanner:
+  ast_planner:
     provider: anthropic
     model: claude-opus-5
     temperature: null        # Claude Opus 5 rejects a temperature
-    api_key: ${env:ANTHROPIC_API_KEY}
-  answersynthesizer:
-    provider: openai
-    model: gpt-5-mini
+  answer_synthesizer:
+    model: gpt-5-mini        # on OpenAI, inherited
     temperature: null        # gpt-5-mini rejects temperature=0
-    api_key: ${env:OPENAI_API_KEY}
 ```
 
-Here `curatedmatcher`, `datasourceresolver`, `decomposer` and `refiner` use `default`. Each node
+Here `curated_matcher`, `datasource_resolver`, `decomposer` and `refiner` run on the top level. With no `api_key`, the
+planner reads `ANTHROPIC_API_KEY` and the others `OPENAI_API_KEY`. Each node
 keeps its own key, endpoint and cache behaviour: the planner's system prompt is
 cache-marked for Anthropic, the others are sent unmarked to OpenAI. The model
 each call actually used is recorded per node in `QueryResult.usage.calls` and
 in a run trace's `llm.by_node` (see [Debugging](../observability/debugging.md)).
 
 In the demo, the playground's **Settings** page writes exactly these entries
-into `configs/llm.demo.yaml`. Choosing a provider and a model for a step adds
+into the demo folder's `llm.yaml`. Choosing a provider and a model for a step adds
 an `agents:` entry with `provider`, `model` and the temperature that model
 takes: `0.0`, or `null` for `gpt-5.5`, `gpt-5-mini`, `claude-opus-5` and
 `claude-sonnet-5`. A step on the default's provider takes the default's
-`base_url` and `api_key` reference; a step on another provider gets that
-provider's own `${env:...}` reference and no `base_url`. Choosing "Default"
-removes the entry. The running engine reloads the file, so the change applies
-to the next question. The page offers the providers and models in
+`base_url` and `api_key`; a step on another provider names no key (its
+standard variable is read) and no `base_url`. A key saved on the page goes to
+the demo's `.env`. Choosing "Default" removes the entry. The running engine
+reloads its `llm` section from `nl2sql.yaml`, so the change applies to the
+next question. The page offers the providers and models in
 `VERIFIED_MODELS` (`nl2sql/llm/providers.py`), OpenAI and Anthropic for
 now, and a provider only once its key is saved. See
 [the Settings page](../getting_started/demo.md#the-settings-page).
@@ -382,22 +350,26 @@ On the **hosted demo** (`nl2sql demo --hosted`) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
 per step in their own browser tab, and both travel with each question: a key
 per provider in a header of its own, and the choices in one compact
-`X-NL2SQL-Models` header, `{"astplanner": "anthropic:claude-opus-5"}`. The
+`X-NL2SQL-Models` header, `{"astplanner": "anthropic:claude-opus-5"}` (the header names a step by
+its registry agent name, `LLM_AGENTS` in `nl2sql/llm/providers.py`). The
 server validates every name against `LLM_AGENTS` and `VERIFIED_MODELS`, builds
 each step's client for that one request from the key for the provider it names,
 caches none of them, and refuses with `400` -- naming the step and the
 provider -- when a step is on a provider the request brought no key for. See
 [Hosted demo](../deployment/hosted-demo.md).
 
-When `nl2sql demo` picks replay or live mode at start-up it points `default`
-at the chosen provider. In replay and record mode every `agents:` entry
-follows, because one fake or proxy serves every call. In live mode a step
-keeps the provider it was given; only an entry with no provider, or one left
-on the replay endpoint, follows the default. Moving an entry between OpenAI
-and Anthropic replaces a model the new provider does not serve (a `gpt-` model
-on Anthropic, a `claude-` one on OpenAI) with that provider's default and its
-temperature. Every provider key saved in `.env.demo` is loaded at start-up, so
-each step finds its own.
+When `nl2sql demo` picks replay or live mode at start-up it points the top
+level of `llm.yaml` at the chosen provider. In replay and record mode every
+`agents:` entry follows, with the local replay server or recording proxy as
+`base_url` and the placeholder `api_key` (`replay`, `proxy`) it accepts,
+because one fake or proxy serves every call; no key goes into the
+environment. In live mode a step keeps the provider it was given; only an
+entry with no provider, or one left on the replay endpoint, follows the top
+level, and no `api_key` is written. Moving an entry between OpenAI and
+Anthropic replaces a model the new provider does not serve (a `gpt-` model on
+Anthropic, a `claude-` one on OpenAI) with that provider's default and its
+temperature. Every provider key saved in the demo's `.env` is loaded at
+start-up, so each step finds its own.
 
 ## Other OpenAI-compatible endpoints
 
@@ -406,12 +378,10 @@ lets the same code path serve any other OpenAI-compatible endpoint — vLLM,
 LiteLLM, a local proxy — without a new provider:
 
 ```yaml
-version: 1
-default:
-  provider: openai
-  model: meta-llama/Llama-3.1-70B-Instruct
-  api_key: ${env:LOCAL_LLM_KEY}
-  base_url: http://localhost:8000/v1
+provider: openai
+model: meta-llama/Llama-3.1-70B-Instruct
+api_key: "${env:LOCAL_LLM_KEY}"
+base_url: http://localhost:8000/v1
 ```
 
 Pick the provider whose credential behaviour matches the endpoint: `openai` or
@@ -429,19 +399,19 @@ build one client.
 
 A missing key does not stop the engine from starting:
 
-- Creating the engine (which `nl2sql setup`, `nl2sql index` and the API all do)
-  does not require a chat provider key. A machine with no key can still run
-  key-free work such as indexing with `EMBEDDING_PROVIDER=local`. That holds
-  for indexing because the `indexing_enrichment` pass is genuinely optional:
-  it is skipped, not merely deferred to a later failure.
+- Building the engine (which `nl2sql index`, the API and the demo all do) does
+  not require a chat provider key. A machine with no key can still run
+  key-free work such as indexing with `embeddings: {provider: local}`. That
+  holds for indexing because the `indexing_enrichment` pass is genuinely
+  optional: it is skipped, not merely deferred to a later failure.
 - `engine.check()` reports every agent whose key does not resolve, without
   calling a model. Using that agent raises the same error, naming the agent,
   the provider and the environment variable to set:
 
   ```text
   ValueError: LLM agent 'default' uses provider 'openai', which requires an API
-  key, but none could be resolved. Set OPENAI_API_KEY in the environment, or give
-  the agent an 'api_key' in configs/llm.yaml.
+  key, but none could be resolved. Set OPENAI_API_KEY ... or in the environment,
+  or give the agent an 'api_key' in the LLM config file.
   ```
 
 The key is read when the clients are built. A key set in the environment after
@@ -500,19 +470,28 @@ replaced by `PUT /api/v1/settings/llm`, which calls `engine.llm.replace`.
 ## Embeddings are a separate path
 
 None of Anthropic, OpenRouter or Ollama covers embeddings — they are not routed through
-`LLMRegistry` at all. Each engine builds its own embedder from its `embeddings`
-section; the 0.4 entry points select it with the `EMBEDDING_PROVIDER`
-environment variable:
+`LLMRegistry` at all. Each engine builds its own embedder from its
+[`embeddings` section](embeddings.md): `{provider: local}` embeds with the
+key-free ONNX `all-MiniLM-L6-v2` model bundled with chromadb, and
+`{provider: openai}` reads `OPENAI_API_KEY` (or `embeddings.api_key`).
+Switching embedding providers requires a re-index.
 
-```bash
-OPENROUTER_API_KEY=sk-or-...   # chat completions
-OPENAI_API_KEY=sk-...          # embeddings, when EMBEDDING_PROVIDER=openai (default)
+## Prices
+
+`prices` gives per-model prices per million tokens, so `QueryResult.usage`
+reports a `cost`:
+
+```yaml
+prices:
+  gpt-4o: { input: 2.5, cached_input: 1.25, output: 10 }
 ```
 
-Set `EMBEDDING_PROVIDER=local` to embed with the key-free ONNX
-`all-MiniLM-L6-v2` model bundled with chromadb, and no `OPENAI_API_KEY` is needed
-for the embedding step. Switching embedding providers requires a re-index. See
-[System configuration → Embeddings](system.md#embeddings).
+Optional `cached_input` (cache reads) defaults to `input`; optional
+`cache_write` (cache writes) defaults to `input` times the wire's write
+premium: 1.25 for Claude (`provider: anthropic`, whose 5-minute cache write
+Anthropic bills at 1.25x input) and 1 for the OpenAI wire. The rest of the
+prompt is billed at `input`. With no price for a model, `QueryResult.usage`
+reports tokens only and `cost` is `null`. No prices are built in.
 
 ## Notes
 
@@ -522,8 +501,8 @@ for the embedding step. Switching embedding providers requires a re-index. See
   (`nl2sql index --enrich`, or `enrich=True` from Python). Omit it, or leave
   its key unset, and indexing still works - the schema is indexed without
   LLM-written descriptions. It never replaces a comment read from the database.
-- `nl2sql setup` prompts for `openai`, `anthropic` and `openrouter`, the hosted
-  providers it can also collect a key for; `setup --api-key` picks the provider
-  from the key's shape (`sk-ant-` is Anthropic, `sk-or-` is OpenRouter, anything
-  else is OpenAI). To use Ollama, edit `configs/llm.yaml` as shown above — no
-  key prompt applies.
+- `nl2sql init --provider` takes `openai`, `anthropic` or `openrouter`, the
+  providers with a default model, and writes no key. `nl2sql demo --api-key`
+  picks the provider from the key's shape (`sk-ant-` is Anthropic, `sk-or-` is
+  OpenRouter, anything else is OpenAI). To use Ollama, edit `llm.yaml` as shown
+  above.

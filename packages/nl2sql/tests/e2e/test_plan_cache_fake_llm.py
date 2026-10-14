@@ -1,19 +1,19 @@
 """The plan cache end to end, through the real CLI and the fake LLM.
 
-Each test gets a private copy of the demo's schema store (``SCHEMA_STORE_PATH``),
-so a plan cached here is never seen by another test, whatever the order. The
-e2e conftest turns the cache off for every other test.
+Each test gets a private copy of the demo's index and state store (its own
+``storage.path``), so a plan cached here is never seen by another test,
+whatever the order. Every other test's config turns the cache off.
 """
 from __future__ import annotations
 
 import json
-import sqlite3
 
 import pytest
+import yaml
 
 from nl2sql.schema import SqliteSchemaStore
 
-from .conftest import _base_env, run_cli
+from .conftest import _base_env, private_storage, run_cli
 from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS
 from .test_trace_fake_llm import _serve
 
@@ -23,42 +23,41 @@ TOP = "Who are the top customers by total spend?"
 
 @pytest.fixture
 def store(demo_project, tmp_path):
-    """A private copy of the demo's schema store (snapshots included, no cached plans)."""
-    source = sqlite3.connect(demo_project / "data" / "schema_store.db")
-    path = tmp_path / "schema_store.db"
-    target = sqlite3.connect(path)
-    try:
-        source.backup(target)
-    finally:
-        source.close()
-        target.close()
-    copy = SqliteSchemaStore(path=path)
+    """A private copy of the demo's index and state store (snapshots included, no cached plans)."""
+    path = private_storage(demo_project, tmp_path / "store")
+    copy = SqliteSchemaStore(path=path / "state.db")
     copy.clear_plan_cache()
     copy.close()
     return path
 
 
-def _env(store, trace_dir, enabled="true", policies=None, today=None):
+def _env():
     env = _base_env()
-    if policies:
-        env["POLICIES_CONFIG"] = str(policies)
-    if today:
-        env["NL2SQL_TODAY"] = today
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-plan-cache", "TRACE_MODE": "always", "TRACE_DIR": str(trace_dir),
-                "SCHEMA_STORE_PATH": str(store), "PLAN_CACHE_ENABLED": enabled,
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = "sk-" + "fake-plan-cache"
     return env
 
 
-def _ask(demo_project, tmp_path, store, n, rules, question, role="admin", enabled="true", policies=None,
+def _config_name(tmp_path, n):
+    return f"plan-cache-{tmp_path.name}-{n}.yaml"
+
+
+def _ask(demo_project, tmp_path, store, n, rules, question, role="admin", enabled=True, policies=None,
          today=None):
     """One CLI run; returns (planner calls made, the trace document, the CLI result)."""
-    config = f"llm.plan-cache-{tmp_path.name}-{n}.yaml"
-    server = _serve(demo_project, rules, config)
-    trace_dir = tmp_path / f"traces-{n}"
+    config = _config_name(tmp_path, n)
+    pipeline = {"plan_cache": enabled, **({"today": today} if today else {})}
+    server = _serve(demo_project, rules, config, mode="always", settings={"pipeline": pipeline},
+                    policies=policies)
+    # Point the config at the test's own store, not a fresh copy of the demo's.
+    path = demo_project / config
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document["storage"] = {"path": str(store)}
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    trace_dir = store / "traces"
+    for old in trace_dir.glob("*.json"):
+        old.unlink()
     try:
-        r = run_cli(demo_project, _env(store, trace_dir, enabled, policies, today), "run", "--role", role,
-                    "--llm-config", f"configs/{config}", question)
+        r = run_cli(demo_project, _env(), "run", "--role", role, question, config=config)
     finally:
         server.stop()
     paths = list(trace_dir.glob("*.json"))
@@ -128,11 +127,10 @@ def test_a_policy_change_between_runs_takes_effect_on_a_cached_plan(demo_project
     assert r.returncode == 0, r.stdout + r.stderr
     assert len(calls) == 1
 
-    policies = json.loads((demo_project / "configs" / "policies.demo.json").read_text(encoding="utf-8"))
+    policies = yaml.safe_load((demo_project / "policies.yaml").read_text(encoding="utf-8"))
     analyst = policies["roles"]["analyst"]
     analyst["allowed_tables"] = [t for t in analyst["allowed_tables"] if t != "chinook.Customer"]
-    narrowed = tmp_path / "policies.narrowed.json"
-    narrowed.write_text(json.dumps(policies), encoding="utf-8")
+    narrowed = policies
 
     calls, doc, _r = _ask(demo_project, tmp_path, store, 2, RULES_COUNT_CUSTOMERS, COUNT, role="analyst",
                           policies=narrowed)
@@ -157,7 +155,7 @@ def test_a_refused_plan_is_not_cached(demo_project, tmp_path, store):
 @pytest.mark.e2e
 def test_the_disable_setting_calls_the_planner_every_time(demo_project, tmp_path, store):
     for n in (1, 2):
-        calls, doc, r = _ask(demo_project, tmp_path, store, n, RULES_COUNT_CUSTOMERS, COUNT, enabled="false")
+        calls, doc, r = _ask(demo_project, tmp_path, store, n, RULES_COUNT_CUSTOMERS, COUNT, enabled=False)
         assert r.returncode == 0, r.stdout + r.stderr
         assert len(calls) == 1
         assert _sub(doc)["plan_source"] == "llm"
@@ -167,7 +165,7 @@ def test_the_disable_setting_calls_the_planner_every_time(demo_project, tmp_path
 def test_cache_clear_makes_the_next_run_call_the_planner(demo_project, tmp_path, store):
     _ask(demo_project, tmp_path, store, 1, RULES_COUNT_CUSTOMERS, COUNT)
 
-    cleared = run_cli(demo_project, _env(store, tmp_path / "unused"), "cache", "clear")
+    cleared = run_cli(demo_project, _env(), "cache", "clear", config=_config_name(tmp_path, 1))
     assert cleared.returncode == 0, cleared.stdout + cleared.stderr
     assert "Cleared 1 cached plans" in " ".join(cleared.stdout.split())
 

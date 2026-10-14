@@ -36,8 +36,8 @@ Twenty-one routes:
                                model each of those is configured to use, and the model
                                the replay recordings were made with
 ``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
-``POST /api/settings/key``     save an API key to ``.env.demo`` and switch to live
-``POST /api/settings/models``  write a model per LLM node into ``llm.demo.yaml``
+``POST /api/settings/key``     save an API key to ``.env`` and switch to live
+``POST /api/settings/models``  write a model per LLM node into ``llm.yaml``
 ``GET  /api/index``            index health (entries by type, schema version, when built)
                                and the state of a running rebuild
 ``POST /api/index/rebuild``    rebuild the datasource's snapshot and vector entries

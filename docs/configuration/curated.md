@@ -1,11 +1,12 @@
 # Curated Answers (`curated.yaml`)
 
-`curated.yaml` is where a data team writes **verified queries**: SQL they have
-already written and reviewed, with typed parameters, and the questions each
-query answers.
+The `curated` section of [`nl2sql.yaml`](system.md), usually its own
+`curated.yaml`, is where a data team writes **verified queries**: SQL they
+have already written and reviewed, with typed parameters, and the questions
+each query answers.
 
 !!! note "What works today"
-    The file is loaded and checked (at startup and with
+    The section is loaded and checked (at startup and with
     `nl2sql curated validate`), every query can be run once with
     `nl2sql curated test`, its questions are indexed with `nl2sql index`, a
     question is matched to a verified query and answered by it (see
@@ -16,33 +17,34 @@ query answers.
     ([From feedback to verified queries](#from-feedback-to-verified-queries))
     are built too. Business metrics are parsed but not used yet.
 
-## Where the file lives
+## Where it lives
 
-| Setting | Env | Default | Meaning |
-| --- | --- | --- | --- |
-| `curated_config_path` | `CURATED_CONFIG` | `configs/curated.yaml` | The curated answers file, relative to the working directory or absolute. |
-| `curated_enabled` | `CURATED_ENABLED` | `true` | `false` turns the feature off without removing the file: no matching, and every answer is generated. `nl2sql curated validate` still checks it. |
-| `curated_match_top_k` | `CURATED_MATCH_TOP_K` | `5` | Verified query candidates a question's search returns and the model is shown, one per query. |
-| `curated_match_floor` | `CURATED_MATCH_FLOOR` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if the file did not exist, with no model call. Calibrated on the local embedding model; see [the design](../architecture/curated_answers.md#settings). |
+```yaml
+# nl2sql.yaml
+curated: { file: curated.yaml }
+```
 
-The file is optional:
+The section is optional. **Present, curated answers are on; absent, they are
+off**, and nothing else changes. To turn them off, remove the line from
+`nl2sql.yaml` (the file can stay). A `file:` that does not exist is an error,
+and so is a section that is broken: building the engine (`NL2SQL(config)`,
+`nl2sql run`, the REST API, the playground) fails with a `ConfigError` that
+names every problem, as a broken datasource does.
 
-- `CURATED_CONFIG` left at its default and no `configs/curated.yaml`: the
-  feature is off, and nothing else changes.
-- `CURATED_CONFIG` set to any other path that does not exist: startup fails
-  with `FileNotFoundError`. A typo should not quietly turn verified answers off.
-- The file exists but is broken: startup (`NL2SQL(config)`, `nl2sql run`, the
-  REST API, the playground) fails with a `ConfigError` that names every problem,
-  as a broken datasource does.
+The matching knobs are in the [`settings` section](settings.md):
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `settings.curated.match_top_k` | `5` | Verified query candidates a question's search returns and the model is shown, one per query. |
+| `settings.curated.match_floor` | `0.6` | Cosine similarity the best candidate must reach before the model is asked to choose one. Below it the question is answered as if there were no curated section, with no model call. Calibrated on the local embedding model; see [the design](../architecture/curated_answers.md#settings). |
 
 ## Writing the file
 
-One file covers every datasource, keyed by the datasource `id` from
-`datasources.yaml`. This is the Chinook example from
-[`configs/curated.example.yaml`](https://github.com/nadeem4/nl2sql/blob/main/configs/curated.example.yaml):
+One section covers every datasource, keyed by the datasource `id`. This is
+one of the demo's verified queries (`nl2sql init --demo` writes all six):
 
 ```yaml
-version: 1
+# curated.yaml
 datasources:
   chinook:
     verified_queries:
@@ -113,17 +115,12 @@ Every key is checked: a misspelt one (`descripton:`) is an error, not ignored.
 ## Checking the file
 
 ```bash
-nl2sql curated validate
-nl2sql curated validate --curated configs/curated.yaml --config configs/datasources.yaml
+nl2sql curated validate                              # ./nl2sql.yaml, or NL2SQL_CONFIG
+nl2sql --config prod/nl2sql.yaml curated validate
 ```
 
-| Option | Default |
-| --- | --- |
-| `--curated` | `CURATED_CONFIG` |
-| `--config` | `DATASOURCE_CONFIG` |
-| `--secrets` | `SECRETS_CONFIG` |
-
-It runs every check startup runs, plus one that needs the index: every table
+Building the engine runs every startup check; a section that fails one exits
+1 with the `ConfigError`. The command then adds the one that needs the index: every table
 a query reads (CTE names aside) is in its datasource's latest indexed schema,
 compared case-insensitively. A datasource that has not been indexed yet is
 skipped for that check, with a note. The command prints a table, one row per
@@ -149,13 +146,13 @@ query, and exits 1 on any error, so it can run in CI:
 | SQL `:name` placeholders are exactly the params | yes | yes |
 | Tables the SQL reads are in the indexed schema | no | yes, when indexed |
 
-From Python, the same check is `CuratedAPI`, also available as
-`NL2SQL.from_config(...).curated`:
+From Python, the same check is `engine.curated`, on the engine's own config:
 
 ```python
-from nl2sql import CuratedAPI
+from nl2sql import NL2SQL
 
-report = CuratedAPI().validate()          # or validate(curated_path=..., datasources_path=...)
+engine = NL2SQL.from_config("nl2sql.yaml")
+report = engine.curated.validate()
 if not report.ok:
     for error in report.errors:
         print(error)
@@ -171,10 +168,10 @@ its database:
 
 ```bash
 nl2sql curated test
-nl2sql curated test --curated configs/curated.yaml --config configs/datasources.yaml
+nl2sql --config prod/nl2sql.yaml curated test
 ```
 
-It takes the same options as `validate`. Each param is bound to its
+It reads the same config as `validate`. Each param is bound to its
 `default`, else its `example`; a param with neither fails its query without
 running it, so give every required param an `example`. A query that fails the
 static checks (not read-only, placeholders that do not match the params) is
@@ -194,7 +191,7 @@ so it can run in CI after a schema change:
 └────────────┴──────────────────────────┴────────┴─────────────────┴──────────────────────────────────────────────┘
 ```
 
-From Python it is `CuratedAPI().test()`, which returns a report like
+From Python it is `engine.curated.test()`, which returns a report like
 `validate()`'s: `ok`, `errors`, and one entry per query with its `status`
 (`PASS` or `FAIL`), `params`, `row_count` and `details`.
 
@@ -205,7 +202,7 @@ description, beside the datasource's schema entries. Placeholders are filled
 first with the param's `example`, else its `default`: "Best {n} customers in
 {year}" is indexed as "Best 10 customers in 2012". The SQL is never indexed.
 
-After editing `curated.yaml`, re-index its questions:
+After editing the curated section, re-index its questions:
 
 ```bash
 nl2sql index --curated-only                       # every datasource
@@ -236,8 +233,8 @@ that executes starts at the curated matcher
 
 1. It searches the indexed phrasings of the verified queries of the
    datasources the caller's role may read (only the pinned datasource when a
-   request names one), and keeps the best `CURATED_MATCH_TOP_K` queries.
-2. If the best one's similarity is below `CURATED_MATCH_FLOOR`, the question
+   request names one), and keeps the best `settings.curated.match_top_k` queries.
+2. If the best one's similarity is below `settings.curated.match_floor`, the question
    goes to the normal pipeline. No model call is made.
 3. Otherwise one model call sees those candidates: each one's
    `datasource.id`, `description` and params (type, bounds, choices,
@@ -246,20 +243,20 @@ that executes starts at the curated matcher
 4. Code checks the values against the param specs. A param the question does
    not give takes its `default`; a required one missing, or a value out of
    bounds, sends the question to the normal pipeline.
-5. Every table the SQL reads must be allowed for the role in
-   `policies.json`. If one is not, the question goes to the normal pipeline,
+5. Every table the SQL reads must be allowed for the role by the
+   [`policies` section](policies.md). If one is not, the question goes to the normal pipeline,
    which refuses it the way it always does. The user is never told a
    verified query exists.
 6. The SQL runs with the values bound by the driver, through the same
    executor as generated SQL. The row limit is the datasource's `row_limit`
-   (capped by `RESULT_ROW_LIMIT`): the executor stops reading there and marks
+   (capped by `settings.results.row_limit`): the executor stops reading there and marks
    the result cut, rather than adding a `LIMIT` to your SQL. The result is
    saved, paged and exported like any other, and the answer is written from
    it, told what the numbers mean by the query's `description`.
 
 A verified answer costs two model calls (the choice and the answer). When
-anything above does not hold, the run continues as if the file did not
-exist, and the answer is generated.
+anything above does not hold, the run continues as if there were no curated
+section, and the answer is generated.
 
 Every answer says where it came from, in `QueryResult.source` (and the REST
 response):
@@ -287,8 +284,8 @@ floor, the model's choice and reason, the checked values, and one reason code:
 `policy_denied`, `capability_missing` or `execution_failed`. A verified query
 that fails to run also adds a warning to the result.
 
-The model for the choice is the `curatedmatcher` agent in the
-[LLM config](llm.md), falling back to `default`.
+The model for the choice is the `curated_matcher` agent in the
+[`llm` section](llm.md#per-node-models), falling back to the top level.
 
 Parameters are bound by the datasource's adapter. Every built-in adapter
 binds them; a third-party adapter has to declare `SUPPORTS_BOUND_PARAMETERS`
@@ -297,9 +294,9 @@ does not is never run (`capability_missing`).
 
 ## In the demo
 
-`nl2sql demo` and `nl2sql setup --demo` write `configs/curated.demo.yaml`
-with six verified queries on Chinook, set `CURATED_CONFIG` to it in
-`.env.demo`, and index their questions with the schema:
+`nl2sql init --demo` (which `nl2sql demo` runs the first time) writes
+`curated.yaml` with six verified queries on Chinook and includes it from
+`nl2sql.yaml`; `nl2sql demo` indexes their questions with the schema:
 
 | Query | One of its phrasings | Params |
 | --- | --- | --- |
@@ -312,8 +309,9 @@ with six verified queries on Chinook, set `CURATED_CONFIG` to it in
 
 Two of the guided questions, "What is the total revenue per year?" and "Which
 genre sells the most tracks?", are phrasings of these, so with a key they come
-back verified. Check and run the file with
-`nl2sql --env demo curated validate` and `nl2sql --env demo curated test`.
+back verified. Check and run them with
+`nl2sql --config nl2sql-demo/nl2sql.yaml curated validate` and
+`nl2sql --config nl2sql-demo/nl2sql.yaml curated test`.
 
 The keyless demo (a hosted Space with no key, or `nl2sql demo` replaying
 recordings) answers from recorded model answers, and those include the
@@ -324,8 +322,8 @@ there per month in 2013?" come back verified, and the rest generated.
 
 ## Preferred tables
 
-Preferred tables are not in `curated.yaml`: they are a `preferred_tables` list
-on a datasource in `datasources.yaml`, naming views or tables (built by the
+Preferred tables are not in the curated section: they are a `preferred_tables`
+list on a datasource, naming views or tables (built by the
 data team, never by the package) the planner should reach for first. See
 [Datasources: preferred tables](datasources.md#preferred-tables).
 
@@ -333,18 +331,17 @@ data team, never by the package) the planner should reach for first. See
 
 A thumbs-up on a generated answer in the playground is a candidate verified
 query: a real question, and SQL a person said was right. Export them as
-proposals and review them like any other change to `curated.yaml`:
+proposals and review them like any other change to the curated section:
 
 ```bash
 nl2sql curated proposals export                                   # print to stdout
-nl2sql curated proposals export --out configs/curated.proposals.yaml
+nl2sql curated proposals export --out curated.proposals.yaml
 ```
 
-Each proposal is an entry in `curated.yaml`'s shape, under the datasource the
-run used:
+Each proposal is an entry in the curated section's shape, under the
+datasource the run used:
 
 ```yaml
-version: 1
 datasources:
   chinook:
     verified_queries:
@@ -377,21 +374,20 @@ person reads each entry, checks the SQL answers the question, writes the
 description, turns the values a reader would change into `{params}` in the
 question and `:params` in the SQL with a `params:` entry, drops the row-cap
 `LIMIT` the generator added unless the question asks for it, adds other
-phrasings, moves the entry into `curated.yaml`, runs
+phrasings, moves the entry into the curated section, runs
 `nl2sql curated validate`, and commits it. The same steps head the exported
 file as comments.
 
-`export` never writes `curated.yaml`: it refuses an `--out` that is the active
-curated file (`CURATED_CONFIG`) and exits 2. Neither the REST API nor the
+`export` never writes the config's own files: it refuses an `--out` that is
+`nl2sql.yaml` or any file it includes, and exits 2. Neither the REST API nor the
 playground writes it either.
 
 ## Source references
 
-- Models: `packages/nl2sql/src/nl2sql/config/curated.py`
-- SQL checks and the file model: `packages/nl2sql/src/nl2sql/configs/curated.py`
+- Models and SQL checks: `packages/nl2sql/src/nl2sql/config/curated.py`
+- The section in the config: `Curated` in `packages/nl2sql/src/nl2sql/config/models.py`
 - Index entries and the change hash: `packages/nl2sql/src/nl2sql/indexing/curated.py`
-- Loader: `ConfigManager.load_curated()` in `packages/nl2sql/src/nl2sql/configs/manager.py`
-- Startup load: `packages/nl2sql/src/nl2sql/runtime.py`
+- Startup check: `packages/nl2sql/src/nl2sql/runtime.py`
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `packages/nl2sql/src/nl2sql/cli/commands/curated.py`
 - The demo's verified queries: `CHINOOK_VERIFIED_QUERIES` in `packages/nl2sql/src/nl2sql/datasets/chinook.py`

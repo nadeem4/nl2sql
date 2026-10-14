@@ -1,12 +1,11 @@
 """``nl2sql curated``: the curated answers file.
 
-* ``validate`` -- check ``curated.yaml`` before it ships.
+* ``validate`` -- check the ``curated`` section before it ships.
 * ``test`` -- run every verified query once against its database.
 * ``proposals export`` -- thumbs-up generated answers as proposed verified
   queries, in their own file (or on stdout) for a person to review. It never
-  writes ``curated.yaml``.
+  writes the config's own files.
 """
-import os
 import pathlib
 import sys
 from typing import Optional
@@ -18,8 +17,8 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import Annotated
 
-from nl2sql import CuratedAPI
 from nl2sql.cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.engine import build_engine, load_project_config, store_paths
 
 app = typer.Typer(help="Check and test the curated answers file.", no_args_is_help=True)
 console = Console()
@@ -27,16 +26,12 @@ console = Console()
 
 @app.command("validate")
 @handle_cli_errors
-def validate(
-    curated: Annotated[Optional[pathlib.Path], typer.Option("--curated", help="Path to curated.yaml")] = None,
-    config: Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config")] = None,
-    secrets: Annotated[Optional[pathlib.Path], typer.Option("--secrets", help="Path to secrets config")] = None,
-):
+def validate(ctx: typer.Context):
     """
-    Validate curated.yaml: shape, ids, params, read-only SQL in each datasource's
-    dialect, and the tables it reads against the indexed schema.
+    Validate the curated section: shape, ids, params, read-only SQL in each
+    datasource's dialect, and the tables it reads against the indexed schema.
     """
-    report = CuratedAPI().validate(curated_path=curated, datasources_path=config, secrets_path=secrets)
+    report = build_engine(ctx, check=False).curated.validate()
     console.print(f"[bold blue]Validating curated answers from:[/bold blue] {escape(report.path)}")
 
     for error in report.errors:
@@ -64,16 +59,12 @@ def validate(
 
 @app.command("test")
 @handle_cli_errors
-def test(
-    curated: Annotated[Optional[pathlib.Path], typer.Option("--curated", help="Path to curated.yaml")] = None,
-    config: Annotated[Optional[pathlib.Path], typer.Option("--config", help="Path to datasource config")] = None,
-    secrets: Annotated[Optional[pathlib.Path], typer.Option("--secrets", help="Path to secrets config")] = None,
-):
+def test(ctx: typer.Context):
     """
     Run every verified query once against its database, read-only, with each
     param's default or example bound. Exits 1 if any query fails.
     """
-    report = CuratedAPI().test(curated_path=curated, datasources_path=config, secrets_path=secrets)
+    report = build_engine(ctx, check=False).curated.test()
     console.print(f"[bold blue]Testing verified queries from:[/bold blue] {escape(report.path)}")
 
     for error in report.errors:
@@ -104,25 +95,25 @@ app.add_typer(proposals_app, name="proposals")
 
 @proposals_app.command("export")
 def export_proposals(
+    ctx: typer.Context,
     out: Annotated[Optional[pathlib.Path], typer.Option(
-        "--out", help="Write the proposals here (default: print them). Never curated.yaml itself.")] = None,
+        "--out", help="Write the proposals here (default: print them). Never a file of the config itself.")] = None,
 ):
     """
     Turn thumbs-up feedback on generated answers into proposed verified queries,
-    in curated.yaml's shape, for a person to review and commit.
+    in the curated section's shape, for a person to review and commit.
     """
-    from nl2sql.common.settings import settings
     from nl2sql.feedback import FeedbackStore, build_proposals, render_proposals, write_proposals
 
-    protected = [pathlib.Path(settings.curated_config_path)]
-    if os.environ.get("CURATED_CONFIG"):
-        protected.append(pathlib.Path(os.environ["CURATED_CONFIG"]))
+    config = load_project_config(ctx)
+    protected = _config_files(config.folder)
     if out is not None and any(out.resolve() == p.resolve() for p in protected):
-        console.print("[bold red]Error:[/bold red] Proposals never go into the curated answers file itself. "
-                      "Pick another --out, review the entries, then move them into curated.yaml.", soft_wrap=True)
+        console.print("[bold red]Error:[/bold red] Proposals never go into the config's own files. "
+                      "Pick another --out, review the entries, then move them into the curated section.",
+                      soft_wrap=True)
         raise typer.Exit(2)
 
-    store_path = pathlib.Path(settings.schema_store_path)
+    store_path = store_paths(ctx).state
     rows = []
     if store_path.exists():
         store = FeedbackStore(store_path)
@@ -142,4 +133,23 @@ def export_proposals(
     write_proposals(text, out, protected=protected)
     console.print(f"[green]Wrote {count} proposed verified quer{'y' if count == 1 else 'ies'}[/green] to "
                   f"{escape(str(out.resolve()))}; skipped: {escape(reasons)}.", soft_wrap=True)
-    console.print("Review each entry, turn literal values into {params}, then move it into curated.yaml.")
+    console.print("Review each entry, turn literal values into {params}, then move it into the curated section.")
+
+
+def _config_files(folder: Optional[pathlib.Path]) -> list:
+    """``nl2sql.yaml`` and every file it includes, so proposals never overwrite the config."""
+    if folder is None:
+        return []
+    import yaml
+
+    toc = folder / "nl2sql.yaml"
+    files = [toc]
+    try:
+        sections = yaml.safe_load(toc.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return files
+    for value in sections.values() if isinstance(sections, dict) else []:
+        if isinstance(value, dict) and isinstance(value.get("file"), str):
+            target = folder / value["file"]
+            files += sorted(target.glob("*.yaml")) if target.is_dir() else [target]
+    return files

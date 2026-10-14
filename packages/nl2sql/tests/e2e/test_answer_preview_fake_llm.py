@@ -53,17 +53,16 @@ RULES = [
 ]
 
 
-def _run(demo_project, tmp_path, name, **extra_env):
-    server = _serve(demo_project, RULES, name)
+def _run(demo_project, tmp_path, name, settings=None):
+    server = _serve(demo_project, RULES, name, store=tmp_path, mode="always", settings=settings)
     env = _base_env()
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-answer-preview", "TRACE_MODE": "always", "TRACE_DIR": str(tmp_path),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0", **extra_env})
+    env["OPENAI_API_KEY"] = "sk-" + "fake-answer-preview"
     try:
-        r = run_cli(demo_project, env, "run", "--llm-config", f"configs/{name}", QUESTION)
+        r = run_cli(demo_project, env, "run", QUESTION, config=name)
     finally:
         server.stop()
     assert r.returncode == 0, r.stdout + r.stderr
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     [synthesis] = [c for c in server.calls if c["name"] == "AggregatedResponse"]
     prompt = "\n".join(str(m.get("content") or "") for m in synthesis["body"].get("messages", []))
     return json.loads(path.read_text(encoding="utf-8"))["result"], prompt
@@ -71,7 +70,7 @@ def _run(demo_project, tmp_path, name, **extra_env):
 
 @pytest.mark.e2e
 def test_the_answer_prompt_holds_twenty_rows_and_the_count(demo_project, tmp_path):
-    result, prompt = _run(demo_project, tmp_path, "llm.answer-preview.yaml")
+    result, prompt = _run(demo_project, tmp_path, "answer-preview.yaml")
 
     [sub] = result["sub_queries"]
     assert result["status"] == "success", result["errors"]
@@ -86,7 +85,7 @@ def test_the_answer_prompt_holds_twenty_rows_and_the_count(demo_project, tmp_pat
 
 @pytest.mark.e2e
 def test_a_result_at_the_ceiling_is_flagged_and_the_answer_says_so(demo_project, tmp_path):
-    result, prompt = _run(demo_project, tmp_path, "llm.answer-ceiling.yaml", RESULT_ROW_LIMIT="10")
+    result, prompt = _run(demo_project, tmp_path, "answer-ceiling.yaml", settings={"results": {"row_limit": 10}})
 
     [sub] = result["sub_queries"]
     assert result["status"] == "success", result["errors"]

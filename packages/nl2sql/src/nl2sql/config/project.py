@@ -18,7 +18,19 @@ from typing import Any, Dict, List, Optional, Union
 import yaml
 
 from nl2sql.config.loader import load_config
-from nl2sql.config.models import LLM, Config, Curated, Datasource, Embeddings, Policies, Role, Storage
+from nl2sql.config.models import (
+    LLM,
+    Config,
+    Curated,
+    Datasource,
+    Embeddings,
+    PipelineSettings,
+    Policies,
+    Role,
+    Settings,
+    Storage,
+    TraceSettings,
+)
 
 PathLike = Union[str, "os.PathLike[str]"]
 
@@ -50,6 +62,11 @@ def demo_config(
     The databases are opened read-only from ``data_dir``, by default the
     folder the package installed them in. Each datasource carries its sample
     questions. Without ``llm``, the default OpenAI model is used.
+
+    Its settings are the demo's own: a live run walks six model calls (one
+    OpenAI run took 136 s), so a question may take 300 s; every run writes a
+    trace, which the playground's Debug drill-down reads; and a refusal names
+    the table, since showing one is the demo's point.
     """
     from nl2sql.datasets import CHINOOK_DB_PATH
     from nl2sql.datasets.demo import DEMO_CURATED, DEMO_DATASOURCES, DEMO_POLICIES, DEMO_QUESTIONS_BY_DATASOURCE
@@ -67,9 +84,11 @@ def demo_config(
         datasources=datasources,
         llm=llm if llm is not None else default_llm("openai"),
         embeddings=Embeddings(provider="local"),
-        policies=Policies(roles={name: Role(**role) for name, role in DEMO_POLICIES.items()}),
+        policies=Policies(roles={name: Role(**role) for name, role in DEMO_POLICIES.items()},
+                          refusal_names_tables=True),
         storage=Storage(path=Path(path)),
         curated=Curated(**DEMO_CURATED),
+        settings=Settings(pipeline=PipelineSettings(timeout_s=300), traces=TraceSettings(mode="always")),
     )
 
 
@@ -93,7 +112,7 @@ def init_project(
     files: Dict[str, str] = {}
     copies: Dict[str, Path] = {}
 
-    sections = ["datasources", "llm", "embeddings", "policies", "storage", *(["curated"] if demo else [])]
+    sections = ["datasources", "llm", "embeddings", "policies", "storage", *(["curated", "settings"] if demo else [])]
     files["nl2sql.yaml"] = TOC_HEADER + "version: 2\n" + "".join(
         f"{section + ':':<13}{{ file: {_section_file(section)} }}\n" for section in sections)
     files["llm.yaml"] = _llm_file(llm)
@@ -107,6 +126,8 @@ def init_project(
             copies[f"{DATA_FOLDER}/{source.name}"] = source
         files["policies.yaml"] = _dump(config.policies.model_dump(mode="json", exclude_defaults=True))
         files["curated.yaml"] = CURATED_HEADER + _dump(config.curated.model_dump(mode="json", exclude_defaults=True))
+        files["settings.yaml"] = DEMO_SETTINGS_HEADER + _dump(
+            config.settings.model_dump(mode="json", by_alias=True, exclude_defaults=True))
     else:
         files["datasources/example.yaml"] = EXAMPLE_DATASOURCE
         files["policies.yaml"] = POLICIES_HEADER + _dump({"allow_all": True})
@@ -192,6 +213,12 @@ CURATED_HEADER = """\
 # Verified queries: SQL a person wrote and reviewed, with typed params, and the
 # questions each one answers. While this section is present, curated answers
 # are on. See docs/configuration/curated.md.
+"""
+
+DEMO_SETTINGS_HEADER = """\
+# The demo's tuning knobs; every other setting keeps its default. A live run
+# makes six model calls, so a question may take 300 s, and every run writes a
+# trace for the playground's Debug drill-down. See configuration/settings.
 """
 
 

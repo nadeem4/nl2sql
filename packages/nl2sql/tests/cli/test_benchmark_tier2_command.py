@@ -4,12 +4,14 @@ The benchmark API is replaced, so no context is built and nothing is called;
 the real run against a fake LLM is ``tests/e2e/test_benchmark_tier2_fake_llm.py``.
 """
 import json
+import pathlib
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.evaluation import tier2
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 
@@ -51,11 +53,16 @@ class _FakeAPI:
         return _FakeAPI.board
 
 
+def _engine(ctx):
+    """The engine `--config` builds: its benchmark API is the fake, its folder the working directory."""
+    return SimpleNamespace(benchmark=_FakeAPI(), config=SimpleNamespace(folder=pathlib.Path.cwd()))
+
+
 @pytest.fixture(autouse=True)
 def _api(monkeypatch):
     _FakeAPI.calls, _FakeAPI.board = [], _board()
     monkeypatch.delenv("CI", raising=False)
-    monkeypatch.setattr("nl2sql.cli.commands.benchmark.BenchmarkAPI", _FakeAPI)
+    monkeypatch.setattr("nl2sql.cli.commands.benchmark.build_engine", _engine)
 
 
 def _invoke(tmp_path, *args):
@@ -226,14 +233,12 @@ def test_the_plan_is_printed_before_the_run(tmp_path, monkeypatch):
 
 
 def test_outputs_default_to_the_project_folder(tmp_path, monkeypatch):
+    # The project is the folder of nl2sql.yaml; the fake engine's folder is the working directory.
     project = tmp_path / "demo"
     project.mkdir()
-    (project / ".env.demo").write_text("", encoding="utf-8")
     monkeypatch.chdir(project)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.delenv("ENV_FILE_PATH", raising=False)
     _FakeAPI.board = {**_board(), "database": CHINOOK}
-    out = runner.invoke(app, ["--env", "demo", "benchmark", "--tier", "2", "--model", "gpt-5.4", "--max-cost", "5",
+    out = runner.invoke(app, ["benchmark", "--tier", "2", "--model", "gpt-5.4", "--max-cost", "5",
                               "--note", "slim prompts"])
     assert out.exit_code == 0, out.output
     assert (project / "benchmark_tier2.json").exists()

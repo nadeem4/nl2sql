@@ -1,6 +1,13 @@
-"""`nl2sql demo`: scaffold a demo project, index it, and serve the playground.
+"""`nl2sql demo`: write the demo project, index it, and serve the playground.
 
-``--hosted`` (or ``NL2SQL_DEMO_HOSTED=1``) is a fourth mode and a different
+The first run writes the project with ``nl2sql init --demo`` into ``--dir``
+(``nl2sql-demo/``): ``nl2sql.yaml``, its section files and the three sample
+databases. Every run loads the ``.env`` next to it (never overriding a
+variable already set), builds the engine with ``load_config`` and checks it
+(``engine.check()``), builds the index when the check reports it is not
+ready, and serves the playground on that engine.
+
+``--hosted`` is a fourth mode and a different
 server: it is for a public demo, where the process holds no key at all and
 every visitor brings their own in a request header; a visitor without one is
 answered from the packaged recordings for the guided questions they cover. Nothing is saved -- not the
@@ -14,22 +21,23 @@ Otherwise three modes, chosen at process start from the first key that turns up:
 ``replay``  no key anywhere, so questions answer only from recordings: the
             demo project's ``recordings.json`` (written by ``--record``), else
             any packaged with the engine (``scripts/record_demo_answers.py``
-            makes those)
+            makes those). ``llm.yaml`` points at the local replay server, with
+            the placeholder key it accepts.
 ``live``    a key (or a reachable Ollama) is present, so questions go upstream
 ``record``  ``--record`` with a key, capturing upstream answers for replay
 
 The key is looked for in a fixed order, highest precedence first:
 
 1. ``--api-key`` on the command line, which is also written into the demo
-   project's ``.env.demo`` so later runs from that directory stay live
+   project's ``.env`` so later runs from that directory stay live
 2. ``OPENAI_API_KEY`` / ``OPENROUTER_API_KEY`` / ``ANTHROPIC_API_KEY`` in the
    process environment
-3. whichever of those is already recorded in the demo project's ``.env.demo``
+3. whichever of those is already recorded in the demo project's ``.env``
 4. a reachable Ollama (live, but nothing to record through)
 5. replay
 
 ``--api-key`` and the playground's settings panel are the only sources that
-write a key down, and both write only to ``.env.demo``, through
+write a key down, and both write only to ``.env``, through
 :func:`nl2sql.cli.demo.llm_config.persist_api_key`. A key saved in the panel takes effect at once, and on
 the next start it sits at step 3 of the order above. No path echoes a key: the
 console and the playground show at most a masked form. The panel (and, by the
@@ -45,8 +53,6 @@ import urllib.request
 import webbrowser
 from typing import List, Optional, Tuple
 
-import yaml
-
 from nl2sql.llm.providers import (
     ANTHROPIC_UPSTREAM,
     KEYED_PROVIDERS,
@@ -59,14 +65,15 @@ from nl2sql.llm.providers import (
 )
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
-from nl2sql.cli.demo import DemoManager
 from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
+from nl2sql.cli.demo.llm_config import ENV_FILE, read_llm
 from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
 from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
-from nl2sql.cli.demo.stamp import outdated_warning
+from nl2sql.cli.demo.defaults import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION
+from nl2sql.cli.demo.stamp import outdated_warning, write_stamp
 from rich.markup import escape
-from nl2sql.common.settings import reload_settings
 from nl2sql.llm.registry import PROVIDER_PRESETS
+from nl2sql.config import load_env_file
 from nl2sql.llm.replay import RecordingProxy, ReplayStore
 from nl2sql.testing.fake_llm import FakeLLMServer
 
@@ -85,14 +92,15 @@ INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
 # the datasource the playground's schema panel opens on.
 DATASET = "chinook"
 
-# `.env.demo` ships an empty `OPENAI_API_KEY=` placeholder. Indexing used to load
-# it with `override=True`, which blanked a real key already in the environment,
-# so live mode fell back to `ollama` and enrichment ran with no key. Indexing now
-# keeps a key already set (`manager._load_demo_env`); restoring the keys the mode
-# was chosen from after scaffolding stays as a second guard. Those keys are
-# ``PROVIDER_KEYS``; it, ``UPSTREAMS`` (where the recording proxy forwards each
-# OpenAI-wire provider) and ``KEYED_PROVIDERS`` (the providers a saved key can
-# select) all come from the provider presets in ``nl2sql.llm``.
+# The provider key variables are ``PROVIDER_KEYS``; it, ``UPSTREAMS`` (where the
+# recording proxy forwards each OpenAI-wire provider) and ``KEYED_PROVIDERS``
+# (the providers a saved key can select) all come from the provider presets in
+# ``nl2sql.llm``.
+
+# The placeholder key the replay server and the recording proxy accept: they
+# hold no key of their own worth protecting, and a real one never reaches them.
+REPLAY_KEY = "replay"
+PROXY_KEY = "proxy"
 
 # Ollama's own API sits next to the OpenAI-compatible /v1 its preset names.
 OLLAMA_TAGS_URL = PROVIDER_PRESETS["ollama"].base_url.rsplit("/v1", 1)[0] + "/api/tags"
@@ -116,7 +124,7 @@ def live_provider(key: Optional[str], source: str) -> str:
     """Names the provider live mode will call with ``key``.
 
     A key the user exported themselves is trusted to be in the right variable
-    whatever it looks like; one from ``--api-key`` or from ``.env.demo`` is
+    whatever it looks like; one from ``--api-key`` or from ``.env`` is
     placed, and so read back, by its own shape.
     """
     if not key:
@@ -131,9 +139,8 @@ def live_provider(key: Optional[str], source: str) -> str:
 def _key_from_env_file(path: pathlib.Path) -> Optional[str]:
     """Returns a non-empty provider key recorded in ``path``, if there is one.
 
-    The file is read, not loaded: `.env.demo` ships an empty ``OPENAI_API_KEY=``
-    placeholder, and putting that into the environment is exactly the bug that
-    blanked a real key.
+    The file is read, not loaded: an empty ``OPENAI_API_KEY=`` line must never
+    count as a key.
     """
     if not path.exists():
         return None
@@ -153,7 +160,7 @@ def resolve_api_key(api_key: Optional[str], env_file: pathlib.Path) -> Tuple[Opt
 
     Args:
         api_key: the value of ``--api-key``, if it was passed.
-        env_file: the demo project's ``.env.demo``, which may not exist yet.
+        env_file: the demo project's ``.env``, which may not exist yet.
 
     Returns:
         ``(key, source)`` where source is ``"flag"``, ``"environment"``,
@@ -179,69 +186,34 @@ _INDEX_STATE = {
 }
 
 
-def prepare_project(directory: pathlib.Path, require_index: bool = False) -> pathlib.Path:
-    """Scaffolds the demo folder if needed and makes sure its index is usable.
+def prepare_project(directory: pathlib.Path) -> pathlib.Path:
+    """Writes the demo project with ``nl2sql init --demo`` the first time; returns its ``nl2sql.yaml``.
 
-    The index is judged by its contents (entries, and whether they match the
-    latest schema snapshot), not by whether its folder exists: a folder with
-    an empty collection once passed the old check on every start.
-
-    A failed index is not fatal by default -- the playground shows it and
-    offers Rebuild. ``require_index`` (``--record``) makes it exit 1 instead:
-    answers recorded against no index are the wrong answers.
+    A folder written by an older engine is used as it is, with a warning:
+    demo folders are never upgraded in place.
     """
+    from nl2sql.config import init_project
+
     directory.mkdir(parents=True, exist_ok=True)
-    manager = DemoManager(console, directory)
-    if not (directory / "configs" / "datasources.demo.yaml").exists():
-        print_step(f"Writing the demo project to {directory}")
-        manager.setup_demo()
+    config_path = directory / "nl2sql.yaml"
+    if not config_path.exists():
+        print_step(f"Writing the demo project to {directory} (nl2sql init --demo)")
+        try:
+            init_project(directory, demo=True)
+        except FileExistsError as error:
+            # A folder from another tool or an older demo (0.4 had no nl2sql.yaml).
+            print_error(f"{error} Start a new demo folder with --dir.")
+            raise SystemExit(1)
+        write_stamp(directory)
     else:
         warning = outdated_warning(directory)
         if warning:
             console.print(f"[warning]{escape(warning)}[/warning]")
-
-    health = manager.index_health()
-    if not health.ok:
-        print_step(
-            f"{_INDEX_STATE.get(health.status, 'The vector index needs rebuilding')}: indexing the schema "
-            "(first run downloads a 79 MB embedding model)"
-        )
-        if not manager.index_demo_data():
-            if require_index:
-                print_error(
-                    "Indexing failed, so --record stops here: answers recorded against no index "
-                    "would be wrong. Nothing was recorded. Fix the error above and run it again."
-                )
-                raise SystemExit(1)
-            print_error(
-                "Indexing failed, so questions will fail until the index is rebuilt. "
-                "Any previous index is unchanged. Fix the error above, then press Rebuild "
-                "in the playground or run: nl2sql --env demo index"
-            )
-    return directory
-
-
-def _load_saved_keys(path: pathlib.Path) -> None:
-    """Puts every provider key saved in ``.env.demo`` into the environment.
-
-    A node the settings panel put on another provider reads that provider's
-    key. A key already exported wins, and the shipped empty placeholders are
-    skipped, so nothing is blanked.
-    """
-    if not path.exists():
-        return
-    from dotenv import dotenv_values
-
-    for name, value in dotenv_values(path).items():
-        if name in PROVIDER_KEYS and (value or "").strip() and not os.environ.get(name):
-            os.environ[name] = value.strip()
+    return config_path
 
 
 def _default_provider(directory: pathlib.Path) -> Optional[str]:
-    path = directory / "configs" / "llm.demo.yaml"
-    if not path.exists():
-        return None
-    return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("default", {}).get("provider")
+    return read_llm(directory).get("provider")
 
 
 def replay_recordings(directory: pathlib.Path) -> Optional[pathlib.Path]:
@@ -279,11 +251,70 @@ def _serve(app, host: str, port: int) -> None:
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
-def _build_engine():
-    """Seam: the tests swap this so they never construct a real engine."""
-    from nl2sql import NL2SQL
+def _build_engine(config_path: pathlib.Path, *, plan_cache: bool = True):
+    """Seam: the tests swap this so they never construct a real engine.
 
-    return NL2SQL._legacy()
+    ``plan_cache`` False turns the plan cache off for this run only
+    (``settings.pipeline.plan_cache``), in the engine's own config.
+    """
+    from nl2sql import NL2SQL, load_config
+
+    cfg = load_config(config_path)
+    if not plan_cache:
+        settings = cfg.settings
+        cfg = cfg.model_copy(update={"settings": settings.model_copy(
+            update={"pipeline": settings.pipeline.model_copy(update={"plan_cache": False})})})
+    return NL2SQL(cfg)
+
+
+def start_engine(config_path: pathlib.Path, *, plan_cache: bool = True, require_index: bool = False):
+    """Builds the demo's engine, checks it, and builds the index when the check says it is not ready.
+
+    A ``required`` datasource that fails, or none ready at all, exits 1; an
+    optional one that fails is printed and the demo runs degraded. A failed
+    index is not fatal by default -- the playground shows it and offers
+    Rebuild. ``require_index`` (``--record``) makes it exit 1 instead: answers
+    recorded against no index are the wrong answers.
+    """
+    from nl2sql import ConfigError, EngineNotReady
+    from nl2sql.cli.common.indexing import run_indexing
+
+    try:
+        engine = _build_engine(config_path, plan_cache=plan_cache)
+    except ConfigError as error:
+        print_error(str(error))
+        raise SystemExit(1)
+    try:
+        report = engine.check()
+    except EngineNotReady as error:
+        print_error(str(error))
+        engine.close()
+        raise SystemExit(1)
+    for status in report.datasources:
+        if status.status == "failed":
+            console.print(f"[warning]{escape(str(status))}[/warning]")
+
+    if report.index != "ok":
+        print_step(
+            f"{_INDEX_STATE.get(report.index, 'The vector index needs rebuilding')}: indexing the schema "
+            "(first run downloads a 79 MB embedding model)"
+        )
+        try:
+            run_indexing(engine)
+        except SystemExit:
+            # run_indexing exits 1 on any failure, after printing why.
+            if require_index:
+                print_error(
+                    "Indexing failed, so --record stops here: answers recorded against no index "
+                    "would be wrong. Nothing was recorded. Fix the error above and run it again."
+                )
+                raise SystemExit(1)
+            print_error(
+                "Indexing failed, so questions will fail until the index is rebuilt. "
+                "Any previous index is unchanged. Fix the error above, then press Rebuild "
+                f"in the playground or run: nl2sql --config {config_path.as_posix()} index"
+            )
+    return engine
 
 
 def run_succeeded(result) -> bool:
@@ -349,18 +380,21 @@ def demo_command(
     api_key: Optional[str] = None,
     allow_settings: bool = False,
     hosted: bool = False,
+    *,
+    questions_per_minute: int = DEFAULT_QUESTIONS_PER_MINUTE,
+    questions_per_session: int = DEFAULT_QUESTIONS_PER_SESSION,
 ) -> None:
     # The playground -- and hosted mode with it -- comes from the demo extra.
     # Asked for here so a missing extra is one clear line, not an ImportError
     # halfway through scaffolding.
     try:
-        from nl2sql.cli.demo.playground.hosted import Replay
-        from nl2sql.cli.demo.playground.hosted import from_env as _hosted_from_env
+        from nl2sql.cli.demo.playground.hosted import Hosted, Limits, Replay
     except ImportError:
         print_error(INSTALL_HINT)
         raise SystemExit(1)
 
-    hosted_mode = _hosted_from_env(hosted)
+    hosted_mode = Hosted(enabled=hosted, limits=Limits(per_minute=questions_per_minute,
+                                                       per_session=questions_per_session))
     if hosted_mode.enabled and record:
         print_error("--record is refused in hosted mode: it would write recordings to the server's disk.")
         raise SystemExit(1)
@@ -368,16 +402,10 @@ def demo_command(
         print_error("--api-key is refused in hosted mode: the server holds no key; each visitor brings one.")
         raise SystemExit(1)
 
-    # chdir before anything indexes. The schema store path is resolved against
-    # the working directory rather than the project root, so indexing from a
-    # different cwd than the one the engine later runs in writes the snapshot
-    # where the playground cannot find it and /api/schema comes back empty.
     directory = directory.resolve()
-    directory.mkdir(parents=True, exist_ok=True)
-    os.chdir(directory)
-    os.environ["ENV"] = "demo"
+    config_path = prepare_project(directory)
 
-    env_file = directory / ".env.demo"
+    env_file = directory / ENV_FILE
     if hosted_mode.enabled:
         # No key is looked for and none is used: a key found here would be the
         # owner's, and a public demo must never spend it.
@@ -388,6 +416,10 @@ def demo_command(
         # A key already exported by the user stays under the variable they
         # chose; one from the flag or from the file is placed by its own shape.
         os.environ[env_var_for_key(resolved_key)] = resolved_key
+    if not hosted_mode.enabled:
+        # Every other key saved in .env too: a node the settings panel put on
+        # another provider reads that provider's key. A key already set wins.
+        load_env_file(config_path)
 
     mode = "hosted" if hosted_mode.enabled else detect_llm_mode()
     # A reachable Ollama makes the mode "live" but gives recording nothing to
@@ -403,15 +435,7 @@ def demo_command(
         print_error("--record needs an OpenAI, OpenRouter or Anthropic key.")
         raise SystemExit(1)
 
-    preserved = {key: os.environ[key] for key in PROVIDER_KEYS if os.environ.get(key)}
-    directory = prepare_project(directory, require_index=record)
-    for key, value in preserved.items():
-        if not os.environ.get(key):
-            os.environ[key] = value
-
     if key_source == "flag":
-        # Scaffolding writes `.env.demo` (with an empty placeholder), so the
-        # key goes in afterwards whether the project is new or already there.
         _persist_api_key(env_file, resolved_key)
         print_success(
             f"Saved {env_var_for_key(resolved_key)} ({mask_key(resolved_key)}) to "
@@ -431,17 +455,11 @@ def demo_command(
         store = ReplayStore.load(store_path) if store_path.exists() else ReplayStore()
         if record_provider == "anthropic":
             proxy = RecordingProxy(ANTHROPIC_UPSTREAM, resolved_key, store, wire="anthropic").start()
-            _point_llm_config_at(directory, proxy.anthropic_base_url, provider="anthropic")
-            anthropic_env = env_var_for_provider("anthropic")
-            os.environ[anthropic_env] = os.environ.get(anthropic_env) or "proxy"
+            _point_llm_config_at(directory, proxy.anthropic_base_url, provider="anthropic", api_key=PROXY_KEY)
         else:
             proxy = RecordingProxy(UPSTREAMS[record_provider], resolved_key, store,
                                    provider=record_provider).start()
-            _point_llm_config_at(directory, proxy.base_url, provider="openai")
-            os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY") or "proxy"
-        # A plan served from the plan cache makes no planner call, so nothing
-        # would be recorded for replay to answer with.
-        os.environ["PLAN_CACHE_ENABLED"] = "false"
+            _point_llm_config_at(directory, proxy.base_url, provider="openai", api_key=PROXY_KEY)
         console.print("[bold]Recording mode:[/bold] running the sample questions through the real provider.")
     elif mode == "hosted":
         # The config is normalised once, here, and never written again: a
@@ -481,11 +499,9 @@ def demo_command(
         recorded_questions = len(store.covered(DEMO_QUESTIONS))
         replay_server = FakeLLMServer(store.rules(), stream_delay=REPLAY_STREAM_DELAY).start()
         local_replay = Replay(replay_server.base_url, store.covered(DEMO_QUESTIONS), store.recorded_with)
-        _point_llm_config_at(directory, replay_server.base_url)
-        os.environ["OPENAI_API_KEY"] = "replay"
+        _point_llm_config_at(directory, replay_server.base_url, provider="openai", api_key=REPLAY_KEY)
         console.print(replay_message(recorded_questions, len(DEMO_QUESTIONS), recordings))
     else:
-        _load_saved_keys(env_file)
         provider = live_provider(resolved_key, key_source)
         configured = _default_provider(directory)
         if key_source == "env-file" and configured in KEYED_PROVIDERS and os.environ.get(
@@ -495,15 +511,21 @@ def demo_command(
         _point_llm_config_at(directory, None, provider=provider)
         console.print(f"[bold]Live mode:[/bold] using {provider}.")
 
-    reload_settings()
-
     try:
         from nl2sql.cli.demo.playground.app import build_app
     except ImportError:
         print_error(INSTALL_HINT)
         raise SystemExit(1)
 
-    engine = _build_engine()
+    # A plan served from the plan cache makes no planner call, so a recording
+    # run turns it off: nothing would be recorded for replay to answer with.
+    try:
+        engine = start_engine(config_path, plan_cache=not record, require_index=record)
+    except SystemExit:
+        for server in (proxy, replay_server):
+            if server is not None:
+                server.stop()
+        raise
     questions = list(DEMO_QUESTIONS)
     roles = list(engine.config.policies.roles)
 
@@ -537,3 +559,4 @@ def demo_command(
     finally:
         if replay_server:
             replay_server.stop()
+        engine.close()

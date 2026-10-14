@@ -28,37 +28,52 @@ the `nl2sql-engine` distribution; an extra only adds the driver it needs, so add
 extra to the `pip install` line in `packages/api/Dockerfile` to include one -
 for example `"./packages/nl2sql[postgres,mysql,mssql]"`.
 
-## Run the API
+## Configuration
 
-```bash
-docker run --rm -p 8000:8000 nl2sql-api
+The image sets `NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml`. Mount a config folder
+there: `nl2sql.yaml`, the files it includes, and optionally a `.env` next to
+it, which the API loads at startup without overriding variables already set.
+Write one with `nl2sql init` (see
+[Start a config](index.md#start-a-config-with-nl2sql-init)).
+
+Keep the index, state, traces and results on a volume: write
+`storage.path` from an environment variable, and mount the volume there.
+
+```yaml
+# storage.yaml
+path: "${env:NL2SQL_DATA_DIR}"
 ```
 
-To set environment selection:
-
-```bash
-docker run --rm -p 8000:8000 -e ENV=demo -e NL2SQL_API_ROLE=admin nl2sql-api
+```yaml
+# api.yaml (nl2sql.yaml has  api: { file: api.yaml })
+role: admin             # one static role for every request
 ```
 
-`NL2SQL_API_ROLE` pins the RBAC role for every request; without a role setting
-the query route answers HTTP 401. See [Caller role](../api/rest/index.md#caller-role).
+`api.role` pins the RBAC role for every request; without a role source the
+query route answers HTTP 401. See [Caller role](../api/rest/index.md#caller-role)
+and [API settings](../configuration/api.md).
 
 The routes that register datasources or LLMs and build or clear the index need a
-role listed in `NL2SQL_API_ADMIN_ROLES` (default `admin`), so `NL2SQL_API_ROLE=admin`
+role listed in `policies.admin_roles` (default `[admin]`), so `role: admin`
 above allows them. Without any role setting they answer loopback clients only,
 and a request through a published Docker port does not come from loopback: it
 gets HTTP 403. See [Admin routes](../api/rest/index.md#admin-routes).
 
-## Configuration
+## Run the API
 
-Mount or bake your config files into the container:
+```bash
+docker run --rm -p 8000:8000 \
+  -v "$PWD/my-project:/etc/nl2sql:ro" \
+  -v nl2sql-data:/data -e NL2SQL_DATA_DIR=/data \
+  nl2sql-api
+```
 
-- `configs/datasources.yaml`
-- `configs/llm.yaml`
-- `configs/policies.json`
-- `configs/secrets.yaml` (optional)
-
-See `configuration/system.md` for environment variables and defaults.
+Provider keys come from the environment (`-e OPENAI_API_KEY=...`) or from the
+mounted `.env`. Before it serves, the API calls `engine.check()`: a datasource
+with `required: true` that cannot connect stops the container, and any other
+that fails is logged and left out. Build the index once with
+`POST /api/v1/index-all`, or with `nl2sql --config my-project/nl2sql.yaml index`
+against the same storage.
 
 ## API usage
 

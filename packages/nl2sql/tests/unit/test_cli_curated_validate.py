@@ -1,8 +1,10 @@
-"""``nl2sql curated validate`` and the facade it calls, ``CuratedAPI.validate()``.
+"""``nl2sql curated validate`` and the facade it calls, ``engine.curated.validate()``.
 
-The command runs the startup checks plus the one that needs the index: every
-table a verified query reads exists in its datasource's latest indexed schema.
-It prints a report and exits non-zero on any error.
+The checks that need no index run when the engine is built (a broken
+``curated`` section is a ``ConfigError``, so the command exits 1 naming it).
+The command adds the one that needs the index: every table a verified query
+reads exists in its datasource's latest indexed schema. It prints a report and
+exits non-zero on any error.
 """
 from __future__ import annotations
 
@@ -14,10 +16,11 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from nl2sql import CuratedAPI
+from nl2sql import NL2SQL, load_config
 from nl2sql.cli.main import app
-from nl2sql.common.settings import settings
+from nl2sql.runtime import StorePaths
 from nl2sql.schema import SqliteSchemaStore
+from nl2sql.testing.config import make_config
 from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
@@ -39,16 +42,12 @@ MISSING_TABLE = _query("author_count", "SELECT COUNT(*) AS authors FROM Author")
 
 
 @pytest.fixture
-def project(tmp_path, monkeypatch):
-    database = tmp_path / "books.sqlite"
-    with sqlite3.connect(database) as conn:
+def project(tmp_path):
+    with sqlite3.connect(tmp_path / "books.sqlite") as conn:
         conn.execute("CREATE TABLE Book (BookId INTEGER PRIMARY KEY, Title TEXT)")
-    (tmp_path / "datasources.yaml").write_text(yaml.safe_dump({"version": 1, "datasources": [{
-        "id": "books", "connection": {"type": "sqlite", "database": str(database)},
-    }]}), encoding="utf-8")
-    (tmp_path / "secrets.yaml").write_text("version: 1\nproviders: []\n", encoding="utf-8")
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
-    monkeypatch.setattr(settings, "schema_store_path", str(tmp_path / "data" / "schema_store.db"))
+    (tmp_path / "curated.yaml").write_text("datasources: {}\n", encoding="utf-8")
+    make_config(tmp_path, datasources=[{"id": "books", "type": "sqlite", "connection": {"database": "books.sqlite"}}],
+                curated={"file": "curated.yaml"})
     return tmp_path
 
 
@@ -56,11 +55,16 @@ def _curated(project: Path, *queries, datasource: str = "books") -> Path:
     path = project / "curated.yaml"
     path.write_text(yaml.safe_dump({"datasources": {datasource: {"verified_queries": list(queries)}}}),
                     encoding="utf-8")
-    return path
+    return project / "nl2sql.yaml"
+
+
+def _state(project: Path) -> Path:
+    return StorePaths.under(project / ".nl2sql").state
 
 
 def _index(project: Path, *tables: str) -> None:
-    store = SqliteSchemaStore(path=Path(settings.schema_store_path))
+    _state(project).parent.mkdir(parents=True, exist_ok=True)
+    store = SqliteSchemaStore(path=_state(project))
     refs = [TableRef(schema_name="main", table_name=t) for t in tables]
     store.register_snapshot(SchemaSnapshot(
         contract=SchemaContract(datasource_id="books", engine_type="sqlite",
@@ -70,17 +74,15 @@ def _index(project: Path, *tables: str) -> None:
     store.close()
 
 
-def _invoke(project: Path, curated: Path):
-    result = runner.invoke(app, ["curated", "validate", "--curated", str(curated),
-                                 "--config", str(project / "datasources.yaml"),
-                                 "--secrets", str(project / "secrets.yaml")])
+def _invoke(config: Path):
+    result = runner.invoke(app, ["--config", str(config), "curated", "validate"])
     return result, ANSI.sub("", result.output)
 
 
 def test_a_good_file_passes_and_exits_zero(project):
     _index(project, "Book")
 
-    result, out = _invoke(project, _curated(project, GOOD))
+    result, out = _invoke(_curated(project, GOOD))
 
     assert result.exit_code == 0, out
     assert "book_count" in out
@@ -90,7 +92,7 @@ def test_a_good_file_passes_and_exits_zero(project):
 def test_a_table_missing_from_the_indexed_schema_fails(project):
     _index(project, "Book")
 
-    result, out = _invoke(project, _curated(project, GOOD, MISSING_TABLE))
+    result, out = _invoke(_curated(project, GOOD, MISSING_TABLE))
 
     assert result.exit_code == 1, out
     assert "author_count" in out
@@ -100,29 +102,27 @@ def test_a_table_missing_from_the_indexed_schema_fails(project):
 def test_table_names_match_case_insensitively(project):
     _index(project, "Book")
 
-    result, out = _invoke(project, _curated(project, _query("lower", "SELECT COUNT(*) FROM book")))
+    result, out = _invoke(_curated(project, _query("lower", "SELECT COUNT(*) FROM book")))
 
     assert result.exit_code == 0, out
 
 
 def test_without_an_index_the_table_check_is_skipped_and_said_so(project):
-    result, out = _invoke(project, _curated(project, GOOD, MISSING_TABLE))
+    result, out = _invoke(_curated(project, GOOD, MISSING_TABLE))
 
     assert result.exit_code == 0, out
     assert "not indexed" in out
-    # Checking must not create a schema store.
-    assert not Path(settings.schema_store_path).exists()
 
 
 def test_a_file_that_breaks_the_models_exits_one(project):
-    result, out = _invoke(project, _curated(project, GOOD, GOOD))
+    result, out = _invoke(_curated(project, GOOD, GOOD))
 
     assert result.exit_code == 1, out
     assert "book_count" in out
 
 
 def test_unsafe_sql_exits_one_and_names_the_query(project):
-    result, out = _invoke(project, _curated(project, GOOD, _query("wipe", "DELETE FROM Book")))
+    result, out = _invoke(_curated(project, GOOD, _query("wipe", "DELETE FROM Book")))
 
     assert result.exit_code == 1, out
     assert "wipe" in out
@@ -130,27 +130,26 @@ def test_unsafe_sql_exits_one_and_names_the_query(project):
 
 
 def test_an_unknown_datasource_exits_one(project):
-    result, out = _invoke(project, _curated(project, GOOD, datasource="bookz"))
+    result, out = _invoke(_curated(project, GOOD, datasource="bookz"))
 
     assert result.exit_code == 1, out
     assert "bookz" in out
 
 
 def test_a_missing_file_exits_one(project):
-    result, out = _invoke(project, project / "nope.yaml")
+    (project / "curated.yaml").unlink()
+
+    result, out = _invoke(project / "nl2sql.yaml")
 
     assert result.exit_code == 1, out
-    assert "nope.yaml" in out
+    assert "curated.yaml" in out
 
 
 def test_the_facade_returns_the_report(project):
     _index(project, "Book")
 
-    report = CuratedAPI().validate(
-        curated_path=_curated(project, GOOD, MISSING_TABLE),
-        datasources_path=project / "datasources.yaml",
-        secrets_path=project / "secrets.yaml",
-    )
+    with NL2SQL(load_config(_curated(project, GOOD, MISSING_TABLE))) as engine:
+        report = engine.curated.validate()
 
     assert not report.ok
     by_id = {e.query_id: e for e in report.entries}

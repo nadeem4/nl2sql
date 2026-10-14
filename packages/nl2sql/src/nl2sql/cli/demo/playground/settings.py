@@ -1,9 +1,10 @@
 """The playground's settings panel: an API key and a model per LLM node.
 
-The panel has no store of its own. It edits the demo project's
-``configs/llm.demo.yaml`` and ``.env.demo`` -- the files ``nl2sql demo`` and
-the rest of the CLI read -- and then reloads the engine's LLM registry from
-that same YAML, so a change takes effect on the next question with no restart.
+The panel has no store of its own. It edits the demo project's ``llm.yaml``
+(the ``llm`` section its ``nl2sql.yaml`` includes) and ``.env`` -- the files
+``nl2sql demo`` and the rest of the CLI read -- and then reloads the engine's
+LLMs from that same config, so a change takes effect on the next question with
+no restart.
 
 Three rules:
 
@@ -36,28 +37,31 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
 from urllib.parse import urlsplit
 
-import yaml
 from fastapi import HTTPException, Request
 
 from nl2sql.llm.providers import (
     KEY_SHAPE_MESSAGE,
     LLM_AGENTS,
     PROVIDER_LABELS,
-    PROVIDER_KEYS,
     VERIFIED_MODELS,
     env_var_for_key,
     looks_like_api_key,
     mask_key,
     provider_for_key,
 )
-from nl2sql.cli.demo.llm_config import persist_api_key, point_llm_config_at
+from nl2sql.cli.demo.llm_config import (
+    AGENT_NODES,
+    ENV_FILE,
+    LLM_FILE,
+    persist_api_key,
+    point_llm_config_at,
+    read_llm,
+    write_llm,
+)
 from nl2sql.common.logger import get_logger
 from nl2sql.llm.registry import PROVIDER_PRESETS
 
 logger = get_logger(__name__)
-
-LLM_CONFIG = Path("configs") / "llm.demo.yaml"
-ENV_FILE = Path(".env.demo")
 
 # What each LLM node does, for the page. The nodes and their agent names are
 # ``LLM_AGENTS``; anything not listed there uses ``default``.
@@ -221,12 +225,8 @@ class SettingsPanel:
 
     # --- reading ---------------------------------------------------------------
 
-    @property
-    def _llm_path(self) -> Path:
-        return self.project_dir / LLM_CONFIG
-
     def _load(self) -> Dict[str, Any]:
-        return yaml.safe_load(self._llm_path.read_text(encoding="utf-8")) or {}
+        return read_llm(self.project_dir)
 
     def read(self) -> Dict[str, Any]:
         """What the panel shows. Never the key: at most its masked form."""
@@ -255,8 +255,7 @@ class SettingsPanel:
             return {"available": False, "hosted": False, "reason": self.reason}
 
         cfg = self._load()
-        default = cfg.get("default") or {}
-        provider = default.get("provider", "openai")
+        provider = cfg.get("provider", "openai")
         agents = cfg.get("agents") or {}
         verified = VERIFIED_MODELS.get(provider, {})
 
@@ -264,12 +263,12 @@ class SettingsPanel:
             "available": True,
             "mode": self.mode,
             "provider": provider,
-            "default_model": default.get("model"),
+            "default_model": cfg.get("model"),
             "key": self._key(provider),
             "models": [{"id": model, "temperature": temp} for model, temp in verified.items()],
             "models_note": None if verified else (
                 f"Model lists exist for OpenAI and Anthropic only for now. Every node uses "
-                f"{default.get('model')} from {LLM_CONFIG.as_posix()}."
+                f"{cfg.get('model')} from {LLM_FILE.as_posix()}."
             ),
             # Every provider a node can be put on, one key each.
             "providers": [
@@ -278,8 +277,9 @@ class SettingsPanel:
                  "models": [{"id": model, "temperature": temp} for model, temp in models.items()]}
                 for name, models in VERIFIED_MODELS.items()
             ],
-            "nodes": [self._node(node, agents.get(node["agent"]) or {}, provider) for node in LLM_NODES],
-            "files": {"llm": LLM_CONFIG.as_posix(), "env": ENV_FILE.as_posix()},
+            "nodes": [self._node(node, agents.get(AGENT_NODES[node["agent"]]) or {}, provider)
+                      for node in LLM_NODES],
+            "files": {"llm": LLM_FILE.as_posix(), "env": ENV_FILE.as_posix()},
         }
 
     def _key(self, provider: str) -> Dict[str, Optional[str]]:
@@ -310,11 +310,11 @@ class SettingsPanel:
     # --- writing ---------------------------------------------------------------
 
     def _reload(self) -> None:
-        """Rebuilds the registry from the YAML the CLI reads."""
-        self.engine.reload_llm_config(self._llm_path)
+        """Rebuilds the engine's LLMs from the config the CLI reads."""
+        self.engine.reload_llm_config(self.project_dir / "nl2sql.yaml")
 
     def save_key(self, key: str) -> None:
-        """Saves ``key`` to ``.env.demo`` and switches the demo to live on it."""
+        """Saves ``key`` to ``.env`` and switches the demo to live on it."""
         key = (key or "").strip()
         if not looks_like_api_key(key):
             # Deliberately says nothing about the value it was given.
@@ -324,13 +324,8 @@ class SettingsPanel:
             try:
                 persist_api_key(self.project_dir / ENV_FILE, key)
                 os.environ[variable] = key
-                if self.mode != "live":
-                    # The replay placeholder in OPENAI_API_KEY is not a key and
-                    # must not be sent to a real provider. Live, other
-                    # providers' keys stay: a node may be on one of them.
-                    for other in PROVIDER_KEYS:
-                        if other != variable:
-                            os.environ.pop(other, None)
+                # Off the replay server and its placeholder key: the section
+                # names no key, so the provider's variable is read.
                 point_llm_config_at(self.project_dir, None, provider=provider_for_key(key))
                 self._reload()
             except Exception as exc:
@@ -343,36 +338,37 @@ class SettingsPanel:
             self.mode = "live"
 
     def set_models(self, models: Dict[str, Any]) -> None:
-        """Writes a provider and a model per node into ``llm.demo.yaml``.
+        """Writes a provider and a model per node into ``llm.yaml``'s ``agents``.
 
         Each value is ``None`` (use the default agent), a model name (on the
         default's provider), or ``{"provider": ..., "model": ...}``.
         """
-        default_provider = (self._load().get("default") or {}).get("provider", "openai")
+        default_provider = self._load().get("provider", "openai")
         choices = {agent: self._choice(agent, value, default_provider) for agent, value in models.items()}
 
         with self.gate.change():
             cfg = self._load()
-            default = cfg.get("default") or {}
             agents = cfg.get("agents") or {}
             for agent, choice in choices.items():
+                node = AGENT_NODES[agent]
                 if choice is None:
-                    agents.pop(agent, None)
+                    agents.pop(node, None)
                     continue
                 provider, model = choice
-                if provider == default.get("provider"):
+                if provider == cfg.get("provider"):
                     # On the default's provider a node differs from the default
                     # only in its model and the temperature that model accepts;
                     # endpoint and key follow the default.
-                    api_key, base_url = default.get("api_key"), default.get("base_url")
+                    api_key, base_url = cfg.get("api_key"), cfg.get("base_url")
                 else:
-                    api_key, base_url = "${env:" + PROVIDER_PRESETS[provider].api_key_env + "}", None
+                    # No key named: the provider's standard variable is read.
+                    api_key, base_url = None, None
                 entry = {"provider": provider, "model": model,
                          "temperature": VERIFIED_MODELS[provider][model], "api_key": api_key,
-                         "base_url": base_url, "name": agent}
-                agents[agent] = {k: v for k, v in entry.items() if v is not None or k == "temperature"}
+                         "base_url": base_url}
+                agents[node] = {k: v for k, v in entry.items() if v is not None or k == "temperature"}
             cfg["agents"] = agents
-            self._llm_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+            write_llm(self.project_dir, cfg)
             self._reload()
 
     def _choice(self, agent: str, value: Any, default_provider: str) -> Optional[tuple]:

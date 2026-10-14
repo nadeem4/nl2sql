@@ -10,12 +10,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.configs.curated import CuratedFileConfig
+from nl2sql.config import Curated
 from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.pipeline.steps import PIPELINE_STEPS, SQL_AGENT_STEP, describe_pipeline
 from nl2sql.testing.runtime import fake_runtime
 
-CURATED = CuratedFileConfig.model_validate({"datasources": {"ds": {"verified_queries": [
+CURATED = Curated.model_validate({"datasources": {"ds": {"verified_queries": [
     {"id": "q", "description": "d", "questions": ["How many?"], "sql": "SELECT 1"}]}}})
 
 

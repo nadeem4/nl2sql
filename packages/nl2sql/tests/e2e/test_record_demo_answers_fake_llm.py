@@ -35,18 +35,15 @@ def _script():
 def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project, tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from nl2sql import NL2SQL
+    from nl2sql.cli.commands.demo import _build_engine
     from nl2sql.cli.demo.llm_config import point_llm_config_at
     from nl2sql.cli.demo.playground.app import build_app
     from nl2sql.cli.demo.playground.hosted import Hosted, Replay
-    from nl2sql.common.settings import reload_settings
 
     project = tmp_path / "demo"
     shutil.copytree(demo_project, project)
     out = tmp_path / "chinook.json"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
@@ -59,7 +56,6 @@ def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project
                                  "--env-file", str(tmp_path / "no.env")])
     finally:
         claude.stop()
-        reload_settings()
 
     # Recorded on Anthropic's wire, with the visitor-free key, for every guided question.
     assert status == 0
@@ -71,13 +67,10 @@ def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project
     # The hosted demo, as `nl2sql demo --hosted` leaves it: no key anywhere.
     monkeypatch.delenv("ANTHROPIC_API_KEY")
     point_llm_config_at(project, None, provider="openai")
-    monkeypatch.chdir(project)
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.demo.yaml")
-    monkeypatch.setenv("PLAN_CACHE_ENABLED", "false")
-    reload_settings()
     replay = FakeLLMServer(store.rules()).start()
     try:
-        app = build_app(NL2SQL._legacy(), questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
+        engine = _build_engine(project / "nl2sql.yaml", plan_cache=False)
+        app = build_app(engine, questions=list(DEMO_QUESTIONS), roles=["admin"], mode="hosted",
                         dataset="chinook", project_dir=project, host="0.0.0.0",
                         hosted=Hosted(enabled=True, replay=Replay(replay.base_url, store.covered(DEMO_QUESTIONS))))
         client = TestClient(app, base_url="http://demo.example:7860")
@@ -85,7 +78,6 @@ def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project
         missed = client.post("/api/ask", json={"question": UNRECORDED, "role": "admin"}).json()
     finally:
         replay.stop()
-        reload_settings()
 
     assert answered["recorded"] is True and answered["replay_miss"] is False
     assert answered["status"] == "success", answered["errors"]

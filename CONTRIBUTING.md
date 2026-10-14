@@ -68,14 +68,17 @@ that imports none of it:
 pytest packages/nl2sql/tests/architecture
 ```
 
-Integration tests need generated demo data, and some modules also need a real
-LLM API key. The two are separate markers, so the key-free subset -- the same
-selection CI runs -- can be run on its own:
+Integration tests run on the demo databases packaged with the engine, and
+build their configs (`nl2sql.testing.config.make_demo_config`, local
+embeddings) themselves; some modules also need a real LLM API key. The two are
+separate markers, so the key-free subset -- the same selection CI runs -- can
+be run on its own:
 
 ```bash
-nl2sql setup --demo
-EMBEDDING_PROVIDER=local pytest -m "integration and not llm"
+pytest -m "integration and not llm"
 ```
+
+The first run downloads the ~79 MB local embedding model.
 
 Add `--collect-only -q` to that command to see exactly which tests the subset
 covers; the count moves as tests are added, so read it from pytest rather than
@@ -84,7 +87,7 @@ from this page.
 Add a key to run the rest:
 
 ```bash
-EMBEDDING_PROVIDER=local OPENAI_API_KEY=sk-... pytest -m integration
+OPENAI_API_KEY=sk-... pytest -m integration
 ```
 
 The `llm`-marked tests fail, rather than skip, without `OPENAI_API_KEY`. That

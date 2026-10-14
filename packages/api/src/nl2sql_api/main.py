@@ -1,26 +1,37 @@
-import os
+from typing import Tuple
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 
+from starlette.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
+
 from .routes import query, health, datasource, llm, indexing
-from fastapi.middleware.cors import CORSMiddleware
-from nl2sql import NL2SQL, configure_logging
+from nl2sql import NL2SQL, configure_logging, load_env_file
 from .auth import warn_if_body_role_trusted
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # The library no longer configures logging on import, so the application
-    # entry point owns it - before anything that logs is constructed. The
-    # exporter is read through the facade once the engine has loaded settings;
-    # an OTLP deployment then switches to JSON logs.
+    # entry point owns it - before anything that logs is constructed. An OTLP
+    # deployment then switches to JSON logs.
     configure_logging(level="INFO")
-    engine = NL2SQL._legacy()
-    if engine.get_setting("observability_exporter") == "otlp":
+    # nl2sql.yaml is NL2SQL_CONFIG's file, else ./nl2sql.yaml. The .env next
+    # to it is loaded first and never overrides a variable already set.
+    load_env_file()
+    engine = NL2SQL.from_config()
+    if engine.config.settings.observability.exporter == "otlp":
         configure_logging(level="INFO", json_format=True)
-    warn_if_body_role_trusted()
+    # Refuse to start when a required datasource cannot connect (EngineNotReady);
+    # an optional one that fails leaves the API serving the others.
+    try:
+        engine.check()
+    except Exception:
+        engine.close()
+        raise
+    warn_if_body_role_trusted(engine.config.api)
     app.state.engine = engine
     yield
     engine.close()
@@ -40,6 +51,39 @@ def _app_version() -> str:
         return "0.0.0"
 
 
+class ConfigCORSMiddleware:
+    """CORS for the origins in the engine's config (``api.cors_origins``).
+
+    The engine is built in the lifespan, after the middleware stack exists, so
+    the origins are read per request from ``app.state.engine``. With none
+    configured, no cross-origin request is allowed.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self._cors: dict = {}
+
+    def _for(self, origins: Tuple[str, ...]) -> ASGIApp:
+        if origins not in self._cors:
+            self._cors[origins] = CORSMiddleware(
+                self.app,
+                allow_origins=list(origins),
+                allow_credentials=bool(origins),
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
+        return self._cors[origins]
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        engine = getattr(scope["app"].state, "engine", None)
+        config = getattr(engine, "config", None)
+        origins = tuple(config.api.cors_origins) if config is not None else ()
+        await self._for(origins)(scope, receive, send)
+
+
 app = FastAPI(
     title="NL2SQL API",
     version=_app_version(),
@@ -52,14 +96,4 @@ app.include_router(datasource.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(indexing.router, prefix="/api/v1")
 
-_origins = [o.strip() for o in os.getenv("NL2SQL_API_CORS_ORIGINS", "").split(",") if o.strip()]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_origins,
-    allow_credentials=bool(_origins),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
+app.add_middleware(ConfigCORSMiddleware)

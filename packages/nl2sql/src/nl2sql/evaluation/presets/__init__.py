@@ -12,7 +12,7 @@ from typing import List, Tuple
 
 import yaml
 
-from nl2sql.configs.llm import AgentConfig, LLMFileConfig
+from nl2sql.llm.models import AgentConfig, LLMFileConfig
 
 PRESETS_DIR = pathlib.Path(__file__).resolve().parent
 
@@ -23,7 +23,7 @@ def model_config(spec: str) -> LLMFileConfig:
     A model in ``VERIFIED_MODELS`` names its provider and its temperature
     (none where the model rejects one). Any other model is written
     ``provider/model``, e.g. ``ollama/llama3``, and runs at temperature 0.
-    The key is the provider's ``${env:...}`` variable, which ``--env`` loads.
+    The key is the provider's ``${env:...}`` variable (the .env next to nl2sql.yaml may set it).
     """
     from nl2sql.llm.providers import LLM_AGENTS, VERIFIED_MODELS, default_temperature_for
     from nl2sql.llm.registry import PROVIDER_PRESETS
@@ -50,10 +50,16 @@ def preset_names() -> List[str]:
     return sorted(p.stem for p in PRESETS_DIR.glob("*.yaml"))
 
 
+def load_llm_file(path: pathlib.Path) -> LLMFileConfig:
+    """The ``llm`` section in ``path`` (an ``llm.yaml``), as one entry per agent."""
+    from nl2sql.config import LLM
+
+    return LLMFileConfig.from_llm(LLM.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")) or {}))
+
+
 def list_presets() -> List[Tuple[str, LLMFileConfig]]:
     """Every preset, by name, loaded."""
-    return [(name, LLMFileConfig.model_validate(
-        yaml.safe_load((PRESETS_DIR / f"{name}.yaml").read_text(encoding="utf-8")))) for name in preset_names()]
+    return [(name, load_llm_file(PRESETS_DIR / f"{name}.yaml")) for name in preset_names()]
 
 
 def resolve_llm_spec(spec: str) -> Tuple[str, pathlib.Path]:

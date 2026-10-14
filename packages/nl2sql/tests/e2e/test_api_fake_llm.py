@@ -9,40 +9,35 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("nl2sql_api")
 
+from .conftest import fake_llm_section, project_config  # noqa: E402
 from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def _role_from_a_trusted_proxy_header(monkeypatch):
-    """The API takes the role from a proxy header, as a deployment would."""
-    monkeypatch.setenv("NL2SQL_API_ROLE_HEADER", "X-NL2SQL-Role")
+def _serve_api(demo_project, server, env, monkeypatch, settings=None):
+    """Point ``nl2sql-api`` at a config on ``server``; the role comes from a proxy header, as a deployment would."""
+    config = project_config(demo_project, "api-fake.yaml", llm=fake_llm_section(server.base_url),
+                            api={"role_header": "X-NL2SQL-Role"}, settings=settings)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("NL2SQL_CONFIG", str(config))
 
 
 @pytest.mark.e2e
 def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
     from fastapi.testclient import TestClient
 
-    from nl2sql.common.settings import reload_settings
     from nl2sql_api.main import app
 
     server, env = fake_llm(RULES_COUNT_CUSTOMERS)
-    monkeypatch.chdir(demo_project)
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.fake.yaml")
-    reload_settings()
+    _serve_api(demo_project, server, env, monkeypatch)
 
-    try:
-        # The context manager runs the lifespan, which constructs the real engine.
-        with TestClient(app) as client:
-            response = client.post(
-                "/api/v1/query",
-                json={"natural_language": "How many customers are there?"},
-                headers={"X-NL2SQL-Role": "admin"},
-            )
-    finally:
-        reload_settings()
+    # The context manager runs the lifespan, which constructs the real engine.
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/query",
+            json={"natural_language": "How many customers are there?"},
+            headers={"X-NL2SQL-Role": "admin"},
+        )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -66,26 +61,17 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
     """
     from fastapi.testclient import TestClient
 
-    from nl2sql.common.settings import reload_settings
     from nl2sql_api.main import app
 
     server, env = fake_llm(RULES_TOP_CUSTOMERS)
-    monkeypatch.chdir(demo_project)
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.fake.yaml")
-    reload_settings()
+    _serve_api(demo_project, server, env, monkeypatch)
 
-    try:
-        with TestClient(app) as client:
-            response = client.post(
-                "/api/v1/query",
-                json={"natural_language": "Who are the top customers by total spend?"},
-                headers={"X-NL2SQL-Role": "viewer"},
-            )
-    finally:
-        reload_settings()
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/query",
+            json={"natural_language": "Who are the top customers by total spend?"},
+            headers={"X-NL2SQL-Role": "viewer"},
+        )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -102,29 +88,20 @@ def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, 
     """No datasource holds the weather: the resolver refuses, and nothing else runs."""
     from fastapi.testclient import TestClient
 
-    from nl2sql.common.settings import reload_settings
     from nl2sql.testing.fake_llm import Rule
     from nl2sql_api.main import app
 
     unanswerable = Rule("AnswerabilityResponse",
                         {"answerable_datasource_ids": [], "reason": "Chinook holds no weather data."})
     server, env = fake_llm([unanswerable] + RULES_COUNT_CUSTOMERS)
-    monkeypatch.chdir(demo_project)
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.fake.yaml")
-    reload_settings()
+    _serve_api(demo_project, server, env, monkeypatch)
 
-    try:
-        with TestClient(app) as client:
-            response = client.post(
-                "/api/v1/query",
-                json={"natural_language": "What is the weather in Paris?"},
-                headers={"X-NL2SQL-Role": "admin"},
-            )
-    finally:
-        reload_settings()
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/query",
+            json={"natural_language": "What is the weather in Paris?"},
+            headers={"X-NL2SQL-Role": "admin"},
+        )
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -204,31 +181,21 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
 
     from nl2sql.api.query_api import QueryResult
     from nl2sql.auth.models import UserContext
-    from nl2sql.common.settings import reload_settings
     from nl2sql_api.main import app
 
     server, env = fake_llm(_rules_with_one_retry())
-    monkeypatch.chdir(demo_project)
-    for key, value in env.items():
-        monkeypatch.setenv(key, value)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.fake.yaml")
-    monkeypatch.setenv("SQL_AGENT_RETRY_BASE_DELAY_SEC", "0")
-    monkeypatch.setenv("SQL_AGENT_RETRY_JITTER_SEC", "0")
-    reload_settings()
+    _serve_api(demo_project, server, env, monkeypatch,
+               settings={"pipeline": {"retries": {"base_delay_s": 0, "jitter_s": 0}}})
 
-    try:
-        with TestClient(app) as client:
-            # The Python API: the engine the REST route delegates to.
-            result = app.state.engine.run_query(
-                "How many customers are there?", user_context=UserContext(roles=["admin"]))
-            response = client.post(
-                "/api/v1/query",
-                json={"natural_language": "How many customers are there?"},
-                headers={"X-NL2SQL-Role": "admin"},
-            )
-    finally:
-        reload_settings()
+    with TestClient(app) as client:
+        # The Python API: the engine the REST route delegates to.
+        result = app.state.engine.run_query(
+            "How many customers are there?", user_context=UserContext(roles=["admin"]))
+        response = client.post(
+            "/api/v1/query",
+            json={"natural_language": "How many customers are there?"},
+            headers={"X-NL2SQL-Role": "admin"},
+        )
 
     assert isinstance(result, QueryResult)
     # The retry recovered: the second plan ran and returned the count, so the

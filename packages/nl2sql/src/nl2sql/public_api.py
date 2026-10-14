@@ -71,16 +71,6 @@ class NL2SQL:
 
         return cls(demo_config(llm=llm if llm is not None else _demo_llm(), path=pathlib.Path(path)))
 
-    @classmethod
-    def _legacy(cls, **paths) -> "NL2SQL":
-        """The engine from the 0.4 config files. For the CLI, ``nl2sql-api`` and the playground
-        only, until they move onto ``nl2sql.yaml`` (PR 7b deletes it)."""
-        from nl2sql._legacy import legacy_runtime
-
-        engine = cls.__new__(cls)
-        engine._attach(legacy_runtime(**paths))
-        return engine
-
     def _attach(self, runtime: "Runtime") -> None:
         from nl2sql.api.query_api import QueryAPI
         from nl2sql.api.datasource_api import DatasourceAPI
@@ -450,18 +440,15 @@ class NL2SQL:
 
     def reload_llm_config(self, config_path: Union[str, pathlib.Path]) -> None:
         """
-        Replace every configured LLM with those in ``config_path``, as one step.
+        Replace every configured LLM with the ``llm`` section of the
+        ``nl2sql.yaml`` at ``config_path``, as one step.
 
-        Unlike ``configure_llm_from_config`` this also forgets agents the file
-        no longer names, so they fall back to ``default``. An invalid file
-        leaves the current configuration in place.
+        Agents the section no longer names fall back to the top level. An
+        invalid file leaves the current configuration in place.
         """
-        from nl2sql.configs import ConfigManager
+        from nl2sql.config import load_config
 
-        cfg = ConfigManager().load_llm(pathlib.Path(config_path))
-        agents = dict(cfg.agents or {})
-        agents["default"] = cfg.default
-        self._runtime.llm_registry.replace_llms(agents)
+        self.llm.replace(load_config(config_path).llm)
 
 
 def _demo_llm() -> "LLM":

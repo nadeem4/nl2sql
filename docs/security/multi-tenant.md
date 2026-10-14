@@ -25,7 +25,7 @@ Tenant isolation is **not** applied to indexing; the vector store and schema sto
 
 ## Authorization model
 
-RBAC evaluates `UserContext.roles` against policies defined in `configs/policies.json`. The validator enforces datasource/table scope at planning time.
+RBAC evaluates `UserContext.roles` against the `policies` section of `nl2sql.yaml`. The validator enforces datasource/table scope at planning time.
 
 ## Source references
 

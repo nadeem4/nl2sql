@@ -133,17 +133,17 @@ installed version.
 
 ### Settings on the Space
 
-None are required. The image sets them all, and the Space's **Settings →
-Variables** can override any of them:
+None are required. The image's command and the demo's config set them all:
 
-| Variable | Default | What it does |
-| --- | --- | --- |
-| `NL2SQL_DEMO_HOSTED` | `1` | hosted mode; never turn this off on a public Space |
-| `PORT` | `7860` | the port the Space routes to (`app_port` above must match) |
-| `NL2SQL_DEMO_QUESTIONS_PER_MINUTE` | `6` | rate limit per visitor |
-| `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `30` | cap per browser session |
-| `GLOBAL_TIMEOUT_SEC` | `300` (from `.env.demo`) | how long one question may run |
-| `TRACE_MODE` | `always` (from `.env.demo`) | what the playground's **Debug** drill-down reads. Every question writes a trace file to the container's own disk, which is wiped whenever the Space restarts; set it to `on_failure` to keep only the runs that went wrong |
+| Setting | Where | Default | What it does |
+| --- | --- | --- | --- |
+| `--hosted` | the `CMD` | on | hosted mode; never run a public Space without it |
+| `PORT` | a Space variable | `7860` | the port the Space routes to (`app_port` above must match) |
+| `--questions-per-minute` | the `CMD` | `6` | rate limit per visitor |
+| `--questions-per-session` | the `CMD` | `30` | cap per browser session |
+| `NL2SQL_CONFIG` | the image | `/home/demo/demo/nl2sql.yaml` | the config `nl2sql init --demo` wrote |
+| `settings.pipeline.timeout_s` | `settings.yaml` | `300` | how long one question may run |
+| `settings.traces.mode` | `settings.yaml` | `always` | what the playground's **Debug** drill-down reads. Every question writes a trace file to the container's own disk, which is wiped whenever the Space restarts; set it to `on_failure` to keep only the runs that went wrong |
 
 **Never add an API key as a Space secret.** The whole point of hosted mode is
 that the server has none; a key here would be spent by every visitor, and

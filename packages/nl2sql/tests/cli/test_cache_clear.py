@@ -1,4 +1,4 @@
-"""``nl2sql cache clear``: empties the plan cache in the schema store, and nothing else."""
+"""``nl2sql cache clear``: empties the plan cache in the state store (``<storage.path>/state.db``), and nothing else."""
 from __future__ import annotations
 
 import re
@@ -28,15 +28,13 @@ def _sq(intent: str) -> SubQuery:
     return SubQuery(id="sq1", datasource_id="chinook", intent=intent, schema_version="v1")
 
 
-def test_cache_clear_removes_the_cached_plans_and_keeps_the_schema(tmp_path, monkeypatch):
-    path = tmp_path / "data" / "schema_store.db"
+def test_cache_clear_removes_the_cached_plans_and_keeps_the_schema(project_stores, monkeypatch):
+    path = project_stores.state
     store = SqliteSchemaStore(path=path)
     cache = PlanCache(store)
     cache.put(_sq("How many customers are there?"), _plan())
     cache.put(_sq("How many albums are there?"), _plan())
     store.close()
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
-    monkeypatch.setattr(settings, "schema_store_path", str(path))
 
     result = runner.invoke(app, ["cache", "clear"])
 
@@ -53,10 +51,8 @@ def test_cache_clear_removes_the_cached_plans_and_keeps_the_schema(tmp_path, mon
         reopened.close()
 
 
-def test_cache_clear_without_a_store_file_creates_nothing(tmp_path, monkeypatch):
-    path = tmp_path / "data" / "schema_store.db"
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
-    monkeypatch.setattr(settings, "schema_store_path", str(path))
+def test_cache_clear_without_a_store_file_creates_nothing(project_stores):
+    path = project_stores.state
 
     result = runner.invoke(app, ["cache", "clear"])
 

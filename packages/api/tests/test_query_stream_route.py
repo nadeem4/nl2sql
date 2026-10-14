@@ -48,9 +48,7 @@ def test_the_stream_is_server_sent_events_ending_in_the_query_response(api_clien
     assert call["user_context"].roles == ["admin"]
 
 
-def test_the_stream_needs_a_role_like_the_query_route(api_client, monkeypatch):
-    for name in ("NL2SQL_API_ROLE_HEADER", "NL2SQL_API_ROLE", "NL2SQL_API_TRUST_BODY_ROLE"):
-        monkeypatch.delenv(name, raising=False)
+def test_the_stream_needs_a_role_like_the_query_route(api_client):
     client, engine = api_client(QueryResult(status="success"), authenticated=False)
 
     response = client.post("/api/v1/query/stream", json={"natural_language": "q"})

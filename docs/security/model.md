@@ -14,12 +14,12 @@ from depends on the client:
 - Python API: `UserContext(roles=[...])`, whatever the calling code passes.
 - REST API: the `get_user_context` dependency
   (`packages/api/src/nl2sql_api/auth.py`). It reads a header set by a trusted
-  proxy (`NL2SQL_API_ROLE_HEADER`) or a static role (`NL2SQL_API_ROLE`), and
+  proxy (`api.role_header` in `nl2sql.yaml`) or a static role (`api.role`), and
   answers `HTTP 401` when neither gives one. The body's `user_context` counts
-  only with the dev flag `NL2SQL_API_TRUST_BODY_ROLE=true`, which logs a
+  only with the dev flag `api.trust_body_role: true`, which logs a
   warning at startup. See [Caller role](../api/rest/index.md#caller-role).
   The routes that change datasources, LLMs or the index also need one of the
-  roles in `NL2SQL_API_ADMIN_ROLES` (default `admin`), else `HTTP 403`; with no
+  roles in `policies.admin_roles` (default `[admin]`), else `HTTP 403`; with no
   role source configured they answer loopback clients only. See
   [Admin routes](../api/rest/index.md#admin-routes).
 
@@ -63,10 +63,10 @@ refuses the plan before any SQL exists, and the run ends there.
   `details` (`datasource_id`, `table`, `roles`), which the run trace keeps and
   the `QueryResult` error summary does not carry. The validator's `policy` check
   is still present with `passed: false`, so a UI can show the gate firing.
-- **Naming tables is an opt-in.** Set `RBAC_REFUSAL_NAMES_TABLES=true` to put
-  the role and table in the user-facing message ("Role 'viewer' denied access
-  to 'chinook.Customer'. ..."). The generated demo's `.env.demo` sets it,
-  because showing the refusal is the demo's point.
+- **Naming tables is an opt-in.** Set `policies.refusal_names_tables: true` to
+  put the role and table in the user-facing message ("Role 'viewer' denied
+  access to 'chinook.Customer'. ..."). The demo's config (`nl2sql init --demo`)
+  sets it, because showing the refusal is the demo's point.
 - **The decision is deterministic code.** Only the validator decides, from the
   policy and the plan's table list. Nothing the model writes (its reasoning, a
   claim that the role is allowed) is read by the policy check, so a crafted
@@ -80,7 +80,7 @@ trace to the user who produced it is left to a multi-user deployment.
 
 ## Security controls
 
-- **RBAC policies** loaded from `configs/policies.json` and evaluated by `RBAC`.
+- **RBAC policies**: the `policies` section of `nl2sql.yaml`, evaluated by `RBAC`.
   A policy is a per-role allowlist of datasources and of tables
   (`datasource.schema.table`, with schema and datasource wildcards) — nothing
   finer. There is no column masking and no row-level security.

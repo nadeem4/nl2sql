@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from nl2sql.configs.curated import VerifiedQuery
+from nl2sql.config.curated import VerifiedQuery
 from nl2sql.pipeline.nodes.curated_matcher.params import ParamError, resolve_params
 from nl2sql.pipeline.nodes.curated_matcher.schemas import ParamValue
 

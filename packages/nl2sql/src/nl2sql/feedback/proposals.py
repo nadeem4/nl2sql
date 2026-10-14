@@ -2,7 +2,7 @@
 
 A thumbs-up on a *generated* answer is a candidate verified query: the
 question the person asked and the SQL that answered it well. The proposals
-have ``curated.yaml``'s shape (:class:`nl2sql.configs.curated.CuratedFileConfig`):
+have ``curated.yaml``'s shape (:class:`nl2sql.config.Curated`):
 an id derived from the question, the question as the one phrasing, the run's
 SQL and a description placeholder, under the datasource the run used.
 
@@ -101,7 +101,7 @@ def build_proposals(rows: Iterable[Mapping[str, Any]]) -> Tuple[Dict[str, Any], 
             "questions": [question],
             "sql": sql.strip() + "\n",
         })
-    return {"version": 1, "datasources": datasources}, skipped
+    return {"datasources": datasources}, skipped
 
 
 class _Dumper(yaml.SafeDumper):

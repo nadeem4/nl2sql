@@ -130,21 +130,20 @@ def _rules(answerable, decomposition, plans):
     ]
 
 
-def _env(trace_dir):
+def _env():
     env = _base_env()
     # Built at run time: GitGuardian scans every push.
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-multi-sq", "TRACE_MODE": "always", "TRACE_DIR": str(trace_dir),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = "sk-" + "fake-multi-sq"
     return env
 
 
-def _run(demo_project, tmp_path, rules, config_name, question=QUESTION, **extra_env):
-    server = _serve(demo_project, rules, config_name)
+def _run(demo_project, tmp_path, rules, config_name, question=QUESTION, settings=None):
+    server = _serve(demo_project, rules, config_name, store=tmp_path, mode="always", settings=settings)
     try:
-        r = run_cli(demo_project, {**_env(tmp_path), **extra_env}, "run", "--llm-config", f"configs/{config_name}", question)
+        r = run_cli(demo_project, _env(), "run", question, config=config_name)
     finally:
         server.stop()
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     return server, r, json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -159,7 +158,7 @@ def _answer_ids(doc):
 def test_two_datasources_joined_on_customer_give_the_sqlite_answer(demo_project, tmp_path):
     rules = _rules(["chinook", "support"], _join_decomposition(MUSIC_SPEND_SQ, OPEN_TICKETS_SQ),
                    [(MUSIC_SPEND_INTENT, MUSIC_SPEND_PLAN), (OPEN_TICKETS_INTENT, OPEN_TICKETS_PLAN)])
-    server, r, doc = _run(demo_project, tmp_path, rules, "llm.multi-sq-join.yaml")
+    server, r, doc = _run(demo_project, tmp_path, rules, "multi-sq-join.yaml")
 
     assert doc["result"]["errors"] == [], r.stdout + r.stderr
     uris = [ref["uri"] for ref in doc["result"]["artifact_refs"].values()]
@@ -176,7 +175,7 @@ def test_two_sub_queries_on_one_datasource_keep_their_own_results(demo_project, 
     decomposition = _join_decomposition(MUSIC_SPEND_SQ, INVOICE_COUNT_SQ)
     rules = _rules(["chinook"], decomposition,
                    [(MUSIC_SPEND_INTENT, MUSIC_SPEND_PLAN), (INVOICE_COUNT_INTENT, INVOICE_COUNT_PLAN)])
-    server, r, doc = _run(demo_project, tmp_path, rules, "llm.multi-sq-same-ds.yaml",
+    server, r, doc = _run(demo_project, tmp_path, rules, "multi-sq-same-ds.yaml",
                           question="How many invoices do the customers who spent the most have?")
 
     assert doc["result"]["errors"] == [], r.stdout + r.stderr
@@ -218,9 +217,9 @@ def test_a_join_input_cut_short_by_the_row_cap_is_refused(demo_project, tmp_path
     decomposition["post_combine_ops"] = []
     rules = _rules(["chinook", "support"], decomposition,
                    [(LINES_INTENT, LINES_PLAN), (TICKET_CUSTOMERS_INTENT, TICKET_CUSTOMERS_PLAN)])
-    server, r, doc = _run(demo_project, tmp_path, rules, "llm.multi-sq-capped.yaml",
+    server, r, doc = _run(demo_project, tmp_path, rules, "multi-sq-capped.yaml",
                           question="Which invoice lines belong to customers who opened a ticket?",
-                          RESULT_ROW_LIMIT="1000")
+                          settings={"results": {"row_limit": 1000}})
 
     codes = [e["error_code"] for e in doc["result"]["errors"]]
     assert codes == ["RESULT_TRUNCATED"], r.stdout + r.stderr

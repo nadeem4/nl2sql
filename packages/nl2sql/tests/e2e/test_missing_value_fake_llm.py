@@ -60,16 +60,15 @@ def _answer(prompt_text: str) -> dict:
 
 
 def _run(demo_project, tmp_path, rules, name, question):
-    server = _serve(demo_project, rules, name)
+    server = _serve(demo_project, rules, name, store=tmp_path, mode="always")
     env = _base_env()
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-missing-value", "TRACE_MODE": "always", "TRACE_DIR": str(tmp_path),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = "sk-" + "fake-missing-value"
     try:
-        r = run_cli(demo_project, env, "run", "--llm-config", f"configs/{name}", question)
+        r = run_cli(demo_project, env, "run", question, config=name)
     finally:
         server.stop()
     assert r.returncode == 0, r.stdout + r.stderr
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     return server, json.loads(path.read_text(encoding="utf-8"))["result"]
 
 
@@ -87,7 +86,7 @@ def test_a_misspelt_value_is_looked_up_and_the_retry_answers(demo_project, tmp_p
         Rule("AggregatedResponse", _answer),
         Rule("plain", "The genre is stored as 'Jazz'."),
     ]
-    server, result = _run(demo_project, tmp_path, rules, "llm.missing-value.yaml", "How many Jaz tracks are there?")
+    server, result = _run(demo_project, tmp_path, rules, "missing-value.yaml", "How many Jaz tracks are there?")
 
     [sub] = result["sub_queries"]
     assert result["status"] == "success", result["errors"]
@@ -110,7 +109,7 @@ def test_a_value_with_nothing_close_is_reported_as_missing(demo_project, tmp_pat
         Rule("AggregatedResponse", _answer),
         Rule("plain", "Keep the same plan."),
     ]
-    server, result = _run(demo_project, tmp_path, rules, "llm.missing-value-none.yaml",
+    server, result = _run(demo_project, tmp_path, rules, "missing-value-none.yaml",
                           "How many Polka tracks are there?")
 
     [sub] = result["sub_queries"]

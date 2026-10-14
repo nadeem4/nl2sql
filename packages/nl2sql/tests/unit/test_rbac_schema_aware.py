@@ -239,17 +239,14 @@ def test_the_executor_value_check_asks_with_the_schema(monkeypatch):
 # --- the shipped policies still load and mean what they meant -------------------
 
 
-@pytest.mark.parametrize("name", ["policies.demo.json", "policies.example.json"])
-def test_the_shipped_policies_still_validate(name):
-    import json
-    from pathlib import Path
-
+def test_the_shipped_demo_policies_still_validate():
     from nl2sql.auth.models import RolePolicy as Policy
+    from nl2sql.config import Role
+    from nl2sql.datasets.demo import DEMO_POLICIES
 
-    root = Path(__file__).resolve().parents[4]
-    data = json.loads((root / "configs" / name).read_text(encoding="utf-8"))
-    for role in data["roles"].values():
-        Policy(**role)
+    for name, role in DEMO_POLICIES.items():
+        Role(**role)
+        Policy(role=name, **role)
 
 
 def test_the_refusal_names_the_schema_only_outside_the_default_one():

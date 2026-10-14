@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from nl2sql import NL2SQL, UserContext, ResultManifest, ResultSummary
 from nl2sql.api.query_api import QueryAPI
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.testing.config import make_config
 from nl2sql_api.auth import get_user_context
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
@@ -36,6 +37,8 @@ def client(tmp_path):
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
     engine = NL2SQL.__new__(NL2SQL)
+    # The API reads its role settings from the engine's config.
+    engine._runtime = SimpleNamespace(config=make_config(tmp_path / "project"), closed=False)
     engine.query = QueryAPI(SimpleNamespace(tenant_id="t1", artifact_store=store))
     app.dependency_overrides[get_engine] = lambda: engine
     app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])

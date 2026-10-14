@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
-from nl2sql.configs.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
+from nl2sql.config.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService

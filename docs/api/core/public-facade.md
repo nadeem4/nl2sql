@@ -68,8 +68,8 @@ references only; `add_datasource` is the one call that changes it.
     `settings`, and building an engine copies its config into it. Two engines
     in one process therefore share those values until the last migration pull
     request (configuration v2, section 8). The CLI, `nl2sql-api` and the
-    playground still start from the 0.4 files through a private constructor
-    until they move onto `nl2sql.yaml`.
+    playground build their engine from `nl2sql.yaml` and call `check()` at
+    startup.
 
 ## Lifecycle
 
@@ -129,7 +129,7 @@ to that.
 | `list_unavailable_datasources()` | `dict` | Configured datasources that `check()` could not connect to, mapped to the reason. They are not in `list_datasources()` until a later `check()` connects. See [Datasources → When a datasource fails to start](../../configuration/datasources.md#when-a-datasource-fails-to-start). |
 | `rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)` | `RebuildResult` | Rebuilds the vector entries beside the live ones, then switches; the current entries answer questions until then. `enrich` asks the LLM for descriptions and spends tokens, so it is off by default. `on_progress` gets a sentence before each step; `switch_guard` is a context manager factory held around each switch. The result has `ok`, `stats`, `empty` and `errors`. |
 | `inspect_retrieval(query, k=8, lambda_mult=None, types=None, datasource_id=None)` | `dict` | One MMR search of the live index, as the engine runs it: the pool with scores, the picks in order and what was dropped. `types` limits the entry types (`schema.table`, ...). Raises `LookupError` when no vector store is configured. |
-| `reload_llm_config(config_path)` | `None` | Replaces every configured LLM with the file's, as one step: agents the file no longer names fall back to `default`. An invalid file leaves the current configuration in place. |
+| `reload_llm_config(config_path)` | `None` | Replaces every configured LLM with the `llm` section of the `nl2sql.yaml` at `config_path`, as one step: agents the section no longer names fall back to the top level. An invalid file leaves the current configuration in place. |
 
 ```python
 engine = NL2SQL.demo()

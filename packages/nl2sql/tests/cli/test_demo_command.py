@@ -1,4 +1,5 @@
-"""The `nl2sql demo` command: scaffolding, mode detection and server launch."""
+"""The `nl2sql demo` command: `init --demo`, mode detection, the engine check and server launch."""
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -11,36 +12,38 @@ from nl2sql.cli.main import app
 
 runner = CliRunner()
 
+KEYS = ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY")
+
 
 @pytest.fixture(autouse=True)
-def _stay_put(tmp_path, monkeypatch):
-    """`demo_command` chdirs into the demo project; put the cwd back afterwards."""
-    import os
-
-    original = os.getcwd()
-    yield
-    os.chdir(original)
+def _no_keys(monkeypatch):
+    for name in KEYS:
+        monkeypatch.delenv(name, raising=False)
 
 
-def test_demo_scaffolds_indexes_and_starts_replay_when_no_key(tmp_path, monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def _llm(tmp_path):
+    return yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text(encoding="utf-8"))
+
+
+def test_demo_writes_the_project_with_init_demo_and_starts_replay_when_no_key(tmp_path, monkeypatch, demo_engines):
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
     launched = {}
     monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: launched.update(host=host, port=port))
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
     monkeypatch.setattr("webbrowser.open", lambda url: launched.update(browser=url))
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--port", "8999"])
 
     assert result.exit_code == 0, result.output
-    assert (tmp_path / "d" / "data" / "chinook.sqlite").exists()
-    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
-    assert llm["default"]["base_url"].startswith("http://127.0.0.1:")
+    assert (tmp_path / "d" / "nl2sql.yaml").exists() and (tmp_path / "d" / "data" / "chinook.sqlite").exists()
+    llm = _llm(tmp_path)
+    # Pointed at the local replay server, with the placeholder it takes: no key in the environment.
+    assert llm["base_url"].startswith("http://127.0.0.1:") and llm["api_key"] == "replay"
+    assert "OPENAI_API_KEY" not in os.environ
     assert launched == {"host": "127.0.0.1", "port": 8999}
     assert "replay mode" in result.output.lower()
+    [engine] = demo_engines
+    assert engine.config_path == (tmp_path / "d" / "nl2sql.yaml").resolve()
+    assert engine.config.llm.base_url == llm["base_url"]
 
 
 def _replay_demo(tmp_path, monkeypatch, packaged=None):
@@ -49,12 +52,7 @@ def _replay_demo(tmp_path, monkeypatch, packaged=None):
     ``packaged`` stands in for the recordings shipped inside the package, which
     today are none.
     """
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
     served = {}
     monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: served.update(app=app))
     shipped = tmp_path / "packaged"
@@ -75,7 +73,7 @@ def _meta(served_app):
     return TestClient(served_app).get("/api/meta").json()
 
 
-def test_replay_without_recordings_says_it_cannot_answer(tmp_path, monkeypatch):
+def test_replay_without_recordings_says_it_cannot_answer(tmp_path, monkeypatch, demo_engines):
     output, served_app = _replay_demo(tmp_path, monkeypatch)
 
     assert "Replay mode: no API key found, and replay mode has no recorded answers" in output
@@ -84,7 +82,7 @@ def test_replay_without_recordings_says_it_cannot_answer(tmp_path, monkeypatch):
     assert _meta(served_app)["recorded_questions"] == 0
 
 
-def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch):
+def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch, demo_engines):
     """`--record` writes `<demo>/recordings.json`; replay has to read it back."""
     from nl2sql.datasets.demo import CHINOOK_QUESTIONS, DEMO_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore
@@ -101,7 +99,7 @@ def test_replay_reads_the_recordings_written_by_record(tmp_path, monkeypatch):
     assert _meta(served_app)["recorded_questions"] == 1
 
 
-def test_replay_streams_a_recorded_answer_at_reading_pace(tmp_path, monkeypatch):
+def test_replay_streams_a_recorded_answer_at_reading_pace(tmp_path, monkeypatch, demo_engines):
     """A streamed recorded answer arrives a word at a time, not all at once."""
     from nl2sql.cli.commands.demo import REPLAY_STREAM_DELAY
     from nl2sql.testing.fake_llm import FakeLLMServer
@@ -119,7 +117,7 @@ def test_replay_streams_a_recorded_answer_at_reading_pace(tmp_path, monkeypatch)
     assert servers and all(s.stream_delay == REPLAY_STREAM_DELAY > 0 for s in servers)
 
 
-def test_replay_falls_back_to_the_packaged_recordings(tmp_path, monkeypatch):
+def test_replay_falls_back_to_the_packaged_recordings(tmp_path, monkeypatch, demo_engines):
     from nl2sql.datasets.demo import CHINOOK_QUESTIONS, DEMO_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore
 
@@ -131,82 +129,58 @@ def test_replay_falls_back_to_the_packaged_recordings(tmp_path, monkeypatch):
     assert _meta(served_app)["recorded_questions"] == 2
 
 
-def test_demo_uses_live_mode_when_key_present(tmp_path, monkeypatch):
+def test_demo_uses_live_mode_when_key_present(tmp_path, monkeypatch, demo_engines):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
     monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: None)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser"])
 
     assert result.exit_code == 0, result.output
-    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
-    assert llm["default"].get("base_url") in (None, "")
+    llm = _llm(tmp_path)
+    assert llm.get("base_url") is None and llm.get("api_key") is None
     assert "live mode" in result.output.lower()
 
 
-def test_indexing_runs_from_inside_the_demo_directory(tmp_path, monkeypatch):
-    """The schema store path is relative to the cwd, not to the project root.
+def test_the_env_file_next_to_nl2sql_yaml_is_loaded_and_never_overrides(tmp_path, monkeypatch, demo_engines):
+    """A key saved in the demo's .env makes it live; a key already exported wins over the file."""
+    from nl2sql.cli.commands.demo import prepare_project
 
-    Indexing from anywhere else writes the snapshot where the engine -- and so
-    ``GET /api/schema`` -- cannot find it, and the schema panel comes up empty.
-    """
-    import os
-
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    seen = {}
-    monkeypatch.setattr(
-        "nl2sql.cli.demo.manager.DemoManager.index_demo_data",
-        lambda self: seen.update(cwd=os.getcwd()) or True,
-    )
-    monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: None)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
-
-    target = tmp_path / "d"
-    result = runner.invoke(app, ["demo", "--dir", str(target), "--no-browser"])
-
-    assert result.exit_code == 0, result.output
-    assert seen["cwd"] == str(target.resolve())
-
-
-def test_indexing_cannot_blank_the_real_api_key(tmp_path, monkeypatch):
-    """`.env.demo` ships an empty OPENAI_API_KEY placeholder.
-
-    Indexing loads it with `override=True`, so a real key in the environment was
-    replaced by an empty string and live mode silently fell back to `ollama`
-    with no key at all.
-    """
-    import os
-
+    prepare_project(tmp_path / "d")
+    (tmp_path / "d" / ".env").write_text("ANTHROPIC_API_KEY=sk-ant-from-file\nOPENAI_API_KEY=sk-from-file\n",
+                                         encoding="utf-8")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-real")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-
-    def _blanking_index(self):
-        os.environ["OPENAI_API_KEY"] = ""  # what load_dotenv(override=True) does
-        return True
-
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", _blanking_index)
     monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: None)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser"])
 
     assert result.exit_code == 0, result.output
     assert "using openai" in result.output.lower(), result.output
     assert os.environ["OPENAI_API_KEY"] == "sk-real"
+    assert os.environ["ANTHROPIC_API_KEY"] == "sk-ant-from-file"
+
+
+def test_a_missing_index_is_built_before_the_playground_starts(tmp_path, monkeypatch, demo_engines):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: None)
+    indexed = []
+    monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", lambda engine, **kw: indexed.append(engine))
+
+    class Unindexed(demo_engines.cls):
+        index = "missing"
+
+    demo_engines.cls = Unindexed
+
+    result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser"])
+
+    assert result.exit_code == 0, result.output
+    assert indexed == list(demo_engines)
+    assert "No vector index yet" in result.output
 
 
 def test_detect_llm_mode_reads_the_environment(monkeypatch):
     from nl2sql.cli.commands import demo
 
     monkeypatch.setattr(demo, "_ollama_reachable", lambda: False)
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert demo.detect_llm_mode() == "replay"
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or")
@@ -217,31 +191,24 @@ def test_detect_llm_mode_reads_the_environment(monkeypatch):
     assert demo.detect_llm_mode() == "live"
 
 
-def test_record_without_a_key_is_refused(tmp_path, monkeypatch):
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+def test_record_without_a_key_is_refused(tmp_path, monkeypatch, demo_engines):
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
 
     assert result.exit_code == 1
     assert "OPENAI_API_KEY" in result.output
+    assert not demo_engines
 
 
-def test_record_needs_a_key_even_when_ollama_is_running(tmp_path, monkeypatch):
+def test_record_needs_a_key_even_when_ollama_is_running(tmp_path, monkeypatch, demo_engines):
     """Ollama makes the mode `live`, but there is nothing to record through.
 
     `--record` proxies to an OpenAI-compatible upstream with a bearer token; a
     reachable Ollama gave neither, so recording started with an empty key and
     failed confusingly instead of saying what was missing.
     """
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: True)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
 
@@ -249,79 +216,61 @@ def test_record_needs_a_key_even_when_ollama_is_running(tmp_path, monkeypatch):
     assert "OPENAI_API_KEY" in result.output
 
 
-def test_record_turns_the_plan_cache_off_so_every_planner_answer_is_recorded(tmp_path, monkeypatch):
+class _Proxy:
+    base_url = "http://127.0.0.1:9/v1"
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def start(self):
+        return self
+
+    def stop(self):
+        pass
+
+
+def test_record_turns_the_plan_cache_off_so_every_planner_answer_is_recorded(tmp_path, monkeypatch, demo_engines):
     """A cached plan makes no planner call, so replay would have nothing to answer with."""
-    from types import SimpleNamespace
-
-    from nl2sql.common.settings import settings
-
     monkeypatch.setenv("OPENAI_API_KEY", "sk-" + "fake-record-test")
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
+    monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", _Proxy)
 
-    class _Proxy:
-        base_url = "http://127.0.0.1:9/v1"
-
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def start(self):
-            return self
-
-        def stop(self):
-            pass
-
-    seen = []
-
-    class _Recorder(_StubEngine):
+    class Recorder(demo_engines.cls):
         def run_query(self, *args, **kwargs):
-            seen.append(settings.plan_cache_enabled)
             return SimpleNamespace(status="success", final_answer={"summary": "ok"}, errors=[])
 
-    monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", _Proxy)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _Recorder())
+    demo_engines.cls = Recorder
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
 
     assert result.exit_code == 0, result.output
-    assert seen and not any(seen)
+    [engine] = demo_engines
+    assert engine.plan_cache is False
+    # The config points at the recording proxy with its placeholder key; the real key stays in the proxy.
+    llm = _llm(tmp_path)
+    assert llm["base_url"] == _Proxy.base_url and llm["api_key"] == "proxy"
 
 
-def test_record_stops_when_indexing_fails(tmp_path, monkeypatch):
+def test_record_stops_when_indexing_fails(tmp_path, monkeypatch, demo_engines):
     """A recording made against no index records the wrong answers, so it stops."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-" + "fake-record-test")
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: False)
-    built = []
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: built.append(1))
+    monkeypatch.setattr("nl2sql.cli.commands.demo.RecordingProxy", _Proxy)
+
+    def _failing_index(engine, **kwargs):
+        raise SystemExit(1)
+
+    monkeypatch.setattr("nl2sql.cli.common.indexing.run_indexing", _failing_index)
+
+    class Unindexed(demo_engines.cls):
+        index = "missing"
+
+        def run_query(self, *args, **kwargs):  # pragma: no cover - must never run
+            raise AssertionError("recorded against no index")
+
+    demo_engines.cls = Unindexed
 
     result = runner.invoke(app, ["demo", "--dir", str(tmp_path / "d"), "--no-browser", "--record"])
 
     assert result.exit_code == 1, result.output
-    assert not built
     assert "Nothing was recorded" in " ".join(result.output.split())
-
-
-class _StubEngine:
-    """Stands in for `NL2SQL()`; the command only reads policies off it."""
-
-    def __init__(self):
-        self.context = _StubContext()
-        self.config = SimpleNamespace(policies=self.context.policies_cfg)
-
-    def run_query(self, *args, **kwargs):  # pragma: no cover - not exercised here
-        raise AssertionError("the stub engine does not run queries")
-
-    def list_datasources(self):
-        return []
-
-
-class _StubContext:
-    def __init__(self):
-        self.policies_cfg = _StubPolicies()
-        self.schema_store = None
-        self.ds_registry = None
-
-
-class _StubPolicies:
-    roles = {"admin": object(), "analyst": object(), "viewer": object()}

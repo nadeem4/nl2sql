@@ -33,46 +33,11 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
-def _write_empty_secrets(tmp_path: Path) -> Path:
-    secrets_path = tmp_path / "secrets.yaml"
-    secrets_path.write_text("version: 1\nproviders: []\n", encoding="utf-8")
-    return secrets_path
-
-
-def _demo_config_paths(root: Path, secrets_config_path: Path) -> dict[str, Path]:
-    return {
-        "ds_config_path": root / "configs" / "datasources.demo.yaml",
-        "llm_config_path": root / "configs" / "llm.demo.yaml",
-        "policies_config_path": root / "configs" / "policies.demo.json",
-        "secrets_config_path": secrets_config_path,
-    }
-
-
-def _demo_db_paths(root: Path) -> list[Path]:
-    config_path = root / "configs" / "datasources.demo.yaml"
-    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    db_paths = []
-    for datasource in payload.get("datasources", []):
-        connection = datasource.get("connection") or {}
-        database = connection.get("database")
-        if database:
-            db_paths.append(root / database)
-    return db_paths
-
-
-def _skip_if_missing_demo_dbs(root: Path) -> None:
-    missing = [str(path) for path in _demo_db_paths(root) if not path.exists()]
-    if missing:
-        pytest.skip(f"Missing demo databases: {', '.join(missing)}")
-
-
 @pytest.fixture(scope="module")
 def demo_env() -> SimpleNamespace:
     root = _project_root()
-    _skip_if_missing_demo_dbs(root)
 
     tmp_dir = Path(tempfile.mkdtemp(prefix="answer_synthesizer_real_data_"))
-    secrets_path = _write_empty_secrets(tmp_dir)
 
     monkeypatch = pytest.MonkeyPatch()
     collection_name = f"itest_answer_synth_{uuid.uuid4().hex}"
@@ -87,8 +52,6 @@ def demo_env() -> SimpleNamespace:
     finally:
         monkeypatch.undo()
         shutil.rmtree(tmp_dir, ignore_errors=True)
-
-
 
 
 def _build_aggregator_response(ctx) -> AggregatorResponse:

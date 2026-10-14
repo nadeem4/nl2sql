@@ -9,7 +9,6 @@ import yaml
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
-from nl2sql.common.settings import settings
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH, GoldQuestion
 from nl2sql.feedback import FeedbackStore
 from nl2sql.tracing.document import TRACE_FORMAT_VERSION
@@ -24,12 +23,10 @@ def _record(trace_id, question, sql, codes=(), sub_queries=1):
             "plan_cache_hits": 0, "sub_queries": sub_queries, "models": {}, "engine_version": "x"}
 
 
-def _seed(tmp_path, monkeypatch):
-    path = tmp_path / "data" / "schema_store.db"
-    trace_dir = tmp_path / "traces"
-    trace_dir.mkdir()
-    monkeypatch.setattr(settings, "schema_store_path", str(path))
-    monkeypatch.setattr(settings, "trace_dir", str(trace_dir))
+def _seed(stores):
+    path = stores.state
+    trace_dir = stores.traces
+    trace_dir.mkdir(parents=True)
     store = FeedbackStore(path)
     store.save(_record("a1", "How many customers are there?", ["SELECT COUNT(*) AS n FROM Customer"]),
                rating="up", note=None)
@@ -48,8 +45,8 @@ def _out(result):
     return ANSI.sub("", result.output)
 
 
-def test_stats_prints_the_rates(tmp_path, monkeypatch):
-    _seed(tmp_path, monkeypatch)
+def test_stats_prints_the_rates(tmp_path, project_stores):
+    _seed(project_stores)
 
     result = runner.invoke(app, ["feedback", "stats"])
 
@@ -60,8 +57,8 @@ def test_stats_prints_the_rates(tmp_path, monkeypatch):
     assert "Plan cache" in out
 
 
-def test_stats_as_json(tmp_path, monkeypatch):
-    _seed(tmp_path, monkeypatch)
+def test_stats_as_json(tmp_path, project_stores):
+    _seed(project_stores)
 
     result = runner.invoke(app, ["feedback", "stats", "--json"])
 
@@ -70,16 +67,16 @@ def test_stats_as_json(tmp_path, monkeypatch):
     assert stats["feedback"]["up"] == 2 and stats["feedback"]["down"] == 1
 
 
-def test_list_prints_the_ratings(tmp_path, monkeypatch):
-    _seed(tmp_path, monkeypatch)
+def test_list_prints_the_ratings(tmp_path, project_stores):
+    _seed(project_stores)
 
     out = _out(runner.invoke(app, ["feedback", "list"]))
 
     assert "How many customers are there?" in out and "wrong table" in out
 
 
-def test_export_good_writes_draft_gold_entries_and_never_touches_the_gold_set(tmp_path, monkeypatch):
-    _seed(tmp_path, monkeypatch)
+def test_export_good_writes_draft_gold_entries_and_never_touches_the_gold_set(tmp_path, project_stores):
+    _seed(project_stores)
     before = hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest()
     target = tmp_path / "drafts.yaml"
 
@@ -99,8 +96,8 @@ def test_export_good_writes_draft_gold_entries_and_never_touches_the_gold_set(tm
     assert "1 draft" in out and "skipped 1" in out.lower()
 
 
-def test_export_refuses_to_write_over_the_gold_set(tmp_path, monkeypatch):
-    _seed(tmp_path, monkeypatch)
+def test_export_refuses_to_write_over_the_gold_set(tmp_path, project_stores):
+    _seed(project_stores)
     before = hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest()
 
     result = runner.invoke(app, ["feedback", "export", "--good", "--out", str(GOLD_DATASET_PATH)])
@@ -109,14 +106,14 @@ def test_export_refuses_to_write_over_the_gold_set(tmp_path, monkeypatch):
     assert hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest() == before
 
 
-def test_export_needs_good(tmp_path, monkeypatch):
-    _seed(tmp_path, monkeypatch)
+def test_export_needs_good(tmp_path, project_stores):
+    _seed(project_stores)
 
     assert runner.invoke(app, ["feedback", "export", "--out", str(tmp_path / "d.yaml")]).exit_code != 0
 
 
-def test_clear_removes_the_ratings(tmp_path, monkeypatch):
-    path = _seed(tmp_path, monkeypatch)
+def test_clear_removes_the_ratings(tmp_path, project_stores):
+    path = _seed(project_stores)
 
     result = runner.invoke(app, ["feedback", "clear", "--yes"])
 
@@ -127,10 +124,8 @@ def test_clear_removes_the_ratings(tmp_path, monkeypatch):
     store.close()
 
 
-def test_commands_without_a_store_file_create_nothing(tmp_path, monkeypatch):
-    path = tmp_path / "data" / "schema_store.db"
-    monkeypatch.setattr(settings, "schema_store_path", str(path))
-    monkeypatch.setattr(settings, "trace_dir", str(tmp_path / "traces"))
+def test_commands_without_a_store_file_create_nothing(project_stores):
+    path = project_stores.state
 
     for args in (["feedback", "list"], ["feedback", "clear", "--yes"], ["feedback", "stats"]):
         assert runner.invoke(app, args).exit_code == 0

@@ -73,8 +73,6 @@ An artifact's path is `<results folder>/<rendered path>`, and its parent folders
 <storage.path>/results/<tenant_id>/<request_id>/<sub_query_id>.parquet
 ```
 
-Until the CLI, `nl2sql-api` and the playground move onto `nl2sql.yaml`, they start from the 0.4 files, and their results folder is still `RESULT_ARTIFACT_BASE_URI` (default `./artifacts`).
-
 The store is exercised by real read/write round-trip tests (`packages/nl2sql/tests/unit/test_artifact_store.py`).
 
 ## ArtifactRef fields

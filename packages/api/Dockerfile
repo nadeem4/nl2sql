@@ -10,8 +10,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# The config is a folder mounted at /etc/nl2sql: nl2sql.yaml, the files it
+# includes, and optionally the .env next to it (loaded at startup, never
+# overriding a variable already set). Point storage.path at a mounted data
+# volume, for example `path: "${env:NL2SQL_DATA_DIR}"`:
+#   docker run -v ./config:/etc/nl2sql:ro -v nl2sql-data:/data \
+#     -e NL2SQL_DATA_DIR=/data -p 8000:8000 nl2sql-api
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    NL2SQL_CONFIG=/etc/nl2sql/nl2sql.yaml
 
 COPY ./packages/sdk /app/packages/sdk
 COPY ./packages/nl2sql /app/packages/nl2sql

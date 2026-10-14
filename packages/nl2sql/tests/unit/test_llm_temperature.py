@@ -16,7 +16,7 @@ import pytest
 import yaml
 from pydantic import BaseModel
 
-from nl2sql.configs import LLMFileConfig
+from nl2sql.llm.models import LLMFileConfig
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
 from nl2sql.secrets import SecretManager

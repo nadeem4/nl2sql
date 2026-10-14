@@ -26,34 +26,42 @@ library. `pip install --group dev` (pip 25.1 or newer) installs the PEP 735
 
 ## Configuration
 
-Create config files in your working directory:
+The engine reads one `nl2sql.yaml`. `nl2sql init` writes it, with each section
+in its own file, and `nl2sql init --demo` writes the demo's. See
+[Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init)
+and [Configuration](../configuration/system.md).
 
-- `configs/datasources.yaml`
-- `configs/llm.yaml`
-- `configs/policies.json`
-- `configs/secrets.yaml` (optional)
-
-Start from `configs/datasources.example.yaml` and `configs/policies.example.json`.
-
-!!! note "0.5: `nl2sql init`"
-    From 0.5 the engine reads one `nl2sql.yaml` instead. `nl2sql init` writes
-    it, with each section in its own file, and `nl2sql init --demo` writes the
-    demo's. See [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
+```bash
+nl2sql init my-demo --demo
+nl2sql --config my-demo/nl2sql.yaml index
+```
 
 ## Run locally
+
+CLI:
+
+```bash
+nl2sql --config my-demo/nl2sql.yaml run "How many customers are there?"
+```
 
 Python API:
 
 ```bash
-python -c "from nl2sql import NL2SQL, UserContext; print(NL2SQL.from_config('nl2sql.yaml').run_query('hello', user_context=UserContext(roles=['admin'])))"
+python -c "from nl2sql import NL2SQL, UserContext; print(NL2SQL.from_config('my-demo/nl2sql.yaml').run_query('How many customers are there?', user_context=UserContext(roles=['admin'])))"
 ```
 
-API service (Docker):
+API service:
+
+```bash
+NL2SQL_CONFIG=my-demo/nl2sql.yaml nl2sql-api --port 8000
+```
+
+or in Docker:
 
 ```bash
 docker build -f packages/api/Dockerfile -t nl2sql-api .
-docker run --rm -p 8000:8000 nl2sql-api
+docker run --rm -p 8000:8000 -v "$PWD/my-demo:/etc/nl2sql" nl2sql-api
 ```
 
-See [Docker (REST API)](docker.md) for adapter extras, environment selection
-and mounting config files.
+See [Docker (REST API)](docker.md) for adapter extras, the role settings and
+the data volume.

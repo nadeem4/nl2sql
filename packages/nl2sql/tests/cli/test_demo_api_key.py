@@ -1,11 +1,10 @@
 """`nl2sql demo --api-key`: live mode from the command line, persisted.
 
 Precedence, highest first: ``--api-key``, the process environment, the demo
-project's ``.env.demo``, a reachable Ollama, replay.
+project's ``.env`` (next to its ``nl2sql.yaml``), a reachable Ollama, replay.
 """
 import os
 import re
-from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -24,24 +23,16 @@ FAKE_ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "test", "not", "a", "real",
 
 
 @pytest.fixture(autouse=True)
-def _isolated(monkeypatch):
-    """`demo_command` chdirs and writes ENV; put both back afterwards."""
+def _isolated(monkeypatch, demo_engines):
+    """No key anywhere, no Ollama, no server: the engine is a stub (``demo_engines``)."""
     # The command writes provider keys into os.environ. delenv on an absent
     # variable records nothing to restore, so set each first: whatever the
     # command writes is then removed afterwards instead of leaking.
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
-    # monkeypatch records ENV here, so the command's own os.environ write is
-    # rolled back at teardown.
-    monkeypatch.delenv("ENV", raising=False)
     monkeypatch.setattr("nl2sql.cli.commands.demo._ollama_reachable", lambda: False)
-    monkeypatch.setattr("nl2sql.cli.demo.manager.DemoManager.index_demo_data", lambda self: True)
     monkeypatch.setattr("nl2sql.cli.commands.demo._serve", lambda app, host, port: None)
-    monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", lambda: _StubEngine())
-    original = os.getcwd()
-    yield
-    os.chdir(original)
 
 
 def _run(*args):
@@ -68,20 +59,19 @@ def test_api_key_selects_live_mode_with_nothing_in_the_environment(tmp_path):
     assert result.exit_code == 0, result.output
     assert "live mode" in _plain(result.output).lower(), result.output
     assert "using openai" in _plain(result.output).lower(), result.output
-    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
+    llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text())
     # No base_url means the engine talks to the real provider, not a local
     # replay or recording server.
-    assert llm["default"].get("base_url") in (None, "")
+    assert llm.get("base_url") is None and llm.get("api_key") is None
 
 
-def test_api_key_is_written_into_env_demo(tmp_path):
+def test_api_key_is_written_into_the_env_file(tmp_path):
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
 
     assert result.exit_code == 0, result.output
-    env_demo = (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
+    env_demo = (tmp_path / "d" / ".env").read_text(encoding="utf-8")
     assert f"OPENAI_API_KEY={FAKE_KEY}" in env_demo
-    # The shipped empty placeholder must not survive below the real value:
-    # indexing loads this file with override=True and would blank the key.
+    # No empty placeholder survives below the real value.
     assert "OPENAI_API_KEY=\n" not in env_demo
 
 
@@ -106,7 +96,7 @@ def test_an_openrouter_shaped_key_selects_openrouter(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert "using openrouter" in _plain(result.output).lower(), result.output
-    env_demo = (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
+    env_demo = (tmp_path / "d" / ".env").read_text(encoding="utf-8")
     assert f"OPENROUTER_API_KEY={FAKE_OPENROUTER_KEY}" in env_demo
 
 
@@ -117,12 +107,12 @@ def test_api_key_beats_a_key_already_in_the_environment(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
-    env_demo = (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
+    env_demo = (tmp_path / "d" / ".env").read_text(encoding="utf-8")
     assert FAKE_KEY in env_demo
     assert "sk-test-from-the-environment" not in env_demo
 
 
-def test_the_environment_beats_a_key_stored_in_env_demo(tmp_path, monkeypatch):
+def test_the_environment_beats_a_key_stored_in_the_env_file(tmp_path, monkeypatch):
     directory = tmp_path / "d"
     assert _run("--dir", str(directory), "--api-key", FAKE_KEY).exit_code == 0
 
@@ -173,15 +163,15 @@ def test_the_key_is_never_echoed(tmp_path):
     assert FAKE_KEY not in _plain(result.stdout)
     # Rich wraps long lines, so a key could also be split across them.
     assert FAKE_KEY not in "".join(plain.split())
-    # The generated LLM config points at the variable, it does not inline it.
-    assert FAKE_KEY not in (tmp_path / "d" / "configs" / "llm.demo.yaml").read_text()
+    # The LLM config names no key: the provider's variable is read.
+    assert FAKE_KEY not in (tmp_path / "d" / "llm.yaml").read_text()
     assert "sk-...1234" in plain
 
 
 def test_the_key_is_not_echoed_when_the_command_fails(tmp_path, monkeypatch):
     """`handle_cli_errors` prints a full traceback; the key must not be in it."""
 
-    def _boom():
+    def _boom(*args, **kwargs):
         raise RuntimeError("engine construction failed")
 
     monkeypatch.setattr("nl2sql.cli.commands.demo._build_engine", _boom)
@@ -199,16 +189,16 @@ def test_an_anthropic_key_selects_claude(tmp_path):
 
     assert result.exit_code == 0, result.output
     assert "using anthropic" in _plain(result.output).lower(), result.output
-    env_demo = (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
+    env_demo = (tmp_path / "d" / ".env").read_text(encoding="utf-8")
     assert f"ANTHROPIC_API_KEY={FAKE_ANTHROPIC_KEY}" in env_demo
     assert "OPENAI_API_KEY=" not in env_demo
-    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
+    llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text())
     # The scaffolded gpt model means nothing to Anthropic, and Claude 5 models
     # reject a temperature, so both follow the provider.
-    assert llm["default"]["provider"] == "anthropic"
-    assert llm["default"]["model"] == "claude-opus-5"
-    assert llm["default"]["temperature"] is None
-    assert llm["default"]["api_key"] == "${env:ANTHROPIC_API_KEY}"
+    assert llm["provider"] == "anthropic"
+    assert llm["model"] == "claude-opus-5"
+    assert llm["temperature"] is None
+    assert "api_key" not in llm
 
 
 def test_an_anthropic_key_in_the_environment_selects_claude(tmp_path, monkeypatch):
@@ -224,12 +214,11 @@ def test_a_restart_keeps_every_saved_key_and_each_steps_provider(tmp_path):
     directory = tmp_path / "d"
     assert _run("--dir", str(directory), "--api-key", FAKE_KEY).exit_code == 0
     # What the settings panel leaves after an Anthropic key and a Claude planner.
-    with open(directory / ".env.demo", "a", encoding="utf-8") as env_demo:
+    with open(directory / ".env", "a", encoding="utf-8") as env_demo:
         env_demo.write(f"ANTHROPIC_API_KEY={FAKE_ANTHROPIC_KEY}\n")
-    path = directory / "configs" / "llm.demo.yaml"
+    path = directory / "llm.yaml"
     cfg = yaml.safe_load(path.read_text())
-    cfg["agents"] = {"astplanner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None,
-                                    "api_key": "${env:ANTHROPIC_API_KEY}", "name": "astplanner"}}
+    cfg["agents"] = {"ast_planner": {"provider": "anthropic", "model": "claude-opus-5", "temperature": None}}
     path.write_text(yaml.safe_dump(cfg))
     os.environ.pop("OPENAI_API_KEY", None)
 
@@ -239,9 +228,9 @@ def test_a_restart_keeps_every_saved_key_and_each_steps_provider(tmp_path):
     assert "using openai" in _plain(result.output).lower()
     assert os.environ["ANTHROPIC_API_KEY"] == FAKE_ANTHROPIC_KEY
     cfg = yaml.safe_load(path.read_text())
-    assert cfg["default"]["provider"] == "openai"
-    assert cfg["agents"]["astplanner"]["provider"] == "anthropic"
-    assert cfg["agents"]["astplanner"]["api_key"] == "${env:ANTHROPIC_API_KEY}"
+    assert cfg["provider"] == "openai"
+    assert cfg["agents"]["ast_planner"]["provider"] == "anthropic"
+    assert "api_key" not in cfg["agents"]["ast_planner"]
 
 
 def test_record_with_an_anthropic_key_proxies_to_anthropic_on_its_own_wire(tmp_path, monkeypatch):
@@ -260,9 +249,9 @@ def test_record_with_an_anthropic_key_proxies_to_anthropic_on_its_own_wire(tmp_p
     assert _StubProxy.last_upstream == "https://api.anthropic.com"
     assert _StubProxy.last_wire == "anthropic"
     assert _StubProxy.last_key == FAKE_ANTHROPIC_KEY
-    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text(encoding="utf-8"))
-    assert llm["default"]["provider"] == "anthropic"
-    assert llm["default"]["base_url"] == "http://127.0.0.1:9"
+    llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text(encoding="utf-8"))
+    assert llm["provider"] == "anthropic"
+    assert llm["base_url"] == "http://127.0.0.1:9" and llm["api_key"] == "proxy"
 
 
 def test_help_states_the_precedence_and_the_argv_caveat():
@@ -275,7 +264,7 @@ def test_help_states_the_precedence_and_the_argv_caveat():
     # box-drawing border, then the wrapping, before matching on phrases.
     text = " ".join(re.sub(r"[^\x20-\x7e]", " ", _plain(result.output)).split())
     assert "--api-key" in text
-    assert ".env.demo" in text
+    assert ".env" in text and ".env.demo" not in text
     assert "OPENROUTER_API_KEY" in text
     assert "Ollama" in text
     assert "replay" in text
@@ -297,12 +286,13 @@ def _settings(app):
 
 
 def test_an_openrouter_key_is_read_from_the_openrouter_variable(tmp_path):
-    """The scaffolded config reads ${env:OPENAI_API_KEY}; OpenRouter needs its own."""
+    """The config names no key, so OpenRouter reads its own variable, not OpenAI's."""
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_OPENROUTER_KEY)
 
     assert result.exit_code == 0, result.output
-    llm = yaml.safe_load((tmp_path / "d" / "configs" / "llm.demo.yaml").read_text())
-    assert llm["default"]["api_key"] == "${env:OPENROUTER_API_KEY}"
+    llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text())
+    assert llm["provider"] == "openrouter" and "api_key" not in llm
+    assert os.environ["OPENROUTER_API_KEY"] == FAKE_OPENROUTER_KEY
 
 
 def test_the_api_key_flag_path_is_unchanged_by_the_settings_panel(tmp_path, monkeypatch):
@@ -312,7 +302,7 @@ def test_the_api_key_flag_path_is_unchanged_by_the_settings_panel(tmp_path, monk
 
     assert result.exit_code == 0, result.output
     assert "live mode" in _plain(result.output).lower()
-    assert f"OPENAI_API_KEY={FAKE_KEY}" in (tmp_path / "d" / ".env.demo").read_text(encoding="utf-8")
+    assert f"OPENAI_API_KEY={FAKE_KEY}" in (tmp_path / "d" / ".env").read_text(encoding="utf-8")
     body = _settings(served["app"])
     assert body["available"] is True and body["mode"] == "live"
     assert body["key"] == {"masked": "sk-...1234", "env_var": "OPENAI_API_KEY"}
@@ -345,20 +335,20 @@ def test_replay_points_per_node_models_at_the_replay_server_too(tmp_path):
     """A node chosen in the panel must not reach the real provider in replay."""
     directory = tmp_path / "d"
     assert _run("--dir", str(directory), "--api-key", FAKE_KEY).exit_code == 0
-    path = directory / "configs" / "llm.demo.yaml"
+    path = directory / "llm.yaml"
     cfg = yaml.safe_load(path.read_text())
-    cfg["agents"] = {"astplanner": {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0,
-                                    "api_key": "${env:OPENAI_API_KEY}", "name": "astplanner"}}
+    cfg["agents"] = {"ast_planner": {"provider": "openai", "model": "gpt-4.1", "temperature": 0.0}}
     path.write_text(yaml.safe_dump(cfg))
-    (directory / ".env.demo").write_text("OPENAI_API_KEY=\n", encoding="utf-8")
+    (directory / ".env").write_text("OPENAI_API_KEY=\n", encoding="utf-8")
     os.environ.pop("OPENAI_API_KEY", None)
 
     result = _run("--dir", str(directory))
 
     assert "replay mode" in _plain(result.output).lower(), result.output
     llm = yaml.safe_load(path.read_text())
-    assert llm["agents"]["astplanner"]["base_url"] == llm["default"]["base_url"]
-    assert llm["agents"]["astplanner"]["base_url"].startswith("http://127.0.0.1:")
+    assert llm["agents"]["ast_planner"]["base_url"] == llm["base_url"]
+    assert llm["agents"]["ast_planner"]["base_url"].startswith("http://127.0.0.1:")
+    assert llm["agents"]["ast_planner"]["api_key"] == "replay"
 
 
 class _StubProxy:
@@ -379,28 +369,3 @@ class _StubProxy:
 
     def stop(self):
         return None
-
-
-class _StubEngine:
-    """Stands in for `NL2SQL()`; the command only reads policies off it."""
-
-    def __init__(self):
-        self.context = _StubContext()
-        self.config = SimpleNamespace(policies=self.context.policies_cfg)
-
-    def run_query(self, *args, **kwargs):  # pragma: no cover - not exercised here
-        raise AssertionError("the stub engine does not run queries")
-
-    def list_datasources(self):
-        return []
-
-
-class _StubContext:
-    def __init__(self):
-        self.policies_cfg = _StubPolicies()
-        self.schema_store = None
-        self.ds_registry = None
-
-
-class _StubPolicies:
-    roles = {"admin": object(), "analyst": object(), "viewer": object()}

@@ -1,185 +1,315 @@
 # Configuration System
 
-Configuration is split into **environment variables** (runtime settings) and **file-based configuration** (datasources, LLMs, policies, secrets). `Settings` loads env vars; `ConfigManager` validates file formats and resolves secrets.
+nl2sql reads one config: `nl2sql.yaml` and the files it includes. Loading it
+gives one typed `Config` object, and building that same `Config` in Python
+gives exactly the same engine. Everything the engine needs is in it. Only
+the config path and the provider key variables are read directly (see
+[Environment variables](#environment-variables)); any other value from the
+environment is written in the YAML as `${env:VAR}`.
 
-## Settings (environment variables)
+The design and its reasoning are in
+[Configuration v2](../architecture/configuration_v2.md). This page is the
+reference.
 
-### Paths
+## `nl2sql.yaml`
 
-| Env var | Default | Description |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | `—` | OpenAI API key (held as `SecretStr`: never printed). Used for chat when `provider: openai`, and for embeddings when `EMBEDDING_PROVIDER=openai` (the default). |
-| `ANTHROPIC_API_KEY` | `—` | Anthropic API key, read when an agent has `provider: anthropic` and no `api_key` of its own (needs the `anthropic` extra). Chat only: Anthropic serves no embeddings. |
-| `EMBEDDING_PROVIDER` | `openai` | Embedding backend: `openai` (needs `OPENAI_API_KEY`) or `local` (key-free ONNX `all-MiniLM-L6-v2` bundled with chromadb). |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model. Ignored when `EMBEDDING_PROVIDER=local`. |
-| `LLM_CONFIG` | `configs/llm.yaml` | Path to the LLM config file. |
-| `DATASOURCE_CONFIG` | `configs/datasources.yaml` | Path to the datasource config file. |
-| `SAMPLE_QUESTIONS` | `configs/sample_questions.yaml` | Path to the sample questions file (a map of datasource id to questions). They are indexed into each datasource's `schema.datasource` entry. `ROUTING_EXAMPLES`, the name `.env` files generated before 2026-09-21 wrote, is accepted as well. |
-| `POLICIES_CONFIG` | `configs/policies.json` | Path to the RBAC policies file. |
-| `SECRETS_CONFIG` | `configs/secrets.yaml` | Path to the secrets config file. |
-| `CURATED_CONFIG` | `configs/curated.yaml` | Path to the curated answers file (verified queries). Absent at the default path, the feature is off; set to any other path that does not exist, startup fails. See [Curated Answers](curated.md). |
-| `VECTOR_STORE` | `./chroma_db` | Persist directory for the vector store. |
-| `VECTOR_STORE_COLLECTION` | `nl2sql_store` | Collection name `nl2sql doctor` inspects. The engine always writes `nl2sql_store`, an internal constant in 0.5. |
+`nl2sql init` writes a new project, with each section in its own file:
 
-On the CLI, `nl2sql run`, `nl2sql index`, `nl2sql benchmark` and
-`nl2sql trace replay` override these paths per command with `--config`
-(datasources), `--llm-config`, `--secrets-config` and `--vector-store`; `run`,
-`benchmark` and `trace replay` also take `--policies-config`. Each file flag
-takes a path, relative to the working directory or absolute.
-
-From Python, the engine is built from one `Config` instead: `NL2SQL(config)`,
-`NL2SQL.from_config("nl2sql.yaml")` or `NL2SQL.demo()` (see
-[Public Facade](../api/core/public-facade.md#creating-an-engine)). The files and
-variables on this page are what the CLI, `nl2sql-api` and the playground still
-read until they move onto `nl2sql.yaml`; a blank `VECTOR_STORE` stops them at
-startup with a `ValueError`.
-
-### Embeddings
-
-`EMBEDDING_PROVIDER` selects how schema chunks are embedded during `nl2sql index`
-and how queries are embedded during retrieval:
-
-| Value | Model | Dimensions | API key |
-| --- | --- | --- | --- |
-| `openai` (default) | `EMBEDDING_MODEL`, default `text-embedding-3-small` | 1536 | `OPENAI_API_KEY` required |
-| `local` | `all-MiniLM-L6-v2` (ONNX, bundled with chromadb) | 384 | none |
-
-Notes on the `local` provider:
-
-- **No extra dependency.** The model ships with `chromadb`, which is already a
-  transitive dependency through `langchain-chroma`.
-- **One-time download.** The first indexing run downloads roughly 79 MB of ONNX
-  model files into a local cache directory. Expect a pause of up to a few
-  minutes; a log line is emitted before the download starts.
-- **Embeddings only.** This removes the API key requirement from the embedding
-  step. It does not make querying key-free — answering a question still needs a
-  chat model (OpenAI, Anthropic or OpenRouter).
-
-**Switching providers requires a re-index.** The two providers produce vectors of
-different dimensionality, so an existing Chroma collection cannot be read with the
-other provider. Retrieving from a store whose persisted vectors disagree with the
-configured provider raises `EmbeddingDimensionMismatchError` naming both
-providers. The check runs on the read path only, so the fix is simply to re-run
-`nl2sql index` (indexing clears the collection first); alternatively, point
-`VECTOR_STORE` at a separate directory per provider.
-
-### Storage
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `SCHEMA_STORE_BACKEND` | `sqlite` | Read by `nl2sql cache` and `nl2sql curated validate` only. The engine always keeps its schema store in SQLite at `SCHEMA_STORE_PATH` (`<storage.path>/state.db` for an engine built from a `Config`). |
-| `SCHEMA_STORE_PATH` | `data/schema_store.db` | SQLite database path for schema store persistence. Also holds the plan cache (`plan_cache` table). |
-| `SCHEMA_STORE_MAX_VERSIONS` | `3` | Max schema versions retained per datasource. |
-| `RESULT_ARTIFACT_BASE_URI` | `./artifacts` | Folder result files are written under (an engine built from a `Config` uses `<storage.path>/results/`). The S3 and ADLS backends and their `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_S3_*` and `RESULT_ARTIFACT_ADLS_*` settings were removed in 0.5. |
-| `RESULT_ARTIFACT_PATH_TEMPLATE` | `<tenant_id>/<request_id>/<sub_query_id>.parquet` | Artifact path relative to the results folder. Placeholders available: `<tenant_id>`, `<request_id>`, `<sub_query_id>`, `<dag_node_id>`, `<subgraph_name>`, `<schema_version>`. Every sub-query of a run writes its own file: a template without `<sub_query_id>` or `<dag_node_id>` gets `-<sub_query_id>` added to its file name (see [artifact store](../storage/artifact-store.md#one-artifact-per-sub-query)). |
-
-### Execution
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `GLOBAL_TIMEOUT_SEC` | `60` | Global timeout in seconds for pipeline execution. The caller is answered within about a second of the limit; the run's worker thread winds down in the background (see `../execution/isolation.md`). |
-
-### Behavior
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `SCHEMA_VERSION_MISMATCH_POLICY` | `warn` | Action on schema version mismatch: `warn`, `fail`, `ignore`. |
-| `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | `15` | When a datasource's schema has at most this many tables, the schema retriever skips vector retrieval and passes the full schema snapshot (every table, every column) to the planner. Set to `0` to always use vector retrieval. |
-| `SQL_AGENT_MAX_RETRIES` | `3` | Max retry attempts for SQL agent refinement. |
-| `SQL_AGENT_RETRY_BASE_DELAY_SEC` | `1.0` | Base delay for SQL agent retries (seconds). |
-| `SQL_AGENT_RETRY_MAX_DELAY_SEC` | `10.0` | Max delay for SQL agent retries (seconds). |
-| `SQL_AGENT_RETRY_JITTER_SEC` | `0.5` | Max jitter added to SQL agent retry delays (seconds). |
-| `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `true` | Treat a column the plan names but the retrieved schema does not have as a blocking, retryable `COLUMN_NOT_FOUND` error, so the planner is asked again instead of the plan reaching the database. Set `false` to downgrade it to a warning that lets the plan through once retries are spent. |
-| `PLAN_CACHE_ENABLED` | `true` | Reuse a plan that already passed validation and executed, for the same normalised sub-query intent, datasource and schema version on the same run date (`NL2SQL_TODAY`, else the UTC date), instead of calling the planner LLM. The cached plan is validated again on every use, so RBAC and policy changes still apply. Stored in the schema store (`SCHEMA_STORE_PATH`); `nl2sql cache clear` empties it. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
-| `FEEDBACK_ENABLED` | `true` | Let the playground record a thumbs up or down, with an optional note, for a run. Stored in the schema store's `feedback` table (`SCHEMA_STORE_PATH`): question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. Local only, like Settings. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
-| `CURATED_ENABLED` | `true` | Load and check the curated answers file at startup, and match questions to its verified queries. `false` turns the feature off without removing the file (every answer is generated); `nl2sql curated validate` still checks it. See [Curated Answers](curated.md). |
-| `CURATED_MATCH_TOP_K` | `5` | Verified query candidates a question's search returns, one per query (`VectorStore.retrieve_verified_query_candidates`). See [Curated Answers](curated.md). |
-| `CURATED_MATCH_FLOOR` | `0.6` | Cosine similarity the best verified query candidate must reach before the model is asked to choose one. Below it the question is answered by the normal pipeline with no model call. Calibrated on the local embedding model. See [Curated Answers](curated.md#what-happens-at-question-time). |
-| `RBAC_REFUSAL_NAMES_TABLES` | `false` | Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. `nl2sql setup --demo` writes `true` into `.env.demo`. See [Security Model](../security/model.md#strict-refusal). |
-| `NL2SQL_TODAY` | `—` | The date the planner and refiner are told it is, as an ISO date (`2013-12-31`). Unset, it is the real date in UTC. Pin it for tests and gold runs whose questions say "this year" or "the last 30 days". A trace records the date its run used, and `nl2sql trace replay` pins it. It is also part of the plan cache key, so a plan made on another date is not reused. |
-| `TENANT_ID` | `default_tenant` | Default tenant ID for requests. |
-
-### Observability
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `OBSERVABILITY_EXPORTER` | `none` | Exporter for metrics/traces: `none`, `console`, `otlp`. |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `—` | Endpoint for OTLP exporter. |
-| `LLM_PRICES` | `{}` | Optional per-model prices per million tokens, as JSON, e.g. `{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}`. Optional `cached_input` (cache reads) defaults to `input`; optional `cache_write` (cache writes) defaults to `input` times the wire's write premium: 1.25 for Claude (`provider: anthropic`, whose 5-minute cache write Anthropic bills at 1.25x input) and 1 for the OpenAI wire. The rest of the prompt is billed at `input`. With no price for a model, `QueryResult.usage` reports tokens only and `cost` is `null`. No prices are built in. |
-| `TRACE_MODE` | `on_failure` | When to write a run trace: `off`, `on_failure` (errors, a retry, or an incomplete run) or `always`. `nl2sql demo` writes `always` into `.env.demo`. See [Debugging a Run](../observability/debugging.md). |
-| `TRACE_DIR` | `traces` | Directory run traces are written to, relative to the working directory. |
-| `RESULT_ROW_LIMIT` | `100000` | The most rows one sub-query returns: a resource ceiling baked into the SQL as a `LIMIT`. A datasource's own `row_limit` applies when it is lower (the demo datasources set `10000`). A result that reaches it is flagged as truncated (`QueryResult.truncated`, `sub_queries[].truncated`) and the answer says it was cut. |
-| `RESULT_FETCH_BATCH_SIZE` | `10000` | Rows fetched from the database and written to the sub-query's result artifact at a time, for an adapter that streams (`execute_batches`; every built-in SQL adapter does). At most one batch is held in memory. See [Artifact Store](../storage/artifact-store.md#batched-writes). |
-| `ANSWER_PREVIEW_ROWS` | `20` | Result rows the answer model sees, with the total row count and the column names. The model writes about the result; it never copies it. See [AnswerSynthesizerNode](../architecture/nodes/answer_synthesizer_node.md). |
-| `TRACE_SAMPLE_ROWS` | `50` | Result rows kept in a trace. |
-| `TRACE_MAX_FIELD_CHARS` | `20000` | Longest string kept in a node's recorded inputs and outputs; LLM prompts and responses are never cut. |
-
-### Environment file loading
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `ENV_FILE_PATH` | `—` | Path to a specific `.env` file to load. |
-| `ENV` | `—` | Environment name used to load `.env.{ENV}`. |
-| `APP_ENV` | `—` | Alternate environment name used to load `.env.{APP_ENV}`. |
-
-On the CLI, `--env <name>` sets `ENV` and `--env-file <path>` sets
-`ENV_FILE_PATH`. Either flag also loads that file into the process environment
-(`load_dotenv(..., override=False)`), because `nl2sql doctor`, the LLM
-registry and `${env:VAR}` references read `os.environ` rather than settings. A
-variable already exported in the shell wins over the file.
-
-From Python, the library reads no env file: the engine is built from a
-`Config` (`NL2SQL.from_config("nl2sql.yaml")`), and `nl2sql.config.load_env_file()`
-is there for an entry point that wants the `.env` next to `nl2sql.yaml`.
-
-### REST API (`nl2sql-api`)
-
-These are read by `nl2sql-api` only, not by `Settings`, on each request (CORS
-once at startup).
-
-| Env var | Default | Description |
-| --- | --- | --- |
-| `NL2SQL_API_ROLE_HEADER` | `—` | Header a trusted, authenticating proxy sets with the caller's roles (comma-separated). See [Caller role](../api/rest/index.md#caller-role). |
-| `NL2SQL_API_ROLE` | `—` | One static role for every request. |
-| `NL2SQL_API_TRUST_BODY_ROLE` | `false` | Dev only: take `user_context` from the request body. |
-| `NL2SQL_API_ADMIN_ROLES` | `admin` | Comma-separated roles allowed on the routes that change datasources, LLMs or the index. With no role source set, those routes answer loopback clients only. See [Admin routes](../api/rest/index.md#admin-routes). |
-| `NL2SQL_API_CORS_ORIGINS` | `—` | Browser origins allowed to call the API. See [CORS origins](../api/rest/index.md#cors-origins). |
-
-## Config manager flow
-
-```mermaid
-flowchart TD
-    Env[Environment Variables] --> Settings[Settings]
-    Settings --> ConfigManager[ConfigManager]
-    ConfigManager --> Datasources[datasources.yaml]
-    ConfigManager --> LLM[llm.yaml]
-    ConfigManager --> Policies[policies.json]
-    ConfigManager --> Secrets[secrets.yaml]
-    ConfigManager --> Curated["curated.yaml (optional)"]
+```bash
+nl2sql init my-project              # an example SQLite datasource, allow_all policies
+nl2sql init my-project --demo       # the demo: three sample databases, roles, verified queries
+nl2sql init my-project --provider anthropic
 ```
 
-## Secret resolution
+```text
+nl2sql.yaml            # the table of contents
+datasources/
+  example.yaml         # one file per datasource (--demo: chinook.yaml, support.yaml, webanalytics.yaml)
+llm.yaml               # provider + model; no key, the provider's standard variable is read
+embeddings.yaml        # provider: local
+policies.yaml          # allow_all: true            (--demo: admin, analyst, viewer roles)
+storage.yaml           # path: .nl2sql
+curated.yaml           # --demo only: the demo's verified queries
+settings.yaml          # --demo only: the demo's tuning knobs
+data/                  # --demo only: the three SQLite files, copied
+.gitignore             # .nl2sql/ and .env
+```
 
-`SecretManager` resolves secret references (`${provider:key}`):
+`init` refuses to overwrite a file without `--force`, never writes a key, and
+checks what it wrote with `load_config`.
 
-- Default provider: `env`
-- Two-phase loading: secrets are resolved before registries initialize
+```yaml
+# nl2sql.yaml
+version: 2
+datasources: { file: datasources/ }      # a folder, one file per datasource
+llm:         { file: llm.yaml }
+embeddings:  { file: embeddings.yaml }
+policies:    { file: policies.yaml }
+storage:     { file: storage.yaml }
+curated:     { file: curated.yaml }      # optional
+secrets:     { file: secrets.yaml }      # optional
+settings:    { file: settings.yaml }     # optional
+api:         { file: api.yaml }          # optional, read by nl2sql-api only
+```
 
-## Configuration file contracts
+A small project can write every section inline instead. This file builds the
+same `Config` as a split layout would:
 
-- `configs/datasources.yaml`: datasource IDs, connection types, and options.
-  See [Datasource config](datasources.md).
-- `configs/llm.yaml`: model/provider settings per agent name.
-  See [LLM config](llm.md).
-- `configs/policies.json`: RBAC policies and allowed tables/datasources.
-  See [Policies config](policies.md).
-- `configs/secrets.yaml`: optional secret providers.
-  See [Secrets config](secrets.md).
-- `configs/curated.yaml`: optional verified queries, keyed by datasource.
-  See [Curated answers](curated.md).
+```yaml
+version: 2
+datasources:
+  - id: shop
+    type: sqlite
+    connection: { database: shop.db }
+llm:        { provider: anthropic, model: claude-sonnet-5-5 }
+embeddings: { provider: local }
+policies:   { allow_all: true }
+storage:    { path: .nl2sql }
+```
+
+| Section | Required | Page | Notes |
+| --- | --- | --- | --- |
+| `version` | yes | | `2`. Anything else, or none, is an error that points to [the 0.4 mapping](#from-04). |
+| `datasources` | yes | [Datasources](datasources.md) | A list; `[]` is enough. |
+| `llm` | yes | [LLMs](llm.md) | The model every agent uses, and per-agent overrides. |
+| `embeddings` | yes | [Embeddings](embeddings.md) | `{provider: local}` is a complete section. |
+| `policies` | yes | [Policies](policies.md) | `{allow_all: true}` is a complete section. |
+| `storage` | yes | [Storage](storage.md) | `{path: .nl2sql}` is a complete section. |
+| `curated` | no | [Curated Answers](curated.md) | Present means curated answers are on. |
+| `secrets` | no | [Secrets](secrets.md) | The `env` provider is always there without it. |
+| `settings` | no | [Settings](settings.md) | Tuning knobs; every field has a default. |
+| `api` | no | [REST API](api.md) | `nl2sql-api`'s own settings; the engine ignores them. |
+
+From Python:
+
+```python
+from nl2sql import NL2SQL, load_config
+
+engine = NL2SQL.from_config("nl2sql.yaml")        # path=None: NL2SQL_CONFIG, then ./nl2sql.yaml
+cfg = load_config("nl2sql.yaml")                  # the Config, to change in code first
+engine = NL2SQL(cfg.model_copy(update={"settings": cfg.settings.model_copy(update={"tenant_id": "acme"})}))
+```
+
+See [Public Facade → Creating an engine](../api/core/public-facade.md#creating-an-engine).
+
+### `file:` includes
+
+| Rule | Detail |
+| --- | --- |
+| Shape | A section is either inline, or exactly `{file: <path>}` with no other keys. |
+| Relative paths | The path is relative to `nl2sql.yaml`, not to the working directory. |
+| One level | Only `nl2sql.yaml` includes. An included file holds the section's body and includes nothing itself. |
+| No `version` | Only `nl2sql.yaml` has `version:`. |
+| Datasource folder | `datasources: {file: datasources/}` names a folder. Every `*.yaml` in it, sorted by name and not recursive, holds one datasource. `id` may be left out and defaults to the file name; if it is given, it must equal the file name. |
+| Datasource file | `datasources: {file: datasources.yaml}` names a file whose body is the list. |
+| Literal paths | `file:` values are never interpolated. |
+| Each file once | Including the same file twice is an error. |
+
+Other relative paths are relative to `nl2sql.yaml` too: `storage.path`, and a
+SQLite or DuckDB `database`. The engine can be run from any working directory.
+
+### Secret and variable references
+
+`${env:SALES_DB_PASSWORD}` reads an environment variable; `${vault:apps/sales:password}`
+reads a secret from the provider whose `id` is `vault` (see
+[Secrets](secrets.md)). `env` is built in.
+
+| Rule | Detail |
+| --- | --- |
+| Whole value only | A reference is the entire string. `"postgres://${env:U}@db"` is an error, and there is no default syntax. |
+| Secrets resolve late | Every `api_key`, the secret providers' credentials and every value under a datasource's `connection` keep the reference. It is resolved when the component is built, so `engine.config`, logs and errors never hold a plaintext secret. |
+| Everything else resolves at load | Any other field, for example `storage.path: "${env:NL2SQL_DATA_DIR}"`, is resolved by `load_config`. A variable that is not set is an error naming the field. |
+| Inside `secrets:` | Only `${env:...}`: one provider cannot depend on another. |
+
+### Strict keys and errors
+
+Every section forbids unknown keys and suggests the closest known one. Names
+resolved through the [registry](../development/index.md) (`type:`,
+`provider:`) suggest from the installed names. `load_config` and `NL2SQL(...)`
+collect every problem before raising one `ConfigError`:
+
+```text
+nl2sql.yaml has 2 problems:
+
+  datasources/sales.yaml → preferd_tables
+    Unknown key. Did you mean 'preferred_tables'?
+
+  llm.yaml → provider
+    'antropic' is not an installed LLM provider. Did you mean 'anthropic'?
+```
+
+A secret is shown as its reference, never as its value. A 0.4 file
+(`version: 1`) gets one message pointing to [the mapping](#from-04).
+
+## Environment variables
+
+Only these are read directly:
+
+| Variable | Read by | Purpose |
+| --- | --- | --- |
+| `NL2SQL_CONFIG` | `load_config()` with no path, the CLI, `nl2sql-api` | Path to `nl2sql.yaml`. Without it, `./nl2sql.yaml`. |
+| `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | `nl2sql/llm/` | The fallback key when `llm.api_key` (or an agent's, or `embeddings.api_key`) is not set. |
+
+Anything else from the environment is written in the YAML as `${env:VAR}`.
+There are no generic overrides such as `NL2SQL__SECTION__KEY`. Third-party
+libraries (boto3, the OpenTelemetry SDK) still read their own standard
+variables, and the trace redactor scans the environment for values to mask.
+
+### `.env` files
+
+Only the entry points load a `.env` file: the CLI, `nl2sql-api` and
+`nl2sql demo` load the `.env` **next to `nl2sql.yaml`** into the process
+environment at startup. A variable that is already set always wins; the file
+never overrides it.
+
+The library itself never reads a `.env` file. A Python caller that wants one
+loads it before building the engine:
+
+```python
+from dotenv import load_dotenv
+from nl2sql import NL2SQL
+
+load_dotenv("my-project/.env")   # or nl2sql.load_env_file("my-project/nl2sql.yaml")
+engine = NL2SQL.from_config("my-project/nl2sql.yaml")
+```
+
+`nl2sql init` adds `.env` to `.gitignore`. Keep keys there, or in the
+environment, never in the YAML.
+
+## The CLI
+
+Every command reads the same config, named once, before the subcommand:
+
+```bash
+nl2sql --config prod/nl2sql.yaml index
+nl2sql --config prod/nl2sql.yaml run "Top 5 customers by revenue"
+NL2SQL_CONFIG=prod/nl2sql.yaml nl2sql curated validate
+nl2sql run "..."                       # ./nl2sql.yaml
+```
+
+There are no per-command path flags. Commands that query or index build the
+engine and call `engine.check()` first (see [Startup](#startup-check-and-required)).
+`nl2sql cache`, `nl2sql feedback` and `nl2sql trace show` only need the store
+paths under `storage.path`, and build no engine.
+
+## Startup: `check()` and `required`
+
+Building the engine never connects to a datasource or calls a model: every
+problem it can find without a connection is one `ConfigError`. `engine.check()`
+then connects to each datasource, checks that every agent's API key resolves
+(no model call) and reports the index status.
+
+The CLI, `nl2sql-api` (in its lifespan, before it accepts requests) and
+`nl2sql demo` call `check()` at startup:
+
+- A datasource with `required: true` that fails, or datasources configured and
+  none ready, raises `EngineNotReady`: the entry point prints the report and
+  refuses to start (the CLI exits 1).
+- An optional datasource that fails is printed, left out of routing, and the
+  entry point runs degraded.
+
+```yaml
+# datasources/sales.yaml
+type: postgres
+required: true           # without it, nothing works: refuse to start
+connection: { host: db.internal, database: sales, user: nl2sql, password: "${env:SALES_DB_PASSWORD}" }
+```
+
+A Python caller decides for itself. Without `check()`, a broken datasource
+fails the first query that targets it, with its reason.
+
+## From 0.4
+
+0.5 reads only `nl2sql.yaml`. There is no migration command: map each 0.4 file,
+variable and flag with these tables. `nl2sql init` writes a fresh layout to
+start from.
+
+### Files
+
+| 0.4 | 0.5 |
+| --- | --- |
+| `configs/datasources.yaml` (`DATASOURCE_CONFIG`) | `datasources:`, one file per datasource in `datasources/`. `connection.type` moves up to `type`; `options:` and the top-level limits become `limits: {row_limit, timeout_ms, max_bytes}`. |
+| `configs/llm.yaml` (`LLM_CONFIG`) | `llm:`, flat: `default:`'s keys are the top level; `agents:` are keyed by node name (`ast_planner`, not `astplanner`); `name:` and `version:` are gone. |
+| `configs/policies.json` (`POLICIES_CONFIG`) | `policies:`, in YAML; the `role:` field that repeated the key is gone. |
+| `configs/secrets.yaml` (`SECRETS_CONFIG`) | `secrets:`, without `version`. `hashi` is now `hashicorp`. |
+| `configs/curated.yaml` (`CURATED_CONFIG`) | `curated:`, without `version`. Present means on. |
+| `configs/sample_questions.yaml` (`SAMPLE_QUESTIONS`, `ROUTING_EXAMPLES`) | `sample_questions:` on each datasource. |
+| `.env`, `.env.<name>` (`ENV`, `APP_ENV`, `ENV_FILE_PATH`) | The `.env` next to `nl2sql.yaml`, loaded by the entry points only. |
+| `.env.demo` and `configs/*.demo.*` | `nl2sql init --demo` (and `nl2sql demo`, which runs it): `nl2sql.yaml`, its files, and `.env`. |
+
+### Settings variables
+
+| 0.4 variable | 0.5 |
+| --- | --- |
+| `OPENAI_API_KEY` | `llm.api_key` / `embeddings.api_key`, or the fallback variable above |
+| `VECTOR_STORE` | `storage.path` (the index is `<path>/index/`) |
+| `VECTOR_STORE_COLLECTION` | removed (an internal constant) |
+| `EMBEDDING_PROVIDER` | `embeddings.provider` |
+| `EMBEDDING_MODEL` | `embeddings.model` |
+| `TENANT_ID` | `settings.tenant_id` |
+| `CURATED_ENABLED` | removed: the `curated` section is present or absent |
+| `CURATED_MATCH_TOP_K` | `settings.curated.match_top_k` |
+| `CURATED_MATCH_FLOOR` | `settings.curated.match_floor` |
+| `GLOBAL_TIMEOUT_SEC` | `settings.pipeline.timeout_s` |
+| `RESULT_ARTIFACT_BASE_URI` | `storage.path` (`<path>/results/`) |
+| `RESULT_ARTIFACT_PATH_TEMPLATE` | removed: a fixed layout under `<path>/results/` |
+| `RESULT_ARTIFACT_BACKEND`, `RESULT_ARTIFACT_S3_*`, `RESULT_ARTIFACT_ADLS_*` | removed: results are local; the S3 and ADLS backends are deleted |
+| `SCHEMA_STORE_BACKEND` | removed: SQLite at `<path>/state.db` |
+| `SCHEMA_STORE_PATH` | `storage.path` (`<path>/state.db`, which also holds the plan cache and feedback) |
+| `SCHEMA_STORE_MAX_VERSIONS` | `settings.schema.max_versions` |
+| `SCHEMA_VERSION_MISMATCH_POLICY` | `settings.schema.version_mismatch` |
+| `PLAN_CACHE_ENABLED` | `settings.pipeline.plan_cache` |
+| `FEEDBACK_ENABLED` | `settings.feedback.enabled` |
+| `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | `settings.retrieval.full_snapshot_max_tables` |
+| `LOGICAL_VALIDATOR_STRICT_COLUMNS` | `settings.pipeline.strict_columns` |
+| `RBAC_REFUSAL_NAMES_TABLES` | `policies.refusal_names_tables` |
+| `SQL_AGENT_MAX_RETRIES` | `settings.pipeline.retries.max` |
+| `SQL_AGENT_RETRY_BASE_DELAY_SEC` | `settings.pipeline.retries.base_delay_s` |
+| `SQL_AGENT_RETRY_MAX_DELAY_SEC` | `settings.pipeline.retries.max_delay_s` |
+| `SQL_AGENT_RETRY_JITTER_SEC` | `settings.pipeline.retries.jitter_s` |
+| `LLM_PRICES` | `llm.prices` |
+| `TRACE_MODE` | `settings.traces.mode` |
+| `TRACE_DIR` | `storage.path` (`<path>/traces/`) |
+| `RESULT_ROW_LIMIT` | `settings.results.row_limit` |
+| `RESULT_FETCH_BATCH_SIZE` | `settings.results.fetch_batch_size` |
+| `ANSWER_PREVIEW_ROWS` | `settings.results.preview_rows` |
+| `TRACE_SAMPLE_ROWS` | `settings.traces.sample_rows` |
+| `TRACE_MAX_FIELD_CHARS` | `settings.traces.max_field_chars` |
+| `NL2SQL_TODAY` | `settings.pipeline.today` |
+| `OBSERVABILITY_EXPORTER` | `settings.observability.exporter` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `settings.observability.otlp_endpoint` |
+
+### Other variables
+
+| 0.4 variable | 0.5 |
+| --- | --- |
+| `NL2SQL_API_ROLE_HEADER` | `api.role_header` |
+| `NL2SQL_API_ROLE` | `api.role` |
+| `NL2SQL_API_TRUST_BODY_ROLE` | `api.trust_body_role` |
+| `NL2SQL_API_CORS_ORIGINS` (comma-separated) | `api.cors_origins` (a list) |
+| `NL2SQL_API_ADMIN_ROLES` | `policies.admin_roles` |
+| `NL2SQL_DEMO_HOSTED` | `nl2sql demo --hosted` |
+| `NL2SQL_DEMO_QUESTIONS_PER_MINUTE`, `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `nl2sql demo --questions-per-minute N --questions-per-session N` |
+| `VAULT_ADDR`, `VAULT_TOKEN` | `secrets.providers[].url` / `.token` (write `${env:VAULT_TOKEN}` to keep reading the variable) |
+| `AZURE_KEYVAULT_URL` | `secrets.providers[].vault_url` |
+| `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unchanged: the fallback key variables |
+| `CI` | unchanged: `nl2sql benchmark` refuses tier 2 in CI |
+
+### CLI
+
+| 0.4 | 0.5 |
+| --- | --- |
+| `nl2sql setup` | `nl2sql init [DIR] [--provider NAME] [--force]`; the guided flow comes in a later release |
+| `nl2sql setup --demo` | `nl2sql init --demo [DIR]` (or just `nl2sql demo`) |
+| `--env NAME`, `--env-file PATH` | removed: the `.env` next to `nl2sql.yaml` is loaded |
+| `--config PATH` (the datasource file), `--llm-config`, `--secrets-config`, `--policies-config`, `--vector-store` | the one global `nl2sql --config PATH/nl2sql.yaml` |
+| `curated validate/test --curated --config --secrets` | `nl2sql --config ... curated validate/test` |
+| `policy validate --config --policies --secrets` | `nl2sql --config ... policy validate` |
+| `nl2sql --env demo <command>` (from the demo folder) | `nl2sql --config nl2sql-demo/nl2sql.yaml <command>`, or run it from inside `nl2sql-demo/` |
 
 ## Source references
 
-- Settings: `packages/nl2sql/src/nl2sql/common/settings.py`
-- ConfigManager: `packages/nl2sql/src/nl2sql/configs/manager.py`
-- SecretManager: `packages/nl2sql/src/nl2sql/secrets/manager.py`
+- Models and `load_config`: `packages/nl2sql/src/nl2sql/config/`
+- `init_project`, `demo_config`: `packages/nl2sql/src/nl2sql/config/project.py`
+- The runtime built from a `Config`: `packages/nl2sql/src/nl2sql/runtime.py`
+- The CLI's `--config`: `packages/nl2sql/src/nl2sql/cli/common/engine.py`

@@ -4,13 +4,14 @@ import pathlib
 import sys
 from typing import Dict, List, Optional, Sequence, Union
 
+import typer
 from rich.markup import escape
 
-from nl2sql import BenchmarkAPI, BenchmarkConfig
+from nl2sql import BenchmarkConfig
 from nl2sql.cli.common.decorators import handle_cli_errors
+from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.reporting import ConsolePresenter
-from nl2sql.common.env_hint import active_env_file
-from nl2sql.configs.llm import LLMFileConfig
+from nl2sql.llm.models import LLMFileConfig
 from nl2sql.evaluation import presets
 from nl2sql.evaluation.benchmark_runner import BenchmarkResult
 from nl2sql.evaluation.gold import load_gold_dataset
@@ -38,21 +39,13 @@ DEFAULT_TIER2_REPORT_PATH = pathlib.Path("benchmark_tier2.json")
 DEFAULT_RETRIEVAL_REPORT_PATH = pathlib.Path("benchmark_retrieval.json")
 
 
-def project_dir() -> pathlib.Path:
-    """The project a run belongs to: the folder of the env file ``--env``/``--env-file`` selects.
-
-    ``--env demo`` reads ``./.env.demo``, so it is the current folder; an
-    ``--env-file`` elsewhere names that file's folder.
-    """
-    return pathlib.Path(active_env_file()).resolve().parent
-
 # Tier 2 exit codes beyond 0 (complete) and 1 (baseline regression or a failed run).
 EXIT_USAGE = 2
 EXIT_STOPPED_AT_MAX_COST = 3
 
 
 @handle_cli_errors
-def run_benchmark(config: BenchmarkConfig, tier: Optional[int] = None) -> None:
+def run_benchmark(ctx: typer.Context, config: BenchmarkConfig, tier: Optional[int] = None) -> None:
     """Runs the benchmark, prints it, writes the JSON report and exits non-zero on any failure.
 
     Args:
@@ -66,7 +59,7 @@ def run_benchmark(config: BenchmarkConfig, tier: Optional[int] = None) -> None:
         presenter.print_error(f"Unknown tier {tier}. Use --tier 1 or --tier 2, or omit it to run with the configured LLM.")
         sys.exit(EXIT_USAGE)
 
-    api = BenchmarkAPI()
+    api = build_engine(ctx).benchmark
     try:
         if tier == 1:
             results: Dict[str, BenchmarkResult] = {"tier1": api.run_tier1(config)}
@@ -135,6 +128,7 @@ def print_presets() -> None:
 
 @handle_cli_errors
 def run_tier2_benchmark(
+    ctx: typer.Context,
     config: BenchmarkConfig,
     *,
     llm_specs: Optional[List[str]],
@@ -179,11 +173,12 @@ def run_tier2_benchmark(
         presenter.print_error(str(e))
         sys.exit(EXIT_USAGE)
 
-    project = project_dir()
+    engine = build_engine(ctx)
+    project = engine.config.folder
     results_dir = pathlib.Path(results_dir) if results_dir else project / BENCHMARKS_DIR
     export_path = pathlib.Path(config.export_path) if config.export_path else project / DEFAULT_TIER2_REPORT_PATH
     config = config.model_copy(update={"roles": config.roles or ["admin"], "iterations": 1})
-    api = BenchmarkAPI()
+    api = engine.benchmark
 
     def on_case(name, record, spent):
         presenter.console.print(escape(
@@ -237,6 +232,7 @@ def run_tier2_benchmark(
 
 @handle_cli_errors
 def run_retrieval_benchmark(
+    ctx: typer.Context,
     config: BenchmarkConfig,
     *,
     questions: Optional[List[str]] = None,
@@ -253,8 +249,9 @@ def run_retrieval_benchmark(
     """
     presenter = ConsolePresenter()
     questions = [q.strip() for item in (questions or []) for q in item.split(",") if q.strip()]
+    engine = build_engine(ctx)
     try:
-        report = BenchmarkAPI().run_retrieval(config, questions or None)
+        report = engine.benchmark.run_retrieval(config, questions or None)
     except Exception as e:
         presenter.print_error(f"Retrieval benchmark failed: {e}")
         sys.exit(1)
@@ -283,7 +280,7 @@ def run_retrieval_benchmark(
                                     f"{pct(m['column_recall'][0])} -> {pct(m['column_recall'][1])}"]
                                    for m in diff["moved"]],
                                   title="Questions whose recall changed", columns=["ID", "Tables", "Columns"])
-    project = project_dir()
+    project = engine.config.folder
     presenter.export_benchmark_report(
         report, pathlib.Path(config.export_path) if config.export_path else project / DEFAULT_RETRIEVAL_REPORT_PATH)
     if record:

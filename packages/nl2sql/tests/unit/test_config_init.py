@@ -228,6 +228,28 @@ def test_demo_config_has_the_demo_roles_and_curated_answers():
     assert config.storage.path == Path(".nl2sql-demo")
 
 
+def test_demo_config_keeps_the_demos_own_settings():
+    """What the 0.4 demo's .env.demo set, now in the demo's config.
+
+    A live run walks six model calls (one OpenAI run took 136 s), so the demo
+    allows 300 s; it traces every run for the playground's Debug drill-down;
+    and a refusal names the table, since showing one is the demo's point.
+    """
+    config = demo_config()
+
+    assert config.settings.pipeline.timeout_s == 300
+    assert config.settings.traces.mode == "always"
+    assert config.policies.refusal_names_tables is True
+
+
+def test_demo_output_writes_the_settings_section(tmp_path):
+    init_project(tmp_path, demo=True)
+
+    toc = yaml.safe_load((tmp_path / "nl2sql.yaml").read_text(encoding="utf-8"))
+    assert toc["settings"] == {"file": "settings.yaml"}
+    assert load_config(tmp_path / "nl2sql.yaml").settings.traces.mode == "always"
+
+
 def test_demo_config_takes_its_llm_and_storage_path(tmp_path):
     llm = LLM(provider="openai", model="gpt-5.4-mini", base_url="http://127.0.0.1:9/v1")
 

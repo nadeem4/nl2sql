@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from langchain_core.embeddings import FakeEmbeddings
 
-from nl2sql.configs.curated import CuratedDatasource
+from nl2sql.config.curated import CuratedDatasource
 from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash
 from nl2sql.indexing.health import inspect_index_at, inspect_vector_store, summarize
 from nl2sql.indexing.vector_store import VectorStore

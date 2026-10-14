@@ -20,7 +20,7 @@ REPO = pathlib.Path(__file__).resolve().parents[4]
 def test_retrieval_recall_runs_over_every_answerable_question(demo_project, tmp_path):
     report_path, results = tmp_path / "retrieval.json", tmp_path / "records"
     proc = run_cli(demo_project, _base_env(), "benchmark", "retrieval", "--export-path", str(report_path),
-                   "--record", "--note", "e2e", "--results-dir", str(results), timeout=900)
+                   "--record", "--note", "e2e", "--results-dir", str(results), config="nl2sql.yaml", timeout=900)
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
     report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -59,6 +59,7 @@ def test_retrieval_recall_runs_over_every_answerable_question(demo_project, tmp_
 def test_the_report_lands_in_the_project_folder_by_default(demo_project):
     report = demo_project / "benchmark_retrieval.json"
     report.unlink(missing_ok=True)
-    proc = run_cli(demo_project, _base_env(), "benchmark", "retrieval", "--questions", "chinook_001", timeout=900)
+    proc = run_cli(demo_project, _base_env(), "benchmark", "retrieval", "--questions", "chinook_001",
+                   config="nl2sql.yaml", timeout=900)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert json.loads(report.read_text(encoding="utf-8"))["summary"]["questions"] == 1

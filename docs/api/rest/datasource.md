@@ -7,7 +7,7 @@ Source: `packages/api/src/nl2sql_api/models/datasource.py`
 ### `DatasourceRequest`
 | field | type | required | meaning |
 | --- | --- | --- | --- |
-| `config` | `Dict[str, Any]` | yes | Datasource config payload. |
+| `config` | `Dict[str, Any]` | yes | One datasource, in the shape of a `datasources` entry of `nl2sql.yaml`: `id`, `type`, `connection`, and optionally `description`, `limits`, `preferred_tables`, `sample_questions`, `required`. See [Datasources](../../configuration/datasources.md). |
 
 ### `DatasourceResponse`
 | field | type | required | meaning |
@@ -29,10 +29,12 @@ Response model: `DatasourceResponse`
 Admin only: see [Admin routes](index.md#admin-routes).
 
 Execution flow:
-- Delegates to `engine.add_datasource(...)`.
+- Validates `config` as a `Datasource` and delegates to `engine.add_datasource(...)`:
+  the adapter is built (not connected) and the datasource joins `engine.config`.
+  Nothing is written to the config files and nothing is indexed.
 
 Errors:
-- No role -> `HTTP 401`; a role not in `NL2SQL_API_ADMIN_ROLES` -> `HTTP 403`.
+- No role -> `HTTP 401`; a role not in `policies.admin_roles` -> `HTTP 403`.
 - A failure to add -> `HTTP 500` with a generic message. The exception, which can
   hold the connection string, is logged server-side and never returned.
 

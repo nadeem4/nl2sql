@@ -5,7 +5,7 @@ Configure LLM providers and expose LLM configurations by name.
 
 ## Responsibilities
 - Replace the engine's whole LLM at runtime (`replace`).
-- Register LLM configs programmatically or from file.
+- Register LLM configs programmatically, or replace them all with the `llm` section of an `nl2sql.yaml`.
 - Provide config lookup and listing.
 
 ## Key Modules
@@ -14,14 +14,18 @@ Configure LLM providers and expose LLM configurations by name.
 - `packages/nl2sql/src/nl2sql/llm/llm_set.py`
 - `packages/nl2sql/src/nl2sql/llm/client_cache.py`
 - `packages/nl2sql/src/nl2sql/llm/models.py`
-- `packages/nl2sql/src/nl2sql/configs/llm.py`
+- `packages/nl2sql/src/nl2sql/config/models.py` (`LLM`, `AgentLLM`: the `llm` section)
 
 ## Public Surface
 
 ### AgentConfig
 
+One agent's resolved settings, as `LLMRegistry` builds a client from them.
+`agents_from_config(llm)` (`llm/registry.py`) makes one per agent from the
+config's `llm` section ([LLM configuration](../../configuration/llm.md)).
+
 Source:
-`packages/nl2sql/src/nl2sql/configs/llm.py`
+`packages/nl2sql/src/nl2sql/llm/models.py`
 
 Fields:
 | name | type | required | meaning |
@@ -29,29 +33,24 @@ Fields:
 | `provider` | `str` | yes | Provider name: `openai`, `anthropic`, `openrouter` or `ollama`. |
 | `model` | `str` | yes | Model identifier. |
 | `temperature` | `Optional[float]` | no | Sampling temperature (default `0.0`). `None` (`null` in YAML) sends no temperature parameter, for models that accept only their default. |
-| `api_key` | `Optional[SecretStr]` | no | API key or secret reference. Masked in `repr`, `str` and JSON dumps; `LLMGenerator` writes the real value or reference. |
+| `api_key` | `Optional[SecretStr]` | no | API key or secret reference. Masked in `repr`, `str` and JSON dumps. `None` reads the provider's standard variable. |
 | `base_url` | `Optional[str]` | no | Endpoint override; defaults to the provider preset (`https://openrouter.ai/api/v1` for `openrouter`, `http://localhost:11434/v1` for `ollama`). |
 | `name` | `str` | no | Agent name (default `default`). |
 
-!!! note
-    There is one definition, in `packages/nl2sql/src/nl2sql/configs/llm.py`
-    (read/written by `ConfigManager` and `LLMGenerator`).
-    `packages/nl2sql/src/nl2sql/llm/models.py` re-exports it for `LLMRegistry`,
-    so `nl2sql.llm.AgentConfig` and `nl2sql.configs.AgentConfig` are the same
-    class. It used to be duplicated, and a fix applied to only one copy
-    silently did nothing.
 
 ### LLMFileConfig
 
+A set of agents the benchmark compares, one config at a time:
+`LLMFileConfig.from_llm(llm)` turns an `llm` section into it.
+
 Source:
-`packages/nl2sql/src/nl2sql/configs/llm.py`
+`packages/nl2sql/src/nl2sql/llm/models.py`
 
 Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `version` | `int` | yes | Schema version (defaults to 1). |
-| `default` | `AgentConfig` | yes | Default LLM configuration. |
-| `agents` | `Dict[str, AgentConfig]` | no | Per-agent overrides. |
+| `default` | `AgentConfig` | yes | The top level of the `llm` section. |
+| `agents` | `Dict[str, AgentConfig]` | no | The agents that set their own fields. |
 
 ### LLM_API.replace
 
@@ -120,12 +119,18 @@ Idempotency:
 Signature:
 `configure_llm_from_config(config_path: Union[str, pathlib.Path]) -> None`
 
+Parameters:
+| name | type | required | meaning |
+| --- | --- | --- | --- |
+| `config_path` | `Union[str, pathlib.Path]` | yes | An `nl2sql.yaml`; its `llm` section is used. |
+
 Raises:
-- `FileNotFoundError` if config missing.
-- `ValueError` for schema validation errors.
+- `ConfigError` if the file does not load, naming every problem.
 
 Side Effects:
-- Registers all LLMs from file; also registers `default` from file.
+- Replaces every agent with the file's `llm` section, as one step; an agent
+  the section no longer names falls back to the top level. An invalid file
+  changes nothing. `NL2SQL.reload_llm_config(path)` does the same.
 
 ### LLM_API.get_llm
 

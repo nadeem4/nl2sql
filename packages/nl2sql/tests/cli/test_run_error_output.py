@@ -8,6 +8,8 @@ printed, and the command still exits 1.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from nl2sql.cli.commands import run as run_module
@@ -42,7 +44,7 @@ def failing_pipeline(monkeypatch):
 def _run(verbose: bool) -> None:
     config = RunConfig(query="How many employees are there?", verbose=verbose)
     with pytest.raises(SystemExit) as exc:
-        run_module.run_pipeline(config, ctx=fake_runtime())
+        run_module.run_pipeline(config, SimpleNamespace(context=fake_runtime()))
     assert exc.value.code == 1
 
 

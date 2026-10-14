@@ -117,34 +117,21 @@ def test_indexing_an_unavailable_datasource_fails_with_the_reason():
 
 
 def test_policy_validation_says_a_referenced_datasource_failed_to_start(tmp_path):
-    import json
+    from nl2sql.testing.config import make_config
 
-    from nl2sql.api.policy_api import PolicyAPI
+    config = make_config(tmp_path, datasources=[
+        {"id": "good", "type": "sqlite", "connection": {"database": ":memory:"}},
+        {"id": "bad", "type": "sqlite", "connection": {"database": "no/such/folder/bad.db"}},
+    ], policies={"roles": {"analyst": {"description": "d", "allowed_datasources": ["bad"],
+                                       "allowed_tables": ["bad.*"]}}})
 
-    (tmp_path / "datasources.yaml").write_text(
-        "version: 1\n"
-        "datasources:\n"
-        "  - id: good\n"
-        "    connection: {type: sqlite, database: \":memory:\"}\n"
-        "  - id: bad\n"
-        "    connection: {type: nosuchdb}\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "policies.json").write_text(json.dumps({
-        "version": 1,
-        "roles": {"analyst": {"description": "d", "role": "analyst",
-                              "allowed_datasources": ["bad"], "allowed_tables": ["bad.*"]}},
-    }), encoding="utf-8")
-
-    report = PolicyAPI().validate_policies(
-        policies_path=tmp_path / "policies.json",
-        datasources_path=tmp_path / "datasources.yaml",
-        secrets_path=tmp_path / "secrets.yaml",
-    )
+    with NL2SQL(config) as engine:
+        engine.check()  # bad is optional: the engine runs without it
+        report = engine.policy.validate_policies()
 
     entry = next(e for e in report.entries if e.target == "Datasource: bad")
     assert entry.status == "UNAVAILABLE"
-    assert "nosuchdb" in entry.details
+    assert "connection test failed" in entry.details
     assert not report.ok
 
 

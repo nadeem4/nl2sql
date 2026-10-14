@@ -1,21 +1,31 @@
-import os
+"""``nl2sql doctor``: what is installed, which provider keys are set, and whether the configured engine is ready.
+
+Doctor is what a stuck user runs, so nothing here may escape as an exception:
+a config that does not load, a datasource that does not connect and a missing
+key are reported, not raised. A config's own problems are ``load_config``'s
+to name; doctor prints them as they come.
+"""
 import sys
 import importlib.util
+
+import typer
 from rich.markup import escape
 from rich.table import Table
 from rich.panel import Panel
-from nl2sql.common.env_hint import active_env_file
-from nl2sql.configs.manager import ConfigManager
-from nl2sql.llm.registry import PROVIDER_PRESETS
+from rich.text import Text
+
+from nl2sql.cli.common.engine import config_option
+from nl2sql.llm.providers import KEYED_PROVIDERS, api_key_from_env, env_var_for_provider
 from nl2sql.llm.wires.anthropic import EXTRA_HINT as ANTHROPIC_EXTRA_HINT
 from nl2sql.cli.console import console, print_success, print_error
 from nl2sql.cli.config import ADAPTER_DRIVERS, KNOWN_ADAPTERS
-from nl2sql.cli.checks import check_package, verify_connectivity
+from nl2sql.cli.checks import check_package
 
 from nl2sql.cli.common.decorators import handle_cli_errors
 
+
 @handle_cli_errors
-def doctor_command():
+def doctor_command(ctx: typer.Context):
     console.print(Panel("[bold cyan]NL2SQL Doctor[/bold cyan]"))
 
     # 1. Python Version
@@ -45,106 +55,53 @@ def doctor_command():
         ok = check_package(ADAPTER_DRIVERS[name])
         status = "[green]Installed[/green]" if ok else "[red]Missing[/red]"
         table.add_row(name, escape(pkg), status)
-    
+
     console.print(table)
-    
-    # 4. Connectivity Check
-    console.print("\n[bold]Connectivity:[/bold]")
-    verify_connectivity(print_table=True)
 
-    # 5. LLM credential check
-    #
-    # Everything above this point can be green while a query still cannot run:
-    # the missing key is the single most common first-run failure, and doctor
-    # is where a stuck user looks. Reporting it is diagnosis, so a broken LLM
-    # config is printed, not raised.
-    console.print("\n[bold]LLM:[/bold]")
-    try:
-        agent = ConfigManager().load_llm().default
-        preset = PROVIDER_PRESETS.get(agent.provider)
-        env_var = preset.api_key_env if preset else None
-        configured_key = agent.api_key.get_secret_value() if agent.api_key else ""
-        has_key = (
-            bool(preset is not None and preset.api_key_placeholder)
-            or bool(env_var and os.environ.get(env_var))
-            # A "${env:VAR}" reference is a pointer, not a key; only a literal
-            # value in the config counts on its own.
-            or bool(configured_key and not configured_key.startswith("${env:"))
-        )
-        if has_key:
-            print_success(f"LLM {agent.provider}/{agent.model}: key found.")
+    # 4. Provider keys: which standard variables are set. The missing key is
+    # the most common first-run failure; the config may name another
+    # variable, which the engine check below reports.
+    console.print("\n[bold]Provider keys:[/bold]")
+    for provider in KEYED_PROVIDERS:
+        variable = env_var_for_provider(provider)
+        if api_key_from_env(provider):
+            print_success(f"{variable} is set.")
         else:
-            print_error(
-                f"MISSING: LLM {agent.provider}/{agent.model} needs {env_var}. "
-                f"Set it in {active_env_file()} or the environment, "
-                "or pass --api-key to nl2sql setup or nl2sql demo."
-            )
-        if preset is not None and preset.wire == "anthropic" and not check_package("langchain_anthropic"):
-            print_error(f"MISSING: LLM provider anthropic needs langchain-anthropic. {ANTHROPIC_EXTRA_HINT}")
-    except Exception as exc:
-        print_error(f"LLM configuration could not be loaded: {exc}")
+            console.print(f"{escape(variable)}: not set")
+    if not check_package("langchain_anthropic"):
+        console.print(f"[dim]The anthropic provider needs langchain-anthropic. {escape(ANTHROPIC_EXTRA_HINT)}[/dim]")
 
-    # 6. Index health
-    #
-    # Judged by the index's contents: an empty collection fails every
-    # question at the resolver while every check above can be green.
-    console.print("\n[bold]Index:[/bold]")
-    _report_index_health()
+    # 5. The configured engine: built from --config (or NL2SQL_CONFIG, or
+    # ./nl2sql.yaml) and checked: each datasource connects, each agent's key
+    # resolves, the index is built.
+    console.print("\n[bold]Engine:[/bold]")
+    _report_engine(ctx)
 
 
-def _report_index_health() -> None:
-    from pathlib import Path
-
-    from nl2sql.common.settings import settings
-    from nl2sql.indexing.health import inspect_index_at
-
-    from nl2sql.indexing.curated import curated_hashes
+def _report_engine(ctx: typer.Context) -> None:
+    from nl2sql import NL2SQL, EngineNotReady
 
     try:
-        configs = ConfigManager().load_datasources()
-    except Exception:
-        configs = []
-    datasource_ids = [ds.id for ds in configs]
-    preferred = {ds.id: ds.preferred_tables for ds in configs if ds.preferred_tables}
-    # A broken curated.yaml is `nl2sql curated validate`'s to report; here it
-    # only means there is nothing to compare the index with.
-    hashes = None
-    if settings.curated_enabled:
-        try:
-            hashes = curated_hashes(ConfigManager().load_curated(), datasource_ids)
-        except Exception:
-            hashes = None
-    try:
-        health = inspect_index_at(
-            Path(settings.vector_store_path or ""),
-            settings.vector_store_collection_name,
-            Path(settings.schema_store_path),
-            datasource_ids,
-            curated_hashes=hashes,
-            preferred_tables=preferred,
-        )
+        engine = NL2SQL.from_config(config_option(ctx))
     except Exception as exc:
-        print_error(f"The vector index could not be inspected: {exc}")
+        console.print(Text(str(exc), style="red"))
         return
-
-    console.print(f"Vector index: {escape(str(settings.vector_store_path))} "
-                  f"(collection {escape(settings.vector_store_collection_name)})")
-    if health.total:
-        counts = ", ".join(f"{kind}={n}" for kind, n in health.counts.items())
-        console.print(f"Entries: {health.total} ({escape(counts)})")
-    if health.built_at:
-        console.print(f"Built: {escape(health.built_at)}")
-    for ds in health.datasources:
-        if ds.entries and ds.snapshot_version and ds.index_version == ds.snapshot_version:
-            console.print(
-                f"{escape(ds.datasource_id)}: schema version {escape(ds.index_version)} "
-                "matches the latest snapshot."
-            )
-    for warning in health.warnings:
-        console.print(f"[yellow]Warning:[/yellow] {escape(warning)}")
-    if health.ok:
-        print_success("Index OK.")
+    try:
+        report = engine.check()
+        ok = report.ok
+    except EngineNotReady as exc:
+        report, ok = exc.report, False
+    except Exception as exc:
+        console.print(Text(f"The engine check failed: {exc}", style="red"))
+        return
+    finally:
+        engine.close()
+    source = (engine.config.folder / "nl2sql.yaml").as_posix() if engine.config.folder else "Config"
+    console.print(f"Config: {escape(source)}", soft_wrap=True)
+    console.print(Text(str(report)))
+    if ok:
+        print_success("The engine is ready.")
     else:
-        for problem in health.problems:
-            print_error(problem)
-
+        print_error("The engine is not fully ready: see above.")
+    if report.index != "ok":
+        console.print("Build the index: nl2sql index")

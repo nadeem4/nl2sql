@@ -24,27 +24,26 @@ def _prompt(call) -> str:
     return "\n".join(str(m.get("content") or "") for m in call["body"].get("messages", []))
 
 
-def _env(trace_dir):
+def _env():
     env = _base_env()
-    env.update({"OPENAI_API_KEY": "sk-fake-retry", "TRACE_MODE": "always", "TRACE_DIR": str(trace_dir),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = "sk-fake-retry"
     return env
 
 
 @pytest.mark.e2e
 def test_an_unjoined_plan_is_retried_and_the_second_plan_answers(demo_project, tmp_path):
     # Arrange
-    server = _serve(demo_project, RULES_ALBUMS_PER_ARTIST_RETRY, "llm.retry.yaml")
+    server = _serve(demo_project, RULES_ALBUMS_PER_ARTIST_RETRY, "retry.yaml", store=tmp_path, mode="always")
 
     # Act
     try:
-        r = run_cli(demo_project, _env(tmp_path), "run", "--llm-config", "configs/llm.retry.yaml", QUESTION)
+        r = run_cli(demo_project, _env(), "run", QUESTION, config="retry.yaml")
     finally:
         server.stop()
 
     # Assert
     assert r.returncode == 0, r.stdout + r.stderr
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     doc = json.loads(path.read_text(encoding="utf-8"))
     [sub] = doc["result"]["sub_queries"]
 
@@ -73,11 +72,11 @@ def test_the_refiner_runs_once_between_the_two_planner_calls(demo_project, tmp_p
     whether the refiner ran or not.
     """
     # Arrange
-    server = _serve(demo_project, RULES_ALBUMS_PER_ARTIST_RETRY, "llm.retry-refiner.yaml")
+    server = _serve(demo_project, RULES_ALBUMS_PER_ARTIST_RETRY, "retry-refiner.yaml", store=tmp_path, mode="always")
 
     # Act
     try:
-        r = run_cli(demo_project, _env(tmp_path), "run", "--llm-config", "configs/llm.retry-refiner.yaml", QUESTION)
+        r = run_cli(demo_project, _env(), "run", QUESTION, config="retry-refiner.yaml")
     finally:
         server.stop()
 

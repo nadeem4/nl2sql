@@ -42,11 +42,11 @@ def test_verified_models_name_known_providers():
 
 def test_the_cli_and_demo_reuse_the_llm_tables():
     from nl2sql.cli.commands import demo
-    from nl2sql.cli.demo import manager
+    from nl2sql.cli.demo import llm_config
     from nl2sql.cli.demo.playground import settings
 
     assert demo.PROVIDER_KEYS is PROVIDER_KEYS
-    assert manager.PROVIDER_KEYS is PROVIDER_KEYS
+    assert llm_config.PROVIDER_KEYS is PROVIDER_KEYS
     assert demo.UPSTREAMS is UPSTREAMS
     assert [node["agent"] for node in settings.LLM_NODES] == list(LLM_AGENTS.values())
 

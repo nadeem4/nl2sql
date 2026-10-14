@@ -22,14 +22,14 @@ from .test_trace_fake_llm import _serve
 
 @pytest.mark.e2e
 def test_a_multi_batch_result_is_whole_and_its_combined_result_is_saved(demo_project, tmp_path):
-    artifacts, traces = tmp_path / "artifacts", tmp_path / "traces"
-    server = _serve(demo_project, RULES, "llm.batched-fetch.yaml")
+    # The run's results and traces go under its private storage.path.
+    artifacts, traces = tmp_path / "results", tmp_path / "traces"
+    server = _serve(demo_project, RULES, "batched-fetch.yaml", store=tmp_path, mode="always",
+                    settings={"results": {"fetch_batch_size": 4}})
     env = _base_env()
-    env.update({"OPENAI_API_KEY": "sk-" + "fake-batched-fetch", "TRACE_MODE": "always", "TRACE_DIR": str(traces),
-                "RESULT_FETCH_BATCH_SIZE": "4", "RESULT_ARTIFACT_BASE_URI": str(artifacts),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = "sk-" + "fake-batched-fetch"
     try:
-        r = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.batched-fetch.yaml", QUESTION)
+        r = run_cli(demo_project, env, "run", QUESTION, config="batched-fetch.yaml")
     finally:
         server.stop()
 

@@ -11,11 +11,10 @@ import re
 from types import SimpleNamespace
 
 import pytest
-import yaml
 
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
 
-from .conftest import _base_env, run_cli
+from .conftest import _base_env, fake_llm_section, private_storage, project_config, run_cli
 from .recordings_chinook import (
     ANSWERABLE,
     COUNT_CUSTOMERS_DECOMPOSER,
@@ -36,19 +35,24 @@ NODES = {
 }
 
 
-def _serve(demo_project, rules, name):
+def _serve(demo_project, rules, name, *, store=None, mode="on_failure", settings=None, llm=None, **config):
+    """Serve ``rules`` and write ``<demo>/<name>``: a config whose LLM is that server.
+
+    Retries wait 0 s. With ``store`` (a temp folder), the run gets a private
+    copy of the demo's index and state, and its traces go to ``store/traces``.
+    """
     server = FakeLLMServer(rules).start()
-    cfg = {"version": 1, "default": {"provider": "openai", "model": "gpt-4o", "temperature": 0.0,
-                                     "base_url": server.base_url, "api_key": "${env:OPENAI_API_KEY}",
-                                     "name": "default"}, "agents": {}}
-    (demo_project / "configs" / name).write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    merged = {"pipeline": {"retries": {"base_delay_s": 0, "jitter_s": 0}}, "traces": {"mode": mode}}
+    for group, values in (settings or {}).items():
+        merged[group] = {**merged.get(group, {}), **values}
+    project_config(demo_project, name, llm=fake_llm_section(server.base_url, **(llm or {})), settings=merged,
+                   storage=private_storage(demo_project, store) if store is not None else None, **config)
     return server
 
 
-def _env(trace_dir, mode):
+def _env():
     env = _base_env()
-    env.update({"OPENAI_API_KEY": FAKE_KEY, "TRACE_MODE": mode, "TRACE_DIR": str(trace_dir),
-                "SQL_AGENT_RETRY_BASE_DELAY_SEC": "0", "SQL_AGENT_RETRY_JITTER_SEC": "0"})
+    env["OPENAI_API_KEY"] = FAKE_KEY
     return env
 
 
@@ -58,15 +62,14 @@ def _llm_calls(doc):
 
 @pytest.mark.e2e
 def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_project, tmp_path):
-    server = _serve(demo_project, RULES_COUNT_CUSTOMERS, "llm.trace-ok.yaml")
+    server = _serve(demo_project, RULES_COUNT_CUSTOMERS, "trace-ok.yaml", store=tmp_path, mode="always")
     try:
-        r = run_cli(demo_project, _env(tmp_path, "always"), "run", "--llm-config", "configs/llm.trace-ok.yaml",
-                    QUESTION)
+        r = run_cli(demo_project, _env(), "run", QUESTION, config="trace-ok.yaml")
     finally:
         server.stop()
     assert r.returncode == 0, r.stdout + r.stderr
 
-    [path] = list(tmp_path.glob("*.json"))
+    [path] = list((tmp_path / "traces").glob("*.json"))
     assert path.name in ANSI.sub("", r.stdout).replace("\n", "")  # the CLI says where it went
     text = path.read_text(encoding="utf-8")
     assert FAKE_KEY not in text
@@ -145,12 +148,12 @@ def _retry_rules():
 
 @pytest.fixture(scope="module")
 def failing_run(demo_project, tmp_path_factory):
-    traces = tmp_path_factory.mktemp("traces")
-    server = _serve(demo_project, _retry_rules(), "llm.trace-retry.yaml")
-    env = _env(traces, "on_failure")
-    run = run_cli(demo_project, env, "run", "--llm-config", "configs/llm.trace-retry.yaml", QUESTION)
+    store = tmp_path_factory.mktemp("store")
+    server = _serve(demo_project, _retry_rules(), "trace-retry.yaml", store=store)
+    env = _env()
+    run = run_cli(demo_project, env, "run", QUESTION, config="trace-retry.yaml")
     try:
-        yield SimpleNamespace(root=demo_project, server=server, env=env, run=run, traces=traces)
+        yield SimpleNamespace(root=demo_project, server=server, env=env, run=run, traces=store / "traces")
     finally:
         server.stop()
 
@@ -185,7 +188,7 @@ def test_replay_reproduces_the_run_with_zero_model_calls(failing_run):
     [path] = list(failing_run.traces.glob("*.json"))
     calls_before = len(failing_run.server.calls)
 
-    r = run_cli(failing_run.root, failing_run.env, "trace", "replay", str(path))
+    r = run_cli(failing_run.root, failing_run.env, "trace", "replay", str(path), config="trace-retry.yaml")
     out = ANSI.sub("", r.stdout)
     assert r.returncode == 0, out + r.stderr
     assert len(failing_run.server.calls) == calls_before  # the model endpoint was never called
@@ -206,7 +209,7 @@ def test_replay_reports_where_the_run_diverged_from_the_recording(failing_run, t
     edited.write_text(json.dumps(doc), encoding="utf-8")
     calls_before = len(failing_run.server.calls)
 
-    r = run_cli(failing_run.root, failing_run.env, "trace", "replay", str(edited))
+    r = run_cli(failing_run.root, failing_run.env, "trace", "replay", str(edited), config="trace-retry.yaml")
     out = ANSI.sub("", r.stdout)
     assert r.returncode == 1, out + r.stderr
     assert "diverged" in out.lower()

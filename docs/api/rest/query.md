@@ -10,7 +10,7 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `natural_language` | `str` | yes | User query. |
 | `datasource_id` | `Optional[str]` | no | Datasource override. |
 | `execute` | `bool` | no | Execute SQL against datasource (default `true`). |
-| `user_context` | `Optional[Dict[str, Any]]` | no | Ignored unless `NL2SQL_API_TRUST_BODY_ROLE=true` (local testing only); then an RBAC payload such as `{"roles": ["admin"]}`. See [Caller role](index.md#caller-role). |
+| `user_context` | `Optional[Dict[str, Any]]` | no | Ignored unless `api.trust_body_role` is `true` (local testing only); then an RBAC payload such as `{"roles": ["admin"]}`. See [Caller role](index.md#caller-role). |
 
 ### `SubQueryResponse`
 

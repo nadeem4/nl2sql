@@ -39,7 +39,6 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
     from nl2sql.cli.demo.playground.hosted import KEY_HEADER, Hosted
-    from nl2sql.common.settings import reload_settings
 
     project = tmp_path / "demo"
     shutil.copytree(demo_project, project)
@@ -48,20 +47,14 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
     provider = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     point_llm_config_at(project, provider.base_url)
 
-    monkeypatch.chdir(project)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.demo.yaml")
-    monkeypatch.setenv("TRACE_MODE", "always")
-    monkeypatch.setenv("TRACE_DIR", str(project / "traces"))
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
-    reload_settings()
 
     try:
-        engine = NL2SQL._legacy()
+        # The demo's own config traces every run, under its storage.path.
+        engine = NL2SQL.from_config(project / "nl2sql.yaml")
         app = build_app(engine, questions=[QUESTION], roles=["admin"], mode="hosted",
-                        dataset="chinook", trace_dir=project / "traces", project_dir=project,
+                        dataset="chinook", trace_dir=project / ".nl2sql" / "traces", project_dir=project,
                         host="0.0.0.0", hosted=Hosted(enabled=True))
         client = TestClient(app, base_url="http://demo.example:7860")
 
@@ -73,7 +66,6 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
         trace = client.get(f"/api/trace/{body['trace_id']}")
     finally:
         provider.stop()
-        reload_settings()
 
     # Without a key, and nothing recorded: the replay miss asks for a key, and
     # no model was called.
@@ -92,8 +84,8 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
     assert trace.status_code == 200
     for path in _files(project):
         assert VISITOR_KEY not in path.read_text(encoding="utf-8", errors="ignore"), path
-    for name in ("configs/llm.demo.yaml", ".env.demo"):
-        assert VISITOR_KEY not in (project / name).read_text(encoding="utf-8")
+    assert VISITOR_KEY not in (project / "llm.yaml").read_text(encoding="utf-8")
+    assert not (project / ".env").exists()
     for text in (answered.text, trace.text, caplog.text):
         assert VISITOR_KEY not in text
     assert VISITOR_KEY not in "".join(os.environ.values())
@@ -117,7 +109,6 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
     from nl2sql.cli.demo.playground.hosted import MODELS_HEADER, Hosted, key_header_for
-    from nl2sql.common.settings import reload_settings
     from nl2sql.llm import registry as llm_registry
 
     pytest.importorskip("langchain_anthropic")
@@ -132,20 +123,14 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
     monkeypatch.setitem(llm_registry.PROVIDER_PRESETS, "anthropic",
                         preset._replace(base_url=provider.anthropic_base_url))
 
-    monkeypatch.chdir(project)
-    monkeypatch.setenv("ENV", "demo")
-    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
-    monkeypatch.setenv("LLM_CONFIG", "configs/llm.demo.yaml")
-    monkeypatch.setenv("TRACE_MODE", "always")
-    monkeypatch.setenv("TRACE_DIR", str(project / "traces"))
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
-    reload_settings()
 
     try:
-        engine = NL2SQL._legacy()
+        # The demo's own config traces every run, under its storage.path.
+        engine = NL2SQL.from_config(project / "nl2sql.yaml")
         app = build_app(engine, questions=[QUESTION], roles=["admin"], mode="hosted",
-                        dataset="chinook", trace_dir=project / "traces", project_dir=project,
+                        dataset="chinook", trace_dir=project / ".nl2sql" / "traces", project_dir=project,
                         host="0.0.0.0", hosted=Hosted(enabled=True))
         client = TestClient(app, base_url="http://demo.example:7860")
 
@@ -164,7 +149,6 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
         trace = client.get(f"/api/trace/{body['trace_id']}")
     finally:
         provider.stop()
-        reload_settings()
 
     assert answered.status_code == 200, answered.text
     assert body["status"] == "success", body["errors"]

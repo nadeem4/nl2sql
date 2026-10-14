@@ -430,12 +430,12 @@ with `record: clips` runs the same script in CI and opens a pull request.
   **API key** (`#settings-key`, a 44px mono input, and `#settings-save-key`) shows the key in use
   only in masked form (`#settings-key-current`), with three facts (Stored, Sent,
   Never) and the full text behind **How your key is handled** (`#settings-key-help`); saving one writes it to the
-  demo project's `.env.demo` and turns replay into live without a restart, and
+  demo project's `.env` and turns replay into live without a restart, and
   the status pill follows. **Model for each step** has one selector per LLM node
   (`#model-datasourceresolver`, `#model-decomposer`, `#model-astplanner`,
   `#model-refiner`, `#model-answersynthesizer`) with a Default option, and
   **Save models** (`#settings-save-models`) writes the changed ones to
-  `configs/llm.demo.yaml`.
+  the demo project's `llm.yaml` (its `agents`).
   Choosing a model that runs without a temperature shows
   `#settings-temperature-note`. The model list comes from `GET /api/settings`;
   the page names no model itself. When the server has settings off (a

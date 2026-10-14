@@ -472,7 +472,6 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py`
 - `packages/nl2sql/src/nl2sql/config/curated.py`
-- `packages/nl2sql/src/nl2sql/configs/curated.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`

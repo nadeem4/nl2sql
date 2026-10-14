@@ -4,52 +4,17 @@
 Register, validate, and inspect datasources backed by adapter implementations.
 
 ## Responsibilities
-- Register datasources from config or programmatically.
+- Register datasources from `nl2sql.yaml` or programmatically.
 - Validate datasource connections via adapters.
 - Expose adapter capabilities and details.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/datasource_api.py`
 - `packages/nl2sql/src/nl2sql/datasources/registry.py`
-- `packages/nl2sql/src/nl2sql/datasources/models.py`
+- `packages/nl2sql/src/nl2sql/config/models.py` (`Datasource`)
 - `packages/nl2sql/src/nl2sql/registry.py` (adapter lookup by `type`)
 
 ## Public Surface
-
-### ConnectionConfig
-
-Source:
-`packages/nl2sql/src/nl2sql/datasources/models.py`
-
-Fields:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `type` | `str` | yes | Adapter type (e.g., `postgres`, `mysql`). |
-| `...` | `Any` | no | Adapter-specific connection fields (allowed via `extra`). |
-
-### DatasourceConfig
-
-Source:
-`packages/nl2sql/src/nl2sql/datasources/models.py`
-
-Fields:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `id` | `str` | yes | Datasource identifier. |
-| `description` | `Optional[str]` | no | Human-readable description. |
-| `connection` | `ConnectionConfig` | yes | Connection details. |
-| `options` | `Dict[str, Any]` | no | Limits and adapter options. |
-
-### DatasourceFileConfig
-
-Source:
-`packages/nl2sql/src/nl2sql/configs/datasources.py`
-
-Fields:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `version` | `int` | yes | Schema version (defaults to 1). |
-| `datasources` | `List[DatasourceConfig]` | yes | Datasource definitions. |
 
 ### DatasourceAPI.add_datasource
 
@@ -57,12 +22,12 @@ Source:
 `packages/nl2sql/src/nl2sql/api/datasource_api.py`
 
 Signature:
-`add_datasource(config: Union[Datasource, Dict[str, Any]]) -> None`
+`add_datasource(config: Datasource) -> None`
 
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `config` | `Datasource | Dict[str, Any]` | yes | A `Datasource` (see [Configuration v2](../../architecture/configuration_v2.md#datasources-datasource)). The 0.4 dict shape, with `connection.type`, is still read until the REST API takes the `Datasource` body. |
+| `config` | `Datasource` | yes | A `Datasource` (see [Datasources](../../configuration/datasources.md)). |
 
 Returns:
 `None`.
@@ -89,18 +54,17 @@ Signature:
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `config_path` | `Union[str, pathlib.Path]` | yes | Path to `datasources.yaml`. |
+| `config_path` | `Union[str, pathlib.Path]` | yes | Path to another `nl2sql.yaml`; its datasources are added. |
 
 Returns:
 `None`.
 
 Raises:
-- `FileNotFoundError` if config is missing.
-- `RuntimeError` if PyYAML is not installed.
-- `ValueError` for schema validation or adapter initialization errors.
+- `ConfigError` if the file does not load, naming every problem.
+- `ValueError` if an id is already configured or an adapter cannot be built.
 
 Side Effects:
-- Registers all datasources in registry.
+- Adds each datasource as `add_datasource` does: built, not connected.
 
 Idempotency:
 No (registrations happen each call).
