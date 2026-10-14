@@ -13,12 +13,19 @@ the model again.
 
 ## When a trace is written
 
+Each engine reads these from the `settings.traces` section of its config, so
+two engines in one process trace by their own settings. The 0.4 variable each
+one is still set from by the CLI and the playground is in brackets.
+
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `TRACE_MODE` | `on_failure` | `off`, `on_failure` or `always`. |
-| `TRACE_DIR` | `traces` | Directory, relative to the working directory. Add it to `.gitignore` (this repository does). |
-| `TRACE_SAMPLE_ROWS` | `50` | Result rows kept in the trace. |
-| `TRACE_MAX_FIELD_CHARS` | `20000` | Longest string kept in a node's recorded inputs and outputs. |
+| `settings.traces.mode` (`TRACE_MODE`) | `on_failure` | `off`, `on_failure` or `always`. |
+| `settings.traces.sample_rows` (`TRACE_SAMPLE_ROWS`) | `50` | Result rows kept in the trace. |
+| `settings.traces.max_field_chars` (`TRACE_MAX_FIELD_CHARS`) | `20000` | Longest string kept in a node's recorded inputs and outputs. |
+
+Traces go to the engine's trace folder, `traces/` under `storage.path`
+(`TRACE_DIR` for the CLI and the playground, default `traces` relative to the
+working directory). Add it to `.gitignore` (this repository does).
 
 `on_failure` writes a trace when the run returned errors, needed a retry in any
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
@@ -62,7 +69,7 @@ by time.
   "llm": {"configured": {"default": {"provider": "openai", "model": "gpt-5.4", "temperature": 0.0}},
           "by_node": {"decomposer": "gpt-5.4", "ast_planner": "gpt-5.4", "refiner": "gpt-5.4",
                       "answer_synthesizer": "gpt-5.4"}},
-  "settings": {"...": "every setting except those that can hold a credential"},
+  "settings": {"...": "the run's settings section: pipeline, retrieval, results, traces, schema, ..."},
   "limits": {"sample_rows": 50, "max_field_chars": 20000, "max_list_items": 200, "note": "..."},
   "nodes": ["... one entry per node execution, below ..."],
   "result": {"...": "the QueryResult, rows capped"}
@@ -194,8 +201,9 @@ Every trace is redacted before it is written, with no setting to turn it off:
   `api_key=`, `AccountKey=`, `token=` pairs;
 - the string value of any key named like `api_key`, `password`, `secret`,
   `authorization`, `access_key`, `connection_string` or `credential(s)`;
-- the settings snapshot leaves out every setting whose name could hold a
-  credential (`openai_api_key`, `result_artifact_adls_connection_string`).
+- the settings snapshot is the `settings` section only, which holds no
+  credential: keys live in the `llm`, `embeddings` and `datasources` sections
+  as references, and their resolved values are redacted as above.
 
 A test runs a real question with the fake key `sk-test-not-a-real-key-1234` in
 the environment and asserts that string appears nowhere in the file. Redaction
@@ -206,8 +214,8 @@ prompts, schema and a sample of result rows.
 
 Node inputs and outputs, and the result, are capped so a trace stays readable:
 result rows (`rows`, and the aggregator's `terminal_results`) keep
-`TRACE_SAMPLE_ROWS` rows, other lists keep 200 items, and strings keep
-`TRACE_MAX_FIELD_CHARS` characters. Every cut leaves a `[truncated]` marker
+`settings.traces.sample_rows` rows, other lists keep 200 items, and strings
+keep `settings.traces.max_field_chars` characters. Every cut leaves a `[truncated]` marker
 saying how much was dropped. **LLM messages and raw responses are never cut**,
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.
@@ -254,9 +262,16 @@ served. It then compares the replayed `QueryResult` with the recorded one
   recorded run used the cache, replay uses it too, and reports a divergence
   (`missing`) when the cached plan has since been cleared.
 - **Date.** The planner and refiner prompts carry today's date, and the trace
-  records it as `request.today`. Replay pins `NL2SQL_TODAY` to that date, so a
-  trace recorded yesterday replays without diverging. A trace written before
-  the date was recorded replays with the current setting.
+  records it as `request.today`. Replay pins `settings.pipeline.today` to that
+  date, so a trace recorded yesterday replays without diverging. A trace
+  written before the date was recorded replays with the current setting.
+- **Its own runtime.** The pinned date, the plan cache choice and a zero retry
+  back-off go into a config derived from the engine's
+  (`Runtime.derive`), and the replay runs on a runtime built from it, with
+  its own playback clients. The engine's config and LLMs are never changed,
+  so a query running on the same engine meanwhile is unaffected. The replayed
+  result is capped with that runtime's `settings.traces` sizes, as the
+  recording was.
 - **Exit code**: 0 when the replayed result matches the recording, 1 on a
   divergence, a different result, or a datasource that cannot be reached.
 

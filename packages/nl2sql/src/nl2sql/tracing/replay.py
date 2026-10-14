@@ -281,25 +281,25 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     """Re-runs the traced question, answering every LLM call from the recording."""
     from nl2sql.api.query_api import result_from_state
     from nl2sql.auth import UserContext
-    from nl2sql.common.settings import settings
     from nl2sql.pipeline.runtime import run_with_graph
-    from nl2sql.runtime import pinned_config
 
-    playback = TracePlayback(doc)
-    _install_playback_clients(ctx, playback)
-    request = doc.get("request") or {}
-    user_context = UserContext(roles=list(request.get("roles") or []),
-                               **({"tenant_id": request["tenant_id"]} if request.get("tenant_id") else {}))
-
-    pipeline = ctx.config.settings.pipeline
-    pinned = {
+    # The replay runs on a runtime of its own (``ctx.derive``): the engine's
+    # config and LLMs are never changed.
+    pipeline = ctx.settings.pipeline
+    run = ctx.derive({
         # Retry back-off only waits; the recorded answers do not depend on it.
         "settings.pipeline.retries.base_delay_s": 0.0,
         "settings.pipeline.retries.jitter_s": 0.0,
         "settings.pipeline.plan_cache": pipeline.plan_cache and recorded_plan_cache_hit(doc),
         # The prompts carry the date; replay them on the day they were recorded.
         "settings.pipeline.today": recorded_run_date(doc) or pipeline.today,
-    }
+    })
+    playback = TracePlayback(doc)
+    _install_playback_clients(run, playback)
+    request = doc.get("request") or {}
+    user_context = UserContext(roles=list(request.get("roles") or []),
+                               **({"tenant_id": request["tenant_id"]} if request.get("tenant_id") else {}))
+
     # Once the run has diverged, the nodes log the refused call as a failure with
     # a stack trace. That is the replay stopping, not a fault: the report says so.
     quiet = _AfterDivergence(playback)
@@ -307,21 +307,21 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     for handler in handlers:
         handler.addFilter(quiet)
     try:
-        with pinned_config(ctx, pinned):
-            state = run_with_graph(
-                ctx, request.get("question") or "", datasource_id=request.get("datasource_id"),
-                execute=bool(request.get("execute", True)), callbacks=[playback.recorder],
-                user_context=user_context, cancellation_token=playback.token, trace_mode="off",
-            )
+        state = run_with_graph(
+            run, request.get("question") or "", datasource_id=request.get("datasource_id"),
+            execute=bool(request.get("execute", True)), callbacks=[playback.recorder],
+            user_context=user_context, cancellation_token=playback.token, trace_mode="off",
+        )
     finally:
         for handler in handlers:
             handler.removeFilter(quiet)
 
-    result = result_from_state(state, artifact_store=getattr(ctx, "artifact_store", None),
-                               sample_rows=settings.trace_sample_rows).model_dump(mode="json")
+    traces = run.settings.traces
+    result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
+                               sample_rows=traces.sample_rows).model_dump(mode="json")
     # Compared the way the recorded result was stored: capped, then redacted.
-    limits = Limits(sample_rows=settings.trace_sample_rows, max_field_chars=settings.trace_max_field_chars)
-    result = Redactor(collect_secrets(ctx)).redact(cap(result, limits))
+    limits = Limits(sample_rows=traces.sample_rows, max_field_chars=traces.max_field_chars)
+    result = Redactor(collect_secrets(run)).redact(cap(result, limits))
     report = ReplayReport(result=result, served=playback.served, divergence=playback.divergence)
     if report.divergence is None:
         unused = playback.unused_calls()

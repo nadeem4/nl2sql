@@ -15,10 +15,10 @@ read this engine's values. The architecture ratchet test lists them.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+import copy
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional
 
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
@@ -176,12 +176,6 @@ class Runtime:
         with self._lock:
             return self._config
 
-    @config.setter
-    def config(self, config: Config) -> None:
-        """Only for ``pinned_config``: evaluation and trace replay pin settings for a run."""
-        with self._lock:
-            self._config = config
-
     @property
     def settings(self):
         """The ``settings`` section: the tuning knobs this engine runs with."""
@@ -245,6 +239,27 @@ class Runtime:
         _log_llm_change(change, tenant_id=self.tenant_id)
         return change
 
+    def derive(self, changes: Dict[str, Any]) -> "Runtime":
+        """A run-scoped runtime whose config is this one's with ``changes`` (dotted paths) set.
+
+        Evaluation and trace replay run on one when a run needs different
+        settings: ``ctx.derive({"settings.pipeline.plan_cache": False})``. It
+        shares this runtime's adapters, embedder, stores and LLM client cache,
+        and has its own config, its own curated answers (the derived config's)
+        and its own LLM set, built through that cache from the derived ``llm``
+        section (which carries any ``llm.replace`` made on this runtime). So
+        replacing the run's LLMs leaves this runtime's alone. This runtime
+        never changes. The engine owns the shared parts, so a derived runtime
+        is never closed.
+        """
+        config = derived_config(self.config, changes)
+        run = copy.copy(self)
+        run._lock = RLock()
+        run._config = config
+        run.curated = config.curated
+        run.llm_registry = self.llm_registry.derive(config.llm)
+        return run
+
     # ------------------------------------------------------------ lifecycle
 
     def check_datasources(self) -> List[DatasourceStatus]:
@@ -297,25 +312,14 @@ def _llm_providers(llm: "LLM"):
             yield f"llm.agents.{agent}.provider", provider
 
 
-@contextmanager
-def pinned_config(ctx: Any, changes: Dict[str, Any]) -> Iterator[None]:
-    """Runs the block with ``ctx.config`` changed at dotted paths, then puts it back.
+def derived_config(config: Config, changes: Dict[str, Any]) -> Config:
+    """``config`` with each dotted path in ``changes`` set: ``{"settings.pipeline.plan_cache": False}``.
 
-    ``pinned_config(ctx, {"settings.pipeline.plan_cache": False})``. Evaluation
-    and trace replay use it to pin settings for one run, as they did on the
-    process-global ``settings``. Like that, it changes the runtime for every
-    thread using it; they move to derived configs (``cfg.model_copy``) in a
-    later pull request (docs/architecture/configuration_v2.md, section 8).
+    Built with ``model_copy``; ``config`` itself is never changed.
     """
-    saved = ctx.config
-    config = saved
     for path, value in changes.items():
         config = _replaced(config, path.split("."), value)
-    ctx.config = config
-    try:
-        yield
-    finally:
-        ctx.config = saved
+    return config
 
 
 def _replaced(model: Any, path: List[str], value: Any) -> Any:

@@ -30,7 +30,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from nl2sql.api.query_api import QueryResult
 from nl2sql.configs.llm import AgentConfig, LLMFileConfig
-from nl2sql.runtime import Runtime, pinned_config
+from nl2sql.runtime import Runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.faithfulness import answer_text, check_answer
@@ -473,7 +473,8 @@ def run_tier2(
     ``max_cost`` covers the whole run, every config and pass. ``on_case`` is
     called after each question with the config name, its record and the
     dollars spent so far. ``before_case`` is passed to the runner (a test's
-    fake LLM uses it). The context's LLM registry is left on the last config.
+    fake LLM uses it). The run uses a runtime derived from ``ctx``
+    (``ctx.derive``) with its own LLMs, so ``ctx`` is never changed.
     Curated answers are off for the run unless ``use_curated`` is set.
     """
     if not max_cost or max_cost <= 0:
@@ -482,46 +483,44 @@ def run_tier2(
         raise ValueError("Tier 2 needs at least one LLM config.")
     check_prices(llm_configs, prices)
 
-    runner = BenchmarkRunner(config, ctx, workers=1, before_case=before_case)
+    # Refusals are scored against the generic message and pass 2 must plan
+    # afresh, so the run's config turns both off. Curated answers are off
+    # unless asked for, as in tier 1: a verified answer has no plan, and the
+    # published runs score what the model planned. Without ``curated`` the
+    # graph has no curated matcher. ``ctx`` itself is never changed.
+    changes: Dict[str, Any] = {"policies.refusal_names_tables": False, "settings.pipeline.plan_cache": False}
+    if not use_curated:
+        changes["curated"] = None
+    run = ctx.derive(changes)
+
+    runner = BenchmarkRunner(config, run, workers=1, before_case=before_case)
     cases = runner.cases()
     spent, dearest, stopped = 0.0, 0.0, None
     records: Dict[str, List[Dict[str, Any]]] = {name: [] for name in llm_configs}
 
-    # Curated answers are off unless asked for, as in tier 1: a verified answer
-    # has no plan, and the published runs score what the model planned.
-    # Without ``ctx.curated`` the graph has no curated matcher.
-    curated = getattr(ctx, "curated", None)
-    if not use_curated:
-        ctx.curated = None
-    try:
-        # Refusals are scored against the generic message and pass 2 must plan
-        # afresh, so both settings are pinned for the run and restored after.
-        with pinned_config(ctx, {"policies.refusal_names_tables": False, "settings.pipeline.plan_cache": False}):
-            for name, cfg in llm_configs.items():
-                agents = dict(cfg.agents or {})
-                agents["default"] = cfg.default
-                ctx.llm_registry.replace_llms(agents)
-                for pass_no in range(1, passes + 1):
-                    for question, role in cases:
-                        if spent + dearest > max_cost:
-                            stopped = "max_cost"
-                            break
-                        t0 = time.perf_counter()
-                        row, result = runner.run_case(question, role)
-                        latency = time.perf_counter() - t0
-                        cost = question_cost(result.usage, cfg, prices) if result else 0.0
-                        spent += cost
-                        dearest = max(dearest, cost)
-                        record = _record(question, row, result, pass_no, cost, latency)
-                        records[name].append(record)
-                        if on_case:
-                            on_case(name, record, spent)
-                    if stopped:
-                        break
-                if stopped:
+    for name, cfg in llm_configs.items():
+        agents = dict(cfg.agents or {})
+        agents["default"] = cfg.default
+        run.llm_registry.replace_llms(agents)
+        for pass_no in range(1, passes + 1):
+            for question, role in cases:
+                if spent + dearest > max_cost:
+                    stopped = "max_cost"
                     break
-    finally:
-        ctx.curated = curated
+                t0 = time.perf_counter()
+                row, result = runner.run_case(question, role)
+                latency = time.perf_counter() - t0
+                cost = question_cost(result.usage, cfg, prices) if result else 0.0
+                spent += cost
+                dearest = max(dearest, cost)
+                record = _record(question, row, result, pass_no, cost, latency)
+                records[name].append(record)
+                if on_case:
+                    on_case(name, record, spent)
+            if stopped:
+                break
+        if stopped:
+            break
 
     planned = len(cases) * passes
     boards = {}

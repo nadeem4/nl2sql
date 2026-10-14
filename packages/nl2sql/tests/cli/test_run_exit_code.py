@@ -13,6 +13,7 @@ from nl2sql.cli.commands import run as run_module
 from nl2sql.cli.types import RunConfig
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.pipeline.pipeline_runner import PipelineResult
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _runner_returning(errors):
@@ -45,7 +46,7 @@ def test_a_blocking_error_in_the_final_state_exits_1(monkeypatch, capsys, severi
     monkeypatch.setattr(run_module, "PipelineRunner", _runner_returning([_error(severity)]))
 
     with pytest.raises(SystemExit) as exc:
-        run_module.run_pipeline(RunConfig(query="How many customers are there?"), ctx=None)
+        run_module.run_pipeline(RunConfig(query="How many customers are there?"), ctx=fake_runtime())
 
     assert exc.value.code == 1
     assert "Pipeline Errors" in capsys.readouterr().out
@@ -56,4 +57,4 @@ def test_warnings_alone_exit_0(monkeypatch):
         run_module, "PipelineRunner", _runner_returning([_error(ErrorSeverity.WARNING)])
     )
 
-    run_module.run_pipeline(RunConfig(query="How many customers are there?"), ctx=None)
+    run_module.run_pipeline(RunConfig(query="How many customers are there?"), ctx=fake_runtime())

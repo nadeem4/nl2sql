@@ -732,7 +732,7 @@ class VectorStore:
         self,
         query: str,
         datasource_ids: List[str],
-        k: Optional[int] = None,
+        k: int,
         explain: Optional[List[Dict[str, Any]]] = None,
     ) -> List[VerifiedQueryCandidate]:
         """
@@ -748,7 +748,7 @@ class VectorStore:
         Args:
             query: The question.
             datasource_ids: Search only these datasources' entries.
-            k: How many queries; ``CURATED_MATCH_TOP_K`` when not given.
+            k: How many queries: the caller's ``settings.curated.match_top_k``.
             explain: When given, the search's record is appended to it, shaped
                 like an MMR search's (``retrieval_trace.mmr_search``).
 
@@ -758,9 +758,7 @@ class VectorStore:
         from langchain_chroma.vectorstores import cosine_similarity
 
         from nl2sql.common.resilience import VECTOR_BREAKER
-        from nl2sql.common.settings import settings
 
-        k = k or settings.curated_match_top_k
         if not datasource_ids:
             return []
         self.initialize_if_not_exists()

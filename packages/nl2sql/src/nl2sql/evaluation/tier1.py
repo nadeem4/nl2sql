@@ -23,7 +23,7 @@ from typing import Any, Dict, Optional
 import yaml
 
 from nl2sql.configs.llm import AgentConfig
-from nl2sql.runtime import Runtime, pinned_config
+from nl2sql.runtime import Runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkResult, BenchmarkRunner
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset
 from nl2sql.evaluation.types import BenchmarkConfig
@@ -115,9 +115,9 @@ class GoldPlanLLM:
 def run_tier1(ctx: Runtime, config: Optional[BenchmarkConfig] = None) -> BenchmarkResult:
     """Runs every selected gold question once per role on ``ctx``, key-free.
 
-    ``ctx`` must hold the indexed Chinook demo datasource. Its LLM registry is
-    replaced with the gold-plan fake for the duration of the run, so the
-    context should not be reused for real questions afterwards.
+    ``ctx`` must hold the indexed Chinook demo datasource. The run uses a
+    runtime derived from it (``ctx.derive``) whose LLMs are the gold-plan
+    fake, so ``ctx`` itself is never changed.
     """
     config = (config or BenchmarkConfig()).model_copy(update={"iterations": 1})
     plans = load_gold_plans()
@@ -127,15 +127,11 @@ def run_tier1(ctx: Runtime, config: Optional[BenchmarkConfig] = None) -> Benchma
 
     # Refusals are scored against the default, generic message. The demo opts
     # into naming the forbidden table (policies.refusal_names_tables), so the
-    # default is pinned for the run and restored after.
+    # run's config has the default.
     # Curated answers are off for the run: tier 1 scores plans, and a verified
-    # answer has none. Without ``ctx.curated`` the graph has no curated matcher.
-    curated = getattr(ctx, "curated", None)
-    ctx.curated = None
-    try:
-        with pinned_config(ctx, {"policies.refusal_names_tables": False}), GoldPlanLLM(plans) as llm:
-            ctx.llm_registry.replace_llms({"default": llm.agent_config()})
-            runner = BenchmarkRunner(config, ctx, workers=1, before_case=llm.select)
-            return runner.run_dataset()
-    finally:
-        ctx.curated = curated
+    # answer has none. Without ``curated`` the graph has no curated matcher.
+    run = ctx.derive({"policies.refusal_names_tables": False, "curated": None})
+    with GoldPlanLLM(plans) as llm:
+        run.llm_registry.replace_llms({"default": llm.agent_config()})
+        runner = BenchmarkRunner(config, run, workers=1, before_case=llm.select)
+        return runner.run_dataset()

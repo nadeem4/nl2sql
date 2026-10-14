@@ -64,19 +64,13 @@ _ERROR = PipelineError(node="ast_planner", message="Planner failed.", severity=E
 
 @pytest.fixture
 def trace_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "trace_dir", str(tmp_path))
-    monkeypatch.setattr(settings, "openai_api_key", FAKE_KEY)
     monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
     return tmp_path
 
 
-def _run(monkeypatch, mode, errors):
+def _run(monkeypatch, mode, errors, trace_dir):
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _FakeGraph(_planner_run(errors)))
-    # The run reads the mode from its runtime. The trace's settings snapshot is
-    # still taken from the process-global settings until tracing moves onto the
-    # runtime, so the global carries the same mode.
-    monkeypatch.setattr(settings, "trace_mode", mode)
-    ctx = fake_runtime(settings={"traces": {"mode": mode}})
+    ctx = fake_runtime(settings={"traces": {"mode": mode}}, traces_dir=trace_dir)
     return runtime.run_with_graph(ctx, "how many customers?", user_context=UserContext(roles=["admin"]))
 
 
@@ -99,7 +93,7 @@ def test_an_invalid_mode_is_rejected(monkeypatch):
 
 
 def test_on_failure_writes_a_failed_run_and_says_where(trace_dir, monkeypatch):
-    state = _run(monkeypatch, "on_failure", [_ERROR])
+    state = _run(monkeypatch, "on_failure", [_ERROR], trace_dir)
     [path] = list(trace_dir.glob("*.json"))
     assert state["trace_path"] == str(path)
     assert path.name.endswith(f"_{state['trace_id']}.json")
@@ -120,42 +114,44 @@ def test_on_failure_writes_a_failed_run_and_says_where(trace_dir, monkeypatch):
 
 
 def test_on_failure_skips_a_clean_run(trace_dir, monkeypatch):
-    state = _run(monkeypatch, "on_failure", [])
+    state = _run(monkeypatch, "on_failure", [], trace_dir)
     assert list(trace_dir.glob("*.json")) == []
     assert state.get("trace_path") is None
 
 
 def test_always_writes_a_clean_run(trace_dir, monkeypatch):
-    _run(monkeypatch, "always", [])
+    _run(monkeypatch, "always", [], trace_dir)
     assert len(list(trace_dir.glob("*.json"))) == 1
 
 
-def test_the_mode_is_the_runtime_s_not_the_global(trace_dir, monkeypatch):
+def test_the_mode_and_the_folder_are_the_runtime_s_not_the_global(trace_dir, monkeypatch):
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _FakeGraph(_planner_run([])))
     monkeypatch.setattr(settings, "trace_mode", "off")
+    monkeypatch.setattr(settings, "trace_dir", str(trace_dir / "global"))
 
-    runtime.run_with_graph(fake_runtime(settings={"traces": {"mode": "always"}}), "how many customers?",
-                           user_context=UserContext(roles=["admin"]))
+    runtime.run_with_graph(fake_runtime(settings={"traces": {"mode": "always"}}, traces_dir=trace_dir / "own"),
+                           "how many customers?", user_context=UserContext(roles=["admin"]))
 
-    assert len(list(trace_dir.glob("*.json"))) == 1
+    assert len(list((trace_dir / "own").glob("*.json"))) == 1
+    assert not (trace_dir / "global").exists()
 
 
 def test_off_writes_nothing(trace_dir, monkeypatch):
-    _run(monkeypatch, "off", [_ERROR])
+    _run(monkeypatch, "off", [_ERROR], trace_dir)
     assert list(trace_dir.glob("*.json")) == []
 
 
 def test_no_secret_reaches_the_file(trace_dir, monkeypatch):
-    _run(monkeypatch, "always", [])
+    _run(monkeypatch, "always", [], trace_dir)
     [path] = list(trace_dir.glob("*.json"))
     text = path.read_text(encoding="utf-8")
     assert FAKE_KEY not in text
     assert "[REDACTED]" in text
 
 
-def test_the_settings_snapshot_holds_no_secret_fields(trace_dir, monkeypatch):
-    _run(monkeypatch, "always", [])
+def test_the_settings_snapshot_is_the_run_s_settings_section(trace_dir, monkeypatch):
+    _run(monkeypatch, "always", [], trace_dir)
     [path] = list(trace_dir.glob("*.json"))
     snapshot = json.loads(path.read_text(encoding="utf-8"))["settings"]
-    assert "openai_api_key" not in snapshot
-    assert snapshot["trace_mode"] == "always"
+    assert snapshot["traces"]["mode"] == "always"
+    assert "schema" in snapshot and "openai_api_key" not in snapshot

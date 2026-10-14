@@ -186,14 +186,12 @@ def test_no_curated_entries_means_no_embedding_call(tmp_path):
     assert store.retrieve_verified_query_candidates("best customers", [], k=5) == []
 
 
-def test_k_defaults_to_the_setting(tmp_path, monkeypatch):
-    from nl2sql.common.settings import settings
-
+def test_k_caps_the_queries_returned(tmp_path):
+    # The curated matcher passes settings.curated.match_top_k; the store has no default of its own.
     store = _store(tmp_path)
     _index(store, "chinook", _section(TOP_CUSTOMERS, TRACKS_BY_GENRE))
-    monkeypatch.setattr(settings, "curated_match_top_k", 1)
 
-    assert len(store.retrieve_verified_query_candidates("customers", ["chinook"])) == 1
+    assert len(store.retrieve_verified_query_candidates("customers", ["chinook"], k=1)) == 1
 
 
 def test_the_search_is_recorded_when_asked(tmp_path):

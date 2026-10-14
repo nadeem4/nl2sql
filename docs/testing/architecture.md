@@ -109,6 +109,31 @@ do not unwind - into loud local failures rather than intermittent CI ones. Each
 run prints the seed it used; reproduce a failure with
 `pytest -p randomly --randomly-seed=<seed>`.
 
+## Settings in tests
+
+The engine reads its settings from its runtime, not from a process global
+([configuration v2, section 8](../architecture/configuration_v2.md#8-process-globals)),
+so a test sets them on the runtime it builds:
+
+- **One node or service:** `nl2sql.testing.runtime.fake_runtime(settings=...,
+  policies=..., traces_dir=..., **attrs)` builds a stand-in runtime with a real
+  config. Settings are written as in YAML: `settings={"traces": {"mode":
+  "always"}}`.
+- **A whole engine:** `Runtime.from_config(make_config(tmp_path, ...))`. An
+  `Embeddings(instance=FakeEmbeddings(size=8))` keeps it free of any model.
+- **One run with different settings:** `ctx.derive({"settings.pipeline.plan_cache":
+  True})` returns a run-scoped runtime with a derived config, its own curated
+  answers and its own `LLMSet`, sharing the stores and the engine's LLM
+  client cache. Evaluation and trace replay
+  use it the same way; the runtime it came from never changes.
+  `tests/unit/test_run_scoped_runtime.py` pins that down.
+
+Monkeypatching `nl2sql.common.settings.settings` changes nothing the
+pipeline, indexing, tracing or evaluation read. The global goes in a later
+pull request; until then `READS_THE_SETTINGS_GLOBAL` in
+`tests/architecture/test_boundaries.py` lists the modules still reading it,
+and it may only shrink.
+
 ```mermaid
 flowchart TD
     Unit[Unit Tests] --> Core[Core Components]
