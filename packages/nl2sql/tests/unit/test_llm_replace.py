@@ -38,11 +38,12 @@ class FakeClient(FakeListChatModel):
 class FakeProvider:
     """An LLM provider registered in code; counts every client it builds."""
 
-    interface_version = 1
+    interface_version = 2
     label = "Fake"
     api_key_env = None
     requires = ()
     install_hint = ""
+    structured_output = "tool_calling"
 
     def __init__(self) -> None:
         self.built: List[FakeClient] = []

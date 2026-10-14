@@ -620,6 +620,13 @@ A new boundary test: only `nl2sql/storage/` imports `chromadb` or `sqlite3`.
 
 ## 5. LLM and embeddings providers
 
+!!! note "Built: LLM providers and agent fields (PR L1)"
+    `openai_compatible`, with `openrouter` and `ollama` as its presets;
+    `structured_output`, `max_tokens`, `timeout_s`, `max_retries` and
+    `headers` on `LLM` and `AgentLLM`; `LLMProvider` on interface version 2.
+    `parse_retries` and parse-and-retry come with L2. See
+    [LLM configuration](../configuration/llm.md).
+
 ### The LLM config
 
 Phase 1's `llm` section stays flat. Six fields are added to `LLM` and to

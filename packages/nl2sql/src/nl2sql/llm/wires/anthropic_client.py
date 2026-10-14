@@ -14,10 +14,11 @@ from langchain_anthropic import ChatAnthropic
 from .anthropic import AnthropicWire
 from .base import temperature_error
 
-# The SDK refuses a non-streaming call whose max_tokens could outlast its
-# 10-minute timeout, and every node call here but the streamed answer of
-# ``stream_query`` is non-streaming. 16,000 leaves
-# room for adaptive thinking before the structured answer.
+# The default when the agent sets no ``max_tokens``. The SDK refuses a
+# non-streaming call whose max_tokens could outlast its 10-minute timeout, and
+# every node call here but the streamed answer of ``stream_query`` is
+# non-streaming. 16,000 leaves room for adaptive thinking before the
+# structured answer.
 MAX_TOKENS = 16000
 
 _WIRE = AnthropicWire()
@@ -69,6 +70,8 @@ def build_claude_client(model: str, temperature: Any, **kwargs: Any) -> CachingC
     """A Claude client sending exactly the configured temperature, or none.
 
     Claude Opus 5 and Sonnet 5 reject any sampling parameter with HTTP 400, so
-    ``temperature: null`` in the config is what sends nothing.
+    ``temperature: null`` in the config is what sends nothing. ``max_tokens``
+    is the agent's, else ``MAX_TOKENS``.
     """
-    return CachingChatAnthropic(model=model, temperature=temperature, max_tokens=MAX_TOKENS, **kwargs)
+    kwargs.setdefault("max_tokens", MAX_TOKENS)
+    return CachingChatAnthropic(model=model, temperature=temperature, **kwargs)
