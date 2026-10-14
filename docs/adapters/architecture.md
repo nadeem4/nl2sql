@@ -80,4 +80,5 @@ To add a new adapter:
 - Adapter protocol: `packages/sdk/src/nl2sql_sdk/protocols.py`
 - Registry: `packages/nl2sql/src/nl2sql/registry.py`
 - Datasource registry: `packages/nl2sql/src/nl2sql/datasources/registry.py`
-- Example adapter: `packages/nl2sql/src/nl2sql/adapters/sqlalchemy_base/adapter.py`
+- SQLAlchemy base: `packages/sdk/src/nl2sql_sdk/sqlalchemy/adapter.py`
+- Example adapter: `packages/nl2sql/src/nl2sql/adapters/postgres/adapter.py`

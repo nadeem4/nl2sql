@@ -11,7 +11,7 @@ packages/nl2sql/tests/
   e2e/              # End-to-end flows
   cli/              # CLI command tests
   adapters/         # Cross-dialect adapter contract tests
-  sqlalchemy_base/  # SQLAlchemy base adapter tests
+  sqlalchemy_base/  # tests of the SDK's SQLAlchemy base (nl2sql_sdk.sqlalchemy)
   realdb/           # Against real PostgreSQL, MySQL and SQL Server (the test bed)
 packages/api/tests/ # FastAPI route and service tests (stubbed engine)
 ```

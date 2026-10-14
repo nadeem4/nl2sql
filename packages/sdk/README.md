@@ -3,15 +3,18 @@
 The interfaces an extension for the
 [nl2sql engine](https://github.com/nadeem4/nl2sql) implements: database
 adapters, secret providers, stores and policy checks. The import package is
-`nl2sql_sdk`. It depends
+`nl2sql_sdk`. Its core depends
 on pydantic and the standard library only, so an extension built against it
 inherits nothing else.
 
-- `DatasourceAdapterProtocol`: `capabilities()`, `connect()`,
-  `fetch_schema_snapshot()`, `execute(request)` and `get_dialect()`, which
+- `DatasourceAdapter`: `capabilities()`, `test_connection()`,
+  `fetch_schema_snapshot(scope)`, `execute(request)` and `get_dialect()`, which
   returns a sqlglot dialect name such as `postgres` or `tsql`. An adapter class
-  also declares `interface_version = 1`, the `driver_modules` it needs and an
-  `install_hint` for when one is missing.
+  also declares `interface_version = 2`, a `connection_model`, the
+  `driver_modules` it needs and an `install_hint` for when one is missing.
+- `nl2sql_sdk.sqlalchemy` (`pip install "nl2sql-sdk[sqlalchemy]"`):
+  `SQLAlchemyAdapter`, the base the built-in adapters are built on, and
+  `SQLAlchemyConnection`. The one part of the SDK that imports SQLAlchemy.
 - `AdapterRequest`, `ResultFrame` and `ResultError`: what the engine sends an
   adapter and what it gets back.
 - `SchemaSnapshot` and the table, column and foreign-key contracts an adapter

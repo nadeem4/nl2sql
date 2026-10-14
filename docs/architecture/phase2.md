@@ -1025,6 +1025,24 @@ database has a `realdb` test.
     and no stage yet (B3 classifies). The pool settings, `profile`,
     `sample_values` and `max_profile_rows` come with B2.
 
+!!! note "Built: B2, the SQLAlchemy base in the SDK"
+    `nl2sql_sdk.sqlalchemy` (the `nl2sql-sdk[sqlalchemy]` extra) holds
+    `SQLAlchemyAdapter`, `SQLAlchemyConnection` with `pool`, `ColumnProfile`
+    and `column_profile`; the five built-ins import it, and the engine's
+    `adapters/sqlalchemy_base/` is gone with `dry_run`, `explain` and
+    `cost_estimate` (B22, B23, B24). A snapshot reflects each schema once,
+    after `IndexScope` has dropped what it does not want, takes row counts
+    from `row_estimates` (PostgreSQL, MySQL, SQL Server, DuckDB; SQLite
+    counts), profiles by `column_profile`, keeps values only with
+    `sample_values`, and reports failures as `IndexIssue`s, which
+    `index.build()` returns and `nl2sql index` prints. Filled in on the way:
+    `IndexScope.wants_schema`, which also leaves out a schema no
+    `include_tables` pattern names; SQLite and DuckDB connections have no
+    `pool` (a file has no server to protect); a schema-wide estimate failure
+    is an issue on `schema.*`. `session_setup` and `classify` come with B3.
+    Not done here: the scope is not yet part of the snapshot's fingerprint,
+    which lives in the state store (S3).
+
 ### The contract
 
 ```python

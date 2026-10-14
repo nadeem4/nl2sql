@@ -112,7 +112,13 @@ class IndexingOrchestrator:
         ).build() + CuratedChunkBuilder(datasource_id, curated, schema_version).build()
 
         self._commit(datasource_id, schema_version, chunks, [], curated_hash(curated))
-        return _stats(datasource_id, schema_version, [c.type for c in chunks])
+        stats = _stats(datasource_id, schema_version, [c.type for c in chunks])
+        if schema_snapshot.issues:
+            # What a table or column was indexed without: reported, not only logged.
+            stats["issues"] = [issue.model_dump(exclude_none=True) for issue in schema_snapshot.issues]
+            logger.warning(f"Indexed {datasource_id} with {len(schema_snapshot.issues)} issue(s); "
+                           f"the first: {schema_snapshot.issues[0].table}: {schema_snapshot.issues[0].message}")
+        return stats
 
     def refresh_curated(self, datasource_id: str) -> Dict[str, Any]:
         """Re-indexes a datasource's verified queries only.

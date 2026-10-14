@@ -1,6 +1,6 @@
 """A query the database rejects comes back as a ``ResultFrame`` error, not an exception.
 
-``BaseSQLAlchemyAdapter.execute`` used to let the driver's exception escape, so
+``SQLAlchemyAdapter.execute`` used to let the driver's exception escape, so
 the executor node reported every database error as a CRITICAL
 ``EXECUTOR_CRASH`` and the sub-query ended, even for an unknown column the
 planner could have fixed. The adapter, which is the only place that knows its
@@ -12,7 +12,7 @@ import sqlite3
 import pytest
 from sqlalchemy import exc as sa_exc
 
-from nl2sql.adapters.sqlalchemy_base.adapter import BaseSQLAlchemyAdapter
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
 from nl2sql_sdk import Limits
 from nl2sql_sdk.contracts import AdapterRequest
@@ -102,7 +102,7 @@ def _wrapped(kind, message, sqlstate=None):
          "connection", "permission (message)", "unknown column (no sqlstate)", "conversion"],
 )
 def test_the_base_adapter_classifies_by_sqlstate_then_by_kind(error, retryable):
-    adapter = BaseSQLAlchemyAdapter.__new__(BaseSQLAlchemyAdapter)
+    adapter = SQLAlchemyAdapter.__new__(SQLAlchemyAdapter)
     adapter.datasource_id = "ds"
 
     frame = adapter.query_failed(error)

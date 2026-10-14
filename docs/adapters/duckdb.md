@@ -3,7 +3,7 @@
 In-process analytical adapter for local files and ad-hoc analysis.
 
 !!! info "Implementation"
-    This adapter extends `BaseSQLAlchemyAdapter`. It overrides `build_engine()` only to
+    This adapter extends `SQLAlchemyAdapter`. It overrides `build_engine()` only to
     enforce `limits.timeout_ms`: DuckDB runs in-process and has no statement
     timeout setting, so the adapter interrupts a statement that runs too long.
 
@@ -44,9 +44,8 @@ connection:
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
 | **Timeout** | `interrupt()` on a timer | See [Statement Timeout](#statement-timeout). |
-| **Dry Run** | `EXPLAIN` | Plans the query without executing it. |
-| **Explain** | `EXPLAIN` | Returns DuckDB's rendered operator tree as text. |
-| **Costing** | Stubbed | Returns a fixed cost of `1.0`; see below. |
+| **Row counts** | `duckdb_tables().estimated_size` | The catalog's count. |
+| **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
 ### Statement Timeout
 
@@ -57,18 +56,6 @@ raises `InterruptException`, which the adapter reports as a refusal
 the statement finishes or fails, so it never touches a later query. The limit
 covers running the statement; DuckDB materialises the result while it runs, so
 fetching rows afterwards is not timed.
-
-### Optimization Details
-
-* **Dry Run**: Uses `EXPLAIN {sql}`. DuckDB binds and plans the statement without running
-  it, so success means the SQL parses and every referenced table and column resolves.
-* **Explain**: Returns the `physical_plan` text of `EXPLAIN {sql}` — DuckDB's box-drawn
-  operator tree. It is human-readable, not machine-parsable.
-* **Cost Estimate**: **Stubbed.** DuckDB's `EXPLAIN` prints an operator tree carrying no
-  cost or cardinality figures, so there is nothing real to report. The adapter validates
-  the query and then returns a fixed `estimated_cost=1.0` / `estimated_rows=10`, exactly
-  as the SQLite adapter does. Do not use these numbers for planning or budgeting; a
-  failed validation is signalled by `estimated_cost=-1.0`.
 
 ### Schema Introspection
 

@@ -143,19 +143,46 @@ def _broke(rule: str, offenders: list[str]) -> str:
 # 1. The SDK depends on nothing
 # --------------------------------------------------------------------------
 
-def test_the_sdk_imports_only_pydantic_and_the_stdlib():
-    """An adapter author installs the SDK, not the engine."""
+SDK_SQLALCHEMY = SDK / "sqlalchemy"
+
+
+def test_sdk_core_imports_only_pydantic_and_the_stdlib():
+    """An adapter author installs the SDK, not the engine. ``nl2sql_sdk.sqlalchemy`` is the one extra."""
     allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
     offenders = [
         f"{_where(path)}:{lineno} {name}"
         for path in python_files(SDK)
+        if not path.is_relative_to(SDK_SQLALCHEMY)
         for lineno, name, _ in imports(path)
         if name.partition(".")[0] not in allowed
+        and not name.startswith("nl2sql_sdk.sqlalchemy")
     ]
     assert not offenders, _broke(
         "The SDK imports only pydantic and the standard library: it is the "
         "contract a third-party adapter compiles against, so it must not drag in the "
-        "engine, SQLAlchemy or a driver.", offenders)
+        "engine, SQLAlchemy or a driver. The SQLAlchemy base is nl2sql_sdk.sqlalchemy, "
+        "installed with nl2sql-sdk[sqlalchemy], and the core never imports it.", offenders)
+
+
+def test_the_sdk_sqlalchemy_base_imports_only_sqlalchemy_sqlglot_pydantic_and_the_stdlib():
+    """``nl2sql_sdk.sqlalchemy`` is what an adapter on SQLAlchemy builds on: no engine, no driver."""
+    allowed = {"pydantic", "nl2sql_sdk", "sqlalchemy", "sqlglot"} | set(sys.stdlib_module_names)
+    assert SDK_SQLALCHEMY.is_dir(), "nl2sql_sdk/sqlalchemy/ holds the public SQLAlchemy base."
+    offenders = [
+        f"{_where(path)}:{lineno} {name}"
+        for path in python_files(SDK_SQLALCHEMY)
+        for lineno, name, _ in imports(path)
+        if name.partition(".")[0] not in allowed
+    ]
+    assert not offenders, _broke(
+        "nl2sql_sdk.sqlalchemy imports only SQLAlchemy, sqlglot, pydantic and the standard "
+        "library: an adapter author installs nl2sql-sdk[sqlalchemy], not the engine.", offenders)
+
+
+def test_the_engine_has_no_sqlalchemy_base_of_its_own():
+    """The built-ins build on ``nl2sql_sdk.sqlalchemy``, the base any adapter author uses."""
+    assert not (ADAPTERS / "sqlalchemy_base").exists(), (
+        "nl2sql/adapters/sqlalchemy_base/ moved to nl2sql_sdk/sqlalchemy/ (adapter SDK v2).")
 
 
 def test_the_sdk_stores_module_imports_only_pydantic():
@@ -266,14 +293,15 @@ def test_nothing_outside_the_adapters_imports_a_database_library():
     """SQLAlchemy in the pipeline would be a second, unpluggable way to reach a database."""
     offenders = []
     for path in python_files(*SOURCES):
-        if path.is_relative_to(ADAPTERS):
+        if path.is_relative_to(ADAPTERS) or path.is_relative_to(SDK_SQLALCHEMY):
             continue
         allowed = DATABASE_LIBRARY_EXCEPTIONS.get(_where(path), set())
         offenders += [f"{_where(path)}:{lineno} {name}"
                       for lineno, name, _ in imports(path)
                       if name.partition(".")[0] in DATABASE_LIBRARIES - allowed]
     assert not offenders, _broke(
-        "Only nl2sql/adapters/ imports SQLAlchemy or a database driver. sqlite3 is not on "
+        "Only nl2sql/adapters/ (and the SDK's SQLAlchemy base, nl2sql_sdk/sqlalchemy/) "
+        "imports SQLAlchemy or a database driver. sqlite3 is not on "
         "this list: it is the standard library behind the engine's own schema and feedback "
         "stores, which are metadata, not a datasource.", offenders)
 

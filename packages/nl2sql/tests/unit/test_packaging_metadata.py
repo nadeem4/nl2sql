@@ -10,6 +10,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
@@ -112,9 +113,10 @@ def test_the_engine_pins_the_sdk_release_it_ships_with():
     version as a compatible release, and release-please bumps the line.
     """
     engine_version = Version(_project("nl2sql")["version"])
-    pin = next(d for d in _project("nl2sql")["dependencies"] if d.startswith("nl2sql-sdk"))
-    spec = SpecifierSet(pin.removeprefix("nl2sql-sdk"))
-    assert str(spec) == f"~={engine_version}", pin
+    pin = Requirement(next(d for d in _project("nl2sql")["dependencies"] if d.startswith("nl2sql-sdk")))
+    assert str(pin.specifier) == f"~={engine_version}", pin
+    # The built-in adapters build on nl2sql_sdk.sqlalchemy.
+    assert pin.extras == {"sqlalchemy"}, pin
     assert not any(d.startswith("nl2sql-adapter-sdk") for d in _project("nl2sql")["dependencies"])
 
     lines = (ENGINE / "pyproject.toml").read_text(encoding="utf-8").splitlines()

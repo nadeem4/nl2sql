@@ -337,9 +337,9 @@ Dependencies point in one direction: `nl2sql-sdk` → nothing, `nl2sql.adapters.
 
 Concretely:
 
-- The SDK imports only pydantic and the standard library.
+- The SDK's core imports only pydantic and the standard library. `nl2sql_sdk.sqlalchemy`, the SQLAlchemy base installed with `nl2sql-sdk[sqlalchemy]`, may also import SQLAlchemy and sqlglot, and the core never imports it.
 - An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
-- Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapter`.
+- Nothing outside `nl2sql/adapters/` (and the SDK's SQLAlchemy base) imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapter`.
 - Only `nl2sql/storage/` imports `chromadb` (or `langchain_chroma`). The engine embeds, ranks and filters through the `IndexStore` interface (`nl2sql_sdk.stores`), so a plugin index store works the same way as the built-in `chroma` one. The one exception is the local embedder, `nl2sql/embeddings/local.py`, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.
 - Nothing outside `nl2sql/cli/` imports the CLI, and `nl2sql.cli.demo` never imports `nl2sql.cli.commands`.
 - `nl2sql_api` imports only the top-level `nl2sql` namespace, and so do the playground and `nl2sql demo`, apart from a named list of exceptions (`STILL_IMPORTED_FROM_INSIDE`: the provider catalogue in `llm/providers.py`, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import `nl2sql.feedback`, `nl2sql.tracing`, `nl2sql.pipeline`, `nl2sql.indexing` or `PROVIDER_PRESETS`: `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.index.inspect_defaults()` and `engine.llm.providers()` serve them. The CLI, the playground and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`).
@@ -459,7 +459,7 @@ A verified query's SQL is written, reviewed and committed by a person in `curate
 - `VerifiedQuery` and `ParamSpec` in `nl2sql.config.curated`, and `inspect_verified_sql()` and `check_curated_queries()` in `nl2sql.configs.curated`, at startup, in `nl2sql curated validate`, and in `nl2sql curated test` (`CuratedAPI.test()`), which runs only queries that pass them, with their values bound
 - `resolve_params()` in `nl2sql.pipeline.nodes.curated_matcher.params`
 - `CuratedMatcherNode._match()` in `nl2sql.pipeline.nodes.curated_matcher.node`: parses the SQL read-only again before running, and checks the capability
-- `BaseSQLAlchemyAdapter._run()` in `nl2sql.adapters.sqlalchemy_base.adapter`: `conn.execute(text(sql), parameters)`; without parameters the call is exactly `conn.execute(text(sql))`
+- `SQLAlchemyAdapter._run()` in `nl2sql_sdk.sqlalchemy.adapter`: `conn.execute(text(sql), parameters)`; without parameters the call is exactly `conn.execute(text(sql))`
 - `packages/nl2sql/tests/sqlalchemy_base/test_bound_parameters.py`: a value `1; DROP TABLE x` is compared as a value and the table survives
 
 ### Failure Behavior

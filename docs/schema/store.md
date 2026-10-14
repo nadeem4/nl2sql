@@ -24,8 +24,9 @@ Metadata complements contracts:
 - `ColumnStatistics`: distinct counts, min/max, sample values (for a text
   column: every distinct value when there are at most 50, else the five most
   frequent; most frequent first, ties by value). A column the adapter could
-  not profile has no statistics; see
-  [Column statistics](../adapters/sqlalchemy.md#column-statistics)
+  not profile has no statistics and an index issue; values are kept only
+  with the datasource's `index.sample_values`. See
+  [Reading a schema](../adapters/sqlalchemy.md#reading-a-schema)
 
 ## Snapshotting and fingerprinting
 

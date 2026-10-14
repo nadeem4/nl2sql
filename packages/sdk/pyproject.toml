@@ -26,6 +26,10 @@ dependencies = [
     "pydantic>=2.0",
 ]
 
+[project.optional-dependencies]
+# nl2sql_sdk.sqlalchemy: the base an adapter on SQLAlchemy builds on.
+sqlalchemy = ["SQLAlchemy>=2.0"]
+
 [project.urls]
 Homepage = "https://github.com/nadeem4/nl2sql"
 Documentation = "https://nadeem4.github.io/nl2sql/"
