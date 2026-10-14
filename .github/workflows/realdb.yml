@@ -1,0 +1,96 @@
+name: Real databases
+
+# The test bed (testbed/docker-compose.yml) on GitHub's runners: PostgreSQL,
+# MySQL and SQL Server, then `pytest -m realdb`. It runs on pull requests that
+# change database-facing code, nightly on main, and on demand, which is done
+# before every release. `realdb-gate` always runs and is the required check,
+# so a run skipped because nothing database-facing changed is an honest pass.
+# docs/testing/test-bed.md has the details.
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      realdb: ${{ steps.filter.outputs.realdb || 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        if: github.event_name == 'pull_request'
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            realdb:
+              - 'packages/sdk/**'
+              - 'packages/nl2sql/src/nl2sql/adapters/**'
+              - 'packages/nl2sql/src/nl2sql/indexing/**'
+              - 'packages/nl2sql/src/nl2sql/storage/**'
+              - 'packages/nl2sql/src/nl2sql/schema/**'
+              - 'packages/nl2sql/tests/realdb/**'
+              - 'testbed/**'
+              - '.github/workflows/realdb.yml'
+
+  realdb:
+    needs: changes
+    if: needs.changes.outputs.realdb == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      REALDB: compose
+      REALDB_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the test bed
+        run: docker compose -f testbed/docker-compose.yml up -d --wait --wait-timeout 1200
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # pyodbc needs Microsoft's ODBC driver for SQL Server.
+      - name: Install the Microsoft ODBC driver
+        run: |
+          if ! odbcinst -q -d -n "ODBC Driver 18 for SQL Server" > /dev/null 2>&1; then
+            curl -sSL -O "https://packages.microsoft.com/config/ubuntu/$(. /etc/os-release && echo "$VERSION_ID")/packages-microsoft-prod.deb"
+            sudo dpkg -i packages-microsoft-prod.deb
+            sudo apt-get update
+            sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
+          fi
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e packages/sdk -e "packages/nl2sql[postgres,mysql,mssql,duckdb]" pytest pytest-randomly
+
+      - name: Run the realdb tests
+        run: pytest -m realdb
+
+      - name: Show the test bed's logs
+        if: failure()
+        run: docker compose -f testbed/docker-compose.yml logs --no-color
+
+  realdb-gate:
+    needs: [changes, realdb]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: testbed/gate.py
+          sparse-checkout-cone-mode: false
+
+      - name: Decide
+        run: python testbed/gate.py --changes "${{ needs.changes.result }}" --realdb "${{ needs.realdb.result }}"
