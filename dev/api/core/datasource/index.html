@@ -3743,6 +3743,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#testing-a-datasource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing a datasource
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4634,6 +4645,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#testing-a-datasource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing a datasource
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4654,18 +4676,21 @@
 <h1 id="datasource-api">Datasource API</h1>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.datasources</code>: the engine's datasources, listed with their status,
-added and removed at runtime, tested, and their indexed schema.</p>
+added and removed at runtime, tested, and their indexed schema; and the
+methods behind Connect a database: the adapter types with their connection
+forms, and a test of a datasource before it is added.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>List every configured datasource with its status, capabilities and masked connection.</li>
-<li>Add a <code>Datasource</code> (built, not connected) and remove one.</li>
-<li>Connect to one datasource on demand, as <code>check()</code> does.</li>
+<li>List every adapter type the registry can name, installed or not, with its connection model's JSON Schema.</li>
+<li>Test a configured datasource, as <code>check()</code> does, or a <code>Datasource</code> that is not added, registering nothing.</li>
+<li>Add a <code>Datasource</code> (validated, built, not connected) and remove one.</li>
 <li>Return the indexed schema as the planner is given it.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/datasource_api.py</code> (<code>DatasourcesAPI</code>, internal)</li>
-<li><code>packages/nl2sql/src/nl2sql/api/types.py</code> (<code>DatasourceInfo</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/types.py</code> (<code>DatasourceInfo</code>, <code>DatasourceType</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/datasources/registry.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>Datasource</code>)</li>
 </ul>
@@ -4690,9 +4715,19 @@ added and removed at runtime, tested, and their indexed schema.</p>
 <td>One configured datasource. Raises <code>ValueError</code> for an unknown id.</td>
 </tr>
 <tr>
+<td><code>types()</code></td>
+<td><code>list[DatasourceType]</code></td>
+<td>Every adapter the engine's registry can name, sorted by name, whether its driver is installed or not. An adapter module imports without its driver, so the connection schema is there before the driver is. A plugin that fails to import, or implements another interface version, is left out.</td>
+</tr>
+<tr>
+<td><code>test(datasource)</code></td>
+<td><code>DatasourceStatus</code></td>
+<td>See <a href="#testing-a-datasource">Testing a datasource</a>.</td>
+</tr>
+<tr>
 <td><code>add(datasource)</code></td>
 <td><code>None</code></td>
-<td>Builds the adapter without connecting, registers it, and adds the <code>Datasource</code> to <code>engine.config</code>; its description and sample questions are what indexing reads. Raises <code>ValueError</code> if the id is taken, the type is unknown, a reference does not resolve or the adapter rejects its connection settings (with every secret masked). Index it next: <code>engine.index.build([datasource.id])</code>.</td>
+<td>Validates <code>connection</code> against the adapter's connection model and <code>index</code> as an <code>IndexScope</code>, builds the adapter without connecting, registers it, and adds the <code>Datasource</code> to <code>engine.config</code>; its description and sample questions are what indexing reads. Raises <code>ValueError</code> if the id is taken, the type is unknown, a reference does not resolve, <code>index</code> does not validate (naming the <code>index.</code> field) or the adapter rejects its connection settings (naming the field, with "did you mean" for an unknown key, and never a value). Index it next: <code>engine.index.build([datasource.id])</code>.</td>
 </tr>
 <tr>
 <td><code>remove(datasource_id)</code></td>
@@ -4703,11 +4738,6 @@ added and removed at runtime, tested, and their indexed schema.</p>
 <td><code>schema(datasource_id)</code></td>
 <td><code>dict</code></td>
 <td>The indexed schema as the planner is given it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). Read from the snapshot the datasource's live index build was made from, not the database; before the first index <code>tables</code> is empty.</td>
-</tr>
-<tr>
-<td><code>test(datasource_id)</code></td>
-<td><code>DatasourceStatus</code></td>
-<td>Connects to one datasource, as <code>check()</code> does: <code>ready</code> puts it back in routing, <code>failed</code> (stage <code>connect</code>, the reason and a fix) keeps it out. Raises <code>ValueError</code> for an unknown id.</td>
 </tr>
 </tbody>
 </table>
@@ -4750,22 +4780,106 @@ added and removed at runtime, tested, and their indexed schema.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Datasource</span>
+<p><code>DatasourceType</code> is a frozen dataclass, exported from <code>nl2sql</code>:</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>The name a datasource's <code>type</code> uses: <code>postgres</code>.</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>The adapter's title, for a form: <code>PostgreSQL</code>.</td>
+</tr>
+<tr>
+<td><code>installed</code></td>
+<td>Every one of its driver modules is found.</td>
+</tr>
+<tr>
+<td><code>install_hint</code></td>
+<td>What to install when it is not: <code>pip install "nl2sql-engine[postgres]"</code>.</td>
+</tr>
+<tr>
+<td><code>connection_schema</code></td>
+<td>The JSON Schema of its connection model (<code>connection_model.model_json_schema()</code>): the form. A secret field is <code>"format": "password", "writeOnly": true</code>, which a form renders as a password input; a field with <code>"group": "advanced"</code> is folded away.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="testing-a-datasource">Testing a datasource</h2>
+<p><code>test()</code> takes a configured datasource's id or a <code>Datasource</code>.</p>
+<ul>
+<li><strong>An id</strong> connects to that configured datasource, as <code>check()</code> does: <code>ready</code>
+  puts it back in routing, <code>failed</code> keeps it out. Raises <code>ValueError</code> for an
+  unknown id.</li>
+<li><strong>A <code>Datasource</code></strong> that is not added: builds its adapter, runs
+  <code>test_connection</code>, closes the adapter, and registers nothing. It is what a
+  Connect a database form calls before <code>add</code>. A failure is reported, never
+  raised. An <code>adapter</code> object is tested as given and not closed: the caller
+  owns it.</li>
+</ul>
+<p>A failed status carries the stage, the reason and the fix:</p>
+<table>
+<thead>
+<tr>
+<th><code>stage</code></th>
+<th>When</th>
+<th><code>fix</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>config</code></td>
+<td>The <code>type</code> is unknown (with the closest name), or <code>connection</code> does not validate against the adapter's model (the field, and "did you mean" for an unknown key; never a value)</td>
+<td>What to correct</td>
+</tr>
+<tr>
+<td><code>driver</code></td>
+<td>A module in the adapter's <code>driver_modules</code> is not installed</td>
+<td>The adapter's <code>install_hint</code></td>
+</tr>
+<tr>
+<td>the adapter's stage</td>
+<td><code>test_connection</code> failed: the <code>ConnectionCheck</code>'s <code>stage</code> (<code>network</code>, <code>auth</code>, <code>database</code>, <code>permission</code>), or <code>connect</code> where the adapter does not say</td>
+<td>The <code>ConnectionCheck</code>'s <code>fix</code>, or a generic one</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Datasource</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">[(</span><span class="n">d</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">status</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">list</span><span class="p">()]</span>   <span class="c1"># [('shop', 'ready'), ('hr', 'failed')]</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hr"</span><span class="p">)</span><span class="o">.</span><span class="n">reason</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"ledger"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sqlite"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"database"</span><span class="p">:</span> <span class="s2">"ledger.db"</span><span class="p">}))</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="s2">"ledger"</span><span class="p">)</span><span class="o">.</span><span class="n">status</span>                 <span class="c1"># 'ready'</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"ledger"</span><span class="p">])</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">{</span><span class="n">t</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">installed</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">types</span><span class="p">()}</span>   <span class="c1"># {'duckdb': True, 'mssql': False, ...}</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">form</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">types</span><span class="p">()</span> <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"postgres"</span><span class="p">)</span><span class="o">.</span><span class="n">connection_schema</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">candidate</span> <span class="o">=</span> <span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"postgres"</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                       <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"host"</span><span class="p">:</span> <span class="s2">"db.internal"</span><span class="p">,</span> <span class="s2">"database"</span><span class="p">:</span> <span class="s2">"sales"</span><span class="p">,</span> <span class="s2">"user"</span><span class="p">:</span> <span class="s2">"nl2sql"</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                                   <span class="s2">"password"</span><span class="p">:</span> <span class="s2">"${env:SALES_DB_PASSWORD}"</span><span class="p">})</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">status</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>   <span class="c1"># registers nothing</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="k">if</span> <span class="n">status</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"ready"</span><span class="p">:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">candidate</span><span class="p">)</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">status</span><span class="o">.</span><span class="n">stage</span><span class="p">,</span> <span class="n">status</span><span class="o">.</span><span class="n">reason</span><span class="p">,</span> <span class="n">status</span><span class="o">.</span><span class="n">fix</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Datasource</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">[(</span><span class="n">d</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">status</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">list</span><span class="p">()]</span>   <span class="c1"># [('shop', 'ready'), ('hr', 'failed')]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hr"</span><span class="p">)</span><span class="o">.</span><span class="n">reason</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"ledger"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sqlite"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"database"</span><span class="p">:</span> <span class="s2">"ledger.db"</span><span class="p">}))</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="s2">"ledger"</span><span class="p">)</span><span class="o">.</span><span class="n">status</span>                 <span class="c1"># 'ready'</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"ledger"</span><span class="p">])</span>
 </code></pre></div>
 <p>To add every datasource of another <code>nl2sql.yaml</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">for</span> <span class="n">datasource</span> <span class="ow">in</span> <span class="n">load_config</span><span class="p">(</span><span class="s2">"other/nl2sql.yaml"</span><span class="p">)</span><span class="o">.</span><span class="n">datasources</span><span class="p">:</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">datasource</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">for</span> <span class="n">datasource</span> <span class="ow">in</span> <span class="n">load_config</span><span class="p">(</span><span class="s2">"other/nl2sql.yaml"</span><span class="p">)</span><span class="o">.</span><span class="n">datasources</span><span class="p">:</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">datasource</span><span class="p">)</span>
 </code></pre></div>
 <p>See <a href="../../../configuration/datasources/">Datasources</a> for the <code>Datasource</code>
 fields, and <a href="../../../configuration/datasources/#when-a-datasource-fails-to-start">When a datasource fails to start</a>

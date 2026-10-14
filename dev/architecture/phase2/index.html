@@ -5252,6 +5252,18 @@ subclasses. The author provides three fixtures:</p>
 <p>The kit proves itself on the five built-ins: SQLite and DuckDB in the unit
 job, PostgreSQL, MySQL and SQL Server in the <code>realdb</code> job.</p>
 <h3 id="enginedatasources-the-methods-behind-connect-a-database"><code>engine.datasources</code>: the methods behind Connect a database</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: B5</p>
+<p><code>types()</code> returns <code>DatasourceType</code>s (exported from <code>nl2sql</code>), <code>test()</code>
+takes an id or a <code>Datasource</code>, and <code>add()</code> validates <code>index</code> as an
+<code>IndexScope</code> again, since <code>model_copy(update=...)</code> skips validation. Filled
+in on the way: <code>Registry.load(..., require_installed=False)</code> and
+<code>missing_modules</code> describe an adapter without its driver; a <code>Datasource</code>
+that cannot be built fails <code>test()</code> at <code>config</code> (unknown type, or a
+connection the model rejects) or <code>driver</code> (the install hint is the fix),
+and an adapter that names no stage still reports <code>connect</code> until B3
+classifies. The REST routes and the form are Phase 4.</p>
+</div>
 <table>
 <thead>
 <tr>
