@@ -56,8 +56,8 @@ also needs Microsoft's ODBC Driver 18 for SQL Server on the machine.
 | `samples` | `python:3.12-slim` | One-shot. Runs `testbed/samples.py`: downloads each sample from a pinned URL, checks its SHA-256, extracts Sakila from its archive, and writes the wide schema for the three servers with `testbed/wide_schema.py`, all into the `samples` volume. Skips what is already there. |
 | `postgres` | `postgres:16` | Starts after `samples`. On its first start, `testbed/postgres/init.sh` (the image's own init mechanism) loads Pagila and the wide schema and creates the reader login. |
 | `mysql` | `mysql:8.0` | The same with Sakila, through `testbed/mysql/init.sh`. The `mysql` client handles Sakila's `DELIMITER` blocks. |
-| `mssql` | `mcr.microsoft.com/mssql/server:2022-latest` | The server. Its healthcheck passes only once `mssql-init` has finished. |
-| `mssql-init` | the same image, for its `sqlcmd` | Runs `testbed/mssql/init.sh`: restores AdventureWorksLT from the `.bak`, loads the wide schema and creates the reader login, skipping each database that already exists. Then it marks itself loaded for its healthcheck and idles instead of exiting. |
+| `mssql` | `mcr.microsoft.com/mssql/server:2022-latest` | The server. Its healthcheck passes only once `mssql-init` has finished. It has a 60-second `stop_grace_period`: after Docker's default 10 seconds a stop ends in `SIGKILL`, and the next start then recovers every database before any can be opened. |
+| `mssql-init` | the same image, for its `sqlcmd` | Runs `testbed/mssql/init.sh`: waits up to five minutes until the server accepts logins and every sample database it already has is `ONLINE` in `sys.databases` (asked from `master`, since a database still in recovery cannot be opened), then restores AdventureWorksLT from the `.bak`, loads the wide schema and creates the reader login, skipping each database that already exists. Then it marks itself loaded for its healthcheck and idles instead of exiting. |
 
 Every server has a healthcheck that passes only once it is loaded, so
 `up --wait` is enough before running tests. `--wait` fails on an exited
@@ -228,7 +228,7 @@ python scripts/testbed.py down
 |---|---|
 | `up` | Reads the three passwords from Secret Manager into memory, starts the VM, copies `testbed/` to it (never a local `testbed/.env`), waits up to five minutes for Docker (the first boot installs it), runs `docker compose up -d --wait` there with `TESTBED_BIND=0.0.0.0`, then opens the three IAP tunnels in the background and waits until `localhost:15432`, `13306` and `11433` answer. The first session loads the samples, which takes several minutes. |
 | `run -- <cmd>` | `up`, then `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` pointing at the tunnels, then `down` in a `finally`: also after Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
-| `down` | Closes the tunnels it opened and stops the VM. Safe to run again. |
+| `down` | Closes the tunnels it opened, runs `docker compose stop` on the VM so every server shuts down cleanly, then stops the VM. Stopping the VM alone kills SQL Server, and the next session then waits for its databases to recover. If the servers cannot be stopped within three minutes (the VM is unreachable or already stopped), it says so and stops the VM anyway. Safe to run again. |
 | `status` | The VM's state, how long it has been running, and whether each tunnel answers. Never a password. |
 
 `--project`, `--zone` and `--instance` override the defaults above.
@@ -256,7 +256,9 @@ the passwords on its stdin reach the VM. OpenSSH ignores the setting.
 
 After `up` on its own, remember `down`: a running VM bills by the hour. If
 the script is killed hard or the VM is started by hand, the nightly stop job
-below stops it at 03:00 UTC.
+below stops it at 03:00 UTC. That stop does not stop the servers first, so
+SQL Server is killed; the next `up` then waits while it recovers its
+databases, which `mssql-init` allows for.
 
 ### Cost controls
 

@@ -334,7 +334,7 @@ Windows and CI runs Linux. It calls `gcloud` (found with `shutil.which`, so
 |---|---|
 | `up` | Starts the VM (`gcloud compute instances start`). Copies `testbed/` to it (`gcloud compute scp --tunnel-through-iap`). Runs `docker compose up -d --wait` on it over `gcloud compute ssh --tunnel-through-iap`, with `TESTBED_BIND=0.0.0.0` and the three passwords from Secret Manager passed on that command's environment only (they travel on its stdin, never on a command line). Then opens the three IAP tunnels in the background and waits until each local port answers. |
 | `run -- <cmd>` | `up`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` (pointing at the local tunnel ports) in the child's environment only, then closes the tunnels and stops the VM in a `finally`: also on Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
-| `down` | Closes any tunnels it opened and stops the VM. Safe to run again. |
+| `down` | Closes any tunnels it opened, runs `docker compose stop` on the VM (bounded; a failure is reported, not fatal) so SQL Server shuts down cleanly, then stops the VM. Safe to run again. |
 | `status` | The VM's state, how long it has been running, and whether the tunnels are open. Never a password. |
 
 Passwords are read with `gcloud secrets versions access latest` into memory,

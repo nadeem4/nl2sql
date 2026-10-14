@@ -7,14 +7,26 @@ set -eo pipefail
 
 sqlcmd=(/opt/mssql-tools18/bin/sqlcmd -C -b -r1 -S mssql -U sa -P "$MSSQL_SA_PASSWORD")
 
-for _ in $(seq 1 90); do
-  "${sqlcmd[@]}" -Q "SELECT 1" > /dev/null 2>&1 && break
+# Wait, for up to five minutes, until the server accepts logins and every
+# sample database it has is ONLINE. After an unclean stop SQL Server recovers
+# each database on start, and DB_ID already finds one that is still
+# recovering, which cannot be opened yet. Asked from master only: a login whose
+# database is not online fails.
+not_online() {
+  "${sqlcmd[@]}" -d master -h -1 -W -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name IN ('AdventureWorksLT2022', 'wide') AND state_desc <> 'ONLINE'" 2> /dev/null | tr -d '[:space:]'
+}
+online=
+for _ in $(seq 1 150); do
+  if [ "$(not_online)" = 0 ]; then online=1; break; fi
   sleep 2
 done
-"${sqlcmd[@]}" -Q "SELECT 1" > /dev/null
+if [ -z "$online" ]; then
+  echo "mssql-init: SQL Server or a sample database is not online after five minutes" >&2
+  exit 1
+fi
 
 exists() {
-  "${sqlcmd[@]}" -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN DB_ID('$1') IS NULL THEN 0 ELSE 1 END" | tr -d '[:space:]'
+  "${sqlcmd[@]}" -d master -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN DB_ID('$1') IS NULL THEN 0 ELSE 1 END" | tr -d '[:space:]'
 }
 
 if [ "$(exists AdventureWorksLT2022)" != 1 ]; then
