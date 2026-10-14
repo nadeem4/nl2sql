@@ -80,17 +80,24 @@ def _ask(demo_project, store, rules, role, config_name, names_tables=False, ques
 
 
 @pytest.mark.e2e
-def test_a_viewer_is_refused_without_seeing_or_leaking_forbidden_data(demo_project, tmp_path):
+def test_denied_table_never_reaches_the_planner_prompt(demo_project, tmp_path):
+    """A viewer asking about customers: the planner never sees Customer or Invoice, and the
+    gold-style plan that names them anyway is refused by the validator."""
     server, r = _ask(demo_project, tmp_path, _top_customers_rules(), "viewer", "rbac-viewer.yaml")
     assert "SECURITY_VIOLATION" in r.stdout, r.stdout + r.stderr
 
-    # (a) Structure yes, data no, in the prompt the model actually received.
+    # (a) Hidden, in the prompt the model actually received: no name, no column, no data.
     prompt = _planner_prompts(server)
     for probe in PROBES:
         assert probe not in prompt
-    assert '\\"name\\":\\"Customer\\"' in prompt and '\\"name\\":\\"Invoice\\"' in prompt
-    assert '\\"name\\":\\"Email\\"' in prompt and '\\"name\\":\\"Total\\"' in prompt
+    assert '\\"name\\":\\"Customer\\"' not in prompt and '\\"name\\":\\"Invoice\\"' not in prompt
+    assert '\\"name\\":\\"Email\\"' not in prompt
+    assert '\\"name\\":\\"Track\\"' in prompt
     assert "sample_values" in prompt  # readable tables (Track, Album, ...) keep theirs
+    # Nor does any other model call name them: not the answerability judge, not the decomposer.
+    for call in server.calls:
+        text = json.dumps(call["body"])
+        assert "InvoiceLine" not in text and "Employee" not in text, call["name"]
 
     # (b) The written trace carries none of it either.
     text, doc = _only_trace(tmp_path)

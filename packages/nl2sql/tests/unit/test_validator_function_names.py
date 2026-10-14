@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.pipeline.nodes.ast_planner.functions import ALLOWED_FUNCTIONS
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
@@ -35,8 +35,7 @@ def _errors(expr, where="select"):
         select_items=[SelectItem(alias="v", expr=expr if where == "select" else NAME)],
         order_by=[OrderItem(expr=expr)] if where == "order_by" else [],
     )
-    rbac = SimpleNamespace(get_allowed_tables=lambda _: ["*"])
-    node = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac))
+    node = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True}))
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="q"),

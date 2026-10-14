@@ -25,15 +25,13 @@ WEBANALYTICS_DATASOURCE = {
     ),
 }
 
-# Every table in the database, and the subsets each demo role may read.
-WEBANALYTICS_ALL = ["conversions", "devices", "page_views", "referrers", "sessions"]
-
-WEBANALYTICS_TABLES_BY_ROLE = {
+# What each demo role may read here, as policy patterns.
+WEBANALYTICS_ROLES = {
     # Nothing here identifies an employee or an agent, so the analyst reads it all.
-    "analyst": list(WEBANALYTICS_ALL),
+    "analyst": {"allow": ["webanalytics"]},
     # Traffic shape without the people: sessions and conversions both carry a
     # customer email, so the viewer sees neither.
-    "viewer": ["devices", "page_views", "referrers"],
+    "viewer": {"allow": [f"webanalytics.main.{t}" for t in ("devices", "page_views", "referrers")]},
 }
 
 WEBANALYTICS_QUESTIONS = [

@@ -198,7 +198,7 @@ def _executor(adapter, monkeypatch, row_count, allowed=("*",)):
     monkeypatch.setattr(SqlExecutorService, "execute", execute)
     registry = SimpleNamespace(supports=lambda *_a: True, get_adapter=lambda _id: adapter)
     ctx = fake_runtime(settings={"tenant_id": "t1"}, ds_registry=registry,
-                       rbac=SimpleNamespace(get_allowed_tables=lambda _user: list(allowed)))
+                       policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": list(allowed)}}})
     return ExecutorNode(ctx)
 
 
@@ -236,7 +236,7 @@ def test_a_result_with_rows_is_not_probed(adapter, monkeypatch):
 def test_the_role_s_tables_bound_the_probe(adapter, monkeypatch):
     spy = _Spy(adapter)
 
-    result = _executor(spy, monkeypatch, row_count=0, allowed=["music.Track"])(_sub_state(JAZ))
+    result = _executor(spy, monkeypatch, row_count=0, allowed=["music.main.Track"])(_sub_state(JAZ))
 
     assert result["errors"] == [] and spy.sql == []
 

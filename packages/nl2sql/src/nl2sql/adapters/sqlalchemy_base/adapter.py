@@ -166,8 +166,8 @@ class BaseSQLAlchemyAdapter:
     def default_schema(self) -> Optional[str]:
         """The schema an unqualified table name resolves to, or ``None`` if unknown.
 
-        RBAC reads a two-part ``datasource.table`` policy entry as that table
-        in this schema. Asked of the database once and remembered.
+        Policies read a plan table with no schema as a table in this schema.
+        Asked of the database once and remembered.
         """
         if not self.engine:
             return None

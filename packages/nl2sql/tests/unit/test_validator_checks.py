@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
     Expr,
@@ -28,8 +28,8 @@ def _col(alias: str, name: str) -> Expr:
 
 
 def _ctx(allowed_tables):
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: list(allowed_tables))
-    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
+    roles = {role: {"description": "d", "allow": list(allowed_tables)} for role in ("admin", "viewer")}
+    return fake_runtime(ds_registry=SimpleNamespace(), policies={"roles": roles})
 
 
 def _plan() -> PlanModel:
@@ -64,7 +64,7 @@ def valid_state():
 @pytest.fixture
 def denying_validator_node():
     # A role whose allowlist covers nothing in this plan.
-    return LogicalValidatorNode(_ctx(["other_ds.*"]))
+    return LogicalValidatorNode(_ctx(["other_ds"]))
 
 
 @pytest.fixture

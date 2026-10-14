@@ -1,13 +1,12 @@
-"""``engine.policies``: the roles, what a caller may read, and whether the rules match the datasources."""
+"""``engine.policies``: the roles, what a caller may read, and whether the patterns match the datasources."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set
 
-from nl2sql.auth.models import UserContext
-from nl2sql.auth.rbac import default_schema
 from nl2sql.config import Role
+from nl2sql.policies import Scope, UserContext, matching_datasources
 from nl2sql.runtime import Runtime
 
 
@@ -34,99 +33,50 @@ class PoliciesAPI:
         self._ctx = ctx
 
     def roles(self) -> Dict[str, Role]:
-        """The configured roles by id: each one's description and what it may read."""
+        """The configured roles by id: each one's description and its allow and deny patterns."""
         return dict(self._ctx.config.policies.roles)
+
+    def scope(self, user_context: UserContext, datasource_id: str) -> Scope:
+        """What ``user_context`` may read in ``datasource_id``: the same ``Scope`` a run decides with."""
+        return self._ctx.policy_engine.scope(user_context, datasource_id)
 
     def allows(self, user_context: UserContext, datasource_id: str, table: str,
                schema: Optional[str] = None) -> bool:
         """Whether ``user_context`` may read ``table``; ``schema`` defaults to the datasource's default schema."""
-        default = default_schema(self._ctx.ds_registry, datasource_id)
-        return self._ctx.rbac.is_allowed(user_context, datasource_id, table, schema, default)
-
-    def allowed(self, user_context: UserContext) -> Dict[str, List[str]]:
-        """What ``user_context`` may read: ``{"datasources": [...], "tables": [...]}``, as the rules say it."""
-        rbac = self._ctx.rbac
-        return {"datasources": rbac.get_allowed_datasources(user_context),
-                "tables": rbac.get_allowed_tables(user_context)}
+        return self.scope(user_context, datasource_id).allows(schema, table)
 
     def validate(self) -> PolicyValidationReport:
         """
-        Check that every datasource and table rule the engine's ``policies``
-        name is one of its datasources. The policies' own shape was checked
-        when the config loaded.
+        Check that every pattern the engine's ``policies`` name matches one of
+        its datasources. A pattern for a datasource that is not configured is
+        reported here rather than refused at startup, since datasources can be
+        added at runtime. The patterns' own shape was checked when the config
+        loaded.
         """
-        policy_cfg = self._ctx.config.policies
         registry = self._ctx.ds_registry
-        available_ds = set(registry.list_ids())
-        unavailable_ds = registry.unavailable()
+        available = set(registry.list_ids())
+        unavailable = registry.unavailable()
 
         entries: List[PolicyValidationEntry] = []
-        has_errors = False
-
-        for role_id, role_def in policy_cfg.roles.items():
-            for ds in role_def.allowed_datasources:
-                if ds == "*":
-                    entries.append(
-                        PolicyValidationEntry(role=role_id, target="Datasource: *", status="OK", details="Global Access")
-                    )
-                    continue
-                if ds in unavailable_ds:
-                    entries.append(
-                        PolicyValidationEntry(
-                            role=role_id,
-                            target=f"Datasource: {ds}",
-                            status="UNAVAILABLE",
-                            details=f"Datasource failed to start: {unavailable_ds[ds]}",
-                        )
-                    )
-                    has_errors = True
-                elif ds not in available_ds:
-                    entries.append(
-                        PolicyValidationEntry(
-                            role=role_id,
-                            target=f"Datasource: {ds}",
-                            status="MISSING",
-                            details="Datasource not defined in config",
-                        )
-                    )
-                    has_errors = True
-                else:
-                    entries.append(
-                        PolicyValidationEntry(role=role_id, target=f"Datasource: {ds}", status="OK", details="Verified")
-                    )
-
-            for rule in role_def.allowed_tables:
-                if rule == "*":
-                    entries.append(
-                        PolicyValidationEntry(role=role_id, target="Table: *", status="OK", details="Global Access")
-                    )
-                    continue
-
-                parts = rule.split(".")
-                if len(parts) >= 2:
-                    ds_part = parts[0]
-                    if ds_part not in available_ds and ds_part != "*":
-                        entries.append(
-                            PolicyValidationEntry(
-                                role=role_id,
-                                target=f"Table Rule: {rule}",
-                                status="INVALID_DS",
-                                details=f"Datasource '{ds_part}' unknown",
-                            )
-                        )
-                        has_errors = True
-                    else:
-                        entries.append(
-                            PolicyValidationEntry(
-                                role=role_id,
-                                target=f"Table Rule: {rule}",
-                                status="OK",
-                                details="DS Verified",
-                            )
-                        )
+        for role_id, role in self._ctx.config.policies.roles.items():
+            for kind, patterns in (("Allow", role.allow), ("Deny", role.deny)):
+                for text in patterns:
+                    entries.append(self._entry(role_id, f"{kind}: {text}", text, available, unavailable))
 
         return PolicyValidationReport(
-            ok=not has_errors,
+            ok=all(e.status == "OK" for e in entries),
             entries=entries,
-            available_datasources=available_ds,
+            available_datasources=available,
         )
+
+    @staticmethod
+    def _entry(role: str, target: str, text: str, available: Set[str],
+               unavailable: Dict[str, str]) -> PolicyValidationEntry:
+        failed = matching_datasources(text, unavailable)
+        matched = matching_datasources(text, available)
+        if failed and not matched:
+            reasons = "; ".join(f"{ds}: {unavailable[ds]}" for ds in failed)
+            return PolicyValidationEntry(role, target, "UNAVAILABLE", f"Datasource failed to start: {reasons}")
+        if not matched:
+            return PolicyValidationEntry(role, target, "MISSING", "No configured datasource matches it")
+        return PolicyValidationEntry(role, target, "OK", f"Matches {', '.join(matched)}")

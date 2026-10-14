@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from langchain_core.documents import Document
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
@@ -46,7 +46,7 @@ class DatasourceResolverNode:
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
-        self.rbac = ctx.rbac
+        self.policy_engine = ctx.policy_engine
         self.ds_registry = ctx.ds_registry
         self.schema_store = ctx.schema_store
         self.version_mismatch = ctx.settings.schema_.version_mismatch
@@ -125,12 +125,8 @@ class DatasourceResolverNode:
         user_context: UserContext,
         candidate_ids: list[str],
     ) -> list[str]:
-        allowed_ids = self.rbac.get_allowed_datasources(user_context)
-        if not allowed_ids:
-            return []
-        if "*" in allowed_ids:
-            return candidate_ids
-        return [ds_id for ds_id in candidate_ids if ds_id in allowed_ids]
+        return [ds_id for ds_id in candidate_ids
+                if self.policy_engine.scope(user_context, ds_id).reaches_datasource()]
 
 
     def _apply_schema_version_mismatch_policy(self, resolved_datasources: list[ResolvedDatasource], allowed_ids: list[str], unsupported_ids: list[str]):
@@ -184,17 +180,23 @@ class DatasourceResolverNode:
             schema_version=self.schema_store.get_latest_version(datasource_id),
         )
 
-    def _summary(self, datasource_id: str) -> tuple[str, list[str]]:
-        """The datasource's description and its sorted, bare table names."""
+    def _summary(self, user_context: UserContext, datasource_id: str) -> tuple[str, list[str]]:
+        """The datasource's description and the sorted, bare names of the tables the caller may read.
+
+        A table the caller's scope denies is never named to a model: not to
+        the answerability judge, not to the decomposer.
+        """
         snapshot = self.schema_store.get_latest_snapshot(datasource_id)
         if not snapshot:
             return "", []
         description = (snapshot.metadata.description or "").strip()
+        scope = self.policy_engine.scope(user_context, datasource_id)
         # Bare table names: routing needs the topic, not the qualified name.
-        tables = sorted({t.table.table_name for t in snapshot.contract.tables.values()})
+        tables = sorted({t.table.table_name for t in snapshot.contract.tables.values()
+                         if scope.allows(t.table.schema_name, t.table.table_name)})
         return description, tables
 
-    def _answerability_input(self, datasource_ids: list[str]) -> str:
+    def _answerability_input(self, user_context: UserContext, datasource_ids: list[str]) -> str:
         """Each datasource's description and table list, serialized deterministically.
 
         Sorted by id, keys sorted, tables sorted: the same datasources give the
@@ -203,22 +205,23 @@ class DatasourceResolverNode:
         """
         entries = []
         for ds_id in sorted(datasource_ids):
-            description, tables = self._summary(ds_id)
+            description, tables = self._summary(user_context, ds_id)
             entries.append({"description": description, "id": ds_id, "tables": tables})
         return json.dumps(entries, sort_keys=True, ensure_ascii=False)
 
-    def _with_context(self, datasource: ResolvedDatasource) -> ResolvedDatasource:
+    def _with_context(self, user_context: UserContext, datasource: ResolvedDatasource) -> ResolvedDatasource:
         """The datasource with its description and a capped table list, for the decomposer."""
-        description, tables = self._summary(datasource.datasource_id)
+        description, tables = self._summary(user_context, datasource.datasource_id)
         return datasource.model_copy(update={
             "description": description,
             "tables": tables[:MAX_DECOMPOSER_TABLES],
             "more_tables": max(0, len(tables) - MAX_DECOMPOSER_TABLES),
         })
 
-    def _judge_answerability(self, question: str, datasource_ids: list[str]) -> AnswerabilityResponse:
+    def _judge_answerability(self, user_context: UserContext, question: str,
+                             datasource_ids: list[str]) -> AnswerabilityResponse:
         return self.answerability_chain.invoke(
-            {"datasources": self._answerability_input(datasource_ids), "user_query": question}
+            {"datasources": self._answerability_input(user_context, datasource_ids), "user_query": question}
         )
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
@@ -340,7 +343,7 @@ class DatasourceResolverNode:
             if "errors" in mismatch_response:
                 return mismatch_response
 
-            verdict = self._judge_answerability(state.user_query, allowed_ids)
+            verdict = self._judge_answerability(state.user_context, state.user_query, allowed_ids)
             if searched:
                 # Only what the verdict accepted goes forward, and only what
                 # the role may read: the verdict cannot add a datasource.
@@ -368,7 +371,7 @@ class DatasourceResolverNode:
             # Sorted by id: the decomposer prints these into its prompt, and
             # the vector store returns them in no fixed order.
             forwarded = sorted(
-                (self._with_context(c) for c in candidates if c.datasource_id in forward_ids),
+                (self._with_context(state.user_context, c) for c in candidates if c.datasource_id in forward_ids),
                 key=lambda c: c.datasource_id,
             )
             return {

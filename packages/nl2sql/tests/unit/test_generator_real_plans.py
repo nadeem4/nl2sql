@@ -301,7 +301,7 @@ def test_the_validator_builds_its_query_with_the_same_arithmetic():
     """
     from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 
-    validator = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=None))
+    validator = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace()))
     plan = PlanModel.model_validate(_captured_plan())
 
     query = validator._build_validation_query(plan, ["t1", "t2", "t3"])

@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
@@ -52,7 +52,7 @@ def _ctx(dialect: str = "sqlite", row_limit: int = 1000):
     adapter = SimpleNamespace(row_limit=row_limit, max_bytes=1000, get_dialect=lambda: dialect)
     return fake_runtime(
         ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter),
-        rbac=SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"]),
+        policies={"allow_all": True},
     )
 
 

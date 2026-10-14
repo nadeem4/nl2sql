@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.config.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
 from nl2sql.runtime import Runtime
@@ -67,7 +66,7 @@ class CuratedMatcherNode:
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.curated = ctx.curated
         self.vector_store = ctx.vector_store
-        self.rbac = ctx.rbac
+        self.policy_engine = ctx.policy_engine
         self.ds_registry = ctx.ds_registry
         self.schema_store = ctx.schema_store
         self.tenant_id = ctx.tenant_id
@@ -87,9 +86,8 @@ class CuratedMatcherNode:
 
     def _searchable(self, state: GraphState) -> List[str]:
         """Datasources with verified queries that the caller may read, the pinned one alone if pinned."""
-        allowed = self.rbac.get_allowed_datasources(state.user_context) or []
-        registered = list(self.ds_registry.list_ids())
-        readable = registered if "*" in allowed else [d for d in registered if d in allowed]
+        readable = [d for d in self.ds_registry.list_ids()
+                    if self.policy_engine.scope(state.user_context, d).reaches_datasource()]
         if state.datasource_id:
             readable = [d for d in readable if d == state.datasource_id]
         return [d for d in readable if self._queries(d)]
@@ -121,11 +119,10 @@ class CuratedMatcherNode:
         return matches[0]
 
     def _check_access(self, state: GraphState, ds_id: str, tables: List[Tuple[str, str]]) -> None:
-        allowed = self.rbac.get_allowed_tables(state.user_context)
-        default = default_schema(self.ds_registry, ds_id)
+        scope = self.policy_engine.scope(state.user_context, ds_id)
         for schema, table in tables:
             name = f"{schema}.{table}" if schema else table
-            if not table_allowed(allowed, ds_id, table, schema, default):
+            if not scope.allows(schema, table):
                 raise _Fallback("policy_denied", f"'{ds_id}.{name}' is not allowed for this role")
 
     def _row_ceiling(self, ds_id: str) -> int:

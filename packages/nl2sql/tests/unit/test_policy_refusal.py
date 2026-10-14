@@ -1,11 +1,11 @@
-"""Strict RBAC refusal (Phase 1d Task 3b).
+"""Policy refusal, and denied tables hidden from the planner.
 
-A question that needs a table the caller's role cannot read is refused by the
-logical validator. These tests pin the four refinements the owner agreed to:
+A table the caller's scope denies never reaches the planner, and a plan that
+names one anyway is refused by the logical validator. These tests pin:
 
-1. structure yes, data no: the planner sees every table's structure, but no
-   sample values or column statistics from a table the role cannot read;
-2. a generic refusal for the user, the table and role for the operator;
+1. hidden, not stripped: a denied table's name, columns, keys, relationships
+   and data never reach the planner's prompt (owner decision D7, Phase 2);
+2. a generic refusal for the user, the table, role and rule for the operator;
 3. an unknown role, or no role at all, refuses cleanly instead of crashing;
 4. the permission decision is made by the validator from the policy, never by
    anything the model says.
@@ -16,9 +16,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import RBAC, UserContext
-from nl2sql.auth.models import RolePolicy
 from nl2sql.common.errors import ErrorCode
+from nl2sql.config import Policies, Role
+from nl2sql.policies import PolicyEngine, UserContext
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
     Expr,
@@ -28,7 +28,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import (
 )
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
-from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
+from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table, render_schema_for_prompt
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.testing.runtime import fake_runtime
@@ -50,38 +50,33 @@ PROBE_EMAIL = "luisg@embraer.com.br"  # a real Chinook Customer.Email value
 GENERIC_REFUSAL = "You do not have permission to see the data this question requires."
 
 
-def _rbac() -> RBAC:
-    return RBAC(
-        {
-            "admin": RolePolicy(description="all", role="admin", allowed_datasources=["*"], allowed_tables=["*"]),
-            "viewer": RolePolicy(
-                description="catalog only",
-                role="viewer",
-                allowed_datasources=[DS],
-                allowed_tables=[f"{DS}.Track", f"{DS}.Album"],
-            ),
-        }
-    )
+ROLES = {
+    "admin": {"description": "all", "allow": ["*"]},
+    "viewer": {"description": "catalog only", "allow": [f"{DS}.main.Track", f"{DS}.main.Album"]},
+}
+
+
+def _policies(**extra) -> dict:
+    return {"roles": ROLES, **extra}
 
 
 # --- 3. unknown or empty roles ------------------------------------------------
 
 
 @pytest.mark.parametrize("roles", [["ghost"], []], ids=["unknown-role", "no-role"])
-def test_rbac_grants_nothing_to_an_unknown_or_missing_role(roles):
-    rbac = _rbac()
-    ctx = UserContext(roles=roles)
+def test_an_unknown_or_missing_role_reads_nothing(roles):
+    scope = PolicyEngine(Policies.model_validate(_policies())).scope(UserContext(roles=roles), DS)
 
-    assert rbac.get_allowed_tables(ctx) == []
-    assert rbac.get_allowed_datasources(ctx) == []
+    assert not scope.reaches_datasource()
+    assert not scope.allows("main", "Track")
 
 
-def test_rbac_ignores_an_unknown_role_beside_a_known_one():
-    rbac = _rbac()
-    ctx = UserContext(roles=["ghost", "viewer"])
+def test_an_unknown_role_beside_a_known_one_is_ignored():
+    scope = PolicyEngine(Policies.model_validate(_policies())).scope(UserContext(roles=["ghost", "viewer"]), DS)
 
-    assert sorted(rbac.get_allowed_tables(ctx)) == [f"{DS}.Album", f"{DS}.Track"]
-    assert rbac.get_allowed_datasources(ctx) == [DS]
+    assert scope.reaches_datasource()
+    assert scope.allows("main", "Track") and scope.allows(None, "Album")
+    assert not scope.allows("main", "Customer")
 
 
 # --- validator helpers --------------------------------------------------------
@@ -111,8 +106,8 @@ def _state(plan: PlanModel, roles) -> SubgraphExecutionState:
 
 
 def _validator(refusal_names_tables: bool = False) -> LogicalValidatorNode:
-    return LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=_rbac(),
-                                             policies={"refusal_names_tables": refusal_names_tables}))
+    return LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(),
+                                             policies=_policies(refusal_names_tables=refusal_names_tables)))
 
 
 def _policy_check(result):
@@ -147,7 +142,8 @@ def test_the_default_refusal_does_not_name_the_table():
     assert "Customer" not in str(result["logical_validator_response"].reasoning)
     # The operator still gets the table and the role, in the error's details
     # (which the run trace records and the QueryResult summary does not carry).
-    assert denial.details == {"datasource_id": DS, "table": f"{DS}.Customer", "roles": ["viewer"]}
+    assert denial.details == {"datasource_id": DS, "table": f"{DS}.Customer", "roles": ["viewer"],
+                              "rule": "no allow pattern of role(s) 'viewer' matches 'chinook.main.Customer'"}
 
 
 def test_a_deployment_can_opt_into_naming_the_table():
@@ -186,7 +182,7 @@ def test_the_model_cannot_talk_the_validator_round():
 
 
 def test_the_policy_decision_reads_only_the_policy_and_the_plan_tables():
-    """Allow and deny follow the RBAC policy for the plan's tables, nothing else."""
+    """Allow and deny follow the policy for the plan's tables, nothing else."""
     validator = _validator()
 
     allowed = validator(_state(_plan("Track"), ["viewer"]))
@@ -198,7 +194,7 @@ def test_the_policy_decision_reads_only_the_policy_and_the_plan_tables():
     assert _policy_check(admin).passed is True
 
 
-# --- 1. structure yes, data no ------------------------------------------------
+# --- 1. denied tables are hidden from the planner ------------------------------
 
 CUSTOMER = TableRef(schema_name="main", table_name="Customer")
 TRACK = TableRef(schema_name="main", table_name="Track")
@@ -265,7 +261,7 @@ def _retriever(vector_store=None, full_snapshot_max_tables=15) -> SchemaRetrieve
         settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
         vector_store=vector_store,
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
-        rbac=_rbac(),
+        policies=_policies(),
     )
     return SchemaRetrieverNode(ctx)
 
@@ -279,44 +275,57 @@ def _retrieve(node, roles):
     return {t.name: t for t in node(state)["relevant_tables"]}
 
 
-def _assert_structure_without_data(tables):
-    customer = tables["Customer"]
-    assert [c.name for c in customer.columns] == ["CustomerId", "Email"]
-    assert [c.type for c in customer.columns] == ["INTEGER", "NVARCHAR(60)"]
-    assert customer.primary_key == ["CustomerId"]
-    assert all(not c.stats for c in customer.columns)
-    assert PROBE_EMAIL not in "".join(t.model_dump_json() for t in tables.values())
-    # A readable table keeps its statistics, and its relationship to the
-    # forbidden table is still described.
+def _assert_customer_is_hidden(tables):
+    assert set(tables) == {"Track"}
+    prompt = render_schema_for_prompt(list(tables.values()))
+    assert '"Customer"' not in prompt and CUSTOMER.full_name not in prompt
+    assert "Email" not in prompt and PROBE_EMAIL not in prompt
+    # The readable table keeps its statistics; its key into the hidden table is dropped.
     track = tables["Track"]
     assert next(c for c in track.columns if c.name == "Name").stats["sample_values"]
-    assert track.relationships[0]["to_table"] == CUSTOMER.full_name
+    assert track.relationships == []
 
 
-@pytest.mark.parametrize("roles", [["viewer"], ["ghost"], []], ids=["viewer", "unknown-role", "no-role"])
-def test_full_snapshot_path_strips_data_but_keeps_structure_for_forbidden_tables(roles):
-    tables = _retrieve(_retriever(), roles)
-
-    customer = tables["Customer"]
-    assert [c.name for c in customer.columns] == ["CustomerId", "Email"]
-    assert all(not c.stats for c in customer.columns)
-    assert PROBE_EMAIL not in "".join(t.model_dump_json() for t in tables.values())
-    if roles == ["viewer"]:
-        _assert_structure_without_data(tables)
+def test_denied_table_never_reaches_the_planner_prompt():
+    _assert_customer_is_hidden(_retrieve(_retriever(), ["viewer"]))
 
 
-def test_vector_path_strips_data_but_keeps_structure_for_forbidden_tables():
+@pytest.mark.parametrize("roles", [["ghost"], []], ids=["unknown-role", "no-role"])
+def test_an_unknown_or_missing_role_gets_no_tables(roles):
+    assert _retrieve(_retriever(), roles) == {}
+
+
+def test_the_vector_searches_run_over_the_readable_tables_only():
+    asked = []
     doc = SimpleNamespace(metadata={"table": CUSTOMER.full_name})
     track_doc = SimpleNamespace(metadata={"table": TRACK.full_name})
+
+    def retrieve_schema_context(*_a, tables=None, **_k):
+        asked.append(tables)
+        # A store that ignored the filter still cannot show the planner a hidden table.
+        return [doc, track_doc]
+
     vector_store = SimpleNamespace(
-        retrieve_schema_context=lambda *_a, **_k: [doc, track_doc],
+        retrieve_schema_context=retrieve_schema_context,
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
 
     tables = _retrieve(_retriever(vector_store, full_snapshot_max_tables=0), ["viewer"])
 
-    _assert_structure_without_data(tables)
+    assert asked == [[TRACK.full_name]]
+    _assert_customer_is_hidden(tables)
+
+
+def test_plan_naming_a_hidden_table_is_refused():
+    # The planner saw only what the retriever gave it, but names Customer anyway.
+    relevant = list(_retrieve(_retriever(), ["viewer"]).values())
+    state = _state(_plan("Customer"), ["viewer"]).model_copy(update={"relevant_tables": relevant})
+
+    result = _validator()(state)
+
+    assert any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in result["errors"])
+    assert _policy_check(result).passed is False
 
 
 def test_admin_still_receives_full_statistics():

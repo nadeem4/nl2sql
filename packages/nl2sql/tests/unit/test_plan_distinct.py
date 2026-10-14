@@ -13,7 +13,7 @@ import pytest
 import sqlglot
 from sqlglot import expressions as exp
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
@@ -66,8 +66,7 @@ def _sql(plan: PlanModel, dialect: str = "sqlite") -> str:
 
 
 def _validate(plan: PlanModel):
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac,
+    return LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True},
                                              settings={"pipeline": {"strict_columns": True}}))(_state(plan))
 
 

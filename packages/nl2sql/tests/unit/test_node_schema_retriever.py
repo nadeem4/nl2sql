@@ -69,7 +69,7 @@ def test_schema_retriever_falls_back_to_schema_store():
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store())
+    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store(), policies={"allow_all": True})
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -110,7 +110,7 @@ def test_schema_retriever_builds_tables_from_docs():
         retrieve_planning_context=lambda *_a, **_k: [doc_col, doc_rel],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store())
+    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store(), policies={"allow_all": True})
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -142,7 +142,7 @@ def test_schema_retriever_uses_column_fallback():
         retrieve_planning_context=lambda *_a, **_k: [doc_col],
         retrieve_column_candidates=lambda *_a, **_k: [doc_col],
     )
-    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store())
+    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store(), policies={"allow_all": True})
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -192,7 +192,7 @@ def retriever_with_snapshot():
             retrieve_column_candidates=MagicMock(return_value=[]),
         )
         schema_store = SimpleNamespace(get_latest_snapshot=lambda _id: snapshot)
-        ctx = fake_runtime(vector_store=vector_store, schema_store=schema_store,
+        ctx = fake_runtime(vector_store=vector_store, schema_store=schema_store, policies={"allow_all": True},
                            settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}})
         node = SchemaRetrieverNode(ctx)
         return node, vector_store, {ref.table_name for ref in refs}

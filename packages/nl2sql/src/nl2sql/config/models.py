@@ -19,6 +19,7 @@ from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
 from nl2sql.config.curated import CuratedDatasource
+from nl2sql.policies.patterns import parse_pattern
 
 
 class KeepsReferences:
@@ -218,26 +219,21 @@ class Embeddings(_Model):
 # ---------------------------------------------------------------- policies
 
 class Role(_Model):
-    """What one role may read."""
+    """What one role may read: allow and deny patterns over ``datasource.schema.table``.
+
+    A pattern is ``*``, ``datasource`` or ``datasource.schema.table``, each part
+    a glob; matching ignores case. Deny beats allow within the role.
+    """
 
     description: str
-    allowed_datasources: List[str] = Field(default_factory=list)
-    allowed_tables: List[str] = Field(default_factory=list)
+    allow: List[str] = Field(default_factory=list)
+    deny: List[str] = Field(default_factory=list)
 
-    @field_validator("allowed_tables")
+    @field_validator("allow", "deny")
     @classmethod
-    def _namespaced(cls, value: List[str]) -> List[str]:
-        """``*``, ``datasource.*``, ``datasource.schema.*``, ``datasource.schema.table``
-        or ``datasource.table`` (that table in the datasource's default schema)."""
-        for table in value:
-            if table == "*":
-                continue
-            parts = table.split(".")
-            if len(parts) not in (2, 3) or any(not p for p in parts) or "*" in parts[:-1]:
-                raise ValueError(
-                    f"Invalid table '{table}'. Use 'datasource.*', 'datasource.schema.*', "
-                    "'datasource.schema.table' or 'datasource.table'."
-                )
+    def _patterns(cls, value: List[str]) -> List[str]:
+        for pattern in value:
+            parse_pattern(pattern)
         return value
 
 

@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Literal, Any
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from nl2sql.auth.models import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import PipelineError
 
 

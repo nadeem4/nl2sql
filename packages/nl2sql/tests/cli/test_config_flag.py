@@ -114,8 +114,8 @@ def test_the_env_file_next_to_the_config_is_loaded_without_overriding(tmp_path, 
 
 def test_policy_validate_checks_the_configs_policies(tmp_path):
     config = _project(tmp_path, policies={"roles": {
-        "analyst": {"description": "Shop only", "allowed_datasources": ["shop"], "allowed_tables": ["shop.*"]},
-        "ghost": {"description": "A datasource that does not exist", "allowed_datasources": ["nowhere"]},
+        "analyst": {"description": "Shop only", "allow": ["shop"]},
+        "ghost": {"description": "A datasource that does not exist", "allow": ["nowhere"]},
     }, "default_role": "analyst"})
 
     result = runner.invoke(app, ["--config", str(config), "policy", "validate"])
