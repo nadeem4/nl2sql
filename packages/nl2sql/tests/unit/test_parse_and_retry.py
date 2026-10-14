@@ -163,3 +163,25 @@ def test_a_good_first_answer_makes_one_call():
     finally:
         server.stop()
     assert len(server.calls) == 1
+
+
+@pytest.mark.parametrize("wire", [structured, streaming_structured], ids=["plain", "streamed"])
+def test_retries_are_in_the_trace_with_the_parsed_answer(wire):
+    from langchain_core.runnables import RunnableLambda
+
+    from nl2sql.tracing.recorder import TraceRecorder
+
+    server = FakeLLMServer([Rule("Pick", GOOD, when=RETRY), Rule("Pick", BAD)]).start()
+    recorder = TraceRecorder()
+    try:
+        chain = PROMPT | wire(_llm(server), Pick)
+        # As the graph runs it: inside a run named after the node.
+        node = RunnableLambda(lambda question, config: chain.invoke(question, config), name="ast_planner")
+        _ask(node, callbacks=[recorder])
+    finally:
+        server.stop()
+
+    calls = [call for execution in recorder.node_executions() for call in execution["llm_calls"]]
+    assert [call["key"]["call_index"] for call in calls] == [1, 2]
+    assert RETRY in calls[1]["messages"][-1]["content"]
+    assert calls[1]["parsed"] == GOOD

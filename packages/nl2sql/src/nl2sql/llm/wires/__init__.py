@@ -139,12 +139,16 @@ def _errors_of(exc: BaseException) -> str:
     return str(exc)
 
 
-def _retrying(llm: Any, schema: Any, model: Any, parser: Any, first: Any, json_mode: bool) -> Any:
-    """Asks ``first``, then ``model`` with what was wrong, up to the agent's ``parse_retries`` times.
+def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
+              streamed: Optional[tuple] = None) -> Any:
+    """Asks ``model``, then again with what was wrong, up to the agent's ``parse_retries`` times.
 
-    Each retry adds the model's answer and the errors to the messages. The
-    model and the parser run under the caller's config, so every call reaches
-    the usage and trace callbacks.
+    ``streamed`` is ``(streaming model, repair)``: the first answer is asked
+    of that model and passed through ``repair``. Each retry adds the model's
+    answer and the errors to the messages. The model and the parser run under
+    the caller's config, directly under this step, so every call reaches the
+    usage and trace callbacks and the trace records this step's parsed answer
+    against the call.
     """
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.runnables import RunnableLambda
@@ -156,9 +160,12 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, first: Any, json_m
         messages = _messages(prompt)
         if json_mode:
             messages = _with_schema(messages, schema)
-        asking, errors = first, ""
-        for _ in range(retries + 1):
-            answer = asking.invoke(messages, config)
+        errors = ""
+        for attempt in range(retries + 1):
+            if attempt == 0 and streamed is not None:
+                answer = streamed[1](streamed[0].invoke(messages, config))
+            else:  # a retry is never streamed
+                answer = model.invoke(messages, config)
             try:
                 parsed = parser.invoke(answer, config)
             except ValueError as exc:  # OutputParserException, ValidationError and JSONDecodeError all are
@@ -170,7 +177,6 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, first: Any, json_m
             messages = [*messages, AIMessage(content=_answer_text(answer)),
                         HumanMessage(content=f"Your answer did not match the schema: {errors}. "
                                              f"Answer again with only {name}.")]
-            asking = model  # a retry is never streamed
         agent = (config.get("metadata") or {}).get("langgraph_node") or _metadata(llm).get(AGENT_KEY) or "default"
         raise StructuredOutputError(agent, name, retries + 1, errors)
 
@@ -202,7 +208,7 @@ def structured(llm: Any, schema: Any) -> Any:
     if pair is None:  # not a model and a parser: nothing to send an answer back to
         return chain
     model, parser = pair
-    return _retrying(llm, schema, model, parser, model, method == "json_mode")
+    return _retrying(llm, schema, model, parser, method == "json_mode")
 
 
 def streaming_structured(llm: Any, schema: Any) -> Any:
@@ -218,7 +224,6 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
     is retried without streaming.
     """
     from langchain_core.outputs import ChatGeneration, ChatResult
-    from langchain_core.runnables import RunnableLambda
 
     method = _method(llm)
     chain = llm.with_structured_output(schema, method=method)
@@ -231,5 +236,5 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
             return message
         return repair(ChatResult(generations=[ChatGeneration(message=message)]), tools).generations[0].message
 
-    streamed = model.bind(stream=True, stream_usage=True) | RunnableLambda(repaired)
-    return _retrying(llm, schema, model, parser, streamed, method == "json_mode")
+    streaming = model.bind(stream=True, stream_usage=True)
+    return _retrying(llm, schema, model, parser, method == "json_mode", streamed=(streaming, repaired))
