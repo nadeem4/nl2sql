@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import streaming_structured, structured
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
@@ -77,7 +77,7 @@ def _cut_results(state: GraphState) -> List[str]:
 class AnswerSynthesizerNode:
     """Summarizes aggregated results into a user-facing answer."""
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)

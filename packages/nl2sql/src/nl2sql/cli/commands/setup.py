@@ -349,18 +349,20 @@ def _install_required_adapters(config_manager: ConfigManager):
 def _run_indexing_step():
     """Offers schema indexing and runs it through a context built from config paths."""
     from nl2sql.common.settings import settings
-    from nl2sql.context import NL2SQLContext
-    from nl2sql.indexing.vector_store import VectorStore
+    from nl2sql._legacy import legacy_runtime
     from nl2sql.cli.commands.indexing import run_indexing
 
     try:
-        v_store = VectorStore(
-            collection_name=settings.vector_store_collection_name,
-            persist_directory=str(PROJECT_ROOT / settings.vector_store_path),
+        ctx = legacy_runtime(
+            ds_config_path=PROJECT_ROOT / settings.datasource_config_path,
+            secrets_config_path=PROJECT_ROOT / settings.secrets_config_path,
+            llm_config_path=PROJECT_ROOT / settings.llm_config_path,
+            vector_store_path=PROJECT_ROOT / settings.vector_store_path,
+            policies_config_path=PROJECT_ROOT / settings.policies_config_path,
         )
         should_index = False
 
-        if not v_store.is_empty():
+        if not ctx.vector_store.is_empty():
             console.print("[yellow]Vector Store already contains data.[/yellow]")
             if inquirer.confirm(message="Do you want to clear and re-index?", default=False).execute():
                 should_index = True
@@ -372,17 +374,6 @@ def _run_indexing_step():
             return
 
         print_step("Starting Indexer...")
-
-        # NL2SQLContext builds the datasource, LLM and vector store registries
-        # itself; it takes config *paths*, not pre-built registries.
-        ctx = NL2SQLContext(
-            ds_config_path=PROJECT_ROOT / settings.datasource_config_path,
-            secrets_config_path=PROJECT_ROOT / settings.secrets_config_path,
-            llm_config_path=PROJECT_ROOT / settings.llm_config_path,
-            vector_store_path=PROJECT_ROOT / settings.vector_store_path,
-            policies_config_path=PROJECT_ROOT / settings.policies_config_path,
-        )
-
         run_indexing(ctx)
         print_success("Indexing process finished.")
 

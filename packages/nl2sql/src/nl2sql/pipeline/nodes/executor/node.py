@@ -6,7 +6,7 @@ from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
 from nl2sql.pipeline.nodes.executor.value_check import check_values
@@ -21,7 +21,7 @@ logger = get_logger("executor")
 class ExecutorNode:
     """Thin wrapper that delegates to executor services based on capabilities."""
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ds_registry = ctx.ds_registry
         self.executor = SqlExecutorService(ctx.ds_registry)

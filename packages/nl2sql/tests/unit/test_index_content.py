@@ -70,9 +70,9 @@ def _ctx(description=DESCRIPTION, questions=QUESTIONS, schema_store=None):
     return SimpleNamespace(
         vector_store=_RecordingStore(),
         schema_store=schema_store or InMemorySchemaStore(),
-        config_manager=SimpleNamespace(
-            get_example_questions=lambda _ds: list(questions),
-            get_datasource_description=lambda _ds: description,
+        ds_registry=SimpleNamespace(
+            get_sample_questions=lambda _ds: list(questions),
+            get_description=lambda _ds: description,
         ),
         llm_registry=SimpleNamespace(get_llm=lambda _name: (_ for _ in ()).throw(ValueError("no key"))),
     )

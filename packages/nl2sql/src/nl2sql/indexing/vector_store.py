@@ -9,7 +9,6 @@ from langchain_core.embeddings import Embeddings
 
 from nl2sql.indexing.embeddings import (
     PROVIDER_BY_DIMENSION,
-    EmbeddingService,
     describe_embeddings,
 )
 from nl2sql.common.exceptions import NL2SQLError
@@ -90,7 +89,7 @@ class VectorStore:
         self,
         collection_name: str,
         persist_directory: str,
-        embeddings: Optional[Embeddings] = None,
+        embeddings: Embeddings,
     ):
         """
         Initializes the vector store.
@@ -101,7 +100,7 @@ class VectorStore:
             embeddings: Embedding implementation to use.
         """
         self.collection_name = collection_name
-        self.embeddings = embeddings or EmbeddingService.get_embeddings()
+        self.embeddings = embeddings
         self.persist_directory = persist_directory
         self._initialize_vector_store()
 
@@ -517,6 +516,13 @@ class VectorStore:
         if had_live:
             client.delete_collection(previous)
         self._initialize_vector_store()
+
+    def close(self) -> None:
+        """Releases the Chroma client. Chroma counts its clients per folder, so other stores stay open."""
+        client = getattr(self.vectorstore, "_client", None)
+        close = getattr(client, "close", None)
+        if callable(close):
+            close()
 
     def clear(self) -> None:
         """

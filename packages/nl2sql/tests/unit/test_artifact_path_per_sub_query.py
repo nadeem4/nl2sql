@@ -31,7 +31,7 @@ def _metadata(sub_query_id):
 
 
 def _store(base_uri, template):
-    return ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(base_uri), path_template=template))
+    return ArtifactStore(ArtifactStoreConfig(base_uri=str(base_uri), path_template=template))
 
 
 def test_the_default_template_names_the_sub_query():
@@ -101,7 +101,6 @@ class _Adapter:
 
 @pytest.mark.parametrize("template", [DEFAULT_TEMPLATE, "<tenant_id>/<request_id>.parquet"])
 def test_the_executor_writes_each_sub_query_of_a_run_to_its_own_artifact(tmp_path, monkeypatch, template):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
     monkeypatch.setattr(settings, "result_artifact_path_template", template)
     adapters = {"chinook": _Adapter("music"), "support": _Adapter("tickets")}

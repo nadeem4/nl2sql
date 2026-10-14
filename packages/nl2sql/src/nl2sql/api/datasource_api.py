@@ -1,3 +1,4 @@
+    
 """
 Datasource API for NL2SQL
 
@@ -9,52 +10,49 @@ from __future__ import annotations
 import pathlib
 from typing import Union, Dict, Any, List
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.config import Datasource
+from nl2sql.runtime import Runtime
 from nl2sql.datasources.registry import DatasourceRegistry, mask_connection_args
-from nl2sql.datasources.models import DatasourceConfig
 
 
 class DatasourceAPI:
     """
     API for managing datasources programmatically or via config files.
     """
-    
-    def __init__(self, ctx: NL2SQLContext):
+
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
         self._registry: DatasourceRegistry = ctx.ds_registry
-    
-    def add_datasource(
-        self,
-        config: Union[DatasourceConfig, Dict[str, Any]]
-    ) -> None:
+
+    def add_datasource(self, config: Union[Datasource, Dict[str, Any]]) -> None:
         """
-        Programmatically add a datasource to the engine.
-        
+        Add a datasource to the engine: built, not connected, and added to
+        ``engine.config``.
+
         Args:
-            config: Datasource configuration as either a DatasourceConfig object
-                   or a dictionary with the configuration
+            config: A ``Datasource``. The 0.4 shape (a dict with
+                ``connection.type``) is still read until the REST API moves to
+                the ``Datasource`` body.
         """
-        if isinstance(config, dict):
-            config = DatasourceConfig(**config)
-        
-        self._registry.register_datasource(config)
-    
-    def add_datasource_from_config(
-        self,
-        config_path: Union[str, pathlib.Path]
-    ) -> None:
+        if not isinstance(config, Datasource):
+            from nl2sql._legacy import datasource_from_04
+
+            config = datasource_from_04(config)
+        self._ctx.add_datasource(config)
+
+    def add_datasource_from_config(self, config_path: Union[str, pathlib.Path]) -> None:
         """
-        Add datasources from a configuration file.
-        
+        Add the datasources in a 0.4 datasources file.
+
         Args:
             config_path: Path to the datasource configuration file
         """
+        from nl2sql._legacy import datasource_from_04
         from nl2sql.configs import ConfigManager
-        cm = ConfigManager()
-        config_path = pathlib.Path(config_path)
-        ds_configs = cm.load_datasources(config_path)
-        self._registry.register_datasources(ds_configs)
-    
+
+        for config in ConfigManager().load_datasources(pathlib.Path(config_path)):
+            self._ctx.add_datasource(datasource_from_04(config))
+
     def list_datasources(self) -> List[str]:
         """
         List all registered datasource IDs.

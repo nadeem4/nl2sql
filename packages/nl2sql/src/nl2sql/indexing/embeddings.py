@@ -1,18 +1,19 @@
+"""The local embedder and embedder diagnostics.
+
+The embedder an engine uses is built once, by the runtime, from the
+``embeddings`` section through the registry (``nl2sql.embeddings``).
+"""
 from __future__ import annotations
 
-import os
 from typing import Dict, List, Optional, Tuple
 
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import secret_value, settings
 from nl2sql.embeddings.local import LOCAL_EMBEDDING_MODEL
 
 logger = get_logger(__name__)
-
-SUPPORTED_EMBEDDING_PROVIDERS: Tuple[str, ...] = ("openai", "local")
 
 LOCAL_EMBEDDING_DIMENSION = 384
 
@@ -106,84 +107,3 @@ def describe_embeddings(embeddings: Embeddings) -> Tuple[str, str, Optional[int]
     dimension = KNOWN_EMBEDDING_DIMENSIONS.get(model) if model else None
     return provider, model or "unknown", dimension
 
-
-class EmbeddingService:
-    """
-    Centralized service for managing embedding models.
-    Ensures consistency across the application.
-    """
-
-    _instance: Optional[Embeddings] = None
-    _instance_provider: Optional[str] = None
-
-    @classmethod
-    def get_embeddings(cls) -> Embeddings:
-        """
-        Returns the embeddings instance for the configured provider.
-
-        The instance is cached per provider so a runtime settings reload
-        (``reload_settings``) cannot hand back an embedder for the old provider.
-        """
-        provider = cls._resolve_provider()
-        if cls._instance is None or cls._instance_provider != provider:
-            cls._instance = cls._build_embeddings(provider)
-            cls._instance_provider = provider
-        return cls._instance
-
-    @classmethod
-    def reset(cls) -> None:
-        """Drops the cached embedder so the next call rebuilds it.
-
-        The cache lives on the class and outlives any single caller, so tests
-        and long-lived processes that change the configured provider need a way
-        to discard it.
-        """
-        cls._instance = None
-        cls._instance_provider = None
-
-    @classmethod
-    def _resolve_provider(cls) -> str:
-        """Returns the normalized embedding provider from settings."""
-        return (settings.embedding_provider or "openai").strip().lower()
-
-    @classmethod
-    def _build_embeddings(cls, provider: str) -> Embeddings:
-        """
-        Builds an embeddings instance for a provider.
-
-        Args:
-            provider: Normalized provider name.
-
-        Returns:
-            The embeddings implementation.
-
-        Raises:
-            ValueError: If the provider is not recognized, or if the OpenAI
-                provider is selected without an API key.
-        """
-        if provider == "openai":
-            api_key = secret_value(settings.openai_api_key)
-            if not (api_key or os.environ.get("OPENAI_API_KEY")):
-                raise ValueError(
-                    "EMBEDDING_PROVIDER is 'openai' but OPENAI_API_KEY is not set. "
-                    "Set the key, or set EMBEDDING_PROVIDER=local to use the "
-                    "key-free ONNX embedder."
-                )
-            return OpenAIEmbeddings(
-                model=settings.embedding_model,
-                api_key=api_key or None,
-            )
-        if provider == "local":
-            return LocalEmbeddings()
-
-        raise ValueError(
-            f"Unknown EMBEDDING_PROVIDER '{provider}'. "
-            f"Valid options are: {', '.join(SUPPORTED_EMBEDDING_PROVIDERS)}."
-        )
-
-    @classmethod
-    def get_model_name(cls) -> str:
-        """Returns the name of the configured embedding model."""
-        if cls._resolve_provider() == "local":
-            return LOCAL_EMBEDDING_MODEL
-        return settings.embedding_model

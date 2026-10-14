@@ -102,11 +102,6 @@ class Settings(BaseSettings):
         description="Global timeout in seconds for pipeline execution."
     )
 
-    result_artifact_backend: str = Field(
-        default="local",
-        validation_alias="RESULT_ARTIFACT_BACKEND",
-        description="Artifact backend to store executor results: local, s3, adls."
-    )
     result_artifact_base_uri: str = Field(
         default="./artifacts",
         validation_alias="RESULT_ARTIFACT_BASE_URI",
@@ -123,31 +118,6 @@ class Settings(BaseSettings):
             "neither <sub_query_id> nor <dag_node_id> gets -<sub_query_id> "
             "added to its file name, so the sub-queries of a run never share one."
         )
-    )
-    result_artifact_s3_bucket: Optional[str] = Field(
-        default=None,
-        validation_alias="RESULT_ARTIFACT_S3_BUCKET",
-        description="S3 bucket for artifact storage."
-    )
-    result_artifact_s3_prefix: Optional[str] = Field(
-        default=None,
-        validation_alias="RESULT_ARTIFACT_S3_PREFIX",
-        description="S3 prefix for artifact storage."
-    )
-    result_artifact_adls_account: Optional[str] = Field(
-        default=None,
-        validation_alias="RESULT_ARTIFACT_ADLS_ACCOUNT",
-        description="ADLS storage account name."
-    )
-    result_artifact_adls_container: Optional[str] = Field(
-        default=None,
-        validation_alias="RESULT_ARTIFACT_ADLS_CONTAINER",
-        description="ADLS container name."
-    )
-    result_artifact_adls_connection_string: Optional[SecretStr] = Field(
-        default=None,
-        validation_alias="RESULT_ARTIFACT_ADLS_CONNECTION_STRING",
-        description="ADLS connection string, if using key-based auth."
     )
 
     schema_store_backend: str = Field(

@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from nl2sql.api.query_api import QueryResult, result_from_state
 from nl2sql.auth import UserContext
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset
 from nl2sql.evaluation.types import BenchmarkConfig
@@ -35,7 +35,7 @@ class BenchmarkRunner:
     def __init__(
         self,
         config: BenchmarkConfig,
-        ctx: NL2SQLContext,
+        ctx: Runtime,
         *,
         workers: int = 5,
         before_case: Optional[Callable[[GoldQuestion], None]] = None,

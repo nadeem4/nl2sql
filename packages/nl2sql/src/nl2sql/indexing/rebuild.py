@@ -54,7 +54,7 @@ def rebuild_index(
     """Rebuilds the vector index.
 
     Args:
-        ctx: An ``NL2SQLContext`` (or anything with ``vector_store`` and
+        ctx: An ``Runtime`` (or anything with ``vector_store`` and
             ``ds_registry``).
         enrich: Ask the LLM for descriptions; spends tokens. Off by default.
         datasource_ids: Only these datasources; all registered ones when None.

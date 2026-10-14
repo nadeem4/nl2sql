@@ -50,13 +50,15 @@ def test_env_provider_satisfies_the_sdk_protocol(monkeypatch):
 
 
 def test_the_0_4_name_hashi_is_not_a_provider_type():
-    with pytest.raises(ValidationError, match="hashicorp"):
-        SecretProviderConfig(id="vault", type="hashi", url="https://vault", token=FAKE_TOKEN)
+    with pytest.raises(ValueError, match="hashicorp"):
+        SecretManager().configure([
+            SecretProviderConfig(id="vault", type="hashi", url="https://vault", token=FAKE_TOKEN)])
 
 
-def test_an_unknown_key_in_a_provider_block_fails_when_the_config_loads():
-    with pytest.raises(ValidationError, match="tokn"):
-        SecretProviderConfig(id="vault", type="hashicorp", url="https://vault", tokn=FAKE_TOKEN)
+def test_an_unknown_key_in_a_provider_block_fails_when_the_provider_is_built():
+    with pytest.raises(ValueError, match="tokn"):
+        SecretManager().configure([
+            SecretProviderConfig(id="vault", type="hashicorp", url="https://vault", tokn=FAKE_TOKEN)])
 
 
 def _fake_hvac(monkeypatch):
@@ -74,8 +76,8 @@ def test_hashicorp_needs_url_and_token_in_its_block(monkeypatch):
     monkeypatch.setenv("VAULT_ADDR", "https://from-env")
     monkeypatch.setenv("VAULT_TOKEN", FAKE_TOKEN)
 
-    with pytest.raises(ValidationError) as excinfo:
-        SecretProviderConfig(id="vault", type="hashicorp")
+    with pytest.raises(ValueError) as excinfo:
+        SecretManager().configure([SecretProviderConfig(id="vault", type="hashicorp")])
 
     message = str(excinfo.value)
     assert "url" in message and "token" in message
@@ -95,8 +97,8 @@ def test_hashicorp_uses_its_block_and_never_the_environment(monkeypatch):
 def test_azure_needs_vault_url_in_its_block(monkeypatch):
     monkeypatch.setenv("AZURE_KEYVAULT_URL", "https://from-env")
 
-    with pytest.raises(ValidationError, match="vault_url"):
-        SecretProviderConfig(id="kv", type="azure")
+    with pytest.raises(ValueError, match="vault_url"):
+        SecretManager().configure([SecretProviderConfig(id="kv", type="azure")])
 
 
 def test_a_missing_client_library_fails_with_the_install_hint(monkeypatch):

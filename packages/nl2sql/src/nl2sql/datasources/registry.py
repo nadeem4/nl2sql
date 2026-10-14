@@ -1,4 +1,5 @@
-from typing import Dict, List, Any, Optional, Set
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Any, Optional, Set
 from threading import RLock
 
 from nl2sql_sdk.capabilities import DatasourceCapability
@@ -6,7 +7,10 @@ from nl2sql.common.logger import get_logger
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
 from nl2sql.registry import Registry
 from nl2sql.secrets import SecretManager
-from .models import DatasourceConfig, ConnectionConfig, SECRET_ARG_HINTS, _is_secret_arg  # noqa: F401
+from .models import SECRET_ARG_HINTS, _is_secret_arg  # noqa: F401
+
+if TYPE_CHECKING:
+    from nl2sql.config import Datasource
 
 logger = get_logger(__name__)
 
@@ -32,90 +36,142 @@ def redact_connection_secrets(text: str, connection_args: Dict[str, Any]) -> str
 
 
 class DatasourceRegistry:
-    """Manages a collection of active DatasourceAdapters.
-    
-    Acts as the factory and cache for DataSourceAdapter instances.
+    """The adapters one engine built, one per datasource, and which of them are available.
+
+    Building an adapter never connects. ``mark_unavailable`` (called by
+    ``engine.check()`` when a datasource cannot connect) keeps it out of
+    ``list_ids`` and routing, and anything that targets it fails with the
+    reason; ``mark_available`` brings it back.
     """
 
-    def __init__(self, secret_manager: SecretManager, registry: Optional[Registry] = None):
-        """Starts empty. ``registry`` turns a connection ``type`` into an adapter class.
+    def __init__(self, secret_manager: SecretManager, registry: Optional[Registry] = None,
+                 base_dir: Optional[Path] = None):
+        """Starts empty. ``registry`` turns a datasource ``type`` into an adapter class.
 
-        Defaults to ``Registry.default()``: the built-in and installed adapters.
+        ``registry`` defaults to ``Registry.default()``: the built-in and
+        installed adapters. ``base_dir`` is the folder of the ``nl2sql.yaml``
+        the datasources came from; each adapter is given it, so a relative
+        file path in a connection (a SQLite or DuckDB file) is read from there.
+        None means the working directory.
         """
         self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
+        self._datasources: Dict[str, "Datasource"] = {}
         self._capabilities: Dict[str, Set[str]] = {}
-        self._preferred: Dict[str, List[str]] = {}
-        self._descriptions: Dict[str, Optional[str]] = {}
         self._unavailable: Dict[str, str] = {}
         self._registry = registry or Registry.default()
         self._secret_manager = secret_manager
+        self._base_dir = base_dir
         self._lock = RLock()
 
-    def find_and_resolve_secret(self, key: str) -> str:
-        """Attempts to resolve a secret using the secret manager.
+    @property
+    def secret_manager(self) -> SecretManager:
+        return self._secret_manager
 
-        Args:
-            key (str): The name of the secret to resolve.
+    def resolved_connection(self, connection: Dict[str, Any]) -> Dict[str, Any]:
+        """``connection`` with every ``${provider:key}`` value resolved through the secret manager.
 
-        Returns:
-            str: The resolved secret value.
+        Values are returned as plain strings. Each adapter's own config model
+        declares which fields are secret and pydantic coerces the plain string
+        into ``SecretStr`` for those, so masking is preserved exactly where it
+        is declared.
+        """
+        return {
+            key: self._secret_manager.resolve(value)
+            if isinstance(value, str) and value.startswith("${") and value.endswith("}") else value
+            for key, value in (connection or {}).items()
+        }
+
+    def register_datasources(self, datasources: List["Datasource"]) -> None:
+        """Registers every datasource that can be built; records the rest as unavailable.
+
+        For the tools that check a config without an engine (``doctor``,
+        ``policy validate``, ``curated validate``). The engine builds its
+        datasources with ``register_datasource`` and reports every failure
+        as one ``ConfigError``.
+        """
+        for datasource in datasources:
+            try:
+                self.register_datasource(datasource)
+            except Exception as e:
+                self.mark_unavailable(datasource.id, str(e) or type(e).__name__)
+
+    def register_datasource(self, datasource: "Datasource") -> DatasourceAdapterProtocol:
+        """Builds the datasource's adapter, without connecting, and registers it.
+
+        A ``Datasource`` with an ``adapter`` object is registered as given.
+        Otherwise ``type`` is loaded from the registry, every reference in
+        ``connection`` is resolved, and the adapter class is built with the
+        datasource's limits.
 
         Raises:
-            ValueError: If the secret cannot be resolved.
+            RegistryError: the type is unknown, implements another interface
+                version, or its driver is not installed.
+            ValueError: a reference did not resolve, or the adapter rejected
+                the connection settings (with every secret masked).
         """
-        return self._secret_manager.resolve(key)
-
-    def resolved_connection(self, unresolved_connection: ConnectionConfig) -> ConnectionConfig:
-        """Resolves all secrets in a connection dictionary.
-
-        Values are returned as plain strings. ``ConnectionConfig`` declares only
-        ``type`` and allows extras, so there is no type information here to tell
-        a password apart from a host, a user or a port -- wrapping every
-        placeholder in ``SecretStr`` broke every non-password field. Each
-        adapter's own config model declares which fields are secret and pydantic
-        coerces the plain string into ``SecretStr`` for those, so masking is
-        preserved exactly where it is declared.
-
-        Args:
-            unresolved_connection (ConnectionConfig): The connection dictionary with potential secrets.
-
-        Returns:
-            ConnectionConfig: The connection dictionary with resolved secrets.
-        """
-        resolved_connection = unresolved_connection.model_dump()
-        for key, value in list(resolved_connection.items()):
-            if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
-                resolved_connection[key] = self.find_and_resolve_secret(value)
-        return ConnectionConfig(**resolved_connection)
-
-    def register_datasources(self, configs: List[DatasourceConfig]):
-        """Registers every datasource that can start; records the rest as unavailable.
-
-        One bad datasource (unknown type, missing driver, invalid connection
-        config, unresolved secret) does not stop the others: it is logged,
-        kept in ``unavailable()`` with its reason, and anything that targets it
-        later fails with that reason. If datasources were configured and none
-        of them could start, this raises, since an engine with nothing to query
-        is not worth starting.
-        """
-        failures: Dict[str, str] = {}
-        for config in configs:
+        adapter = datasource.adapter
+        if adapter is None:
+            adapter_cls = self._registry.load("adapter", datasource.type)
+            connection_args = self.resolved_connection(datasource.connection)
             try:
-                self.register_datasource(config)
+                adapter = adapter_cls(
+                    datasource_id=datasource.id,
+                    datasource_engine_type=datasource.type,
+                    connection_args=connection_args,
+                    statement_timeout_ms=datasource.limits.timeout_ms,
+                    row_limit=datasource.limits.row_limit,
+                    max_bytes=datasource.limits.max_bytes,
+                    base_dir=self._base_dir,
+                )
             except Exception as e:
-                reason = str(e) or type(e).__name__
-                failures[config.id] = reason
-                with self._lock:
-                    self._unavailable[config.id] = reason
-                logger.error(f"Datasource '{config.id}' is unavailable: {reason}")
-        if failures and not self.list_ids():
-            details = "; ".join(f"'{ds_id}': {reason}" for ds_id, reason in failures.items())
-            raise ValueError(f"No datasource could be started. {details}")
+                # A pydantic ValidationError renders the whole input dict, which
+                # now holds the plaintext password. Re-raise without the cause so
+                # neither the message nor the traceback carries it.
+                raise ValueError(redact_connection_secrets(str(e), connection_args)) from None
+        capabilities = self._read_capabilities(datasource.id, adapter)
+        with self._lock:
+            self._adapters[datasource.id] = adapter
+            self._datasources[datasource.id] = datasource
+            self._capabilities[datasource.id] = capabilities
+            self._unavailable.pop(datasource.id, None)
+        return adapter
+
+    def remove(self, datasource_id: str) -> None:
+        """Forgets a datasource and closes its adapter."""
+        with self._lock:
+            adapter = self._adapters.pop(datasource_id, None)
+            self._datasources.pop(datasource_id, None)
+            self._capabilities.pop(datasource_id, None)
+            self._unavailable.pop(datasource_id, None)
+        if adapter is not None:
+            close_adapter(adapter)
+
+    def mark_unavailable(self, datasource_id: str, reason: str) -> None:
+        """Keeps a datasource out of routing; anything that targets it fails with ``reason``."""
+        with self._lock:
+            self._unavailable[datasource_id] = reason
+        logger.error(f"Datasource '{datasource_id}' is unavailable: {reason}")
+
+    def mark_available(self, datasource_id: str) -> None:
+        with self._lock:
+            self._unavailable.pop(datasource_id, None)
 
     def unavailable(self) -> Dict[str, str]:
-        """Datasources that failed to start, mapped to the reason."""
+        """Datasources that are unavailable, mapped to the reason."""
         with self._lock:
             return dict(self._unavailable)
+
+    def all_adapters(self) -> Dict[str, DatasourceAdapterProtocol]:
+        """Every built adapter by id, available or not: what ``check()`` connects to."""
+        with self._lock:
+            return dict(self._adapters)
+
+    def close(self) -> None:
+        """Closes every adapter: disposes its connection pool."""
+        with self._lock:
+            adapters = list(self._adapters.values())
+        for adapter in adapters:
+            close_adapter(adapter)
 
     def _not_registered(self, datasource_id: str) -> ValueError:
         reason = self._unavailable.get(datasource_id)
@@ -146,74 +202,26 @@ class DatasourceRegistry:
             logger.error(f"Failed to get capabilities for datasource '{ds_id}'; it gets none. {exc}")
             return set()
 
-    def register_datasource(self, config: DatasourceConfig) -> DatasourceAdapterProtocol:
-        """Registers a new datasource dynamically.
-
-        Args:
-            config: The datasource configuration dictionary or object.
-
-        Returns:
-            DatasourceAdapterProtocol: The created and registered adapter.
-
-        Raises:
-            ValueError: If configuration is invalid or adapter type is unknown.
-        """
-        ds_id = config.id
-        if not ds_id:
-            raise ValueError("Datasource ID is required. Please check your configuration.")
-
-        connection = config.connection
-        conn_type = connection.type.lower()
-        resolved_connection = self.resolved_connection(connection)
-        connection_args = resolved_connection.model_dump()
-
-        # Unknown type, wrong interface version or missing driver: a RegistryError
-        # that says how to fix it.
-        adapter_cls = self._registry.load("adapter", conn_type)
-
-        try:
-            adapter = adapter_cls(
-                datasource_id=ds_id,
-                datasource_engine_type=conn_type,
-                connection_args=connection_args,
-                statement_timeout_ms=config.options.get("statement_timeout_ms"),
-                row_limit=config.options.get("row_limit"),
-                max_bytes=config.options.get("max_bytes"),
-            )
-        except Exception as e:
-            # A pydantic ValidationError renders the whole input dict, which
-            # now holds the plaintext password. Re-raise without the cause so
-            # neither the message nor the traceback carries it.
-            raise ValueError(
-                redact_connection_secrets(str(e), connection_args)
-            ) from None
-        capabilities = self._read_capabilities(ds_id, adapter)
-        with self._lock:
-            self._adapters[ds_id] = adapter
-            self._capabilities[ds_id] = capabilities
-            self._preferred[ds_id] = list(config.preferred_tables)
-            self._descriptions[ds_id] = config.description
-            self._unavailable.pop(ds_id, None)
-        return adapter
-
-
+    def _available(self, datasource_id: str) -> bool:
+        return datasource_id in self._adapters and datasource_id not in self._unavailable
 
     def get_adapter(self, datasource_id: str) -> DatasourceAdapterProtocol:
-        """Retrieves the adapter for a datasource.
-
-        Args:
-            datasource_id: The ID of the datasource.
-
-        Returns:
-            DatasourceAdapterProtocol: The active adapter instance.
+        """The adapter for an available datasource.
 
         Raises:
-            ValueError: If the datasource ID is unknown.
+            ValueError: the datasource is unknown, or unavailable (with the reason).
         """
         with self._lock:
-            if datasource_id not in self._adapters:
+            if not self._available(datasource_id):
                 raise self._not_registered(datasource_id)
             return self._adapters[datasource_id]
+
+    def get_datasource(self, datasource_id: str) -> "Datasource":
+        """The ``Datasource`` the datasource was registered with: description, sample questions, limits."""
+        with self._lock:
+            if datasource_id not in self._datasources:
+                raise self._not_registered(datasource_id)
+            return self._datasources[datasource_id]
 
     def get_dialect(self, datasource_id: str) -> str:
         """Returns a normalized dialect string from the adapter.
@@ -229,47 +237,57 @@ class DatasourceRegistry:
     def get_preferred_tables(self, datasource_id: str) -> List[str]:
         """The datasource's ``preferred_tables``; empty for an unknown id."""
         with self._lock:
-            return list(self._preferred.get(datasource_id, []))
+            datasource = self._datasources.get(datasource_id)
+            return list(datasource.preferred_tables) if datasource else []
 
     def get_description(self, datasource_id: str) -> Optional[str]:
         """The ``description`` the datasource was registered with; None for an unknown id."""
         with self._lock:
-            return self._descriptions.get(datasource_id)
+            datasource = self._datasources.get(datasource_id)
+            return datasource.description if datasource else None
+
+    def get_sample_questions(self, datasource_id: str) -> List[str]:
+        """The datasource's ``sample_questions``; empty for an unknown id."""
+        with self._lock:
+            datasource = self._datasources.get(datasource_id)
+            return list(datasource.sample_questions) if datasource else []
 
     def get_capabilities(self, datasource_id: str) -> Set[str]:
         """Returns the capability flags for a datasource."""
         with self._lock:
-            if datasource_id not in self._capabilities:
+            if not self._available(datasource_id):
                 raise self._not_registered(datasource_id)
             return set(self._capabilities[datasource_id])
 
     def supports(self, datasource_id: str, *capabilities: Any) -> bool:
-        """True only if the datasource is registered and declares every one of ``capabilities``.
+        """True only if the datasource is available and declares every one of ``capabilities``.
 
         The one capability check: routing and execution both ask it. An
-        unknown datasource, or one whose adapter could not report its
-        capabilities, supports nothing.
+        unknown or unavailable datasource, or one whose adapter could not
+        report its capabilities, supports nothing.
         """
         with self._lock:
-            declared = self._capabilities.get(datasource_id)
+            declared = self._capabilities.get(datasource_id) if self._available(datasource_id) else None
         if declared is None:
             return False
         return self._normalize_capabilities(capabilities) <= declared
 
     def list_adapters(self) -> List[DatasourceAdapterProtocol]:
-        """Returns a list of all registered adapters.
-
-        Returns:
-            List[DatasourceAdapterProtocol]: All active adapters.
-        """
+        """Every available adapter."""
         with self._lock:
-            return list(self._adapters.values())
+            return [a for ds_id, a in self._adapters.items() if ds_id not in self._unavailable]
 
     def list_ids(self) -> List[str]:
-        """Returns a list of all registered datasource IDs.
-
-        Returns:
-            List[str]: All registered IDs.
-        """
+        """Every available datasource id."""
         with self._lock:
-            return list(self._adapters.keys())
+            return [ds_id for ds_id in self._adapters if ds_id not in self._unavailable]
+
+
+def close_adapter(adapter: Any) -> None:
+    """Releases an adapter's connections through its optional ``close()``. Never raises."""
+    try:
+        close = getattr(adapter, "close", None)
+        if callable(close):
+            close()
+    except Exception as e:
+        logger.warning(f"Closing datasource '{getattr(adapter, 'datasource_id', '?')}' failed: {e}")

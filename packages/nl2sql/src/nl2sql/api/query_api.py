@@ -12,7 +12,7 @@ import threading
 from typing import Optional, List, Dict, Any, Iterator, Literal
 
 from pydantic import BaseModel, Field
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
@@ -285,7 +285,7 @@ class QueryAPI:
     API for executing natural language queries against databases.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
     def run_query(

@@ -12,7 +12,7 @@ from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
 from nl2sql.aggregation.columns import combined_columns, input_order, missing_columns_message, post_op_columns
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 import hashlib
@@ -133,7 +133,7 @@ class DecomposerNode:
         chain (Runnable): The execution chain.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         """Initializes the DecomposerNode.
 
         Args:

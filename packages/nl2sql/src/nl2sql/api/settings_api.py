@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.common.settings import Settings, settings
 
 
@@ -17,7 +17,7 @@ class SettingsAPI:
     API for configuration and settings management.
     """
     
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self._ctx = ctx
         # ``settings`` is a module singleton that ``reload_settings()`` updates in
         # place, so binding it once here keeps reading the live values.

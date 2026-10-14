@@ -16,7 +16,7 @@ from langchain_core.runnables import RunnableLambda
 
 from nl2sql.api.indexing_api import IndexingAPI
 from nl2sql.datasources import DatasourceRegistry
-from nl2sql.datasources.models import DatasourceConfig
+from nl2sql.config import Datasource, Limits
 from nl2sql.indexing.enrichment_service import (
     ColumnEnrichment,
     DatasourceEnrichment,
@@ -106,15 +106,12 @@ def _context(llm_registry, ds_registry=None, file_description="User records"):
     ds_registry = ds_registry or SimpleNamespace(
         get_adapter=lambda ds_id: _StubAdapter(),
         list_ids=lambda: ["ds1"],
-        get_description=lambda ds_id: None,
+        get_description=lambda ds_id: file_description,
+        get_sample_questions=lambda ds_id: [],
     )
     return SimpleNamespace(
         vector_store=_RecordingVectorStore(),
         schema_store=InMemorySchemaStore(),
-        config_manager=SimpleNamespace(
-            get_example_questions=lambda ds_id: [],
-            get_datasource_description=lambda ds_id: file_description,
-        ),
         llm_registry=llm_registry,
         ds_registry=ds_registry,
     )
@@ -211,10 +208,10 @@ def test_code_added_datasource_description_reaches_the_datasource_chunk(tmp_path
         conn.execute("CREATE TABLE orders (id INTEGER PRIMARY KEY, total REAL)")
 
     ds_registry = DatasourceRegistry(SecretManager())
-    ds_registry.register_datasource(DatasourceConfig(
+    ds_registry.register_datasource(Datasource(
         id="shop",
         description="Online shop orders and revenue",
-        connection={"type": "sqlite", "database": str(database)},
+        type="sqlite", connection={"database": str(database)},
     ))
     # The datasources YAML on disk does not list "shop".
     ctx = _context(_RecordingLLMRegistry(), ds_registry=ds_registry, file_description=None)

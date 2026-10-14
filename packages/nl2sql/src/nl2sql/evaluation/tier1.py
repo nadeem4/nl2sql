@@ -24,7 +24,7 @@ import yaml
 
 from nl2sql.common.settings import settings
 from nl2sql.configs.llm import AgentConfig
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkResult, BenchmarkRunner
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset
 from nl2sql.evaluation.types import BenchmarkConfig
@@ -113,7 +113,7 @@ class GoldPlanLLM:
                            api_key="sk-fake-tier1")
 
 
-def run_tier1(ctx: NL2SQLContext, config: Optional[BenchmarkConfig] = None) -> BenchmarkResult:
+def run_tier1(ctx: Runtime, config: Optional[BenchmarkConfig] = None) -> BenchmarkResult:
     """Runs every selected gold question once per role on ``ctx``, key-free.
 
     ``ctx`` must hold the indexed Chinook demo datasource. Its LLM registry is

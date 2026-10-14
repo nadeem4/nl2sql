@@ -9,22 +9,22 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _reset_embedding_service_cache():
-    """Clear the process-wide embedder cache around every test.
+def _restore_the_global_settings():
+    """Put the process-global ``settings`` back after every test.
 
-    ``EmbeddingService`` memoises its embedder on the class, and ``monkeypatch``
-    does not unwind class attributes. Without this, whichever test first builds
-    an embedder while an API key happens to be set leaves that instance in place
-    for the rest of the session, so tests that construct a context pass or fail
-    depending on the order they ran in.
+    Building an engine copies its config into the global (the staging step in
+    docs/architecture/configuration_v2.md, section 8), and ``monkeypatch``
+    cannot unwind that. Without this, one test's engine would leave its
+    settings in place for the next. Deleted with the global.
     """
-    from nl2sql.indexing.embeddings import EmbeddingService
+    from nl2sql.common.settings import settings
 
-    EmbeddingService.reset()
+    saved = dict(settings.__dict__)
     try:
         yield
     finally:
-        EmbeddingService.reset()
+        settings.__dict__.clear()
+        settings.__dict__.update(saved)
 
 
 @pytest.fixture(autouse=True)

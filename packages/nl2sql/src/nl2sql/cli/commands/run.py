@@ -12,12 +12,12 @@ from nl2sql.pipeline.pipeline_runner import PipelineRunner
 from nl2sql.common.settings import settings
 from nl2sql.cli.types import RunConfig
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 
 @handle_cli_errors
 def run_pipeline(
     config: RunConfig, 
-    ctx: NL2SQLContext
+    ctx: Runtime
 ) -> None:
     """Executes the NL2SQL pipeline."""
     if not config.query:

@@ -1,6 +1,6 @@
 from langgraph.graph import END, StateGraph
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, wrap_subgraph
 from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
 from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
@@ -12,7 +12,7 @@ from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 
 def build_graph(
-    ctx: NL2SQLContext,
+    ctx: Runtime,
     execute: bool = True,
 ) -> StateGraph:
     """Builds the main LangGraph pipeline.
@@ -28,7 +28,7 @@ def build_graph(
     is exactly the one without curated answers.
 
     Args:
-        ctx (NL2SQLContext): The application context containing registries and services.
+        ctx (Runtime): The application context containing registries and services.
         execute (bool): Whether to allow execution against real databases.
 
     Returns:

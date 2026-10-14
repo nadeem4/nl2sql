@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from nl2sql.common.env_hint import active_env_file
 from nl2sql.common.logger import configure_logging
 from nl2sql.common.settings import reload_settings, settings
-from nl2sql.context import NL2SQLContext
+from nl2sql._legacy import legacy_runtime
 from nl2sql import BenchmarkConfig
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH
 
@@ -125,7 +125,7 @@ def run(
         verbose=verbose,
         show_perf=show_perf
     )
-    ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path, policies_config_path)
+    ctx = legacy_runtime(ds_config_path, secrets_config_path, llm_config_path, vector_store_path, policies_config_path)
 
     run_pipeline(run_config, ctx)
 
@@ -142,7 +142,7 @@ def trace_replay(
     """
     Re-run a traced question feeding back the recorded LLM responses (no model calls).
     """
-    replay_command(target, lambda: NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path,
+    replay_command(target, lambda: legacy_runtime(ds_config_path, secrets_config_path, llm_config_path,
                                                  vector_store_path, policies_config_path))
 
 
@@ -185,7 +185,7 @@ def index(
         raise typer.BadParameter("--full and --curated-only cannot be combined.")
     if enrich and curated_only:
         raise typer.BadParameter("--enrich and --curated-only cannot be combined.")
-    ctx = NL2SQLContext(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
+    ctx = legacy_runtime(ds_config_path, secrets_config_path, llm_config_path, vector_store_path)
 
     run_indexing(ctx, enrich=enrich, datasource_ids=datasource or None, full=full,
                  curated_only=curated_only)

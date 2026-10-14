@@ -13,7 +13,6 @@ from typing import Optional
 
 class MssqlConnectionConfig(BaseModel):
     """Strict configuration schema for MSSQL adapter."""
-    type: str = Field("mssql", description="Connection type")
     host: str = Field(..., description="Server hostname")
     user: Optional[str] = None
     password: Optional[SecretStr] = None

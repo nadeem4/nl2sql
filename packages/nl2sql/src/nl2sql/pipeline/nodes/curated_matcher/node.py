@@ -18,7 +18,7 @@ from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
 from nl2sql.configs.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
 from nl2sql.llm.wires import structured
@@ -64,7 +64,7 @@ class CuratedMatcherNode:
     ``execution_failed``. A fallback is never an error of the run.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.curated = ctx.curated
         self.vector_store = ctx.vector_store

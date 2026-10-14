@@ -63,7 +63,7 @@ class _Engine(NL2SQL):
     """The real facade over a live vector store in ``tmp_path``."""
 
     def __init__(self, tmp_path):
-        self._ctx = _Context(tmp_path)
+        self._runtime = _Context(tmp_path)
 
     def list_datasources(self):
         return ["chinook"]

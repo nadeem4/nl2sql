@@ -20,8 +20,6 @@ from nl2sql.configs.llm import AgentConfig, LLMFileConfig
 from nl2sql.datasources.models import ConnectionConfig
 
 FAKE_KEY = "-".join(["sk", "proj", "neverprint" + "q" * 24 + "5e1d"])
-FAKE_CONN = ";".join(["DefaultEndpointsProtocol=https", "AccountName=acct",
-                      "AccountKey=" + "neverprintconn" + "w" * 20])
 FAKE_PASSWORD = "pw-" + "neverprint" + "p" * 12
 
 
@@ -35,20 +33,16 @@ def _all_renderings(obj) -> str:
 def hermetic_settings(monkeypatch):
     """Settings built from the environment only, never from any ``.env`` file."""
     monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
-    monkeypatch.setenv("RESULT_ARTIFACT_ADLS_CONNECTION_STRING", FAKE_CONN)
     return Settings(_env_file=None)
 
 
 def test_settings_never_print_their_secrets(hermetic_settings):
     text = _all_renderings(hermetic_settings)
     assert FAKE_KEY not in text
-    assert FAKE_CONN not in text
-    assert "AccountKey" not in text
 
 
 def test_settings_still_hold_the_real_values(hermetic_settings):
     assert hermetic_settings.openai_api_key.get_secret_value() == FAKE_KEY
-    assert hermetic_settings.result_artifact_adls_connection_string.get_secret_value() == FAKE_CONN
 
 
 def test_llm_config_models_never_print_the_key():
@@ -101,34 +95,23 @@ def test_llm_client_resolves_an_env_reference(monkeypatch):
 
 
 def test_embeddings_get_the_real_key(monkeypatch):
-    from nl2sql.common.settings import settings
-    from nl2sql.indexing.embeddings import EmbeddingService
+    from nl2sql.config import Embeddings
+    from nl2sql.registry import Registry
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(settings, "openai_api_key", SecretStr(FAKE_KEY))
-    embeddings = EmbeddingService._build_embeddings("openai")
+    provider = Registry.default().load("embeddings", "openai")
+    embeddings = provider.create(Embeddings(provider="openai", api_key=FAKE_KEY))
     assert embeddings.openai_api_key.get_secret_value() == FAKE_KEY
 
 
 def test_embeddings_refuse_an_empty_secret(monkeypatch):
-    from nl2sql.common.settings import settings
-    from nl2sql.indexing.embeddings import EmbeddingService
+    from nl2sql.config import Embeddings
+    from nl2sql.registry import Registry
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(settings, "openai_api_key", SecretStr(""))
-    with pytest.raises(ValueError, match="OPENAI_API_KEY is not set"):
-        EmbeddingService._build_embeddings("openai")
-
-
-def test_artifact_store_gets_the_real_connection_string_but_never_prints_it(monkeypatch):
-    from nl2sql.common.settings import settings
-    from nl2sql.execution.artifacts.store import build_artifact_store
-
-    monkeypatch.setattr(settings, "result_artifact_backend", "adls")
-    monkeypatch.setattr(settings, "result_artifact_adls_connection_string", SecretStr(FAKE_CONN))
-    store = build_artifact_store()
-    assert FAKE_CONN not in repr(store.config)
-    assert store._storage_options() == {"connection_string": FAKE_CONN}
+    provider = Registry.default().load("embeddings", "openai")
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        provider.create(Embeddings(provider="openai", api_key=""))
 
 
 def test_trace_redactor_collects_the_real_value_not_the_mask(monkeypatch):
@@ -136,12 +119,11 @@ def test_trace_redactor_collects_the_real_value_not_the_mask(monkeypatch):
     from nl2sql.tracing.trace import collect_secrets, settings_snapshot
 
     monkeypatch.setattr(settings, "openai_api_key", SecretStr(FAKE_KEY))
-    monkeypatch.setattr(settings, "result_artifact_adls_connection_string", SecretStr(FAKE_CONN))
     found = collect_secrets(object())
-    assert FAKE_KEY in found and FAKE_CONN in found
+    assert FAKE_KEY in found
     assert "**********" not in found
     snapshot = str(settings_snapshot())
-    assert FAKE_KEY not in snapshot and FAKE_CONN not in snapshot
+    assert FAKE_KEY not in snapshot
 
 
 def _fake_secret_clients(monkeypatch) -> dict:

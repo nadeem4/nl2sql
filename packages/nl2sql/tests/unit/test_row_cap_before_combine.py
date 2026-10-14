@@ -59,7 +59,7 @@ def test_a_plan_s_own_top_n_is_not_a_cap():
 # --- the subgraph output carries it to the aggregator ----------------------
 
 def _artifact(row_count):
-    return ArtifactRef(uri="u", backend="local", format="parquet", row_count=row_count, columns=["c"],
+    return ArtifactRef(uri="u", format="parquet", row_count=row_count, columns=["c"],
                        bytes=1, content_hash="h", created_at=datetime(2026, 1, 1), path_template="p")
 
 
@@ -83,9 +83,8 @@ def test_the_subgraph_output_records_the_row_cap():
 # --- the aggregator refuses a join on a capped input, warns on a union ------
 
 def _combine_state(tmp_path, monkeypatch, operation, rows_left, rows_right, cap=3):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
-    store = ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(tmp_path),
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
                                               path_template="<request_id>/<sub_query_id>.parquet"))
 
     def scan(sq_id, n):

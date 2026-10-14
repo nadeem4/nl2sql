@@ -4,6 +4,8 @@ Hosted mode is a different server, not a looser one: it holds no key of its
 own, writes nothing a visitor asked for, and turns down ``--record`` and
 ``--api-key`` before it starts.
 """
+from types import SimpleNamespace
+
 import pytest
 import yaml
 from typer.testing import CliRunner
@@ -166,6 +168,7 @@ class _StubEngine:
 
     def __init__(self):
         self.context = _StubContext()
+        self.config = SimpleNamespace(policies=self.context.policies_cfg)
 
     def list_datasources(self):
         return []

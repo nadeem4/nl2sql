@@ -103,7 +103,6 @@ def db(tmp_path):
 
 @pytest.fixture(autouse=True)
 def _artifacts(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path / "artifacts"))
     monkeypatch.setattr(settings, "result_artifact_path_template", "<tenant_id>/<request_id>/<sub_query_id>.parquet")
 

@@ -225,7 +225,9 @@ class _Loader:
         config = self._validate(data)
         if self.problems:
             raise self._fail()
-        return self._anchor_storage(config)
+        config = self._anchor_storage(config)
+        config._folder = self.root
+        return config
 
     def _check_version(self, data: Dict[str, Any]) -> None:
         version = data.get("version")

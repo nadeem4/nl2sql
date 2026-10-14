@@ -61,7 +61,6 @@ class _StreamingAdapter:
 
 
 def _service(tmp_path, monkeypatch, adapter):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
     monkeypatch.setattr(settings, "result_artifact_path_template", "<tenant_id>/<request_id>/<sub_query_id>.parquet")
     registry = SimpleNamespace(get_adapter=lambda ds: adapter, supports=lambda ds, cap: True)
@@ -142,7 +141,7 @@ def test_the_batch_size_has_a_setting():
 
 
 def test_the_store_writes_batches_to_one_artifact(tmp_path):
-    store = ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(tmp_path),
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
                                               path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
     frames = [ResultFrame(columns=COLUMNS, rows=chunk, row_count=len(chunk))
               for chunk in (_rows(12)[:4], _rows(12)[4:8], _rows(12)[8:])]

@@ -7,7 +7,6 @@ from nl2sql.execution.contracts import ArtifactRef
 def _artifact_ref() -> ArtifactRef:
     return ArtifactRef(
         uri="file:///artifacts/sq-1.parquet",
-        backend="local",
         format="parquet",
         row_count=2,
         columns=["region", "revenue"],

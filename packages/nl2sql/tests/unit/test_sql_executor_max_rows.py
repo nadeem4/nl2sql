@@ -50,7 +50,6 @@ class _OneShotAdapter:
 
 
 def _service(tmp_path, monkeypatch, adapter, batch_size=4):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
     monkeypatch.setattr(settings, "result_artifact_path_template", "<tenant_id>/<request_id>/<sub_query_id>.parquet")
     monkeypatch.setattr(settings, "result_fetch_batch_size", batch_size)

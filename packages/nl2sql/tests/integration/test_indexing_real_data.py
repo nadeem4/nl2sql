@@ -10,8 +10,8 @@ import pytest
 import yaml
 
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
-from nl2sql.indexing.embeddings import EmbeddingService
+from nl2sql.runtime import Runtime
+from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 
 
@@ -85,17 +85,11 @@ def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
     collection_name = f"itest_indexing_{uuid.uuid4().hex}"
     vector_store_path = tmp_path / "chroma"
     schema_store_path = tmp_path / "schema_store.db"
-
-    monkeypatch.setattr(settings, "vector_store_collection_name", collection_name)
     monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
     monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
-    ctx = NL2SQLContext(
-        **_demo_config_paths(root, secrets_path),
-        vector_store_path=vector_store_path,
-    )
+    ctx = Runtime.from_config(make_demo_config(tmp_path))
     orchestrator = IndexingOrchestrator(ctx)
 
     for adapter in ctx.ds_registry.list_adapters():
@@ -111,7 +105,7 @@ def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
     doc = result["documents"][0]
     stored_embedding = np.array(result["embeddings"][0])
     computed_embedding = np.array(
-        EmbeddingService.get_embeddings().embed_documents([doc])[0]
+        ctx.embedder.embed_documents([doc])[0]
     )
     similarity = _cosine_similarity(stored_embedding, computed_embedding)
     assert similarity >= 0.999, f"Embedding similarity too low: {similarity:.6f}"
@@ -126,30 +120,18 @@ def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
 
 
 def test_indexing_eviction_with_schema_change(tmp_path, monkeypatch) -> None:
-    root = _project_root()
-    _skip_if_missing_demo_dbs(root)
-    secrets_path = _write_empty_secrets(tmp_path)
+    from nl2sql.config import demo_config
 
-    datasources = _load_demo_datasources(root)
-    assert datasources, "Demo datasources missing from config."
-    base_ds = datasources[0]
-    base_db_path = root / base_ds["connection"]["database"]
+    base_ds = demo_config().datasources[0].model_dump(mode="json", exclude_defaults=True,
+                                                       exclude={"sample_questions"})
+    base_db_path = Path(base_ds["connection"]["database"])
+    one_version = {"schema": {"max_versions": 1}}
 
-    collection_name = f"itest_eviction_{uuid.uuid4().hex}"
-    vector_store_path = tmp_path / "chroma"
-    schema_store_path = tmp_path / "schema_store.db"
+    def _with_database(database: Path) -> dict:
+        return {**base_ds, "connection": {"database": database.as_posix()}}
 
-    monkeypatch.setattr(settings, "vector_store_collection_name", collection_name)
-    monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
-    monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
-    monkeypatch.setattr(settings, "schema_store_max_versions", 1)
-
-    config_path_1 = _write_datasource_config(tmp_path, base_ds, base_db_path)
-    ctx1 = NL2SQLContext(
-        **_demo_config_paths(root, secrets_path, ds_config_path=config_path_1),
-        vector_store_path=vector_store_path,
-    )
+    ctx1 = Runtime.from_config(make_demo_config(tmp_path, datasources=[_with_database(base_db_path)],
+                                                settings=one_version))
     orchestrator_1 = IndexingOrchestrator(ctx1)
     adapter_1 = ctx1.ds_registry.list_adapters()[0]
     orchestrator_1.index_datasource(adapter_1)
@@ -161,11 +143,8 @@ def test_indexing_eviction_with_schema_change(tmp_path, monkeypatch) -> None:
         conn.execute("CREATE TABLE IF NOT EXISTS extra_table (id INTEGER)")
         conn.commit()
 
-    config_path_2 = _write_datasource_config(tmp_path, base_ds, modified_db)
-    ctx2 = NL2SQLContext(
-        **_demo_config_paths(root, secrets_path, ds_config_path=config_path_2),
-        vector_store_path=vector_store_path,
-    )
+    ctx2 = Runtime.from_config(make_demo_config(tmp_path, datasources=[_with_database(modified_db)],
+                                                settings=one_version))
     orchestrator_2 = IndexingOrchestrator(ctx2)
     adapter_2 = ctx2.ds_registry.list_adapters()[0]
     orchestrator_2.index_datasource(adapter_2)

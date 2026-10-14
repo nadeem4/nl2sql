@@ -18,7 +18,6 @@ _TIMER = "nl2sql_statement_timer"
 
 class DuckdbConnectionConfig(BaseModel):
     """Strict configuration schema for DuckDB adapter."""
-    type: str
     database: str = Field(..., description="Path to DuckDB database file, or ':memory:'")
     options: Dict[str, Any] = Field(default_factory=dict)
 
@@ -43,7 +42,7 @@ class DuckdbAdapter(BaseSQLAlchemyAdapter):
             ValidationError: If the configuration is invalid.
         """
         config = DuckdbConnectionConfig(**args)
-        return f"duckdb:///{config.database}"
+        return f"duckdb:///{self.local_path(config.database)}"
 
     def connect(self) -> None:
         """Connects, and enforces ``statement_timeout_ms`` by interrupting.

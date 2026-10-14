@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from nl2sql.auth import UserContext
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH, GoldQuestion, load_gold_dataset
 
 
@@ -103,7 +103,7 @@ def compare_reports(new: Dict[str, Any], old: Dict[str, Any]) -> Dict[str, Any]:
     return {"summary": summary, "moved": moved}
 
 
-def _embedding_name(ctx: NL2SQLContext) -> str:
+def _embedding_name(ctx: Runtime) -> str:
     embeddings = getattr(ctx.vector_store, "embeddings", None)
     from nl2sql.indexing.embeddings import LOCAL_EMBEDDING_MODEL, LocalEmbeddings
 
@@ -112,7 +112,7 @@ def _embedding_name(ctx: NL2SQLContext) -> str:
     return str(getattr(embeddings, "model", None) or type(embeddings).__name__)
 
 
-def _retrieved_datasource(ctx: NL2SQLContext, question: str) -> Optional[str]:
+def _retrieved_datasource(ctx: Runtime, question: str) -> Optional[str]:
     """The datasource the resolver would pick, without its LLM answerability check.
 
     Reported beside the gold entry's own datasource, never used in place of
@@ -126,7 +126,7 @@ def _retrieved_datasource(ctx: NL2SQLContext, question: str) -> Optional[str]:
     return docs[0].metadata.get("datasource_id") if docs else None
 
 
-def _sent(ctx: NL2SQLContext, question: GoldQuestion, datasource_id: Optional[str]) -> Dict[str, List[str]]:
+def _sent(ctx: Runtime, question: GoldQuestion, datasource_id: Optional[str]) -> Dict[str, List[str]]:
     """The tables and columns the schema retriever sends the planner for the question."""
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
     from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
@@ -141,7 +141,7 @@ def _sent(ctx: NL2SQLContext, question: GoldQuestion, datasource_id: Optional[st
     return {t["table"]: list(t["columns"]) for t in record.get("tables", [])}
 
 
-def run_retrieval_recall(ctx: NL2SQLContext, dataset_path: pathlib.Path = GOLD_DATASET_PATH,
+def run_retrieval_recall(ctx: Runtime, dataset_path: pathlib.Path = GOLD_DATASET_PATH,
                          question_ids: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """Runs the schema retriever on every answerable gold question and returns the report."""
     dataset = [q for q in load_gold_dataset(dataset_path) if q.needed_tables]

@@ -5,7 +5,7 @@ from langgraph.types import Send
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.pipeline.graph_utils import (
     build_scan_payload,
     completed_scan_ids,
@@ -50,7 +50,7 @@ def aggregator_route(state: GraphState) -> str:
     return "answer_synthesizer"
 
 
-def build_scan_layer_router(ctx: NL2SQLContext, execute: bool = True):
+def build_scan_layer_router(ctx: Runtime, execute: bool = True):
     """Builds the router that fans sub-queries out and then moves on.
 
     When ``execute`` is False the run stops once every scan has produced a

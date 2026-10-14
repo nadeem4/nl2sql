@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.datasources.models import matches_table
 from .schema import Table, Column
 from nl2sql_sdk.schema import SchemaSnapshot, TableRef
@@ -30,7 +30,7 @@ class SchemaRetrieverNode:
     # its similarity is at most this far below the least similar pick.
     PREFERRED_MARGIN = 0.05
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store

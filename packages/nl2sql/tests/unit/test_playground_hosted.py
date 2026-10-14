@@ -73,9 +73,9 @@ class _Engine(NL2SQL):
     """The real facade; runs no pipeline, but reports the key each run saw."""
 
     def __init__(self, project):
-        self._ctx = _Context(project)
-        self.datasource = DatasourceAPI(self._ctx)
-        self.llm = LLM_API(self._ctx)
+        self._runtime = _Context(project)
+        self.datasource = DatasourceAPI(self._runtime)
+        self.llm = LLM_API(self._runtime)
         self.seen = []
         self.per_step = []
         self.hold = None

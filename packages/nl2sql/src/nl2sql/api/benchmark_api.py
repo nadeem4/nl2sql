@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional, Union
 import yaml
 
 from nl2sql.configs.llm import LLMFileConfig
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
+from nl2sql._legacy import legacy_runtime
 from nl2sql.evaluation.benchmark_runner import BenchmarkRunner, BenchmarkResult
 from nl2sql.evaluation.gold import dataset_datasources, load_gold_dataset
 from nl2sql.evaluation.records import database_identity
@@ -35,12 +36,12 @@ class BenchmarkAPI:
     API for running dataset benchmarks using core evaluation tooling.
     """
 
-    def __init__(self, ctx: Optional[NL2SQLContext] = None):
+    def __init__(self, ctx: Optional[Runtime] = None):
         self._ctx = ctx
 
-    def _context(self, config: BenchmarkConfig) -> NL2SQLContext:
+    def _context(self, config: BenchmarkConfig) -> Runtime:
         if self._ctx is None:
-            self._ctx = NL2SQLContext(
+            self._ctx = legacy_runtime(
                 ds_config_path=config.config_path,
                 secrets_config_path=config.secrets_path,
                 llm_config_path=config.llm_config_path,
@@ -110,7 +111,9 @@ class BenchmarkAPI:
         Each value is an ``LLMFileConfig`` (``--model``) or the path of an LLM
         config in the normal ``llm.yaml`` format. Loading one makes no model call.
         """
-        manager = self._context(config).config_manager
+        from nl2sql.configs import ConfigManager
+
+        manager = ConfigManager(llm_config_path=pathlib.Path(config.llm_config_path) if config.llm_config_path else None)
         if not llm_configs:
             return {"default": manager.load_llm()}
         return {name: cfg if isinstance(cfg, LLMFileConfig) else manager.load_llm(pathlib.Path(cfg))

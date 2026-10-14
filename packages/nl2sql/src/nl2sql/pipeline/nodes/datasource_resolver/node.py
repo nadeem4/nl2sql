@@ -10,7 +10,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from langchain_core.documents import Document
 from nl2sql.auth import UserContext
 from nl2sql.common.logger import get_logger
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.common.settings import settings
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
@@ -44,7 +44,7 @@ class DatasourceResolverNode:
        decomposer.
     """
 
-    def __init__(self, ctx: NL2SQLContext):
+    def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
         self.rbac = ctx.rbac

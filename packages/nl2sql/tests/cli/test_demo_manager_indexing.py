@@ -4,7 +4,7 @@ import pytest
 import yaml
 from rich.console import Console
 
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
 from nl2sql.cli.demo.manager import DemoManager
 
 
@@ -30,7 +30,7 @@ def test_index_demo_data_hands_a_context_to_run_indexing(demo_project, monkeypat
     assert demo_project.index_demo_data() is True
 
     assert len(captured) == 1
-    assert isinstance(captured[0][0], NL2SQLContext)
+    assert isinstance(captured[0][0], Runtime)
     # Enrichment spends tokens, so the demo only runs it when asked.
     assert captured[0][1] is False
 

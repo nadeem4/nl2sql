@@ -17,12 +17,13 @@ async def lifespan(app: FastAPI):
     # exporter is read through the facade once the engine has loaded settings;
     # an OTLP deployment then switches to JSON logs.
     configure_logging(level="INFO")
-    engine = NL2SQL()
+    engine = NL2SQL._legacy()
     if engine.get_setting("observability_exporter") == "otlp":
         configure_logging(level="INFO", json_format=True)
     warn_if_body_role_trusted()
     app.state.engine = engine
     yield
+    engine.close()
 
 
 def _app_version() -> str:

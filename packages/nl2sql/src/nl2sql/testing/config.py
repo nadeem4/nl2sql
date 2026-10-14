@@ -32,3 +32,24 @@ def make_config(folder: Path, **sections: Any) -> Config:
     path = folder / "nl2sql.yaml"
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     return load_config(path)
+
+
+def make_demo_config(folder: Path, **sections: Any) -> Config:
+    """``make_config`` with the demo's three databases and roles, for tests that need real data.
+
+    The databases are the packaged read-only files, without their sample
+    questions; the LLM is OpenAI's default model reading ``OPENAI_API_KEY``;
+    there are no curated answers. Each keyword replaces one section, as in
+    ``make_config``.
+    """
+    from nl2sql.config import demo_config
+
+    demo = demo_config()
+    datasources = [d.model_dump(mode="json", exclude_defaults=True, exclude={"sample_questions"})
+                   for d in demo.datasources]
+    defaults = {
+        "datasources": datasources,
+        "llm": {"provider": "openai", "model": demo.llm.model, "api_key": "${env:OPENAI_API_KEY}"},
+        "policies": demo.policies.model_dump(mode="json", exclude_defaults=True),
+    }
+    return make_config(folder, **{**defaults, **sections})

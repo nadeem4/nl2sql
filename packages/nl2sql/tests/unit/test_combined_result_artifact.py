@@ -30,10 +30,9 @@ TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
 
 @pytest.fixture()
 def store(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "result_artifact_backend", "local")
     monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
     monkeypatch.setattr(settings, "result_artifact_path_template", TEMPLATE)
-    return ArtifactStore(ArtifactStoreConfig(backend="local", base_uri=str(tmp_path), path_template=TEMPLATE))
+    return ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
 
 
 def _scan(store, sub_query_id, rows):
@@ -118,7 +117,7 @@ def test_the_answer_prompt_counts_the_saved_result_not_the_preview(monkeypatch):
     node = AnswerSynthesizerNode.__new__(AnswerSynthesizerNode)
     node.node_name = "answer_synthesizer"
     node.chain = _Chain()
-    saved = ArtifactRef(uri="u", backend="local", format="parquet", row_count=45, columns=["id"], bytes=1,
+    saved = ArtifactRef(uri="u", format="parquet", row_count=45, columns=["id"], bytes=1,
                         content_hash="h", created_at="2026-01-01T00:00:00", path_template=TEMPLATE)
     response = AggregatorResponse(terminal_results={"combine_g1": [{"id": i} for i in range(20)]},
                                   computed_artifacts={"combine_g1": saved})

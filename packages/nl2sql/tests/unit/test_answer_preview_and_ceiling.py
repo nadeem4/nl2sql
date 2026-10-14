@@ -155,7 +155,7 @@ def test_the_hosted_demo_datasources_are_capped_at_ten_thousand_rows():
 # --- the truncated flag ----------------------------------------------------
 
 def _artifact(row_count):
-    return ArtifactRef(uri="u", backend="local", format="parquet", row_count=row_count, columns=["c"],
+    return ArtifactRef(uri="u", format="parquet", row_count=row_count, columns=["c"],
                        bytes=1, content_hash="h", created_at=datetime(2026, 1, 1), path_template="p")
 
 

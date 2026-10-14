@@ -12,7 +12,8 @@ import yaml
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorSeverity
 from nl2sql.common.settings import settings
-from nl2sql.context import NL2SQLContext
+from nl2sql.runtime import Runtime
+from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
@@ -101,17 +102,11 @@ def demo_env() -> SimpleNamespace:
     collection_name = f"itest_logical_validator_{uuid.uuid4().hex}"
     vector_store_path = tmp_dir / "chroma"
     schema_store_path = tmp_dir / "schema_store.db"
-
-    monkeypatch.setattr(settings, "vector_store_collection_name", collection_name)
     monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_backend", "sqlite")
     monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
     monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
-    ctx = NL2SQLContext(
-        **_demo_config_paths(root, secrets_path),
-        vector_store_path=vector_store_path,
-    )
+    ctx = Runtime.from_config(make_demo_config(tmp_dir))
 
     orchestrator = IndexingOrchestrator(ctx)
     for adapter in ctx.ds_registry.list_adapters():
