@@ -114,6 +114,23 @@ flowchart LR
 
 ## 3. The real-database test bed
 
+!!! note "Built: the compose file, the `realdb` marker and the CI workflow (PR T1)"
+    `testbed/` holds the compose file, `wide_schema.py`, `samples.py` (the
+    pinned samples with their checksums), `passwords.py`, the servers' init
+    scripts and `gate.py`; `packages/nl2sql/tests/realdb/` holds the
+    fixtures; and `.github/workflows/realdb.yml` runs them. Four details
+    differ from the first draft of this section. The passwords have no
+    default: `testbed/passwords.py` writes random ones to the git-excluded
+    `testbed/.env`, and CI generates new ones per run, so no password is
+    written in the repository. Pagila is pinned to commit `5ba5a57`, because
+    later commits need PostgreSQL 18. The `audit` schema is a small 21st
+    schema beside the 20 numbered ones that hold the 1,200 tables.
+    `datasource()` defaults to the server's own sample database (Pagila,
+    Sakila or AdventureWorksLT) and passes other keywords to `Datasource`,
+    since `Datasource.index` arrives with B1. The GCP VM and
+    `scripts/testbed.py` are PR T2. See
+    [The real-database test bed](../testing/test-bed.md).
+
 ### What it is
 
 One file, `testbed/docker-compose.yml`, defines the whole test bed. The same
@@ -197,17 +214,16 @@ is loaded. Each server also gets a login `nl2sql_reader` with read grants on
 its sample database only; the conformance kit uses it for the `permission`
 stage of `test_connection`.
 
-The file reads four variables, each with a default for local use and CI:
+The file reads four variables. The bind address has a default; the
+passwords do not, so no password is written in the repository:
 
 | Variable | Default | On the GCP VM |
 |---|---|---|
 | `TESTBED_BIND` | `127.0.0.1` | `0.0.0.0` (the firewall admits only IAP, see below) |
-| `TESTBED_POSTGRES_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
-| `TESTBED_MYSQL_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
-| `TESTBED_MSSQL_PASSWORD` | `Nl2sql-Testbed-1` | from Secret Manager |
+| `TESTBED_POSTGRES_PASSWORD` | none: required; `testbed/passwords.py` makes random ones, and CI makes new ones per run | from Secret Manager |
+| `TESTBED_MYSQL_PASSWORD` | none: required; `testbed/passwords.py` makes random ones, and CI makes new ones per run | from Secret Manager |
+| `TESTBED_MSSQL_PASSWORD` | none: required; `testbed/passwords.py` makes random ones, and CI makes new ones per run | from Secret Manager |
 
-The default password is a throwaway for containers bound to `127.0.0.1` or
-to a CI runner. It never protects anything reachable from outside.
 
 | Service | Published port | User |
 |---|---|---|
@@ -220,7 +236,9 @@ The ports avoid a clash with a database already installed locally.
 ### Local use
 
 ```bash
+python testbed/passwords.py > testbed/.env               # once
 docker compose -f testbed/docker-compose.yml up -d --wait
+set -a; . testbed/.env; set +a
 REALDB=compose pytest -m realdb
 docker compose -f testbed/docker-compose.yml down        # add -v to drop the data
 ```
@@ -267,7 +285,7 @@ The fixtures live in `packages/nl2sql/tests/realdb/conftest.py`:
 
 | Variable | Meaning |
 |---|---|
-| `REALDB=compose` | The compose servers on `127.0.0.1`, at the published ports, with the default password |
+| `REALDB=compose` | The compose servers on `127.0.0.1`, at the published ports, with the passwords in `TESTBED_*_PASSWORD` |
 | `REALDB_POSTGRES`, `REALDB_MYSQL`, `REALDB_MSSQL` | A URL for one server, such as `postgresql://postgres:<password>@127.0.0.1:15432/`, with the password percent-encoded. It wins over `REALDB=compose`. `scripts/testbed.py run` sets these. |
 | `REALDB_REQUIRED=1` | A missing server is a failure, not a skip |
 
