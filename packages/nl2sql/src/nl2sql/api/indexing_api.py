@@ -8,6 +8,10 @@ from nl2sql.api.types import IndexProgress
 from nl2sql.runtime import Runtime
 
 
+# The entry types the index holds, in the order the inspector lists them.
+ENTRY_TYPES = ["schema.datasource", "schema.table", "schema.column", "schema.relationship", "schema.metric"]
+
+
 class IndexAPI:
     """``engine.index``. Internal: reach it through ``NL2SQL``."""
 
@@ -92,6 +96,18 @@ class IndexAPI:
     def clear(self) -> None:
         """Remove every entry from the index. Questions need a ``build`` before they can be answered."""
         self._ctx.vector_store.clear()
+
+    def inspect_defaults(self) -> Dict[str, Any]:
+        """What :meth:`inspect` searches with when not told otherwise, as the pipeline searches.
+
+        ``k`` (picks), ``lambda_mult`` (1 is relevance only, 0 is difference
+        only), ``fetch_multiplier`` (the candidate pool is ``k`` times it) and
+        ``types``, every entry type the index holds.
+        """
+        from nl2sql.indexing.vector_store import VectorStore
+
+        return {"k": 8, "lambda_mult": VectorStore.LAMBDA_MULT,
+                "fetch_multiplier": VectorStore.FETCH_MULTIPLIER, "types": list(ENTRY_TYPES)}
 
     def inspect(self, query: str, k: int = 8, lambda_mult: Optional[float] = None,
                 types=None, datasource_id: Optional[str] = None) -> Dict[str, Any]:

@@ -110,15 +110,16 @@ datasource fails.
 ```python
 engine.run_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
 engine.stream_query(question, *, datasource_id=None, execute=True, user_context=None, cancellation_token=None)
-engine.check(); engine.close(); engine.config
+engine.check(); engine.close(); engine.config; engine.about()
 
 engine.datasources   # list, get, add, remove, schema, test
-engine.index         # build, health, clear, inspect
-engine.llm           # list, get, replace
+engine.index         # build, health, clear, inspect, inspect_defaults
+engine.llm           # list, get, providers, replace
 engine.policies      # roles, allows, allowed, validate
 engine.curated       # validate, test
 engine.results       # manifest, page, csv
-engine.traces        # replay
+engine.feedback      # record, list, stats, export, clear
+engine.traces        # get, replay
 engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2
 ```
 
@@ -130,7 +131,8 @@ engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_
 | `llm` | [LLM API](llm.md) |
 | `policies` | [Policies API](policies.md) |
 | `curated` | [Curated answers → Checking them](../../configuration/curated.md) |
-| `traces` | below |
+| `feedback` | below, and [Feedback and signals](../../observability/feedback.md) |
+| `traces`, `about()` | below |
 | `benchmark` | [Benchmarks](../../benchmarks.md) |
 
 The namespace classes are internal: reach them through the engine, never by
@@ -139,9 +141,59 @@ importing them. Each is built on first use.
 The CLI, the playground and `nl2sql-api` are callers like any other: they use
 only these methods and namespaces, never the runtime behind them.
 `test_the_cli_the_playground_and_the_api_use_only_the_public_api` in
-`tests/architecture/test_boundaries.py` holds them to that.
+`tests/architecture/test_boundaries.py` holds them to that, and
+`test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql`
+holds the playground, `nl2sql demo` and `nl2sql-api` to importing from the
+top-level `nl2sql` only (the playground and `nl2sql demo` keep a short, named
+list of exceptions in that test, each with the reason and the change that
+removes it).
+
+### About
+
+`engine.about()` describes the engine and its pipeline: `version` (of
+`nl2sql-engine`), `git_sha` (when running from a checkout, else `None`),
+`python`, and `steps`, one dict per step of a run in the order a run takes
+them. Each step has its `node` (the name usage and timings are recorded
+under), `label`, what it `does`, its `kind` (`model` when a model decides it,
+`code` otherwise) and its `parent` (`sql_agent` for the steps nested in the SQL
+agent). A model step also has its `agent` and the `provider` and `model` it is
+configured to run on; never a key. The playground's Pipeline page reads it.
+
+```python
+about = engine.about()
+[(s["node"], s["model"]) for s in about["steps"] if s["kind"] == "model"]
+# [('curated_matcher', 'gpt-5.4'), ('datasource_resolver', 'gpt-5.4'), ...]
+```
+
+### Feedback
+
+Ratings of answered runs, and the guardrail rates over recorded runs. They live
+in the `feedback` table of `<storage.path>/state.db`; the rates also read the
+traces in `<storage.path>/traces`. `nl2sql feedback` and the playground's
+thumbs up and down are built on it. See
+[Feedback and signals](../../observability/feedback.md) for what is stored.
+
+| method | does |
+| --- | --- |
+| `record(result, *, question, role, rating, note=None) -> dict` | Rate one run, `"up"` or `"down"`, with an optional note (cut to 280 characters). `result` is the run's `QueryResult` or its JSON. The stored row is built from it and from the run's trace when one was kept; never rows, the answer, error messages or keys, and a run refused for the role keeps no SQL. A later rating of the same run replaces the earlier one. Returns the row; raises `ValueError` for another rating or a result with no `trace_id`. |
+| `list(limit=None) -> list[dict]` | Every rating, newest first. |
+| `stats(*, traces=None) -> dict` | Rates over the ratings plus the traces in `traces` (default: the engine's traces folder): feedback, refusals, refiner retries, validator failures, errors, and the plan cache's hit rate. |
+| `export(path) -> dict` | Write the thumbs-up runs to `path` as draft gold entries for review; `{"written", "skipped"}`. Raises `ValueError` for the gold set's own path. |
+| `clear() -> int` | Delete every rating; returns how many. |
+
+```python
+result = engine.run_query("How many customers are there?")
+engine.feedback.record(result, question="How many customers are there?", role="admin", rating="up")
+engine.feedback.stats()["feedback"]   # {'up': 1, 'down': 0, 'up_rate': 1.0, 'down_rate': 0.0}
+```
 
 ### Traces
+
+`engine.traces.get(trace_id)` returns one recorded run's trace document, or
+`None` when none was kept (which runs are kept is `settings.traces.mode`). It
+reads only `<storage.path>/traces`, and the id must be a plain token (letters,
+digits, `-` and `_`), so no id can name a file elsewhere: anything else raises
+`ValueError`, as does a file in another trace format.
 
 `engine.traces.replay(trace)` re-runs a recorded question, answering every LLM
 call from the trace document (no model is called), on a runtime of its own so

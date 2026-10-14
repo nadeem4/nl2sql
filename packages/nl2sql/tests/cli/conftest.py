@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from nl2sql.common.settings import settings
+from nl2sql.testing.facade import StubLLMs
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +59,7 @@ class StubDemoEngine:
         self.plan_cache = plan_cache
         self.closed = False
         self.datasources = SimpleNamespace(list=lambda: [])
-        self.llm = SimpleNamespace(list=lambda: {}, get=lambda agent: {})
+        self.llm = StubLLMs({})
         self.index = SimpleNamespace(health=lambda: {"status": self.index_status})
 
     def check(self):

@@ -54,7 +54,7 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
         # The demo's own config traces every run, under its storage.path.
         engine = NL2SQL.from_config(project / "nl2sql.yaml")
         app = build_app(engine, questions=[QUESTION], roles=["admin"], mode="hosted",
-                        dataset="chinook", trace_dir=project / ".nl2sql" / "traces", project_dir=project,
+                        dataset="chinook", project_dir=project,
                         host="0.0.0.0", hosted=Hosted(enabled=True))
         client = TestClient(app, base_url="http://demo.example:7860")
 
@@ -130,7 +130,7 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
         # The demo's own config traces every run, under its storage.path.
         engine = NL2SQL.from_config(project / "nl2sql.yaml")
         app = build_app(engine, questions=[QUESTION], roles=["admin"], mode="hosted",
-                        dataset="chinook", trace_dir=project / ".nl2sql" / "traces", project_dir=project,
+                        dataset="chinook", project_dir=project,
                         host="0.0.0.0", hosted=Hosted(enabled=True))
         client = TestClient(app, base_url="http://demo.example:7860")
 

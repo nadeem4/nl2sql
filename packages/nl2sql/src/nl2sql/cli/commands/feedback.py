@@ -5,14 +5,14 @@
 * ``export --good`` -- thumbs-up runs as draft gold entries in their own YAML file.
 * ``clear``  -- empty the feedback table; schema snapshots and the plan cache stay.
 
-Every command reads the ``feedback`` table of the state store,
-``<storage.path>/state.db``. None of them creates the store when it is missing.
+Every command builds the engine from ``--config`` and calls ``engine.feedback``,
+which reads the ``feedback`` table of the state store, ``<storage.path>/state.db``.
 """
 from __future__ import annotations
 
 import json
 import pathlib
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 import typer
 from rich import box
@@ -20,10 +20,8 @@ from rich.markup import escape
 from rich.table import Table
 from typing_extensions import Annotated
 
+from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
-from nl2sql.cli.common.engine import store_paths
-from nl2sql.evaluation.gold import GOLD_DATASET_PATH
-from nl2sql.feedback import FeedbackStore, compute_stats, draft_entries, load_traces, write_drafts
 
 app = typer.Typer(help="Answer feedback from the playground, and guardrail rates over recorded runs.",
                   no_args_is_help=True)
@@ -31,19 +29,13 @@ app = typer.Typer(help="Answer feedback from the playground, and guardrail rates
 DEFAULT_DRAFTS = pathlib.Path("feedback_gold_drafts.yaml")
 
 
-def _store_path(ctx: typer.Context) -> pathlib.Path:
-    return store_paths(ctx).state
+def _engine(ctx: typer.Context):
+    # Nothing here connects to a datasource, so the engine is not checked.
+    return build_engine(ctx, check=False)
 
 
-def _rows(ctx: typer.Context) -> List[Dict[str, Any]]:
-    path = _store_path(ctx)
-    if not path.exists():
-        return []
-    store = FeedbackStore(path)
-    try:
-        return store.list()
-    finally:
-        store.close()
+def _store(engine) -> str:
+    return escape(str((pathlib.Path(engine.config.storage.path) / "state.db").resolve()))
 
 
 def _pct(rate: Optional[float]) -> str:
@@ -54,10 +46,11 @@ def _pct(rate: Optional[float]) -> str:
 def list_command(ctx: typer.Context,
                  limit: Annotated[int, typer.Option(help="Show at most this many ratings.")] = 50) -> None:
     """The ratings, newest first: question, role, rating, note and status."""
-    rows = _rows(ctx)[:limit]
-    if not rows:
-        console.print(f"No feedback recorded in {escape(str(_store_path(ctx).resolve()))}.", soft_wrap=True)
-        return
+    with _engine(ctx) as engine:
+        rows = engine.feedback.list(limit=limit)
+        if not rows:
+            console.print(f"No feedback recorded in {_store(engine)}.", soft_wrap=True)
+            return
     for row in rows:
         rating = "[green]up  [/green]" if row["rating"] == "up" else "[red]down[/red]"
         note = f"  note: {escape(row['note'])}" if row["note"] else ""
@@ -74,8 +67,9 @@ def stats_command(
         "--traces", help="Directory of run traces to include (default: <storage.path>/traces).")] = None,
 ) -> None:
     """Rates over recorded runs: feedback, refusals, refiner retries, validator failures, errors, plan cache."""
-    trace_dir = traces if traces is not None else store_paths(ctx).traces
-    stats = compute_stats(_rows(ctx), load_traces(trace_dir))
+    with _engine(ctx) as engine:
+        stats = engine.feedback.stats(traces=traces)
+        trace_dir = traces if traces is not None else pathlib.Path(engine.config.storage.path) / "traces"
     if as_json:
         typer.echo(json.dumps(stats, indent=2))
         return
@@ -121,13 +115,15 @@ def export_command(
     if not good:
         console.print("[red][ERROR][/red] Say which runs to export: --good (the thumbs-up runs).")
         raise typer.Exit(2)
-    if out.resolve() == GOLD_DATASET_PATH.resolve():
-        console.print("[red][ERROR][/red] Drafts never go into the gold set itself. Pick another --out.")
-        raise typer.Exit(2)
-    drafts, skipped = draft_entries(_rows(ctx))
-    write_drafts(drafts, out)
-    console.print(f"[green]Wrote {len(drafts)} draft{'s' if len(drafts) != 1 else ''}[/green] to "
-                  f"{escape(str(out.resolve()))}; skipped {skipped} (no SQL, or more than one statement).")
+    with _engine(ctx) as engine:
+        try:
+            report = engine.feedback.export(out)
+        except ValueError as error:
+            console.print(f"[red][ERROR][/red] {escape(str(error))} Pick another --out.")
+            raise typer.Exit(2)
+    written = report["written"]
+    console.print(f"[green]Wrote {written} draft{'s' if written != 1 else ''}[/green] to "
+                  f"{escape(str(out.resolve()))}; skipped {report['skipped']} (no SQL, or more than one statement).")
     console.print("Review each entry, then add it to the gold set and run `python -m nl2sql.evaluation.gold`.")
 
 
@@ -135,15 +131,8 @@ def export_command(
 def clear_command(ctx: typer.Context,
                   yes: Annotated[bool, typer.Option("--yes", help="Do not ask to confirm.")] = False) -> None:
     """Delete every rating. Schema snapshots and the plan cache are kept."""
-    path = _store_path(ctx)
-    if not path.exists():
-        console.print(f"No feedback: {escape(str(path.resolve()))} does not exist.")
-        return
-    if not yes and not typer.confirm(f"Delete every rating in {path.resolve()}?"):
-        raise typer.Exit(1)
-    store = FeedbackStore(path)
-    try:
-        removed = store.clear()
-    finally:
-        store.close()
-    console.print(f"[green]Cleared {removed} ratings[/green] from {escape(str(path.resolve()))}.")
+    with _engine(ctx) as engine:
+        if not yes and not typer.confirm(f"Delete every rating in {_store(engine)}?"):
+            raise typer.Exit(1)
+        removed = engine.feedback.clear()
+        console.print(f"[green]Cleared {removed} ratings[/green] from {_store(engine)}.")

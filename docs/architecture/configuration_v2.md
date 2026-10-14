@@ -1146,6 +1146,48 @@ noisy than wall-clock time. The rule is added to `invariants.md`.
       until the next full build. The REST datasource routes now return
       `DatasourceInfo` and `DELETE` removes.
 
+!!! note "Built: the playground off the engine's internals (PR 10b)"
+    `engine.feedback`, `engine.traces.get`, `engine.about()`,
+    `engine.llm.providers()` and `engine.index.inspect_defaults()` are built,
+    and the playground, `nl2sql demo` and `nl2sql feedback` use them. Building
+    it settled these details:
+
+    - **`feedback.record(result, *, question, role, rating, note=None)`**
+      takes the run's `QueryResult` (or its JSON) and builds the stored row
+      from it and from the run's trace, so `run_record` moved behind the
+      facade too: the playground remembers the part of each answered result a
+      rating reads (no rows) and hands it over when the page rates the run.
+      `list(limit=None)`, `stats(*, traces=None)`, `export(path)` (refuses the
+      gold set's path with `ValueError`, returns `{"written", "skipped"}`) and
+      `clear()` complete it. `nl2sql feedback` builds the engine without
+      `check()`; the state store the engine opens holds the table, so the
+      commands no longer avoid creating `state.db`.
+    - **`traces.get(trace_id)`** returns the document or `None`, and raises
+      `ValueError` for an id that is not a plain token; the playground's
+      `build_app` lost its `trace_dir` argument.
+    - **`about()`** is `engine_info()` (`version`, `git_sha`, `python`) plus
+      `steps`, `describe_pipeline` over `llm.list()`. **`llm.providers()`**
+      lists what the engine's registry can load: `name`, `label`,
+      `key_variable`, `key_present`. **`index.inspect_defaults()`** is `k`,
+      `lambda_mult`, `fetch_multiplier` and the entry `types`: the "retrieval
+      inspector's defaults" the playground read from `VectorStore`.
+    - Every new method returns plain dicts, so the export list is unchanged.
+    - **The stricter boundary test** is
+      `test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql`:
+      `nl2sql_api` imports the top-level `nl2sql` only; the playground and
+      `cli/commands/demo.py` import the top-level `nl2sql`, their own CLI
+      package, and `STILL_IMPORTED_FROM_INSIDE`, a named list that only
+      shrinks: `nl2sql.common.settings` (until PR 13), `nl2sql.llm.providers`
+      (the provider catalogue the CLI reads, per CLAUDE.md),
+      `nl2sql.llm.request_key` (`use_request_llms`, until Phase 4), and
+      `nl2sql demo`'s replay machinery, questions and `init_project`
+      (`nl2sql.llm.replay`, `nl2sql.testing.fake_llm`, `nl2sql.datasets.demo`,
+      `nl2sql.config`). `nl2sql.feedback`, `nl2sql.tracing`,
+      `nl2sql.pipeline`, `nl2sql.indexing` and `PROVIDER_PRESETS` are out.
+    - Left for PR 13: the playground still reads `settings.feedback_enabled`
+      from the global, and the settings panel and `nl2sql demo` still write a
+      key into `os.environ`.
+
 ### The new shape
 
 ```python
@@ -1154,7 +1196,7 @@ engine.stream_query(question, *, datasource_id=None, execute=True, user_context=
 engine.check(); engine.close(); engine.config; engine.about()
 
 engine.datasources   # list, get, add, remove, schema, test
-engine.index         # build, health, clear, inspect
+engine.index         # build, health, clear, inspect, inspect_defaults
 engine.llm           # list, get, providers, replace
 engine.policies      # roles, allows, allowed, validate
 engine.curated       # validate, test

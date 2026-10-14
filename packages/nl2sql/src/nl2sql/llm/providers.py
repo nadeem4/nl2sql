@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Protocol, Tuple, runtime_checkable
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Protocol, Tuple, runtime_checkable
 
 from .registry import PROVIDER_PRESETS, ProviderPreset
 from .wires import WIRES
@@ -28,10 +28,12 @@ __all__ = [
     "LLMProvider",
     "LLM_PROVIDERS",
     "OLLAMA",
+    "OLLAMA_BASE_URL",
     "OPENAI",
     "OPENROUTER",
     "ResolvedAgent",
     "api_key_from_env",
+    "describe_providers",
     "KEY_SHAPE_MESSAGE",
     "DEFAULT_ANTHROPIC_MODEL",
     "DEFAULT_MODELS",
@@ -96,6 +98,9 @@ UPSTREAMS: Dict[str, str] = {
     name: PROVIDER_PRESETS[name].base_url or _OPENAI_BASE_URL
     for name in KEYED_PROVIDERS if PROVIDER_PRESETS[name].wire == "openai"
 }
+
+# Where a local Ollama daemon answers, from its preset.
+OLLAMA_BASE_URL: str = PROVIDER_PRESETS["ollama"].base_url
 
 # Where Anthropic's Messages API is reached; the client appends /v1/messages.
 # The recording proxy forwards Claude's calls here when the demo's answers are
@@ -211,6 +216,24 @@ def api_key_from_env(provider: str) -> Optional[str]:
     """
     preset = PROVIDER_PRESETS.get(provider)
     return os.environ.get(preset.api_key_env) if preset and preset.api_key_env else None
+
+
+def describe_providers(registry: Any) -> List[Dict[str, Any]]:
+    """Each LLM provider ``registry`` can load: its name, label, key variable and whether that is set.
+
+    A provider whose client library is not installed is left out. Never the
+    key itself: ``key_present`` is all that is read from the environment.
+    """
+    described = []
+    for name in registry.names("llm"):
+        try:
+            provider = registry.load("llm", name)
+        except Exception:  # not installed, or a plugin that fails its checks
+            continue
+        variable = getattr(provider, "api_key_env", None)
+        described.append({"name": name, "label": getattr(provider, "label", None) or name,
+                          "key_variable": variable, "key_present": bool(variable and os.environ.get(variable))})
+    return described
 
 
 @dataclass(frozen=True)

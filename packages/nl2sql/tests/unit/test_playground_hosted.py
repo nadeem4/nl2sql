@@ -38,6 +38,7 @@ from nl2sql.cli.demo.playground.hosted import (
 from nl2sql import load_config
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.request_key import current_api_key
+from nl2sql.registry import Registry
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.config import make_config
 
@@ -62,6 +63,7 @@ class _Context:
         self.vector_store = None
         self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
+        self.registry = Registry.default()
         self.config = load_config(project / "nl2sql.yaml")
         self.replace_llm(self.config.llm)
 
@@ -97,7 +99,7 @@ def _client(project, *, hosted=True, limits=None, engine=None):
     engine = engine or _Engine(project)
     app = build_app(engine, questions=["q1"], roles=["admin"],
                     mode="hosted" if hosted else "replay", dataset="chinook",
-                    trace_dir=project / "traces", project_dir=project, host="0.0.0.0",
+                    project_dir=project, host="0.0.0.0",
                     hosted=Hosted(enabled=hosted, limits=limits))
     return engine, TestClient(app, base_url="http://demo.example:7860")
 
@@ -222,7 +224,7 @@ def _replay_client(project, recorded, limits=None):
                     replay=Replay(base_url="http://127.0.0.1:9/v1", questions=recorded,
                                   recorded_with=RECORDED_WITH))
     app = build_app(engine, questions=["q1", "q2"], roles=["admin"], mode="hosted", dataset="chinook",
-                    trace_dir=project / "traces", project_dir=project, host="0.0.0.0", hosted=hosted,
+                    project_dir=project, host="0.0.0.0", hosted=hosted,
                     recorded_questions=len(recorded))
     return engine, TestClient(app, base_url="http://demo.example:7860")
 

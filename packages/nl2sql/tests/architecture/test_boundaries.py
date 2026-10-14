@@ -438,6 +438,58 @@ def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
         "a facade method every caller can use.", offenders)
 
 
+# What the playground and ``nl2sql demo`` still import from inside the engine,
+# and why. Everything else comes from the top-level ``nl2sql``. The list only
+# shrinks: nl2sql-api gets none of it.
+STILL_IMPORTED_FROM_INSIDE = {
+    "nl2sql.common.settings": "the playground reads the settings global until PR 13 deletes it",
+    "nl2sql.llm.providers": "provider knowledge the CLI reads from the engine: labels, verified models, "
+                            "the key shape (CLAUDE.md)",
+    "nl2sql.llm.request_key": "the hosted demo's per-request keys, until Phase 4 moves the web app onto "
+                              "nl2sql-api",
+    "nl2sql.llm.replay": "nl2sql demo's recording proxy and replay store",
+    "nl2sql.testing.fake_llm": "nl2sql demo's keyless replay server",
+    "nl2sql.datasets.demo": "nl2sql demo's guided questions",
+    "nl2sql.config": "nl2sql demo writes its project with init_project, as nl2sql init does",
+}
+
+
+def _engine_imports(path: pathlib.Path):
+    """``(lineno, module)`` for every import of an ``nl2sql`` module, at any scope."""
+    for node in ast.walk(_tree(path)):
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names = [node.module]
+        else:
+            continue
+        yield from ((node.lineno, name) for name in names if name == "nl2sql" or name.startswith("nl2sql."))
+
+
+def test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql():
+    """They are clients of the facade: ``from nl2sql import ...``, never the engine's internals.
+
+    Feedback, traces, the pipeline's steps, the index's defaults and the
+    provider list are facade methods (``engine.feedback``, ``engine.traces``,
+    ``engine.about()``, ``engine.index``, ``engine.llm.providers()``), so
+    ``nl2sql.feedback``, ``nl2sql.tracing``, ``nl2sql.pipeline``,
+    ``nl2sql.indexing`` and ``PROVIDER_PRESETS`` are out of reach.
+    """
+    api = PACKAGES / "api" / "src" / "nl2sql_api"
+    offenders = []
+    for path in python_files(DEMO / "playground", api) + (CLI / "commands" / "demo.py",):
+        in_api = path.is_relative_to(api)
+        for lineno, name in _engine_imports(path):
+            allowed = name == "nl2sql" or (not in_api and (
+                name.startswith("nl2sql.cli.") or name in STILL_IMPORTED_FROM_INSIDE))
+            if not allowed:
+                offenders.append(f"{_where(path)}:{lineno} {name}")
+    assert not offenders, _broke(
+        "The playground, nl2sql demo and nl2sql-api import only the top-level nl2sql (plus, for "
+        "the first two, their own CLI package and STILL_IMPORTED_FROM_INSIDE). What they need from "
+        "the engine is a facade method every caller can use.", offenders)
+
+
 # --------------------------------------------------------------------------
 # 9. The runtime does not pay for the benchmark (moved from
 #    tests/unit/test_import_hygiene.py)
