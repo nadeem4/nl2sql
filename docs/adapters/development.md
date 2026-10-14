@@ -29,6 +29,10 @@ from sqlalchemy import URL
 from nl2sql.adapters.sqlalchemy_base import BaseSQLAlchemyAdapter
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
+    interface_version = 1
+    driver_modules = ("psycopg2",)
+    install_hint = 'pip install "nl2sql-engine[postgres]"'
+
     def construct_uri(self, args: Dict[str, Any]) -> str:
         # URL.create escapes the credentials; an f-string breaks on a password
         # containing @ : / # or %.
@@ -55,16 +59,21 @@ If you need to connect to something else (e.g., ElasticSearch, a CRM API, or a r
 * Fetching and normalizing schema metadata.
 * Executing queries and formatting results.
 * Implementing safety breakers (`row_limit`).
+* Declaring `interface_version = 1`, the `driver_modules` it imports to connect, and an `install_hint` (see [Class attributes](sdk.md#class-attributes)).
 * Optionally, a `default_schema` attribute naming the schema an unqualified table resolves to. RBAC reads a two-part `datasource.table` policy entry as that table in this schema; without it, `main` is assumed.
 
 ### Example
 
 ```python
-from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql_sdk.protocols import DatasourceAdapterProtocol
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql_sdk.capabilities import DatasourceCapability
 
 class MyRestAdapter(DatasourceAdapterProtocol):
+    interface_version = 1
+    driver_modules = ("httpx",)
+    install_hint = 'pip install "nl2sql-my-rest"'
+
     def capabilities(self):
         return {DatasourceCapability.SUPPORTS_REST}
 

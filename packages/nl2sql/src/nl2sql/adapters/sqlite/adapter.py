@@ -69,6 +69,9 @@ class SqliteConnectionConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
 class SqliteAdapter(BaseSQLAlchemyAdapter):
+    interface_version = 1
+    driver_modules = ("sqlite3",)
+    install_hint = 'sqlite3 ships with Python: use a Python build that includes it'
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
         """Constructs the SQLite connection URI.
