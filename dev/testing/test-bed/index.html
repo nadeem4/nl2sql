@@ -3507,6 +3507,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#the-gcp-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The GCP VM
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The GCP VM">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scriptstestbedpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scripts/testbed.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-time-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-time set-up
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4672,6 +4733,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#the-gcp-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The GCP VM
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The GCP VM">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scriptstestbedpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scripts/testbed.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cost-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost controls
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-time-set-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One-time set-up
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4695,7 +4817,8 @@ real server behaves (catalogs, quoting, permissions, read-only sessions,
 timeouts) is tested against real servers instead: PostgreSQL, MySQL and SQL
 Server, each loaded with a well-known sample database and a large generated
 schema. One compose file, <code>testbed/docker-compose.yml</code>, defines all of it,
-and the same file runs on your machine and on GitHub's runners in CI.</p>
+and the same file runs on your machine, on GitHub's runners in CI, and on one
+small GCP VM started on demand.</p>
 <p>The design is in <a href="../../architecture/phase2/#3-the-real-database-test-bed">Phase 2, section 3</a>.</p>
 <table>
 <thead>
@@ -5040,9 +5163,241 @@ cloud credentials are involved.</p>
 <p>The unit job in <code>test.yml</code> runs <code>pytest -m "not integration and not realdb"</code>.</p>
 <p>The scripts under <code>testbed/</code> have their own unit tests, which need no
 database: <code>packages/nl2sql/tests/unit/test_testbed.py</code> (the wide schema, the
-checksums, skipping what is there, and the gate) and
+checksums, skipping what is there, and the gate),
 <code>packages/nl2sql/tests/unit/test_realdb_fixtures.py</code> (the skip, the failure
-under <code>REALDB_REQUIRED=1</code>, and the variables).</p>
+under <code>REALDB_REQUIRED=1</code>, and the variables) and
+<code>packages/nl2sql/tests/unit/test_testbed_vm.py</code> (<code>scripts/testbed.py</code>, against
+a fake <code>gcloud</code> on <code>PATH</code>).</p>
+<h2 id="the-gcp-vm">The GCP VM</h2>
+<p>The same compose file also runs on one small VM, <code>nl2sql-testbed</code> in project
+<code>nl2sql-testbed-261014</code>, zone <code>us-central1-a</code>. It is started for a session
+and stopped after it. There are no GitHub-to-GCP credentials: the owner, or an
+agent the owner asks, runs it by hand, at least once before each release.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Machine</td>
+<td><code>e2-standard-2</code> (2 vCPU, 8 GB: SQL Server alone wants 2 GB), Debian 12</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td>Installed with the compose plugin by the VM's startup script on its first boot</td>
+</tr>
+<tr>
+<td>Disk</td>
+<td>30 GB standard persistent disk. It keeps the images and the data volumes while the VM is stopped, so a later session skips the load.</td>
+</tr>
+<tr>
+<td>External IP</td>
+<td>Ephemeral, for outbound traffic only (image pulls, sample downloads). It is released, and free, while the VM is stopped.</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>Its own VPC, <code>nl2sql-testbed</code>, so none of the default network's open rules apply. One firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range <code>35.235.240.0/20</code> only: no database port is public.</td>
+</tr>
+<tr>
+<td>Access</td>
+<td>IAP: <code>gcloud compute ssh</code> and <code>scp</code> with <code>--tunnel-through-iap</code>, and <code>gcloud compute start-iap-tunnel</code> for the three servers</td>
+</tr>
+<tr>
+<td>Passwords</td>
+<td>Secret Manager: <code>testbed-postgres-root-password</code>, <code>testbed-mysql-root-password</code> and <code>testbed-mssql-root-password</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="scriptstestbedpy"><code>scripts/testbed.py</code></h3>
+<p>You need the Google Cloud CLI, logged in (<code>gcloud auth login</code>) as an account
+with the access listed below. The script is Python so that it runs the same on
+Windows and Linux; it finds <code>gcloud</code> on <code>PATH</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>scripts/testbed.py<span class="w"> </span>run<span class="w"> </span>--<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>realdb<span class="w">    </span><span class="c1"># the usual way: up, the command, down</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python<span class="w"> </span>scripts/testbed.py<span class="w"> </span>up<span class="w">                         </span><span class="c1"># or step by step</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>python<span class="w"> </span>scripts/testbed.py<span class="w"> </span>status
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>python<span class="w"> </span>scripts/testbed.py<span class="w"> </span>down
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>up</code></td>
+<td>Reads the three passwords from Secret Manager into memory, starts the VM, copies <code>testbed/</code> to it (never a local <code>testbed/.env</code>), runs <code>docker compose up -d --wait</code> there with <code>TESTBED_BIND=0.0.0.0</code>, then opens the three IAP tunnels in the background and waits until <code>localhost:15432</code>, <code>13306</code> and <code>11433</code> answer. The first session loads the samples, which takes several minutes.</td>
+</tr>
+<tr>
+<td><code>run -- &lt;cmd&gt;</code></td>
+<td><code>up</code>, then <code>&lt;cmd&gt;</code> with <code>REALDB_POSTGRES</code>, <code>REALDB_MYSQL</code> and <code>REALDB_MSSQL</code> pointing at the tunnels, then <code>down</code> in a <code>finally</code>: also after Ctrl-C, a failing command or a failed <code>up</code>. It exits with the command's code.</td>
+</tr>
+<tr>
+<td><code>down</code></td>
+<td>Closes the tunnels it opened and stops the VM. Safe to run again.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>The VM's state, how long it has been running, and whether each tunnel answers. Never a password.</td>
+</tr>
+</tbody>
+</table>
+<p><code>--project</code>, <code>--zone</code> and <code>--instance</code> override the defaults above.</p>
+<p>The passwords reach the VM on the stdin of the <code>docker compose</code> command, so
+they live only in that command's environment there, and reach <code>&lt;cmd&gt;</code> through
+its own environment. They are never written to a file, put on a command line
+or printed, and the script never changes its own environment. The tunnels'
+process ids are kept in <code>nl2sql-testbed/tunnels.json</code> in the system's
+temporary folder, so a later <code>down</code> can close them.</p>
+<p>After <code>up</code> on its own, remember <code>down</code>: a running VM bills by the hour. If
+the script is killed hard or the VM is started by hand, the nightly stop job
+below stops it at 03:00 UTC.</p>
+<h3 id="cost-controls">Cost controls</h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The VM is stopped whenever no session runs</td>
+<td>A running VM bills by the hour</td>
+</tr>
+<tr>
+<td>Ephemeral external IP only</td>
+<td>Released, and free, while stopped</td>
+</tr>
+<tr>
+<td>No public database port; IAP's range only</td>
+<td>Nothing else can reach the servers</td>
+</tr>
+<tr>
+<td><code>run</code> always stops the VM in a <code>finally</code></td>
+<td>A failed test cannot leave it running</td>
+</tr>
+<tr>
+<td>The nightly stop at 03:00 UTC</td>
+<td>The backstop for everything above</td>
+</tr>
+<tr>
+<td>A budget of $10 a month with alerts</td>
+<td>The last line</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Approximate cost (check the billing report after the first month)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stopped</td>
+<td>the 30 GB disk: about $1 to $2 a month</td>
+</tr>
+<tr>
+<td>Running</td>
+<td>about $0.07 an hour</td>
+</tr>
+<tr>
+<td>The scheduler job</td>
+<td>free: one job is inside Cloud Scheduler's free tier</td>
+</tr>
+</tbody>
+</table>
+<h3 id="access">Access</h3>
+<p>The owner's account holds <code>roles/owner</code> on the project, which covers both the
+set-up below and <code>scripts/testbed.py</code>. Anyone else who runs the script needs:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roles/compute.instanceAdmin.v1</code></td>
+<td>starting, stopping and describing the VM, and the SSH key <code>gcloud compute ssh</code> adds to it</td>
+</tr>
+<tr>
+<td><code>roles/iap.tunnelResourceAccessor</code></td>
+<td><code>--tunnel-through-iap</code> and <code>start-iap-tunnel</code></td>
+</tr>
+<tr>
+<td><code>roles/secretmanager.secretAccessor</code> on the three secrets</td>
+<td>the passwords</td>
+</tr>
+</tbody>
+</table>
+<h3 id="one-time-set-up">One-time set-up</h3>
+<p>Nothing in the repository creates cloud resources. The owner runs these once,
+in a <code>bash</code> shell (Git Bash on Windows) logged in to <code>gcloud</code>. The three
+secrets already exist.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">PROJECT</span><span class="o">=</span>nl2sql-testbed-261014
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nv">REGION</span><span class="o">=</span>us-central1
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nv">ZONE</span><span class="o">=</span>us-central1-a
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nv">VM</span><span class="o">=</span>nl2sql-testbed
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nv">STOPPER</span><span class="o">=</span>testbed-stopper@<span class="nv">$PROJECT</span>.iam.gserviceaccount.com
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># 1. The APIs.</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>gcloud<span class="w"> </span>services<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>compute.googleapis.com<span class="w"> </span>iap.googleapis.com<span class="w"> </span>cloudscheduler.googleapis.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span>billingbudgets.googleapis.com<span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1"># 2. A network of its own, so the default network's open SSH and RDP rules do not apply.</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>gcloud<span class="w"> </span>compute<span class="w"> </span>networks<span class="w"> </span>create<span class="w"> </span>nl2sql-testbed<span class="w"> </span>--subnet-mode<span class="o">=</span>custom<span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>gcloud<span class="w"> </span>compute<span class="w"> </span>networks<span class="w"> </span>subnets<span class="w"> </span>create<span class="w"> </span>nl2sql-testbed<span class="w"> </span>--network<span class="o">=</span>nl2sql-testbed<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span>--region<span class="o">=</span><span class="nv">$REGION</span><span class="w"> </span>--range<span class="o">=</span><span class="m">10</span>.10.0.0/24<span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="c1"># 3. The one inbound rule: SSH and the three servers, from IAP's range only.</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>gcloud<span class="w"> </span>compute<span class="w"> </span>firewall-rules<span class="w"> </span>create<span class="w"> </span>nl2sql-testbed-allow-iap<span class="w"> </span>--network<span class="o">=</span>nl2sql-testbed<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span>--direction<span class="o">=</span>INGRESS<span class="w"> </span>--action<span class="o">=</span>ALLOW<span class="w"> </span>--rules<span class="o">=</span>tcp:22,tcp:15432,tcp:13306,tcp:11433<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">    </span>--source-ranges<span class="o">=</span><span class="m">35</span>.235.240.0/20<span class="w"> </span>--target-tags<span class="o">=</span>nl2sql-testbed<span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="c1"># 4. The VM: e2-standard-2, Debian 12, a 30 GB standard disk, an ephemeral external IP,</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="c1">#    no service account. Its startup script installs Docker and the compose plugin once.</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>gcloud<span class="w"> </span>compute<span class="w"> </span>instances<span class="w"> </span>create<span class="w"> </span><span class="nv">$VM</span><span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span><span class="w"> </span>--zone<span class="o">=</span><span class="nv">$ZONE</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">    </span>--machine-type<span class="o">=</span>e2-standard-2<span class="w"> </span>--image-family<span class="o">=</span>debian-12<span class="w"> </span>--image-project<span class="o">=</span>debian-cloud<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">    </span>--boot-disk-size<span class="o">=</span>30GB<span class="w"> </span>--boot-disk-type<span class="o">=</span>pd-standard<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">    </span>--network<span class="o">=</span>nl2sql-testbed<span class="w"> </span>--subnet<span class="o">=</span>nl2sql-testbed<span class="w"> </span>--tags<span class="o">=</span>nl2sql-testbed<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">    </span>--no-service-account<span class="w"> </span>--no-scopes<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">    </span>--metadata<span class="o">=</span>startup-script<span class="o">=</span><span class="s1">'#!/bin/bash</span>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="s1">command -v docker &gt;/dev/null || curl -fsSL https://get.docker.com | sh'</span>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>gcloud<span class="w"> </span>compute<span class="w"> </span>instances<span class="w"> </span>stop<span class="w"> </span><span class="nv">$VM</span><span class="w"> </span>--zone<span class="o">=</span><span class="nv">$ZONE</span><span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span><span class="w">    </span><span class="c1"># stopped until a session needs it</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="c1"># 5. The nightly stop: a service account that may only stop this VM, and a scheduler job</span>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="c1">#    that calls the Compute Engine API with its token at 03:00 UTC.</span>
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>gcloud<span class="w"> </span>iam<span class="w"> </span>service-accounts<span class="w"> </span>create<span class="w"> </span>testbed-stopper<span class="w"> </span>--display-name<span class="o">=</span><span class="s2">"Stops the test-bed VM"</span><span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span>
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>gcloud<span class="w"> </span>iam<span class="w"> </span>roles<span class="w"> </span>create<span class="w"> </span>testbedStopper<span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span><span class="w"> </span>--title<span class="o">=</span><span class="s2">"Test-bed stopper"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">    </span>--permissions<span class="o">=</span>compute.instances.stop<span class="w"> </span>--stage<span class="o">=</span>GA
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>gcloud<span class="w"> </span>compute<span class="w"> </span>instances<span class="w"> </span>add-iam-policy-binding<span class="w"> </span><span class="nv">$VM</span><span class="w"> </span>--zone<span class="o">=</span><span class="nv">$ZONE</span><span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">    </span>--member<span class="o">=</span>serviceAccount:<span class="nv">$STOPPER</span><span class="w"> </span>--role<span class="o">=</span>projects/<span class="nv">$PROJECT</span>/roles/testbedStopper
+<a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>gcloud<span class="w"> </span>scheduler<span class="w"> </span><span class="nb">jobs</span><span class="w"> </span>create<span class="w"> </span>http<span class="w"> </span>nl2sql-testbed-nightly-stop<span class="w"> </span>--project<span class="o">=</span><span class="nv">$PROJECT</span><span class="w"> </span>--location<span class="o">=</span><span class="nv">$REGION</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="w">    </span>--schedule<span class="o">=</span><span class="s2">"0 3 * * *"</span><span class="w"> </span>--time-zone<span class="o">=</span>Etc/UTC<span class="w"> </span>--http-method<span class="o">=</span>POST<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="w">    </span>--uri<span class="o">=</span>https://compute.googleapis.com/compute/v1/projects/<span class="nv">$PROJECT</span>/zones/<span class="nv">$ZONE</span>/instances/<span class="nv">$VM</span>/stop<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="w">    </span>--oauth-service-account-email<span class="o">=</span><span class="nv">$STOPPER</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a><span class="w">    </span>--oauth-token-scope<span class="o">=</span>https://www.googleapis.com/auth/cloud-platform
+<a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>
+<a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="c1"># 6. The budget: $10 a month, with alerts at 50%, 90% and 100%.</span>
+<a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a><span class="nv">BILLING</span><span class="o">=</span><span class="k">$(</span>gcloud<span class="w"> </span>billing<span class="w"> </span>projects<span class="w"> </span>describe<span class="w"> </span><span class="nv">$PROJECT</span><span class="w"> </span>--format<span class="o">=</span><span class="s1">'value(billingAccountName)'</span><span class="k">)</span>
+<a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>gcloud<span class="w"> </span>billing<span class="w"> </span>budgets<span class="w"> </span>create<span class="w"> </span>--billing-account<span class="o">=</span><span class="si">${</span><span class="nv">BILLING</span><span class="p">#billingAccounts/</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a><span class="w">    </span>--display-name<span class="o">=</span><span class="s2">"nl2sql test bed"</span><span class="w"> </span>--budget-amount<span class="o">=</span>10USD<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a><span class="w">    </span>--filter-projects<span class="o">=</span>projects/<span class="nv">$PROJECT</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a><span class="w">    </span>--threshold-rule<span class="o">=</span><span class="nv">percent</span><span class="o">=</span><span class="m">0</span>.5<span class="w"> </span>--threshold-rule<span class="o">=</span><span class="nv">percent</span><span class="o">=</span><span class="m">0</span>.9<span class="w"> </span>--threshold-rule<span class="o">=</span><span class="nv">percent</span><span class="o">=</span><span class="m">1</span>.0
+</code></pre></div>
+<p>To check the set-up, run <code>python scripts/testbed.py run -- pytest -m realdb</code>.
+To check the nightly job, start the VM with <code>python scripts/testbed.py up</code>,
+run <code>gcloud scheduler jobs run nl2sql-testbed-nightly-stop --location=$REGION --project=$PROJECT</code>,
+and <code>python scripts/testbed.py status</code> should then show it stopped; finish
+with <code>python scripts/testbed.py down</code> to close the tunnels.</p>
 
 
 

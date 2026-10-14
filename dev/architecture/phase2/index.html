@@ -3703,7 +3703,7 @@ on GitHub's runners; no cloud credentials are involved.</p>
 <p>Test code may name dialects and use SQLAlchemy directly. The boundary tests
 cover <code>packages/*/src</code>, not the tests.</p>
 <h3 id="the-gcp-vm">The GCP VM</h3>
-<p>One small VM in <code>nl2sql-testbed-261014</code> runs the same compose file
+<p>One small VM, <code>nl2sql-testbed</code> in <code>nl2sql-testbed-261014</code> (zone <code>us-central1-a</code>), runs the same compose file
 (owner decision 3). It is started for a session and stopped after it.</p>
 <table>
 <thead>
@@ -3731,7 +3731,7 @@ cover <code>packages/*/src</code>, not the tests.</p>
 </tr>
 <tr>
 <td>Inbound</td>
-<td>No public database port. A firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range <code>35.235.240.0/20</code> only.</td>
+<td>No public database port. The VM sits in its own VPC, <code>nl2sql-testbed</code>, so the default network's open SSH and RDP rules do not apply, and one firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range <code>35.235.240.0/20</code> only.</td>
 </tr>
 <tr>
 <td>Access</td>
@@ -3762,7 +3762,7 @@ Windows and CI runs Linux. It calls <code>gcloud</code> (found with <code>shutil
 <tbody>
 <tr>
 <td><code>up</code></td>
-<td>Starts the VM (<code>gcloud compute instances start</code>). Copies <code>testbed/</code> to it (<code>gcloud compute scp --tunnel-through-iap</code>). Runs <code>docker compose up -d --wait</code> on it over <code>gcloud compute ssh --tunnel-through-iap</code>, with <code>TESTBED_BIND=0.0.0.0</code> and the three passwords from Secret Manager passed on that command's environment only. Then opens the three IAP tunnels in the background and waits until each local port answers.</td>
+<td>Starts the VM (<code>gcloud compute instances start</code>). Copies <code>testbed/</code> to it (<code>gcloud compute scp --tunnel-through-iap</code>). Runs <code>docker compose up -d --wait</code> on it over <code>gcloud compute ssh --tunnel-through-iap</code>, with <code>TESTBED_BIND=0.0.0.0</code> and the three passwords from Secret Manager passed on that command's environment only (they travel on its stdin, never on a command line). Then opens the three IAP tunnels in the background and waits until each local port answers.</td>
 </tr>
 <tr>
 <td><code>run -- &lt;cmd&gt;</code></td>
@@ -3784,7 +3784,7 @@ and are never written to a file or printed.</p>
 started by hand, it would keep billing. One Cloud Scheduler job calls the
 Compute Engine API directly at 03:00 UTC, with an OAuth token for a service
 account that may only stop instances in this project:
-<code>POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/&lt;zone&gt;/instances/&lt;vm&gt;/stop</code>.
+<code>POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/us-central1-a/instances/nl2sql-testbed/stop</code>.
 Stopping a stopped VM does nothing, so the job needs no logic, and one job is
 inside Cloud Scheduler's free tier.</p>
 <p><code>docs/testing/test-bed.md</code> gives the commands for the owner to create the
