@@ -31,6 +31,20 @@ design aims to be correct, not compatible:
   in one process never share anything. Phase 1 gets there in
   [staged pull requests](#8-process-globals), and each one stays green.
 
+## Owner decisions
+
+The owner answered the six questions this design left open. Each one is
+written into the section it affects:
+
+| # | Decision | Where |
+|---|---|---|
+| 1 | **`nl2sql-api` settings go in an `api:` section** of `nl2sql.yaml`, typed by an `Api` model. The engine ignores it, and `nl2sql-api` reads `engine.config.api`. The `NL2SQL_API_*` variables are removed. | [`api`](#api-api) |
+| 2 | **Only the entry points load `.env`.** The CLI, `nl2sql-api` and the demo load the `.env` next to `nl2sql.yaml` without overriding variables that are already set. The library never reads `.env` and never writes `os.environ`. | [Environment variables](#3-environment-variables) |
+| 3 | **The constructor never connects.** The entry points call `engine.check()`, and `required: true` is enforced there. | [Lifecycle](#lifecycle) |
+| 4 | **The S3 and ADLS result backends are deleted now.** The Phase 2 results-store interface brings remote stores back. | [`storage`](#storage-storage-path-only) |
+| 5 | **`nl2sql setup` is removed in 0.5.** `nl2sql init` replaces it, and the guided flow comes in Phase 4. | [CLI](#cli) |
+| 6 | **The LLM can be replaced at runtime.** `engine.llm.replace(LLM(...))` and an admin-only `PUT /api/v1/settings/llm` do it. The swap is atomic and logged, LLM clients are cached per engine, and the plan cache key includes the planner's model. | [Replacing the LLM at runtime](#replacing-the-llm-at-runtime) |
+
 Two rules from earlier decisions apply throughout:
 
 - **Every component works the same way:** a small interface, the built-ins
@@ -52,6 +66,7 @@ Two rules from earlier decisions apply throughout:
 | **A defined loading order** | Discover names, eagerly load and validate what the config uses, connect lazily, and report readiness with `engine.check()`. |
 | **A light import** | `import nl2sql` loads no database driver, chromadb, onnxruntime, textual or opentelemetry. A test enforces this. |
 | **A clean facade** | `run_query` and `stream_query` at the top level, and everything else in noun namespaces. `engine.context`, the duplicate methods and the sub-API classes are removed. |
+| **A runtime LLM switch** | `engine.llm.replace()` and `PUT /api/v1/settings/llm` swap the LLM atomically and log who changed what. LLM clients are cached per engine. |
 | **No process globals** | Settings, the embeddings cache and the secret manager belong to one engine, and nothing writes `os.environ`. Two engines can run in one process. |
 | **The SDK renamed** | `nl2sql-adapter-sdk` becomes `nl2sql-sdk` (`nl2sql_sdk`). It holds the adapter and secrets interfaces. |
 | **CLI on one flag** | A single `--config`, plus `nl2sql init` and `nl2sql config check`. |
@@ -87,6 +102,7 @@ storage:     { file: storage.yaml }
 curated:     { file: curated.yaml }      # optional
 secrets:     { file: secrets.yaml }      # optional
 settings:    { file: settings.yaml }     # optional
+api:         { file: api.yaml }          # optional, read by nl2sql-api only
 ```
 
 A small project can write every section inline instead. This file builds the
@@ -115,14 +131,14 @@ storage:    { path: .nl2sql }
 | `curated` | no | `Curated` | Absent means curated answers are off. |
 | `secrets` | no | `Secrets` | The `env` provider is always available without it. |
 | `settings` | no | `Settings` | Tuning knobs. Every field has a default. |
+| `api` | no | `Api` | `nl2sql-api`'s own settings. The engine validates it and never reads it. |
 
 The five required sections are explicit choices. There is no hidden default
 for where data lives, which embedder runs, or who may read what. Each one fits
 on one line, and `nl2sql init` writes all five.
 
-`glossary`, `evals` and `api` are not Phase 1 sections. The root model forbids
-unknown keys, so writing one today is an error (see
-[open question 1](#12-open-questions) on `api`).
+`glossary` and `evals` are not Phase 1 sections. The root model forbids
+unknown keys, so writing one in 0.5 is an error.
 
 ### `file:` includes
 
@@ -332,6 +348,11 @@ Today's stores move under it:
 | Run traces | `traces/` (`TRACE_DIR`) | `<path>/traces/` |
 | Result files | `./artifacts` (`RESULT_ARTIFACT_BASE_URI`) | `<path>/results/` |
 
+The S3 and ADLS result backends (`RESULT_ARTIFACT_BACKEND=s3|adls` and their
+settings) are deleted in 0.5 (owner decision 4). They were untested and
+unreachable from the new config. The Phase 2 results-store interface brings
+remote stores back as built-ins or plugins.
+
 In Phase 2, `index`, `state`, `traces` and `results` become optional
 sub-blocks, each with a `type`. A config with only `path` stays valid.
 
@@ -405,7 +426,34 @@ Each group is its own frozen model (`PipelineSettings`, `RetrySettings`,
 `CuratedSettings`, `FeedbackSettings`, `ObservabilitySettings`), with today's
 validation (for example `match_floor` between 0 and 1).
 
-### Frozen, except datasources
+#### `api`: `Api`
+
+These are `nl2sql-api`'s own settings (owner decision 1). The class lives in
+`nl2sql.config`, so the file gets the same strict validation, `${env:}` rules
+and `nl2sql config check` as every other section. The engine never reads it,
+and `nl2sql-api` reads `engine.config.api`. Without the section, `nl2sql-api`
+uses the defaults: no role source, so admin routes answer on loopback only, as
+today.
+
+```yaml
+# api.yaml
+role_header: X-NL2SQL-Role      # a header a trusted proxy sets on every request
+role: null                      # or one static role for every request
+trust_body_role: false          # accept "role" in the request body (dev only)
+cors_origins: [https://app.example.com]
+```
+
+| Field | Type | Default | Was (0.4) |
+|---|---|---|---|
+| `role_header` | `str \| None` | `None` | `NL2SQL_API_ROLE_HEADER` |
+| `role` | `str \| None` | `None` | `NL2SQL_API_ROLE` |
+| `trust_body_role` | `bool` | `False` | `NL2SQL_API_TRUST_BODY_ROLE` |
+| `cors_origins` | `list[str]` | `[]` | `NL2SQL_API_CORS_ORIGINS` (comma-separated) |
+
+The admin role list is a policy, so it lives in `policies.admin_roles`, not
+here.
+
+### Frozen, except datasources and the LLM
 
 `Config` and every section are frozen. Code changes a config by copying it:
 
@@ -415,11 +463,15 @@ cfg = cfg.with_datasource(Datasource(id="shop", type="sqlite", connection={"data
 cfg = cfg.model_copy(update={"settings": cfg.settings.model_copy(update={"tenant_id": "acme"})})
 ```
 
-Once an engine is built, only its datasources can change, through
-`engine.datasources.add()` and `remove()`. Each call swaps in a new `Config`
-atomically, under the registry lock, so `engine.config` always matches what
-the engine runs. Nothing is written to disk: persisting a datasource is the
-calling app's job.
+Once an engine is built, two sections can still change:
+- **`datasources`**, through `engine.datasources.add()` and `remove()`;
+- **`llm`**, through `engine.llm.replace()` (see
+  [Replacing the LLM at runtime](#replacing-the-llm-at-runtime)).
+
+Each call swaps in a new `Config` atomically, under a lock, so `engine.config`
+always matches what the engine runs. Nothing is written to disk. A restart
+returns to the files, and persisting a change is the calling app's job.
+Every other section is fixed for the engine's lifetime.
 
 ## 3. Environment variables
 
@@ -437,6 +489,21 @@ Anything else from the environment is written explicitly in the YAML:
 are not configuration: the trace redactor scans `os.environ` for values to
 mask, and `nl2sql benchmark` checks `CI`. Third-party libraries such as boto3
 and the OpenTelemetry SDK still read their own standard variables.
+
+### `.env` files
+
+Only the entry points load `.env` (owner decision 2):
+- The CLI, `nl2sql-api` and the demo load the `.env` next to `nl2sql.yaml`
+  into the process environment at startup.
+- Variables that are already set win. The file never overrides them.
+- The library never reads a `.env` file and never writes `os.environ`. A
+  Python caller who wants a `.env` calls `python-dotenv` before
+  `NL2SQL.from_config()`.
+
+This replaces 0.4's three ways in: pydantic-settings reading `.env`, the
+`ENV`/`APP_ENV` lookup of `.env.<name>`, and `ENV_FILE_PATH`. Loading lives in
+one helper, `nl2sql.config.load_env_file(config_path)`. Only the entry points
+call it, and the boundary test allows `load_dotenv` there and nowhere else.
 
 ### Every 0.4 variable, and where it goes
 
@@ -460,14 +527,14 @@ The 48 `Settings` fields (`common/settings.py`):
 | `CURATED_MATCH_TOP_K` | `settings.curated.match_top_k` |
 | `CURATED_MATCH_FLOOR` | `settings.curated.match_floor` |
 | `GLOBAL_TIMEOUT_SEC` | `settings.pipeline.timeout_s` |
-| `RESULT_ARTIFACT_BACKEND` | removed: results are local under `storage.path` (see [open question 4](#12-open-questions)) |
+| `RESULT_ARTIFACT_BACKEND` | removed: results are local under `storage.path`, and the S3/ADLS backends are deleted (owner decision 4) |
 | `RESULT_ARTIFACT_BASE_URI` | `storage.path` (`<path>/results/`) |
 | `RESULT_ARTIFACT_PATH_TEMPLATE` | removed: a fixed layout under `<path>/results/` |
-| `RESULT_ARTIFACT_S3_BUCKET` | removed (open question 4) |
-| `RESULT_ARTIFACT_S3_PREFIX` | removed (open question 4) |
-| `RESULT_ARTIFACT_ADLS_ACCOUNT` | removed (open question 4) |
-| `RESULT_ARTIFACT_ADLS_CONTAINER` | removed (open question 4) |
-| `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` | removed (open question 4) |
+| `RESULT_ARTIFACT_S3_BUCKET` | removed with the backend (owner decision 4) |
+| `RESULT_ARTIFACT_S3_PREFIX` | removed with the backend (owner decision 4) |
+| `RESULT_ARTIFACT_ADLS_ACCOUNT` | removed with the backend (owner decision 4) |
+| `RESULT_ARTIFACT_ADLS_CONTAINER` | removed with the backend (owner decision 4) |
+| `RESULT_ARTIFACT_ADLS_CONNECTION_STRING` | removed with the backend (owner decision 4) |
 | `SCHEMA_STORE_BACKEND` | removed: SQLite at `<path>/state.db` (tests use a temporary `storage.path`) |
 | `SCHEMA_STORE_PATH` | `storage.path` (`<path>/state.db`) |
 | `SCHEMA_STORE_MAX_VERSIONS` | `settings.schema.max_versions` |
@@ -497,9 +564,9 @@ The variables read outside `Settings`:
 
 | 0.4 variable | Read in | 0.5 |
 |---|---|---|
-| `ENV`, `APP_ENV`, `ENV_FILE_PATH` | `settings.py`, `env_hint.py`, written by `context.py` and `cli/main.py` | removed, with the `--env`/`--env-file` flags and the `.env.<name>` lookup (see [open question 2](#12-open-questions) on `.env`) |
+| `ENV`, `APP_ENV`, `ENV_FILE_PATH` | `settings.py`, `env_hint.py`, written by `context.py` and `cli/main.py` | removed, with the `--env`/`--env-file` flags and the `.env.<name>` lookup. The entry points load the `.env` next to `nl2sql.yaml` ([`.env` files](#env-files)). |
 | `NL2SQL_API_ADMIN_ROLES` | `nl2sql_api/auth.py` | `policies.admin_roles` |
-| `NL2SQL_API_ROLE_HEADER`, `NL2SQL_API_ROLE`, `NL2SQL_API_TRUST_BODY_ROLE`, `NL2SQL_API_CORS_ORIGINS` | `nl2sql_api/auth.py`, `main.py` | moved into config, under [open question 1](#12-open-questions) |
+| `NL2SQL_API_ROLE_HEADER`, `NL2SQL_API_ROLE`, `NL2SQL_API_TRUST_BODY_ROLE`, `NL2SQL_API_CORS_ORIGINS` | `nl2sql_api/auth.py`, `main.py` | `api.role_header`, `api.role`, `api.trust_body_role`, `api.cors_origins` |
 | `NL2SQL_DEMO_HOSTED` | `cli/demo/playground/hosted.py` | `nl2sql demo --hosted` (the flag already exists) |
 | `NL2SQL_DEMO_QUESTIONS_PER_MINUTE`, `NL2SQL_DEMO_QUESTIONS_PER_SESSION` | `hosted.py` | `nl2sql demo --questions-per-minute N --questions-per-session N` |
 | `VAULT_ADDR`, `VAULT_TOKEN` | `secrets/providers/hashi.py` | `secrets.providers[].url` / `.token` |
@@ -604,12 +671,108 @@ with NL2SQL.from_config("nl2sql.yaml") as engine:
 
 | Method | What it does |
 |---|---|
-| `NL2SQL(config, *, registry=None)` | Loads and validates: resolves every name, imports only those components, checks interface versions and driver modules, builds the secret manager, adapters (not connected), LLM clients (no call) and stores. Raises one `ConfigError` with every problem. |
+| `NL2SQL(config, *, registry=None)` | Loads and validates: resolves every name, imports only those components, checks interface versions and driver modules, builds the secret manager, adapters (not connected), LLM clients (no call) and stores. Raises one `ConfigError` with every problem. **It never connects** to a datasource or calls a model (owner decision 3). |
 | `NL2SQL.from_config(path=None, *, registry=None)` | `NL2SQL(load_config(path), registry=registry)`. |
 | `engine.check() -> CheckReport` | Connects to each datasource and records `ready` or `failed(stage, reason, fix)`. A failed datasource is marked unavailable and left out of routing. It also checks that every agent's API key resolves (no model call) and reports the index status (`index.health()`). It raises `EngineNotReady` if a `required: true` datasource fails, or if datasources are configured and none is ready. It is safe to call again. |
 | `engine.close()` | Disposes adapter pools and closes the state store and the vector store client. The engine cannot be used afterwards. Calling it twice is fine. |
 | `__enter__` / `__exit__` | `with` support. `__exit__` calls `close()`. |
-| `engine.config` | The current frozen `Config`. Secrets appear as references only. |
+| `engine.config` | The current frozen `Config`. Secrets appear as references only. It changes only through `datasources.add`/`remove` and `llm.replace`. |
+
+**Startup policy belongs to the entry points.** The CLI, `nl2sql-api` (in its
+lifespan, before it accepts requests) and the playground call
+`engine.check()` straight after construction. They refuse to start on
+`EngineNotReady`, and they start degraded, printing the report, when an
+optional datasource fails. A Python caller decides for itself. Without
+`check()`, a broken datasource fails the first query that targets it, with its
+reason. Building an engine therefore stays cheap and has no side effects for
+tests, `nl2sql config check` and notebooks.
+
+### What can change after creation
+
+Only two things, and each goes through one method:
+
+```python
+engine.datasources.add(Datasource(id="hr", type="postgres", connection={...}))   # Connect a database
+engine.datasources.remove("hr")
+engine.llm.replace(LLM(provider="openai", model="gpt-5.4",
+                       agents={"ast_planner": AgentLLM(model="gpt-5.5")}))      # switch models
+```
+
+### Replacing the LLM at runtime
+
+Owner decision 6 keeps a runtime model switch. Changing the model by hand is
+something both the playground and an operator need.
+
+**The entry points**
+
+| Caller | How |
+|---|---|
+| Python | `engine.llm.replace(llm: LLM, *, by: UserContext \| None = None) -> LLMChange` |
+| `nl2sql-api` | `PUT /api/v1/settings/llm`, admin only (`require_admin`). The body is the `llm` section as JSON, the same shape as `llm.yaml`. It replaces `POST /llm`. It returns the `LLMChange` with no keys. |
+| Playground | The settings panel calls `engine.llm.replace(...)`. |
+
+**Validation.** The new section is validated exactly like `llm.yaml`. The
+same `LLM` model runs with `extra="forbid"` and "did you mean", the provider
+names are resolved through the engine's registry (checking interface version
+and `find_spec`), and every agent's key reference is resolved. A request that
+fails changes nothing and returns the same `ConfigError` text, as HTTP 422
+from the API. No model is called during validation.
+
+**The swap is atomic.**
+- The runtime holds one immutable `LLMSet`, which maps each agent to its
+  client and resolved settings.
+- `replace` builds the new `LLMSet` completely, then swaps one reference
+  under the engine's lock, along with `engine.config` (`llm` is replaced, and
+  nothing else changes).
+- A run reads the reference once, when it starts. In-flight runs finish on the
+  old set, and every run that starts after the swap uses the new one. No run
+  ever mixes the two.
+
+**It is not persisted.** The file on disk is not rewritten, so a restart
+returns to `llm.yaml`. Saving the change explicitly is out of scope for 0.5.
+The playground already writes its own `llm.yaml` for the next start, and keeps
+doing so as a separate step after `replace` succeeds.
+
+**Every swap is logged.** One INFO log line, and one audit record through the
+engine's `event_logger`. That stub becomes the audit observer, and the record
+becomes the `llm.changed` event, when the Phase 3 event bus lands. The record
+holds:
+- who: `by.user_id` and `by.roles` when known, otherwise the entry point
+  (`api`, `playground`, `python`);
+- each agent whose effective provider or model changed, as old and new;
+- never a key, a key reference or a header value.
+
+```text
+INFO nl2sql.llm: LLM replaced by user=u42 roles=[admin] via api:
+  default: openai/gpt-5.4 -> anthropic/claude-sonnet-5-5;
+  ast_planner: openai/gpt-5.4 -> anthropic/claude-opus-5-5
+```
+
+**Clients are cached per engine.** `LLMClientCache` is owned by the runtime
+and is not a global. It also serves initial construction.
+- **The key** is the agent's resolved client settings: provider, model,
+  `base_url`, temperature, and every other client field the agent model has
+  (Phase 2 adds `max_tokens`, `timeout_s`, `max_retries`, `seed` and
+  `headers`, and the key covers them automatically because it is built from
+  the model's fields).
+- **Secrets are resolved but never stored in the key.** The resolved API key
+  (and any secret header) enters the key only as a SHA-256 digest, and the
+  key's string form, used in logs and debugging, prints the digest prefix
+  only.
+- **Sharing.** Agents whose settings are equal share one client, so seven
+  agents on one model build one client. Swapping back to an earlier LLM
+  reuses the cached clients instead of building new ones.
+- **Bounded.** An LRU of 16 entries. A client evicted from the cache is
+  closed (its HTTP client's `close()`) once no `LLMSet` refers to it any more,
+  so an in-flight run on the old set is never cut off. `engine.close()`
+  closes them all.
+
+**The plan cache key includes the planner's model.** Today the key is the
+normalised intent and run date, the datasource and the schema version
+(`pipeline/plan_cache.py`). It gains the `ast_planner` agent's effective
+`provider` and `model`, so after a swap a plan written by another model is
+never served. Entries from the old model stay in the cache, and swapping back
+hits them again.
 
 ## 5. The registry
 
@@ -732,8 +895,8 @@ flowchart LR
 | **CI** | `nl2sql config check` | Steps 1, 2a and 2b without creating any store files. `--connect` also runs step 3. Exit code 0 or 1. | the same errors, printed by file |
 
 The CLI, `nl2sql-api` (in its lifespan) and the playground call
-`engine.check()` straight after building the engine. Python callers may call
-it or not (see [open question 3](#12-open-questions)).
+`engine.check()` straight after building the engine, and enforce `required`
+there. The constructor never connects (owner decision 3).
 
 ### The import-time rule
 
@@ -788,7 +951,7 @@ engine.check(); engine.close(); engine.config; engine.about()
 
 engine.datasources   # list, get, add, remove, schema, test
 engine.index         # build, health, clear, inspect
-engine.llm           # list, get, providers
+engine.llm           # list, get, providers, replace
 engine.policies      # roles, allows, allowed, validate
 engine.curated       # validate, test
 engine.results       # manifest, page, csv
@@ -824,9 +987,9 @@ the playground stops importing `nl2sql.pipeline.steps` and
 | `datasource.get_adapter(id)` | removed |
 | — | `datasources.remove(id)`, `datasources.schema(id)` |
 | `get_schema(id)` | `datasources.schema(id)` |
-| `configure_llm(config)`, `llm.configure_llm(config)` | removed: the LLM config is frozen; build a new engine |
-| `configure_llm_from_config(path)`, `llm.configure_llm_from_config(path)` | removed |
-| `reload_llm_config(path)` | removed |
+| `configure_llm(config)`, `llm.configure_llm(config)` | `llm.replace(LLM)`: the whole `llm` section at once, validated, atomic and logged ([Replacing the LLM at runtime](#replacing-the-llm-at-runtime)) |
+| `configure_llm_from_config(path)`, `llm.configure_llm_from_config(path)` | `llm.replace(load_config(path).llm)` |
+| `reload_llm_config(path)` | `llm.replace(load_config(path).llm)` |
 | `list_llms()`, `llm.list_llms()` | `llm.list()` (agent → provider, model, inherited or set) |
 | `get_llm(name)`, `llm.get_llm(name)` | `llm.get(agent)` |
 | — | `llm.providers()` (installed providers, label, key variable, key present); the playground stops importing `PROVIDER_PRESETS` |
@@ -858,9 +1021,9 @@ expose them.
 
 | Consumer | Today | What Phase 1 changes |
 |---|---|---|
-| **`nl2sql-api`** | `NL2SQL()` in the lifespan; `engine.get_setting("observability_exporter")`; flat methods; `POST /llm` calls `configure_llm`; role and CORS settings from `NL2SQL_API_*` | `NL2SQL.from_config()` (reads `NL2SQL_CONFIG`), then `engine.check()`. Uses `engine.config.settings.observability.exporter` and the namespaces. **`POST /llm` is removed** ([open question 6](#12-open-questions)). Admin roles come from `engine.config.policies.admin_roles`, and the other settings move under [open question 1](#12-open-questions). The `nl2sql-engine` pin becomes `~=0.5.0` (bug B17). |
+| **`nl2sql-api`** | `NL2SQL()` in the lifespan; `engine.get_setting("observability_exporter")`; flat methods; `POST /llm` calls `configure_llm`; role and CORS settings from `NL2SQL_API_*` | `NL2SQL.from_config()` (reads `NL2SQL_CONFIG`), then `engine.check()`. Uses `engine.config.settings.observability.exporter` and the namespaces. **`POST /llm` becomes `PUT /api/v1/settings/llm`** (admin only), calling `engine.llm.replace()`. Admin roles come from `engine.config.policies.admin_roles`. The role header, static role, body-role trust and CORS origins come from `engine.config.api`. The lifespan loads the `.env` next to `nl2sql.yaml` before building the engine. The `nl2sql-engine` pin becomes `~=0.5.0` (bug B17). |
 | **The CLI** | Builds `NL2SQLContext` directly in `run`, `index`, `trace replay`, `setup`, `cli/common/indexing.py`; reads `settings.*` paths | Every command builds `NL2SQL.from_config(ctx.config_path)` and uses the facade. `run_pipeline` and `run_indexing` take the engine. `NL2SQLContext` is no longer importable from the CLI. |
-| **The playground** (`cli/demo/`) | `NL2SQL()`, `engine.context.policies_cfg`, `reload_llm_config`, `FeedbackStore(settings.schema_store_path)`, `settings.trace_dir`, `settings.feedback_enabled`, `describe_pipeline`, `engine_info`, `PROVIDER_PRESETS`; writes keys into `os.environ` | Builds from the demo folder's `nl2sql.yaml`. Uses `policies.roles()`, `feedback.*`, `traces.get()`, `about()` and `llm.providers()`. **Switching the model builds a new engine** from `cfg.model_copy(update={"llm": new_llm})` and swaps it under the settings gate. It still writes `llm.yaml` for the next start, and a key typed in the panel goes into the new `LLM` as a value and into the demo folder's `.env`, never into `os.environ`. `use_request_llms` (hosted per-request keys) and `run_record` stay internal imports until Phase 4, when the web app moves onto `nl2sql-api`. |
+| **The playground** (`cli/demo/`) | `NL2SQL()`, `engine.context.policies_cfg`, `reload_llm_config`, `FeedbackStore(settings.schema_store_path)`, `settings.trace_dir`, `settings.feedback_enabled`, `describe_pipeline`, `engine_info`, `PROVIDER_PRESETS`; writes keys into `os.environ` | Builds from the demo folder's `nl2sql.yaml`. Uses `policies.roles()`, `feedback.*`, `traces.get()`, `about()` and `llm.providers()`. **Switching the model calls `engine.llm.replace(new_llm)`** in place of `reload_llm_config`. It still writes `llm.yaml` for the next start, and a key typed in the panel goes into the new `LLM` as a value and into the demo folder's `.env`, never into `os.environ`. `use_request_llms` (hosted per-request keys) and `run_record` stay internal imports until Phase 4, when the web app moves onto `nl2sql-api`. |
 
 The boundary test `test_the_playground_never_touches_the_engine_context`
 becomes stricter: the playground and `nl2sql_api` may not import
@@ -987,10 +1150,11 @@ users, yanking it adds nothing.
 | Change | Detail |
 |---|---|
 | **One global `--config PATH`** | On the app callback, before the subcommand: `nl2sql --config prod/nl2sql.yaml index`. Without it, `NL2SQL_CONFIG`, then `./nl2sql.yaml`. |
+| **`.env` and startup** | Before building the engine, the CLI loads the `.env` next to the chosen `nl2sql.yaml` without overriding variables already set. Commands that query or index call `engine.check()` and stop on `EngineNotReady`. |
 | **Flags removed** | `--env`, `--env-file`, and every per-command path flag: `--config` (meaning the datasource file), `--secrets-config`, `--llm-config`, `--policies-config`, `--vector-store`, and `curated`'s and `policy`'s `--curated`, `--config`, `--secrets` and `--policies`. |
 | **`nl2sql init [DIR] [--demo] [--provider NAME] [--force]`** | Non-interactive. Writes the split layout below into `DIR` (default `.`), validates it with `load_config` and prints the next steps. It refuses to overwrite a file without `--force`. `--provider` (default `openai`) picks the `llm.yaml` provider and its default model. |
 | **`nl2sql config check [--connect]`** | [Loading](#6-loading), step "CI". It prints problems grouped by file and exits 0 or 1. |
-| **`nl2sql setup` removed** | `init` replaces `setup --demo`. The interactive wizard goes until the Phase 4 guided flow ([open question 5](#12-open-questions)). |
+| **`nl2sql setup` removed** | `init` replaces it, including `setup --demo` (owner decision 5). The guided flow (connect, scan, draft, review) comes in Phase 4. |
 | **`nl2sql doctor`** | Reports Python, installed packages and extras, and provider keys present. Config problems are `config check`'s job. |
 | **`nl2sql list-adapters`** | Reads `Registry.default().names("adapter")` and marks each installed or missing its driver. |
 
@@ -1043,7 +1207,7 @@ data/                  # --demo only: the three bundled SQLite files, copied
 | new `configuration/storage.md`, `configuration/settings.md`, `configuration/embeddings.md` | The new sections. |
 | `getting_started/*.md`, `index.md`, `README.md`, `packages/nl2sql/README.md` | `nl2sql init`, `--config`, `from_config`. |
 | `api/core/*.md`, `api/index.md` | The new facade. `settings.md` is replaced by a page on `engine.config` and `check()`. |
-| `api/rest/llm.md`, `api/rest/datasource.md` | `POST /llm` removed; the datasource body uses the `Datasource` shape. |
+| `api/rest/llm.md`, `api/rest/datasource.md` | `PUT /api/v1/settings/llm` replaces `POST /llm`; the datasource body uses the `Datasource` shape. |
 | `deployment/docker.md`, `deployment/kubernetes.md`, `deployment/architecture.md`, `deployment/hosted-demo.md` | `NL2SQL_CONFIG`, mounted config, flags. |
 | `development/index.md`, `extensions/add-adapter.md` | The registry, entry point groups and interface versions. |
 | `architecture/invariants.md` | The import-time rule, the env allow-list, no process globals, the SDK name. |
@@ -1067,30 +1231,33 @@ flowchart TD
   P5 --> P7a
   P7a --> P7b["7b. Callers onto the new config"]
   P6 --> P7b
-  P7a --> P10["10. Settings off the global: pipeline"]
-  P7a --> P11["11. Settings off the global: indexing and the rest"]
+  P7a --> P9["9. LLM client cache and llm.replace"]
+  P7a --> P11["11. Settings off the global: pipeline"]
+  P7a --> P12["12. Settings off the global: indexing and the rest"]
   P7b --> P8["8. nl2sql config check"]
-  P7b --> P9["9. Facade namespaces"]
-  P9 --> P12["12. Settings off the global: apps, delete global"]
-  P10 --> P12
-  P11 --> P12
+  P7b --> P10["10. Facade namespaces"]
+  P9 --> P10
+  P10 --> P13["13. Settings off the global: apps, delete global"]
+  P11 --> P13
+  P12 --> P13
 ```
 
 | # | PR | Depends on | Tests first | Docs |
 |---|---|---|---|---|
 | 1 | **SDK rename to `nl2sql-sdk`.** A mechanical move of `packages/adapter-sdk` to `packages/sdk` and of the imports; pyproject, release-please, `publish_pypi.yaml`, `test.yml`, the API Dockerfile. | — | Boundary tests point at `nl2sql_sdk`. The wheel smoke test installs `nl2sql_sdk-*.whl`. A test asserts no file imports `nl2sql_adapter_sdk`. | adapter pages, invariants, releasing (the PyPI checklist), CLAUDE.md, CONTRIBUTING, READMEs |
-| 2 | **Config models and `load_config`.** `nl2sql/config/`: every section class, `file:` includes (file and folder), interpolation rules, `extra="forbid"` with "did you mean", frozen models with `with_datasource`, `ConfigError` formatting, the 0.4-file message, and a `make_config()` test helper. Not yet wired into the engine. | — | One test per rule in section 2, for example `test_unknown_key_suggests_closest`, `test_folder_include_defaults_id_to_file_stem`, `test_secret_fields_keep_the_reference`, `test_missing_env_in_storage_path_names_the_field`, `test_reference_inside_a_string_is_an_error`, `test_version_1_file_points_to_the_mapping`. | This page's section 2 stays the reference until 7b. |
+| 2 | **Config models and `load_config`.** `nl2sql/config/`: every section class including `Api`, `file:` includes (file and folder), interpolation rules, `extra="forbid"` with "did you mean", frozen models with `with_datasource`, `ConfigError` formatting, the 0.4-file message, `load_env_file()`, and a `make_config()` test helper. Not yet wired into the engine. | — | One test per rule in section 2, for example `test_unknown_key_suggests_closest`, `test_folder_include_defaults_id_to_file_stem`, `test_secret_fields_keep_the_reference`, `test_missing_env_in_storage_path_names_the_field`, `test_reference_inside_a_string_is_an_error`, `test_version_1_file_points_to_the_mapping`, `test_api_section_rejects_unknown_keys`, `test_env_file_never_overrides_a_set_variable`. | This page's section 2 stays the reference until 7b. |
 | 3 | **A light `import nl2sql`.** A lazy `__init__` through `__getattr__`, and the facade imports the runtime inside the constructor. | — | `test_importing_nl2sql_loads_no_heavy_library`, `test_import_nl2sql_stays_within_its_time_budget` | invariants.md: the import rule |
 | 4 | **SDK interfaces for the registry.** `interface_version`, `driver_modules` and `install_hint` on the adapter protocol and the five built-ins; `SecretProvider` with `config_model`/`from_config` moves into `nl2sql_sdk.secrets`; built-in secret providers adopt it, `hashi` is renamed `hashicorp`, and the env-var fallbacks are removed. | 1 | Every built-in adapter declares version 1 and its driver modules; the SDK still imports only pydantic and the standard library; a secret provider rejects an unknown key. | `adapters/sdk.md`, `configuration/secrets.md` |
 | 5 | **The registry.** `nl2sql/registry.py`: `default()`, `empty()`, `add_*`, decorators, `names()`; the entry point groups `nl2sql.llms`, `nl2sql.embeddings` and `nl2sql.secrets` with the built-ins declared in pyproject; `LLMProvider` and `EmbeddingsProvider` built from `PROVIDER_PRESETS`; load-time checks (version, `find_spec`, clashes, "did you mean"). `discover_adapters()` is deleted. | 4 | `test_default_registry_imports_no_plugin`, `test_two_registries_do_not_share_registrations`, `test_wrong_interface_version_is_rejected_with_package_name`, `test_missing_driver_reports_install_hint`, `test_duplicate_entry_point_names_both_packages`, `test_decorator_registers_on_that_registry_only` | `development/index.md`, `extensions/add-adapter.md` (registration) |
 | 6 | **`nl2sql init`.** Writes the split layout (and `--demo`), validated by `load_config`. It does not remove `setup` yet. | 2 | `init` output loads cleanly; `--demo` output equals `NL2SQL.demo()`'s config apart from paths; `--force` is needed to overwrite; no key is ever written into YAML. | `getting_started/*` sections on `init` (marked "0.5") |
-| 7a | **Runtime from Config.** `Runtime.from_config(cfg, registry)` replaces `NL2SQLContext`. Adds `NL2SQL(cfg)`, `from_config`, `demo()`, `check()`, `close()`, the context manager, `required:`, sample questions read from `Datasource`, and the per-engine embedder and secret manager. The old path constructor is reduced to a private `_legacy_config(paths)` used only by the CLI, the API and the playground, and deleted in 7b. The ratchet test and the strict-xfail two-engines test are added. | 2, 5 | `test_check_reports_failed_datasource_and_runs_degraded`, `test_required_datasource_failure_raises`, `test_close_disposes_pools_and_is_idempotent`, `test_datasource_added_in_code_keeps_its_description` (B9), `test_secret_provider_failure_fails_startup` (B10), `test_demo_builds_from_bundled_files`, `test_embedder_is_per_engine` | `api/core/public-facade.md` (constructors, `check`, `close`) |
-| 7b | **Callers onto the new config.** The CLI gets a global `--config` and loses the path and env flags; `nl2sql demo` and the playground use `init --demo` and `from_config`; `nl2sql-api` uses `from_config` and `check()`; the hosted Dockerfile and the API Dockerfile change. Deleted: `setup`, `ConfigManager`, `configs/*.py` file envelopes, `sample_questions.py`, `_legacy_config`, and the repo's `configs/*.demo.*` (replaced by `init --demo`). | 6, 7a | CLI tests run every command with `--config`; `test_no_module_imports_nl2sql_configs`; the playground's and API's tests build from a `make_config` folder; the Docker image test. | `configuration/*` rewritten, `getting_started/*`, `deployment/*`, the old-to-new table published in `configuration/system.md` |
+| 7a | **Runtime from Config.** `Runtime.from_config(cfg, registry)` replaces `NL2SQLContext`. Adds `NL2SQL(cfg)`, `from_config`, `demo()`, `check()` (the constructor never connects), `close()`, the context manager, `required:`, sample questions read from `Datasource`, and the per-engine embedder and secret manager. Results go to `<path>/results/`, and the S3/ADLS backends and their settings are deleted. The old path constructor is reduced to a private `_legacy_config(paths)` used only by the CLI, the API and the playground, and deleted in 7b. The ratchet test and the strict-xfail two-engines test are added. | 2, 5 | `test_constructor_never_connects`, `test_check_reports_failed_datasource_and_runs_degraded`, `test_required_datasource_failure_raises_in_check`, `test_close_disposes_pools_and_is_idempotent`, `test_datasource_added_in_code_keeps_its_description` (B9), `test_secret_provider_failure_fails_startup` (B10), `test_demo_builds_from_bundled_files`, `test_embedder_is_per_engine` | `api/core/public-facade.md` (constructors, `check`, `close`), `storage/artifact-store.md` |
+| 7b | **Callers onto the new config.** The CLI gets a global `--config` and loses the path and env flags; the CLI, `nl2sql-api` and the demo load the `.env` next to `nl2sql.yaml`; each entry point calls `check()` at startup; `nl2sql demo` and the playground use `init --demo` and `from_config`; `nl2sql-api` reads `engine.config.api` and `policies.admin_roles`, and the `NL2SQL_API_*` variables go; the hosted Dockerfile and the API Dockerfile change. Deleted: `setup`, `ConfigManager`, `configs/*.py` file envelopes, `sample_questions.py`, `_legacy_config`, and the repo's `configs/*.demo.*` (replaced by `init --demo`). | 6, 7a | CLI tests run every command with `--config`; `test_no_module_imports_nl2sql_configs`; `test_api_reads_role_source_from_config`; `test_entry_points_refuse_to_start_when_a_required_datasource_fails`; the playground's and API's tests build from a `make_config` folder; the Docker image test. | `configuration/*` rewritten (with `api` and `.env`), `getting_started/*`, `deployment/*`, the old-to-new table published in `configuration/system.md` |
 | 8 | **`nl2sql config check`.** | 7b | Exit codes; problems grouped by file; `--connect` reports a failed datasource; no files are created under `storage.path`. | `configuration/system.md`, `CONTRIBUTING.md` (CI) |
-| 9 | **Facade namespaces.** The new shape in section 7; the duplicate methods, sub-API exports, `context`, `get_adapter` and `SettingsAPI` deleted; `POST /llm` removed; the API, CLI and playground moved onto the namespaces; the stricter boundary test. | 7b | One test per namespace method in the table; `test_nl2sql_exports_exactly_the_public_surface` (a fixed list, so semver has a test); the boundary test for the playground and API imports. | `api/core/*`, `api/rest/*`, `api/index.md` |
-| 10 | **Settings off the global: pipeline.** Nodes, `execution` and `aggregation` read `ctx.settings`; `run_date(today)`. | 7a | The ratchet list shrinks; node tests pass settings through the runtime and never monkeypatch the global. | node pages that name a setting |
-| 11 | **Settings off the global: indexing and the rest.** `indexing`, `secrets`, `services`, `tracing`, `evaluation` and `feedback`. Evaluation and replay build derived configs instead of editing the global. | 7a | The ratchet list shrinks; `test_tier2_runs_without_touching_another_engine`; `test_replay_pins_the_date_in_its_own_runtime`. | `testing/architecture.md`, `observability/debugging.md` |
-| 12 | **Settings off the global: apps, then delete it.** The CLI, playground and API move off it. `common/settings.py`, `env_hint.py` and the copy step are deleted, and every `os.environ` write goes. | 9, 10, 11 | The two-engines test flips from xfail to pass; `test_no_module_writes_the_environment`; `test_environment_reads_only_from_the_allow_list`. | invariants.md (no process globals, the env allow-list) |
+| 9 | **LLM client cache and `llm.replace`.** `LLMClientCache` (per engine, LRU 16, keys with hashed secrets, evicted clients closed once unused), used for construction too; the immutable `LLMSet`, read once per run; `engine.llm.replace()` with validation, the atomic swap, the INFO line and the audit record; the planner's provider and model in the plan cache key. | 7a | `test_agents_with_equal_settings_share_one_client`, `test_swapping_back_reuses_cached_clients`, `test_cache_key_never_contains_the_key`, `test_evicted_client_is_closed_after_its_last_run`, `test_in_flight_run_finishes_on_the_old_llm`, `test_invalid_replacement_changes_nothing`, `test_replace_logs_old_and_new_models_without_keys`, `test_plan_from_another_model_is_never_served` | `configuration/llm.md` (runtime replacement), `architecture/determinism.md` (plan cache key) |
+| 10 | **Facade namespaces.** The new shape in section 7; the duplicate methods, sub-API exports, `context`, `get_adapter` and `SettingsAPI` deleted; `POST /llm` becomes the admin-only `PUT /api/v1/settings/llm`; the playground's model switch calls `llm.replace`; the API, CLI and playground move onto the namespaces; the stricter boundary test. | 7b, 9 | One test per namespace method in the table; `test_nl2sql_exports_exactly_the_public_surface` (a fixed list, so semver has a test); `test_put_settings_llm_requires_admin`; `test_put_settings_llm_returns_422_with_the_config_error`; the boundary test for the playground and API imports. | `api/core/*`, `api/rest/*` (`llm.md` rewritten for `PUT /settings/llm`), `api/index.md` |
+| 11 | **Settings off the global: pipeline.** Nodes, `execution` and `aggregation` read `ctx.settings`; `run_date(today)`. | 7a | The ratchet list shrinks; node tests pass settings through the runtime and never monkeypatch the global. | node pages that name a setting |
+| 12 | **Settings off the global: indexing and the rest.** `indexing`, `secrets`, `services`, `tracing`, `evaluation` and `feedback`. Evaluation and replay build derived configs instead of editing the global. | 7a | The ratchet list shrinks; `test_tier2_runs_without_touching_another_engine`; `test_replay_pins_the_date_in_its_own_runtime`. | `testing/architecture.md`, `observability/debugging.md` |
+| 13 | **Settings off the global: apps, then delete it.** The CLI, playground and API move off it. `common/settings.py`, `env_hint.py` and the copy step are deleted, and every `os.environ` write goes. | 10, 11, 12 | The two-engines test flips from xfail to pass; `test_no_module_writes_the_environment`; `test_environment_reads_only_from_the_allow_list`; `test_only_entry_points_load_dotenv`. | invariants.md (no process globals, the env allow-list, `.env` loading) |
 
 The waves, with at most four PRs at once:
 
@@ -1100,9 +1267,9 @@ The waves, with at most four PRs at once:
 | 2 | 4, 6 |
 | 3 | 5 |
 | 4 | 7a |
-| 5 | 7b, 10, 11 |
-| 6 | 8, 9 |
-| 7 | 12 |
+| 5 | 7b, 9, 11, 12 |
+| 6 | 8, 10 |
+| 7 | 13 |
 
 PR 7a is the largest. Its production diff is the runtime and the facade
 constructors. Its test diff is mostly fixtures switching to the `make_config`
@@ -1110,76 +1277,14 @@ helper from PR 2, which is why that helper ships early. `_legacy_config` lives
 for exactly one PR (7a to 7b) so that each PR stays green. It is never
 released.
 
+Until PR 10 lands, `POST /llm` keeps calling the old `configure_llm`, which
+7a points at the runtime's LLM set. PR 10 deletes both and adds
+`PUT /api/v1/settings/llm` on top of `llm.replace` from PR 9.
+
 ## 12. Open questions
 
-These are the decisions this design could not settle from
-`phase1-decisions.md` and `owner-decisions.md`.
-
-**1. Where do `nl2sql-api`'s own settings live?** These are the role header,
-the static role, whether to trust a role sent in the body, and the CORS
-origins. They are environment variables today, which the allow-list removes.
-- (a) An `api:` section in `nl2sql.yaml`, typed by an `Api` model in
-  `nl2sql.config`. The engine never reads it, and `nl2sql-api` reads it from
-  `engine.config.api`.
-- (b) `nl2sql-api` takes its own small `api.yaml` (or CLI flags) next to
-  `nl2sql.yaml`.
-- (c) Keep the `NL2SQL_API_*` variables as an exception to the allow-list.
-
-*Recommendation:* (a). One file describes a whole deployment, it gets the same
-strict validation and `${env:}` rules, and `nl2sql config check` covers it.
-The cost is one small model in the engine that the engine ignores.
-
-**2. Who loads `.env`?** Today pydantic-settings and the CLI read `.env` (or
-`.env.<name>`), and the setup flow plans to keep keys in `.env` with
-`${env:...}` in the YAML.
-- (a) The library never reads `.env`. The CLI, `nl2sql-api` and the demo load
-  the `.env` next to `nl2sql.yaml` into the process environment at startup,
-  without overriding variables that are already set. Python users call
-  `python-dotenv` themselves.
-- (b) `NL2SQL.from_config()` loads that `.env` too.
-- (c) Nobody does: users export variables themselves.
-
-*Recommendation:* (a). Loading `.env` is an application decision that writes
-process state, so it belongs to the entry points, not the library. That keeps
-the rule "the library never writes `os.environ`" absolute.
-
-**3. Does `NL2SQL(...)` call `check()` itself?**
-- (a) No. The constructor never connects. The CLI, `nl2sql-api` and the
-  playground call `check()` right after construction, and `required: true` is
-  enforced there.
-- (b) Yes, with `NL2SQL(cfg, check=False)` to opt out.
-
-*Recommendation:* (a). Building an engine stays cheap and side-effect free
-(for tests, `config check` and notebooks), and the three entry points are
-where startup policy belongs.
-
-**4. Remote result storage (S3 and ADLS) in 0.5.** `storage` has only `path`
-in Phase 1, and the S3/ADLS artifact backends are untested (the
-`pyproject.toml` comment says so).
-- (a) Delete the S3/ADLS backends and their settings now. The Phase 2 `results`
-  store interface brings remote stores back as built-ins or plugins.
-- (b) Keep the code, unreachable from config, until Phase 2.
-- (c) Add `storage.results: {type: s3, ...}` in Phase 1.
-
-*Recommendation:* (a). Unreachable, untested code is not worth keeping, and
-Phase 2 redesigns the interface anyway.
-
-**5. The interactive `nl2sql setup` wizard in 0.5.**
-- (a) Remove it in 0.5. `nl2sql init` (non-interactive) replaces it, and the
-  guided flow (connect, scan, draft, review) comes in Phase 4.
-- (b) Rewrite the wizard to write the new layout in Phase 1.
-
-*Recommendation:* (a). The wizard writes the old layout and holds per-database
-knowledge that the Phase 2 connection models replace, so rewriting it now
-would be thrown away.
-
-**6. `nl2sql-api`'s `POST /llm` route.** The LLM config is frozen once the
-engine is built.
-- (a) Remove the route in 0.5. Changing models means editing `llm.yaml` and
-  restarting.
-- (b) Keep it, implemented as "build a new engine with the new `llm` and swap
-  it", as the playground does.
-
-*Recommendation:* (a). A runtime model switch on a shared server is an admin
-action with no current user. The playground keeps its swap locally, and (b)
-can come back with the Phase 4 API parity work if the web app needs it.
+None are open. The owner answered the six questions this design raised, and
+each answer is now written into its section (see
+[Owner decisions](#owner-decisions)). Saving a runtime LLM change back to
+`llm.yaml` is out of scope for 0.5. It will be raised again if the
+playground's own write of `llm.yaml` proves not to be enough.
