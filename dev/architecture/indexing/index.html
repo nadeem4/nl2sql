@@ -2358,10 +2358,17 @@
     CChunker --&gt; Embed
     Embed --&gt; Add[IndexStore.add: a new build]
     Add --&gt; Switch[IndexStore.set_pointers: the commit]</code></pre>
-<p>The snapshot profiles each column on its own: a column, row count or table the
-database cannot profile is indexed without statistics and logged, rather than
-failing the datasource's index (see
-<a href="../../adapters/sqlalchemy/#column-statistics">Column statistics</a>).</p>
+<p>The adapter reads only what the datasource's <a href="../../configuration/datasources/#index"><code>index</code> scope</a>
+wants, so an excluded schema costs no query. The built-in adapters reflect
+each schema once, take row counts from the catalog's estimates (counting rows
+only where the database keeps none, and only under <code>profile: stats</code>), profile
+each column on its own by type, and keep text values only with
+<code>index.sample_values</code> (off by default; the demo turns it on). A column, row
+count or table the database cannot read is indexed without it rather than
+failing the datasource's index, and is an <code>IndexIssue</code> on the snapshot: the
+build returns the issues in the datasource's stats under <code>issues</code>, and
+<code>nl2sql index</code> prints them (see
+<a href="../../adapters/sqlalchemy/#reading-a-schema">Reading a schema</a>).</p>
 <h2 id="what-is-indexed-today">What is indexed today</h2>
 <p>Schema-derived chunks, and the verified queries of <a href="../../configuration/curated/"><code>curated.yaml</code></a>
 when the file exists. There is no symbolic index, behavioral index, or other

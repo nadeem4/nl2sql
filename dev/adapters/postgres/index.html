@@ -2374,23 +2374,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -4661,23 +4644,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -4726,8 +4692,7 @@
 
 
 <h1 id="postgresql-adapter">PostgreSQL Adapter</h1>
-<p>The Postgres adapter is the <strong>Gold Standard</strong> adapter for the platform. It supports the full set of optimization features including <code>EXPLAIN</code>-based dry runs and cost estimation.</p>
-<p>This adapter extends <code>BaseSQLAlchemyAdapter</code>, leveraging automatic schema reflection and statistics gathering.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>, leveraging automatic schema reflection and statistics gathering. Its row counts are the catalog's estimates (<code>pg_class.reltuples</code>), so a table never analyzed has none.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>postgres</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># datasources/my_db.yaml</span>
@@ -4766,31 +4731,17 @@
 <td style="text-align: left;">Enforced server-side.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Dry Run</strong></td>
-<td style="text-align: left;"><code>EXPLAIN {sql}</code></td>
-<td style="text-align: left;">Highly accurate validation.</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>Costing</strong></td>
-<td style="text-align: left;"><code>EXPLAIN (FORMAT JSON) {sql}</code></td>
-<td style="text-align: left;">Returns "Total Cost" and "Plan Rows".</td>
+<td style="text-align: left;"><strong>Row counts</strong></td>
+<td style="text-align: left;"><code>pg_class.reltuples</code></td>
+<td style="text-align: left;">The catalog's estimate; a table never analyzed has none, and is counted under <code>profile: stats</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Stats</strong></td>
-<td style="text-align: left;">Optimized Queries</td>
-<td style="text-align: left;">Fetches <code>null_perc</code>, <code>distinct</code>, <code>min/max</code> (no <code>min/max</code> for <code>boolean</code>, <code>uuid</code>; none for <code>jsonb</code>, <code>bytea</code>, arrays). A column that fails is skipped without aborting the transaction; see <a href="../sqlalchemy/#column-statistics">Column statistics</a>.</td>
+<td style="text-align: left;">One query per column</td>
+<td style="text-align: left;">Null share, distinct count, <code>min/max</code> (no <code>min/max</code> for <code>boolean</code>, <code>uuid</code>; only the null share for <code>jsonb</code>, <code>bytea</code>, arrays). A column that fails is an index issue, rolled back so the transaction is not aborted; see <a href="../sqlalchemy/#reading-a-schema">Reading a schema</a>.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="optimization-details">Optimization Details</h3>
-<p>The Postgres adapter leverages native <code>EXPLAIN</code> capabilities for robust validation and estimation:</p>
-<ul>
-<li><strong>Dry Run</strong>: Implemented via <code>EXPLAIN {sql}</code>. This validates the SQL syntax and ensures that all tables/columns exist without actually executing the query.</li>
-<li><strong>Explain</strong>: Uses <code>EXPLAIN (FORMAT JSON) {sql}</code> to retrieve the full query execution plan in structured JSON format.</li>
-<li><strong>Cost Estimate</strong>: Uses the same <code>EXPLAIN (FORMAT JSON) {sql}</code> command. It parses the root <code>Plan</code> object to extract:</li>
-<li><code>Total Cost</code>: Used as the query cost proxy.</li>
-<li><code>Plan Rows</code>: Used as the estimated result size.</li>
-</ul>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <h3 id="ssl-verification">SSL Verification</h3>
 <p>If connecting to Azure or AWS RDS with strict SSL, ensure you pass the CA certificate path through the standard libpq environment variables (<code>PGSSLROOTCERT</code>), or use <code>sslmode: disable</code> for testing.</p>

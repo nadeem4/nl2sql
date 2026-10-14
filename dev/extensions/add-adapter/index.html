@@ -4671,7 +4671,7 @@
 <p>This guide describes how to add a new datasource adapter and make it available to NL2SQL.</p>
 <h2 id="1-implement-the-adapter-contract">1. Implement the adapter contract</h2>
 <p>All adapters implement <code>DatasourceAdapter</code>, version 2, and declare a <code>connection_model</code>. See <code>../adapters/sdk.md</code> for the authoritative contract and required fields/methods.</p>
-<p>If you are building a SQL adapter, extending <code>BaseSQLAlchemyAdapter</code> can provide schema introspection and default SQL execution. See <code>../adapters/sqlalchemy.md</code>.</p>
+<p>If you are building a SQL adapter, extend <code>SQLAlchemyAdapter</code> from <code>nl2sql_sdk.sqlalchemy</code> (<code>pip install "nl2sql-sdk[sqlalchemy]"</code>): it connects, executes, reads the schema the datasource's <code>index</code> scope wants with catalog row estimates and type-aware statistics, and reports what it could not read as issues. You implement <code>url</code> and <code>get_dialect</code>, and override <code>system_schemas</code>, <code>row_estimates</code> or <code>column_profile</code> where your database differs. See <a href="../../adapters/sqlalchemy/">SQLAlchemy adapters</a> and the complete example in <a href="../../adapters/development/">Building adapters</a>.</p>
 <h2 id="2-register-it">2. Register it</h2>
 <p>The engine finds an adapter by its <code>type</code> name in the
 <a href="../../architecture/configuration_v2/#5-the-registry">registry</a>. There are two
@@ -4744,7 +4744,7 @@ adapter's <code>connection_model</code>: an unknown key is an error.</p>
 <li><code>supports_bound_parameters</code> if <code>execute</code> (and <code>execute_batches</code>) bind
   <code>AdapterRequest.parameters</code> by name to <code>:name</code> placeholders through the
   driver. Without it, a verified query with parameters is never sent to the
-  adapter. Adapters built on <code>BaseSQLAlchemyAdapter</code> inherit both the binding
+  adapter. Adapters built on <code>SQLAlchemyAdapter</code> inherit both the binding
   and the capability.</li>
 <li><code>enforces_read_only</code> and <code>enforces_timeout</code> only when the session cannot
   write, and a statement past <code>limits.timeout_ms</code> is stopped, on a real server.</li>
@@ -4754,7 +4754,7 @@ adapter's <code>connection_model</code>: an unknown key is an error.</p>
 <li>Adapter protocol: <code>packages/sdk/src/nl2sql_sdk/protocols.py</code></li>
 <li>Registry: <code>packages/nl2sql/src/nl2sql/registry.py</code></li>
 <li>Datasource registry: <code>packages/nl2sql/src/nl2sql/datasources/registry.py</code></li>
-<li>SQLAlchemy base adapter: <code>packages/nl2sql/src/nl2sql/adapters/sqlalchemy_base/adapter.py</code></li>
+<li>SQLAlchemy base adapter: <code>packages/sdk/src/nl2sql_sdk/sqlalchemy/adapter.py</code></li>
 </ul>
 
 

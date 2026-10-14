@@ -2402,23 +2402,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -4644,23 +4627,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -4695,7 +4661,7 @@
 <p>Simple file-based adapter for local development and testing.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>BaseSQLAlchemyAdapter</code>. Note that <code>timeout</code> configurations apply to the <em>database lock</em>, not query execution time.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. Note that <code>timeout</code> configurations apply to the <em>database lock</em>, not query execution time.</p>
 </div>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>sqlite</code></p>
@@ -4737,23 +4703,17 @@ does the same.</p>
 <td style="text-align: left;">Controls <em>Locking</em> timeout, not execution.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Dry Run</strong></td>
-<td style="text-align: left;"><code>EXPLAIN QUERY PLAN</code></td>
-<td style="text-align: left;">Validates parsing (rudimentary).</td>
+<td style="text-align: left;"><strong>Row counts</strong></td>
+<td style="text-align: left;"><code>COUNT(*)</code></td>
+<td style="text-align: left;">SQLite keeps no estimate, so rows are counted under <code>profile: stats</code>, and there is no row count under <code>catalog</code>.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Costing</strong></td>
-<td style="text-align: left;">Stubbed</td>
-<td style="text-align: left;">Returns default cost=1.0.</td>
+<td style="text-align: left;"><strong>Stats</strong></td>
+<td style="text-align: left;">One query per column</td>
+<td style="text-align: left;">See <a href="../sqlalchemy/#reading-a-schema">Reading a schema</a>.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="optimization-details">Optimization Details</h3>
-<ul>
-<li><strong>Dry Run</strong>: Uses <code>EXPLAIN QUERY PLAN {sql}</code>. If this command succeeds, the SQL syntax is valid.</li>
-<li><strong>Explain</strong>: Currently stubbed (returns a simple message) as SQLite's explain output is not in a standardized, easily parsable format like JSON or XML.</li>
-<li><strong>Cost Estimate</strong>: Stubbed. Returns a fixed cost of <code>1.0</code> and <code>10</code> estimated rows, as SQLite does not expose cost metrics comfortably.</li>
-</ul>
 <h2 id="hints">Hints</h2>
 <ul>
 <li><strong>Concurrency</strong>: SQLite is poor at high concurrency. Use for <strong>Lite Mode</strong> or single-user testing only.</li>

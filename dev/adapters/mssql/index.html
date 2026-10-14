@@ -2332,17 +2332,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4669,17 +4658,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4715,7 +4693,7 @@
 
 <h1 id="microsoft-sql-server-mssql-adapter">Microsoft SQL Server (MSSQL) Adapter</h1>
 <p>Support for SQL Server 2017+ and Azure SQL.</p>
-<p>This adapter extends <code>BaseSQLAlchemyAdapter</code> but provides specialized <code>dry_run</code> logic using <code>SET NOEXEC ON</code> to safely validate T-SQL.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. Its row counts are the catalog's (<code>sys.partitions</code>), and it enforces <code>limits.timeout_ms</code> through pyodbc's query timeout.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>mssql</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># datasources/my_db.yaml</span>
@@ -4756,14 +4734,14 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 <td style="text-align: left;">Client-side query timeout, in whole seconds.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Dry Run</strong></td>
-<td style="text-align: left;"><code>SET NOEXEC ON</code></td>
-<td style="text-align: left;">Validates syntax without execution.</td>
+<td style="text-align: left;"><strong>Row counts</strong></td>
+<td style="text-align: left;"><code>sys.partitions</code></td>
+<td style="text-align: left;">The row count SQL Server keeps for each table.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Costing</strong></td>
-<td style="text-align: left;"><code>SET SHOWPLAN_XML ON</code></td>
-<td style="text-align: left;">Parses XML for <code>StatementSubTreeCost</code>.</td>
+<td style="text-align: left;"><strong>Stats</strong></td>
+<td style="text-align: left;">One query per column</td>
+<td style="text-align: left;">See <a href="../sqlalchemy/#reading-a-schema">Reading a schema</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -4774,12 +4752,6 @@ pyodbc counts whole seconds, so <code>limits.timeout_ms</code> is rounded <stron
 <code>1500</code> becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
 limit passes, the driver cancels the query and the adapter reports it as a refusal
 (<code>QUERY_REFUSED</code>), which the engine does not retry.</p>
-<h3 id="optimization-details">Optimization Details</h3>
-<ul>
-<li><strong>Dry Run</strong>: Uses <code>SET NOEXEC ON</code>. This is a native T-SQL session setting that compiles the query but ensures it is <strong>not executed</strong>. This is extremely safe and accurate for validation.</li>
-<li><strong>Explain</strong>: Uses <code>SET SHOWPLAN_XML ON</code> to retrieve the execution plan in XML format.</li>
-<li><strong>Cost Estimate</strong>: Parses the XML plan to find <code>StatementSubTreeCost</code> (estimated cost) and <code>StatementEstRows</code> (estimated rows).</li>
-</ul>
 <h2 id="requirements">Requirements</h2>
 <p>You must have the MS ODBC Driver installed in your Docker image or local environment.</p>
 <p><a href="https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server">Download ODBC Driver for SQL Server</a></p>

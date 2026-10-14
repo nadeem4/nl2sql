@@ -5001,33 +5001,19 @@
 
 <h1 id="sdk-interface-reference">SDK Interface Reference</h1>
 <p>The SDK, <code>nl2sql-sdk</code> (imported as <code>nl2sql_sdk</code>), holds the interfaces an
-extension implements. It depends on pydantic and the standard library only.</p>
+extension implements. Its core depends on pydantic and the standard library only.</p>
 <ul>
 <li>Adapters: <code>nl2sql_sdk.DatasourceAdapter</code> (interface version 2), with the
   models it is built from (<code>ConnectionModel</code>, <code>Limits</code>, <code>IndexScope</code>) and
   returns (<code>ConnectionCheck</code>, <code>SchemaSnapshot</code>, <code>ResultFrame</code>)</li>
-<li>Secret providers: <code>nl2sql_sdk.secrets.SecretProvider</code>
-&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD</li>
+<li>The SQLAlchemy base: <code>nl2sql_sdk.sqlalchemy.SQLAlchemyAdapter</code> and
+  <code>SQLAlchemyConnection</code>, installed with <code>pip install "nl2sql-sdk[sqlalchemy]"</code>.
+  The one part of the SDK that imports SQLAlchemy; see
+  <a href="../sqlalchemy/">SQLAlchemy adapters</a>.</li>
+<li>Secret providers: <code>nl2sql_sdk.secrets.SecretProvider</code></li>
 <li>Stores: the four protocols in <code>nl2sql_sdk.stores</code></li>
 <li>Policy checks: <code>nl2sql_sdk.policy.PolicyCheck</code>, with <code>UserContext</code> and
-  <code>Grant</code>
-=======</li>
-<li>Stores: <code>nl2sql_sdk.stores</code><blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<blockquote>
-<p>1359f1a4 (feat(sdk): adapter SDK v2 contract, strict connection models and the index scope (B1))</p>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</blockquote>
-</li>
+  <code>Grant</code></li>
 </ul>
 <p>Everything but the stores is also exported from <code>nl2sql_sdk</code> itself.</p>
 <h2 id="interface-datasourceadapter">Interface: <code>DatasourceAdapter</code></h2>
@@ -5322,7 +5308,7 @@ each table's <code>row_count_source</code> says where its <code>row_count</code>
 </table>
 <p>Only the adapter knows its driver, so the classification is the adapter's;
 the engine names no database. SQLAlchemy adapters inherit it from
-<code>BaseSQLAlchemyAdapter</code> (see <a href="../sqlalchemy/">SQLAlchemy adapters</a>). An exception
+<code>SQLAlchemyAdapter</code> (see <a href="../sqlalchemy/">SQLAlchemy adapters</a>). An exception
 that escapes <code>execute</code> is still caught, as a non-retryable <code>EXECUTOR_CRASH</code>.</p>
 <h4 id="close"><code>close()</code></h4>
 <p>Releases the adapter's connections. The engine calls it once, from
@@ -5332,7 +5318,7 @@ that escapes <code>execute</code> is still caught, as a non-retryable <code>EXEC
 every query as a sqlglot expression tree and, when the adapter has
 <code>render_sql</code>, passes it the finished tree and executes the text it returns.
 Without the hook the engine renders <code>expression.sql(dialect=adapter.get_dialect())</code>,
-so an adapter written before the hook keeps working. <code>BaseSQLAlchemyAdapter</code>
+so an adapter written before the hook keeps working. <code>SQLAlchemyAdapter</code>
 implements that same default.</p>
 <p>Override it only for what sqlglot cannot express for your database. The
 SQLite adapter, for example, rewrites <code>EXTRACT</code> and date truncation with
@@ -5355,7 +5341,7 @@ adapter written before the hook keeps working unchanged.</p>
 <li>A failure, before the first row or between batches, is one frame with <code>success=False</code> and an <code>error</code>, classified exactly as <code>execute</code> would (<code>retryable</code>, <code>safe_message</code>), and it is the last frame. The engine discards whatever it had written.</li>
 <li>The request is the same <code>AdapterRequest</code> <code>execute</code> gets; refuse one you cannot run the same way.</li>
 </ul>
-<p><code>BaseSQLAlchemyAdapter</code> implements it with <code>fetchmany</code> on a result opened with
+<p><code>SQLAlchemyAdapter</code> implements it with <code>fetchmany</code> on a result opened with
 <code>stream_results</code>, a server-side cursor on drivers that have one (see
 <a href="../sqlalchemy/">SQLAlchemy adapters</a>).</p>
 <p>The hook is an optional protocol rather than a required method, so an adapter

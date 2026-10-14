@@ -2346,34 +2346,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limitations
-      
-    </span>
-  </a>
-  
 </li>
       
     </ul>
@@ -4644,34 +4616,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limitations
-      
-    </span>
-  </a>
-  
 </li>
       
     </ul>
@@ -4695,7 +4639,7 @@
 <p>Support for MySQL 5.7+ and 8.0+.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>BaseSQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> to set the <code>MAX_EXECUTION_TIME</code> session variable.</p>
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> to set the <code>MAX_EXECUTION_TIME</code> session variable.</p>
 </div>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>mysql</code></p>
@@ -4733,32 +4677,17 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 <td style="text-align: left;">Session-level enforcement.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Dry Run</strong></td>
-<td style="text-align: left;">Transaction Rollback</td>
-<td style="text-align: left;">Starts transaction, runs SQL, rolls back.</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>Costing</strong></td>
-<td style="text-align: left;"><code>EXPLAIN FORMAT=JSON</code></td>
-<td style="text-align: left;">Extracts <code>query_cost</code>.</td>
+<td style="text-align: left;"><strong>Row counts</strong></td>
+<td style="text-align: left;"><code>information_schema.tables.table_rows</code></td>
+<td style="text-align: left;">InnoDB's estimate; <code>ANALYZE TABLE</code> refreshes it.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Stats</strong></td>
-<td style="text-align: left;"><code>SELECT count(*), min(), max()</code></td>
-<td style="text-align: left;">Standard aggregation.</td>
+<td style="text-align: left;">One query per column</td>
+<td style="text-align: left;">See <a href="../sqlalchemy/#reading-a-schema">Reading a schema</a>.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="optimization-details">Optimization Details</h3>
-<ul>
-<li><strong>Dry Run</strong>: Uses a Transaction Rollback strategy. It starts a transaction (<code>BEGIN</code>), executes the query, and immediately rolls back (<code>ROLLBACK</code>). <strong>Note</strong>: This means the query <em>is</em> technically executed, but its effects are reversed.</li>
-<li><strong>Explain</strong>: Uses <code>EXPLAIN FORMAT=JSON {sql}</code> to get the execution plan.</li>
-<li><strong>Cost Estimate</strong>: Parses the JSON output to extract <code>query_cost</code>. MySQL does not reliably provide a global "estimated rows" count for complex queries, so this is often returned as 0.</li>
-</ul>
-<h2 id="limitations">Limitations</h2>
-<ul>
-<li><strong>Row Estimation</strong>: MySQL's <code>EXPLAIN</code> does not always provide a reliable "Total Rows" estimate for complex joins compared to Postgres.</li>
-</ul>
 
 
 

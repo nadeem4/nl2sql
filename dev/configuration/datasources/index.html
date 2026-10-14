@@ -4840,20 +4840,60 @@ built, with the field it was probably meant to be.</p>
 </tr>
 </tbody>
 </table>
+<p><code>postgres</code>, <code>mysql</code> and <code>mssql</code> also take <code>pool</code>, the connection pool:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">connection</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db.internal</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="c1"># ...</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">pool</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> size</span><span class="p">:</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="nt"> max_overflow</span><span class="p">:</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="nt"> timeout_s</span><span class="p">:</span><span class="w"> </span><span class="nv">30</span><span class="p p-Indicator">,</span><span class="nt"> recycle_s</span><span class="p">:</span><span class="w"> </span><span class="nv">1800</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># the defaults</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>size</code></td>
+<td>5</td>
+<td>Connections kept open</td>
+</tr>
+<tr>
+<td><code>max_overflow</code></td>
+<td>0</td>
+<td>Extra connections allowed under load</td>
+</tr>
+<tr>
+<td><code>timeout_s</code></td>
+<td>30</td>
+<td>How long a query waits for a free connection</td>
+</tr>
+<tr>
+<td><code>recycle_s</code></td>
+<td>1800</td>
+<td>A connection older than this is replaced</td>
+</tr>
+</tbody>
+</table>
+<p>With no overflow, <code>size</code> is also the most queries NL2SQL runs against that
+database at once, so it cannot overload a production server. A SQLite or
+DuckDB file has no pool.</p>
 <p>In Python, <code>connection</code> may also be the adapter's model, used as given:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.adapters.postgres.adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">PostgresConnection</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"postgres"</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>           <span class="n">connection</span><span class="o">=</span><span class="n">PostgresConnection</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">"db.internal"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s2">"nl2sql"</span><span class="p">,</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                                         <span class="n">password</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"SALES_DB_PASSWORD"</span><span class="p">]))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.adapters.postgres.adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">PostgresConnection</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"postgres"</span><span class="p">,</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>           <span class="n">connection</span><span class="o">=</span><span class="n">PostgresConnection</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">"db.internal"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s2">"nl2sql"</span><span class="p">,</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>                                         <span class="n">password</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"SALES_DB_PASSWORD"</span><span class="p">]))</span>
 </code></pre></div>
 <p>The model's JSON Schema (<code>PostgresConnection.model_json_schema()</code>) describes
 the form for connecting that database; a password is <code>"format": "password"</code>.</p>
 <h2 id="limits">Limits</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">limits</span><span class="p">:</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span><span class="w">       </span><span class="c1"># the most rows one sub-query returns</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span><span class="w">      </span><span class="c1"># the longest one statement may run</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">limits</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span><span class="w">       </span><span class="c1"># the most rows one sub-query returns</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span><span class="w">      </span><span class="c1"># the longest one statement may run</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
 </code></pre></div>
 <ul>
 <li><code>timeout_ms</code>: Postgres, MySQL, SQL Server and DuckDB enforce it (SQL Server
@@ -4872,10 +4912,10 @@ spellings are gone.</p>
 <h2 id="index">Index</h2>
 <p><code>index</code> says what of the database is indexed. Every key is optional, and an
 unknown key is an error.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">index</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">include_schemas</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">public</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">reporting</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">exclude_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*.*_audit"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"public.tmp_*"</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">exclude_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"public.customers.email"</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">index</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">include_schemas</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">public</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">reporting</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">exclude_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*.*_audit"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"public.tmp_*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">exclude_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"public.customers.email"</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <table>
 <thead>
@@ -4909,29 +4949,31 @@ unknown key is an error.</p>
 <tr>
 <td><code>profile</code></td>
 <td><code>stats</code></td>
-<td><code>catalog</code> or <code>stats</code></td>
+<td><code>catalog</code>: names, types, keys, comments and the catalog's row estimates, with no query against table data. <code>stats</code>: also each column's null share, distinct count and min/max.</td>
 </tr>
 <tr>
 <td><code>sample_values</code></td>
 <td><code>false</code></td>
-<td>Whether text columns' values are stored in the index</td>
+<td>Store each text column's values: every one when there are 50 or fewer distinct, otherwise the five most frequent. Off by default, since values reach the index, the prompts and the model provider. The demo (<code>NL2SQL.demo()</code>, <code>nl2sql init --demo</code>) turns it on.</td>
 </tr>
 <tr>
 <td><code>max_profile_rows</code></td>
 <td>1,000,000</td>
-<td>A table estimated above this is profiled from the catalog only</td>
+<td>A table estimated above this is profiled from the catalog only, and the index build reports it</td>
 </tr>
 </tbody>
 </table>
 <p>Every glob ignores case, and an exclude wins over an include. A SQLite
 database has one schema, <code>main</code>.</p>
-<div class="admonition note">
-<p class="admonition-title">Built so far</p>
-<p>The schema, table and column rules are applied. <code>profile</code>,
-<code>sample_values</code> and <code>max_profile_rows</code> are validated, and take effect with
-the profiling rework later in 0.6; until then every column is profiled
-and text values are kept, as in 0.5.</p>
-</div>
+<p>The scope is applied before any query that reads a schema, so an excluded
+schema costs nothing. A row count is the catalog's estimate where the
+database keeps one (PostgreSQL, MySQL, SQL Server, DuckDB); otherwise, under
+<code>stats</code>, the rows are counted. What a table or column was indexed without (a
+statistics query the database rejected, a table over <code>max_profile_rows</code>) is
+an issue: <code>nl2sql index</code> prints it, and <code>engine.index.build()</code> returns it in
+the datasource's stats under <code>issues</code>. See
+<a href="../../adapters/sqlalchemy/#reading-a-schema">SQLAlchemy adapters</a> for how
+the built-in adapters read a schema.</p>
 <h2 id="preferred-tables">Preferred tables</h2>
 <p>The package never creates a view. The data team creates it in the database,
 lists it under <code>preferred_tables</code>, and runs <code>nl2sql index</code>; every built-in

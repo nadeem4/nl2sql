@@ -2316,17 +2316,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#schema-introspection" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4703,17 +4692,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#optimization-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#schema-introspection" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4761,7 +4739,7 @@
 <p>In-process analytical adapter for local files and ad-hoc analysis.</p>
 <div class="admonition info">
 <p class="admonition-title">Implementation</p>
-<p>This adapter extends <code>BaseSQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> only to
+<p>This adapter extends <code>SQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> only to
 enforce <code>limits.timeout_ms</code>: DuckDB runs in-process and has no statement
 timeout setting, so the adapter interrupts a statement that runs too long.</p>
 </div>
@@ -4805,19 +4783,14 @@ when running in <strong>Docker</strong>.</p>
 <td style="text-align: left;">See <a href="#statement-timeout">Statement Timeout</a>.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Dry Run</strong></td>
-<td style="text-align: left;"><code>EXPLAIN</code></td>
-<td style="text-align: left;">Plans the query without executing it.</td>
+<td style="text-align: left;"><strong>Row counts</strong></td>
+<td style="text-align: left;"><code>duckdb_tables().estimated_size</code></td>
+<td style="text-align: left;">The catalog's count.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Explain</strong></td>
-<td style="text-align: left;"><code>EXPLAIN</code></td>
-<td style="text-align: left;">Returns DuckDB's rendered operator tree as text.</td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>Costing</strong></td>
-<td style="text-align: left;">Stubbed</td>
-<td style="text-align: left;">Returns a fixed cost of <code>1.0</code>; see below.</td>
+<td style="text-align: left;"><strong>Stats</strong></td>
+<td style="text-align: left;">One query per column</td>
+<td style="text-align: left;">See <a href="../sqlalchemy/#reading-a-schema">Reading a schema</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -4829,18 +4802,6 @@ raises <code>InterruptException</code>, which the adapter reports as a refusal
 the statement finishes or fails, so it never touches a later query. The limit
 covers running the statement; DuckDB materialises the result while it runs, so
 fetching rows afterwards is not timed.</p>
-<h3 id="optimization-details">Optimization Details</h3>
-<ul>
-<li><strong>Dry Run</strong>: Uses <code>EXPLAIN {sql}</code>. DuckDB binds and plans the statement without running
-  it, so success means the SQL parses and every referenced table and column resolves.</li>
-<li><strong>Explain</strong>: Returns the <code>physical_plan</code> text of <code>EXPLAIN {sql}</code> — DuckDB's box-drawn
-  operator tree. It is human-readable, not machine-parsable.</li>
-<li><strong>Cost Estimate</strong>: <strong>Stubbed.</strong> DuckDB's <code>EXPLAIN</code> prints an operator tree carrying no
-  cost or cardinality figures, so there is nothing real to report. The adapter validates
-  the query and then returns a fixed <code>estimated_cost=1.0</code> / <code>estimated_rows=10</code>, exactly
-  as the SQLite adapter does. Do not use these numbers for planning or budgeting; a
-  failed validation is signalled by <code>estimated_cost=-1.0</code>.</li>
-</ul>
 <h3 id="schema-introspection">Schema Introspection</h3>
 <p>DuckDB qualifies schema names with their catalog (<code>memory.main</code>, <code>warehouse.main</code>). The
 adapter excludes <code>system.main</code>, <code>system.information_schema</code> and <code>temp.main</code>, leaving the

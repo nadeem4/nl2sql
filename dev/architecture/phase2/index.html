@@ -4817,6 +4817,25 @@ always <code>mode=ro</code> (its <code>options</code> bag went with strict keys)
 and no stage yet (B3 classifies). The pool settings, <code>profile</code>,
 <code>sample_values</code> and <code>max_profile_rows</code> come with B2.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: B2, the SQLAlchemy base in the SDK</p>
+<p><code>nl2sql_sdk.sqlalchemy</code> (the <code>nl2sql-sdk[sqlalchemy]</code> extra) holds
+<code>SQLAlchemyAdapter</code>, <code>SQLAlchemyConnection</code> with <code>pool</code>, <code>ColumnProfile</code>
+and <code>column_profile</code>; the five built-ins import it, and the engine's
+<code>adapters/sqlalchemy_base/</code> is gone with <code>dry_run</code>, <code>explain</code> and
+<code>cost_estimate</code> (B22, B23, B24). A snapshot reflects each schema once,
+after <code>IndexScope</code> has dropped what it does not want, takes row counts
+from <code>row_estimates</code> (PostgreSQL, MySQL, SQL Server, DuckDB; SQLite
+counts), profiles by <code>column_profile</code>, keeps values only with
+<code>sample_values</code>, and reports failures as <code>IndexIssue</code>s, which
+<code>index.build()</code> returns and <code>nl2sql index</code> prints. Filled in on the way:
+<code>IndexScope.wants_schema</code>, which also leaves out a schema no
+<code>include_tables</code> pattern names; SQLite and DuckDB connections have no
+<code>pool</code> (a file has no server to protect); a schema-wide estimate failure
+is an issue on <code>schema.*</code>. <code>session_setup</code> and <code>classify</code> come with B3.
+Not done here: the scope is not yet part of the snapshot's fingerprint,
+which lives in the state store (S3).</p>
+</div>
 <h3 id="the-contract">The contract</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-15-1" id="__codelineno-15-1" name="__codelineno-15-1"></a><span class="c1"># nl2sql_sdk (core: pydantic and the standard library)</span>
 <a href="#__codelineno-15-2" id="__codelineno-15-2" name="__codelineno-15-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ConnectionModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>

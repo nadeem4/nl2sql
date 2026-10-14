@@ -4646,7 +4646,7 @@
 
 
 <h1 id="supported-adapters">Supported Adapters</h1>
-<p>The NL2SQL Platform supports a variety of datasources through specialized adapters. Each adapter is designed to handle the specific idiosyncrasies of its underlying database engine, from connection strings to specialized <code>EXPLAIN</code> plans.</p>
+<p>The NL2SQL Platform supports a variety of datasources through specialized adapters. Each adapter is designed to handle the specific idiosyncrasies of its underlying database engine, from connection strings to catalog row estimates.</p>
 <h2 id="sql-adapters">SQL Adapters</h2>
 <p>We provide first-class support for the following SQL databases via SQLAlchemy.</p>
 <table>
@@ -4660,7 +4660,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><strong><a href="postgres/">PostgreSQL</a></strong></td>
-<td style="text-align: left;">Full support including <code>EXPLAIN</code>, JSONB, and SSL.</td>
+<td style="text-align: left;">Full support including catalog row estimates, JSONB, and SSL.</td>
 <td style="text-align: left;">🟢 Stable</td>
 </tr>
 <tr>
@@ -4689,7 +4689,7 @@
 <p>For developers building their own adapters, we provide detailed reference documentation for our core SDKs.</p>
 <ul>
 <li><strong><a href="sdk/">SDK Reference</a></strong>: The core interface (<code>DatasourceAdapter</code>, from <code>nl2sql-sdk</code>) that all adapters must implement.</li>
-<li><strong><a href="sqlalchemy/">SQLAlchemy Adapter Reference</a></strong>: The helper base class (<code>BaseSQLAlchemyAdapter</code>) for building SQL-based adapters.</li>
+<li><strong><a href="sqlalchemy/">SQLAlchemy Adapter Reference</a></strong>: The base class in the SDK (<code>nl2sql_sdk.sqlalchemy.SQLAlchemyAdapter</code>) for building SQL-based adapters.</li>
 </ul>
 <h2 id="missing-your-database">Missing your database?</h2>
 <p>Can't find what you need? Check out the <strong><a href="development/">Building Adapters</a></strong> guide to see how to implement your own.</p>

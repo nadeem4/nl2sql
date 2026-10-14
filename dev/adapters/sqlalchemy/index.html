@@ -2198,22 +2198,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#base-class-basesqlalchemyadapter" class="md-nav__link">
+  <a href="#what-the-base-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Base Class: BaseSQLAlchemyAdapter
+        What the base does
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Base Class: BaseSQLAlchemyAdapter">
+    <nav class="md-nav" aria-label="What the base does">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#pool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Features
+        pool
       
     </span>
   </a>
@@ -2221,10 +2221,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#column-statistics" class="md-nav__link">
+  <a href="#reading-a-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Column statistics
+        Reading a schema
       
     </span>
   </a>
@@ -2232,33 +2232,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#required-class-attributes" class="md-nav__link">
+  <a href="#issues-not-log-lines" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Required class attributes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#required-overrides" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Required Overrides
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Required Overrides">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#urlconnection-url-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        url(connection) -&gt; URL | str
+        Issues, not log lines
       
     </span>
   </a>
@@ -2269,46 +2246,36 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#optional-overrides" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#the-extension-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Optional Overrides
+        The extension surface
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Optional Overrides">
+    <nav class="md-nav" aria-label="The extension surface">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#build_engine-engine" class="md-nav__link">
+  <a href="#required" class="md-nav__link">
     <span class="md-ellipsis">
       
-        build_engine() -&gt; Engine
+        Required
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Required">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#close" class="md-nav__link">
+  <a href="#urlconnection-url-str" class="md-nav__link">
     <span class="md-ellipsis">
       
-        close()
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#local_pathpath-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        local_path(path) -&gt; str
+        url(connection) -&gt; URL | str
       
     </span>
   </a>
@@ -2326,16 +2293,116 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+        
           <li class="md-nav__item">
-  <a href="#explainsql-str-cost_estimatesql-str" class="md-nav__link">
+  <a href="#optional" class="md-nav__link">
     <span class="md-ellipsis">
       
-        explain(sql: str) / cost_estimate(sql: str)
+        Optional
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optional">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system_schemas-setstr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        system_schemas() -&gt; set[str]
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#row_estimatesconn-schema-dictstr-int-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        row_estimates(conn, schema) -&gt; dict[str, int] | None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column_profilesa_type-columnprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        column_profile(sa_type) -&gt; ColumnProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#render_sqlexpression-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_sql(expression) -&gt; str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build_engineoptions-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_engine(**options) -&gt; Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is_retryable_errorexc-bool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_retryable_error(exc) -&gt; bool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local_pathpath-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        local_path(path) -&gt; str
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#also-provided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Also provided
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Also provided">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#execute_batchesrequest-batch_size" class="md-nav__link">
@@ -2349,10 +2416,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#is_retryable_errorexc-bool" class="md-nav__link">
+  <a href="#close" class="md-nav__link">
     <span class="md-ellipsis">
       
-        is_retryable_error(exc) -&gt; bool
+        close()
       
     </span>
   </a>
@@ -4713,22 +4780,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#base-class-basesqlalchemyadapter" class="md-nav__link">
+  <a href="#what-the-base-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Base Class: BaseSQLAlchemyAdapter
+        What the base does
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Base Class: BaseSQLAlchemyAdapter">
+    <nav class="md-nav" aria-label="What the base does">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#pool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Features
+        pool
       
     </span>
   </a>
@@ -4736,10 +4803,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#column-statistics" class="md-nav__link">
+  <a href="#reading-a-schema" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Column statistics
+        Reading a schema
       
     </span>
   </a>
@@ -4747,33 +4814,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#required-class-attributes" class="md-nav__link">
+  <a href="#issues-not-log-lines" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Required class attributes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#required-overrides" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Required Overrides
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Required Overrides">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#urlconnection-url-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        url(connection) -&gt; URL | str
+        Issues, not log lines
       
     </span>
   </a>
@@ -4784,46 +4828,36 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#optional-overrides" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#the-extension-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Optional Overrides
+        The extension surface
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Optional Overrides">
+    <nav class="md-nav" aria-label="The extension surface">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#build_engine-engine" class="md-nav__link">
+  <a href="#required" class="md-nav__link">
     <span class="md-ellipsis">
       
-        build_engine() -&gt; Engine
+        Required
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Required">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#close" class="md-nav__link">
+  <a href="#urlconnection-url-str" class="md-nav__link">
     <span class="md-ellipsis">
       
-        close()
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#local_pathpath-str" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        local_path(path) -&gt; str
+        url(connection) -&gt; URL | str
       
     </span>
   </a>
@@ -4841,16 +4875,116 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+        
           <li class="md-nav__item">
-  <a href="#explainsql-str-cost_estimatesql-str" class="md-nav__link">
+  <a href="#optional" class="md-nav__link">
     <span class="md-ellipsis">
       
-        explain(sql: str) / cost_estimate(sql: str)
+        Optional
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optional">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system_schemas-setstr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        system_schemas() -&gt; set[str]
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#row_estimatesconn-schema-dictstr-int-none" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        row_estimates(conn, schema) -&gt; dict[str, int] | None
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column_profilesa_type-columnprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        column_profile(sa_type) -&gt; ColumnProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#render_sqlexpression-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render_sql(expression) -&gt; str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#build_engineoptions-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        build_engine(**options) -&gt; Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is_retryable_errorexc-bool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_retryable_error(exc) -&gt; bool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local_pathpath-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        local_path(path) -&gt; str
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#also-provided" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Also provided
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Also provided">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#execute_batchesrequest-batch_size" class="md-nav__link">
@@ -4864,10 +4998,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#is_retryable_errorexc-bool" class="md-nav__link">
+  <a href="#close" class="md-nav__link">
     <span class="md-ellipsis">
       
-        is_retryable_error(exc) -&gt; bool
+        close()
       
     </span>
   </a>
@@ -4902,12 +5036,21 @@
 
 
 <h1 id="sqlalchemy-adapter-reference">SQLAlchemy Adapter Reference</h1>
-<p>The <strong>SQLAlchemy Adapter</strong> (<code>nl2sql.adapters.sqlalchemy_base</code>, shipped in the <code>nl2sql</code> package) provides a helper base class for building adapters for any SQL database supported by SQLAlchemy.</p>
-<h2 id="base-class-basesqlalchemyadapter">Base Class: <code>BaseSQLAlchemyAdapter</code></h2>
-<p>Constructs a robust adapter by wrapping standard SQLAlchemy components.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.adapters.sqlalchemy_base</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseSQLAlchemyAdapter</span>
+<p><code>nl2sql_sdk.sqlalchemy</code> is the base for an adapter to any database SQLAlchemy
+reaches. It ships in the SDK as an extra, so an adapter author installs the SDK,
+not the engine:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-sdk[sqlalchemy]"</span>
 </code></pre></div>
-<h3 id="features">Features</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">SQLAlchemyAdapter</span><span class="p">,</span> <span class="n">SQLAlchemyConnection</span>
+</code></pre></div>
+<p>The five built-in adapters (PostgreSQL, MySQL, SQL Server, SQLite, DuckDB) are
+built on it. It is the one part of the SDK that imports SQLAlchemy; the SDK's
+core still imports only pydantic and the standard library.</p>
+<p>An adapter on it implements <code>url</code> and <code>get_dialect</code>, and overrides what its
+database does differently. <a href="../development/#option-1-the-fast-lane-sqlalchemy">Building adapters</a>
+has a complete one; the built-in PostgreSQL adapter
+(<code>packages/nl2sql/src/nl2sql/adapters/postgres/adapter.py</code>) is about 60 lines.</p>
+<h2 id="what-the-base-does">What the base does</h2>
 <table>
 <thead>
 <tr>
@@ -4917,104 +5060,247 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>Automatic Schema</strong></td>
-<td style="text-align: left;">Uses <code>sqlalchemy.inspect</code> to reflect tables, columns, and foreign keys automatically.</td>
+<td style="text-align: left;"><strong>Engine on first use</strong></td>
+<td style="text-align: left;">Building the adapter never connects. The SQLAlchemy engine, and the driver import, are made on the first query or <code>test_connection()</code>.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Automatic Stats</strong></td>
-<td style="text-align: left;">Runs optimized generic SQL queries to fetch <code>min</code>, <code>max</code>, <code>null_percentage</code>, and <code>distinct_count</code> (see <a href="#column-statistics">Column statistics</a>).</td>
+<td style="text-align: left;"><strong>Connection pool</strong></td>
+<td style="text-align: left;"><code>SQLAlchemyConnection</code> adds <code>pool</code> (below).</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Connection Pooling</strong></td>
-<td style="text-align: left;">Manages engine lifecycle and connection pools.</td>
+<td style="text-align: left;"><strong>Execution</strong></td>
+<td style="text-align: left;"><code>execute</code> and <code>execute_batches</code>, with <code>AdapterRequest.parameters</code> bound by the driver, never written into the SQL. A database error is a failed <code>ResultFrame</code>, not an exception.</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Transaction Safety</strong></td>
-<td style="text-align: left;">Implements generic <code>dry_run</code> using transaction rollbacks.</td>
+<td style="text-align: left;"><strong>Schema reading</strong></td>
+<td style="text-align: left;"><code>fetch_schema_snapshot(scope)</code>: one reflection pass per schema, filtered by the datasource's <a href="../../configuration/datasources/#index"><code>index</code> scope</a> (below).</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Default Schema</strong></td>
-<td style="text-align: left;"><code>default_schema()</code> reports the schema an unqualified table resolves to (<code>inspect(engine).default_schema_name</code>); RBAC reads a two-part <code>datasource.table</code> policy entry as that table in this schema.</td>
+<td style="text-align: left;"><strong>Default schema</strong></td>
+<td style="text-align: left;"><code>default_schema()</code> reports the schema an unqualified table resolves to (<code>inspect(engine).default_schema_name</code>); policies read a table with no schema as a table in this schema.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="column-statistics">Column statistics</h3>
-<p><code>fetch_schema_snapshot(scope)</code> profiles every column of every table and view
-the datasource's <a href="../../configuration/datasources/#index"><code>index</code> scope</a> wants, on one
-connection, one column at a time, so one column the database cannot profile
-does not fail the datasource's index:</p>
-<ul>
-<li><strong>Type-aware.</strong> The reflected SQLAlchemy type decides what is asked for.
-  <code>Boolean</code> and <code>Uuid</code> (and the dialect types built on them: Postgres <code>uuid</code>,
-  SQL Server <code>bit</code> and <code>uniqueidentifier</code>) get null and distinct counts but no
-  <code>MIN</code>/<code>MAX</code>, which Postgres and SQL Server reject for them. <code>JSON</code> (and
-  <code>jsonb</code>), <code>LargeBinary</code> (<code>bytea</code>, <code>blob</code>), <code>ARRAY</code> and any type whose name
-  says json, blob, binary, bytea, xml or array get no statistics at all.
-  <code>min_max_skip_reason(type)</code> in <code>nl2sql.adapters.sqlalchemy_base.adapter</code>
-  gives the reason. Dates, times, decimals and UUIDs a driver returns for
-  <code>MIN</code>/<code>MAX</code> are stored as ISO strings, floats and text.</li>
-<li><strong>Isolated.</strong> A statement that fails, for one column, a table's row count
-  or a whole table, is caught and the connection's read-only transaction is
-  rolled back, so on Postgres the aborted transaction does not fail every
-  query after it. A rollback rather than a savepoint per column: profiling only
-  reads, so it loses nothing, and it works on every dialect (pysqlite and DuckDB
-  savepoints do not) without a round trip per column.</li>
-<li><strong>Recorded.</strong> A column whose statistics failed keeps its description with
-  <code>statistics: None</code>; a failed row count is recorded as <code>0</code>; a table that could
-  not be profiled at all has no column metadata. Each table with failed columns
-  logs one warning naming them with the driver's error, and the columns that
-  skipped <code>MIN</code>/<code>MAX</code> by type; a table that only skipped by type logs at debug.</li>
-</ul>
-<h3 id="required-class-attributes">Required class attributes</h3>
-<p><code>title</code>, <code>connection_model</code> (a <code>ConnectionModel</code> subclass), <code>driver_modules</code>
-(the DBAPI driver your URL names, for example <code>("psycopg2",)</code>) and
-<code>install_hint</code>. The base class sets <code>interface_version = 2</code>. See
-<a href="../sdk/#class-attributes">Class attributes</a>.</p>
-<h3 id="required-overrides">Required Overrides</h3>
+<h3 id="pool"><code>pool</code></h3>
+<p>A connection model built on <code>SQLAlchemyConnection</code> has a <code>pool</code> block, in the
+form's advanced group:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>size</code></td>
+<td>5</td>
+<td>Connections kept open</td>
+</tr>
+<tr>
+<td><code>max_overflow</code></td>
+<td>0</td>
+<td>Extra connections allowed under load</td>
+</tr>
+<tr>
+<td><code>timeout_s</code></td>
+<td>30</td>
+<td>How long a query waits for a free connection</td>
+</tr>
+<tr>
+<td><code>recycle_s</code></td>
+<td>1800</td>
+<td>A connection older than this is replaced</td>
+</tr>
+</tbody>
+</table>
+<p>With no overflow, <code>size</code> is also the most queries NL2SQL runs against the
+database at once, so it cannot overload a production server. A file database
+has no server to protect: the SQLite and DuckDB connections are plain
+<code>ConnectionModel</code>s, with no <code>pool</code>.</p>
+<h3 id="reading-a-schema">Reading a schema</h3>
+<p><code>fetch_schema_snapshot(scope, on_table=None)</code>:</p>
+<ol>
+<li><strong>The scope first.</strong> The database's schemas are listed, and a schema in
+   <code>system_schemas()</code> or one the scope does not want (<code>scope.wants_schema</code>) is
+   dropped before any query names it. So is a table the scope does not want.
+   An excluded schema costs nothing.</li>
+<li><strong>Reflect once.</strong> Each remaining schema is reflected with
+   <code>inspector.get_multi_columns</code>, <code>get_multi_pk_constraint</code>,
+   <code>get_multi_foreign_keys</code> and <code>get_multi_table_comment</code>, for the wanted
+   tables and views together. A dialect whose multi-table reflection fails is
+   read one table at a time; a table that still cannot be read is an issue
+   (below), and is left out when its columns cannot be read.</li>
+<li><strong>Row counts from the catalog.</strong> <code>row_estimates(conn, schema)</code> gives each
+   table's estimate (<code>row_count_source: catalog</code>). Only a table with none is
+   counted, with <code>COUNT(*)</code>, and only under <code>profile: stats</code>
+   (<code>row_count_source: exact</code>). Under <code>profile: catalog</code> it has no row count.</li>
+<li><strong>Statistics</strong>, under <code>profile: stats</code>, one query per column: its null
+   share, and what <code>column_profile(type)</code> allows: <code>MIN</code>/<code>MAX</code> and the
+   distinct count. A table estimated above <code>max_profile_rows</code> is not
+   profiled, and gets an issue saying so.</li>
+<li><strong>Values</strong>, only with <code>index.sample_values: true</code> and only for a column
+   whose profile allows them (text): every distinct value when there are 50 or
+   fewer, otherwise the five most frequent, most frequent first and ties by
+   value. Off by default: values reach the index, the prompts and the model
+   provider.</li>
+</ol>
+<p><code>on_table</code> is called with each table's <code>schema.table</code> as it is profiled.</p>
+<h3 id="issues-not-log-lines">Issues, not log lines</h3>
+<p>A statement that fails while reading a table (its reflection, its row count, a
+column's statistics or values) is rolled back, so on PostgreSQL the aborted
+transaction does not fail every query after it, and becomes an <code>IndexIssue</code> on
+the snapshot:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>table</code></td>
+<td><code>schema.table</code>, or <code>schema.*</code> when the schema's row estimates failed</td>
+</tr>
+<tr>
+<td><code>column</code></td>
+<td>the column, for a statistics or values failure</td>
+</tr>
+<tr>
+<td><code>stage</code></td>
+<td><code>reflect</code>, <code>estimate</code>, <code>profile</code> or <code>values</code></td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>the driver's first line, or why the table was not profiled</td>
+</tr>
+</tbody>
+</table>
+<p>The column keeps its description with <code>statistics: None</code>. <code>nl2sql index</code>
+prints each datasource's issues, and <code>engine.index.build()</code> returns them in
+the datasource's stats under <code>issues</code>.</p>
+<p>A rollback rather than a savepoint per column: reading only reads, so it loses
+nothing, and it works on every dialect (pysqlite and DuckDB savepoints do not)
+without a round trip per column.</p>
+<h2 id="the-extension-surface">The extension surface</h2>
+<h3 id="required">Required</h3>
 <h4 id="urlconnection-url-str"><code>url(connection) -&gt; URL | str</code></h4>
 <p>Turns the validated <code>connection_model</code> instance into a SQLAlchemy URL. Build it
 with <code>sqlalchemy.URL.create</code>, so a password holding <code>@ : / # %</code> is escaped.</p>
-<h3 id="optional-overrides">Optional Overrides</h3>
-<h4 id="build_engine-engine"><code>build_engine() -&gt; Engine</code></h4>
-<p>Creates the SQLAlchemy engine from <code>url(connection)</code>, on first use: building
-the adapter creates none. Override it to pass driver settings (timeouts,
-isolation levels).</p>
-<p>The base class keeps <code>limits.timeout_ms</code> but does not enforce it: SQLAlchemy has
-no generic statement timeout and silently ignores an <code>execution_options["timeout"]</code>.
-Each adapter enforces it in <code>build_engine()</code> the way its driver allows: Postgres with
-<code>statement_timeout</code>, MySQL with <code>MAX_EXECUTION_TIME</code>, SQL Server with pyodbc's
-query timeout, DuckDB by interrupting the connection. An adapter that does nothing
-here has no statement timeout.</p>
-<h4 id="close"><code>close()</code></h4>
-<p>Disposes the connection pool, if one was made. The engine calls an adapter's
-<code>close()</code> once, from <code>engine.close()</code>. Building an adapter never connects: the
-engine (and the driver import) is made on the first query or <code>test_connection()</code>.</p>
-<h4 id="local_pathpath-str"><code>local_path(path) -&gt; str</code></h4>
-<p>For a file-based database. The engine passes each adapter <code>folder</code>, the
-folder of the <code>nl2sql.yaml</code> the datasource came from (None when the config was
-built in code). <code>local_path</code> reads a relative path from there, and leaves an
-absolute path and <code>:memory:</code> as they are. The SQLite and DuckDB adapters call it
-in <code>url</code>.</p>
 <h4 id="get_dialect-str"><code>get_dialect() -&gt; str</code></h4>
 <p>Returns the <strong>sqlglot</strong> dialect name the engine renders SQL in: <code>postgres</code>,
 <code>tsql</code>, <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, or any other name
 <code>sqlglot.Dialect.get_or_raise</code> accepts. It is not the SQLAlchemy dialect name
-(<code>postgresql</code>, <code>mssql</code>), which sqlglot rejects. The base class raises
-<code>NotImplementedError</code>, so every adapter must implement it.
-<code>tests/adapters/unit/test_adapter_dialect_names.py</code> checks every adapter
-registered under the <code>nl2sql.adapters</code> entry point.</p>
-<h4 id="explainsql-str-cost_estimatesql-str"><code>explain(sql: str)</code> / <code>cost_estimate(sql: str)</code></h4>
-<p>The base class provides stubs. Override these to implement database-specific optimization logic (e.g., <code>EXPLAIN ANALYZE</code>).</p>
-<h4 id="execute_batchesrequest-batch_size"><code>execute_batches(request, batch_size)</code></h4>
-<p>Implements the SDK's optional <code>StreamingAdapterProtocol</code> (see <a href="../sdk/#optional-hook-execute_batchesrequest-batch_size">the SDK</a>).
-It opens the result with <code>stream_results=True</code> and yields it in frames of
-<code>fetchmany(batch_size)</code> rows, each with the columns, so no more than one batch
-is held as Python rows. <code>stream_results</code> is a server-side cursor on drivers
-that have one (psycopg2, the MySQL drivers); the others ignore it and buffer
-in the driver, which is still not a Python row list. A <code>SQLAlchemyError</code>,
-before the first row or between batches, is yielded as <code>query_failed(exc)</code>,
-the same failed frame <code>execute</code> returns. <code>execute</code> itself still reads the whole
-result with <code>fetchall</code>.</p>
+(<code>postgresql</code>, <code>mssql</code>), which sqlglot rejects.
+<code>tests/architecture/test_boundaries.py</code> checks every adapter registered under
+the <code>nl2sql.adapters</code> entry point.</p>
+<p>The class attributes <code>title</code>, <code>connection_model</code>, <code>driver_modules</code> and
+<code>install_hint</code> are required too; the base sets <code>interface_version = 2</code>. See
+<a href="../sdk/#class-attributes">Class attributes</a>.</p>
+<h3 id="optional">Optional</h3>
+<h4 id="system_schemas-setstr"><code>system_schemas() -&gt; set[str]</code></h4>
+<p>The database's own schemas, never indexed whatever the scope says, matched
+ignoring case. The default is none. The built-ins: PostgreSQL <code>pg_catalog</code>
+and <code>information_schema</code>; MySQL <code>mysql</code>, <code>information_schema</code>,
+<code>performance_schema</code> and <code>sys</code>; SQL Server <code>sys</code> and <code>INFORMATION_SCHEMA</code>;
+DuckDB its <code>system</code> and <code>temp</code> catalogs.</p>
+<h4 id="row_estimatesconn-schema-dictstr-int-none"><code>row_estimates(conn, schema) -&gt; dict[str, int] | None</code></h4>
+<p>The catalog's row count of each table in <code>schema</code>, read from the database's
+statistics and never by counting. The default is <code>None</code>: the database keeps
+none. A table left out of the dictionary has no estimate.</p>
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PostgreSQL</td>
+<td><code>pg_class.reltuples</code> (a table never analyzed has none)</td>
+</tr>
+<tr>
+<td>MySQL</td>
+<td><code>information_schema.tables.table_rows</code></td>
+</tr>
+<tr>
+<td>SQL Server</td>
+<td><code>sys.partitions</code></td>
+</tr>
+<tr>
+<td>DuckDB</td>
+<td><code>duckdb_tables().estimated_size</code></td>
+</tr>
+<tr>
+<td>SQLite</td>
+<td>none: <code>COUNT(*)</code> under <code>profile: stats</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="column_profilesa_type-columnprofile"><code>column_profile(sa_type) -&gt; ColumnProfile</code></h4>
+<p>What a column of the reflected SQLAlchemy type gets under <code>profile: stats</code>:
+<code>ColumnProfile(min_max, distinct, values)</code>. Its null share is always read, and
+<code>values</code> is only a permission: the scope's <code>sample_values</code> must be on too. The
+default, <code>nl2sql_sdk.sqlalchemy.column_profile</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th><code>min_max</code></th>
+<th><code>distinct</code></th>
+<th><code>values</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Boolean</code>, <code>Uuid</code> and the dialect types built on them (PostgreSQL <code>uuid</code>, SQL Server <code>bit</code>, <code>uniqueidentifier</code>)</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>JSON</code> (and <code>jsonb</code>), <code>LargeBinary</code> (<code>bytea</code>, <code>blob</code>), <code>ARRAY</code>, and a type whose name says json, blob, binary, bytea, xml or array</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td>A type whose name says char, text, string or clob</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>Anything else</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<p><code>MIN</code>/<code>MAX</code> on boolean and uuid is what PostgreSQL and SQL Server reject. A
+type the driver reflects without a SQLAlchemy class is profiled in full, and a
+query the database rejects for it is an issue. Dates, times, decimals and
+UUIDs a driver returns for <code>MIN</code>/<code>MAX</code> are stored as ISO strings, floats and
+text (<code>as_scalar</code>).</p>
+<h4 id="render_sqlexpression-str"><code>render_sql(expression) -&gt; str</code></h4>
+<p>Renders the engine's finished sqlglot tree as this database's SQL. The default
+is sqlglot's own rendering for <code>get_dialect()</code>. Override it to rewrite what
+sqlglot cannot express for the database (SQLite rewrites date parts with
+<code>STRFTIME</code>).</p>
+<h4 id="build_engineoptions-engine"><code>build_engine(**options) -&gt; Engine</code></h4>
+<p>Creates the SQLAlchemy engine from <code>url(connection)</code> with the connection's
+<code>pool</code>, on first use. Override it to pass driver settings, handing them on as
+<code>super().build_engine(connect_args=...)</code>.</p>
+<p>The base keeps <code>limits.timeout_ms</code> but does not enforce it: SQLAlchemy has no
+generic statement timeout and silently ignores an <code>execution_options["timeout"]</code>.
+Each built-in enforces it in <code>build_engine()</code> the way its driver allows:
+PostgreSQL with <code>statement_timeout</code>, MySQL with <code>MAX_EXECUTION_TIME</code>, SQL
+Server with pyodbc's query timeout, DuckDB by interrupting the connection. An
+adapter that does nothing here has no statement timeout.</p>
 <h4 id="is_retryable_errorexc-bool"><code>is_retryable_error(exc) -&gt; bool</code></h4>
 <p><code>execute()</code> catches every <code>SQLAlchemyError</code> the query raises and returns it as
 a failed <code>ResultFrame</code> (<code>query_failed(exc)</code>), with <code>retryable</code> from this method
@@ -5030,6 +5316,26 @@ and the full error goes to the log.</p>
 <p>Override it when your driver reports a query mistake another way. SQLite does:
 it raises <code>OperationalError</code> with no SQLSTATE for <code>no such column</code> as well as
 for a read-only database, so <code>SqliteAdapter</code> reads the message.</p>
+<h4 id="local_pathpath-str"><code>local_path(path) -&gt; str</code></h4>
+<p>For a file-based database. The engine passes each adapter <code>folder</code>, the
+folder of the <code>nl2sql.yaml</code> the datasource came from (None when the config was
+built in code). <code>local_path</code> reads a relative path from there, and leaves an
+absolute path and <code>:memory:</code> as they are. The SQLite and DuckDB adapters call it
+in <code>url</code>.</p>
+<h3 id="also-provided">Also provided</h3>
+<h4 id="execute_batchesrequest-batch_size"><code>execute_batches(request, batch_size)</code></h4>
+<p>Implements the SDK's optional <code>StreamingAdapterProtocol</code> (see <a href="../sdk/#optional-hook-execute_batchesrequest-batch_size">the SDK</a>).
+It opens the result with <code>stream_results=True</code> and yields it in frames of
+<code>fetchmany(batch_size)</code> rows, each with the columns, so no more than one batch
+is held as Python rows. <code>stream_results</code> is a server-side cursor on drivers
+that have one (psycopg2, the MySQL drivers); the others ignore it and buffer
+in the driver, which is still not a Python row list. A <code>SQLAlchemyError</code>,
+before the first row or between batches, is yielded as <code>query_failed(exc)</code>,
+the same failed frame <code>execute</code> returns. <code>execute</code> itself still reads the whole
+result with <code>fetchall</code>.</p>
+<h4 id="close"><code>close()</code></h4>
+<p>Disposes the connection pool, if one was made. The engine calls an adapter's
+<code>close()</code> once, from <code>engine.close()</code>.</p>
 
 
 
