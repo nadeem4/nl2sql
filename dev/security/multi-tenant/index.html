@@ -2030,7 +2030,7 @@
 <p>RBAC evaluates <code>UserContext.roles</code> against the <code>policies</code> section of <code>nl2sql.yaml</code>. The validator enforces datasource/table scope at planning time.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
-<li>Tenant settings: <code>packages/nl2sql/src/nl2sql/common/settings.py</code></li>
+<li>Tenant settings: <code>settings.tenant_id</code> in <code>packages/nl2sql/src/nl2sql/config/models.py</code></li>
 <li>Context initialization: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 <li>Artifact paths: <code>packages/nl2sql/src/nl2sql/execution/artifacts/store.py</code></li>
 <li>RBAC: <code>packages/nl2sql/src/nl2sql/auth/rbac.py</code></li>

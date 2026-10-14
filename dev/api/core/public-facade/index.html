@@ -4808,15 +4808,10 @@ config was loaded from a file, and from the working directory when it was
 built in code. <code>engine.config</code> is the current frozen <code>Config</code>, with secrets as
 references only; <code>datasources.add</code>, <code>datasources.remove</code> and <code>llm.replace</code> are
 the calls that change it.</p>
-<div class="admonition note">
-<p class="admonition-title">Until the settings global is gone</p>
-<p>Modules not yet moved onto the runtime still read the process-global
-<code>settings</code>, and building an engine copies its config into it. Two engines
-in one process therefore share those values until the last migration pull
-request (configuration v2, section 8). The CLI, <code>nl2sql-api</code> and the
-playground build their engine from <code>nl2sql.yaml</code> and call <code>check()</code> at
-startup.</p>
-</div>
+<p>Each engine owns its config: nothing is process-global and nothing writes
+the environment, so two engines in one process share nothing. The CLI,
+<code>nl2sql-api</code> and the playground build their engine from <code>nl2sql.yaml</code> and call
+<code>check()</code> at startup.</p>
 <h2 id="lifecycle">Lifecycle</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">report</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>

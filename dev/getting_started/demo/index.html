@@ -5116,7 +5116,9 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
   is Anthropic and is stored as <code>ANTHROPIC_API_KEY</code> with <code>provider: anthropic</code>,
   model <code>claude-opus-5</code> and <code>temperature: null</code> (install
   <code>nl2sql-engine[anthropic]</code>); anything else is OpenAI. <code>llm.yaml</code> names no
-  key, so the provider's own variable is read. <code>.env</code> is covered by
+  key: the running engine is given it in memory, ahead of any key exported
+  for the same provider, and later runs read it from <code>.env</code>. The process
+  environment is never written. <code>.env</code> is covered by
   <code>.gitignore</code>, but a key passed on the command line is visible in shell
   history and to <code>ps</code>, so the environment variable remains the more private
   route.</li>
@@ -5132,7 +5134,8 @@ instead of the OpenAI embeddings API. The first indexing run downloads roughly
 <p>Sharing the demo with other people is the one case where none of this applies:
 <code>nl2sql demo --hosted</code> serves the playground with <strong>no key on the server at
 all</strong>, and each visitor pastes their own into the page; a visitor without one
-can replay the guided questions from recorded runs. See
+can replay the guided questions from recorded runs. It refuses to start when
+<code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> is set. See
 <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 <p>Each project keeps its index under its own <code>storage.path</code> (the demo's is
 <code>nl2sql-demo/.nl2sql/index</code>), so projects that embed differently never share a
@@ -5337,7 +5340,8 @@ second settings store, and the browser keeps nothing but UI conveniences.</p>
   running demo switches from replay to live <strong>without a restart</strong>: questions
   already running finish on the model client they started with, then the
   engine's LLM clients are rebuilt from the project's <code>nl2sql.yaml</code> (its
-  <code>llm.yaml</code>). Keys are
+  <code>llm.yaml</code>), with the saved key given to them in memory rather than through
+  the environment. Keys are
   write-only: no response, log line, trace or error carries one, only a masked
   form such as <code>sk-...4f2a</code> per provider. On a later start the precedence above
   still holds, so <code>--api-key</code> or a key exported in your shell wins over a saved

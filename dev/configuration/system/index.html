@@ -5081,6 +5081,11 @@ it is in (an included file, not <code>nl2sql.yaml</code>):</p>
 <td>Path to <code>nl2sql.yaml</code>. Without it, <code>./nl2sql.yaml</code>.</td>
 </tr>
 <tr>
+<td><code>NL2SQL_LOG_LEVEL</code></td>
+<td><code>configure_logging()</code></td>
+<td>The log level when the caller passes none (<code>DEBUG</code>, <code>INFO</code>, ...). Without it, <code>INFO</code>.</td>
+</tr>
+<tr>
 <td><code>OPENAI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code></td>
 <td><code>nl2sql/llm/</code></td>
 <td>The fallback key when <code>llm.api_key</code> (or an agent's, or <code>embeddings.api_key</code>) is not set.</td>
@@ -5089,8 +5094,12 @@ it is in (an included file, not <code>nl2sql.yaml</code>):</p>
 </table>
 <p>Anything else from the environment is written in the YAML as <code>${env:VAR}</code>.
 There are no generic overrides such as <code>NL2SQL__SECTION__KEY</code>. Third-party
-libraries (boto3, the OpenTelemetry SDK) still read their own standard
-variables, and the trace redactor scans the environment for values to mask.</p>
+libraries (the OpenTelemetry SDK) still read their own standard variables, the
+trace redactor scans the environment for values to mask, and <code>nl2sql
+benchmark</code> checks <code>CI</code>. Nothing in nl2sql writes the environment: a key the
+demo is given travels in the engine's LLM config, and only the <code>.env</code> loading
+below adds variables. The architecture tests enforce both
+(<a href="../../architecture/invariants/#an-engine-owns-its-config-no-process-globals">invariants</a>).</p>
 <h3 id="env-files"><code>.env</code> files</h3>
 <p>Only the entry points load a <code>.env</code> file: the CLI, <code>nl2sql-api</code> and
 <code>nl2sql demo</code> load the <code>.env</code> <strong>next to <code>nl2sql.yaml</code></strong> into the process

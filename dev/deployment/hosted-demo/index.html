@@ -2632,8 +2632,9 @@ steps:</p>
 nothing to upload. Until it has, the domain fails with a certificate error and
 the <code>hf.space</code> address keeps working.</p>
 <p><strong>Never give the Space an API key</strong>, as a secret or otherwise. Hosted mode
-clears any provider key it finds in its environment at start-up rather than use
-it, because a key there would be spent by every visitor.</p>
+refuses to start when a provider key variable (<code>OPENAI_API_KEY</code>,
+<code>OPENROUTER_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>) is set, because a key there would be
+spent by every visitor.</p>
 <h3 id="deployed-by-the-release">Deployed by the release</h3>
 <p>The public Space runs <strong>released versions only</strong>, and a release deploys it
 with nothing to do by hand. Merging the release pull request tags <code>vX.Y.Z</code>, and

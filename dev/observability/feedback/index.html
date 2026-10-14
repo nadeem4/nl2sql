@@ -4644,7 +4644,7 @@ produced. A run the playground did not answer is refused with <code>404</code>.<
 </tbody>
 </table>
 <p>Feedback is available in the playground that <code>nl2sql demo</code> starts, and on by
-default. <code>FEEDBACK_ENABLED=false</code> turns it off: the control then says so and
+default. <code>settings.feedback.enabled: false</code> turns it off: the control then says so and
 <code>POST /api/feedback</code> answers <code>403</code>.</p>
 <h2 id="what-is-stored">What is stored</h2>
 <p>One row per run in a <code>feedback</code> table inside the SQLite schema store
@@ -4803,7 +4803,7 @@ recorded the datasource are skipped too. See
 <a href="../../configuration/curated/#from-feedback-to-verified-queries">From feedback to verified queries</a>.</p>
 <h2 id="turning-it-off-and-clearing-it">Turning it off and clearing it</h2>
 <ul>
-<li><code>FEEDBACK_ENABLED=false</code> stops the playground recording ratings.</li>
+<li><code>settings.feedback.enabled: false</code> stops the playground recording ratings.</li>
 <li><code>nl2sql feedback clear</code> deletes every rating (<code>--yes</code> skips the prompt).
   Schema snapshots and the plan cache are kept, and <code>nl2sql cache clear</code>
   never touches the ratings.</li>

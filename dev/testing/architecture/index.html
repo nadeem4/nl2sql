@@ -2217,11 +2217,10 @@ so a test sets them on the runtime it builds:</p>
   use it the same way; the runtime it came from never changes.
   <code>tests/unit/test_run_scoped_runtime.py</code> pins that down.</li>
 </ul>
-<p>Monkeypatching <code>nl2sql.common.settings.settings</code> changes nothing the
-pipeline, indexing, tracing or evaluation read. The global goes in a later
-pull request; until then <code>READS_THE_SETTINGS_GLOBAL</code> in
-<code>tests/architecture/test_boundaries.py</code> lists the modules still reading it,
-and it may only shrink.</p>
+<p>There is no process-global settings object to monkeypatch, and no module
+writes <code>os.environ</code>: a test sets what it needs in the config it builds. The
+architecture tests keep it that way
+(<a href="../../architecture/invariants/#an-engine-owns-its-config-no-process-globals">An Engine Owns Its Config</a>).</p>
 <pre class="mermaid"><code>flowchart TD
     Unit[Unit Tests] --&gt; Core[Core Components]
     Integration[Integration Tests] --&gt; Pipeline[Pipeline Nodes]
