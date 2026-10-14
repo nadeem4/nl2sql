@@ -28,7 +28,7 @@ _EXPORTS = {
     "nl2sql.registry": ("Registry",),
     # The config, and what building an engine from it reports.
     "nl2sql.config": ("Config", "load_config", "load_env_file", "ConfigError", "Datasource", "Limits", "LLM", "AgentLLM",
-                      "Embeddings", "Policies", "Role", "Storage", "Secrets", "Curated", "Settings"),
+                      "Embeddings", "Policies", "Role", "Storage", "StoreConfig", "Secrets", "Curated", "Settings"),
     "nl2sql.check": ("CheckReport", "DatasourceStatus", "EngineNotReady"),
     # The benchmark lives in nl2sql.evaluation, which the runtime never needs.
     "nl2sql.api.benchmark_api": ("BenchmarkAPI",),
@@ -83,6 +83,7 @@ __all__ = [
     "Policies",
     "Role",
     "Storage",
+    "StoreConfig",
     "Secrets",
     "Curated",
     "Settings",

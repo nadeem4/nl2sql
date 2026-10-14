@@ -31,6 +31,7 @@ from nl2sql.config.models import (
     Secrets,
     Settings,
     Storage,
+    StoreConfig,
     TraceSettings,
 )
 from nl2sql.config.project import default_llm, demo_config, init_project
@@ -63,6 +64,7 @@ __all__ = [
     "Secrets",
     "Settings",
     "Storage",
+    "StoreConfig",
     "TraceSettings",
     "default_llm",
     "demo_config",

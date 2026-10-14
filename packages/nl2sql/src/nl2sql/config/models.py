@@ -273,36 +273,79 @@ Policies.allow_all = classmethod(_allow_all)  # type: ignore[assignment,method-a
 
 # ---------------------------------------------------------------- storage
 
-class Storage(_Model):
-    """Where the engine keeps its data: ``<path>/index/``, ``state.db``, ``traces/``, ``results/``.
+class _PluginBlock(BaseModel):
+    """A block a plugin validates itself: ``type`` names the plugin, the other keys are its own.
 
-    In a file, a relative ``path`` is relative to ``nl2sql.yaml``; in code, to
-    the working directory.
-    """
-
-    path: Path
-
-
-# ---------------------------------------------------------------- secrets
-
-class SecretProviderConfig(BaseModel):
-    """One secret provider. ``type`` names it; the provider checks the other keys.
-
-    The other keys are the provider's own settings, so this model allows them
-    and keeps their references; the provider's ``config_model`` validates them
-    when it is built.
+    This model allows the other keys and keeps their references; the plugin's
+    ``config_model`` validates them when it is built.
     """
 
     model_config = ConfigDict(extra="allow", frozen=True, hide_input_in_errors=True)
 
-    id: str = Field(min_length=1)
     type: str = Field(min_length=1)
 
     def __repr_args__(self):
-        # A credential (``token``, ``client_secret``) written as a literal
-        # never prints; a reference, and every other setting, does.
+        # A credential (``token``, ``api_key``) written as a literal never
+        # prints; a reference, and every other setting, does.
         for key, value in super().__repr_args__():
             yield key, masked(value) if is_secret_key(key) else value
+
+
+class StoreConfig(_PluginBlock):
+    """One store, by name: ``StoreConfig(type="files")``. The store's ``config_model`` checks the other keys."""
+
+
+STORE_SLOTS = ("index", "state", "traces", "results")
+
+# How each slot reads in a message: "'chroma' is an index store".
+STORE_LABELS = {"index": "an index store", "state": "a state store",
+                "traces": "a trace store", "results": "a results store"}
+
+# The store each slot uses when the config does not name one.
+BUILT_IN_STORES = {"index": "chroma", "state": "sqlite", "traces": "files", "results": "local"}
+
+
+class Storage(_Model):
+    """Where the engine keeps its data, and which store keeps each part of it.
+
+    In a file, a relative ``path`` is relative to ``nl2sql.yaml``; in code, to
+    the working directory. Each of ``index``, ``state``, ``traces`` and
+    ``results`` is a ``StoreConfig`` (``{type: ..., <its keys>}``) or a store
+    object, used as given. Left out, each is its built-in store under ``path``:
+    ``chroma`` in ``index/``, ``sqlite`` in ``state.db``, ``files`` in
+    ``traces/`` and ``local`` in ``results/``.
+    """
+
+    path: Path
+    index: Union[StoreConfig, Any] = Field(default_factory=lambda: StoreConfig(type=BUILT_IN_STORES["index"]))
+    state: Union[StoreConfig, Any] = Field(default_factory=lambda: StoreConfig(type=BUILT_IN_STORES["state"]))
+    traces: Union[StoreConfig, Any] = Field(default_factory=lambda: StoreConfig(type=BUILT_IN_STORES["traces"]))
+    results: Union[StoreConfig, Any] = Field(default_factory=lambda: StoreConfig(type=BUILT_IN_STORES["results"]))
+
+    @field_validator(*STORE_SLOTS, mode="before")
+    @classmethod
+    def _store(cls, value: Any, info) -> Any:
+        slot = info.field_name
+        if isinstance(value, dict):
+            return StoreConfig(**value)
+        if isinstance(value, StoreConfig):
+            return value
+        if isinstance(value, (str, list)) or value is None:
+            raise ValueError(f"{slot} takes a mapping with a 'type' key, such as "
+                             f"{{type: {BUILT_IN_STORES[slot]}}}, or a store object")
+        found = getattr(value, "slot", None)
+        if found != slot:
+            what = STORE_LABELS.get(found, "not a store (it has no 'slot')")
+            raise ValueError(f"{type(value).__name__} is {what}; {slot} needs {STORE_LABELS[slot]}")
+        return value
+
+
+# ---------------------------------------------------------------- secrets
+
+class SecretProviderConfig(_PluginBlock):
+    """One secret provider. ``type`` names it; the provider checks the other keys."""
+
+    id: str = Field(min_length=1)
 
 
 class Secrets(_Model):

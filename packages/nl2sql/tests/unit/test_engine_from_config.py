@@ -409,15 +409,23 @@ def test_3_in_code_by_name(tmp_path):
 
 
 def test_4_in_code_passing_objects(tmp_path):
+    from nl2sql.storage.chroma import ChromaIndex
+    from nl2sql.storage.files import FilesTraces
+    from nl2sql.storage.local import LocalResults
+    from nl2sql.storage.sqlite import SqliteState
+
     adapter = CountingAdapter(datasource_id="dw", datasource_engine_type="custom")
     model = FakeListChatModel(responses=["ok"])
+    folder = tmp_path / ".nl2sql"
 
     engine = NL2SQL(Config(
         datasources=[Datasource(id="dw", adapter=adapter)],
         llm=LLM(model=model),
         embeddings=Embeddings(**_fake_embeddings()),
         policies=Policies.allow_all(),
-        storage=Storage(path=tmp_path / ".nl2sql"),
+        # An empty registry names no store either, so each slot gets its object.
+        storage=Storage(path=folder, index=ChromaIndex(folder / "index"), state=SqliteState(folder / "state.db"),
+                        traces=FilesTraces(folder / "traces"), results=LocalResults(folder / "results")),
     ), registry=Registry.empty())
 
     assert engine._runtime.ds_registry.get_adapter("dw") is adapter

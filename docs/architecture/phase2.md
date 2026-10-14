@@ -355,6 +355,27 @@ So even a daily session stays well inside $10.
 
 ## 4. Storage: four stores
 
+!!! note "Built: the interfaces, config and registry kind (S1)"
+    `nl2sql_sdk.stores` holds the four protocols with `Entry`, `Hit`,
+    `Filter` and `BuildPointer`; `StoreConfig` and the four `Storage`
+    sub-blocks are in `nl2sql/config/models.py`; the `store` registry kind
+    (`add_store`, `@registry.store`, group `nl2sql.stores`) and the slot check
+    are in `nl2sql/registry.py` and `nl2sql/storage/__init__.py`. The
+    built-ins, `nl2sql/storage/{chroma,sqlite,files,local}.py`, are thin
+    wrappers that build today's `VectorStore`, `SqliteSchemaStore` and
+    `ArtifactStore` and hold the traces folder; `Runtime.index`, `.state`,
+    `.traces` and `.results` are built through the registry. Building it
+    settled these details:
+
+    - `IndexStore.query` returns `Hit` (`id`, `text`, `metadata`,
+      `distance`, and `vector` only when `with_vectors`), which the sketch
+      below used without defining.
+    - Until S2 to S4 move the engine onto each interface, the engine reads a
+      slot only through its built-in store, and a plugin store in that slot
+      is a `ConfigError` at `storage.<slot>` rather than silently unused.
+    - `max_age_days` arrives with retention in S4; until then `files` and
+      `local` take no keys.
+
 ### The config
 
 Every sub-block is optional. A config with only `path` stays valid and means

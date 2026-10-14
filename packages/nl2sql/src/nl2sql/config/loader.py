@@ -30,7 +30,7 @@ from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
 from nl2sql.config.errors import MAPPING_PAGE, ConfigError, Problem
-from nl2sql.config.models import Config, Storage, keeps_references
+from nl2sql.config.models import Config, keeps_references
 
 PathLike = Union[str, "os.PathLike[str]"]
 Loc = Tuple[Union[str, int], ...]
@@ -457,4 +457,5 @@ class _Loader:
         """A relative ``storage.path`` in a file is relative to ``nl2sql.yaml``."""
         if config.storage.path.is_absolute():
             return config
-        return config.model_copy(update={"storage": Storage(path=self.root / config.storage.path)})
+        return config.model_copy(update={"storage": config.storage.model_copy(
+            update={"path": self.root / config.storage.path})})

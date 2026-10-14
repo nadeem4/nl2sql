@@ -33,10 +33,6 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 llm_logger = get_logger("nl2sql.llm")
 
-# The vector index's collection: an internal constant, one per index folder.
-INDEX_COLLECTION = "nl2sql_store"
-
-
 class StorePaths(NamedTuple):
     """Where one engine keeps its data."""
 
@@ -77,11 +73,12 @@ class Runtime:
 
     @classmethod
     def components(cls, config: Config, registry: Optional[Registry] = None) -> "Runtime":
-        """Step 2b of loading without the stores: what ``nl2sql config check`` builds.
+        """Step 2b of loading without opening the stores: what ``nl2sql config check`` builds.
 
         Loads every name ``config`` uses through the registry and builds the
         secret manager, the RBAC policies, the adapters (not connected), the
-        LLM clients (no model call) and the embedder. Nothing is written
+        LLM clients (no model call), the embedder and the four stores
+        named in ``storage`` (they open nothing yet). Nothing is written
         under ``storage.path`` and no process global is touched. The result
         can ``check_datasources()`` and ``close()``; it cannot answer.
 
@@ -147,12 +144,14 @@ class Runtime:
             for issue in check_curated(config.curated, dialects):
                 problem(f"curated.datasources.{issue.datasource_id}", str(issue))
 
+        stores = self._resolve_stores(config, problem)
         if problems:
             self.llm_registry.close()
             raise ConfigError(problems, source=source)
 
         self._config = config
         self.rbac = RBAC.from_policies(config.policies)
+        self.index, self.state, self.traces, self.results = stores
         self.stores = StorePaths.under(config.storage.path)
         return self
 
@@ -194,21 +193,45 @@ class Runtime:
                 info = self._embedding["info"] = probe(info, self.embedder)
             return info
 
+    def _resolve_stores(self, config: Config, problem) -> List[Any]:
+        """The four ``storage`` slots' stores, built through the registry. Writes nothing.
+
+        Until Phase 2 moves each part of the engine onto its store interface
+        (S2 to S4), the engine reads only the built-in stores, so another
+        store in a slot is a problem rather than silently unused.
+        """
+        from nl2sql.config.models import BUILT_IN_STORES, STORE_SLOTS
+        from nl2sql.storage import build_store
+        from nl2sql.storage.chroma import ChromaIndex
+        from nl2sql.storage.files import FilesTraces
+        from nl2sql.storage.local import LocalResults
+        from nl2sql.storage.sqlite import SqliteState
+
+        built_ins = {"index": ChromaIndex, "state": SqliteState, "traces": FilesTraces, "results": LocalResults}
+
+        stores: List[Any] = []
+        for slot in STORE_SLOTS:
+            store = None
+            try:
+                store = build_store(slot, getattr(config.storage, slot), folder=config.storage.path,
+                                    registry=self.registry, secrets=self.secret_manager)
+            except (RegistryError, ValueError) as e:
+                problem(f"storage.{slot}", str(e))
+            else:
+                name = BUILT_IN_STORES[slot]
+                if not isinstance(store, built_ins[slot]):
+                    problem(f"storage.{slot}", f"This engine reads {slot} only through the built-in "
+                            f"'{name}' store for now.", fix=f"Remove storage.{slot}, or set it to {{type: {name}}}.")
+            stores.append(store)
+        return stores
+
     def _build_stores(self) -> None:
         from nl2sql.execution import ExecutionStore
-        from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
-        from nl2sql.indexing.vector_store import VectorStore
-        from nl2sql.schema.sqlite_store import SqliteSchemaStore
 
-        config = self._config
-        self.stores.index.mkdir(parents=True, exist_ok=True)
-        self.stores.state.parent.mkdir(parents=True, exist_ok=True)
-        self.vector_store = VectorStore(collection_name=INDEX_COLLECTION,
-                                        persist_directory=str(self.stores.index), embeddings=self.embedder)
-        self.schema_store = SqliteSchemaStore(path=self.stores.state,
-                                              max_versions=config.settings.schema_.max_versions)
+        self.vector_store = self.index.vector_store(self.embedder)
+        self.schema_store = self.state.schema_store(self._config.settings.schema_.max_versions)
         self.execution_store = ExecutionStore()
-        self.artifact_store = ArtifactStore(ArtifactStoreConfig(base_uri=str(self.stores.results)))
+        self.artifact_store = self.results.artifact_store()
 
     # ------------------------------------------------------------ reading
 
@@ -229,7 +252,7 @@ class Runtime:
 
     @property
     def traces_dir(self) -> Path:
-        return self.stores.traces
+        return self.traces.directory
 
     @property
     def closed(self) -> bool:
