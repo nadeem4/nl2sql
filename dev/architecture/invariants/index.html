@@ -7602,7 +7602,7 @@
 <hr />
 <h2 id="package-boundaries-are-one-way">Package Boundaries Are One-Way</h2>
 <h3 id="definition_19">Definition</h3>
-<p>Dependencies point in one direction: <code>nl2sql-adapter-sdk</code> → nothing, <code>nl2sql.adapters.*</code> → the SDK, <code>nl2sql</code> (the engine) → the SDK, and every caller — the REST API, the CLI, the playground — → the top-level <code>nl2sql</code> facade.</p>
+<p>Dependencies point in one direction: <code>nl2sql-sdk</code> → nothing, <code>nl2sql.adapters.*</code> → the SDK, <code>nl2sql</code> (the engine) → the SDK, and every caller — the REST API, the CLI, the playground — → the top-level <code>nl2sql</code> facade.</p>
 <p>Concretely:</p>
 <ul>
 <li>The SDK imports only pydantic and the standard library.</li>
@@ -7711,7 +7711,7 @@
 <li><code>packages/nl2sql/src/nl2sql/auth/models.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/functions.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/registry.py</code></li>
-<li><code>packages/adapter-sdk/src/nl2sql_adapter_sdk/protocols.py</code></li>
+<li><code>packages/sdk/src/nl2sql_sdk/protocols.py</code></li>
 <li><code>packages/nl2sql/tests/architecture/test_boundaries.py</code></li>
 </ul>
 

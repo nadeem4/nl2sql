@@ -4888,6 +4888,10 @@ Phase 1. OpenTelemetry moves in Phase 3.</p>
 <a href="#__codelineno-24-13" id="__codelineno-24-13" name="__codelineno-24-13"></a>    <span class="k">assert</span> <span class="nb">dict</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">)</span> <span class="o">==</span> <span class="n">env_before</span>                            <span class="c1"># nothing written</span>
 </code></pre></div>
 <h2 id="9-the-sdk-rename-nl2sql-sdk">9. The SDK rename: <code>nl2sql-sdk</code></h2>
+<div class="admonition note">
+<p class="admonition-title">Built</p>
+<p>The rename is built (PR 1). The <code>secrets</code> module comes with PR 4.</p>
+</div>
 <table>
 <thead>
 <tr>
@@ -4925,7 +4929,7 @@ Phase 1. OpenTelemetry moves in Phase 3.</p>
 <tr>
 <td>Engine dependency</td>
 <td><code>nl2sql-adapter-sdk~=0.1</code></td>
-<td><code>nl2sql-sdk~=0.5.0</code></td>
+<td><code>nl2sql-sdk~=0.5.0</code>: the engine's own version as a compatible release, on a line release-please bumps</td>
 </tr>
 <tr>
 <td>Entry points</td>

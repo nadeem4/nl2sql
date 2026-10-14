@@ -5306,7 +5306,7 @@
 <ul>
 <li>SQL generation failures return <code>SQL_GEN_FAILED</code>.</li>
 <li>Executor returns errors for missing SQL, missing datasource, missing executor, or executor crashes.</li>
-<li>A query the database rejected as wrong (the adapter's <code>ResultError.retryable</code>) returns <code>EXECUTION_FAILED</code>, which is retried through the refiner; a refusal (permission, timeout, connection, read-only) returns <code>DB_EXECUTION_ERROR</code>, which is fatal. The message is the adapter's <code>safe_message</code>: one short line, no SQL, no stack trace (see <a href="../../adapters/sdk/">the adapter SDK</a>).</li>
+<li>A query the database rejected as wrong (the adapter's <code>ResultError.retryable</code>) returns <code>EXECUTION_FAILED</code>, which is retried through the refiner; a refusal (permission, timeout, connection, read-only) returns <code>DB_EXECUTION_ERROR</code>, which is fatal. The message is the adapter's <code>safe_message</code>: one short line, no SQL, no stack trace (see <a href="../../adapters/sdk/">the SDK</a>).</li>
 <li>Execution is in-process on the pipeline thread pool. A driver-level crash is not contained and terminates the process; only Python-level exceptions become <code>PipelineError</code> values (see <code>../execution/isolation.md</code>).</li>
 </ul>
 <h3 id="storage">Storage</h3>

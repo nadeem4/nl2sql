@@ -4734,17 +4734,17 @@
 
 
 <h1 id="adapter-interface-reference">Adapter Interface Reference</h1>
-<p>The adapter contract lives in the adapter SDK:</p>
+<p>The adapter contract lives in the SDK, <code>nl2sql-sdk</code> (imported as <code>nl2sql_sdk</code>):</p>
 <ul>
 <li><code>nl2sql.datasources.protocols.DatasourceAdapterProtocol</code></li>
-<li><code>nl2sql_adapter_sdk.contracts.AdapterRequest</code></li>
-<li><code>nl2sql_adapter_sdk.contracts.ResultFrame</code></li>
+<li><code>nl2sql_sdk.contracts.AdapterRequest</code></li>
+<li><code>nl2sql_sdk.contracts.ResultFrame</code></li>
 </ul>
 <h2 id="interface-datasourceadapterprotocol">Interface: <code>DatasourceAdapterProtocol</code></h2>
 <p>Adapters expose a capability-driven interface:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.datasources.protocols</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceAdapterProtocol</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_adapter_sdk.contracts</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ResultFrame</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_adapter_sdk.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceCapability</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.contracts</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ResultFrame</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceCapability</span>
 </code></pre></div>
 <h3 id="mandatory-properties">Mandatory Properties</h3>
 <table>
@@ -4828,7 +4828,7 @@ that escapes <code>execute</code> is still caught, as a non-retryable <code>EXEC
 <h4 id="cost_estimatesql-str"><code>cost_estimate(sql: str)</code></h4>
 <p>Returns cost/row estimates. The pipeline does not currently call it, and there is no capability flag for it: <code>DatasourceCapability</code> carries only what something queries.</p>
 <h3 id="optional-hook-render_sqlexpression">Optional hook: <code>render_sql(expression)</code></h3>
-<p><code>nl2sql_adapter_sdk.protocols.SqlRenderingAdapterProtocol</code>. The engine builds
+<p><code>nl2sql_sdk.protocols.SqlRenderingAdapterProtocol</code>. The engine builds
 every query as a sqlglot expression tree and, when the adapter has
 <code>render_sql</code>, passes it the finished tree and executes the text it returns.
 Without the hook the engine renders <code>expression.sql(dialect=adapter.get_dialect())</code>,
@@ -4841,7 +4841,7 @@ DuckDB use the default.</p>
 <p><code>get_dialect()</code> must return a sqlglot dialect name (<code>postgres</code>, <code>tsql</code>,
 <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, ...), not the SQLAlchemy name.</p>
 <h3 id="optional-hook-execute_batchesrequest-batch_size">Optional hook: <code>execute_batches(request, batch_size)</code></h3>
-<p><code>nl2sql_adapter_sdk.protocols.StreamingAdapterProtocol</code>. When the adapter has
+<p><code>nl2sql_sdk.protocols.StreamingAdapterProtocol</code>. When the adapter has
 <code>execute_batches</code>, the engine reads the result through it, <code>RESULT_FETCH_BATCH_SIZE</code>
 rows at a time (default 10,000), and writes each batch to the sub-query's
 result artifact as it arrives, so a large result is never held whole in memory

@@ -4757,7 +4757,7 @@ registered under the <code>nl2sql.adapters</code> entry point.</p>
 <h4 id="explainsql-str-cost_estimatesql-str"><code>explain(sql: str)</code> / <code>cost_estimate(sql: str)</code></h4>
 <p>The base class provides stubs. Override these to implement database-specific optimization logic (e.g., <code>EXPLAIN ANALYZE</code>).</p>
 <h4 id="execute_batchesrequest-batch_size"><code>execute_batches(request, batch_size)</code></h4>
-<p>Implements the SDK's optional <code>StreamingAdapterProtocol</code> (see <a href="../sdk/#optional-hook-execute_batchesrequest-batch_size">the adapter SDK</a>).
+<p>Implements the SDK's optional <code>StreamingAdapterProtocol</code> (see <a href="../sdk/#optional-hook-execute_batchesrequest-batch_size">the SDK</a>).
 It opens the result with <code>stream_results=True</code> and yields it in frames of
 <code>fetchmany(batch_size)</code> rows, each with the columns, so no more than one batch
 is held as Python rows. <code>stream_results</code> is a server-side cursor on drivers
@@ -4769,7 +4769,7 @@ result with <code>fetchall</code>.</p>
 <h4 id="is_retryable_errorexc-bool"><code>is_retryable_error(exc) -&gt; bool</code></h4>
 <p><code>execute()</code> catches every <code>SQLAlchemyError</code> the query raises and returns it as
 a failed <code>ResultFrame</code> (<code>query_failed(exc)</code>), with <code>retryable</code> from this method
-(see <a href="../sdk/">the adapter SDK</a>). The default reads the driver's SQLSTATE when
+(see <a href="../sdk/">the SDK</a>). The default reads the driver's SQLSTATE when
 there is one: class <code>42</code> (syntax or an unknown name) and <code>22</code> (a data or type
 error) are the query's fault, except <code>42501</code>, insufficient privilege. With no
 SQLSTATE it falls back on the error's kind: <code>ProgrammingError</code> and <code>DataError</code>
