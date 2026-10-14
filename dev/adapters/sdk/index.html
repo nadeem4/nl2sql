@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adapter-interface-reference" class="md-skip">
+        <a href="#sdk-interface-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -2042,6 +2042,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#class-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mandatory-properties" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2187,6 +2198,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interface-secretprovider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface: SecretProvider
+      
+    </span>
+  </a>
   
 </li>
       
@@ -4557,6 +4579,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#class-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#mandatory-properties" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4706,6 +4739,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interface-secretprovider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface: SecretProvider
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#compliance-testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4733,19 +4777,92 @@
 
 
 
-<h1 id="adapter-interface-reference">Adapter Interface Reference</h1>
-<p>The adapter contract lives in the SDK, <code>nl2sql-sdk</code> (imported as <code>nl2sql_sdk</code>):</p>
+<h1 id="sdk-interface-reference">SDK Interface Reference</h1>
+<p>The SDK, <code>nl2sql-sdk</code> (imported as <code>nl2sql_sdk</code>), holds the interfaces an
+extension implements. It depends on pydantic and the standard library only.</p>
 <ul>
-<li><code>nl2sql.datasources.protocols.DatasourceAdapterProtocol</code></li>
-<li><code>nl2sql_sdk.contracts.AdapterRequest</code></li>
-<li><code>nl2sql_sdk.contracts.ResultFrame</code></li>
+<li>Adapters: <code>nl2sql_sdk.protocols.DatasourceAdapterProtocol</code>, with
+  <code>nl2sql_sdk.contracts.AdapterRequest</code> and <code>nl2sql_sdk.contracts.ResultFrame</code></li>
+<li>Secret providers: <code>nl2sql_sdk.secrets.SecretProvider</code></li>
 </ul>
+<p>Everything is also exported from <code>nl2sql_sdk</code> itself.</p>
 <h2 id="interface-datasourceadapterprotocol">Interface: <code>DatasourceAdapterProtocol</code></h2>
 <p>Adapters expose a capability-driven interface:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.datasources.protocols</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceAdapterProtocol</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.protocols</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceAdapterProtocol</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.contracts</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ResultFrame</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.capabilities</span><span class="w"> </span><span class="kn">import</span> <span class="n">DatasourceCapability</span>
 </code></pre></div>
+<h3 id="class-attributes">Class attributes</h3>
+<p>Three class attributes let the engine check an adapter before it builds one.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Attribute</th>
+<th style="text-align: left;">Type</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>interface_version</code></td>
+<td style="text-align: left;"><code>int</code></td>
+<td style="text-align: left;">The version of this interface the adapter was written for: <code>1</code>. The engine accepts exactly the version it was built for, and any other version is a load error.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>driver_modules</code></td>
+<td style="text-align: left;"><code>tuple[str, ...]</code></td>
+<td style="text-align: left;">The modules the adapter needs to connect, for example <code>("psycopg2",)</code>. The engine looks for each one with <code>importlib.util.find_spec</code> before it builds the adapter.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>install_hint</code></td>
+<td style="text-align: left;"><code>str</code></td>
+<td style="text-align: left;">What to install when a driver module is missing, for example <code>pip install "nl2sql-engine[postgres]"</code>.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">SnowflakeAdapter</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">interface_version</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">driver_modules</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"snowflake.connector"</span><span class="p">,)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">install_hint</span> <span class="o">=</span> <span class="s1">'pip install "nl2sql-snowflake"'</span>
+</code></pre></div>
+<p>The adapter module must import without its driver, so import the driver where
+it is used and not at the top of the module. The built-in adapters declare:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Adapter</th>
+<th style="text-align: left;"><code>driver_modules</code></th>
+<th style="text-align: left;">Extra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>sqlite</code></td>
+<td style="text-align: left;"><code>("sqlite3",)</code></td>
+<td style="text-align: left;">none: <code>sqlite3</code> ships with Python</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>postgres</code></td>
+<td style="text-align: left;"><code>("psycopg2",)</code></td>
+<td style="text-align: left;"><code>nl2sql-engine[postgres]</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mysql</code></td>
+<td style="text-align: left;"><code>("pymysql",)</code></td>
+<td style="text-align: left;"><code>nl2sql-engine[mysql]</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>mssql</code></td>
+<td style="text-align: left;"><code>("pyodbc",)</code></td>
+<td style="text-align: left;"><code>nl2sql-engine[mssql]</code>, plus Microsoft's ODBC driver</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>duckdb</code></td>
+<td style="text-align: left;"><code>("duckdb", "duckdb_engine")</code></td>
+<td style="text-align: left;"><code>nl2sql-engine[duckdb]</code></td>
+</tr>
+</tbody>
+</table>
 <h3 id="mandatory-properties">Mandatory Properties</h3>
 <table>
 <thead>
@@ -4858,9 +4975,8 @@ adapter written before the hook keeps working unchanged.</p>
 <p><code>BaseSQLAlchemyAdapter</code> implements it with <code>fetchmany</code> on a result opened with
 <code>stream_results</code>, a server-side cursor on drivers that have one (see
 <a href="../sqlalchemy/">SQLAlchemy adapters</a>).</p>
-<p>The hook is an optional protocol rather than a new required method so that the
-SDK change is additive: <code>DatasourceAdapterProtocol</code> is unchanged, and no
-third-party adapter has to be touched or re-released.</p>
+<p>The hook is an optional protocol rather than a required method, so an adapter
+without it needs no change.</p>
 <h3 id="result-types-every-adapter-returns">Result types every adapter returns</h3>
 <p>These are part of the contract, so the same plan gives the same values on
 every database:</p>
@@ -4888,6 +5004,69 @@ every database:</p>
 <p>The engine already wraps a date part in <code>CAST(... AS INT)</code> and a truncation
 in a <code>YYYY-MM-DD</code> format; an adapter that rewrites the inner nodes keeps
 those wrappers.</p>
+<hr />
+<h2 id="interface-secretprovider">Interface: <code>SecretProvider</code></h2>
+<p>A secret provider is where <code>${id:key}</code> references are read from. The secrets
+config names one by <code>type</code> (see <a href="../../configuration/secrets/">Secrets</a>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Self</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">SecretStr</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">AcmeVaultConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">url</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">token</span><span class="p">:</span> <span class="n">SecretStr</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">class</span><span class="w"> </span><span class="nc">AcmeVaultSecretProvider</span><span class="p">:</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]]</span> <span class="o">=</span> <span class="n">AcmeVaultConfig</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">):</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">client</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">AcmeVaultConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>            <span class="kn">import</span><span class="w"> </span><span class="nn">acme_vault</span>  <span class="c1"># the client library, imported only here</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>            <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">"Missing dependency 'acme-vault'. Install 'nl2sql-acme-vault'."</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">acme_vault</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">cfg</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">token</span><span class="o">.</span><span class="n">get_secret_value</span><span class="p">()))</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_secret</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Member</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>interface_version</code></td>
+<td style="text-align: left;"><code>1</code>. The engine accepts exactly the version it was built for.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>config_model</code></td>
+<td style="text-align: left;">A pydantic model for the provider's entry in the secrets config, apart from <code>id</code> and <code>type</code>. Set <code>extra="forbid"</code>, so a misspelt key fails when the config loads, and hold credentials as <code>SecretStr</code>, so they never print.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>from_config(cfg)</code></td>
+<td style="text-align: left;">Builds the provider from a validated <code>config_model</code> instance, after the engine has resolved any <code>${env:...}</code> in it. Raise <code>ImportError</code> naming what to install when the client library is missing.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>get_secret(key)</code></td>
+<td style="text-align: left;">Returns the secret stored under <code>key</code>, or <code>None</code> when there is none.</td>
+</tr>
+</tbody>
+</table>
+<p>A provider reads its settings from its entry only, never from the
+environment. The module that defines it must import without its client
+library, so the engine can validate the entry before building anything.</p>
 <hr />
 <h2 id="compliance-testing">Compliance Testing</h2>
 <p>All adapters should pass the compliance test suite (schema introspection, type mapping,

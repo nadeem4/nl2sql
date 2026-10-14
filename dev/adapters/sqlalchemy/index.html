@@ -2092,6 +2092,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#required-class-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required class attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#required-overrides" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4546,6 +4557,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#required-class-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required class attributes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#required-overrides" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4730,6 +4752,10 @@ does not fail the datasource's index:</p>
   logs one warning naming them with the driver's error, and the columns that
   skipped <code>MIN</code>/<code>MAX</code> by type; a table that only skipped by type logs at debug.</li>
 </ul>
+<h3 id="required-class-attributes">Required class attributes</h3>
+<p><code>interface_version = 1</code>, <code>driver_modules</code> (the DBAPI driver your URL names,
+for example <code>("psycopg2",)</code>) and <code>install_hint</code>. See
+<a href="../sdk/#class-attributes">Class attributes</a>.</p>
 <h3 id="required-overrides">Required Overrides</h3>
 <h4 id="construct_uriargs-dictstr-any-str"><code>construct_uri(args: Dict[str, Any]) -&gt; str</code></h4>
 <p>Converts a configuration dictionary into a SQLAlchemy connection string.</p>

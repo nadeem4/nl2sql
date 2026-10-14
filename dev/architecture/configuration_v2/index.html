@@ -4472,6 +4472,15 @@ engine.</p>
 <a href="#__codelineno-21-20" id="__codelineno-21-20" name="__codelineno-21-20"></a><span class="n">hashicorp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"</span>
 </code></pre></div>
 <h3 id="interfaces-and-versions">Interfaces and versions</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: the two SDK interfaces</p>
+<p>PR 4 built the adapter and secret provider rows below: the attributes on
+<code>DatasourceAdapterProtocol</code> and the five built-in adapters, and
+<code>nl2sql_sdk.secrets.SecretProvider</code> with the four built-in providers.
+A provider's <code>config_model</code> covers its block apart from <code>id</code> and <code>type</code>.
+Until the registry (PR 5), <code>nl2sql/secrets/factory.py</code> maps the four
+built-in <code>type</code> names to their classes.</p>
+</div>
 <p>Each Phase 1 interface carries <code>interface_version: ClassVar[int]</code>. The engine
 accepts exactly the version it was built for, and anything else is a load
 error: "<code>nl2sql-snowflake</code> implements adapter interface 0; this engine needs
@@ -4921,7 +4930,7 @@ Phase 1. OpenTelemetry moves in Phase 3.</p>
 <h2 id="9-the-sdk-rename-nl2sql-sdk">9. The SDK rename: <code>nl2sql-sdk</code></h2>
 <div class="admonition note">
 <p class="admonition-title">Built</p>
-<p>The rename is built (PR 1). The <code>secrets</code> module comes with PR 4.</p>
+<p>The rename is built (PR 1), and so is the <code>secrets</code> module (PR 4).</p>
 </div>
 <table>
 <thead>
