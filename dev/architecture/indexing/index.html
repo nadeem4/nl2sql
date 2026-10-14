@@ -1763,18 +1763,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/auth/">
-<span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/core/datasource/">
 <span class="md-ellipsis">
     
@@ -1811,11 +1799,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/query/">
+<a class="md-nav__link" href="../../api/core/policies/">
 <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -1823,11 +1811,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/settings/">
+<a class="md-nav__link" href="../../api/core/query/">
 <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -2352,7 +2340,7 @@ catalog in the current implementation.</p>
 <h2 id="chunk-types-and-contracts">Chunk types and contracts</h2>
 <p>Chunk types are defined in <code>nl2sql.indexing.models</code>:</p>
 <ul>
-<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> passed to <code>engine.add_datasource</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the <code>SAMPLE_QUESTIONS</code> file.</li>
+<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> of a <code>Datasource</code> passed to <code>engine.datasources.add</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the <code>SAMPLE_QUESTIONS</code> file.</li>
 <li><strong>TableChunk</strong> (<code>schema.table</code>): table name, PKs, column list, FK summaries, row counts.</li>
 <li><strong>ColumnChunk</strong> (<code>schema.column</code>): column type, stats, synonyms, PII flags.</li>
 <li><strong>RelationshipChunk</strong> (<code>schema.relationship</code>): FK relationships, columns, cardinality.</li>
@@ -2378,7 +2366,7 @@ next schema re-index.</p>
 as canonical JSON (metrics are left out; nothing indexes them yet). Index
 health compares it with the file as it is now (see <a href="#index-health">Index health</a>).</p>
 <p><strong>Changing <code>curated.yaml</code> does not re-read the schema.</strong>
-<code>nl2sql index --curated-only</code> (<code>rebuild_index(..., curated_only=True)</code>,
+<code>nl2sql index --curated-only</code> (<code>engine.index.build(curated_only=True)</code>,
 <code>IndexingOrchestrator.refresh_curated()</code>,
 <code>VectorStore.refresh_curated_chunks()</code>) writes a new build for each datasource
 the usual way, except that the active build's schema entries are <strong>copied</strong>
@@ -2430,11 +2418,13 @@ own, inside the one collection (<code>VectorStore.refresh_schema_chunks</code>):
   each configured datasource in turn, and a failure keeps that datasource's
   previous entries active and exits <code>1</code>.</li>
 <li>Callers that serve questions can hold them back around the switch:
-  <code>rebuild_index(..., switch_guard=...)</code>. The playground passes its <code>RunGate</code>, so
-  questions in flight finish first.</li>
-<li><code>nl2sql.indexing.rebuild.rebuild_index</code> is the one entry point for
-  <code>nl2sql index</code>, the demo's startup repair and the playground's Rebuild (through
-  <code>NL2SQL.rebuild_index</code>).</li>
+  <code>engine.index.build(..., switch_guard=...)</code>. The playground passes its
+  <code>RunGate</code>, so questions in flight finish first.</li>
+<li><code>nl2sql.indexing.rebuild.rebuild_index</code>, behind <code>engine.index.build</code>, is the
+  one entry point for <code>nl2sql index</code>, the demo's startup repair, the
+  playground's Rebuild and the REST index routes. Its <code>on_datasource</code> callback
+  gets an <code>IndexProgress</code> per datasource (<code>started</code>, then <code>done</code> with the entry
+  counts or <code>failed</code> with the reason): <code>nl2sql index</code> prints a line from it.</li>
 </ul>
 <h3 id="one-embedding-model-per-collection">One embedding model per collection</h3>
 <p>A query is embedded once, in one space, so every datasource in a collection
@@ -2464,7 +2454,7 @@ chinook</code>". Questions keep working meanwhile; the stale entries still name
 queries that exist. A <code>preferred_tables</code> entry missing from the datasource's
 latest snapshot is a warning too. <code>nl2sql doctor</code> prints it under <strong>Index</strong>,
 <code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the playground and
-<code>GET /api/v1/index/status</code> show it (through <code>NL2SQL.index_health</code>), the playground
+<code>GET /api/v1/index/status</code> show it (through <code>engine.index.health()</code>), the playground
 with a Rebuild button.</p>
 <h2 id="chunking-strategy-as-implemented">Chunking strategy (as implemented)</h2>
 <p>Chunking is aligned to planning intent:</p>
@@ -2589,7 +2579,7 @@ search (the query, the pool with similarity, Chroma distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see <a href="../../observability/debugging/#retrieval">Debugging a run</a>),
-and the playground's Retrieval inspector (<code>NL2SQL.inspect_retrieval</code>) runs the same
+and the playground's Retrieval inspector (<code>engine.index.inspect</code>) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the <strong>Copy as text</strong> output.</p>
@@ -2612,8 +2602,8 @@ candidates now and then. The other searches stay approximate.</p>
 <li>Vector store retrieval wrapped by <code>VECTOR_BREAKER</code>; failures fast‑fail.</li>
 <li>Vector retrieval errors in <code>SchemaRetrieverNode</code> return empty results with warnings.</li>
 <li>If no candidates are found, the retriever falls back to full schema snapshot.</li>
-<li>Enrichment is opt-in: <code>index_datasource</code>, <code>index_all_datasources</code>,
-  <code>rebuild_index</code>, <code>IndexingOrchestrator</code> and <code>nl2sql index</code> all default to
+<li>Enrichment is opt-in: <code>engine.index.build</code>, <code>rebuild_index</code>,
+  <code>IndexingOrchestrator</code> and <code>nl2sql index</code> all default to
   <code>enrich=False</code>; pass <code>enrich=True</code> (or <code>nl2sql index --enrich</code>) to spend
   tokens on it. It only fills blanks: a table or column comment read from the
   database is never overwritten.</li>

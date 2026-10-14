@@ -16,7 +16,7 @@
         <link rel="prev" href="../../">
       
       
-        <link rel="next" href="../auth/">
+        <link rel="next" href="../datasource/">
       
       
         
@@ -3668,25 +3668,25 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Lifecycle">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#convenience-methods" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Convenience methods
+        The shape
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="The shape">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#schema-index-and-retrieval" class="md-nav__link">
+  <a href="#traces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schema, index and retrieval
+        Traces
       
     </span>
   </a>
@@ -3713,34 +3713,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -3837,14 +3809,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../query/" class="md-nav__link">
+      <a href="../policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3865,14 +3837,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../settings/" class="md-nav__link">
+      <a href="../query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4637,25 +4609,25 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Lifecycle">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#convenience-methods" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Convenience methods
+        The shape
       
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="The shape">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#schema-index-and-retrieval" class="md-nav__link">
+  <a href="#traces" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Schema, index and retrieval
+        Traces
       
     </span>
   </a>
@@ -4698,13 +4670,15 @@
 <h1 id="public-facade-api">Public Facade API</h1>
 <h2 id="purpose">Purpose</h2>
 <p>Provide one entry point: <code>NL2SQL</code> is built from one <code>Config</code>, owns everything
-it builds (its <code>Runtime</code>), and exposes the modular APIs through a single class.</p>
+it builds (its <code>Runtime</code>), and is the only thing an application talks to.
+Questions are top-level methods; everything else is a namespace.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Build the engine from a <code>Config</code>, resolving every name through a <code>Registry</code>.</li>
 <li>Connect, and report what is ready, only when asked (<code>check()</code>).</li>
 <li>Release what it opened (<code>close()</code>).</li>
-<li>Expose convenience methods that delegate to modular APIs.</li>
+<li>Answer questions (<code>run_query</code>, <code>stream_query</code>) and group the rest by subject
+  (<code>engine.datasources</code>, <code>engine.index</code>, ...).</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
@@ -4788,7 +4762,8 @@ embedder (from <code>embeddings</code>, or the <code>instance</code> given), and
 datasource's <code>connection</code>, are read from the folder of <code>nl2sql.yaml</code> when the
 config was loaded from a file, and from the working directory when it was
 built in code. <code>engine.config</code> is the current frozen <code>Config</code>, with secrets as
-references only; <code>add_datasource</code> is the one call that changes it.</p>
+references only; <code>datasources.add</code>, <code>datasources.remove</code> and <code>llm.replace</code> are
+the calls that change it.</p>
 <div class="admonition note">
 <p class="admonition-title">Until the settings global is gone</p>
 <p>Modules not yet moved onto the runtime still read the process-global
@@ -4816,7 +4791,7 @@ startup.</p>
 <tbody>
 <tr>
 <td><code>check() -&gt; CheckReport</code></td>
-<td>Connects to each datasource and records it <code>ready</code>, or <code>failed</code> with the stage (<code>connect</code>), the reason and a fix. A failed datasource is marked unavailable and left out of routing: the engine runs degraded, and a query that targets it fails with the reason. It also reports each agent whose API key does not resolve (no model is called) and the index status from <code>index_health()</code>. Raises <code>EngineNotReady</code> if a <code>required: true</code> datasource fails, or if datasources are configured and none is ready; the error carries the <code>report</code>. Safe to call again: a datasource that connects on a later call is routed to again.</td>
+<td>Connects to each datasource and records it <code>ready</code>, or <code>failed</code> with the stage (<code>connect</code>), the reason and a fix. A failed datasource is marked unavailable and left out of routing: the engine runs degraded, and a query that targets it fails with the reason. It also reports each agent whose API key does not resolve (no model is called) and the index status from <code>index.health()</code>. Raises <code>EngineNotReady</code> if a <code>required: true</code> datasource fails, or if datasources are configured and none is ready; the error carries the <code>report</code>. Safe to call again: a datasource that connects on a later call is routed to again.</td>
 </tr>
 <tr>
 <td><code>close()</code></td>
@@ -4846,76 +4821,99 @@ it suits tests and notebooks. Startup policy belongs to the entry point: call
 <code>check()</code> straight after building the engine, refuse to start on
 <code>EngineNotReady</code>, and start degraded, printing the report, when an optional
 datasource fails.</p>
-<h3 id="convenience-methods">Convenience methods</h3>
-<p>The public facade delegates to modular APIs with the same signatures:
-<code>run_query</code>, <code>add_datasource</code> (a <code>Datasource</code>: built, not connected, and added to <code>engine.config</code>), <code>add_datasource_from_config</code>, <code>list_datasources</code>,
-<code>get_datasource_capabilities</code>, <code>configure_llm</code>, <code>configure_llm_from_config</code>,
-<code>list_llms</code>, <code>get_llm</code>, <code>index_datasource</code>, <code>index_all_datasources</code>, <code>clear_index</code>,
-<code>check_permissions</code>, <code>get_allowed_resources</code>, <code>get_current_settings</code>,
-<code>get_setting</code>, <code>validate_configuration</code>, <code>stream_query</code> (the run as events: see
-<a href="../query/#streaming-a-run">Query API → Streaming a run</a>), and the saved-result reads
-<code>get_result_manifest</code>, <code>get_result_page</code> and <code>export_result_csv</code> (see
-<a href="../query/#reading-a-runs-saved-results">Query API → Reading a run's saved results</a>),
-which <code>nl2sql-api</code> and the playground both serve.</p>
-<h3 id="schema-index-and-retrieval">Schema, index and retrieval</h3>
-<p>What a client shows about the index, as methods on <code>NL2SQL</code> itself. The
-playground and <code>nl2sql-api</code> both use them, and neither reaches into
-<code>engine.context</code>; <code>tests/unit/test_cli_demo_boundaries.py</code> holds the playground
-to that.</p>
+<h2 id="the-shape">The shape</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">close</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">config</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span>   <span class="c1"># list, get, add, remove, schema, test</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span>         <span class="c1"># build, health, clear, inspect</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span>           <span class="c1"># list, get, replace</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">engine</span><span class="o">.</span><span class="n">policies</span>      <span class="c1"># roles, allows, allowed, validate</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">engine</span><span class="o">.</span><span class="n">curated</span>       <span class="c1"># validate, test</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">engine</span><span class="o">.</span><span class="n">results</span>       <span class="c1"># manifest, page, csv</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">engine</span><span class="o">.</span><span class="n">traces</span>        <span class="c1"># replay</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">engine</span><span class="o">.</span><span class="n">benchmark</span>     <span class="c1"># run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2</span>
+</code></pre></div>
 <table>
 <thead>
 <tr>
-<th>method</th>
-<th>returns</th>
-<th>meaning</th>
+<th>namespace</th>
+<th>reference</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>get_schema(datasource_id)</code></td>
-<td><code>dict</code></td>
-<td>The indexed schema as the planner is given it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). Read from the latest schema snapshot, not the database; before the first index <code>tables</code> is empty.</td>
+<td><code>run_query</code>, <code>stream_query</code>, <code>results</code></td>
+<td><a href="../query/">Query API</a></td>
 </tr>
 <tr>
-<td><code>index_health()</code></td>
-<td><code>dict</code></td>
-<td><code>status</code> (<code>ok</code>, <code>empty</code>, <code>stale</code>, <code>missing</code>), <code>total</code>, <code>counts</code> by entry type, <code>built_at</code>, <code>embedding_model</code>, one entry per registered datasource (<code>entries</code>, <code>index_version</code>, <code>snapshot_version</code>, <code>built_at</code>), <code>problems</code> and <code>warnings</code>. <code>missing</code> when no vector store is configured. A datasource that failed to start is a warning: "Datasource 'x' is unavailable: <reason>".</td>
+<td><code>datasources</code></td>
+<td><a href="../datasource/">Datasource API</a></td>
 </tr>
 <tr>
-<td><code>list_unavailable_datasources()</code></td>
-<td><code>dict</code></td>
-<td>Configured datasources that <code>check()</code> could not connect to, mapped to the reason. They are not in <code>list_datasources()</code> until a later <code>check()</code> connects. See <a href="../../../configuration/datasources/#when-a-datasource-fails-to-start">Datasources → When a datasource fails to start</a>.</td>
+<td><code>index</code></td>
+<td><a href="../indexing/">Indexing API</a></td>
 </tr>
 <tr>
-<td><code>rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)</code></td>
-<td><code>RebuildResult</code></td>
-<td>Rebuilds the vector entries beside the live ones, then switches; the current entries answer questions until then. <code>enrich</code> asks the LLM for descriptions and spends tokens, so it is off by default. <code>on_progress</code> gets a sentence before each step; <code>switch_guard</code> is a context manager factory held around each switch. The result has <code>ok</code>, <code>stats</code>, <code>empty</code> and <code>errors</code>.</td>
+<td><code>llm</code></td>
+<td><a href="../llm/">LLM API</a></td>
 </tr>
 <tr>
-<td><code>inspect_retrieval(query, k=8, lambda_mult=None, types=None, datasource_id=None)</code></td>
-<td><code>dict</code></td>
-<td>One MMR search of the live index, as the engine runs it: the pool with scores, the picks in order and what was dropped. <code>types</code> limits the entry types (<code>schema.table</code>, ...). Raises <code>LookupError</code> when no vector store is configured.</td>
+<td><code>policies</code></td>
+<td><a href="../policies/">Policies API</a></td>
 </tr>
 <tr>
-<td><code>reload_llm_config(config_path)</code></td>
-<td><code>None</code></td>
-<td>Replaces every configured LLM with the <code>llm</code> section of the <code>nl2sql.yaml</code> at <code>config_path</code>, as one step: agents the section no longer names fall back to the top level. An invalid file leaves the current configuration in place.</td>
+<td><code>curated</code></td>
+<td><a href="../../../configuration/curated/">Curated answers → Checking them</a></td>
+</tr>
+<tr>
+<td><code>traces</code></td>
+<td>below</td>
+</tr>
+<tr>
+<td><code>benchmark</code></td>
+<td><a href="../../../benchmarks/">Benchmarks</a></td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">demo</span><span class="p">()</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">get_schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>      <span class="c1"># 'Album'</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                         <span class="c1"># 'ok'</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">inspect_retrieval</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
+<p>The namespace classes are internal: reach them through the engine, never by
+importing them. Each is built on first use.</p>
+<p>The CLI, the playground and <code>nl2sql-api</code> are callers like any other: they use
+only these methods and namespaces, never the runtime behind them.
+<code>test_the_cli_the_playground_and_the_api_use_only_the_public_api</code> in
+<code>tests/architecture/test_boundaries.py</code> holds them to that.</p>
+<h3 id="traces">Traces</h3>
+<p><code>engine.traces.replay(trace)</code> re-runs a recorded question, answering every LLM
+call from the trace document (no model is called), on a runtime of its own so
+the engine's config and LLMs never change. It returns a <code>ReplayReport</code>: the
+replayed <code>result</code>, how many recorded calls were <code>served</code>, the <code>divergence</code>
+(where the replay asked for a call the recording does not have) and the
+<code>differences</code> from the recorded result. It raises <code>LookupError</code> when a
+datasource the trace used is not configured here or does not answer; the
+message names each one and why. <code>nl2sql trace replay</code> is built on it (see
+<a href="../../../observability/debugging/">Debugging</a>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">demo</span><span class="p">()</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>   <span class="c1"># 'Album'</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                              <span class="c1"># 'ok'</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">inspect</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="top-level-exports">Top-level exports</h3>
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
 submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,
-<code>ResultSummary</code>, <code>ResultManifest</code>, <code>ResultPage</code>, <code>ResultNotFound</code>,
-<code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>, <code>QueryEvent</code>, <code>UserContext</code>, <code>CancellationToken</code>,
-<code>configure_logging</code>, the config (<code>Config</code>, <code>load_config</code>, <code>ConfigError</code>, <code>Registry</code> and the section classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>AgentLLM</code>, <code>Embeddings</code>, <code>Policies</code>, <code>Role</code>, <code>Storage</code>, <code>Secrets</code>, <code>Curated</code>, <code>Settings</code>), what <code>check()</code> reports (<code>CheckReport</code>, <code>DatasourceStatus</code>, <code>EngineNotReady</code>), the error types
-(<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>) and the modular API classes.
-The REST API (<code>nl2sql-api</code>) is held to this rule by an architecture test.</p>
+<code>AnswerSource</code>, <code>ResultSummary</code>, <code>ResultManifest</code>, <code>ResultPage</code>,
+<code>ResultNotFound</code>, <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>, <code>QueryEvent</code>,
+<code>UserContext</code>, <code>CancellationToken</code>, <code>configure_logging</code>, what the namespaces
+return (<code>DatasourceInfo</code>, <code>IndexProgress</code>, <code>LLMChange</code>), the config (<code>Config</code>,
+<code>load_config</code>, <code>load_env_file</code>, <code>ConfigError</code>, <code>Registry</code> and the section
+classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>AgentLLM</code>, <code>Embeddings</code>, <code>Policies</code>,
+<code>Role</code>, <code>Storage</code>, <code>Secrets</code>, <code>Curated</code>, <code>Settings</code>), what <code>check()</code> reports
+(<code>CheckReport</code>, <code>DatasourceStatus</code>, <code>EngineNotReady</code>), the error types
+(<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>), and the benchmark's
+<code>BenchmarkAPI</code> and <code>BenchmarkConfig</code>. The list is fixed by
+<code>tests/unit/test_public_surface.py</code>: adding or removing a name is a semver
+decision. The REST API (<code>nl2sql-api</code>) is held to importing only from <code>nl2sql</code>
+by an architecture test.</p>
 
 
 

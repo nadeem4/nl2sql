@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../core/datasource/" class="md-nav__link">
         
   
@@ -3696,14 +3668,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/query/" class="md-nav__link">
+      <a href="../../core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3724,14 +3696,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/settings/" class="md-nav__link">
+      <a href="../../core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -3989,45 +3961,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requestresponse-models" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request/Response Models
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Request/Response Models">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#llmrequest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLMRequest
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llmresponse" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLMResponse
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4040,10 +3973,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#post-apiv1llm" class="md-nav__link">
+  <a href="#put-apiv1settingsllm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        POST /api/v1/llm
+        PUT /api/v1/settings/llm
       
     </span>
   </a>
@@ -4062,10 +3995,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#get-apiv1llmllm_name" class="md-nav__link">
+  <a href="#get-apiv1llmagent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GET /api/v1/llm/{llm_name}
+        GET /api/v1/llm/{agent}
       
     </span>
   </a>
@@ -4580,45 +4513,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requestresponse-models" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request/Response Models
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Request/Response Models">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#llmrequest" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLMRequest
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llmresponse" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLMResponse
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4631,10 +4525,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#post-apiv1llm" class="md-nav__link">
+  <a href="#put-apiv1settingsllm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        POST /api/v1/llm
+        PUT /api/v1/settings/llm
       
     </span>
   </a>
@@ -4653,10 +4547,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#get-apiv1llmllm_name" class="md-nav__link">
+  <a href="#get-apiv1llmagent" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GET /api/v1/llm/{llm_name}
+        GET /api/v1/llm/{agent}
       
     </span>
   </a>
@@ -4686,73 +4580,61 @@
 
 
 <h1 id="llm-api">LLM API</h1>
-<h2 id="requestresponse-models">Request/Response Models</h2>
-<p>Source: <code>packages/api/src/nl2sql_api/models/llm.py</code></p>
-<h3 id="llmrequest"><code>LLMRequest</code></h3>
-<table>
-<thead>
-<tr>
-<th>field</th>
-<th>type</th>
-<th>required</th>
-<th>meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>config</code></td>
-<td><code>Dict[str, Any]</code></td>
-<td>yes</td>
-<td>LLM config payload.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="llmresponse"><code>LLMResponse</code></h3>
-<table>
-<thead>
-<tr>
-<th>field</th>
-<th>type</th>
-<th>required</th>
-<th>meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>success</code></td>
-<td><code>bool</code></td>
-<td>yes</td>
-<td>Operation status.</td>
-</tr>
-<tr>
-<td><code>message</code></td>
-<td><code>str</code></td>
-<td>yes</td>
-<td>Result message.</td>
-</tr>
-<tr>
-<td><code>llm_name</code></td>
-<td><code>Optional[str]</code></td>
-<td>no</td>
-<td>LLM name.</td>
-</tr>
-</tbody>
-</table>
+<p>Source: <code>packages/api/src/nl2sql_api/routes/llm.py</code></p>
 <h2 id="endpoints">Endpoints</h2>
-<h3 id="post-apiv1llm"><code>POST /api/v1/llm</code></h3>
+<h3 id="put-apiv1settingsllm"><code>PUT /api/v1/settings/llm</code></h3>
+<p>Replaces the engine's whole <code>llm</code> section in the running process, through
+<code>engine.llm.replace</code> (see <a href="../../core/llm/#llmreplace">LLM API → llm.replace</a>).</p>
 <p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
+<p>Request body: the <code>llm</code> section as JSON, the same shape as <code>llm.yaml</code> (see
+<a href="../../../configuration/llm/">LLM configuration</a>).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai"</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"api_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"${env:OPENAI_API_KEY}"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"agents"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"ast_planner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.5"</span><span class="p">}}</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">}</span>
+</code></pre></div>
 <p>Execution flow:
-- Delegates to <code>engine.configure_llm(...)</code>.</p>
+- The body is checked exactly as <code>llm.yaml</code> is: strict keys with "did you
+  mean", the section's validators, and the providers resolved through the
+  engine's registry. A <code>${provider:key}</code> reference is kept in a secret field
+  (<code>api_key</code>) and resolved by the engine's secret manager, so the body can name
+  a variable or a secret rather than carry a key. A reference anywhere else is
+  an error: the server's environment is never read into the config.
+- Every agent's API key must resolve. No model is called.
+- The new clients are built, then swapped in with <code>engine.config.llm</code> as one
+  step. Questions already running finish on the old LLM.
+- The change is logged (one INFO line on <code>nl2sql.llm</code>) and audited, naming the
+  caller's roles, <code>via: "api"</code>, and each agent's old and new provider and
+  model. Nothing is written to disk: a restart reads <code>llm.yaml</code> again.</p>
+<p>Response (<code>200</code>): the change, never a key.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"by"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"user_id"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">"roles"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"admin"</span><span class="p">],</span><span class="w"> </span><span class="nt">"via"</span><span class="p">:</span><span class="w"> </span><span class="s2">"api"</span><span class="p">},</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"changes"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"old"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai/gpt-5.4"</span><span class="p">,</span><span class="w"> </span><span class="nt">"new"</span><span class="p">:</span><span class="w"> </span><span class="s2">"anthropic/claude-sonnet-5-5"</span><span class="p">},</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">"ast_planner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"old"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai/gpt-5.4"</span><span class="p">,</span><span class="w"> </span><span class="nt">"new"</span><span class="p">:</span><span class="w"> </span><span class="s2">"anthropic/claude-opus-5-5"</span><span class="p">}</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">}</span>
+</code></pre></div>
 <p>Errors:
-- Unhandled exceptions return <code>HTTP 500</code>.</p>
+- No role -&gt; <code>HTTP 401</code>; a role not in <code>policies.admin_roles</code>, or a remote
+  client with no role source configured -&gt; <code>HTTP 403</code>.
+- A section that is not valid, a provider that is not installed, or a key that
+  does not resolve -&gt; <code>HTTP 422</code>, whose <code>detail</code> is the config error's text.
+  Nothing changes.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>HTTP 422
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>{"detail": "LLM has 1 problem:\n\n  LLM → llm.agents.ast_planer\n    Unknown key. Did you mean 'ast_planner'?"}
+</code></pre></div>
 <h3 id="get-apiv1llm"><code>GET /api/v1/llm</code></h3>
-<p>Response model: <code>Dict[str, Any]</code> (with <code>llms</code> map)</p>
-<p>Execution flow:
-- Delegates to <code>engine.list_llms()</code>.</p>
-<h3 id="get-apiv1llmllm_name"><code>GET /api/v1/llm/{llm_name}</code></h3>
-<p>Response model: <code>Dict[str, Any]</code></p>
-<p>Execution flow:
-- Delegates to <code>engine.get_llm(llm_name)</code>.</p>
+<p>Response: <code>{"llms": {...}}</code>, <code>engine.llm.list()</code>: each agent by its name in
+the <code>llm</code> section (<code>default</code> first) with its <code>provider</code>, <code>model</code>,
+<code>temperature</code> and <code>inherited</code> (True when it sets nothing of its own). Never a
+key. No role needed.</p>
+<h3 id="get-apiv1llmagent"><code>GET /api/v1/llm/{agent}</code></h3>
+<p>Response: one agent's entry, <code>engine.llm.get(agent)</code>.</p>
+<p>Errors:
+- An unknown agent -&gt; <code>HTTP 404</code>, naming the agents.</p>
 
 
 

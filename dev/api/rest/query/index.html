@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../core/datasource/" class="md-nav__link">
         
   
@@ -3696,14 +3668,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/query/" class="md-nav__link">
+      <a href="../../core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3724,14 +3696,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/settings/" class="md-nav__link">
+      <a href="../../core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -5314,7 +5286,7 @@ before its next step or model call.</p>
 </tr>
 </tbody>
 </table>
-<p>Response model: <code>ResultPage</code>. Delegates to <code>engine.get_result_page(...)</code>, which
+<p>Response model: <code>ResultPage</code>. Delegates to <code>engine.results.page(...)</code>, which
 reads the rows lazily from the result's parquet artifact: only the slice asked for
 is read. A page past the end has no rows.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-NL2SQL-Role: admin"</span><span class="w">   </span><span class="s2">"http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&amp;limit=100"</span>
@@ -5326,7 +5298,7 @@ is read. A page past the end has no rows.</p>
 <h3 id="get-apiv1queryrequest_idresultsresult_idcsv"><code>GET /api/v1/query/{request_id}/results/{result_id}.csv</code></h3>
 <p>The whole of a run's saved result as <code>text/csv</code> (UTF-8, header first), sent as an
 attachment named <code>&lt;request_id&gt;_&lt;result_id&gt;.csv</code>. Delegates to
-<code>engine.export_result_csv(...)</code>, which reads the parquet artifact a slice at a time
+<code>engine.results.csv(...)</code>, which reads the parquet artifact a slice at a time
 and streams each slice out, so the result is never built in memory on the server.</p>
 <h3 id="errors-and-scope-of-the-result-routes">Errors and scope of the result routes</h3>
 <ul>

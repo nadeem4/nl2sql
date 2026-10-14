@@ -1639,10 +1639,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#add-an-llm-at-runtime" class="md-nav__link">
+  <a href="#replace-the-llm-at-runtime" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Add an LLM at runtime
+        Replace the LLM at runtime
       
     </span>
   </a>
@@ -3777,34 +3777,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/core/datasource/" class="md-nav__link">
         
   
@@ -3889,14 +3861,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/query/" class="md-nav__link">
+      <a href="../../api/core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3917,14 +3889,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/settings/" class="md-nav__link">
+      <a href="../../api/core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4701,10 +4673,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#add-an-llm-at-runtime" class="md-nav__link">
+  <a href="#replace-the-llm-at-runtime" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Add an LLM at runtime
+        Replace the LLM at runtime
       
     </span>
   </a>
@@ -4908,7 +4880,7 @@ with a key-free ONNX model, and <code>provider: openai</code> needs <code>OPENAI
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Datasource</span><span class="p">,</span> <span class="n">Limits</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">add_datasource</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span>
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="nb">id</span><span class="o">=</span><span class="s2">"runtime_pg"</span><span class="p">,</span>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="nb">type</span><span class="o">=</span><span class="s2">"postgres"</span><span class="p">,</span>
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">"Runtime Postgres datasource"</span><span class="p">,</span>
@@ -4922,11 +4894,11 @@ with a key-free ONNX model, and <code>provider: openai</code> needs <code>OPENAI
 <a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>    <span class="n">limits</span><span class="o">=</span><span class="n">Limits</span><span class="p">(</span><span class="n">timeout_ms</span><span class="o">=</span><span class="mi">8000</span><span class="p">,</span> <span class="n">row_limit</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">max_bytes</span><span class="o">=</span><span class="mi">10485760</span><span class="p">),</span>
 <a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="p">))</span>
 <a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_datasource</span><span class="p">(</span><span class="s2">"runtime_pg"</span><span class="p">)</span>
+<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"runtime_pg"</span><span class="p">])</span>
 </code></pre></div>
 <p>The <code>description</code> is indexed as given, even though no file lists
 <code>runtime_pg</code>, and the datasource joins <code>engine.config</code>. Indexing makes no LLM call unless you ask for one:
-<code>engine.index_datasource("runtime_pg", enrich=True)</code> has the
+<code>engine.index.build(["runtime_pg"], enrich=True)</code> has the
 <code>indexing_enrichment</code> agent write descriptions for tables and columns the
 database left without a comment.</p>
 <p>You can also add the datasources of another config:</p>
@@ -4934,27 +4906,23 @@ database left without a comment.</p>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">for</span> <span class="n">datasource</span> <span class="ow">in</span> <span class="n">load_config</span><span class="p">(</span><span class="s2">"other/nl2sql.yaml"</span><span class="p">)</span><span class="o">.</span><span class="n">datasources</span><span class="p">:</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">engine</span><span class="o">.</span><span class="n">add_datasource</span><span class="p">(</span><span class="n">datasource</span><span class="p">)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">datasource</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="add-an-llm-at-runtime">Add an LLM at runtime</h3>
-<p>You can also register or override LLMs programmatically:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
+<h3 id="replace-the-llm-at-runtime">Replace the LLM at runtime</h3>
+<p><code>engine.llm.replace</code> swaps the whole <code>llm</code> section in the running engine, as
+one step: it is validated as <code>llm.yaml</code> is, every agent's key must resolve,
+and questions already running finish on the old LLM.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">AgentLLM</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">configure_llm</span><span class="p">({</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"default"</span><span class="p">,</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="s2">"provider"</span><span class="p">:</span> <span class="s2">"openai"</span><span class="p">,</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    <span class="s2">"model"</span><span class="p">:</span> <span class="s2">"gpt-5.2"</span><span class="p">,</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>    <span class="s2">"temperature"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="s2">"api_key"</span><span class="p">:</span> <span class="s2">"${env:OPENAI_API_KEY}"</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="p">})</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">LLM</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"openai"</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"gpt-5.4"</span><span class="p">,</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>                       <span class="n">agents</span><span class="o">=</span><span class="p">{</span><span class="s2">"ast_planner"</span><span class="p">:</span> <span class="n">AgentLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"gpt-5.5"</span><span class="p">)}))</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">list</span><span class="p">()[</span><span class="s2">"ast_planner"</span><span class="p">][</span><span class="s2">"model"</span><span class="p">]</span>   <span class="c1"># 'gpt-5.5'</span>
 </code></pre></div>
-<p>You can also replace every LLM with the <code>llm</code> section of another config at
-runtime:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
+<p>The <code>llm</code> section of another config:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">configure_llm_from_config</span><span class="p">(</span><span class="s2">"other/nl2sql.yaml"</span><span class="p">)</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">load_config</span><span class="p">(</span><span class="s2">"other/nl2sql.yaml"</span><span class="p">)</span><span class="o">.</span><span class="n">llm</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="policies-configuration-rbac">Policies configuration (RBAC)</h3>
 <p><code>policies.yaml</code> defines which roles can access which datasources and tables:</p>
@@ -5019,8 +4987,8 @@ call, same SQL and rows; still validated every time), and
 <li>Run queries.</li>
 </ol>
 <h2 id="index-schema-required">Index schema (required)</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_datasource</span><span class="p">(</span><span class="s2">"my_postgres"</span><span class="p">)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_all_datasources</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"my_postgres"</span><span class="p">])</span>   <span class="c1"># one datasource</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>                  <span class="c1"># every datasource</span>
 </code></pre></div>
 <h2 id="configure-providers">Configure providers</h2>
 <p>Secrets providers are installed via extras and selected in the <code>secrets</code> section:</p>

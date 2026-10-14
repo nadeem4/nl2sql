@@ -1638,18 +1638,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/auth/">
-<span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/core/datasource/">
 <span class="md-ellipsis">
     
@@ -1686,11 +1674,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/query/">
+<a class="md-nav__link" href="../../api/core/policies/">
 <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -1698,11 +1686,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/settings/">
+<a class="md-nav__link" href="../../api/core/query/">
 <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -2159,9 +2147,10 @@ trace to the user who produced it is left to a multi-user deployment.</p>
   (<code>datasource.schema.table</code>, with schema and datasource wildcards) — nothing
   finer. There is no column masking and no row-level security.</li>
 <li><strong>Logical validation</strong> enforces schema constraints and policy-based table access.</li>
-<li><strong>Audit logging</strong> records <code>llm_interaction</code> events only, and only when the CLI
-  attaches its monitor callback. The Python and REST APIs emit none. See
-  <code>../observability/stack.md</code>.</li>
+<li><strong>Audit logging</strong> records <code>llm.changed</code> events only: each <code>engine.llm.replace</code>
+  (the Python API, <code>PUT /api/v1/settings/llm</code>, the playground's model switch),
+  with who made it and each agent's old and new model, never a key. Queries
+  are not audited. See <code>../observability/stack.md</code>.</li>
 <li><strong>Bounded execution</strong>: a global timeout and a per-run cancellation token cap each run. There is <strong>no process sandbox</strong> — the engine runs in-process (see <code>../execution/isolation.md</code>).</li>
 </ul>
 <h2 id="what-keeps-the-sql-read-only">What keeps the SQL read-only</h2>

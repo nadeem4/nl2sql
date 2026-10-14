@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../core/datasource/" class="md-nav__link">
         
   
@@ -3696,14 +3668,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/query/" class="md-nav__link">
+      <a href="../../core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3724,14 +3696,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/settings/" class="md-nav__link">
+      <a href="../../core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4636,20 +4608,30 @@
 <code>GET /api/v1/index/status</code> is open.</p>
 <h3 id="post-apiv1indexdatasource_id"><code>POST /api/v1/index/{datasource_id}</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.indexing.index_datasource(...)</code>. No enrichment model call
-  is made: enrichment is opt-in in the engine and these routes do not ask for it.</p>
+- Delegates to <code>engine.index.build([datasource_id])</code>: the new entries are
+  written beside the live ones and switched in when all are written. No
+  enrichment model call is made: enrichment is opt-in in the engine and these
+  routes do not ask for it.</p>
 <p>Response:
 <code>{"success": true, "datasource_id": "...", "indexing_stats": {...}, "message": "..."}</code></p>
+<p>Errors:
+- A datasource that fails to index (unknown, unavailable, unreadable) -&gt;
+  <code>HTTP 500</code> naming the reason. It keeps its previous entries.</p>
 <h3 id="post-apiv1index-all"><code>POST /api/v1/index-all</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.indexing.index_all_datasources(...)</code>, without enrichment.</p>
+- Delegates to <code>engine.index.build()</code>, every configured datasource, without
+  enrichment.</p>
+<p>Response:
+<code>{"success": &lt;every datasource indexed&gt;, "indexing_results": {"stats": [...], "empty": [...], "errors": [...]}, "message": "..."}</code>.
+A datasource that fails is in <code>errors</code> (<code>datasource_id</code>, <code>error</code>) and keeps
+its previous entries.</p>
 <h3 id="delete-apiv1index"><code>DELETE /api/v1/index</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.indexing.clear_index()</code>.</p>
+- Delegates to <code>engine.index.clear()</code>.</p>
 <h3 id="get-apiv1indexstatus"><code>GET /api/v1/index/status</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.index_health()</code> (see the
-  <a href="../../core/public-facade/#schema-index-and-retrieval">public facade</a>), the same
+- Delegates to <code>engine.index.health()</code> (see
+  <a href="../../core/indexing/#indexhealth">Indexing API → index.health</a>), the same
   report the playground's index panel shows.</p>
 <p>Response (illustrative):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>

@@ -3788,34 +3788,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/core/datasource/" class="md-nav__link">
         
   
@@ -3900,14 +3872,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/query/" class="md-nav__link">
+      <a href="../../api/core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3928,14 +3900,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/settings/" class="md-nav__link">
+      <a href="../../api/core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -5106,7 +5078,7 @@ and embeds only the verified queries: it reads no schema and makes no
 enrichment model call, so it takes seconds. The datasource must have been
 indexed once with plain <code>nl2sql index</code>. A plain <code>nl2sql index</code> also picks up
 the file, and a schema re-index always keeps the verified queries.</p>
-<p>Until you re-index, <code>nl2sql doctor</code> and the index status (<code>NL2SQL.index_health()</code>,
+<p>Until you re-index, <code>nl2sql doctor</code> and the index status (<code>engine.index.health()</code>,
 <code>GET /api/v1/index/status</code>) warn:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
 </code></pre></div>

@@ -3675,34 +3675,6 @@
   
   
     <li class="md-nav__item">
-      <a href="core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="core/datasource/" class="md-nav__link">
         
   
@@ -3787,14 +3759,14 @@
   
   
     <li class="md-nav__item">
-      <a href="core/query/" class="md-nav__link">
+      <a href="core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3815,14 +3787,14 @@
   
   
     <li class="md-nav__item">
-      <a href="core/settings/" class="md-nav__link">
+      <a href="core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4601,16 +4573,18 @@ API for remote clients. Use the links below for the full technical references.</
 <h2 id="core-api-python">Core API (Python)</h2>
 <ul>
 <li><strong>Location</strong>: Core package (<code>nl2sql</code>)</li>
-<li><strong>Interface</strong>: Direct Python class interface (<code>NL2SQL</code> class and low-level functions)</li>
+<li><strong>Interface</strong>: the <code>NL2SQL</code> class: <code>run_query</code> and <code>stream_query</code> at the top
+  level, everything else in a namespace (<code>engine.datasources</code>, <code>engine.index</code>,
+  <code>engine.llm</code>, <code>engine.policies</code>, <code>engine.curated</code>, <code>engine.results</code>,
+  <code>engine.traces</code>, <code>engine.benchmark</code>)</li>
 <li><strong>Use Case</strong>: Embedded/SDK use in Python applications</li>
-<li><strong>Reference</strong>: Core API index and per-module references:</li>
+<li><strong>Reference</strong>: Core API index and per-namespace references:</li>
 <li><a href="core/public-facade/">Core API index</a></li>
-<li><a href="core/auth/">Auth API</a></li>
-<li><a href="core/datasource/">Datasource API</a></li>
-<li><a href="core/llm/">LLM API</a></li>
-<li><a href="core/indexing/">Indexing API</a></li>
-<li><a href="core/query/">Query API</a></li>
-<li><a href="core/settings/">Settings API</a></li>
+<li><a href="core/query/">Query API</a> (<code>run_query</code>, <code>stream_query</code>, <code>engine.results</code>)</li>
+<li><a href="core/datasource/">Datasource API</a> (<code>engine.datasources</code>)</li>
+<li><a href="core/indexing/">Indexing API</a> (<code>engine.index</code>)</li>
+<li><a href="core/llm/">LLM API</a> (<code>engine.llm</code>)</li>
+<li><a href="core/policies/">Policies API</a> (<code>engine.policies</code>)</li>
 </ul>
 <h2 id="rest-api-fastapi">REST API (FastAPI)</h2>
 <ul>
@@ -4633,9 +4607,10 @@ API for remote clients. Use the links below for the full technical references.</
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>
-<li>Context: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
-<li>Runtime: <code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
-<li>Public API: <code>packages/nl2sql/src/nl2sql/public_api.py</code></li>
+<li>Runtime: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
+<li>Running the graph: <code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
+<li>Public API: <code>packages/nl2sql/src/nl2sql/public_api.py</code>, with the namespaces in
+  <code>packages/nl2sql/src/nl2sql/api/</code></li>
 <li>API Package: <code>packages/api/src/nl2sql_api/</code></li>
 </ul>
 

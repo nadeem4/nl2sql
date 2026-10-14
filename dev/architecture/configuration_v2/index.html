@@ -2083,18 +2083,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/auth/">
-<span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/core/datasource/">
 <span class="md-ellipsis">
     
@@ -2131,11 +2119,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/query/">
+<a class="md-nav__link" href="../../api/core/policies/">
 <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -2143,11 +2131,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/settings/">
+<a class="md-nav__link" href="../../api/core/query/">
 <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4195,7 +4183,7 @@ these details:</p>
   <code>nl2sql_store</code>, a constant), the schema store <code>&lt;storage.path&gt;/state.db</code>,
   traces <code>&lt;storage.path&gt;/traces/</code> and results <code>&lt;storage.path&gt;/results/</code>.
   The S3 and ADLS result backends and their settings are deleted.</li>
-<li><strong>Datasources.</strong> <code>engine.add_datasource(Datasource)</code> builds the adapter
+<li><strong>Datasources.</strong> <code>engine.add_datasource(Datasource)</code> (since 10a <code>engine.datasources.add</code>) builds the adapter
   (not connected) and swaps in a new <code>engine.config</code> under the engine's
   lock. Indexing reads a datasource's description and sample questions
   from its <code>Datasource</code>, so one added in code keeps both (bug B9).</li>
@@ -4335,9 +4323,8 @@ name. Building it settled these details:</p>
 <ul>
 <li><strong>The entry point.</strong> <code>replace</code> takes <code>via</code> alongside <code>by</code>, so the entry
   point (<code>python</code>, <code>api</code>, <code>playground</code>) is known when there is no user.
-  <code>PUT /api/v1/settings/llm</code> arrives in PR 10; until then <code>POST /llm</code>
-  keeps registering one agent through <code>configure_llm</code>, which builds a new
-  set and swaps it, but leaves <code>engine.config.llm</code> as it was.</li>
+  <code>PUT /api/v1/settings/llm</code> (PR 10a) replaced <code>POST /llm</code> and
+  <code>configure_llm</code>.</li>
 <li><strong>Keys.</strong> <code>replace</code> fails with <code>ConfigError</code> when an agent's API key
   does not resolve (<code>llm.api_key</code>, <code>llm.agents.&lt;agent&gt;.api_key</code>). At
   construction a key that does not resolve is still <code>check()</code>'s to
@@ -4777,6 +4764,58 @@ existing <code>_run</code> subprocess helper:</p>
 reports for <code>nl2sql</code>. That figure measures imports only, so it is far less
 noisy than wall-clock time. The rule is added to <code>invariants.md</code>.</p>
 <h2 id="7-the-facade">7. The facade</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: the namespaces (PR 10a)</p>
+<p><code>engine.datasources</code>, <code>engine.index</code>, <code>engine.llm</code> (<code>list</code>, <code>get</code>,
+<code>replace</code>), <code>engine.policies</code>, <code>engine.curated</code>, <code>engine.results</code> and
+<code>engine.traces</code> (<code>replay</code>) are built, as internal classes in
+<code>nl2sql/api/</code> that the facade builds on first use. <code>run_query</code> and
+<code>stream_query</code> take <code>question</code> and keyword-only options. The flat
+methods, <code>engine.query</code>, <code>context</code>, <code>get_adapter</code>, <code>SettingsAPI</code>, the
+sub-API exports, <code>configure_llm</code>, <code>configure_llm_from_config</code> and
+<code>reload_llm_config</code> are deleted, and
+<code>test_nl2sql_exports_exactly_the_public_surface</code> fixes the exports.
+<code>POST /llm</code> is the admin-only <code>PUT /api/v1/settings/llm</code>. Building it
+settled these details:</p>
+<ul>
+<li><strong>The split.</strong> PR 10 was split to stay reviewable. 10a is the
+  namespaces, the REST API and the CLI on them, and the call sites in the
+  playground. 10b moves the playground off the engine's internals:
+  <code>engine.feedback</code>, <code>traces.get</code>, <code>about()</code> and <code>llm.providers()</code>, and the
+  stricter import boundary test for the playground, <code>nl2sql_api</code> and
+  <code>cli/commands/demo.py</code>.</li>
+<li><strong>Public API only, for the CLI too (owner decision).</strong> The CLI, the
+  playground and <code>nl2sql-api</code> use nothing but the facade, never the
+  runtime behind it. <code>nl2sql run</code> shows its live progress from
+  <code>stream_query</code>'s events (the <code>PipelineRunner</code> and the monitor callback
+  are deleted; <code>--show-perf</code> is each step's time from its
+  <code>node_finished</code> event, and the CLI records <code>nl2sql.node.duration</code> from
+  them). <code>index.build</code> gains <code>on_datasource</code>, called with an
+  <code>IndexProgress</code> (<code>datasource_id</code>, <code>state</code>: <code>started</code>, <code>done</code> with
+  <code>counts</code>, or <code>failed</code> with <code>reason</code>) that a console line and a Phase 4
+  index job can both use; <code>nl2sql index</code> prints from it. <code>nl2sql trace
+  replay</code> runs on <code>engine.traces.replay</code>, which 10a builds because the
+  replay needs the runtime. <code>test_the_cli_the_playground_and_the_api_use_only_the_public_api</code>
+  holds all three to it. The CLI's <code>llm_interaction</code> audit event went
+  with the monitor callback; <code>llm.changed</code> is the audit log's one event.</li>
+<li><strong><code>llm.replace</code> takes the section as written.</strong> Besides an <code>LLM</code>, it
+  takes a mapping, checked by the loader's rules (<code>parse_section</code> in
+  <code>config/loader.py</code>): strict keys with "did you mean", references kept
+  in secret fields. A reference anywhere else is an error rather than
+  read, so a request body never reads the server's environment.
+  <code>PUT /api/v1/settings/llm</code> passes its body straight through and answers
+  a <code>ConfigError</code> with 422 and its text.</li>
+<li><strong><code>llm.list()</code></strong> names agents as the <code>llm</code> section does (<code>default</code>,
+  <code>ast_planner</code>, ...), each with <code>provider</code>, <code>model</code>, <code>temperature</code> and
+  <code>inherited</code>.</li>
+<li><strong><code>datasources</code>.</strong> <code>DatasourceInfo.status</code> is <code>ready</code> (connected by
+  <code>check()</code> or <code>test()</code>), <code>failed</code> (with <code>reason</code>) or <code>unchecked</code>, since
+  building never connects. <code>remove(id)</code> takes the datasource out of
+  routing and <code>engine.config</code> and closes its pool; its index entries stay
+  until the next full build. The REST datasource routes now return
+  <code>DatasourceInfo</code> and <code>DELETE</code> removes.</li>
+</ul>
+</div>
 <h3 id="the-new-shape">The new shape</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-23-1" id="__codelineno-23-1" name="__codelineno-23-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <a href="#__codelineno-23-2" id="__codelineno-23-2" name="__codelineno-23-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
@@ -5003,7 +5042,7 @@ expose them.</p>
 </tr>
 </tbody>
 </table>
-<p>The boundary test <code>test_the_playground_never_touches_the_engine_context</code>
+<p>The boundary test <code>test_the_playground_never_touches_the_engine_context</code> (since 10a <code>test_the_cli_the_playground_and_the_api_use_only_the_public_api</code>)
 becomes stricter: the playground and <code>nl2sql_api</code> may not import
 <code>nl2sql.common.settings</code> (which is deleted anyway), <code>nl2sql.context</code>,
 <code>nl2sql.configs</code>, <code>nl2sql.feedback</code>, <code>nl2sql.pipeline</code> or <code>nl2sql.tracing</code>.</p>
@@ -5612,7 +5651,7 @@ means the PR must be merged first. At most four PRs are open at once.</p>
 </tr>
 <tr>
 <td>10</td>
-<td><strong>Facade namespaces.</strong> The new shape in section 7; the duplicate methods, sub-API exports, <code>context</code>, <code>get_adapter</code> and <code>SettingsAPI</code> deleted; <code>POST /llm</code> becomes the admin-only <code>PUT /api/v1/settings/llm</code>; the playground's model switch calls <code>llm.replace</code>; the API, CLI and playground move onto the namespaces; the stricter boundary test.</td>
+<td><strong>Facade namespaces</strong> (built as 10a and 10b: see the note in section 7). The new shape in section 7; the duplicate methods, sub-API exports, <code>context</code>, <code>get_adapter</code> and <code>SettingsAPI</code> deleted; <code>POST /llm</code> becomes the admin-only <code>PUT /api/v1/settings/llm</code>; the playground's model switch calls <code>llm.replace</code>; the API, CLI and playground move onto the namespaces; the stricter boundary test.</td>
 <td>7b, 9</td>
 <td>One test per namespace method in the table; <code>test_nl2sql_exports_exactly_the_public_surface</code> (a fixed list, so semver has a test); <code>test_put_settings_llm_requires_admin</code>; <code>test_put_settings_llm_returns_422_with_the_config_error</code>; the boundary test for the playground and API imports.</td>
 <td><code>api/core/*</code>, <code>api/rest/*</code> (<code>llm.md</code> rewritten for <code>PUT /settings/llm</code>), <code>api/index.md</code></td>
@@ -5684,9 +5723,11 @@ constructors. Its test diff is mostly fixtures switching to the <code>make_confi
 helper from PR 2, which is why that helper ships early. <code>_legacy_config</code> lives
 for exactly one PR (7a to 7b) so that each PR stays green. It is never
 released.</p>
-<p>Until PR 10 lands, <code>POST /llm</code> keeps calling the old <code>configure_llm</code>, which
-7a points at the runtime's LLM set. PR 10 deletes both and adds
-<code>PUT /api/v1/settings/llm</code> on top of <code>llm.replace</code> from PR 9.</p>
+<p>PR 10 deleted <code>POST /llm</code> and <code>configure_llm</code>, and added
+<code>PUT /api/v1/settings/llm</code> on top of <code>llm.replace</code> from PR 9. It was split in
+two to stay reviewable: 10a (the namespaces, the REST API and the CLI on
+them) and 10b (the playground off the engine's internals); see the note in
+<a href="#7-the-facade">section 7</a>.</p>
 <h2 id="12-open-questions">12. Open questions</h2>
 <p>None are open. The owner answered the six questions this design raised, and
 each answer is now written into its section (see

@@ -16,7 +16,7 @@
         <link rel="prev" href="../llm/">
       
       
-        <link rel="next" href="../query/">
+        <link rel="next" href="../policies/">
       
       
         
@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../datasource/" class="md-nav__link">
         
   
@@ -3773,10 +3745,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#indexingapiindex_datasource" class="md-nav__link">
+  <a href="#indexbuild" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IndexingAPI.index_datasource
+        index.build
       
     </span>
   </a>
@@ -3784,10 +3756,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#indexingapiindex_all_datasources" class="md-nav__link">
+  <a href="#indexhealth" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IndexingAPI.index_all_datasources
+        index.health
       
     </span>
   </a>
@@ -3795,10 +3767,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#indexingapiclear_index" class="md-nav__link">
+  <a href="#indexclear" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IndexingAPI.clear_index
+        index.clear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexinspect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.inspect
       
     </span>
   </a>
@@ -3837,14 +3820,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../query/" class="md-nav__link">
+      <a href="../policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3865,14 +3848,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../settings/" class="md-nav__link">
+      <a href="../query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4630,10 +4613,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#indexingapiindex_datasource" class="md-nav__link">
+  <a href="#indexbuild" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IndexingAPI.index_datasource
+        index.build
       
     </span>
   </a>
@@ -4641,10 +4624,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#indexingapiindex_all_datasources" class="md-nav__link">
+  <a href="#indexhealth" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IndexingAPI.index_all_datasources
+        index.health
       
     </span>
   </a>
@@ -4652,10 +4635,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#indexingapiclear_index" class="md-nav__link">
+  <a href="#indexclear" class="md-nav__link">
     <span class="md-ellipsis">
       
-        IndexingAPI.clear_index
+        index.clear
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexinspect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.inspect
       
     </span>
   </a>
@@ -4697,64 +4691,137 @@
 
 <h1 id="indexing-api">Indexing API</h1>
 <h2 id="purpose">Purpose</h2>
-<p>Index datasource schemas into the vector store for retrieval and grounding.</p>
+<p><code>engine.index</code>: build the vector index that retrieval and grounding read,
+report its health, clear it, and inspect one search of it.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Run schema indexing for one or all datasources.</li>
-<li>Clear the vector store.</li>
+<li>Build the index for some or every datasource, beside the live entries.</li>
+<li>Report each datasource's progress as it goes, for a console or a job.</li>
+<li>Report the index's health, clear it, and run one inspected search.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
-<li><code>packages/nl2sql/src/nl2sql/api/indexing_api.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/api/indexing_api.py</code> (<code>IndexAPI</code>, internal)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/types.py</code> (<code>IndexProgress</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/indexing/rebuild.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/indexing/orchestrator.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/indexing/vector_store.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/indexing/chunk_builder.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/indexing/enrichment_service.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/schema/store.py</code></li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
-<h3 id="indexingapiindex_datasource">IndexingAPI.index_datasource</h3>
-<p>Source:
-<code>packages/nl2sql/src/nl2sql/api/indexing_api.py</code></p>
+<h3 id="indexbuild">index.build</h3>
 <p>Signature:
-<code>index_datasource(datasource_id: str, enrich: bool = False) -&gt; Dict[str, int]</code></p>
-<p>Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>datasource_id</code> | <code>str</code> | yes | Datasource ID to index. |
-| <code>enrich</code> | <code>bool</code> | no | Ask the <code>indexing_enrichment</code> LLM for table and column descriptions. Off by default: it spends tokens. |</p>
-<p>Returns:
-Indexing statistics by chunk type (includes <code>datasource_id</code> and <code>schema_version</code>).</p>
+<code>build(datasource_ids=None, *, full=False, curated_only=False, enrich=False, on_progress=None, on_datasource=None, switch_guard=None) -&gt; RebuildResult</code></p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>datasource_ids</code></td>
+<td>Only these datasources; every configured one when <code>None</code>. Ignored with <code>full</code>.</td>
+</tr>
+<tr>
+<td><code>full</code></td>
+<td>Rebuild every datasource into a new collection and swap it in when all succeed. Needed after changing the embedding model.</td>
+</tr>
+<tr>
+<td><code>curated_only</code></td>
+<td>Re-index only the verified queries, keeping each datasource's schema entries: no schema read, no model call. Not with <code>full</code>.</td>
+</tr>
+<tr>
+<td><code>enrich</code></td>
+<td>Ask the <code>indexing_enrichment</code> LLM for table and column descriptions. Off by default: it spends tokens.</td>
+</tr>
+<tr>
+<td><code>on_progress</code></td>
+<td>Called with a sentence before each step.</td>
+</tr>
+<tr>
+<td><code>on_datasource</code></td>
+<td>Called with an <code>IndexProgress</code> as each datasource starts, is done or fails.</td>
+</tr>
+<tr>
+<td><code>switch_guard</code></td>
+<td>A context manager factory held around each switch (the playground holds questions in flight back with it).</td>
+</tr>
+</tbody>
+</table>
+<p>Returns a <code>RebuildResult</code>: <code>ok</code> (every requested datasource's new entries are
+live), <code>stats</code> (one dict per indexed datasource: <code>datasource_id</code>,
+<code>schema_version</code> and the entry counts), <code>empty</code> and <code>errors</code> (<code>datasource_id</code>,
+<code>error</code>).</p>
+<p><code>IndexProgress</code> is a frozen dataclass, exported from <code>nl2sql</code>, that serves a
+console line and a job's status record alike:</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>datasource_id</code></td>
+<td>The datasource.</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>started</code>, then <code>done</code> or <code>failed</code>. A datasource that is unavailable or not configured is <code>failed</code> without <code>started</code>.</td>
+</tr>
+<tr>
+<td><code>counts</code></td>
+<td>With <code>done</code>: the entries written, by kind.</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>With <code>failed</code>: why.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">IndexProgress</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">show</span><span class="p">(</span><span class="n">progress</span><span class="p">:</span> <span class="n">IndexProgress</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">progress</span><span class="o">.</span><span class="n">datasource_id</span><span class="p">,</span> <span class="n">progress</span><span class="o">.</span><span class="n">state</span><span class="p">,</span> <span class="n">progress</span><span class="o">.</span><span class="n">counts</span> <span class="ow">or</span> <span class="n">progress</span><span class="o">.</span><span class="n">reason</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"shop"</span><span class="p">],</span> <span class="n">on_datasource</span><span class="o">=</span><span class="n">show</span><span class="p">)</span>
+</code></pre></div>
 <p>Raises:
-- Adapter-specific errors for schema retrieval.
-- Vector store errors during indexing. Enrichment errors are <strong>not</strong> raised:
-  enrichment is best-effort and degrades to the unenriched snapshot.</p>
-<p>Side Effects:
-- Reads datasource schema.
-- Writes schema versions to schema store.
-- Writes embeddings to vector store.</p>
-<p>Idempotency:
-- Re-indexing replaces this datasource's entries: the new entries are written
-  under a new build id, switched in when all are written, and the previous ones
-  deleted. A failure leaves the previous entries active. Other datasources'
-  entries are never touched. Raises <code>EmbeddingModelMismatchError</code> when the
-  collection records a different embedding model (rebuild with
-  <code>nl2sql index --full</code>).</p>
-<h3 id="indexingapiindex_all_datasources">IndexingAPI.index_all_datasources</h3>
+- <code>ValueError</code> with both <code>full</code> and <code>curated_only</code>.
+- <code>EmbeddingModelMismatchError</code> without <code>full</code>, when the collection records a
+  different embedding model (rebuild with <code>full=True</code>, <code>nl2sql index --full</code>).</p>
+<p>A failure of one datasource never raises: it is in <code>errors</code>, and that
+datasource keeps its previous entries. Enrichment errors are never raised:
+enrichment is best-effort and degrades to the unenriched snapshot.</p>
+<p>Each datasource's new entries are written under a new build id, switched in
+when all are written, and the previous ones deleted. Other datasources'
+entries are never touched.</p>
+<h3 id="indexhealth">index.health</h3>
 <p>Signature:
-<code>index_all_datasources(enrich: bool = False) -&gt; Dict[str, Dict[str, int]]</code></p>
-<p><code>enrich</code> is passed to <code>index_datasource</code> for every datasource; off by default.</p>
-<p>Returns:
-Map of datasource ID → stats; on error, value is <code>{"error": "&lt;message&gt;"}</code>.</p>
-<p>Side Effects:
-Indexes all registered datasources; failures are captured per datasource.</p>
-<h3 id="indexingapiclear_index">IndexingAPI.clear_index</h3>
+<code>health() -&gt; dict</code></p>
+<p><code>status</code> (<code>ok</code>, <code>empty</code>, <code>stale</code>, <code>missing</code>), <code>total</code>, <code>counts</code> by entry
+type, <code>built_at</code>, <code>embedding_model</code>, one entry per registered datasource
+(<code>entries</code>, <code>index_version</code>, <code>snapshot_version</code>, <code>built_at</code>), <code>problems</code> and
+<code>warnings</code>. <code>missing</code> when no vector store is configured. A datasource that
+failed to start is a warning: "Datasource 'x' is unavailable: <reason>".
+<code>check()</code> reports its <code>status</code>.</p>
+<h3 id="indexclear">index.clear</h3>
 <p>Signature:
-<code>clear_index() -&gt; None</code></p>
-<p>Side Effects:
-Deletes and reinitializes the vector store collection, for every datasource.
-Every question fails at the resolver until the index is rebuilt; to refresh an
-index, re-index instead, which never leaves it empty.</p>
+<code>clear() -&gt; None</code></p>
+<p>Deletes and reinitializes the vector store collection, for every datasource.
+Every question fails at the resolver until the index is built again; to
+refresh an index, build it instead, which never leaves it empty.</p>
+<h3 id="indexinspect">index.inspect</h3>
+<p>Signature:
+<code>inspect(query, k=8, lambda_mult=None, types=None, datasource_id=None) -&gt; dict</code></p>
+<p>One MMR search of the live index, as the engine runs it: the candidate pool
+with scores, the picks in order and what was dropped. <code>types</code> limits the
+entry types (<code>schema.table</code>, ...). It reads index metadata only and needs no
+LLM. Raises <code>LookupError</code> when no vector store is configured.</p>
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
 <li>Fetch schema via adapter.</li>

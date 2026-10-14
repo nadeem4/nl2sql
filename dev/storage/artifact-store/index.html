@@ -1682,18 +1682,6 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/auth/">
-<span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/core/datasource/">
 <span class="md-ellipsis">
     
@@ -1730,11 +1718,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/query/">
+<a class="md-nav__link" href="../../api/core/policies/">
 <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -1742,11 +1730,11 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="../../api/core/settings/">
+<a class="md-nav__link" href="../../api/core/query/">
 <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -2202,7 +2190,7 @@
 </code></pre></div>
 <p>A template without <code>&lt;sub_query_id&gt;</code> or <code>&lt;dag_node_id&gt;</code> gets <code>-manifest</code> added, as any file of the run would (see <em>One artifact per sub-query</em>), so a flat template still gives each run its own manifest.</p>
 <h3 id="reading-a-result-back">Reading a result back</h3>
-<p><code>ResultReader</code> (<code>execution/artifacts/results.py</code>), behind the facade's <code>get_result_manifest</code>, <code>get_result_page</code> and <code>export_result_csv</code> (see <a href="../../api/core/query/#reading-a-runs-saved-results">Query API</a>), reads one tenant's results by request id:</p>
+<p><code>ResultReader</code> (<code>execution/artifacts/results.py</code>), behind <code>engine.results</code> (<code>manifest</code>, <code>page</code> and <code>csv</code>) (see <a href="../../api/core/query/#reading-a-runs-saved-results">Query API</a>), reads one tenant's results by request id:</p>
 <ol>
 <li>The request id and the result id must be plain tokens (letters, digits, <code>_</code>, <code>-</code>; up to 128 characters). Anything else is <code>ResultNotFound</code>, before any path is built.</li>
 <li>The manifest is read from the path rendered for the reader's tenant and that request id (<code>ArtifactStore.read_manifest</code>). No file there is <code>ResultNotFound</code>, so another tenant's run is not found, not refused.</li>

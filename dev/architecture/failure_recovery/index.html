@@ -4072,34 +4072,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/core/datasource/" class="md-nav__link">
         
   
@@ -4184,14 +4156,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/query/" class="md-nav__link">
+      <a href="../../api/core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -4212,14 +4184,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/settings/" class="md-nav__link">
+      <a href="../../api/core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -5495,7 +5467,7 @@
 </ul>
 <h3 id="user-facing-errors">User-facing errors</h3>
 <ul>
-<li>Errors are returned in the final state. <code>PipelineRunner</code> returns <code>success=True</code> on graph completion regardless of errors in state.</li>
+<li>Errors are returned in the final state, and <code>QueryResult.errors</code> carries them; a run that finished with an ERROR or CRITICAL error has <code>status: "error"</code>. <code>nl2sql run</code> exits 1 on it.</li>
 </ul>
 <hr />
 <h2 id="retry-architecture">Retry Architecture</h2>
@@ -5560,7 +5532,7 @@
 <li><code>VECTOR_BREAKER</code> is the only circuit breaker; LLM calls and SQL execution have no breaker and no fast-fail path.</li>
 <li>There is no process isolation around SQL execution, so a driver crash is unrecoverable at the engine level.</li>
 <li>Subgraph wrapper assumes executor output is present; earlier failures can cause wrapper-level errors.</li>
-<li>Pipeline completion does not imply success; <code>PipelineRunner</code> does not inspect <code>errors</code> and always returns <code>success=True</code> if the graph returns.</li>
+<li>Pipeline completion does not imply success: read <code>QueryResult.status</code> and <code>errors</code>, not whether the run returned.</li>
 <li>No graph-level retries or replay; only subgraph local retries.</li>
 </ul>
 <hr />

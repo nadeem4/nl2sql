@@ -13,10 +13,10 @@
       
       
       
-        <link rel="prev" href="../indexing/">
+        <link rel="prev" href="../policies/">
       
       
-        <link rel="next" href="../settings/">
+        <link rel="next" href="../../rest/">
       
       
         
@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../datasource/" class="md-nav__link">
         
   
@@ -3676,6 +3648,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policies
   
 
     
@@ -3801,10 +3801,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#queryapirun_query" class="md-nav__link">
+  <a href="#nl2sqlrun_query" class="md-nav__link">
     <span class="md-ellipsis">
       
-        QueryAPI.run_query
+        NL2SQL.run_query
       
     </span>
   </a>
@@ -3857,10 +3857,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#queryapistream_query" class="md-nav__link">
+  <a href="#nl2sqlstream_query" class="md-nav__link">
     <span class="md-ellipsis">
       
-        QueryAPI.stream_query
+        NL2SQL.stream_query
       
     </span>
   </a>
@@ -3937,34 +3937,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../settings/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Settings
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -4714,10 +4686,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#queryapirun_query" class="md-nav__link">
+  <a href="#nl2sqlrun_query" class="md-nav__link">
     <span class="md-ellipsis">
       
-        QueryAPI.run_query
+        NL2SQL.run_query
       
     </span>
   </a>
@@ -4770,10 +4742,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#queryapistream_query" class="md-nav__link">
+  <a href="#nl2sqlstream_query" class="md-nav__link">
     <span class="md-ellipsis">
       
-        QueryAPI.stream_query
+        NL2SQL.stream_query
       
     </span>
   </a>
@@ -4865,35 +4837,39 @@
 
 <h1 id="query-api">Query API</h1>
 <h2 id="purpose">Purpose</h2>
-<p>Execute a natural language query using the NL2SQL pipeline.</p>
+<p>Answer a question with the NL2SQL pipeline: <code>engine.run_query</code>,
+<code>engine.stream_query</code>, and <code>engine.results</code> to read back what a run saved.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Invoke pipeline graph runtime.</li>
-<li>Return a structured <code>QueryResult</code>.</li>
+<li>Return a structured <code>QueryResult</code>, or the run as events.</li>
+<li>Read a run's saved results by its <code>trace_id</code>.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
-<li><code>packages/nl2sql/src/nl2sql/api/query_api.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/public_api.py</code> (<code>NL2SQL.run_query</code>, <code>NL2SQL.stream_query</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/query_api.py</code> (<code>QueryResult</code>, <code>result_from_state</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/results_api.py</code> (<code>ResultsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/state.py</code></li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
-<h3 id="queryapirun_query">QueryAPI.run_query</h3>
+<h3 id="nl2sqlrun_query">NL2SQL.run_query</h3>
 <p>Source:
-<code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
+<code>packages/nl2sql/src/nl2sql/public_api.py</code>, <code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
 <p>Signature:
-<code>run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; QueryResult</code></p>
-<p><code>run_query</code> passes the context's artifact store to <code>result_from_state</code>, so each
+<code>run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; QueryResult</code></p>
+<p>Every argument after the question is keyword-only. <code>run_query</code> passes the runtime's artifact store to <code>result_from_state</code>, so each
 sub-query carries a capped row sample alongside its artifact reference.</p>
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>natural_language</code> | <code>str</code> | yes | User query. |
+| <code>question</code> | <code>str</code> | yes | The question, in plain language. |
 | <code>datasource_id</code> | <code>Optional[str]</code> | no | Datasource override; otherwise resolved. |
 | <code>execute</code> | <code>bool</code> | no | Whether to execute SQL against datasource. |
 | <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Omitted (or <code>None</code>), the run starts with an empty <code>UserContext</code>, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
-| <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. <code>NL2SQL.run_query</code> takes it too. The playground cancels it when the browser drops the request. |</p>
+| <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. The playground cancels it when the browser drops the request. |</p>
 <p>Returns:
 <code>QueryResult</code>, built from the pipeline graph state by <code>result_from_state</code>.</p>
 <p>Raises:
@@ -4947,14 +4923,14 @@ result set lives in artifact storage, addressed through <code>artifact_refs</cod
 combined result is listed in <code>result_manifest</code> and read back by the run's
 <code>trace_id</code> with the methods below.</p>
 <h2 id="streaming-a-run">Streaming a run</h2>
-<h3 id="queryapistream_query">QueryAPI.stream_query</h3>
+<h3 id="nl2sqlstream_query">NL2SQL.stream_query</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/query_api.py</code>, events in
 <code>packages/nl2sql/src/nl2sql/pipeline/events.py</code></p>
 <p>Signature:
-<code>stream_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; Iterator[QueryEvent]</code></p>
+<code>stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; Iterator[QueryEvent]</code></p>
 <p>The same run as <code>run_query</code>, with the same parameters, yielded as it happens.
-<code>NL2SQL.stream_query</code> takes the same arguments.</p>
+<code>nl2sql run</code> shows its live progress from these events.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
@@ -4992,7 +4968,7 @@ event as one Server-Sent Event (<code>event: &lt;type&gt;</code> and <code>data:
 <tr>
 <td><code>result_manifest</code></td>
 <td><code>trace_id</code>, <code>results</code></td>
-<td>The aggregator saved the results: <code>results</code> is the run's <code>result_manifest</code> and <code>trace_id</code> its <code>request_id</code>, so <code>get_result_page</code> can be called before the answer is written.</td>
+<td>The aggregator saved the results: <code>results</code> is the run's <code>result_manifest</code> and <code>trace_id</code> its <code>request_id</code>, so <code>engine.results.page</code> can be called before the answer is written.</td>
 </tr>
 <tr>
 <td><code>answer_delta</code></td>
@@ -5043,8 +5019,8 @@ the keyless tests stream too.</p>
 <p>The aggregator saves each terminal result of a run as
 <code>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet</code> and writes <code>manifest.json</code>
 beside them (see <a href="../../../storage/artifact-store/#the-result-manifest">Artifact Store → The result manifest</a>).
-These <code>QueryAPI</code> methods, also on <code>NL2SQL</code> with the same signatures, read them
-back by the run's <code>trace_id</code> (the <code>request_id</code>). They read lazily from the
+<code>engine.results</code> reads them back by the run's <code>trace_id</code> (its <code>run_id</code>, the
+<code>request_id</code> of the REST routes). They read lazily from the
 parquet file: a page reads only its slice, and the CSV export reads and yields a
 slice at a time (<code>CSV_CHUNK_ROWS</code>, 10,000 rows), so neither holds the whole
 result in memory.</p>
@@ -5058,17 +5034,17 @@ result in memory.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>get_result_manifest(request_id, tenant_id=None)</code></td>
+<td><code>results.manifest(run_id, tenant_id=None)</code></td>
 <td><code>ResultManifest</code></td>
 <td><code>request_id</code> and <code>results: List[ResultSummary]</code>, the same entries as <code>QueryResult.result_manifest</code>.</td>
 </tr>
 <tr>
-<td><code>get_result_page(request_id, result_id, offset=0, limit=100, tenant_id=None)</code></td>
+<td><code>results.page(run_id, result_id, offset=0, limit=100, tenant_id=None)</code></td>
 <td><code>ResultPage</code></td>
 <td>Rows <code>offset</code> to <code>offset + limit</code> of the result whose <code>node_id</code> is <code>result_id</code>. <code>limit</code> above <code>MAX_RESULT_PAGE_SIZE</code> (1,000) is cut to it, and the page's <code>limit</code> says so. A page past the end has no rows. <code>next_offset</code> is where the next page starts, <code>None</code> at the end. A negative <code>offset</code> or a <code>limit</code> below 1 raises <code>ValueError</code>.</td>
 </tr>
 <tr>
-<td><code>export_result_csv(request_id, result_id, tenant_id=None)</code></td>
+<td><code>results.csv(run_id, result_id, tenant_id=None)</code></td>
 <td><code>Iterator[bytes]</code></td>
 <td>The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent.</td>
 </tr>
@@ -5079,7 +5055,7 @@ result in memory.</p>
 <p>Scope: results are read from one tenant's folder, <code>tenant_id</code> or else the
 engine's own <code>TENANT_ID</code>, the tenant every run of this engine writes under. Each
 of these raises <code>ResultNotFound</code> (a <code>LookupError</code>, exported from <code>nl2sql</code>): an
-unknown <code>request_id</code>, a run in another tenant's folder, a <code>result_id</code> the run's
+unknown <code>run_id</code>, a run in another tenant's folder, a <code>result_id</code> the run's
 manifest does not list, and an id that is not a plain token (letters, digits,
 <code>_</code>, <code>-</code>; at most 128 characters). Ids are checked before any path is built, and
 the parquet path is rendered from the artifact template, never read from the
@@ -5087,9 +5063,9 @@ manifest, so no id reaches a file outside the run's folder. Nothing else guards
 a result yet: any caller who knows a <code>trace_id</code> can read it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">get_result_page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">export_result_csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </code></pre></div>
 <p><code>nl2sql-api</code> serves these as

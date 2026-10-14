@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../core/settings/">
+        <link rel="prev" href="../core/query/">
       
       
         <link rel="next" href="health/">
@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../core/datasource/" class="md-nav__link">
         
   
@@ -3696,14 +3668,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/query/" class="md-nav__link">
+      <a href="../core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3724,14 +3696,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/settings/" class="md-nav__link">
+      <a href="../core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4819,7 +4791,7 @@ server on a config:</p>
 <tr>
 <td><a href="llm/">LLM</a></td>
 <td><code>routes/llm.py</code></td>
-<td>Configure and inspect LLMs.</td>
+<td>Replace the LLM (<code>PUT /settings/llm</code>) and inspect each agent's model.</td>
 </tr>
 <tr>
 <td><a href="indexing/">Indexing</a></td>
@@ -4830,7 +4802,8 @@ server on a config:</p>
 </table>
 <h2 id="error-handling">Error Handling</h2>
 <p>FastAPI routers wrap most failures in <code>HTTPException(status_code=500, detail=str(e))</code>.
-Datasource and delete endpoints map <code>ValueError</code> to <code>HTTP 404</code>.</p>
+Datasource and delete endpoints, and <code>GET /api/v1/llm/{agent}</code>, map <code>ValueError</code> to <code>HTTP 404</code>.
+<code>PUT /api/v1/settings/llm</code> answers a config error as <code>HTTP 422</code> with its text.</p>
 <p><code>POST /api/v1/query</code> is the exception: pipeline errors are returned as a normal
 <code>HTTP 200</code> inside <code>QueryResponse.errors</code>, and an unexpected failure returns a
 generic <code>HTTP 500</code> with the traceback logged server-side rather than returned.
@@ -4906,7 +4879,7 @@ or put the provider in the proxy.</p>
 <code>require_admin</code> dependency in <code>nl2sql_api/auth.py</code>:</p>
 <ul>
 <li><code>POST /api/v1/datasource</code> and <code>DELETE /api/v1/datasource/{datasource_id}</code></li>
-<li><code>POST /api/v1/llm</code></li>
+<li><code>PUT /api/v1/settings/llm</code></li>
 <li><code>POST /api/v1/index/{datasource_id}</code>, <code>POST /api/v1/index-all</code> and <code>DELETE /api/v1/index</code></li>
 </ul>
 <table>

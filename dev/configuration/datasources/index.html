@@ -3683,34 +3683,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/core/datasource/" class="md-nav__link">
         
   
@@ -3795,14 +3767,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/query/" class="md-nav__link">
+      <a href="../../api/core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3823,14 +3795,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/settings/" class="md-nav__link">
+      <a href="../../api/core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4735,7 +4707,7 @@ question:</p>
 <p>RBAC is unchanged: a preferred table the role may not read loses its data like
 any other table, and the validator refuses a plan that reads it.</p>
 <p>A name that is not in the indexed schema is a warning, not an error: <code>nl2sql
-doctor</code> and the index status (<code>NL2SQL.index_health</code>, <code>GET /api/v1/index/status</code>)
+doctor</code> and the index status (<code>engine.index.health()</code>, <code>GET /api/v1/index/status</code>)
 print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
 usual cause is a view created after the last index; re-index the datasource.</p>
 <h2 id="when-a-datasource-fails-to-start">When a datasource fails to start</h2>
@@ -4750,18 +4722,18 @@ broken one is marked unavailable:</p>
 <ul>
 <li>the log has an error: <code>Datasource 'sales' is unavailable: &lt;reason&gt;</code>;</li>
 <li><code>check()</code> reports it <code>failed</code> at stage <code>connect</code>, with a fix;</li>
-<li>it is not in <code>list_datasources()</code> (or <code>GET /api/v1/datasource</code>);
-  <code>NL2SQL.list_unavailable_datasources()</code> maps it to the reason;</li>
-<li>the index status (<code>NL2SQL.index_health()</code>, <code>GET /api/v1/index/status</code>) carries
+<li><code>engine.datasources.list()</code> (and <code>GET /api/v1/datasource</code>) shows it with
+  <code>status: "failed"</code> and the <code>reason</code>, and nothing is routed to it;</li>
+<li>the index status (<code>engine.index.health()</code>, <code>GET /api/v1/index/status</code>) carries
   the same sentence as a warning;</li>
 <li>a query with <code>datasource_id</code> set to it, and <code>nl2sql index</code> or
-  <code>rebuild_index(datasource_ids=[...])</code> naming it, fail with that reason.</li>
+  <code>engine.index.build([...])</code> naming it, fail with that reason.</li>
 </ul>
 <p><code>check()</code> raises <code>EngineNotReady</code> when a <code>required: true</code> datasource fails, or
-when datasources are configured and none is ready. A later <code>check()</code> that
-connects routes the datasource again.</p>
+when datasources are configured and none is ready. A later <code>check()</code>, or
+<code>engine.datasources.test(id)</code>, that connects routes the datasource again.</p>
 <p><code>nl2sql doctor</code> prints the same <code>check()</code> report. After <code>check()</code>,
-<code>engine.policy.validate_policies()</code> reports a role that names an unavailable
+<code>engine.policies.validate()</code> reports a role that names an unavailable
 datasource as <code>UNAVAILABLE</code>.</p>
 <p>A secret provider that cannot start is different: it fails startup. See <a href="../secrets/#when-a-provider-fails-to-start">Secrets → When a provider fails to start</a>.</p>
 <h2 id="notes">Notes</h2>
@@ -4769,8 +4741,9 @@ datasource as <code>UNAVAILABLE</code>.</p>
 <li>Use <code>${env:VAR}</code> for environment variables, or <code>${provider:key}</code> for a secret
   from a provider in the <a href="../secrets/"><code>secrets</code> section</a>.</li>
 <li>Adapter-specific fields under <code>connection</code> are passed through to the adapter.</li>
-<li>From Python, <code>engine.add_datasource(Datasource(...))</code> adds one to a running
-  engine (built, not connected); <code>nl2sql-api</code>'s <code>POST /api/v1/datasource</code> takes
+<li>From Python, <code>engine.datasources.add(Datasource(...))</code> adds one to a running
+  engine (built, not connected), and <code>engine.datasources.remove(id)</code> takes one
+  out; <code>nl2sql-api</code>'s <code>POST /api/v1/datasource</code> takes
   the same shape as JSON.</li>
 </ul>
 

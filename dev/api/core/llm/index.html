@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../datasource/" class="md-nav__link">
         
   
@@ -3767,10 +3739,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apireplace" class="md-nav__link">
+  <a href="#llmlist" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.replace
+        llm.list
       
     </span>
   </a>
@@ -3778,10 +3750,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apiconfigure_llm" class="md-nav__link">
+  <a href="#llmget" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.configure_llm
+        llm.get
       
     </span>
   </a>
@@ -3789,10 +3761,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apiconfigure_llm_from_config" class="md-nav__link">
+  <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.configure_llm_from_config
+        llm.replace
       
     </span>
   </a>
@@ -3800,21 +3772,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apiget_llm" class="md-nav__link">
+  <a href="#internals-agentconfig-and-llmfileconfig" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.get_llm
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llm_apilist_llms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLM_API.list_llms
+        Internals: AgentConfig and LLMFileConfig
       
     </span>
   </a>
@@ -3881,14 +3842,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../query/" class="md-nav__link">
+      <a href="../policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3909,14 +3870,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../settings/" class="md-nav__link">
+      <a href="../query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4696,10 +4657,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apireplace" class="md-nav__link">
+  <a href="#llmlist" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.replace
+        llm.list
       
     </span>
   </a>
@@ -4707,10 +4668,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apiconfigure_llm" class="md-nav__link">
+  <a href="#llmget" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.configure_llm
+        llm.get
       
     </span>
   </a>
@@ -4718,10 +4679,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apiconfigure_llm_from_config" class="md-nav__link">
+  <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.configure_llm_from_config
+        llm.replace
       
     </span>
   </a>
@@ -4729,21 +4690,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#llm_apiget_llm" class="md-nav__link">
+  <a href="#internals-agentconfig-and-llmfileconfig" class="md-nav__link">
     <span class="md-ellipsis">
       
-        LLM_API.get_llm
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#llm_apilist_llms" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        LLM_API.list_llms
+        Internals: AgentConfig and LLMFileConfig
       
     </span>
   </a>
@@ -4785,16 +4735,15 @@
 
 <h1 id="llm-api">LLM API</h1>
 <h2 id="purpose">Purpose</h2>
-<p>Configure LLM providers and expose LLM configurations by name.</p>
+<p><code>engine.llm</code>: the model each agent runs on, and replacing them at runtime.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Replace the engine's whole LLM at runtime (<code>replace</code>).</li>
-<li>Register LLM configs programmatically, or replace them all with the <code>llm</code> section of an <code>nl2sql.yaml</code>.</li>
-<li>Provide config lookup and listing.</li>
+<li>List each agent and the provider and model it runs on (<code>list</code>, <code>get</code>).</li>
+<li>Replace the engine's whole <code>llm</code> section at runtime (<code>replace</code>).</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
-<li><code>packages/nl2sql/src/nl2sql/api/llm_api.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/api/llm_api.py</code> (<code>LLMAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/llm/registry.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/llm_set.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/client_cache.py</code></li>
@@ -4827,75 +4776,60 @@ config's <code>llm</code> section (<a href="../../../configuration/llm/">LLM con
 | --- | --- | --- | --- |
 | <code>default</code> | <code>AgentConfig</code> | yes | The top level of the <code>llm</code> section. |
 | <code>agents</code> | <code>Dict[str, AgentConfig]</code> | no | The agents that set their own fields. |</p>
-<h3 id="llm_apireplace">LLM_API.replace</h3>
+<h3 id="llmlist">llm.list</h3>
+<p>Signature:
+<code>list() -&gt; dict</code></p>
+<p>Returns each agent by its name in the <code>llm</code> section, <code>default</code> first: its
+<code>provider</code>, <code>model</code>, <code>temperature</code> and <code>inherited</code> (True when the agent sets
+nothing of its own and runs on <code>default</code>). An agent given a model object shows
+its class as <code>model</code> and no provider. Never a key.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">list</span><span class="p">()[</span><span class="s2">"ast_planner"</span><span class="p">]</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># {'provider': 'openai', 'model': 'gpt-5.5', 'temperature': 0.0, 'inherited': False}</span>
+</code></pre></div>
+<h3 id="llmget">llm.get</h3>
+<p>Signature:
+<code>get(agent: str) -&gt; dict</code></p>
+<p>One agent's entry from <code>list()</code>. Raises <code>ValueError</code> for a name that is not an
+agent, listing the agents.</p>
+<h3 id="llmreplace">llm.replace</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/llm_api.py</code> (<code>Runtime.replace_llm</code> in
 <code>packages/nl2sql/src/nl2sql/runtime.py</code>)</p>
 <p>Signature:
-<code>replace(llm: LLM, *, by: Optional[UserContext] = None, via: str = "python") -&gt; LLMChange</code></p>
+<code>replace(llm: LLM | Mapping, *, by: Optional[UserContext] = None, via: str = "python") -&gt; LLMChange</code></p>
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>llm</code> | <code>LLM</code> | yes | The whole <code>llm</code> section, as in <code>nl2sql.yaml</code>. |
+| <code>llm</code> | <code>LLM</code> or a mapping | yes | The whole <code>llm</code> section: an <code>LLM</code>, or the section as written in <code>nl2sql.yaml</code> (a mapping, such as a request body). A mapping is checked exactly as the file is: strict keys with "did you mean", the model's validators, references kept in secret fields. A <code>${...}</code> reference outside a secret field is an error rather than read, since the data did not come from the operator's file. |
 | <code>by</code> | <code>Optional[UserContext]</code> | no | Who is making the change; its <code>user_id</code> and <code>roles</code> are logged. |
 | <code>via</code> | <code>str</code> | no | The entry point making the change (<code>python</code>, <code>api</code>, <code>playground</code>). |</p>
 <p>Returns:
-<code>LLMChange</code>: <code>by</code> (<code>via</code>, and <code>user_id</code> and <code>roles</code> when <code>by</code> was given) and
-<code>changes</code>, each agent whose effective provider or model changed as
-<code>{"old": "provider/model", "new": "provider/model"}</code>. It holds no key.</p>
+<code>LLMChange</code> (exported from <code>nl2sql</code>): <code>by</code> (<code>via</code>, and <code>user_id</code> and <code>roles</code>
+when <code>by</code> was given) and <code>changes</code>, each agent whose effective provider or
+model changed as <code>{"old": "provider/model", "new": "provider/model"}</code>. It holds
+no key.</p>
 <p>Raises:
-- <code>ConfigError</code> for a provider that is not registered or not installed, or an
-  agent whose API key does not resolve. Nothing changes.</p>
+- <code>ConfigError</code> for a section that does not validate, a provider that is not
+  registered or not installed, or an agent whose API key does not resolve.
+  Nothing changes. <code>nl2sql-api</code> answers it as HTTP 422 with the same text
+  (<a href="../../rest/llm/"><code>PUT /api/v1/settings/llm</code></a>).</p>
 <p>Side Effects:
 - Builds the new clients (no model call), then swaps the engine's <code>LLMSet</code>
   and <code>engine.config.llm</code> together under the engine's lock. Runs already in
   flight finish on the old set.
 - One INFO line on the <code>nl2sql.llm</code> logger and one <code>llm.changed</code> audit record.
   Nothing is written to disk.</p>
+<p>To use the <code>llm</code> section of a file: <code>engine.llm.replace(load_config(path).llm)</code>.</p>
 <p>See <a href="../../../configuration/llm/#replacing-the-llm-at-runtime">LLM configuration → Replacing the LLM at runtime</a>.</p>
-<h3 id="llm_apiconfigure_llm">LLM_API.configure_llm</h3>
-<p>Source:
-<code>packages/nl2sql/src/nl2sql/api/llm_api.py</code></p>
-<p>Signature:
-<code>configure_llm(config: Union[AgentConfig, Dict[str, Any]]) -&gt; None</code></p>
-<p>Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>config</code> | <code>AgentConfig | Dict[str, Any]</code> | yes | LLM config; <code>name</code> defaults to <code>default</code> if omitted. |</p>
-<p>Returns:
-<code>None</code>.</p>
-<p>Raises:
-- <code>ValueError</code> for an unsupported provider or an empty model.</p>
-<p>Side Effects:
-- Sets that agent and keeps the others, as one swap of the engine's <code>LLMSet</code>.
-  The client is built now, through the engine's client cache. <code>engine.config.llm</code>
-  is not updated; <code>replace</code> is the way to change the whole section.</p>
-<p>Idempotency:
-- Re-registering same <code>name</code> overwrites the config; a client still used by
-  another agent or a run in flight is kept.</p>
-<h3 id="llm_apiconfigure_llm_from_config">LLM_API.configure_llm_from_config</h3>
-<p>Signature:
-<code>configure_llm_from_config(config_path: Union[str, pathlib.Path]) -&gt; None</code></p>
-<p>Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>config_path</code> | <code>Union[str, pathlib.Path]</code> | yes | An <code>nl2sql.yaml</code>; its <code>llm</code> section is used. |</p>
-<p>Raises:
-- <code>ConfigError</code> if the file does not load, naming every problem.</p>
-<p>Side Effects:
-- Replaces every agent with the file's <code>llm</code> section, as one step; an agent
-  the section no longer names falls back to the top level. An invalid file
-  changes nothing. <code>NL2SQL.reload_llm_config(path)</code> does the same.</p>
-<h3 id="llm_apiget_llm">LLM_API.get_llm</h3>
-<p>Signature:
-<code>get_llm(name: str) -&gt; dict</code></p>
-<p>Returns:
-LLM configuration (API key excluded). Falls back to <code>default</code> if not found.</p>
-<h3 id="llm_apilist_llms">LLM_API.list_llms</h3>
-<p>Signature:
-<code>list_llms() -&gt; dict</code></p>
-<p>Returns:
-Map of LLM name → config (API key excluded).</p>
+<h3 id="internals-agentconfig-and-llmfileconfig">Internals: <code>AgentConfig</code> and <code>LLMFileConfig</code></h3>
+<p><code>AgentConfig</code> (<code>llm/models.py</code>) is one agent's resolved settings, as
+<code>LLMRegistry</code> builds a client from them; <code>agents_from_config(llm)</code>
+(<code>llm/registry.py</code>) makes one per agent from the <code>llm</code> section. Its fields are
+<code>provider</code>, <code>model</code>, <code>temperature</code> (<code>None</code> sends no temperature parameter),
+<code>api_key</code> (masked in <code>repr</code>, <code>str</code> and JSON dumps; <code>None</code> reads the provider's
+standard variable), <code>base_url</code> and <code>name</code>. <code>LLMFileConfig</code> is a set of agents
+the benchmark compares, one config at a time (<code>LLMFileConfig.from_llm(llm)</code>).
+Neither is part of the public API.</p>
 <h2 id="behavioral-contracts">Behavioral Contracts</h2>
 <ul>
 <li>Providers supported in the core registry are <code>openai</code>, <code>anthropic</code>,
@@ -4959,8 +4893,8 @@ Map of LLM name → config (API key excluded).</p>
   <a href="../../../configuration/llm/#temperature">LLM configuration → Temperature</a>).</li>
 <li>A provider's HTTP 400 rejecting <code>temperature</code> is re-raised as a <code>ValueError</code>
   naming the model and agent and telling you to set <code>temperature: null</code>.</li>
-<li><code>register_llms</code> registers each agent under its key in the mapping, whatever
-  its <code>name</code> field says.</li>
+<li><code>LLMRegistry.register_llms</code> (internal) registers each agent under its key
+  in the mapping, whatever its <code>name</code> field says.</li>
 </ul>
 
 

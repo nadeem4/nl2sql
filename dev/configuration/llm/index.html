@@ -3799,34 +3799,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../api/core/datasource/" class="md-nav__link">
         
   
@@ -3911,14 +3883,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/query/" class="md-nav__link">
+      <a href="../../api/core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3939,14 +3911,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/core/settings/" class="md-nav__link">
+      <a href="../../api/core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -5411,8 +5383,14 @@ runs:</p>
   served. Swapping back hits the old plans again. See
   <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</li>
 </ul>
-<p>The REST API's <code>POST /llm</code> still registers one agent at a time until it is
-replaced by <code>PUT /api/v1/settings/llm</code>, which calls <code>engine.llm.replace</code>.</p>
+<p><code>replace</code> also takes the section as written in <code>nl2sql.yaml</code>, as a mapping,
+checked by the same rules as the file. A <code>${...}</code> reference is kept in a secret
+field (<code>api_key</code>) and is an error anywhere else, so data that did not come
+from your files never reads the environment. <code>nl2sql-api</code> serves it as the
+admin-only <a href="../../api/rest/llm/"><code>PUT /api/v1/settings/llm</code></a>: the body is the
+section as JSON, and a bad one is HTTP 422 with the <code>ConfigError</code> text. The
+playground's model switch calls <code>replace</code> too. <code>engine.llm.list()</code> shows the
+model each agent runs on.</p>
 <h2 id="embeddings-are-a-separate-path">Embeddings are a separate path</h2>
 <p>None of Anthropic, OpenRouter or Ollama covers embeddings — they are not routed through
 <code>LLMRegistry</code> at all. Each engine builds its own embedder from its

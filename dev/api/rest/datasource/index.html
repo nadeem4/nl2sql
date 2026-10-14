@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../core/datasource/" class="md-nav__link">
         
   
@@ -3696,14 +3668,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/query/" class="md-nav__link">
+      <a href="../../core/policies/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Query
+    Policies
   
 
     
@@ -3724,14 +3696,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../core/settings/" class="md-nav__link">
+      <a href="../../core/query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Settings
+    Query
   
 
     
@@ -4767,7 +4739,7 @@
 <p>Response model: <code>DatasourceResponse</code></p>
 <p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
 <p>Execution flow:
-- Validates <code>config</code> as a <code>Datasource</code> and delegates to <code>engine.add_datasource(...)</code>:
+- Validates <code>config</code> as a <code>Datasource</code> and delegates to <code>engine.datasources.add(...)</code>:
   the adapter is built (not connected) and the datasource joins <code>engine.config</code>.
   Nothing is written to the config files and nothing is indexed.</p>
 <p>Errors:
@@ -4775,24 +4747,29 @@
 - A failure to add -&gt; <code>HTTP 500</code> with a generic message. The exception, which can
   hold the connection string, is logged server-side and never returned.</p>
 <h3 id="get-apiv1datasource"><code>GET /api/v1/datasource</code></h3>
-<p>Response model: <code>Dict[str, Any]</code> (with <code>datasources</code> list)</p>
-<p>Execution flow:
-- Delegates to <code>engine.list_datasources()</code>.</p>
+<p>Response: <code>{"datasources": [...]}</code>, <code>engine.datasources.list()</code>: every
+configured datasource with its <code>id</code>, <code>type</code>, <code>description</code>, <code>status</code>
+(<code>ready</code>, <code>failed</code> with a <code>reason</code>, or <code>unchecked</code>), <code>capabilities</code> and
+<code>connection</code> with every secret masked. No role needed.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span><span class="nt">"datasources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"shop"</span><span class="p">,</span><span class="w"> </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w"> </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Orders and customers"</span><span class="p">,</span><span class="w"> </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ready"</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">   </span><span class="nt">"capabilities"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"supports_sql"</span><span class="p">],</span><span class="w"> </span><span class="nt">"connection"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"host"</span><span class="p">:</span><span class="w"> </span><span class="s2">"db"</span><span class="p">,</span><span class="w"> </span><span class="nt">"user"</span><span class="p">:</span><span class="w"> </span><span class="s2">"app"</span><span class="p">,</span><span class="w"> </span><span class="nt">"password"</span><span class="p">:</span><span class="w"> </span><span class="s2">"***"</span><span class="p">},</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">   </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">]}</span>
+</code></pre></div>
 <h3 id="get-apiv1datasourcedatasource_id"><code>GET /api/v1/datasource/{datasource_id}</code></h3>
-<p>Response model: <code>Dict[str, Any]</code></p>
-<p>Execution flow:
-- Validates datasource ID exists.
-- Returns placeholder payload <code>{datasource_id, exists: true}</code>.</p>
+<p>Response: one datasource, as the list shows it (<code>engine.datasources.get(...)</code>).</p>
 <p>Errors:
-- <code>ValueError</code> -&gt; <code>HTTP 404</code>.
-- Other exceptions -&gt; <code>HTTP 500</code>.</p>
+- An unknown id -&gt; <code>HTTP 404</code>.</p>
 <h3 id="delete-apiv1datasourcedatasource_id"><code>DELETE /api/v1/datasource/{datasource_id}</code></h3>
-<p>Response model: <code>Dict[str, Any]</code></p>
 <p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
 <p>Execution flow:
-- Returns a fixed payload indicating removal is not supported.</p>
+- Delegates to <code>engine.datasources.remove(...)</code>: the datasource leaves routing
+  and <code>engine.config</code>, and its connection pool is closed. Nothing is written to
+  the config files, and its index entries stay until the next full index.</p>
+<p>Response: <code>{"success": true, "message": "...", "datasource_id": "..."}</code>.</p>
 <p>Errors:
-- <code>ValueError</code> -&gt; <code>HTTP 404</code>.
+- An unknown id -&gt; <code>HTTP 404</code>.
 - Other exceptions -&gt; <code>HTTP 500</code>.</p>
 
 

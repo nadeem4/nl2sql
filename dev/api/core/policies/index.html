@@ -13,10 +13,10 @@
       
       
       
-        <link rel="prev" href="../query/">
+        <link rel="prev" href="../indexing/">
       
       
-        <link rel="next" href="../../rest/">
+        <link rel="next" href="../query/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Settings - NL2SQL Platform</title>
+        <title>Policies - NL2SQL Platform</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#settings-api-system" class="md-skip">
+        <a href="#policies-api" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Settings
+              Policies
             
           </span>
         </div>
@@ -3584,34 +3584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../auth/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Auth
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../datasource/" class="md-nav__link">
         
   
@@ -3693,34 +3665,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../query/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Query
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -3740,7 +3684,7 @@
   <span class="md-ellipsis">
     
   
-    Settings
+    Policies
   
 
     
@@ -3758,7 +3702,7 @@
   <span class="md-ellipsis">
     
   
-    Settings
+    Policies
   
 
     
@@ -3829,32 +3773,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#settingsapiget_current_settings" class="md-nav__link">
+  <a href="#usercontext" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SettingsAPI.get_current_settings
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#settingsapiget_setting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SettingsAPI.get_setting
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#settingsapivalidate_configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SettingsAPI.validate_configuration
+        UserContext
       
     </span>
   </a>
@@ -3866,10 +3788,49 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#behavioral-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavioral Contracts
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -4619,32 +4580,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#settingsapiget_current_settings" class="md-nav__link">
+  <a href="#usercontext" class="md-nav__link">
     <span class="md-ellipsis">
       
-        SettingsAPI.get_current_settings
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#settingsapiget_setting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SettingsAPI.get_setting
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#settingsapivalidate_configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SettingsAPI.validate_configuration
+        UserContext
       
     </span>
   </a>
@@ -4653,6 +4592,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavioral-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behavioral Contracts
+      
+    </span>
+  </a>
   
 </li>
       
@@ -4673,36 +4623,79 @@
 
 
 
-<h1 id="settings-api-system">Settings API (System)</h1>
+<h1 id="policies-api">Policies API</h1>
 <h2 id="purpose">Purpose</h2>
-<p>Expose runtime settings and configuration validation.</p>
+<p><code>engine.policies</code>: who may read what. The roles, whether a caller may read a
+table, what a caller may read, and whether the rules match the datasources.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Return current settings.</li>
-<li>Fetch specific setting keys.</li>
-<li>Validate configuration integrity.</li>
+<li>List the configured roles.</li>
+<li>Check one table for a user context, and list what a user context may read.</li>
+<li>Check that every rule names a datasource the engine has.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
-<li><code>packages/nl2sql/src/nl2sql/api/settings_api.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/common/settings.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/api/policy_api.py</code> (<code>PoliciesAPI</code>, internal)</li>
+<li><code>packages/nl2sql/src/nl2sql/auth/models.py</code> (<code>UserContext</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/auth/rbac.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>Policies</code>, <code>Role</code>)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
-<h3 id="settingsapiget_current_settings">SettingsAPI.get_current_settings</h3>
-<p>Signature:
-<code>get_current_settings() -&gt; Dict[str, Any]</code></p>
-<p>Returns:
-Settings as a dictionary (<code>Settings.model_dump()</code>).</p>
-<h3 id="settingsapiget_setting">SettingsAPI.get_setting</h3>
-<p>Signature:
-<code>get_setting(key: str) -&gt; Any</code></p>
-<p>Returns:
-Value for the given key or <code>None</code>.</p>
-<h3 id="settingsapivalidate_configuration">SettingsAPI.validate_configuration</h3>
-<p>Signature:
-<code>validate_configuration() -&gt; bool</code></p>
-<p>Returns:
-<code>True</code> if settings can be loaded; <code>False</code> otherwise.</p>
+<h3 id="usercontext">UserContext</h3>
+<p>Exported from <code>nl2sql</code>. Fields: <code>user_id</code> (optional), <code>tenant_id</code> (optional)
+and <code>roles</code> (the RBAC roles, a list).</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>returns</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>roles()</code></td>
+<td><code>dict[str, Role]</code></td>
+<td>The configured roles by id: each one's <code>description</code>, <code>allowed_datasources</code> and <code>allowed_tables</code>. Empty with <code>allow_all</code>.</td>
+</tr>
+<tr>
+<td><code>allows(user_context, datasource_id, table, schema=None)</code></td>
+<td><code>bool</code></td>
+<td>Whether <code>user_context</code> may read <code>table</code>. <code>schema</code> defaults to the datasource's default schema.</td>
+</tr>
+<tr>
+<td><code>allowed(user_context)</code></td>
+<td><code>dict</code></td>
+<td>What <code>user_context</code> may read, as the rules say it: <code>{"datasources": [...], "tables": [...]}</code>.</td>
+</tr>
+<tr>
+<td><code>validate()</code></td>
+<td><code>PolicyValidationReport</code></td>
+<td>Every datasource and table rule checked against the engine's datasources: one entry per rule (<code>role</code>, <code>target</code>, <code>status</code> -- <code>OK</code>, <code>MISSING</code>, <code>UNAVAILABLE</code>, <code>INVALID_DS</code> -- and <code>details</code>), and <code>ok</code>. The policies' own shape was checked when the config loaded. <code>nl2sql policy validate</code> prints it.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserContext</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">analyst</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">])</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">policies</span><span class="o">.</span><span class="n">allows</span><span class="p">(</span><span class="n">analyst</span><span class="p">,</span> <span class="s2">"shop"</span><span class="p">,</span> <span class="s2">"customers"</span><span class="p">)</span>   <span class="c1"># True</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">engine</span><span class="o">.</span><span class="n">policies</span><span class="o">.</span><span class="n">allowed</span><span class="p">(</span><span class="n">analyst</span><span class="p">)</span>                       <span class="c1"># {'datasources': ['shop'], 'tables': ['shop.customers']}</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">policies</span><span class="o">.</span><span class="n">roles</span><span class="p">()[</span><span class="s2">"analyst"</span><span class="p">]</span><span class="o">.</span><span class="n">description</span>
+</code></pre></div>
+<h2 id="behavioral-contracts">Behavioral Contracts</h2>
+<ul>
+<li>Policies enforce table namespacing (<code>datasource.*</code>, <code>datasource.schema.*</code>,
+  <code>datasource.schema.table</code>, or <code>datasource.table</code>, read as the datasource's
+  default schema only). See <a href="../../../configuration/policies/">Policies</a>.</li>
+<li>Unknown roles yield empty permissions, and an empty <code>roles</code> list does too;
+  neither raises. An unknown role beside a known one is ignored.</li>
+<li><code>table_allowed(allowed_tables, datasource_id, table, schema, default_schema)</code>
+  is the single matching rule used by the logical validator (to refuse), the
+  schema retriever (to strip a forbidden table's statistics), the executor's
+  value check and the curated matcher. <code>default_schema(ds_registry,
+  datasource_id)</code> reads the default schema from the adapter; <code>main</code> stands in
+  when the adapter cannot report one.</li>
+</ul>
 
 
 
