@@ -207,7 +207,7 @@ everything. Loading happens once per data volume, so a second `up` is quick.
 | `postgres` | `postgres:16` | Starts after `samples`. Its first start runs Pagila and the wide schema from `/docker-entrypoint-initdb.d`, the image's own init mechanism. |
 | `mysql` | `mysql:8.0` | The same, with Sakila. The image's init uses the `mysql` client, which handles `DELIMITER` blocks. |
 | `mssql` | `mcr.microsoft.com/mssql/server:2022-latest` | Starts the server. |
-| `mssql-init` | the same image (it ships `sqlcmd`) | One-shot, after `mssql` is healthy. Restores AdventureWorksLT from the `.bak`, loads the wide schema, and creates the test logins. Skips each step whose database already exists. |
+| `mssql-init` | the same image (it ships `sqlcmd`) | After `mssql` starts. Restores AdventureWorksLT from the `.bak`, loads the wide schema, and creates the test logins. Skips each step whose database already exists. Then it idles, healthy, instead of exiting: nothing waits for it to complete, and `--wait` fails on an exited container, which a skipping second `up` would otherwise produce. |
 
 Every service has a healthcheck, so `--wait` returns only when every server
 is loaded. Each server also gets a login `nl2sql_reader` with read grants on

@@ -281,6 +281,18 @@ def test_down_closes_tunnels_and_is_idempotent(tb):
     _stopped(tb)
 
 
+def test_a_repeat_up_runs_the_documented_compose(tb):
+    """A second start runs the same `up -d --wait` as CI and a laptop; the compose file makes it repeatable."""
+    assert tb.main(["up"]) == 0
+    assert tb.main(["down"]) == 0
+    assert tb.main(["up"]) == 0
+
+    commands = [next(a for a in c["argv"] if "docker compose" in a) for c in tb.calls()
+                if "ssh" in c["argv"] and any("up -d" in a for a in c["argv"])]
+    assert len(commands) == 2 and commands[0] == commands[1]
+    assert commands[0].endswith(" docker compose -f testbed/docker-compose.yml up -d --wait")
+
+
 def test_status_never_prints_a_password(tb, monkeypatch, capfd):
     assert tb.main(["up"]) == 0
     capfd.readouterr()
