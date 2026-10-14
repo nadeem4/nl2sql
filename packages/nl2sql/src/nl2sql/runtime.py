@@ -202,6 +202,12 @@ class Runtime:
         """
         from nl2sql.config.models import BUILT_IN_STORES, STORE_SLOTS
         from nl2sql.storage import build_store
+        from nl2sql.storage.chroma import ChromaIndex
+        from nl2sql.storage.files import FilesTraces
+        from nl2sql.storage.local import LocalResults
+        from nl2sql.storage.sqlite import SqliteState
+
+        built_ins = {"index": ChromaIndex, "state": SqliteState, "traces": FilesTraces, "results": LocalResults}
 
         stores: List[Any] = []
         for slot in STORE_SLOTS:
@@ -213,7 +219,7 @@ class Runtime:
                 problem(f"storage.{slot}", str(e))
             else:
                 name = BUILT_IN_STORES[slot]
-                if not isinstance(store, self.registry.load("store", name)):
+                if not isinstance(store, built_ins[slot]):
                     problem(f"storage.{slot}", f"This engine reads {slot} only through the built-in "
                             f"'{name}' store for now.", fix=f"Remove storage.{slot}, or set it to {{type: {name}}}.")
             stores.append(store)
