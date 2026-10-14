@@ -30,7 +30,7 @@ from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
 from nl2sql.config.errors import MAPPING_PAGE, ConfigError, Problem
-from nl2sql.config.models import KEEPS_REFERENCES, Config, Storage
+from nl2sql.config.models import Config, Storage, keeps_references
 
 PathLike = Union[str, "os.PathLike[str]"]
 Loc = Tuple[Union[str, int], ...]
@@ -112,15 +112,6 @@ def _members(annotation: Any) -> List[Any]:
     if typing.get_origin(annotation) in _UNIONS:
         return [m for arg in typing.get_args(annotation) for m in _members(arg)]
     return [annotation]
-
-
-def _keeps_references(annotation: Any) -> bool:
-    if typing.get_origin(annotation) is Annotated:
-        args = typing.get_args(annotation)
-        return KEEPS_REFERENCES in args[1:] or _keeps_references(args[0])
-    if typing.get_origin(annotation) in _UNIONS:
-        return any(_keeps_references(a) for a in typing.get_args(annotation))
-    return False
 
 
 def _model(annotation: Any) -> Optional[type]:
@@ -385,7 +376,7 @@ class _Loader:
             for key, child in value.items():
                 field = _field(model, key)
                 if field is not None:
-                    child_keep = keep or KEEPS_REFERENCES in field.metadata or _keeps_references(field.annotation)
+                    child_keep = keep or keeps_references(field)
                     out[key] = self._walk(child, field.annotation, loc + (key,), child_keep)
                 elif model.model_config.get("extra") == "allow":
                     # A block the component validates itself (a secret provider's settings).

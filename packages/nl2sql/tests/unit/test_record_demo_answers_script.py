@@ -23,17 +23,16 @@ def _clear(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_the_key_is_read_from_the_env_file_like_the_engine_reads_its_own(tmp_path, monkeypatch):
+def test_the_key_is_read_from_the_env_file_without_writing_the_environment(tmp_path, monkeypatch):
+    import os
+
     _clear(monkeypatch)
     env = tmp_path / ".env"
     env.write_text(f"ANTHROPIC_API_KEY={FAKE_CLAUDE}\nOPENAI_API_KEY={FAKE_OPENAI}\n", encoding="utf-8")
+    before = dict(os.environ)
 
-    import os
-
-    assert _load().recording_key_present(env) is True
-    assert os.environ["ANTHROPIC_API_KEY"] == FAKE_CLAUDE
-    # Another provider's key is set aside, so --record cannot pick it first.
-    assert "OPENAI_API_KEY" not in os.environ
+    assert _load().recording_key(env) == FAKE_CLAUDE
+    assert dict(os.environ) == before
 
 
 def test_a_key_already_exported_wins_over_the_file(tmp_path, monkeypatch):
@@ -42,10 +41,29 @@ def test_a_key_already_exported_wins_over_the_file(tmp_path, monkeypatch):
     env = tmp_path / ".env"
     env.write_text("ANTHROPIC_API_KEY=something-else-entirely\n", encoding="utf-8")
 
+    assert _load().recording_key(env) == FAKE_CLAUDE
+
+
+def test_the_key_is_passed_to_the_demo_and_beats_another_provider_s_exported_key(tmp_path, monkeypatch):
+    """The demo is given the Claude key as --api-key would give it, so an
+    exported OpenAI key cannot be picked first; the environment is left as it is."""
     import os
 
-    assert _load().recording_key_present(env) is True
-    assert os.environ["ANTHROPIC_API_KEY"] == FAKE_CLAUDE
+    _clear(monkeypatch)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
+    monkeypatch.setenv("OPENAI_API_KEY", FAKE_OPENAI)
+    seen = {}
+
+    def _demo(**kwargs):
+        seen.update(kwargs)
+        raise SystemExit(1)
+
+    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _demo)
+
+    _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(tmp_path / "out.json")])
+
+    assert seen["api_key"] == FAKE_CLAUDE and seen["record"] is True
+    assert os.environ["OPENAI_API_KEY"] == FAKE_OPENAI
 
 
 def test_no_key_records_nothing_and_says_so_without_running(tmp_path, monkeypatch, capsys):

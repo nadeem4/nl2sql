@@ -38,6 +38,8 @@ ENGINE = PACKAGES / "nl2sql" / "src" / "nl2sql"
 SDK = PACKAGES / "sdk" / "src" / "nl2sql_sdk"
 ADAPTERS = ENGINE / "adapters"
 SOURCES = [ENGINE, SDK, PACKAGES / "api" / "src" / "nl2sql_api"]
+REPO = PACKAGES.parent
+SCRIPTS = REPO / "scripts"
 
 
 # --------------------------------------------------------------------------
@@ -128,7 +130,9 @@ def python_files(*roots: pathlib.Path) -> tuple[pathlib.Path, ...]:
 
 
 def _where(path: pathlib.Path) -> str:
-    return str(path.relative_to(PACKAGES)).replace("\\", "/")
+    """``path`` relative to ``packages/``, or to the repository for a file outside it (``scripts/``)."""
+    root = PACKAGES if PACKAGES in path.parents else REPO
+    return str(path.relative_to(root)).replace("\\", "/")
 
 
 def _broke(rule: str, offenders: list[str]) -> str:
@@ -709,12 +713,13 @@ def _may_read_the_environment(path: pathlib.Path) -> bool:
 
 def test_no_module_writes_the_environment():
     offenders = [f"{_where(path)}:{lineno} {what}"
-                 for path in python_files(*SOURCES)
+                 for path in python_files(*SOURCES, SCRIPTS)
                  for lineno, what in _environment_writes(path)]
     assert not offenders, _broke(
-        "No module writes the process environment: no os.environ assignment, pop or update, no "
-        "os.putenv, no load_dotenv outside nl2sql.config.load_env_file. Keys and options travel in "
-        "the engine's Config, so two engines in one process share nothing.", offenders)
+        "No module, and no script under scripts/, writes the process environment: no os.environ "
+        "assignment, pop or update, no os.putenv, no load_dotenv outside "
+        "nl2sql.config.load_env_file. Keys and options travel in the engine's Config (a script "
+        "passes them as arguments), so two engines in one process share nothing.", offenders)
 
 
 def test_environment_reads_only_from_the_allow_list():

@@ -11,11 +11,14 @@ From the repository root::
     python scripts/record_demo_answers.py
 
 The key is ``ANTHROPIC_API_KEY``, read from the environment or, failing that,
-from the repository root's ``.env`` through python-dotenv -- the same loader
-the engine uses for its own env files. The script never prints it. Any OpenAI
-or OpenRouter key in the environment is set aside for the run, so the answers
-are always recorded with the Anthropic preset's default model
-(``nl2sql.llm.providers.DEFAULT_ANTHROPIC_MODEL``).
+from the repository root's ``.env`` (read with python-dotenv, never loaded into
+the environment). The script never prints it and never writes the environment:
+it hands the key to ``nl2sql demo --record`` as ``--api-key`` would, so it wins
+over any OpenAI or OpenRouter key that is exported, and the answers are always
+recorded with the Anthropic preset's default model
+(``nl2sql.llm.providers.DEFAULT_ANTHROPIC_MODEL``). Like ``--api-key``, the
+demo saves it to the demo project's ``.env`` -- a temporary folder unless
+``--dir`` names one.
 
 It spends money: every guided question runs the whole pipeline once (about
 five model calls each). The ``Record demo answers`` workflow
@@ -60,28 +63,25 @@ def _parse(argv: Optional[List[str]]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def recording_key_present(env_file: pathlib.Path) -> bool:
-    """Loads ``env_file`` without overriding anything set, then says whether there is a Claude key.
+def recording_key(env_file: pathlib.Path) -> Optional[str]:
+    """The Claude key: the exported ``ANTHROPIC_API_KEY``, else the one in ``env_file``.
 
-    Every other provider's key is removed from this process's environment, so
-    ``nl2sql demo --record`` cannot pick it first.
+    The file is read, not loaded: nothing is written to the environment.
     """
-    from dotenv import load_dotenv
+    from dotenv import dotenv_values
 
-    from nl2sql.llm.providers import PROVIDER_KEYS, env_var_for_provider
+    from nl2sql.llm.providers import api_key_from_env, env_var_for_provider
 
-    if env_file.is_file():
-        load_dotenv(env_file, override=False)
-    wanted = env_var_for_provider("anthropic")
-    for name in PROVIDER_KEYS:
-        if name != wanted:
-            os.environ.pop(name, None)
-    return bool((os.environ.get(wanted) or "").strip())
+    key = (api_key_from_env("anthropic") or "").strip()
+    if not key and env_file.is_file():
+        key = (dotenv_values(env_file).get(env_var_for_provider("anthropic")) or "").strip()
+    return key or None
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parse(argv)
-    if not recording_key_present(args.env_file):
+    key = recording_key(args.env_file)
+    if not key:
         print("No ANTHROPIC_API_KEY in the environment or in "
               f"{args.env_file}. Nothing was recorded.", file=sys.stderr)
         return 2
@@ -113,7 +113,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     started = time.time()
     try:
         try:
-            demo.demo_command(directory=directory, host="127.0.0.1", port=0, no_browser=True, record=True)
+            # Given as --api-key would give it: it beats any other provider's
+            # exported key, and travels in the engine's config, not the environment.
+            demo.demo_command(directory=directory, host="127.0.0.1", port=0, no_browser=True, record=True,
+                              api_key=key)
         except SystemExit as exc:
             # `demo --record` exits 1 in two cases, after printing why. Either
             # it stopped before recording (indexing failed, say) and wrote

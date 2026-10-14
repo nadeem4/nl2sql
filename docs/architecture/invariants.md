@@ -396,7 +396,7 @@ Concretely:
 - Runs that need different settings (evaluation, trace replay) take a run-scoped runtime with a derived config (`ctx.derive(...)`) instead of editing shared state.
 
 ### Enforcement Points
-- `test_no_module_writes_the_environment`, `test_environment_reads_only_from_the_allow_list` and `test_only_entry_points_load_dotenv` in `packages/nl2sql/tests/architecture/test_boundaries.py`, an AST scan of `packages/*/src` (`READS_THE_ENVIRONMENT` names each allowed reader and why)
+- `test_no_module_writes_the_environment`, `test_environment_reads_only_from_the_allow_list` and `test_only_entry_points_load_dotenv` in `packages/nl2sql/tests/architecture/test_boundaries.py`, an AST scan of `packages/*/src` (`READS_THE_ENVIRONMENT` names each allowed reader and why); the first also scans `scripts/`, so a maintenance script passes keys as arguments instead of writing the environment
 - `packages/nl2sql/tests/e2e/test_two_engines_fake_llm.py` — two engines in one process, each with its own row limit, plan cache, LLM, embedder and storage, and `os.environ` unchanged afterwards
 
 ### Failure Behavior

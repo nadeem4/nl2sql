@@ -81,7 +81,7 @@ compliance audit trail.
 
 ## Structured logging
 
-The library does not configure logging on import; the application entry point calls `nl2sql.configure_logging` (the REST API does it in its lifespan). JSON formatting is enabled when `Settings.observability_exporter == "otlp"`. Trace and tenant context helpers exist (`trace_context`, `tenant_context`), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.
+The library does not configure logging on import; the application entry point calls `nl2sql.configure_logging` after loading the `.env` next to `nl2sql.yaml`, so a `NL2SQL_LOG_LEVEL` there applies (the REST API does it in its lifespan, the CLI before every command, `nl2sql demo` again once the demo project's `.env` is loaded). JSON formatting is enabled when `Settings.observability_exporter == "otlp"`. Trace and tenant context helpers exist (`trace_context`, `tenant_context`), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.
 
 ## Source references
 

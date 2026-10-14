@@ -8,11 +8,14 @@ section 2.
 from __future__ import annotations
 
 import re
+import types
+import typing
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PrivateAttr, field_validator, model_validator
+from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
 from nl2sql.config.curated import CuratedDatasource
@@ -29,10 +32,48 @@ class KeepsReferences:
 KEEPS_REFERENCES = KeepsReferences()
 
 Secret = Annotated[str, KEEPS_REFERENCES]
+"""A secret value, or a ``${provider:key}`` reference to one, kept unresolved."""
 
 # "datasources[0].type" -> ("datasources", "0", "type"): a section, an item and the rest.
 _SECTION_PATH = re.compile(r"([A-Za-z_]+)(?:\[(\d+)\])?\.?(.*)")
-"""A secret value, or a ``${provider:key}`` reference to one, kept unresolved."""
+
+_UNIONS = (Union, getattr(types, "UnionType", Union))
+
+# A datasource's ``connection`` and a secret provider's settings are free-form,
+# so a secret among them is recognised by its key.
+SECRET_KEY_HINTS = ("password", "secret", "token", "api_key")
+
+MASK = "**********"
+
+
+def is_secret_key(key: Any) -> bool:
+    """Whether a free-form key (``password``, ``client_secret``, ``token``, ...) holds a secret."""
+    return isinstance(key, str) and any(hint in key.lower() for hint in SECRET_KEY_HINTS)
+
+
+def _annotation_keeps_references(annotation: Any) -> bool:
+    if typing.get_origin(annotation) is Annotated:
+        args = typing.get_args(annotation)
+        return KEEPS_REFERENCES in args[1:] or _annotation_keeps_references(args[0])
+    if typing.get_origin(annotation) in _UNIONS:
+        return any(_annotation_keeps_references(a) for a in typing.get_args(annotation))
+    return False
+
+
+def keeps_references(field: FieldInfo) -> bool:
+    """Whether ``field`` is a ``Secret`` or a ``connection``: it keeps its references."""
+    return KEEPS_REFERENCES in field.metadata or _annotation_keeps_references(field.annotation)
+
+
+def masked(value: Any) -> Any:
+    """``value`` as it may print: a literal secret is masked, a ``${provider:key}`` reference is not."""
+    if isinstance(value, str) and value and not value.startswith("${"):
+        return MASK
+    return value
+
+
+def _masked_by_key(values: Dict[Any, Any]) -> Dict[Any, Any]:
+    return {key: masked(value) if is_secret_key(key) else value for key, value in values.items()}
 
 AgentName = Literal[
     "curated_matcher",
@@ -46,7 +87,21 @@ AgentName = Literal[
 
 
 class _Model(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
+    """Strict, frozen, and a secret never prints.
+
+    The value stays a plain ``str`` the engine reads as it is; only ``repr``
+    and ``str`` mask it. A validation error never echoes its input.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True,
+                              hide_input_in_errors=True)
+
+    def __repr_args__(self):
+        fields = type(self).model_fields
+        for key, value in super().__repr_args__():
+            if key in fields and keeps_references(fields[key]):
+                value = _masked_by_key(value) if isinstance(value, dict) else masked(value)
+            yield key, value
 
 
 # ---------------------------------------------------------------- datasources
@@ -236,18 +291,16 @@ class SecretProviderConfig(BaseModel):
     when it is built.
     """
 
-    model_config = ConfigDict(extra="allow", frozen=True)
+    model_config = ConfigDict(extra="allow", frozen=True, hide_input_in_errors=True)
 
     id: str = Field(min_length=1)
     type: str = Field(min_length=1)
 
     def __repr_args__(self):
-        # A credential written as a literal must never print: only id, type
-        # and a reference show.
+        # A credential (``token``, ``client_secret``) written as a literal
+        # never prints; a reference, and every other setting, does.
         for key, value in super().__repr_args__():
-            if key not in ("id", "type") and isinstance(value, str) and not value.startswith("${"):
-                value = "**********"
-            yield key, value
+            yield key, masked(value) if is_secret_key(key) else value
 
 
 class Secrets(_Model):

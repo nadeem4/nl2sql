@@ -5,15 +5,13 @@ from typing import Optional, Dict, Any, List
 
 from nl2sql_sdk.schema import TableRef
 
+# Connection args are free-form extras, so secrets are recognised by name,
+# by the same rule the config masks them with.
+from nl2sql.config.models import SECRET_KEY_HINTS as SECRET_ARG_HINTS  # noqa: F401
+from nl2sql.config.models import is_secret_key as _is_secret_arg
+
 # Limits a datasource may set beside ``connection`` or under ``options``.
 LIMIT_KEYS = ("row_limit", "statement_timeout_ms", "max_bytes")
-
-# Connection args are free-form extras, so secrets are recognised by name.
-SECRET_ARG_HINTS = ("password", "secret", "token", "api_key")
-
-
-def _is_secret_arg(key: str) -> bool:
-    return any(hint in key.lower() for hint in SECRET_ARG_HINTS)
 
 
 class ConnectionConfig(BaseModel):

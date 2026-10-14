@@ -55,3 +55,25 @@ def test_the_api_starts_degraded_from_its_config_and_loads_the_env_file(tmp_path
         os.environ.pop("NL2SQL_API_TEST_FROM_FILE", None)
         if hasattr(app.state, "engine"):
             del app.state.engine
+
+
+def test_the_api_logs_at_the_level_its_env_file_names(tmp_path, monkeypatch):
+    import logging
+
+    config = _project(tmp_path, required=False)
+    (tmp_path / ".env").write_text("NL2SQL_LOG_LEVEL=DEBUG\n", encoding="utf-8")
+    monkeypatch.setenv("NL2SQL_CONFIG", str(config))
+    # Set, then deleted, so whatever the .env adds is removed afterwards.
+    monkeypatch.setenv("NL2SQL_LOG_LEVEL", "")
+    monkeypatch.delenv("NL2SQL_LOG_LEVEL")
+    root = logging.getLogger()
+    level, handlers = root.level, root.handlers[:]
+
+    try:
+        with TestClient(app):
+            assert root.level == logging.DEBUG
+    finally:
+        root.setLevel(level)
+        root.handlers[:] = handlers
+        if hasattr(app.state, "engine"):
+            del app.state.engine

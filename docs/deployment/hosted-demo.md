@@ -97,9 +97,11 @@ deliberate act, never part of CI. Either:
   ```
 
   It reads `ANTHROPIC_API_KEY` from the environment or, failing that, from the
-  repository root's `.env` (python-dotenv, the loader the engine uses; nothing
-  prints the key), sets any OpenAI or OpenRouter key aside for the run, builds
-  a fresh demo project, runs `nl2sql demo --record` through the recording proxy
+  repository root's `.env` (read with python-dotenv, never loaded into the
+  environment; nothing prints the key), builds a fresh demo project, and runs
+  `nl2sql demo --record` with that key passed as `--api-key` would pass it, so
+  an exported OpenAI or OpenRouter key never wins. The script writes nothing to
+  the environment. The demo records through the recording proxy
   on Anthropic's own wire with the Anthropic preset's default model, and writes
   `packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json`, stamped with
   the provider and the model the proxy saw requested. A question is
