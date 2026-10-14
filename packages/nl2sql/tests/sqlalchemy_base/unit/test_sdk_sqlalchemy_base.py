@@ -22,6 +22,7 @@ from nl2sql_sdk import IndexScope, Limits
 from nl2sql_sdk.sqlalchemy import (
     ColumnProfile,
     Pool,
+    ReflectedTable,
     SQLAlchemyAdapter,
     SQLAlchemyConnection,
     as_scalar,
@@ -290,6 +291,28 @@ def test_an_excluded_schema_is_never_queried(shop, tmp_path):
 
     assert [t.table.table_name for t in snapshot.contract.tables.values()] == ["orders"]
     assert not [s for s in seen if "hidden_zone" in s]
+
+
+# --- An adapter can read its own catalog ------------------------------------
+
+def test_an_adapter_reads_its_own_catalog_through_schema_names_and_reflect(shop):
+    class OwnCatalog(SqliteAdapter):
+        def schema_names(self, conn):
+            return ["main"]
+
+        def reflect(self, conn, schema, wants_table, issues):
+            columns = [{"name": "id", "type": "BIGINT", "nullable": False, "comment": "The id"}]
+            return {"orders": ReflectedTable(columns=columns, primary_key={"id"}, foreign_keys=[],
+                                             comment="Orders, as the catalog says")}
+
+    adapter = OwnCatalog("t", SqliteConnection(database=shop.as_posix()), Limits())
+
+    snapshot = adapter.fetch_schema_snapshot(IndexScope(profile="catalog"))
+
+    [contract] = snapshot.contract.tables.values()
+    assert contract.columns["id"].data_type == "BIGINT" and contract.columns["id"].is_primary_key
+    orders = _table(snapshot, "orders")
+    assert (orders.description, orders.columns["id"].description) == ("Orders, as the catalog says", "The id")
 
 
 # --- The demo turns sample values on ----------------------------------------

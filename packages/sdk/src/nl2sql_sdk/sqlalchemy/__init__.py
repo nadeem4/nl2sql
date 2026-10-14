@@ -6,13 +6,14 @@ five built-in adapters are built on it. Unlike the rest of the SDK, this
 subpackage imports SQLAlchemy.
 """
 
-from .adapter import Pool, SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
+from .adapter import Pool, ReflectedTable, SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 from .profiling import ALL_VALUES_MAX_DISTINCT, SAMPLE_VALUES, ColumnProfile, as_scalar, column_profile
 
 __all__ = [
     "SQLAlchemyAdapter",
     "SQLAlchemyConnection",
     "Pool",
+    "ReflectedTable",
     "ColumnProfile",
     "column_profile",
     "as_scalar",

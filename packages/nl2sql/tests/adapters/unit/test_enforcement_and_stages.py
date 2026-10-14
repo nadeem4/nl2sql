@@ -299,14 +299,12 @@ def test_a_good_connection_has_no_stage(shop):
 
 
 def test_a_connection_whose_catalog_cannot_be_read_is_the_permission_stage(shop, monkeypatch):
-    import nl2sql_sdk.sqlalchemy.adapter as base
-
     adapter = SqliteAdapter("lite", SqliteConnection(database=shop.as_posix()), Limits())
 
-    def refuse(conn):
+    def refuse(self, conn):
         raise sa_exc.ProgrammingError("SELECT", {}, _Sqlstate("permission denied for schema x", "42501"))
 
-    monkeypatch.setattr(base, "_read_catalog", refuse)
+    monkeypatch.setattr(SqliteAdapter, "schema_names", refuse)
     check = adapter.test_connection()
 
     assert check.ok is False and check.stage == "permission" and check.fix

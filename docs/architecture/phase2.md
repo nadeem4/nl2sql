@@ -1344,7 +1344,9 @@ job, PostgreSQL, MySQL and SQL Server in the `realdb` job.
     (SQLSTATE 42000) and DuckDB's write to a read-only file were both
     `retryable`. It also found that SQLAlchemy 2.1 breaks every DuckDB
     snapshot (`duckdb-engine` inherits PostgreSQL reflection, which now
-    queries `pg_collation`), so the `duckdb` extra keeps SQLAlchemy below 2.1.
+    queries `pg_collation`). The DuckDB adapter now reads DuckDB's own
+    catalog through the base's `schema_names` and `reflect` hooks, so it
+    runs on SQLAlchemy 2.1.
 
 ### `engine.datasources`: the methods behind Connect a database
 
