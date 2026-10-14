@@ -2544,9 +2544,9 @@ warning in <code>nl2sql doctor</code> and the index status, not an error.</p>
 withheld exactly like any other (<code>SchemaRetrieverNode._withhold_unreadable</code>).</p>
 <h2 id="validation">Validation</h2>
 <p>The file is checked at three moments, each catching what it can.</p>
-<p><strong>At startup</strong>, <code>NL2SQLContext.__init__</code> calls <code>ConfigManager.load_curated()</code>
-after the datasources load. A broken file fails startup loudly, as a broken
-<code>datasources.yaml</code> does. These checks need no database and no index:</p>
+<p><strong>At startup</strong>, <code>Runtime.from_config</code> checks the config's <code>curated</code>
+section after the datasources are built. A broken section fails startup with
+a <code>ConfigError</code>, as a broken datasource does. These checks need no database and no index:</p>
 <ul>
 <li>the YAML parses and matches the models;</li>
 <li>every datasource key is a configured datasource;</li>
@@ -3051,7 +3051,7 @@ test first and each updating its docs in the same PR (this page,
 <p><strong>1. Config, loader and <code>nl2sql curated validate</code>.</strong>
 <code>nl2sql/configs/curated.py</code>, <code>ConfigManager.load_curated()</code>, the
 <code>CURATED_CONFIG</code> and <code>CURATED_ENABLED</code> settings, the startup load in
-<code>NL2SQLContext</code>, the read-only and placeholder checks, <code>CuratedAPI.validate()</code>
+<code>Runtime</code>, the read-only and placeholder checks, <code>CuratedAPI.validate()</code>
 and <code>cli/commands/curated.py</code>. New page <code>docs/configuration/curated.md</code>; the
 settings table in <code>configuration/system.md</code>.
 Tests: <code>tests/unit/test_curated_config.py</code> (models, unique ids,
@@ -3060,7 +3060,7 @@ placeholder and param agreement, defaults against types),
 DDL refused, CTEs, placeholders read in every built-in dialect),
 <code>tests/unit/test_cli_curated_validate.py</code> (report and exit codes, a table
 missing from the indexed schema), and a startup test that a broken file fails
-<code>NL2SQLContext</code>.</p>
+<code>Runtime</code>.</p>
 <p><strong>2. Indexing, staleness and candidates.</strong>
 <code>VerifiedQueryChunk</code>, <code>CuratedChunkBuilder</code>, the orchestrator writing curated
 chunks in the datasource's build, <code>curated_hash:&lt;id&gt;</code> in the collection

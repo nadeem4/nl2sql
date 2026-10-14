@@ -2218,7 +2218,7 @@
 <tr>
 <td><code>VECTOR_STORE_COLLECTION</code></td>
 <td><code>nl2sql_store</code></td>
-<td>Collection name for schema embeddings.</td>
+<td>Collection name <code>nl2sql doctor</code> inspects. The engine always writes <code>nl2sql_store</code>, an internal constant in 0.5.</td>
 </tr>
 </tbody>
 </table>
@@ -2227,16 +2227,12 @@
 (datasources), <code>--llm-config</code>, <code>--secrets-config</code> and <code>--vector-store</code>; <code>run</code>,
 <code>benchmark</code> and <code>trace replay</code> also take <code>--policies-config</code>. Each file flag
 takes a path, relative to the working directory or absolute.</p>
-<p>From Python, the same overrides are the <code>NL2SQL(...)</code> / <code>NL2SQLContext(...)</code>
-arguments <code>ds_config_path</code>, <code>llm_config_path</code>, <code>secrets_config_path</code>,
-<code>policies_config_path</code> and <code>vector_store_path</code>. The context hands the explicit
-file paths to its <code>ConfigManager</code>, so lookups made later, such as the
-datasource description indexing stores for the resolver, read the same files
-the context loaded rather than the settings paths.</p>
-<p><code>NL2SQLContext</code> validates the vector store configuration before it loads secrets or
-builds the datasource and LLM registries. A blank <code>VECTOR_STORE_COLLECTION</code>, or a blank
-<code>VECTOR_STORE</code> with no explicit <code>vector_store_path</code> argument, raises <code>ValueError</code> at
-construction time instead of failing later during setup.</p>
+<p>From Python, the engine is built from one <code>Config</code> instead: <code>NL2SQL(config)</code>,
+<code>NL2SQL.from_config("nl2sql.yaml")</code> or <code>NL2SQL.demo()</code> (see
+<a href="../../api/core/public-facade/#creating-an-engine">Public Facade</a>). The files and
+variables on this page are what the CLI, <code>nl2sql-api</code> and the playground still
+read until they move onto <code>nl2sql.yaml</code>; a blank <code>VECTOR_STORE</code> stops them at
+startup with a <code>ValueError</code>.</p>
 <h3 id="embeddings">Embeddings</h3>
 <p><code>EMBEDDING_PROVIDER</code> selects how schema chunks are embedded during <code>nl2sql index</code>
 and how queries are embedded during retrieval:</p>
@@ -2295,7 +2291,7 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <tr>
 <td><code>SCHEMA_STORE_BACKEND</code></td>
 <td><code>sqlite</code></td>
-<td>Schema store backend identifier.</td>
+<td>Read by <code>nl2sql cache</code> and <code>nl2sql curated validate</code> only. The engine always keeps its schema store in SQLite at <code>SCHEMA_STORE_PATH</code> (<code>&lt;storage.path&gt;/state.db</code> for an engine built from a <code>Config</code>).</td>
 </tr>
 <tr>
 <td><code>SCHEMA_STORE_PATH</code></td>
@@ -2308,44 +2304,14 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 <td>Max schema versions retained per datasource.</td>
 </tr>
 <tr>
-<td><code>RESULT_ARTIFACT_BACKEND</code></td>
-<td><code>local</code></td>
-<td>Artifact backend: <code>local</code>, <code>s3</code>, <code>adls</code>.</td>
-</tr>
-<tr>
 <td><code>RESULT_ARTIFACT_BASE_URI</code></td>
 <td><code>./artifacts</code></td>
-<td>Base URI or path for artifact storage.</td>
+<td>Folder result files are written under (an engine built from a <code>Config</code> uses <code>&lt;storage.path&gt;/results/</code>). The S3 and ADLS backends and their <code>RESULT_ARTIFACT_BACKEND</code>, <code>RESULT_ARTIFACT_S3_*</code> and <code>RESULT_ARTIFACT_ADLS_*</code> settings were removed in 0.5.</td>
 </tr>
 <tr>
 <td><code>RESULT_ARTIFACT_PATH_TEMPLATE</code></td>
 <td><code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code></td>
-<td>Artifact path relative to the backend root. Placeholders available: <code>&lt;tenant_id&gt;</code>, <code>&lt;request_id&gt;</code>, <code>&lt;sub_query_id&gt;</code>, <code>&lt;dag_node_id&gt;</code>, <code>&lt;subgraph_name&gt;</code>, <code>&lt;schema_version&gt;</code>. Every sub-query of a run writes its own file: a template without <code>&lt;sub_query_id&gt;</code> or <code>&lt;dag_node_id&gt;</code> gets <code>-&lt;sub_query_id&gt;</code> added to its file name (see <a href="../../storage/artifact-store/#one-artifact-per-sub-query">artifact store</a>).</td>
-</tr>
-<tr>
-<td><code>RESULT_ARTIFACT_S3_BUCKET</code></td>
-<td><code>—</code></td>
-<td>S3 bucket for artifact storage.</td>
-</tr>
-<tr>
-<td><code>RESULT_ARTIFACT_S3_PREFIX</code></td>
-<td><code>—</code></td>
-<td>S3 prefix for artifact storage.</td>
-</tr>
-<tr>
-<td><code>RESULT_ARTIFACT_ADLS_ACCOUNT</code></td>
-<td><code>—</code></td>
-<td>ADLS storage account name.</td>
-</tr>
-<tr>
-<td><code>RESULT_ARTIFACT_ADLS_CONTAINER</code></td>
-<td><code>—</code></td>
-<td>ADLS container name.</td>
-</tr>
-<tr>
-<td><code>RESULT_ARTIFACT_ADLS_CONNECTION_STRING</code></td>
-<td><code>—</code></td>
-<td>ADLS connection string, if using key-based auth (held as <code>SecretStr</code>: never printed).</td>
+<td>Artifact path relative to the results folder. Placeholders available: <code>&lt;tenant_id&gt;</code>, <code>&lt;request_id&gt;</code>, <code>&lt;sub_query_id&gt;</code>, <code>&lt;dag_node_id&gt;</code>, <code>&lt;subgraph_name&gt;</code>, <code>&lt;schema_version&gt;</code>. Every sub-query of a run writes its own file: a template without <code>&lt;sub_query_id&gt;</code> or <code>&lt;dag_node_id&gt;</code> gets <code>-&lt;sub_query_id&gt;</code> added to its file name (see <a href="../../storage/artifact-store/#one-artifact-per-sub-query">artifact store</a>).</td>
 </tr>
 </tbody>
 </table>
@@ -2547,8 +2513,9 @@ providers. The check runs on the read path only, so the fix is simply to re-run
 (<code>load_dotenv(..., override=False)</code>), because <code>nl2sql doctor</code>, the LLM
 registry and <code>${env:VAR}</code> references read <code>os.environ</code> rather than settings. A
 variable already exported in the shell wins over the file.</p>
-<p>From Python, <code>NL2SQL(env="demo")</code> sets <code>ENV</code> and <code>NL2SQL(env_file=path)</code> sets
-<code>ENV_FILE_PATH</code>, reloading settings before any configuration path is resolved.</p>
+<p>From Python, the library reads no env file: the engine is built from a
+<code>Config</code> (<code>NL2SQL.from_config("nl2sql.yaml")</code>), and <code>nl2sql.config.load_env_file()</code>
+is there for an entry point that wants the <code>.env</code> next to <code>nl2sql.yaml</code>.</p>
 <h3 id="rest-api-nl2sql-api">REST API (<code>nl2sql-api</code>)</h3>
 <p>These are read by <code>nl2sql-api</code> only, not by <code>Settings</code>, on each request (CORS
 once at startup).</p>

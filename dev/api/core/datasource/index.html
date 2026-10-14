@@ -4784,20 +4784,21 @@
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/datasource_api.py</code></p>
 <p>Signature:
-<code>add_datasource(config: Union[DatasourceConfig, Dict[str, Any]]) -&gt; None</code></p>
+<code>add_datasource(config: Union[Datasource, Dict[str, Any]]) -&gt; None</code></p>
 <p>Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>config</code> | <code>DatasourceConfig | Dict[str, Any]</code> | yes | Datasource configuration. |</p>
+| <code>config</code> | <code>Datasource | Dict[str, Any]</code> | yes | A <code>Datasource</code> (see <a href="../../../architecture/configuration_v2/#datasources-datasource">Configuration v2</a>). The 0.4 dict shape, with <code>connection.type</code>, is still read until the REST API takes the <code>Datasource</code> body. |</p>
 <p>Returns:
 <code>None</code>.</p>
 <p>Raises:
-- <code>ValueError</code> if datasource ID is missing or adapter type is unknown.
-- <code>ValueError</code> if secret resolution fails.</p>
+- <code>ValueError</code> if the id is already configured, the adapter type is unknown, or a reference does not resolve.</p>
 <p>Side Effects:
-- Registers adapter instance in <code>DatasourceRegistry</code>.</p>
+- Builds the adapter without connecting, registers it, and adds the datasource
+  to <code>engine.config</code>. Its description and sample questions are what indexing
+  reads.</p>
 <p>Idempotency:
-- Not strictly idempotent; re-registering the same ID overwrites in-memory registry.</p>
+- Not idempotent: adding an id that is already configured raises.</p>
 <h3 id="datasourceapiadd_datasource_from_config">DatasourceAPI.add_datasource_from_config</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/datasource_api.py</code></p>
@@ -4821,7 +4822,7 @@ No (registrations happen each call).</p>
 <p>Signature:
 <code>list_datasources() -&gt; List[str]</code></p>
 <p>Returns:
-List of registered datasource IDs. A configured datasource that failed to start
+List of available datasource IDs. A datasource <code>check()</code> could not connect to
 is not in it; <code>NL2SQL.list_unavailable_datasources()</code> maps each one to the
 reason.</p>
 <h3 id="datasourceapiget_adapter">DatasourceAPI.get_adapter</h3>

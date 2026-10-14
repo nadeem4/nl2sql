@@ -4535,6 +4535,10 @@
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"sqlite"</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="s">"./my_data.db"</span><span class="w"> </span><span class="c1"># Absolute or relative path</span>
 </code></pre></div>
+<p>A relative <code>database</code> is read from the folder of <code>nl2sql.yaml</code> when the config
+was loaded from a file (so <code>nl2sql init --demo</code> can write <code>data/chinook.sqlite</code>),
+and from the working directory when it was built in code. The DuckDB adapter
+does the same.</p>
 <div class="admonition warning">
 <p class="admonition-title">Persistence</p>
 <p>If using <strong>Docker</strong>, avoid relative paths like <code>./my_data.db</code> as they will be lost on container restart. Use an absolute path mapped to a volume, e.g., <code>/app/data/my_data.db</code>.</p>

@@ -2032,10 +2032,10 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="architecture-overview">Architecture Overview</h1>
-<p>NL2SQL is a <strong>multi-stage orchestration pipeline</strong> built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by <code>NL2SQLContext</code>, which instantiates registries, stores, and policy enforcement.</p>
+<p>NL2SQL is a <strong>multi-stage orchestration pipeline</strong> built on LangGraph. A single request flows through control-plane nodes (resolution, decomposition, planning), capability-driven subgraphs (SQL agents), and an aggregation layer. The system is wired by <code>Runtime</code>, which instantiates registries, stores, and policy enforcement.</p>
 <h2 id="key-runtime-components">Key runtime components</h2>
 <ul>
-<li><code>NL2SQLContext</code> initializes registries, stores, and policy enforcement.</li>
+<li><code>Runtime</code> initializes registries, stores, and policy enforcement.</li>
 <li><code>build_graph()</code> compiles the LangGraph control-plane pipeline.</li>
 <li><code>run_with_graph()</code> executes the pipeline with cancellation and timeout.</li>
 <li><code>GraphState</code> is the shared mutable state across pipeline nodes (see <code>graph_state.md</code>).</li>
@@ -2052,7 +2052,7 @@
     Router --&gt; Aggregator[EngineAggregatorNode]
     Aggregator --&gt; Synthesizer[AnswerSynthesizerNode]
 
-    subgraph Context[NL2SQLContext]
+    subgraph Context[Runtime]
         DS[DatasourceRegistry]
         LLM[LLMRegistry]
         VS[VectorStore]
@@ -2119,7 +2119,7 @@
 <li>Graph construction: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></li>
 <li>Runtime execution: <code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
 <li>Shared state: <code>packages/nl2sql/src/nl2sql/pipeline/state.py</code></li>
-<li>Context initialization: <code>packages/nl2sql/src/nl2sql/context.py</code></li>
+<li>Context initialization: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 </ul>
 </article>
 </div>

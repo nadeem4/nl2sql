@@ -3537,27 +3537,27 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#public-surface" class="md-nav__link">
+  <a href="#creating-an-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Public Surface
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Public Surface">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#nl2sqlinit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NL2SQL.init
+        Creating an engine
       
     </span>
   </a>
   
 </li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lifecycle">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#convenience-methods" class="md-nav__link">
@@ -4506,27 +4506,27 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#public-surface" class="md-nav__link">
+  <a href="#creating-an-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Public Surface
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Public Surface">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#nl2sqlinit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NL2SQL.init
+        Creating an engine
       
     </span>
   </a>
   
 </li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Lifecycle">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#convenience-methods" class="md-nav__link">
@@ -4585,55 +4585,158 @@
 
 <h1 id="public-facade-api">Public Facade API</h1>
 <h2 id="purpose">Purpose</h2>
-<p>Provide a stable, consolidated entrypoint that wires <code>NL2SQLContext</code> and exposes
-modular APIs through a single class.</p>
+<p>Provide one entry point: <code>NL2SQL</code> is built from one <code>Config</code>, owns everything
+it builds (its <code>Runtime</code>), and exposes the modular APIs through a single class.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Initialize registries and stores in a consistent order.</li>
+<li>Build the engine from a <code>Config</code>, resolving every name through a <code>Registry</code>.</li>
+<li>Connect, and report what is ready, only when asked (<code>check()</code>).</li>
+<li>Release what it opened (<code>close()</code>).</li>
 <li>Expose convenience methods that delegate to modular APIs.</li>
-<li>Provide a single object for application integration.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
-<li><code>packages/nl2sql/src/nl2sql/public_api.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/context.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/public_api.py</code>: the facade</li>
+<li><code>packages/nl2sql/src/nl2sql/runtime.py</code>: <code>Runtime.from_config</code>, what one engine builds</li>
+<li><code>packages/nl2sql/src/nl2sql/check.py</code>: <code>CheckReport</code>, <code>DatasourceStatus</code>, <code>EngineNotReady</code></li>
 </ul>
-<h2 id="public-surface">Public Surface</h2>
-<h3 id="nl2sqlinit">NL2SQL.<strong>init</strong></h3>
-<p>Source:
-<code>packages/nl2sql/src/nl2sql/public_api.py</code></p>
-<p>Signature:
-<code>NL2SQL(ds_config_path: Optional[Union[str, pathlib.Path]] = None, secrets_config_path: Optional[Union[str, pathlib.Path]] = None, llm_config_path: Optional[Union[str, pathlib.Path]] = None, vector_store_path: Optional[Union[str, pathlib.Path]] = None, policies_config_path: Optional[Union[str, pathlib.Path]] = None, env: Optional[str] = None, env_file: Optional[Union[str, pathlib.Path]] = None)</code></p>
-<p>Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| <code>ds_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Datasource config path override. Indexing reads each datasource's <code>description</code> from this file too. |
-| <code>secrets_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Secrets config path override. |
-| <code>llm_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | LLM config path override. |
-| <code>vector_store_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Vector store persistence path override. |
-| <code>policies_config_path</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Policies config path override. |
-| <code>env</code> | <code>Optional[str]</code> | no | Environment name. Sets <code>ENV</code> and reloads settings, so <code>.env.{env}</code> is read from the working directory before any config path is resolved. |
-| <code>env_file</code> | <code>Optional[Union[str, pathlib.Path]]</code> | no | Path to an env file. Sets <code>ENV_FILE_PATH</code> and reloads settings. Takes precedence over <code>env</code>. |</p>
-<p>Returns:
-<code>NL2SQL</code> instance with initialized context and API modules.</p>
-<p>Raises:
-- <code>FileNotFoundError</code>, <code>ValueError</code> from config loading (see <code>ConfigManager</code>).
-- Provider-specific errors from secrets/LLM initialization.</p>
-<p>Side Effects:
-- Loads configs, resolves secrets, builds registries and stores.
-- With <code>env</code> or <code>env_file</code>, writes <code>ENV</code> / <code>ENV_FILE_PATH</code> into the process
-  environment and refreshes the <code>settings</code> singleton in place.</p>
-<p>Example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
+<h2 id="creating-an-engine">Creating an engine</h2>
+<p>Every way builds the same <code>Config</code> (see
+<a href="../../../architecture/configuration_v2/#4-creating-the-engine">Configuration v2, section 4</a>).
+Names in it (<code>type: postgres</code>, <code>provider: anthropic</code>) are resolved through a
+<code>Registry</code>; <code>Registry.default()</code> is used when none is passed.</p>
+<table>
+<thead>
+<tr>
+<th>constructor</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NL2SQL(config, *, registry=None)</code></td>
+<td>Loads and validates: resolves every name, imports only the components the config uses, checks interface versions and driver modules, builds the secret manager, the adapters (not connected), the LLM settings (no model call), the embedder and the stores under <code>storage.path</code>. Raises one <code>ConfigError</code> listing every problem. <strong>It never connects</strong> to a datasource or calls a model.</td>
+</tr>
+<tr>
+<td><code>NL2SQL.from_config(path=None, *, registry=None)</code></td>
+<td><code>NL2SQL(load_config(path), registry=registry)</code>. <code>path</code> defaults to <code>$NL2SQL_CONFIG</code>, then <code>./nl2sql.yaml</code>.</td>
+</tr>
+<tr>
+<td><code>NL2SQL.demo(*, llm=None, path=".nl2sql-demo")</code></td>
+<td>The demo: the three bundled SQLite databases, opened read-only from the installed package, with the demo roles and verified queries. Without <code>llm</code>, the first provider whose key variable is set is used with its default model; with none set, a <code>ConfigError</code> names the variables.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Config</span><span class="p">,</span> <span class="n">Datasource</span><span class="p">,</span> <span class="n">Embeddings</span><span class="p">,</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">Policies</span><span class="p">,</span> <span class="n">Storage</span><span class="p">,</span> <span class="n">load_config</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">env</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>          <span class="c1"># reads ./.env.demo</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">env_file</span><span class="o">=</span><span class="s2">"/etc/nl2sql/.env"</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">Config</span><span class="p">(</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">datasources</span><span class="o">=</span><span class="p">[</span><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"shop"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sqlite"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"database"</span><span class="p">:</span> <span class="s2">"shop.db"</span><span class="p">})],</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">llm</span><span class="o">=</span><span class="n">LLM</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"anthropic"</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"claude-sonnet-5-5"</span><span class="p">),</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">embeddings</span><span class="o">=</span><span class="n">Embeddings</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"local"</span><span class="p">),</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">policies</span><span class="o">=</span><span class="n">Policies</span><span class="o">.</span><span class="n">allow_all</span><span class="p">(),</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">storage</span><span class="o">=</span><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">),</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">))</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">cfg</span> <span class="o">=</span> <span class="n">load_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span><span class="o">.</span><span class="n">with_datasource</span><span class="p">(</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"hr"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sqlite"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"database"</span><span class="p">:</span> <span class="s2">"hr.db"</span><span class="p">}))</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
 </code></pre></div>
-<p>Idempotency:
-- Initialization is not idempotent; it constructs new registries and stores.</p>
+<p>What one engine builds belongs to it alone: its secret manager (resolving
+<code>${provider:key}</code> references through the providers in <code>secrets</code>), its
+embedder (from <code>embeddings</code>, or the <code>instance</code> given), and its stores:</p>
+<table>
+<thead>
+<tr>
+<th>store</th>
+<th>location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Vector index</td>
+<td><code>&lt;storage.path&gt;/index/</code></td>
+</tr>
+<tr>
+<td>Schema snapshots, plan cache, feedback</td>
+<td><code>&lt;storage.path&gt;/state.db</code></td>
+</tr>
+<tr>
+<td>Run traces</td>
+<td><code>&lt;storage.path&gt;/traces/</code></td>
+</tr>
+<tr>
+<td>Result files</td>
+<td><code>&lt;storage.path&gt;/results/</code> (see <a href="../../../storage/artifact-store/">Artifact Store</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>A relative <code>storage.path</code>, and a relative SQLite or DuckDB file in a
+datasource's <code>connection</code>, are read from the folder of <code>nl2sql.yaml</code> when the
+config was loaded from a file, and from the working directory when it was
+built in code. <code>engine.config</code> is the current frozen <code>Config</code>, with secrets as
+references only; <code>add_datasource</code> is the one call that changes it.</p>
+<div class="admonition note">
+<p class="admonition-title">Until the settings global is gone</p>
+<p>Modules not yet moved onto the runtime still read the process-global
+<code>settings</code>, and building an engine copies its config into it. Two engines
+in one process therefore share those values until the last migration pull
+request (configuration v2, section 8). The CLI, <code>nl2sql-api</code> and the
+playground still start from the 0.4 files through a private constructor
+until they move onto <code>nl2sql.yaml</code>.</p>
+</div>
+<h2 id="lifecycle">Lifecycle</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">report</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">report</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"Top 5 customers by revenue"</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># close() ran: pools disposed, stores closed</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>check() -&gt; CheckReport</code></td>
+<td>Connects to each datasource and records it <code>ready</code>, or <code>failed</code> with the stage (<code>connect</code>), the reason and a fix. A failed datasource is marked unavailable and left out of routing: the engine runs degraded, and a query that targets it fails with the reason. It also reports each agent whose API key does not resolve (no model is called) and the index status from <code>index_health()</code>. Raises <code>EngineNotReady</code> if a <code>required: true</code> datasource fails, or if datasources are configured and none is ready; the error carries the <code>report</code>. Safe to call again: a datasource that connects on a later call is routed to again.</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>Disposes each adapter's connection pool (an adapter's optional <code>close()</code>) and closes the state store and the vector store client. <code>run_query</code>, <code>stream_query</code> and <code>check</code> raise afterwards. Calling it twice is fine.</td>
+</tr>
+<tr>
+<td><code>with NL2SQL(...) as engine:</code></td>
+<td><code>__exit__</code> calls <code>close()</code>.</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td>The current frozen <code>Config</code>.</td>
+</tr>
+<tr>
+<td><code>closed</code></td>
+<td>Whether <code>close()</code> ran.</td>
+</tr>
+</tbody>
+</table>
+<p><code>CheckReport</code> has <code>datasources</code> (one <code>DatasourceStatus</code> each: <code>id</code>, <code>status</code>,
+<code>required</code>, <code>stage</code>, <code>reason</code>, <code>fix</code>), <code>llm</code> (agent to reason, for each key
+that does not resolve), <code>index</code>, and <code>ok</code>, true when every datasource is
+ready, every key resolves and the index is built. <code>str(report)</code> is a readable
+summary.</p>
+<p>Building an engine is cheap and has no side effects outside <code>storage.path</code>, so
+it suits tests and notebooks. Startup policy belongs to the entry point: call
+<code>check()</code> straight after building the engine, refuse to start on
+<code>EngineNotReady</code>, and start degraded, printing the report, when an optional
+datasource fails.</p>
 <h3 id="convenience-methods">Convenience methods</h3>
 <p>The public facade delegates to modular APIs with the same signatures:
-<code>run_query</code>, <code>add_datasource</code>, <code>add_datasource_from_config</code>, <code>list_datasources</code>,
+<code>run_query</code>, <code>add_datasource</code> (a <code>Datasource</code>: built, not connected, and added to <code>engine.config</code>), <code>add_datasource_from_config</code>, <code>list_datasources</code>,
 <code>get_datasource_capabilities</code>, <code>configure_llm</code>, <code>configure_llm_from_config</code>,
 <code>list_llms</code>, <code>get_llm</code>, <code>index_datasource</code>, <code>index_all_datasources</code>, <code>clear_index</code>,
 <code>check_permissions</code>, <code>get_allowed_resources</code>, <code>get_current_settings</code>,
@@ -4669,7 +4772,7 @@ to that.</p>
 <tr>
 <td><code>list_unavailable_datasources()</code></td>
 <td><code>dict</code></td>
-<td>Configured datasources that failed to start, mapped to the reason. They are not in <code>list_datasources()</code>. See <a href="../../../configuration/datasources/#when-a-datasource-fails-to-start">Datasources → When a datasource fails to start</a>.</td>
+<td>Configured datasources that <code>check()</code> could not connect to, mapped to the reason. They are not in <code>list_datasources()</code> until a later <code>check()</code> connects. See <a href="../../../configuration/datasources/#when-a-datasource-fails-to-start">Datasources → When a datasource fails to start</a>.</td>
 </tr>
 <tr>
 <td><code>rebuild_index(datasource_ids=None, enrich=False, full=False, on_progress=None, switch_guard=None)</code></td>
@@ -4688,17 +4791,17 @@ to that.</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="p">(</span><span class="n">env</span><span class="o">=</span><span class="s2">"demo"</span><span class="p">)</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">get_schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>      <span class="c1"># 'Album'</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                         <span class="c1"># 'ok'</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">inspect_retrieval</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">demo</span><span class="p">()</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">get_schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>      <span class="c1"># 'Album'</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">index_health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                         <span class="c1"># 'ok'</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">inspect_retrieval</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="top-level-exports">Top-level exports</h3>
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
 submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,
 <code>ResultSummary</code>, <code>ResultManifest</code>, <code>ResultPage</code>, <code>ResultNotFound</code>,
 <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>, <code>QueryEvent</code>, <code>UserContext</code>, <code>CancellationToken</code>,
-<code>configure_logging</code>, the error types
+<code>configure_logging</code>, the config (<code>Config</code>, <code>load_config</code>, <code>ConfigError</code>, <code>Registry</code> and the section classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>AgentLLM</code>, <code>Embeddings</code>, <code>Policies</code>, <code>Role</code>, <code>Storage</code>, <code>Secrets</code>, <code>Curated</code>, <code>Settings</code>), what <code>check()</code> reports (<code>CheckReport</code>, <code>DatasourceStatus</code>, <code>EngineNotReady</code>), the error types
 (<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>) and the modular API classes.
 The REST API (<code>nl2sql-api</code>) is held to this rule by an architecture test.</p>
 

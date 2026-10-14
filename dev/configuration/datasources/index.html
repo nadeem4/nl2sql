@@ -4575,25 +4575,30 @@ doctor</code> and the index status (<code>NL2SQL.index_health</code>, <code>GET 
 print "Preferred table 'v_x' of 'chinook' is not in the indexed schema". The
 usual cause is a view created after the last index; re-index the datasource.</p>
 <h2 id="when-a-datasource-fails-to-start">When a datasource fails to start</h2>
-<p>A datasource that cannot start (an unknown <code>type</code>, a missing driver, an invalid
-connection config, a <code>${...}</code> reference that does not resolve) does not stop the
-engine. At startup the others register and the broken one is marked
-unavailable:</p>
+<p>A datasource the engine cannot build (an unknown <code>type</code>, a missing driver, an
+invalid connection config, a <code>${...}</code> reference that does not resolve) stops
+it: building the engine raises one <code>ConfigError</code> that names every such
+datasource and the reason. Building never connects, so this needs no database.</p>
+<p>A datasource that cannot <strong>connect</strong> is found by <code>engine.check()</code> (see
+<a href="../../api/core/public-facade/#lifecycle">Public Facade → Lifecycle</a>), and does
+not stop the engine unless it is <code>required</code>. The others stay routed, and the
+broken one is marked unavailable:</p>
 <ul>
 <li>the log has an error: <code>Datasource 'sales' is unavailable: &lt;reason&gt;</code>;</li>
+<li><code>check()</code> reports it <code>failed</code> at stage <code>connect</code>, with a fix;</li>
 <li>it is not in <code>list_datasources()</code> (or <code>GET /api/v1/datasource</code>);
   <code>NL2SQL.list_unavailable_datasources()</code> maps it to the reason;</li>
 <li>the index status (<code>NL2SQL.index_health()</code>, <code>GET /api/v1/index/status</code>) carries
   the same sentence as a warning;</li>
 <li>a query with <code>datasource_id</code> set to it, and <code>nl2sql index</code> or
-  <code>rebuild_index(datasource_ids=[...])</code> naming it, fail with that reason;</li>
-<li><code>nl2sql doctor</code> shows it as <code>Failed</code> in the connectivity table, with the
-  reason;</li>
-<li><code>nl2sql policy validate</code> reports a role that names it as <code>UNAVAILABLE</code>.</li>
+  <code>rebuild_index(datasource_ids=[...])</code> naming it, fail with that reason.</li>
 </ul>
-<p>If datasources are configured and none of them can start, startup fails with
-every reason. There is no setting yet to make one bad datasource fatal; run
-<code>nl2sql doctor</code> in a deploy check if you need that.</p>
+<p><code>check()</code> raises <code>EngineNotReady</code> when a <code>required: true</code> datasource fails, or
+when datasources are configured and none is ready. A later <code>check()</code> that
+connects routes the datasource again.</p>
+<p>Without the engine, <code>nl2sql doctor</code> shows a datasource that cannot start or
+connect as <code>Failed</code> in the connectivity table, with the reason, and
+<code>nl2sql policy validate</code> reports a role that names it as <code>UNAVAILABLE</code>.</p>
 <p>A secret provider in <code>secrets.yaml</code> that cannot start is different: it fails
 startup. See <a href="../secrets/#when-a-provider-fails-to-start">Secrets → When a provider fails to start</a>.</p>
 <h2 id="notes">Notes</h2>

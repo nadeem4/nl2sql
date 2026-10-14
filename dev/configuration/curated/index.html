@@ -4769,9 +4769,9 @@ are built too. Business metrics are parsed but not used yet.</p>
   feature is off, and nothing else changes.</li>
 <li><code>CURATED_CONFIG</code> set to any other path that does not exist: startup fails
   with <code>FileNotFoundError</code>. A typo should not quietly turn verified answers off.</li>
-<li>The file exists but is broken: startup (<code>NL2SQL(...)</code>, <code>nl2sql run</code>, the
-  REST API, the playground) fails with a <code>ValueError</code> that names every problem,
-  as a broken <code>datasources.yaml</code> does.</li>
+<li>The file exists but is broken: startup (<code>NL2SQL(config)</code>, <code>nl2sql run</code>, the
+  REST API, the playground) fails with a <code>ConfigError</code> that names every problem,
+  as a broken datasource does.</li>
 </ul>
 <h2 id="writing-the-file">Writing the file</h2>
 <p>One file covers every datasource, keyed by the datasource <code>id</code> from
@@ -4979,7 +4979,7 @@ query, and exits 1 on any error, so it can run in CI:</p>
 </tbody>
 </table>
 <p>From Python, the same check is <code>CuratedAPI</code>, also available as
-<code>NL2SQL(...).curated</code>:</p>
+<code>NL2SQL.from_config(...).curated</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">CuratedAPI</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">report</span> <span class="o">=</span> <span class="n">CuratedAPI</span><span class="p">()</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>          <span class="c1"># or validate(curated_path=..., datasources_path=...)</span>
@@ -5206,7 +5206,7 @@ playground writes it either.</p>
 <li>SQL checks and the file model: <code>packages/nl2sql/src/nl2sql/configs/curated.py</code></li>
 <li>Index entries and the change hash: <code>packages/nl2sql/src/nl2sql/indexing/curated.py</code></li>
 <li>Loader: <code>ConfigManager.load_curated()</code> in <code>packages/nl2sql/src/nl2sql/configs/manager.py</code></li>
-<li>Startup load: <code>packages/nl2sql/src/nl2sql/context.py</code></li>
+<li>Startup load: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 <li>Facade: <code>packages/nl2sql/src/nl2sql/api/curated_api.py</code></li>
 <li>Command: <code>packages/nl2sql/src/nl2sql/cli/commands/curated.py</code></li>
 <li>The demo's verified queries: <code>CHINOOK_VERIFIED_QUERIES</code> in <code>packages/nl2sql/src/nl2sql/datasets/chinook.py</code></li>

@@ -1753,15 +1753,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#context-requires-vector-store-and-schema-store-configuration" class="md-nav__link">
+  <a href="#an-engine-keeps-its-data-under-storagepath" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Context Requires Vector Store and Schema Store Configuration
+        An Engine Keeps Its Data Under storage.path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Context Requires Vector Store and Schema Store Configuration">
+    <nav class="md-nav" aria-label="An Engine Keeps Its Data Under storage.path">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6846,15 +6846,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#context-requires-vector-store-and-schema-store-configuration" class="md-nav__link">
+  <a href="#an-engine-keeps-its-data-under-storagepath" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Context Requires Vector Store and Schema Store Configuration
+        An Engine Keeps Its Data Under storage.path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Context Requires Vector Store and Schema Store Configuration">
+    <nav class="md-nav" aria-label="An Engine Keeps Its Data Under storage.path">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -7671,18 +7671,24 @@
 <h3 id="why-it-exists_14">Why It Exists</h3>
 <p>Guarantees aggregation operates on complete, correctly wired inputs.</p>
 <hr />
-<h2 id="context-requires-vector-store-and-schema-store-configuration">Context Requires Vector Store and Schema Store Configuration</h2>
+<h2 id="an-engine-keeps-its-data-under-storagepath">An Engine Keeps Its Data Under <code>storage.path</code></h2>
 <h3 id="definition_15">Definition</h3>
-<p>Vector store collection/path and schema store path (for SQLite backend) must be configured.</p>
+<p><code>storage</code> is a required section of the config. An engine keeps its vector
+index in <code>&lt;storage.path&gt;/index/</code>, its schema snapshots, plan cache and
+feedback in <code>&lt;storage.path&gt;/state.db</code>, its traces in <code>&lt;storage.path&gt;/traces/</code>
+and its result files in <code>&lt;storage.path&gt;/results/</code>. The index collection name
+is an internal constant.</p>
 <h3 id="enforcement-points_15">Enforcement Points</h3>
 <ul>
-<li><code>NL2SQLContext.__init__()</code> in <code>nl2sql.context</code></li>
-<li><code>build_schema_store()</code> in <code>nl2sql.schema.store</code></li>
+<li><code>Config</code> in <code>nl2sql.config</code> (the section is required)</li>
+<li><code>Runtime.from_config()</code> in <code>nl2sql.runtime</code> (<code>StorePaths.under</code>)</li>
 </ul>
 <h3 id="failure-behavior_15">Failure Behavior</h3>
-<p>Raises <code>ValueError</code> if required settings are missing.</p>
+<p>A config without <code>storage</code> is a <code>ConfigError</code> from <code>load_config</code>, or a
+validation error building <code>Config</code> in code.</p>
 <h3 id="why-it-exists_15">Why It Exists</h3>
-<p>Prevents startup with incomplete indexing and schema storage configuration.</p>
+<p>There is no hidden default for where data lives, and two engines with
+different <code>storage.path</code> values never share a store.</p>
 <hr />
 <h2 id="sql-generation-enforces-a-row-limit-cap">SQL Generation Enforces a Row Limit Cap</h2>
 <h3 id="definition_16">Definition</h3>
@@ -7753,7 +7759,7 @@
 <p>Concretely:</p>
 <ul>
 <li><code>nl2sql/__init__.py</code> imports only the <code>NL2SQL</code> class. Every other public name (<code>QueryResult</code>, <code>QueryEvent</code>, <code>CancellationToken</code>, the API classes, the benchmark) is imported the first time it is asked for, through the module's <code>__getattr__</code>. <code>from nl2sql import QueryResult</code> works as it always did.</li>
-<li><code>nl2sql/public_api.py</code> imports the runtime (<code>NL2SQLContext</code> and the API classes) inside <code>NL2SQL.__init__</code>, not at the top of the module.</li>
+<li><code>nl2sql/public_api.py</code> imports the runtime (<code>Runtime</code> and the API classes) inside <code>NL2SQL.__init__</code>, not at the top of the module.</li>
 <li>Runtime modules import their heavy libraries where they are used, as the adapters already do.</li>
 </ul>
 <h3 id="enforcement-points_20">Enforcement Points</h3>
@@ -7847,7 +7853,7 @@
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/dag.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/dag.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/aggregation/aggregator.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/context.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/schema/store.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/auth/models.py</code></li>

@@ -2586,8 +2586,9 @@ candidates now and then. The other searches stay approximate.</p>
 </ul>
 <h2 id="performance-characteristics-current">Performance characteristics (current)</h2>
 <ul>
-<li>Embedding uses <code>EmbeddingService</code>: OpenAI embeddings by default, or the local
-  ONNX <code>all-MiniLM-L6-v2</code> model when <code>EMBEDDING_PROVIDER=local</code>.</li>
+<li>Embedding uses the engine's own embedder, built from its <code>embeddings</code>
+  section: OpenAI embeddings, or the local ONNX <code>all-MiniLM-L6-v2</code> model with
+  <code>provider: local</code> (<code>EMBEDDING_PROVIDER=local</code> for the 0.4 entry points).</li>
 <li>Vector search is MMR (<code>lambda_mult=0.7</code>, <code>fetch_k = 4*k</code>); see
   <a href="#retrieval-mmr-not-a-re-ranking-model">Retrieval</a>.</li>
 <li>No caching or sharding layers are implemented.</li>

@@ -2211,7 +2211,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></p>
 - <code>GraphState.user_query</code> must be provided.
 - <code>GraphState.trace_id</code> is auto-generated if not provided.</p>
 <p>Preconditions:
-- <code>NL2SQLContext</code> must be initialized with registries/services used by nodes (vector store, LLM registry, datasource registry, schema store, RBAC).</p>
+- <code>Runtime</code> must be initialized with registries/services used by nodes (vector store, LLM registry, datasource registry, schema store, RBAC).</p>
 <p>Triggering parent graph:
 - None. This is the root graph invoked by <code>run_with_graph()</code> in <code>pipeline/runtime.py</code>.</p>
 <hr/>

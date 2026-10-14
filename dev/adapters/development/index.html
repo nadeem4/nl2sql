@@ -4611,6 +4611,8 @@ does not apply it (see the <a href="../sqlalchemy/#connect">reference</a>).</p>
 <li>Fetching and normalizing schema metadata.</li>
 <li>Executing queries and formatting results.</li>
 <li>Implementing safety breakers (<code>row_limit</code>).</li>
+<li>Accepting the keyword arguments the engine builds every adapter with: <code>datasource_id</code>, <code>datasource_engine_type</code>, <code>connection_args</code> (the datasource's <code>connection</code>, references resolved), <code>statement_timeout_ms</code>, <code>row_limit</code> and <code>max_bytes</code> (its <code>limits</code>), and <code>base_dir</code> (the folder of <code>nl2sql.yaml</code>, or None). Take <code>**kwargs</code> so a later one does not break you. Do not connect in the constructor: <code>engine.check()</code> calls <code>test_connection()</code>.</li>
+<li>Optionally, a <code>close()</code> that releases connections; <code>engine.close()</code> calls it once.</li>
 <li>Declaring <code>interface_version = 1</code>, the <code>driver_modules</code> it imports to connect, and an <code>install_hint</code> (see <a href="../sdk/#class-attributes">Class attributes</a>).</li>
 <li>Optionally, a <code>default_schema</code> attribute naming the schema an unqualified table resolves to. RBAC reads a two-part <code>datasource.table</code> policy entry as that table in this schema; without it, <code>main</code> is assumed.</li>
 </ul>

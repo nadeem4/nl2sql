@@ -1142,19 +1142,10 @@
 </nav>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#one-store-three-uri-schemes">
+<a class="md-nav__link" href="#where-the-files-go">
 <span class="md-ellipsis">
       
-        One store, three URI schemes
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#verification-status">
-<span class="md-ellipsis">
-      
-        Verification status
+        Where the files go
       
     </span>
 </a>
@@ -2064,19 +2055,10 @@
 </nav>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#one-store-three-uri-schemes">
+<a class="md-nav__link" href="#where-the-files-go">
 <span class="md-ellipsis">
       
-        One store, three URI schemes
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
-<a class="md-nav__link" href="#verification-status">
-<span class="md-ellipsis">
-      
-        Verification status
+        Where the files go
       
     </span>
 </a>
@@ -2138,7 +2120,8 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="artifact-store-architecture">Artifact Store Architecture</h1>
-<p>Execution results are persisted as <strong>artifacts</strong>. A single <code>ArtifactStore</code> writes Parquet to the configured backend (local, S3, ADLS) and emits <code>ArtifactRef</code> metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.</p>
+<p>Execution results are persisted as <strong>artifacts</strong>. A single <code>ArtifactStore</code> writes Parquet files under the engine's results folder, <code>&lt;storage.path&gt;/results/</code>, and emits <code>ArtifactRef</code> metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.</p>
+<p>Results are local files only. The S3 and ADLS backends, and the <code>RESULT_ARTIFACT_BACKEND</code>, <code>RESULT_ARTIFACT_S3_*</code> and <code>RESULT_ARTIFACT_ADLS_*</code> settings, were removed in 0.5: they were untested and unreachable from the new config. The Phase 2 results-store interface brings remote stores back.</p>
 <h2 id="storage-lifecycle">Storage lifecycle</h2>
 <pre class="mermaid"><code>flowchart TD
     Adapter[Adapter: execute_batches or execute] --&gt; Batches[ResultFrame batches]
@@ -2178,42 +2161,16 @@
 <li>The result id must be a <code>node_id</code> the manifest lists. The parquet path is then rendered from the template, exactly as the aggregator wrote it (<code>ArtifactStore.scan_result</code>); the manifest never supplies a path.</li>
 <li>A page is <code>scan.slice(offset, limit).collect()</code> on a polars scan, so only that slice is read. A CSV export collects one <code>CSV_CHUNK_ROWS</code> (10,000) slice at a time and yields it as CSV text, header first.</li>
 </ol>
-<p>On S3 and ADLS the manifest is written and read through <code>fsspec</code> (polars' own cloud IO writes only tables), which needs <code>s3fs</code> or <code>adlfs</code> installed beside it; neither is an engine dependency. Like the rest of the remote backends this is unit-tested at the URI level only and not yet verified against live storage.</p>
-<h2 id="one-store-three-uri-schemes">One store, three URI schemes</h2>
-<p>There is no per-backend subclass. <code>ArtifactStore</code> builds a backend-specific URI, then uses the same polars read/write path for all backends, since polars addresses <code>s3://</code> and <code>abfs://</code> natively.</p>
-<table>
-<thead>
-<tr>
-<th>Backend</th>
-<th>URI built from settings</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>local</code></td>
-<td><code>&lt;result_artifact_base_uri&gt;/&lt;rendered path&gt;</code> (parent directories are created)</td>
-</tr>
-<tr>
-<td><code>s3</code></td>
-<td><code>s3://&lt;s3_bucket&gt;/&lt;s3_prefix&gt;/&lt;rendered path&gt;</code></td>
-</tr>
-<tr>
-<td><code>adls</code></td>
-<td><code>abfs://&lt;adls_container&gt;@&lt;adls_account&gt;.dfs.core.windows.net/&lt;rendered path&gt;</code></td>
-</tr>
-</tbody>
-</table>
-<p>Missing required configuration raises a <code>ValueError</code> naming the environment variable to set — <code>RESULT_ARTIFACT_S3_BUCKET</code>, <code>RESULT_ARTIFACT_ADLS_CONTAINER</code>, or <code>RESULT_ARTIFACT_ADLS_ACCOUNT</code>. An unrecognised <code>RESULT_ARTIFACT_BACKEND</code> also raises rather than silently falling back to local.</p>
-<p>For ADLS, <code>RESULT_ARTIFACT_ADLS_CONNECTION_STRING</code> is forwarded to polars as <code>storage_options={"connection_string": ...}</code>. No Azure SDK client is constructed. S3 credentials are resolved by the underlying object-store layer from the usual environment.</p>
-<h2 id="verification-status">Verification status</h2>
-<ul>
-<li><strong>Local</strong> is exercised by real read/write round-trip tests (<code>packages/nl2sql/tests/unit/test_artifact_store.py</code>).</li>
-<li><strong>S3 and ADLS</strong> are implemented and unit-tested at the URI and <code>storage_options</code> level, with the actual object-store IO mocked. They have <strong>not</strong> been verified against a real S3 bucket or ADLS account. Treat them as unproven until someone runs them against live storage.</li>
-</ul>
+<h2 id="where-the-files-go">Where the files go</h2>
+<p>An artifact's path is <code>&lt;results folder&gt;/&lt;rendered path&gt;</code>, and its parent folders are created as it is written. For an engine built from a <code>Config</code> the results folder is <code>&lt;storage.path&gt;/results/</code> (see <a href="../../api/core/public-facade/#creating-an-engine">Public Facade → Creating an engine</a>), so the default template gives:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>&lt;storage.path&gt;/results/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+</code></pre></div>
+<p>Until the CLI, <code>nl2sql-api</code> and the playground move onto <code>nl2sql.yaml</code>, they start from the 0.4 files, and their results folder is still <code>RESULT_ARTIFACT_BASE_URI</code> (default <code>./artifacts</code>).</p>
+<p>The store is exercised by real read/write round-trip tests (<code>packages/nl2sql/tests/unit/test_artifact_store.py</code>).</p>
 <h2 id="artifactref-fields">ArtifactRef fields</h2>
 <p><code>ArtifactRef</code> contains:</p>
 <ul>
-<li><code>uri</code>, <code>backend</code>, <code>format</code></li>
+<li><code>uri</code>, <code>backend</code> (always <code>local</code>), <code>format</code></li>
 <li><code>row_count</code>, <code>columns</code>, <code>bytes</code></li>
 <li><code>content_hash</code>, <code>created_at</code></li>
 <li>optional <code>schema_version</code></li>
@@ -2221,8 +2178,8 @@
 <li><code>path_template</code>, the template actually rendered (see <em>One artifact per sub-query</em>)</li>
 </ul>
 <h2 id="path-templating">Path templating</h2>
-<p><code>Settings.result_artifact_path_template</code> defines the artifact path relative to the backend root, for every backend. It defaults to:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+<p>The path template defines the artifact path relative to the results folder. It defaults to:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <p>Each <code>&lt;key&gt;</code> placeholder is substituted from the metadata the executor passes to <code>write_batches</code>. The SQL executor supplies these keys:</p>
 <ul>
@@ -2238,8 +2195,8 @@
 <p>A question that decomposes into several sub-queries runs them under one trace ID, often side by side, and each must write its own file. When they shared <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code>, concurrent writes produced one corrupt Parquet file (<code>AGGREGATOR_FAILED: parquet: File out of specification</code>), and sequential writes kept only the last sub-query's rows, so a join combined a result with itself and returned a wrong answer with no error.</p>
 <p>A template that names neither <code>&lt;sub_query_id&gt;</code> nor <code>&lt;dag_node_id&gt;</code> is therefore made unique rather than rejected: the store adds <code>-&lt;sub_query_id&gt;</code> to the end of the file name, before its extension, so <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code> writes <code>&lt;tenant_id&gt;/&lt;request_id&gt;-&lt;sub_query_id&gt;.parquet</code>. The <code>ArtifactRef</code> records the template actually rendered in <code>path_template</code> and the sub-query in <code>sub_query_id</code>. A store used directly, with no <code>sub_query_id</code> in its metadata, renders the template as written.</p>
 <h2 id="tenant-aware-paths">Tenant-aware paths</h2>
-<p>Because the default template starts with <code>&lt;tenant_id&gt;</code>, every backend partitions artifacts per tenant:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>&lt;backend root&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+<p>Because the default template starts with <code>&lt;tenant_id&gt;</code>, artifacts are partitioned per tenant:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a>&lt;results folder&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <h2 id="source-references">Source references</h2>
 <ul>

@@ -1996,10 +1996,10 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="deployment-architecture">Deployment Architecture</h1>
-<p>NL2SQL is a Python engine that you embed in a service of your choice. The runtime is a single process that initializes <code>NL2SQLContext</code>, loads configuration, and invokes the pipeline per request.</p>
+<p>NL2SQL is a Python engine that you embed in a service of your choice. The runtime is a single process that initializes <code>Runtime</code>, loads configuration, and invokes the pipeline per request.</p>
 <h2 id="runtime-process-layout">Runtime process layout</h2>
 <pre class="mermaid"><code>flowchart TD
-    App[Service Process] --&gt; Context[NL2SQLContext]
+    App[Service Process] --&gt; Context[Runtime]
     Context --&gt; Registries[Registries + Stores]
     Context --&gt; Graph[LangGraph Pipeline]
     Graph --&gt; Exec[Executor Services]
@@ -2026,7 +2026,7 @@
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>
-<li>Context initialization: <code>packages/nl2sql/src/nl2sql/context.py</code></li>
+<li>Context initialization: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 <li>Settings: <code>packages/nl2sql/src/nl2sql/common/settings.py</code></li>
 </ul>
 </article>

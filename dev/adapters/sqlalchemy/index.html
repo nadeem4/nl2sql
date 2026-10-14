@@ -2154,6 +2154,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#close" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        close()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local_pathpath-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        local_path(path) -&gt; str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get_dialect-str" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4619,6 +4641,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#close" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        close()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local_pathpath-str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        local_path(path) -&gt; str
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get_dialect-str" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4772,6 +4816,16 @@ Each adapter enforces it in <code>connect()</code> the way its driver allows: Po
 <code>statement_timeout</code>, MySQL with <code>MAX_EXECUTION_TIME</code>, SQL Server with pyodbc's
 query timeout, DuckDB by interrupting the connection. An adapter that does nothing
 here has no statement timeout.</p>
+<h4 id="close"><code>close()</code></h4>
+<p>Disposes the connection pool. The engine calls an adapter's <code>close()</code>, when it
+has one, once, from <code>engine.close()</code>. Building an adapter never connects:
+<code>create_engine</code> opens no connection until the first query or <code>test_connection()</code>.</p>
+<h4 id="local_pathpath-str"><code>local_path(path) -&gt; str</code></h4>
+<p>For a file-based database. The engine passes each adapter <code>base_dir</code>, the
+folder of the <code>nl2sql.yaml</code> the datasource came from (None when the config was
+built in code). <code>local_path</code> reads a relative path from there, and leaves an
+absolute path and <code>:memory:</code> as they are. The SQLite and DuckDB adapters call it
+in <code>construct_uri</code>.</p>
 <h4 id="get_dialect-str"><code>get_dialect() -&gt; str</code></h4>
 <p>Returns the <strong>sqlglot</strong> dialect name the engine renders SQL in: <code>postgres</code>,
 <code>tsql</code>, <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, or any other name

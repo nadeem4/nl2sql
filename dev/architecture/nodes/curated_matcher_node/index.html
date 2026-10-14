@@ -2192,7 +2192,7 @@
 <li><code>datasource_id</code> (Optional[str]): when set, only this datasource is searched.</li>
 <li><code>user_context</code> (<code>UserContext</code>, required): the role's datasources and tables.</li>
 </ul>
-<p>Context dependencies (<code>NL2SQLContext</code>):</p>
+<p>Context dependencies (<code>Runtime</code>):</p>
 <ul>
 <li><code>curated</code>: the loaded <code>CuratedFileConfig</code>. The matcher reads every query from it, never from the index.</li>
 <li><code>vector_store</code>: <code>retrieve_verified_query_candidates()</code>.</li>

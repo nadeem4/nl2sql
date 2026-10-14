@@ -2283,7 +2283,7 @@
 <li><code>datasource_id</code> (Optional[str]): explicit override for datasource selection.</li>
 <li><code>user_context</code> (<code>UserContext</code>, required): RBAC enforcement.</li>
 </ul>
-<p>Context dependencies (<code>NL2SQLContext</code>):</p>
+<p>Context dependencies (<code>Runtime</code>):</p>
 <ul>
 <li><code>vector_store</code>: needed only when more than one datasource is registered and no override is given; missing then, the resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code>.</li>
 <li><code>ds_registry</code>: adapter registry for registered IDs.</li>

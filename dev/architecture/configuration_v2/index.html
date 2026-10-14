@@ -3106,8 +3106,8 @@ written into the section it affects:</p>
 <p class="admonition-title">Built: the models and <code>load_config</code> (PR 2)</p>
 <p>The models, <code>load_config</code>, <code>ConfigError</code>, <code>load_env_file</code> and the
 <code>nl2sql.testing.config.make_config</code> test helper are in <code>nl2sql.config</code>.
-Nothing reads them yet: the engine is moved onto them in PR 7a, and they
-are exported from <code>nl2sql</code> from then on. Until PR 7b this section stays the
+The engine is built from them since PR 7a, and they
+are exported from <code>nl2sql</code>. Until PR 7b this section stays the
 reference. Building them settled these details:</p>
 <ul>
 <li>In <code>Settings</code>, the <code>schema</code> group is the attribute <code>schema_</code> in Python,
@@ -4104,6 +4104,64 @@ call it, and the boundary test allows <code>load_dotenv</code> there and nowhere
 </tbody>
 </table>
 <h2 id="4-creating-the-engine">4. Creating the engine</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: the runtime from <code>Config</code> (PR 7a)</p>
+<p><code>NL2SQL(config, *, registry=None)</code>, <code>NL2SQL.from_config()</code>,
+<code>NL2SQL.demo()</code>, <code>check()</code>, <code>close()</code> and the context manager are built.
+<code>Runtime.from_config(cfg, registry)</code> (<code>nl2sql/runtime.py</code>) replaces
+<code>NL2SQLContext</code> and <code>nl2sql/context.py</code>; <code>CheckReport</code>, <code>DatasourceStatus</code>
+and <code>EngineNotReady</code> are in <code>nl2sql/check.py</code>. <code>Config</code>, <code>load_config</code> and
+the section classes are exported lazily from <code>nl2sql</code>. Building it settled
+these details:</p>
+<ul>
+<li><strong>What fails where.</strong> Everything that can be known without a connection
+  is one <code>ConfigError</code> from the constructor: an unknown or uninstalled
+  name, a secret provider that cannot start (bug B10), an adapter that
+  rejects its connection settings or a reference that does not resolve,
+  an embeddings provider without its key, and curated answers that do not
+  match the datasources. A datasource that cannot connect is <code>check()</code>'s:
+  <code>failed</code> at stage <code>connect</code>. <code>test_connection()</code> returns a bool, so the
+  reason is generic until the SDK v2 stages (Phase 2). A problem names
+  <code>nl2sql.yaml</code> (or <code>Config</code> when built in code) and the path inside the
+  config (<code>datasources[1].type</code>); which split file a section came from is
+  not tracked yet.</li>
+<li><strong>Relative files.</strong> <code>load_config</code> records the folder of <code>nl2sql.yaml</code>
+  as <code>Config.folder</code> (a private attribute that copies keep and equality
+  ignores). The engine passes it to every adapter as <code>base_dir</code>, and the
+  SQLite and DuckDB adapters read a relative <code>database</code> from there
+  (<code>BaseSQLAlchemyAdapter.local_path</code>). The adapters' connection models no
+  longer have a <code>type</code> field: <code>type</code> is on the <code>Datasource</code>.</li>
+<li><strong>One secret provider shape.</strong> <code>SecretProviderConfig</code> is the one in
+  <code>nl2sql.config</code> (<code>id</code>, <code>type</code> and the provider's own keys, kept as
+  written). The provider's <code>config_model</code> validates the block when the
+  engine builds the provider, after resolving its <code>${env:...}</code> values.
+  <code>nl2sql/secrets/models.py</code> and the module-level <code>secret_manager</code> are
+  deleted; each engine builds its own <code>SecretManager(registry)</code>.</li>
+<li><strong>Per engine.</strong> The embedder is built once from <code>embeddings</code> through the
+  registry, or is the <code>instance</code> given; <code>EmbeddingService</code> is deleted. The
+  LLM settings still go through <code>LLMRegistry</code> until PR 9: it takes the
+  <code>llm</code> section (<code>configure(llm)</code>), resolves providers through the
+  registry, and hands back a chat model object given as <code>LLM(model=...)</code>.
+  <code>Policies.allow_all</code> and <code>default_role</code> are applied by <code>RBAC</code>.</li>
+<li><strong>Stores.</strong> The index is <code>&lt;storage.path&gt;/index/</code> (collection
+  <code>nl2sql_store</code>, a constant), the schema store <code>&lt;storage.path&gt;/state.db</code>,
+  traces <code>&lt;storage.path&gt;/traces/</code> and results <code>&lt;storage.path&gt;/results/</code>.
+  The S3 and ADLS result backends and their settings are deleted.</li>
+<li><strong>Datasources.</strong> <code>engine.add_datasource(Datasource)</code> builds the adapter
+  (not connected) and swaps in a new <code>engine.config</code> under the engine's
+  lock. Indexing reads a datasource's description and sample questions
+  from its <code>Datasource</code>, so one added in code keeps both (bug B9).
+  <code>sample_questions.yaml</code> is read only by the 0.4 entry points.</li>
+<li><strong>The 0.4 entry points.</strong> The CLI, <code>nl2sql-api</code> and the playground
+  still start from the 0.4 files: <code>nl2sql._legacy</code> reads them into a
+  <code>Config</code> (<code>_legacy_config</code>) and keeps their stores where the 0.4
+  variables put them; the facade's private <code>NL2SQL._legacy(**paths)</code> is
+  what <code>nl2sql-api</code> and the playground call. PR 7b deletes the module.</li>
+<li><strong>Tests.</strong> <code>nl2sql.testing.config.make_demo_config(folder)</code> is
+  <code>make_config</code> with the demo's databases and roles; the integration and
+  end-to-end fixtures build their runtime from it.</li>
+</ul>
+</div>
 <p>Every way builds the same <code>Config</code>. Names in it are resolved through a
 <code>Registry</code>, and the default registry is used when none is passed.</p>
 <p><strong>1. From the file.</strong> This is the common case.</p>
@@ -4316,8 +4374,8 @@ the four entry point groups. <code>LLMProvider</code> and <code>ResolvedAgent</c
 <code>nl2sql.llm.providers</code>, <code>EmbeddingsProvider</code> in <code>nl2sql.embeddings</code>.
 <code>discover_adapters()</code> and <code>nl2sql/secrets/factory.py</code> are deleted: the
 <code>DatasourceRegistry</code>, the secret manager and <code>nl2sql list-adapters</code> use the
-registry. The runtime still builds its LLM clients and embedder from the
-0.4 settings until PR 7a passes a registry in.</p>
+registry. Since PR 7a the runtime resolves its LLM providers and builds its
+embedder through the registry it is given.</p>
 </div>
 <h3 id="what-it-is">What it is</h3>
 <p>A YAML file holds only text. When it says <code>type: postgres</code> or
@@ -4905,6 +4963,16 @@ Phase 1. OpenTelemetry moves in Phase 3.</p>
   <code>cfg.model_copy(update=...)</code> instead of editing a global and restoring it.</li>
 </ul>
 <h3 id="staging-it">Staging it</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: step 1 (PR 7a)</p>
+<p><code>_copy_into_global_settings</code> in <code>nl2sql/runtime.py</code> copies the <code>settings</code>
+section, <code>policies.refusal_names_tables</code>, <code>llm.prices</code>, whether <code>curated</code>
+is present, and the store locations under <code>storage.path</code> into the global.
+<code>READS_THE_SETTINGS_GLOBAL</code> in <code>tests/architecture/test_boundaries.py</code> is
+the ratchet list, and <code>tests/e2e/test_two_engines_fake_llm.py</code> is the
+strict expected failure. The repository's root <code>conftest.py</code> puts the
+global back after every test, because building an engine changes it.</p>
+</div>
 <p>Each step is one green PR, and no release happens in between:</p>
 <ol>
 <li><strong>The switch PR (7a in the plan)</strong> introduces <code>Runtime.from_config(cfg)</code>.
