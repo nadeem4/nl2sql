@@ -27,6 +27,15 @@ database is designed from memory.** Until now every test ran against SQLite,
 DuckDB and mocks. Phase 2 builds a test bed with real PostgreSQL, MySQL and
 SQL Server first, and the adapter work is proven on it.
 
+## Owner decisions
+
+Decisions the owner made on this design. Each is written into the section it
+affects.
+
+| # | Decision | Where |
+|---|---|---|
+| 1 | **The GCP test bed is deleted when idle and recreated per session.** Cloud SQL bills a stopped instance's public IPv4 address and will not drop it, and Private Service Connect can only be chosen at creation, so no instance exists between sessions. `up` creates them with session-unique names and imports the samples from the bucket; `down` deletes them; a nightly backstop deletes any left behind. | [The GCP test bed](#the-gcp-test-bed) |
+
 ## Where Phase 1 left us
 
 | Area | What 0.5 has | What is still wrong |
@@ -45,7 +54,7 @@ SQL Server first, and the adapter work is proven on it.
 
 | Goal | What it means |
 |---|---|
-| **A real-database test bed** | PostgreSQL with Pagila, MySQL with Sakila and SQL Server 2022 with AdventureWorksLT, plus a generated schema of 1,200 tables in 20 schemas. They run as CI service containers, in `docker compose` locally, and on a small GCP test bed that is stopped whenever it is not in use. A `realdb` pytest marker and fixtures point the same tests at any of them. |
+| **A real-database test bed** | PostgreSQL with Pagila, MySQL with Sakila and SQL Server 2022 with AdventureWorksLT, plus a generated schema of 1,200 tables in 20 schemas. They run as CI service containers, in `docker compose` locally, and on a GCP test bed that is created for each session and deleted after it. A `realdb` pytest marker and fixtures point the same tests at any of them. |
 | **Four stores** | `storage` gets `index`, `state`, `traces` and `results`, each with a `type`, behind four small interfaces in the SDK. The index's build pointer is the commit, which fixes bug B5. The index has one namespace per embedding model. |
 | **More LLM providers** | `openai_compatible` (any server with an OpenAI-style API, at a `base_url`) and `azure_openai`. Each provider declares how it returns structured output, and a malformed answer is retried with the error fed back. |
 | **More embeddings providers** | `openai_compatible` and `azure_openai`, `base_url` on every hosted provider, and a known model and dimension for every embedder. |
@@ -169,7 +178,7 @@ docker compose -f testbed/compose.yaml down        # add -v to drop the data
 
 ### The loader
 
-`testbed/load.py --target compose|ci|gcp [--wide postgres|all]` loads every
+`testbed/load.py --target compose|ci [--wide postgres|all]` loads every
 sample and the wide schema, and is safe to run again.
 
 - **Idempotent.** Each database holds a `testbed_meta(sample, version,
@@ -183,11 +192,12 @@ sample and the wide schema, and is safe to run again.
     (`docker exec -i <container> psql ... < file`). The SQL Server image
     ships `sqlcmd`. The `.bak` file is copied in with `docker cp` and
     restored with `RESTORE DATABASE ... WITH MOVE`.
-  - On GCP the loader uses Cloud SQL's own import, so no client is needed
-    on the caller's machine: it copies the files once to the bucket
-    `gs://nl2sql-testbed-261014-samples` and runs `gcloud sql import sql`
-    (PostgreSQL, MySQL) or `gcloud sql import bak` (SQL Server). The bucket
-    holds a few megabytes.
+  - On GCP, `scripts/testbed.py up` loads the fresh instances with Cloud
+    SQL's own import from the bucket `gs://nl2sql-testbed-261014-samples`
+    (`gcloud sql import sql` for PostgreSQL and MySQL, `gcloud sql import
+    bak` for SQL Server), so no client is needed on the caller's machine.
+    The bucket holds a few megabytes: the samples, the generated wide
+    schemas and the logins script.
 - **Logins.** It also creates `nl2sql_reader`, with read grants on the
   sample databases only. The conformance kit uses it for the `permission`
   stage of `test_connection`.
@@ -258,64 +268,80 @@ cover `packages/*/src`, not the tests.
 
 ### The GCP test bed
 
-The owner is provisioning it. This design covers how it is used and kept
-cheap.
+Cloud SQL bills a stopped instance's public IPv4 address (about $7.30 a month
+each) and will not drop it, and Private Service Connect can only be chosen
+when an instance is created. So the owner chose **delete when idle, recreate
+per session** ([owner decision 1](#owner-decisions)): no instance exists
+between test runs, idle cost is about $0, and each session pays about ten
+minutes to create the instances and import the samples.
 
 | Setting | Value |
 |---|---|
 | Project | `nl2sql-testbed-261014` |
 | Region | `us-central1` |
-| Instances | `testbed-postgres` (`POSTGRES_16`), `testbed-mysql` (`MYSQL_8_0`), `testbed-mssql` (`SQLSERVER_2022_EXPRESS`) |
+| Instances | None between sessions. Each session creates three, with names unique to it (below). |
 | Root passwords | Secret Manager: `testbed-postgres-root-password`, `testbed-mysql-root-password`, `testbed-mssql-root-password` |
 | Root users | `postgres`, `root`, `sqlserver` (Cloud SQL's names) |
+| Sample dumps | `gs://nl2sql-testbed-261014-samples` |
 | Budget | $10 a month, with alerts |
+
+What `up` creates, all with `--edition=ENTERPRISE --no-backup
+--no-storage-auto-increase --no-deletion-protection --storage-size=10GB`:
+
+| Server | Name | `--database-version` | `--tier` | Storage |
+|---|---|---|---|---|
+| PostgreSQL | `tb-pg-<yymmddhhmm>` | `POSTGRES_16` | `db-f1-micro` | HDD |
+| MySQL | `tb-my-<yymmddhhmm>` | `MYSQL_8_0` | `db-f1-micro` | HDD |
+| SQL Server | `tb-ms-<yymmddhhmm>` | `SQLSERVER_2022_EXPRESS` | `db-custom-1-3840` | SSD (SQL Server requires it) |
+
+Names are unique per session because Cloud SQL does not let a deleted
+instance's name be reused for about a week. The `tb-` prefix is how `status`
+and the backstop find them: `gcloud` has no GA flag to label a Cloud SQL
+instance.
 
 `scripts/testbed.py` is Python, not a shell script, because the owner works on
 Windows and CI runs Linux. It calls `gcloud` (found with `shutil.which`, so
 `gcloud.cmd` works) with `--format=json`, and never writes the environment of
-its own process.
+its own process. It records the current session in `testbed/.state.json`
+(not committed): the three instance names, when they were created and their
+addresses. Never a password.
 
 | Command | What it does |
 |---|---|
-| `up` | For each instance, in parallel: `gcloud sql instances patch <name> --activation-policy=ALWAYS --assign-ip --authorized-networks=<caller IP>/32`, then waits for `RUNNABLE`. The caller's IPv4 address comes from `https://checkip.amazonaws.com`; `up` refuses if it cannot find one. |
-| `load` | `testbed/load.py --target gcp --wide all`. Needs `up`. Idempotent. |
-| `status` | Each instance's state, activation policy, public IP, authorized networks, and whether anything other than storage is being billed. |
-| `down` | For each instance: clear the authorized networks and remove the public IP while it is still running, then `--activation-policy=NEVER`. Waits until each is `STOPPED` without an address. |
-| `run -- <cmd>` | `up`, `load`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` in the child's environment only, then `down` in a `finally`, even on Ctrl-C or a failing command. It exits with the command's code. |
+| `up` | Refuses if the state file already names a session. Finds the caller's IPv4 address (`https://checkip.amazonaws.com`; refuses without one). Chooses the names and writes the state file first, so a failure part-way still leaves a record for `down`. Creates the three instances in parallel (`gcloud sql instances create ... --async`) with `--root-password` from Secret Manager and `--authorized-networks=<caller IP>/32`, and waits for `RUNNABLE`. Grants each instance's service account `roles/storage.objectViewer` on the bucket, then imports: `gcloud sql import sql` for Pagila, Sakila, the wide schema and the test logins, and `gcloud sql import bak` for AdventureWorksLT. A dump is uploaded to the bucket only when its checksum is not there yet. |
+| `status` | Every `tb-` instance in the project (not only this session's), with state, creation time, address and authorized networks, and whether the state file names it. |
+| `down` | Deletes the instances the state file names (`gcloud sql instances delete --quiet`, in parallel), removes their bucket grants, then deletes the state file. With `--all`, deletes every `tb-` instance. Safe to run again. |
+| `run -- <cmd>` | `up`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` in the child's environment only, then `down` in a `finally`: also on Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
 
 Passwords are read with `gcloud secrets versions access latest` into memory,
-passed to the child process, and never written to a file or printed. `status`
-prints addresses, never passwords. One `run` at a time: a second `run` would
-stop the instances under the first, and the script says so in its help.
+passed to `gcloud` and to the child process, and never written to a file or
+printed. One session at a time: `up` refuses while the state file exists.
 
-**The nightly stop.** If `testbed.py` is killed hard, or someone starts an
-instance in the console, the instances would keep billing. A backstop stops
-them every night at 03:00 UTC:
+**The nightly backstop.** If `testbed.py` is killed hard, or an instance is
+created by hand, it would keep billing. Once a night (03:00 UTC) a backstop
+deletes every `tb-` instance older than 6 hours:
 
-- three Cloud Scheduler HTTP jobs, one per instance (three jobs are inside
-  Cloud Scheduler's free tier);
-- each calls the Cloud SQL Admin API directly, with an OAuth token for a
-  service account that has `roles/cloudsql.editor`:
-  `PATCH https://sqladmin.googleapis.com/v1/projects/nl2sql-testbed-261014/instances/<name>`
-  with the body
-  `{"settings": {"activationPolicy": "NEVER", "ipConfiguration": {"ipv4Enabled": false, "authorizedNetworks": []}}}`;
-- no function or container is needed.
+- a Cloud Run job on Google's Cloud SDK image, with a short script: list the
+  instances, keep those named `tb-` whose `createTime` is more than 6 hours
+  ago, delete them;
+- a Cloud Scheduler job that starts it, as a service account with
+  `roles/cloudsql.admin` on this project only;
+- at one run a night, both stay inside their free tiers.
 
-`docs/testing/test-bed.md` gives the three `gcloud scheduler jobs create
-http` commands for the owner to run once. Nothing in the repository creates
-cloud resources.
+`docs/testing/test-bed.md` gives the commands for the owner to create the job
+and the schedule once. Nothing in the repository creates cloud resources by
+itself; `testbed.py` does so only when someone runs it.
 
 ### Cost controls
 
 | Control | Why |
 |---|---|
-| Activation policy `NEVER` whenever no test is running | A running instance bills by the hour |
-| Public IP removed when stopped | An idle public IPv4 address is billed (about $7 a month each) |
-| Authorized networks: only the caller's `/32`, cleared on `down` | Nothing else can reach a running instance |
-| `run` always calls `down` in a `finally` | A failed test cannot leave instances running |
-| The nightly stop at 03:00 UTC | The backstop for everything above |
-| Automated backups and point-in-time recovery off | Backup storage is billed; the data is reloadable |
-| 10 GB of storage per instance, the minimum | Storage is billed while stopped |
+| No instance exists between sessions | Nothing bills while idle: no compute, no storage, no idle IPv4 |
+| `run` always calls `down` in a `finally` | A failed test cannot leave instances behind |
+| The nightly backstop deletes `tb-` instances older than 6 hours | Covers a killed script or a hand-made instance |
+| Authorized networks: only the caller's `/32` | Nothing else can reach an instance |
+| `--no-backup`, `--no-storage-auto-increase`, 10 GB, HDD where allowed | Backups and grown disks are billed; the data is reloadable |
+| Shared-core tiers for PostgreSQL and MySQL; the smallest custom tier for SQL Server Express | The cheapest that runs the samples |
 | Budget of $10 a month with alerts | The last line |
 
 What it should cost, roughly (check the billing report after the first
@@ -323,16 +349,10 @@ month):
 
 | Item | Approximate cost |
 |---|---|
-| Three stopped instances, 10 GB each | a few dollars a month for storage |
-| All three running | about $0.10 an hour (two shared-core instances and one small SQL Server Express) |
-| The samples bucket | under one cent a month |
+| Idle, between sessions | about $0: the bucket's few megabytes and three secrets |
+| A session | about $0.10 an hour while the three instances exist, including the ten minutes to create and load them |
 
-So a few hours of test runs a week stays inside $10.
-
-**A constraint to confirm.** We expect Cloud SQL to refuse an instance with no
-connectivity at all: removing the public IP needs another path, such as a
-private IP. PR T2 confirms this on the first `down`. [Open question 1](#14-open-questions)
-covers what to do.
+So even a session every day stays well inside $10.
 
 ## 4. Storage: four stores
 
@@ -1185,7 +1205,7 @@ flowchart TD
   D --> S1["S1. Store interfaces, config, registry kind"]
   D --> E1["E1. Embeddings providers v2"]
   D --> P1["P1. Policies: globs, Scope, hidden tables"]
-  T1 --> T2["T2. GCP test bed: testbed.py, nightly stop"]
+  T1 --> T2["T2. GCP test bed: testbed.py, nightly backstop"]
   S1 --> S2["S2. Index store, pointer as commit (B5), namespaces"]
   E1 --> S2
   D --> L1["L1. LLM providers and agent fields"]
@@ -1211,7 +1231,7 @@ flowchart TD
 | # | PR | Depends on | Tests first | Docs |
 |---|---|---|---|---|
 | T1 | **Test bed.** `testbed/compose.yaml`, `testbed/load.py` (pins, checksums, `testbed_meta`, `--target compose\|ci`), `testbed/wide_schema.py`, the `realdb` marker, `tests/realdb/conftest.py`, the CI `realdb` job, the unit job's `not realdb`. Fixes B19. | — | `test_wide_schema_is_deterministic`, `test_wide_schema_has_1200_tables_in_20_schemas`, `test_loader_skips_a_loaded_sample`, `test_loader_rejects_a_bad_checksum`, `test_realdb_fixture_skips_with_the_fix_when_unset`, `test_realdb_fixture_fails_when_required`; `realdb`: `test_each_sample_is_loaded` (each sample's known tables are present) | new `testing/test-bed.md` (licences, compose, CI); `testing/architecture.md`; `CLAUDE.md` and `CONTRIBUTING.md` checks |
-| T2 | **GCP test bed.** `scripts/testbed.py` (`up`, `down`, `status`, `load`, `run`), `--target gcp` in the loader, the nightly-stop commands in the docs. | T1 | Unit tests with a fake `gcloud` on `PATH`: `test_up_authorizes_only_the_callers_ip`, `test_down_clears_networks_and_ip_before_stopping`, `test_run_stops_even_when_the_command_fails`, `test_run_stops_on_keyboard_interrupt`, `test_passwords_go_to_the_child_only`, `test_up_refuses_without_an_ipv4_address` | `testing/test-bed.md` (GCP, cost controls, scheduler commands) |
+| T2 | **GCP test bed.** `scripts/testbed.py` (`up`, `down`, `status`, `run`), the bucket uploads and imports, the state file, and the backstop's script and commands in the docs. | T1 | Unit tests with a fake `gcloud` on `PATH`: `test_up_creates_three_instances_with_session_names`, `test_up_authorizes_only_the_callers_ip`, `test_up_writes_state_before_waiting`, `test_up_refuses_while_a_session_exists`, `test_down_deletes_what_state_names_and_removes_grants`, `test_run_deletes_even_when_the_command_fails`, `test_run_deletes_on_keyboard_interrupt`, `test_run_deletes_after_a_failed_up`, `test_passwords_go_to_the_child_only`, `test_up_refuses_without_an_ipv4_address`, `test_backstop_selects_only_old_tb_instances` | `testing/test-bed.md` (GCP, cost controls, backstop commands) |
 | S1 | **Store interfaces.** `nl2sql_sdk.stores` (four protocols, `Entry`, `Filter`, `BuildPointer`); `StoreConfig` and the four `Storage` sub-blocks; the `store` registry kind and `nl2sql.stores` group; slot checks. The built-ins are thin wrappers over today's classes. | — | `test_storage_with_only_path_is_valid`, `test_store_type_in_the_wrong_slot_names_the_installed_ones`, `test_store_block_keys_are_validated_by_its_config_model`, `test_store_object_is_used_as_given`, `test_the_sdk_stores_module_imports_only_pydantic` | `configuration/storage.md`, `adapters/sdk.md` (stores) |
 | E1 | **Embeddings providers v2.** `openai_compatible`, `azure_openai`, `base_url`, `dimension`, `describe()`, the one-call probe, `PROVIDER_PRESETS` rows. | — | `test_openai_compatible_needs_a_model_and_base_url`, `test_base_url_is_an_error_for_local`, `test_known_dimension_needs_no_call`, `test_unknown_dimension_is_probed_once`, `test_azure_key_is_read_from_its_preset_variable` | `configuration/embeddings.md` |
 | P1 | **Policies: globs and `Scope`.** `allow`/`deny`, the pattern rules, `PolicyEngine.scope`, a run's scopes pinned, every call site on `Scope`, the retriever hiding denied tables, `nl2sql/auth` to `nl2sql/policies`. Demo roles rewritten. | — | `test_deny_beats_allow_within_a_role`, `test_union_across_roles_keeps_each_roles_deny`, `test_two_part_pattern_is_rejected_with_the_fix`, `test_matching_ignores_case`, `test_denied_table_never_reaches_the_planner_prompt`, `test_plan_naming_a_hidden_table_is_refused`, `test_every_access_decision_goes_through_scope` (architecture), the tier 1 benchmark per demo role | `configuration/policies.md`, `security/model.md`, `architecture/nodes/schema_retriever_node.md`, `logical_validator_node.md` |
@@ -1258,21 +1278,9 @@ The waves, with at most four PRs at once:
 Only decisions that the owner decisions and Phase 1 do not settle. Each has
 options and a recommendation.
 
-**1. How do we stop paying for idle public IPs on Cloud SQL?**
-Removing the public IP from a stopped instance should stop the IPv4 charge,
-but we expect Cloud SQL to refuse an instance with no connectivity path at
-all.
-
-- (a) Add a private IP to each instance on the project's default VPC (a
-  one-time private services access set-up, with no charge for the range),
-  so `down` can remove the public IP.
-- (b) Keep the public IPs and pay about $7 a month each, which alone exceeds
-  the $10 budget.
-- (c) Delete the instances after each session and recreate them, which costs
-  10 or more minutes and a full reload every time.
-
-*Recommendation: (a).* T2 confirms the constraint on the first `down` and
-documents the one-time set-up.
+**1. Settled.** How to stop paying for idle public IPs on Cloud SQL: the
+owner chose delete when idle, recreate per session. See
+[Owner decisions](#owner-decisions).
 
 **2. When does the `realdb` CI job run?**
 
@@ -1290,8 +1298,8 @@ is easy to misread as green.
 - (a) No: the owner runs `scripts/testbed.py run` by hand, and once before
   each release.
 - (b) Yes, from a manual (`workflow_dispatch`) workflow, with Workload
-  Identity Federation and a service account that can only patch these three
-  instances.
+  Identity Federation and a service account that can create and delete
+  Cloud SQL instances in the test-bed project.
 
 *Recommendation: (a) for Phase 2.* The CI containers cover every pull
 request. (b) means cloud credentials in GitHub for little gain until there
