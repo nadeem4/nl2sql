@@ -12,6 +12,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL
+from nl2sql.testing.facade import StubDatasources
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.indexing.vector_store import VectorStore
 
@@ -35,8 +36,9 @@ class _Engine(NL2SQL):
         self._runtime.schema_store = _Snapshots()
         self._runtime.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: ["chinook"])})()
 
-    def list_datasources(self):
-        return ["chinook"]
+    @property
+    def datasources(self):
+        return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
 
 def _client(tmp_path, host="127.0.0.1", allow_settings=False, store="filled"):

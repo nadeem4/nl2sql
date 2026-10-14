@@ -1,0 +1,336 @@
+"""The facade's namespaces: one test per method in docs/architecture/configuration_v2.md, section 7.
+
+Each builds a real engine on a ``make_config`` folder with a small SQLite
+database and a fake embedder, so nothing is downloaded and no model is called.
+The results namespace is covered in ``test_result_paging.py``, the curated one
+in ``test_cli_curated_validate.py`` and ``test_cli_curated_test.py`` as well.
+"""
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+import pytest
+from langchain_core.embeddings import DeterministicFakeEmbedding
+
+from nl2sql import (
+    LLM,
+    NL2SQL,
+    ConfigError,
+    Datasource,
+    DatasourceInfo,
+    DatasourceStatus,
+    Embeddings,
+    IndexProgress,
+    LLMChange,
+    Registry,
+    UserContext,
+)
+from nl2sql.testing.config import make_config
+
+SHOP = {"id": "shop", "type": "sqlite", "description": "Orders and customers",
+        "connection": {"database": "shop.db"}}
+BROKEN = {"id": "broken", "type": "sqlite", "connection": {"database": "no/such/folder/x.db"}}
+
+
+def _shop(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(path) as connection:
+        connection.execute("CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT)")
+        connection.execute("INSERT INTO customers VALUES (1, 'Ada')")
+    return path
+
+
+def _engine(tmp_path: Path, registry=None, **sections) -> NL2SQL:
+    _shop(tmp_path / "shop.db")
+    sections.setdefault("datasources", [SHOP])
+    cfg = make_config(tmp_path, **sections)
+    return NL2SQL(cfg.model_copy(update={"embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8))}),
+                  registry=registry)
+
+
+@pytest.fixture
+def engine(tmp_path):
+    with _engine(tmp_path) as engine:
+        yield engine
+
+
+class SecretAdapter:
+    """An adapter that takes a password and never connects."""
+
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
+    def __init__(self, datasource_id=None, datasource_engine_type=None, connection_args=None, **kwargs):
+        self.datasource_id = datasource_id
+        self.datasource_engine_type = datasource_engine_type
+        self.connection_args = connection_args or {}
+
+    def capabilities(self):
+        return set()
+
+    def test_connection(self):
+        return True
+
+    def get_dialect(self):
+        return "postgres"
+
+
+# ---------------------------------------------------------------- datasources
+
+def test_datasources_list_reports_every_configured_datasource_and_its_status(tmp_path):
+    with _engine(tmp_path, datasources=[SHOP, BROKEN]) as engine:
+        before = engine.datasources.list()
+        assert [(d.id, d.status) for d in before] == [("shop", "unchecked"), ("broken", "unchecked")]
+
+        engine.check()
+        after = {d.id: d for d in engine.datasources.list()}
+
+    assert all(isinstance(d, DatasourceInfo) for d in before)
+    assert after["shop"].status == "ready" and after["shop"].type == "sqlite"
+    assert after["shop"].description == "Orders and customers" and after["shop"].capabilities
+    assert after["broken"].status == "failed" and after["broken"].reason
+    assert after["broken"].capabilities == []
+
+
+def test_datasources_get_masks_the_connection(tmp_path):
+    registry = Registry.default()
+    registry.add_adapter("secretive", SecretAdapter)
+    datasource = {"id": "dw", "type": "secretive", "connection": {"host": "db.local", "password": "hunter2"}}
+    with _engine(tmp_path, registry=registry, datasources=[datasource]) as engine:
+        info = engine.datasources.get("dw")
+        with pytest.raises(ValueError, match="Unknown datasource ID: nope"):
+            engine.datasources.get("nope")
+
+    assert info.connection == {"host": "db.local", "password": "***"}
+    assert "hunter2" not in repr(info)
+
+
+def test_datasources_add_joins_the_config(engine, tmp_path):
+    _shop(tmp_path / "other.db")
+    engine.datasources.add(Datasource(id="other", type="sqlite",
+                                      connection={"database": (tmp_path / "other.db").as_posix()}))
+
+    assert [d.id for d in engine.config.datasources] == ["shop", "other"]
+    assert engine.datasources.get("other").status == "unchecked"
+
+
+def test_datasources_remove_leaves_the_config_and_routing(engine):
+    engine.datasources.remove("shop")
+
+    assert engine.config.datasources == []
+    assert engine.datasources.list() == []
+    with pytest.raises(ValueError, match="Unknown datasource ID: shop"):
+        engine.datasources.remove("shop")
+
+
+def test_datasources_schema_is_empty_before_the_first_index(engine):
+    schema = engine.datasources.schema("shop")
+
+    assert schema["tables"] == []
+
+
+def test_datasources_test_connects_one_datasource(tmp_path):
+    with _engine(tmp_path, datasources=[SHOP, BROKEN]) as engine:
+        ready = engine.datasources.test("shop")
+        failed = engine.datasources.test("broken")
+
+    assert isinstance(ready, DatasourceStatus) and ready.status == "ready"
+    assert failed.status == "failed" and failed.stage == "connect"
+
+
+# ---------------------------------------------------------------- index
+
+def test_index_build_reports_each_datasource_as_it_goes(engine):
+    progress = []
+
+    result = engine.index.build(on_datasource=progress.append)
+
+    assert result.ok
+    assert [(p.datasource_id, p.state) for p in progress] == [("shop", "started"), ("shop", "done")]
+    assert all(isinstance(p, IndexProgress) for p in progress)
+    assert progress[-1].counts and all(isinstance(v, int) for v in progress[-1].counts.values())
+
+
+def test_index_build_reports_a_failed_datasource_with_its_reason(engine):
+    progress = []
+
+    result = engine.index.build(["nope"], on_datasource=progress.append)
+
+    assert not result.ok
+    assert progress == [IndexProgress("nope", "failed", reason="No such datasource is configured.")]
+
+
+def test_index_health_reads_the_live_index(engine):
+    assert engine.index.health()["status"] == "empty"
+    engine.index.build()
+
+    assert engine.index.health()["status"] == "ok"
+
+
+def test_index_clear_empties_the_index(engine):
+    engine.index.build()
+    engine.index.clear()
+
+    assert engine.index.health()["status"] == "empty"
+
+
+def test_index_inspect_runs_the_mmr_search(engine):
+    engine.index.build()
+
+    report = engine.index.inspect("customers", k=2)
+
+    assert {"picks", "dropped"} <= set(report)
+
+
+# ---------------------------------------------------------------- llm
+
+LLM_WITH_PLANNER = {"provider": "openai", "model": "gpt-test", "api_key": "sk-test",
+                    "agents": {"ast_planner": {"model": "gpt-planner"}}}
+
+
+def test_llm_list_names_each_agent_and_whether_it_inherits(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        listed = engine.llm.list()
+
+    assert listed["default"] == {"provider": "openai", "model": "gpt-test", "temperature": 0.0, "inherited": False}
+    assert listed["ast_planner"]["model"] == "gpt-planner" and listed["ast_planner"]["inherited"] is False
+    assert listed["decomposer"] == {**listed["default"], "inherited": True}
+    assert "api_key" not in str(listed)
+
+
+def test_llm_get_returns_one_agent(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        assert engine.llm.get("ast_planner")["model"] == "gpt-planner"
+        with pytest.raises(ValueError, match="Unknown agent 'planner'"):
+            engine.llm.get("planner")
+
+
+def test_llm_replace_swaps_the_whole_section(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        change = engine.llm.replace(LLM(provider="openai", model="gpt-other", api_key="sk-test"))
+        assert isinstance(change, LLMChange)
+        assert engine.llm.get("ast_planner") == {**engine.llm.get("default"), "inherited": True}
+        assert engine.config.llm.model == "gpt-other"
+        with pytest.raises(ConfigError):
+            engine.llm.replace(LLM(provider="nope", model="x"))
+
+
+def test_llm_replace_takes_the_section_as_written(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        engine.llm.replace({"provider": "openai", "model": "gpt-other", "api_key": "sk-test",
+                            "agents": {"decomposer": {"model": "gpt-split"}}})
+
+        assert engine.llm.get("decomposer")["model"] == "gpt-split"
+        assert engine.config.llm.agents["decomposer"].model == "gpt-split"
+
+
+def test_llm_replace_checks_the_section_as_the_file_is(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        with pytest.raises(ConfigError) as error:
+            engine.llm.replace({"provider": "openai", "model": "gpt-other", "agents": {"ast_planer": {}}})
+        assert "llm.agents.ast_planer" in str(error.value) and "Did you mean 'ast_planner'?" in str(error.value)
+        assert engine.llm.get("ast_planner")["model"] == "gpt-planner"
+
+
+def test_llm_replace_never_reads_the_environment_outside_a_secret_field(tmp_path, monkeypatch):
+    monkeypatch.setenv("SOME_SECRET", "s3cr3t")
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        with pytest.raises(ConfigError, match="allowed only in a secret field") as error:
+            engine.llm.replace({"provider": "openai", "model": "${env:SOME_SECRET}", "api_key": "sk-test"})
+        assert "s3cr3t" not in str(error.value)
+
+
+# ---------------------------------------------------------------- policies
+
+POLICIES = {"roles": {
+    "analyst": {"description": "Reads customers", "allowed_datasources": ["shop"],
+                "allowed_tables": ["shop.customers"]},
+    "admin": {"description": "Everything", "allowed_datasources": ["*"], "allowed_tables": ["*"]},
+}}
+
+
+def test_policies_roles_lists_the_configured_roles(tmp_path):
+    with _engine(tmp_path, policies=POLICIES) as engine:
+        roles = engine.policies.roles()
+
+    assert set(roles) == {"analyst", "admin"}
+    assert roles["analyst"].description == "Reads customers"
+
+
+def test_policies_allows_checks_one_table(tmp_path):
+    with _engine(tmp_path, policies=POLICIES) as engine:
+        analyst = UserContext(roles=["analyst"])
+        assert engine.policies.allows(analyst, "shop", "customers")
+        assert not engine.policies.allows(analyst, "shop", "orders")
+
+
+def test_policies_allowed_lists_what_a_caller_may_read(tmp_path):
+    with _engine(tmp_path, policies=POLICIES) as engine:
+        allowed = engine.policies.allowed(UserContext(roles=["analyst"]))
+
+    assert allowed == {"datasources": ["shop"], "tables": ["shop.customers"]}
+
+
+def test_policies_validate_flags_a_rule_for_an_unknown_datasource(tmp_path):
+    policies = {"roles": {"analyst": {"description": "x", "allowed_datasources": ["ghost"]}}}
+    with _engine(tmp_path, policies=policies) as engine:
+        report = engine.policies.validate()
+
+    assert not report.ok
+    assert [e.status for e in report.entries] == ["MISSING"]
+
+
+# ---------------------------------------------------------------- curated
+
+def test_curated_validate_without_a_curated_section_says_so(engine):
+    report = engine.curated.validate()
+
+    assert not report.ok and "no curated section" in report.errors[0]
+
+
+def test_curated_test_without_a_curated_section_says_so(engine):
+    report = engine.curated.test()
+
+    assert not report.ok and "no curated section" in report.errors[0]
+
+
+# ---------------------------------------------------------------- traces
+
+def test_traces_replay_names_a_datasource_that_is_not_configured(engine):
+    trace = {"trace_id": "t1", "request": {"question": "q", "datasource_id": "ghost"}, "result": {}}
+
+    with pytest.raises(LookupError, match="ghost: not configured in this environment"):
+        engine.traces.replay(trace)
+
+
+# ---------------------------------------------------------------- questions
+
+def test_run_query_takes_the_question_and_keyword_options(engine):
+    import inspect
+
+    for method in (engine.run_query, engine.stream_query):
+        parameters = inspect.signature(method).parameters
+        assert list(parameters)[0] == "question"
+        assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for name, p in parameters.items() if name != "question")
+
+
+# ---------------------------------------------------------------- the old shape is gone
+
+REMOVED = ["context", "query", "datasource", "indexing", "auth", "settings", "policy",
+           "get_result_manifest", "get_result_page", "export_result_csv", "add_datasource",
+           "add_datasource_from_config", "list_datasources", "list_unavailable_datasources",
+           "get_datasource_capabilities", "configure_llm", "configure_llm_from_config", "reload_llm_config",
+           "list_llms", "get_llm", "index_datasource", "index_all_datasources", "clear_index", "rebuild_index",
+           "index_health", "inspect_retrieval", "get_schema", "check_permissions", "get_allowed_resources",
+           "get_current_settings", "get_setting", "validate_configuration"]
+
+
+@pytest.mark.parametrize("name", REMOVED)
+def test_the_04_methods_are_gone(engine, name):
+    assert not hasattr(engine, name)
+
+
+def test_datasources_has_no_get_adapter(engine):
+    assert not hasattr(engine.datasources, "get_adapter")

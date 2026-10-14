@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 from nl2sql.cli.reporting import ConsolePresenter
 from nl2sql.cli.common.decorators import handle_cli_errors
-from nl2sql.indexing.rebuild import rebuild_index
+from nl2sql import IndexProgress
 
 
 @handle_cli_errors
@@ -37,24 +37,27 @@ def run_indexing(
     Raises:
         SystemExit: With code 1 if any datasource failed to index.
     """
-    ctx = engine.context
     presenter = ConsolePresenter()
-    presenter.print_info(f"Indexing schema to: {ctx.vector_store.persist_directory}")
+    presenter.print_info(f"Indexing into {engine.config.storage.path}")
 
     tasks: Dict[str, object] = {}
 
-    def on_datasource(ds_id: str, event: str, error) -> None:
-        if event == "start":
+    def on_datasource(progress: IndexProgress) -> None:
+        ds_id = progress.datasource_id
+        if progress.state == "started":
             tasks[ds_id] = presenter.start_task_line(f"Indexing {ds_id}...")
-        elif event == "done":
-            presenter.finish_task_line(tasks.pop(ds_id), f"{ds_id} indexed", success=True)
+            return
+        task = tasks.pop(ds_id, None)
+        if progress.state == "done":
+            if task is not None:
+                presenter.finish_task_line(task, f"{ds_id} indexed", success=True)
         else:
-            presenter.finish_task_line(tasks.pop(ds_id), f"{ds_id} failed", success=False)
-            presenter.print_error(f"Failed to index {ds_id}: {error}")
+            if task is not None:
+                presenter.finish_task_line(task, f"{ds_id} failed", success=False)
+            presenter.print_error(f"Failed to index {ds_id}: {progress.reason}")
 
-    result = rebuild_index(
-        ctx, enrich=enrich, datasource_ids=datasource_ids, full=full, on_datasource=on_datasource,
-        curated_only=curated_only,
+    result = engine.index.build(
+        datasource_ids, enrich=enrich, full=full, curated_only=curated_only, on_datasource=on_datasource,
     )
     total_adapters = len(result.stats) + len(result.empty) + len(result.errors)
 

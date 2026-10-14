@@ -58,7 +58,7 @@ A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, a
 
 ### Reading a result back
 
-`ResultReader` (`execution/artifacts/results.py`), behind the facade's `get_result_manifest`, `get_result_page` and `export_result_csv` (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
+`ResultReader` (`execution/artifacts/results.py`), behind `engine.results` (`manifest`, `page` and `csv`) (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
 
 1. The request id and the result id must be plain tokens (letters, digits, `_`, `-`; up to 128 characters). Anything else is `ResultNotFound`, before any path is built.
 2. The manifest is read from the path rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No file there is `ResultNotFound`, so another tenant's run is not found, not refused.

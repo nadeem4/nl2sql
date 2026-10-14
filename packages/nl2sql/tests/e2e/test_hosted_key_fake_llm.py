@@ -90,7 +90,7 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
         assert VISITOR_KEY not in text
     assert VISITOR_KEY not in "".join(os.environ.values())
     # Nor in the registry, where the next visitor would have found it.
-    assert engine.context.llm_registry.llms == {}
+    assert engine._runtime.llm_registry.llms == {}
 
 
 @pytest.mark.e2e
@@ -178,4 +178,4 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
         for text in (answered.text, refused.text, trace.text, caplog.text):
             assert key not in text
         assert key not in "".join(os.environ.values())
-    assert engine.context.llm_registry.llms == {}
+    assert engine._runtime.llm_registry.llms == {}

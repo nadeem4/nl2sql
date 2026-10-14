@@ -85,9 +85,10 @@ trace to the user who produced it is left to a multi-user deployment.
   (`datasource.schema.table`, with schema and datasource wildcards) — nothing
   finer. There is no column masking and no row-level security.
 - **Logical validation** enforces schema constraints and policy-based table access.
-- **Audit logging** records `llm_interaction` events only, and only when the CLI
-  attaches its monitor callback. The Python and REST APIs emit none. See
-  `../observability/stack.md`.
+- **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
+  (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
+  with who made it and each agent's old and new model, never a key. Queries
+  are not audited. See `../observability/stack.md`.
 - **Bounded execution**: a global timeout and a per-run cancellation token cap each run. There is **no process sandbox** — the engine runs in-process (see `../execution/isolation.md`).
 
 ## What keeps the SQL read-only

@@ -104,7 +104,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - Signal handlers are restored after execution. There is no explicit cleanup of artifacts or partial state.
 
 ### User-facing errors
-- Errors are returned in the final state. `PipelineRunner` returns `success=True` on graph completion regardless of errors in state.
+- Errors are returned in the final state, and `QueryResult.errors` carries them; a run that finished with an ERROR or CRITICAL error has `status: "error"`. `nl2sql run` exits 1 on it.
 
 ---
 
@@ -170,7 +170,7 @@ Replay is not supported. There is no persisted graph state or execution log to r
 - `VECTOR_BREAKER` is the only circuit breaker; LLM calls and SQL execution have no breaker and no fast-fail path.
 - There is no process isolation around SQL execution, so a driver crash is unrecoverable at the engine level.
 - Subgraph wrapper assumes executor output is present; earlier failures can cause wrapper-level errors.
-- Pipeline completion does not imply success; `PipelineRunner` does not inspect `errors` and always returns `success=True` if the graph returns.
+- Pipeline completion does not imply success: read `QueryResult.status` and `errors`, not whether the run returned.
 - No graph-level retries or replay; only subgraph local retries.
 
 ---

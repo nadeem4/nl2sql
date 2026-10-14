@@ -54,13 +54,14 @@ NL2SQL_CONFIG=nl2sql-demo/nl2sql.yaml nl2sql-api --host 127.0.0.1 --port 8000   
 | [Health](health.md) | `routes/health.py` | Liveness/readiness checks. |
 | [Query](query.md) | `routes/query.py` | Execute natural language queries, whole or streamed as Server-Sent Events; page through or download a run's saved result. |
 | [Datasource](datasource.md) | `routes/datasource.py` | Manage datasource configs. |
-| [LLM](llm.md) | `routes/llm.py` | Configure and inspect LLMs. |
+| [LLM](llm.md) | `routes/llm.py` | Replace the LLM (`PUT /settings/llm`) and inspect each agent's model. |
 | [Indexing](indexing.md) | `routes/indexing.py` | Index management and status. |
 
 ## Error Handling
 
 FastAPI routers wrap most failures in `HTTPException(status_code=500, detail=str(e))`.
-Datasource and delete endpoints map `ValueError` to `HTTP 404`.
+Datasource and delete endpoints, and `GET /api/v1/llm/{agent}`, map `ValueError` to `HTTP 404`.
+`PUT /api/v1/settings/llm` answers a config error as `HTTP 422` with its text.
 
 `POST /api/v1/query` is the exception: pipeline errors are returned as a normal
 `HTTP 200` inside `QueryResponse.errors`, and an unexpected failure returns a
@@ -141,7 +142,7 @@ The routes that change the running process need an admin role, checked by the
 `require_admin` dependency in `nl2sql_api/auth.py`:
 
 - `POST /api/v1/datasource` and `DELETE /api/v1/datasource/{datasource_id}`
-- `POST /api/v1/llm`
+- `PUT /api/v1/settings/llm`
 - `POST /api/v1/index/{datasource_id}`, `POST /api/v1/index-all` and `DELETE /api/v1/index`
 
 | Key | Default | Meaning |

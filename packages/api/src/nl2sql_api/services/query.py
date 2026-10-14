@@ -34,7 +34,7 @@ class QueryService:
             yield event
 
     def get_result_page(self, request_id: str, result_id: str, offset: int, limit: int) -> ResultPage:
-        return self.engine.get_result_page(request_id, result_id, offset=offset, limit=limit)
+        return self.engine.results.page(request_id, result_id, offset=offset, limit=limit)
 
     def export_result_csv(self, request_id: str, result_id: str) -> Iterator[bytes]:
-        return self.engine.export_result_csv(request_id, result_id)
+        return self.engine.results.csv(request_id, result_id)

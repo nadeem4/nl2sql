@@ -39,19 +39,21 @@ def add_datasource(
 def list_datasources(
     service: DatasourceSvc,
 ):
-    """The ids of the registered datasources, as `{"datasources": [...]}`."""
+    """Every configured datasource as `{"datasources": [...]}`: its `id`, `type`, `description`,
+    `status` (`ready`, `failed` with a `reason`, or `unchecked`), `capabilities` and `connection`,
+    with every secret masked."""
     try:
         return {"datasources": service.list_datasources()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Check a datasource exists")
+@router.get("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Get a datasource")
 def get_datasource(
     datasource_id: str,
     service: DatasourceSvc,
 ):
-    """`{"datasource_id": ..., "exists": true}`, or 404 when it is not registered. No other details yet."""
+    """One configured datasource, as the list shows it, or 404 when it is not configured."""
     try:
         return service.get_datasource(datasource_id)
     except ValueError as e:
@@ -60,14 +62,14 @@ def get_datasource(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any],
-               summary="Remove a datasource (not supported)",
+@router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Remove a datasource",
                dependencies=[Depends(auth.require_admin)], responses=auth.ADMIN_RESPONSES)
 def remove_datasource(
     datasource_id: str,
     service: DatasourceSvc,
 ):
-    """Not supported by the engine yet: answers `success: false` (404 for an unknown id). Admin only."""
+    """Take a datasource out of the engine and close its connections (404 for an unknown id). It is not
+    removed from the config file, and its index entries stay until the next full index. Admin only."""
     try:
         return service.remove_datasource(datasource_id)
     except ValueError as e:

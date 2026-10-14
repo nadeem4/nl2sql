@@ -17,7 +17,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from nl2sql import NL2SQL, ResultManifest, ResultSummary  # noqa: E402
-from nl2sql.api.query_api import QueryAPI  # noqa: E402
+from nl2sql.testing.facade import StubDatasources  # noqa: E402
 from nl2sql.cli.demo.playground.app import build_app  # noqa: E402
 from nl2sql.cli.demo.playground.hosted import Hosted  # noqa: E402
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig  # noqa: E402
@@ -27,11 +27,12 @@ ROWS = [{"id": i, "name": f"n{i}"} for i in range(45)]
 
 
 class _Engine(NL2SQL):
-    def __init__(self, query):
-        self.query = query
+    def __init__(self, runtime):
+        self._runtime = runtime
 
-    def list_datasources(self):
-        return ["chinook"]
+    @property
+    def datasources(self):
+        return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
 
 def _save(store, tenant, request, rows):
@@ -45,7 +46,7 @@ def client(request, tmp_path):
     store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
-    engine = _Engine(QueryAPI(SimpleNamespace(tenant_id="t1", artifact_store=store)))
+    engine = _Engine(SimpleNamespace(tenant_id="t1", artifact_store=store))
     hosted = Hosted(enabled=True) if request.param == "hosted" else None
     return TestClient(build_app(engine, questions=[], roles=["admin"], mode=request.param,
                                 dataset="chinook", hosted=hosted))

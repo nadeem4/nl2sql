@@ -58,6 +58,7 @@ from nl2sql.cli.demo.llm_config import (
     read_llm,
     write_llm,
 )
+from nl2sql import load_config
 from nl2sql.common.logger import get_logger
 from nl2sql.llm.registry import PROVIDER_PRESETS
 
@@ -184,7 +185,7 @@ class SettingsPanel:
         hosted mode too, where there is no writable project to read.
         """
         try:
-            default = (self.engine.list_llms() or {}).get("default") or {}
+            default = self.engine.llm.get("default")
         except Exception:  # an engine without a registry
             return "openai"
         return default.get("provider") or "openai"
@@ -192,7 +193,7 @@ class SettingsPanel:
     @property
     def default_model(self) -> Optional[str]:
         try:
-            default = (self.engine.list_llms() or {}).get("default") or {}
+            default = self.engine.llm.get("default")
         except Exception:
             return None
         return default.get("model")
@@ -310,8 +311,8 @@ class SettingsPanel:
     # --- writing ---------------------------------------------------------------
 
     def _reload(self) -> None:
-        """Rebuilds the engine's LLMs from the config the CLI reads."""
-        self.engine.reload_llm_config(self.project_dir / "nl2sql.yaml")
+        """Replaces the engine's LLM with the ``llm`` section of the config the CLI reads."""
+        self.engine.llm.replace(load_config(self.project_dir / "nl2sql.yaml").llm, via="playground")
 
     def save_key(self, key: str) -> None:
         """Saves ``key`` to ``.env`` and switches the demo to live on it."""

@@ -6,16 +6,18 @@ API for remote clients. Use the links below for the full technical references.
 ## Core API (Python)
 
 - **Location**: Core package (`nl2sql`)
-- **Interface**: Direct Python class interface (`NL2SQL` class and low-level functions)
+- **Interface**: the `NL2SQL` class: `run_query` and `stream_query` at the top
+  level, everything else in a namespace (`engine.datasources`, `engine.index`,
+  `engine.llm`, `engine.policies`, `engine.curated`, `engine.results`,
+  `engine.traces`, `engine.benchmark`)
 - **Use Case**: Embedded/SDK use in Python applications
-- **Reference**: Core API index and per-module references:
+- **Reference**: Core API index and per-namespace references:
   - [Core API index](core/public-facade.md)
-  - [Auth API](core/auth.md)
-  - [Datasource API](core/datasource.md)
-  - [LLM API](core/llm.md)
-  - [Indexing API](core/indexing.md)
-  - [Query API](core/query.md)
-  - [Settings API](core/settings.md)
+  - [Query API](core/query.md) (`run_query`, `stream_query`, `engine.results`)
+  - [Datasource API](core/datasource.md) (`engine.datasources`)
+  - [Indexing API](core/indexing.md) (`engine.index`)
+  - [LLM API](core/llm.md) (`engine.llm`)
+  - [Policies API](core/policies.md) (`engine.policies`)
 
 ## REST API (FastAPI)
 
@@ -38,7 +40,8 @@ API for remote clients. Use the links below for the full technical references.
 
 ## Source references
 
-- Context: `packages/nl2sql/src/nl2sql/runtime.py`
-- Runtime: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
-- Public API: `packages/nl2sql/src/nl2sql/public_api.py`
+- Runtime: `packages/nl2sql/src/nl2sql/runtime.py`
+- Running the graph: `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
+- Public API: `packages/nl2sql/src/nl2sql/public_api.py`, with the namespaces in
+  `packages/nl2sql/src/nl2sql/api/`
 - API Package: `packages/api/src/nl2sql_api/`

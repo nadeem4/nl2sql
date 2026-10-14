@@ -9,6 +9,7 @@ fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL
+from nl2sql.testing.facade import StubDatasources
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
 
@@ -34,8 +35,9 @@ class _Engine(NL2SQL):
         self.calls = []
         self._runtime = _Context(snapshot, datasources)
 
-    def list_datasources(self):
-        return self._runtime.ds_registry.list_ids()
+    @property
+    def datasources(self):
+        return StubDatasources(getattr(self, "_runtime", None), self._runtime.ds_registry.list_ids())
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                   cancellation_token=None):

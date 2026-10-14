@@ -53,7 +53,7 @@ def temperature_error(model: str, tags: Optional[list], reason: str) -> ValueErr
     return ValueError(
         f"Model '{model}' (LLM agent '{agent}') rejected the temperature "
         f"parameter (HTTP 400: {reason}) Set 'temperature: null' for agent '{agent}' "
-        "in the LLM config file so no temperature is sent to this model."
+        "(llm.agents.<agent>.temperature in nl2sql.yaml) so no temperature is sent to this model."
     )
 
 

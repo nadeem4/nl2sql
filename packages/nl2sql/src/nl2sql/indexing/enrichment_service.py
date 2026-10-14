@@ -12,7 +12,7 @@ from nl2sql.llm.wires import structured
 
 logger = get_logger("indexing_enrichment")
 
-# Name of the agent in configs/llm.yaml that enrichment calls.
+# Name of the agent in the llm section of nl2sql.yaml that enrichment calls.
 ENRICHMENT_LLM_NAME = "indexing_enrichment"
 
 

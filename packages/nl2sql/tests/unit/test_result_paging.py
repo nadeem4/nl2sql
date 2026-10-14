@@ -3,7 +3,7 @@
 The aggregator saves each terminal result as ``result_<node_id>.parquet`` in
 the run's folder and writes ``manifest.json`` beside them: which results the
 run produced, with their columns, row counts and truncated flags, never the
-rows. ``QueryResult.result_manifest`` carries the same entries. The facade reads a
+rows. ``QueryResult.result_manifest`` carries the same entries. ``engine.results`` reads a
 page of a result, or streams the whole of it as CSV, lazily from its parquet
 file. Results are scoped to the tenant whose folder they are in: an unknown
 request id, one from another tenant, or an id that is not a plain token is
@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from nl2sql import NL2SQL, QueryResult, ResultManifest, ResultNotFound, ResultPage, ResultSummary
-from nl2sql.api.query_api import QueryAPI, result_from_state
+from nl2sql.api.query_api import result_from_state
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.artifacts import results as results_module
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
@@ -62,7 +62,10 @@ def _run(store, tenant="t1", request="run-1", rows=ROWS, truncated=False, column
 
 
 def _api(store, tenant="t1"):
-    return QueryAPI(fake_runtime(settings={"tenant_id": tenant}, artifact_store=store))
+    """``engine.results`` over a runtime whose tenant is ``tenant``."""
+    engine = NL2SQL.__new__(NL2SQL)
+    engine._runtime = fake_runtime(settings={"tenant_id": tenant}, artifact_store=store)
+    return engine.results
 
 
 # The manifest
@@ -108,7 +111,7 @@ def test_query_result_exposes_the_manifest_entries(store):
 def test_the_facade_reads_the_manifest(store):
     _run(store)
 
-    manifest = _api(store).get_result_manifest("run-1")
+    manifest = _api(store).manifest("run-1")
 
     assert isinstance(manifest, ResultManifest)
     assert manifest.request_id == "run-1"
@@ -129,7 +132,7 @@ def test_the_facade_reads_the_manifest(store):
 def test_a_page_is_the_rows_from_offset(store, offset, limit, ids, next_offset):
     _run(store)
 
-    page = _api(store).get_result_page("run-1", "combine_g1", offset=offset, limit=limit)
+    page = _api(store).page("run-1", "combine_g1", offset=offset, limit=limit)
 
     assert isinstance(page, ResultPage)
     assert page.columns == ["id", "name"]
@@ -144,7 +147,7 @@ def test_paging_through_every_page_gives_every_row_once(store):
     api, rows, offset = _api(store), [], 0
 
     while offset is not None:
-        page = api.get_result_page("run-1", "combine_g1", offset=offset, limit=7)
+        page = api.page("run-1", "combine_g1", offset=offset, limit=7)
         rows.extend(page.rows)
         offset = page.next_offset
 
@@ -154,7 +157,7 @@ def test_paging_through_every_page_gives_every_row_once(store):
 def test_the_page_size_is_capped(store):
     _run(store, rows=[{"id": i} for i in range(1500)])
 
-    page = _api(store).get_result_page("run-1", "combine_g1", offset=0, limit=5000)
+    page = _api(store).page("run-1", "combine_g1", offset=0, limit=5000)
 
     assert results_module.MAX_RESULT_PAGE_SIZE == 1000
     assert page.limit == 1000
@@ -167,7 +170,7 @@ def test_a_negative_offset_or_an_empty_page_is_refused(store, offset, limit):
     _run(store)
 
     with pytest.raises(ValueError):
-        _api(store).get_result_page("run-1", "combine_g1", offset=offset, limit=limit)
+        _api(store).page("run-1", "combine_g1", offset=offset, limit=limit)
 
 
 # CSV export
@@ -180,7 +183,7 @@ def _csv(chunks):
 def test_the_csv_holds_the_header_and_every_row(store):
     _run(store)
 
-    lines = _csv(_api(store).export_result_csv("run-1", "combine_g1"))
+    lines = _csv(_api(store).csv("run-1", "combine_g1"))
 
     assert lines[0] == ["id", "name"]
     assert lines[1:] == [[str(r["id"]), r["name"]] for r in ROWS]
@@ -190,7 +193,7 @@ def test_the_csv_is_streamed_a_slice_at_a_time(store, monkeypatch):
     monkeypatch.setattr(results_module, "CSV_CHUNK_ROWS", 10)
     _run(store)
 
-    stream = _api(store).export_result_csv("run-1", "combine_g1")
+    stream = _api(store).csv("run-1", "combine_g1")
 
     assert isinstance(stream, types.GeneratorType)
     chunks = list(stream)
@@ -203,14 +206,14 @@ def test_the_csv_is_streamed_a_slice_at_a_time(store, monkeypatch):
 def test_an_empty_result_exports_its_header(store):
     _run(store, rows=[], columns=["id", "name"])
 
-    assert b"".join(_api(store).export_result_csv("run-1", "combine_g1")).decode("utf-8") == "id,name\n"
+    assert b"".join(_api(store).csv("run-1", "combine_g1")).decode("utf-8") == "id,name\n"
 
 
 def test_a_missing_result_fails_before_the_csv_stream_starts(store):
     _run(store)
 
     with pytest.raises(ResultNotFound):
-        _api(store).export_result_csv("run-1", "combine_nope")
+        _api(store).csv("run-1", "combine_nope")
 
 
 # Not found, other tenants, and ids that are not plain tokens
@@ -220,26 +223,26 @@ def test_an_unknown_request_id_is_not_found(store):
     _run(store)
 
     with pytest.raises(ResultNotFound):
-        _api(store).get_result_page("run-2", "combine_g1")
+        _api(store).page("run-2", "combine_g1")
     with pytest.raises(ResultNotFound):
-        _api(store).get_result_manifest("run-2")
+        _api(store).manifest("run-2")
 
 
 def test_an_unknown_result_id_is_not_found(store):
     _run(store)
 
     with pytest.raises(ResultNotFound):
-        _api(store).get_result_page("run-1", "sq1")
+        _api(store).page("run-1", "sq1")
 
 
 def test_another_tenants_run_is_not_found(store):
     _run(store, tenant="t2", request="theirs")
 
     with pytest.raises(ResultNotFound):
-        _api(store, tenant="t1").get_result_page("theirs", "combine_g1")
+        _api(store, tenant="t1").page("theirs", "combine_g1")
     with pytest.raises(ResultNotFound):
-        _api(store, tenant="t1").export_result_csv("theirs", "combine_g1")
-    assert _api(store, tenant="t2").get_result_page("theirs", "combine_g1").total_rows == 45
+        _api(store, tenant="t1").csv("theirs", "combine_g1")
+    assert _api(store, tenant="t2").page("theirs", "combine_g1").total_rows == 45
 
 
 @pytest.mark.parametrize("request_id, result_id", [
@@ -257,7 +260,7 @@ def test_an_id_that_is_not_a_plain_token_is_not_found(store, request_id, result_
     _run(store, tenant="t2", request="theirs")
 
     with pytest.raises(ResultNotFound):
-        _api(store, tenant="t1").get_result_page(request_id, result_id)
+        _api(store, tenant="t1").page(request_id, result_id)
 
 
 def test_a_manifest_naming_a_path_outside_the_run_is_not_trusted(store, tmp_path):
@@ -270,17 +273,4 @@ def test_a_manifest_naming_a_path_outside_the_run_is_not_trusted(store, tmp_path
     path.write_text(json.dumps(doc), encoding="utf-8")
 
     with pytest.raises(ResultNotFound):
-        _api(store).get_result_page("run-1", "../../t2/theirs/result_combine_g1")
-
-
-# The facade
-
-
-def test_the_top_level_facade_delegates_to_the_query_api(store):
-    _run(store)
-    engine = NL2SQL.__new__(NL2SQL)
-    engine.query = _api(store)
-
-    assert engine.get_result_manifest("run-1").results[0].row_count == 45
-    assert engine.get_result_page("run-1", "combine_g1", offset=40, limit=10).rows[-1] == [44, "n44"]
-    assert len(_csv(engine.export_result_csv("run-1", "combine_g1"))) == 46
+        _api(store).page("run-1", "../../t2/theirs/result_combine_g1")

@@ -13,6 +13,7 @@ from nl2sql import NL2SQL
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.cli.demo.playground.hosted import Hosted
 from nl2sql.llm.providers import LLM_AGENTS
+from nl2sql.testing.facade import StubDatasources, StubLLMs
 
 
 class _Engine(NL2SQL):
@@ -22,17 +23,17 @@ class _Engine(NL2SQL):
         self._llms = llms if llms is not None else {
             "default": {"provider": "openai", "model": "gpt-5.4", "temperature": 0.0},
         }
-
-    def list_llms(self):
-        return self._llms
-
-    def list_datasources(self):
-        return ["chinook"]
+        self.llm = StubLLMs(lambda: self._llms)
+        self.datasources = StubDatasources(None, ["chinook"])
 
 
 class _Broken(_Engine):
-    def list_llms(self):
-        raise RuntimeError("no registry here")
+    def __init__(self):
+        super().__init__()
+
+        def _no_registry():
+            raise RuntimeError("no registry here")
+        self.llm = StubLLMs(_no_registry)
 
 
 def _client(engine=None, hosted=False):
@@ -60,7 +61,7 @@ def test_the_route_lists_every_step_in_order_with_the_model_steps_marked():
 def test_each_model_step_carries_the_model_it_is_configured_to_use():
     engine = _Engine({
         "default": {"provider": "openai", "model": "gpt-5.4"},
-        "astplanner": {"provider": "anthropic", "model": "claude-opus-5"},
+        "ast_planner": {"provider": "anthropic", "model": "claude-opus-5"},
     })
 
     steps = {s["node"]: s for s in _client(engine).get("/api/pipeline").json()["steps"]}

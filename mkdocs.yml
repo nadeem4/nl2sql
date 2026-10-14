@@ -144,12 +144,11 @@ nav:
     - Overview: api/index.md
     - Core API (Python):
       - Public Facade: api/core/public-facade.md
-      - Auth: api/core/auth.md
       - Datasource: api/core/datasource.md
       - LLM: api/core/llm.md
       - Indexing: api/core/indexing.md
+      - Policies: api/core/policies.md
       - Query: api/core/query.md
-      - Settings: api/core/settings.md
     - REST API (FastAPI):
       - Overview: api/rest/index.md
       - Health: api/rest/health.md

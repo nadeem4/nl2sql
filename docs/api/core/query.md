@@ -1,39 +1,43 @@
 # Query API
 
 ## Purpose
-Execute a natural language query using the NL2SQL pipeline.
+Answer a question with the NL2SQL pipeline: `engine.run_query`,
+`engine.stream_query`, and `engine.results` to read back what a run saved.
 
 ## Responsibilities
 - Invoke pipeline graph runtime.
-- Return a structured `QueryResult`.
+- Return a structured `QueryResult`, or the run as events.
+- Read a run's saved results by its `trace_id`.
 
 ## Key Modules
-- `packages/nl2sql/src/nl2sql/api/query_api.py`
+- `packages/nl2sql/src/nl2sql/public_api.py` (`NL2SQL.run_query`, `NL2SQL.stream_query`)
+- `packages/nl2sql/src/nl2sql/api/query_api.py` (`QueryResult`, `result_from_state`)
+- `packages/nl2sql/src/nl2sql/api/results_api.py` (`ResultsAPI`, internal)
 - `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
 - `packages/nl2sql/src/nl2sql/pipeline/graph.py`
 - `packages/nl2sql/src/nl2sql/pipeline/state.py`
 
 ## Public Surface
 
-### QueryAPI.run_query
+### NL2SQL.run_query
 
 Source:
-`packages/nl2sql/src/nl2sql/api/query_api.py`
+`packages/nl2sql/src/nl2sql/public_api.py`, `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> QueryResult`
+`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> QueryResult`
 
-`run_query` passes the context's artifact store to `result_from_state`, so each
+Every argument after the question is keyword-only. `run_query` passes the runtime's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
 
 Parameters:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| `natural_language` | `str` | yes | User query. |
+| `question` | `str` | yes | The question, in plain language. |
 | `datasource_id` | `Optional[str]` | no | Datasource override; otherwise resolved. |
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
 | `user_context` | `Optional[UserContext]` | no | RBAC context. Omitted (or `None`), the run starts with an empty `UserContext`, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
-| `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. `NL2SQL.run_query` takes it too. The playground cancels it when the browser drops the request. |
+| `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The playground cancels it when the browser drops the request. |
 
 Returns:
 `QueryResult`, built from the pipeline graph state by `result_from_state`.
@@ -99,17 +103,17 @@ combined result is listed in `result_manifest` and read back by the run's
 
 ## Streaming a run
 
-### QueryAPI.stream_query
+### NL2SQL.stream_query
 
 Source:
 `packages/nl2sql/src/nl2sql/api/query_api.py`, events in
 `packages/nl2sql/src/nl2sql/pipeline/events.py`
 
 Signature:
-`stream_query(natural_language: str, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> Iterator[QueryEvent]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> Iterator[QueryEvent]`
 
 The same run as `run_query`, with the same parameters, yielded as it happens.
-`NL2SQL.stream_query` takes the same arguments.
+`nl2sql run` shows its live progress from these events.
 
 ```python
 from nl2sql import NL2SQL, UserContext
@@ -133,7 +137,7 @@ event as one Server-Sent Event (`event: <type>` and `data: <json>`), which is ho
 | --- | --- | --- |
 | `node_started` | `node` | A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry). |
 | `node_finished` | `node`, `seconds`, `ok` | The step ended; `ok` is False when it raised. |
-| `result_manifest` | `trace_id`, `results` | The aggregator saved the results: `results` is the run's `result_manifest` and `trace_id` its `request_id`, so `get_result_page` can be called before the answer is written. |
+| `result_manifest` | `trace_id`, `results` | The aggregator saved the results: `results` is the run's `result_manifest` and `trace_id` its `request_id`, so `engine.results.page` can be called before the answer is written. |
 | `answer_delta` | `field`, `text` | The next piece of `final_answer.summary` or `final_answer.content`, as the answer model writes it. |
 | `final` | `QueryResult.model_dump(mode="json")` | The run finished: exactly what `run_query` returns. A refusal, a provider failure, a timeout or a cancel is a `final` with `status: "error"`, as `run_query` returns it. |
 | `error` | `message`, `error_code` | The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built). |
@@ -173,17 +177,17 @@ the keyless tests stream too.
 The aggregator saves each terminal result of a run as
 `<tenant_id>/<request_id>/result_<node_id>.parquet` and writes `manifest.json`
 beside them (see [Artifact Store → The result manifest](../../storage/artifact-store.md#the-result-manifest)).
-These `QueryAPI` methods, also on `NL2SQL` with the same signatures, read them
-back by the run's `trace_id` (the `request_id`). They read lazily from the
+`engine.results` reads them back by the run's `trace_id` (its `run_id`, the
+`request_id` of the REST routes). They read lazily from the
 parquet file: a page reads only its slice, and the CSV export reads and yields a
 slice at a time (`CSV_CHUNK_ROWS`, 10,000 rows), so neither holds the whole
 result in memory.
 
 | method | returns | meaning |
 | --- | --- | --- |
-| `get_result_manifest(request_id, tenant_id=None)` | `ResultManifest` | `request_id` and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
-| `get_result_page(request_id, result_id, offset=0, limit=100, tenant_id=None)` | `ResultPage` | Rows `offset` to `offset + limit` of the result whose `node_id` is `result_id`. `limit` above `MAX_RESULT_PAGE_SIZE` (1,000) is cut to it, and the page's `limit` says so. A page past the end has no rows. `next_offset` is where the next page starts, `None` at the end. A negative `offset` or a `limit` below 1 raises `ValueError`. |
-| `export_result_csv(request_id, result_id, tenant_id=None)` | `Iterator[bytes]` | The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent. |
+| `results.manifest(run_id, tenant_id=None)` | `ResultManifest` | `request_id` and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
+| `results.page(run_id, result_id, offset=0, limit=100, tenant_id=None)` | `ResultPage` | Rows `offset` to `offset + limit` of the result whose `node_id` is `result_id`. `limit` above `MAX_RESULT_PAGE_SIZE` (1,000) is cut to it, and the page's `limit` says so. A page past the end has no rows. `next_offset` is where the next page starts, `None` at the end. A negative `offset` or a `limit` below 1 raises `ValueError`. |
+| `results.csv(run_id, result_id, tenant_id=None)` | `Iterator[bytes]` | The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent. |
 
 `ResultPage` has `request_id`, `result_id`, `columns`, `rows` (`rows[i]` is row
 `offset + i`), `offset`, `limit`, `total_rows` and `next_offset`.
@@ -191,7 +195,7 @@ result in memory.
 Scope: results are read from one tenant's folder, `tenant_id` or else the
 engine's own `TENANT_ID`, the tenant every run of this engine writes under. Each
 of these raises `ResultNotFound` (a `LookupError`, exported from `nl2sql`): an
-unknown `request_id`, a run in another tenant's folder, a `result_id` the run's
+unknown `run_id`, a run in another tenant's folder, a `result_id` the run's
 manifest does not list, and an id that is not a plain token (letters, digits,
 `_`, `-`; at most 128 characters). Ids are checked before any path is built, and
 the parquet path is rendered from the artifact template, never read from the
@@ -201,9 +205,9 @@ a result yet: any caller who knows a `trace_id` can read it.
 ```python
 result = engine.run_query("List every genre.", user_context=UserContext(roles=["admin"]))
 [saved] = result.result_manifest                   # node_id, columns, row_count, truncated
-page = engine.get_result_page(result.trace_id, saved.node_id, offset=0, limit=20)
+page = engine.results.page(result.trace_id, saved.node_id, offset=0, limit=20)
 with open("genres.csv", "wb") as out:
-    for chunk in engine.export_result_csv(result.trace_id, saved.node_id):
+    for chunk in engine.results.csv(result.trace_id, saved.node_id):
         out.write(chunk)
 ```
 

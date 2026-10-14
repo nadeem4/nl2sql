@@ -1,14 +1,13 @@
-"""
-Policy API for NL2SQL.
-
-Provides public entry points for policy validation and integrity checks.
-"""
+"""``engine.policies``: the roles, what a caller may read, and whether the rules match the datasources."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Set
+from typing import Dict, List, Optional, Set
 
+from nl2sql.auth.models import UserContext
+from nl2sql.auth.rbac import default_schema
+from nl2sql.config import Role
 from nl2sql.runtime import Runtime
 
 
@@ -28,15 +27,29 @@ class PolicyValidationReport:
     available_datasources: Set[str] = field(default_factory=set)
 
 
-class PolicyAPI:
-    """
-    API for policy validation and integrity checks.
-    """
+class PoliciesAPI:
+    """``engine.policies``. Internal: reach it through ``NL2SQL``."""
 
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
-    def validate_policies(self) -> PolicyValidationReport:
+    def roles(self) -> Dict[str, Role]:
+        """The configured roles by id: each one's description and what it may read."""
+        return dict(self._ctx.config.policies.roles)
+
+    def allows(self, user_context: UserContext, datasource_id: str, table: str,
+               schema: Optional[str] = None) -> bool:
+        """Whether ``user_context`` may read ``table``; ``schema`` defaults to the datasource's default schema."""
+        default = default_schema(self._ctx.ds_registry, datasource_id)
+        return self._ctx.rbac.is_allowed(user_context, datasource_id, table, schema, default)
+
+    def allowed(self, user_context: UserContext) -> Dict[str, List[str]]:
+        """What ``user_context`` may read: ``{"datasources": [...], "tables": [...]}``, as the rules say it."""
+        rbac = self._ctx.rbac
+        return {"datasources": rbac.get_allowed_datasources(user_context),
+                "tables": rbac.get_allowed_tables(user_context)}
+
+    def validate(self) -> PolicyValidationReport:
         """
         Check that every datasource and table rule the engine's ``policies``
         name is one of its datasources. The policies' own shape was checked

@@ -1,4 +1,4 @@
-"""The documented public facade must be constructible, and its settings API must answer.
+"""The documented public facade must be constructible, and its settings are its config.
 
 ``NL2SQL`` is the entry point the README shows. API tests stub the engine via
 ``dependency_overrides``, so these build the real one from a ``make_config``
@@ -23,18 +23,10 @@ def engine(tmp_path) -> NL2SQL:
 
 
 def test_facade_constructs(engine):
-    """Constructing the facade must not raise; every sub-API is wired up."""
-    assert engine.settings is not None
-    assert engine.context is not None
+    """Constructing the facade must not raise; every namespace is wired up."""
+    for name in ("datasources", "index", "llm", "policies", "curated", "results", "traces"):
+        assert getattr(engine, name) is not None, name
 
 
-def test_current_settings_is_a_populated_dict(engine):
-    current = engine.settings.get_current_settings()
-
-    assert isinstance(current, dict)
-    assert current
-    assert "tenant_id" in current
-
-
-def test_get_setting_returns_the_engines_value(engine):
-    assert engine.get_setting("tenant_id") == "acme"
+def test_the_settings_are_the_config(engine):
+    assert engine.config.settings.tenant_id == "acme"

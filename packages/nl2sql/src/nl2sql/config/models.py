@@ -425,3 +425,9 @@ class Config(_Model):
         if any(d.id == datasource.id for d in self.datasources):
             raise ValueError(f"a datasource with id '{datasource.id}' is already configured")
         return self.model_copy(update={"datasources": [*self.datasources, datasource]})
+
+    def without_datasource(self, datasource_id: str) -> "Config":
+        """A copy of this config without the datasource ``datasource_id``, which must be configured."""
+        if not any(d.id == datasource_id for d in self.datasources):
+            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        return self.model_copy(update={"datasources": [d for d in self.datasources if d.id != datasource_id]})

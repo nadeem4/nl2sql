@@ -235,7 +235,7 @@ datasource's section of `curated.yaml`, as canonical JSON. `IndexHealth`
 (`nl2sql/indexing/health.py`) compares it with the file as it is now and
 reports "curated.yaml changed for 'chinook' since it was indexed; run
 `nl2sql index --curated-only --datasource chinook`". `nl2sql doctor` and the
-facade's `index_health()` show it. Only the verified queries are hashed:
+facade's `engine.index.health()` show it. Only the verified queries are hashed:
 metrics are not indexed yet, so editing one asks for nothing.
 It is a warning, not a failure: the stale entries still point at queries that
 exist, and the matcher re-reads every query from the loaded file, never from
@@ -451,7 +451,7 @@ generated SQL does not need:
   which named the guard but not the mechanism.
 - **Result saving and paging.** The result is written with
   `artifact_store.write_batches()` and the manifest by the aggregator, so
-  paging (`get_result_page`) and CSV export (`export_result_csv`) work for a
+  paging (`engine.results.page`) and CSV export (`engine.results.csv`) work for a
   verified answer as for any other.
 - **Time.** The run is inside `run_with_graph()`'s `GLOBAL_TIMEOUT_SEC` like
   every node, and the datasource's `statement_timeout_ms` applies.

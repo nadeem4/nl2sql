@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from langchain_core.runnables import RunnableLambda
 
-from nl2sql.api.indexing_api import IndexingAPI
+from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.config import Datasource, Limits
 from nl2sql.indexing.enrichment_service import (
@@ -25,7 +25,6 @@ from nl2sql.indexing.enrichment_service import (
     apply_enrichment,
 )
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
-from nl2sql.public_api import NL2SQL
 from nl2sql.schema import InMemorySchemaStore
 from nl2sql.secrets import SecretManager
 from nl2sql_sdk.schema import (
@@ -119,24 +118,11 @@ def _context(llm_registry, ds_registry=None, file_description="User records"):
 
 # --- B8: enrichment is opt-in -------------------------------------------------
 
-def test_index_datasource_makes_no_llm_call_by_default():
+def test_orchestrator_enriches_when_asked():
     registry = _RecordingLLMRegistry()
-    api = IndexingAPI(_context(registry))
+    IndexingOrchestrator(_context(registry), enrich=True).index_datasource(_StubAdapter())
 
-    api.index_datasource("ds1")
-    api.index_all_datasources()
-
-    assert registry.calls == 0
-
-
-def test_index_datasource_enriches_when_asked():
-    registry = _RecordingLLMRegistry()
-    api = IndexingAPI(_context(registry))
-
-    api.index_datasource("ds1", enrich=True)
-    api.index_all_datasources(enrich=True)
-
-    assert registry.calls == 2
+    assert registry.calls == 1
 
 
 def test_orchestrator_does_not_enrich_by_default():
@@ -148,11 +134,11 @@ def test_orchestrator_does_not_enrich_by_default():
 
 
 def test_every_public_entry_point_defaults_to_no_enrichment():
+    from nl2sql.api.indexing_api import IndexAPI
     from nl2sql.cli.common.indexing import run_indexing
     from nl2sql.indexing.rebuild import rebuild_index
 
-    for fn in (NL2SQL.index_datasource, NL2SQL.index_all_datasources, NL2SQL.rebuild_index,
-               rebuild_index, inspect.unwrap(run_indexing)):
+    for fn in (IndexAPI.build, rebuild_index, inspect.unwrap(run_indexing)):
         assert inspect.signature(fn).parameters["enrich"].default is False, fn.__qualname__
 
 
@@ -216,7 +202,7 @@ def test_code_added_datasource_description_reaches_the_datasource_chunk(tmp_path
     # The datasources YAML on disk does not list "shop".
     ctx = _context(_RecordingLLMRegistry(), ds_registry=ds_registry, file_description=None)
 
-    IndexingAPI(ctx).index_datasource("shop")
+    IndexingOrchestrator(ctx).index_datasource(ds_registry.get_adapter("shop"))
 
     datasource_chunks = [c for c in ctx.vector_store.chunks if c.type == "schema.datasource"]
     assert datasource_chunks[0].description == "Online shop orders and revenue"

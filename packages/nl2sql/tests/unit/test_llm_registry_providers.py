@@ -139,15 +139,10 @@ def test_missing_key_registers_but_fails_with_an_actionable_error_on_first_use(m
     assert "Missing credentials" not in message
 
 
-def test_missing_key_error_names_the_env_file_this_run_loads(monkeypatch):
-    """"Set OPENAI_API_KEY" is only actionable if it says *where*.
-
-    A user running `--env demo` has a `.env.demo`, not a `.env`, and the
-    message has to name the one this run reads.
-    """
+def test_missing_key_error_says_where_the_key_goes(monkeypatch):
+    """"Set OPENAI_API_KEY" is only actionable if it says *where*: the
+    environment, the .env next to nl2sql.yaml, or the llm section itself."""
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("ENV_FILE_PATH", raising=False)
-    monkeypatch.setenv("ENV", "demo")
     registry = _registry()
     registry.register_llm(
         AgentConfig(provider="openai", model="gpt-4o", name="default")
@@ -156,7 +151,10 @@ def test_missing_key_error_names_the_env_file_this_run_loads(monkeypatch):
     with pytest.raises(ValueError) as exc:
         registry.get_llm("default")
 
-    assert ".env.demo" in str(exc.value)
+    message = str(exc.value)
+    assert "OPENAI_API_KEY" in message and ".env next to nl2sql.yaml" in message
+    assert "llm.agents.<agent>.api_key" in message
+    assert "configs/llm.yaml" not in message and ".env.demo" not in message
 
 
 def test_missing_key_error_is_not_the_raw_openai_error(monkeypatch):

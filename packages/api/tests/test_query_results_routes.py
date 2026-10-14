@@ -1,6 +1,6 @@
 """GET /query/{request_id}/results/{result_id}: a page of a run's saved result, or all of it as CSV.
 
-The routes call the facade's ``get_result_page`` and ``export_result_csv``,
+The routes call the facade's ``engine.results.page`` and ``engine.results.csv``,
 which read the run's parquet artifact lazily. The engine here is the real
 facade over a local artifact store holding one run, ``run-1`` of tenant
 ``t1``, with 45 rows in ``combine_g1``; tenant ``t2`` holds a run of its own.
@@ -14,7 +14,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL, UserContext, ResultManifest, ResultSummary
-from nl2sql.api.query_api import QueryAPI
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.testing.config import make_config
 from nl2sql_api.auth import get_user_context
@@ -38,8 +37,8 @@ def client(tmp_path):
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
     engine = NL2SQL.__new__(NL2SQL)
     # The API reads its role settings from the engine's config.
-    engine._runtime = SimpleNamespace(config=make_config(tmp_path / "project"), closed=False)
-    engine.query = QueryAPI(SimpleNamespace(tenant_id="t1", artifact_store=store))
+    engine._runtime = SimpleNamespace(config=make_config(tmp_path / "project"), closed=False,
+                                      tenant_id="t1", artifact_store=store)
     app.dependency_overrides[get_engine] = lambda: engine
     app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])
     with_client = TestClient(app)

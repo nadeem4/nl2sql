@@ -14,8 +14,8 @@ because `run_query` calls the model several times.
 from nl2sql import NL2SQL, UserContext
 
 engine = NL2SQL.demo()
-if engine.index_health()["status"] != "ok":
-    engine.index_all_datasources()
+if engine.index.health()["status"] != "ok":
+    engine.index.build()
 # The role decides which tables the plan may read; `admin` may read them all.
 result = engine.run_query("How many customers are there?", user_context=UserContext(roles=["admin"]))
 

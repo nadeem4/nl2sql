@@ -58,6 +58,7 @@ class DatasourceRegistry:
         self._datasources: Dict[str, "Datasource"] = {}
         self._capabilities: Dict[str, Set[str]] = {}
         self._unavailable: Dict[str, str] = {}
+        self._ready: Set[str] = set()
         self._registry = registry or Registry.default()
         self._secret_manager = secret_manager
         self._base_dir = base_dir
@@ -134,6 +135,7 @@ class DatasourceRegistry:
             self._datasources[datasource.id] = datasource
             self._capabilities[datasource.id] = capabilities
             self._unavailable.pop(datasource.id, None)
+            self._ready.discard(datasource.id)
         return adapter
 
     def remove(self, datasource_id: str) -> None:
@@ -143,6 +145,7 @@ class DatasourceRegistry:
             self._datasources.pop(datasource_id, None)
             self._capabilities.pop(datasource_id, None)
             self._unavailable.pop(datasource_id, None)
+            self._ready.discard(datasource_id)
         if adapter is not None:
             close_adapter(adapter)
 
@@ -150,11 +153,19 @@ class DatasourceRegistry:
         """Keeps a datasource out of routing; anything that targets it fails with ``reason``."""
         with self._lock:
             self._unavailable[datasource_id] = reason
+            self._ready.discard(datasource_id)
         logger.error(f"Datasource '{datasource_id}' is unavailable: {reason}")
 
     def mark_available(self, datasource_id: str) -> None:
+        """Puts a datasource that connected back in routing, and records it as ready."""
         with self._lock:
             self._unavailable.pop(datasource_id, None)
+            self._ready.add(datasource_id)
+
+    def is_ready(self, datasource_id: str) -> bool:
+        """True once the datasource connected (``check()``), until it fails or is replaced."""
+        with self._lock:
+            return datasource_id in self._ready
 
     def unavailable(self) -> Dict[str, str]:
         """Datasources that are unavailable, mapped to the reason."""

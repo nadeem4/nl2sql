@@ -91,6 +91,7 @@ from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.cli.demo.stamp import engine_version
 from nl2sql.common.settings import settings
 from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
+from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.llm.request_key import use_request_llms
 from nl2sql.pipeline.steps import describe_pipeline
 from nl2sql.tracing.document import find_trace, load_trace
@@ -253,9 +254,14 @@ def _read_page() -> str:
         return _MISSING_PAGE
 
 
+def _available(engine) -> List[str]:
+    """The datasources questions can reach: every configured one that has not failed."""
+    return [d.id for d in engine.datasources.list() if d.status != "failed"]
+
+
 def _default_datasource(engine, dataset: str) -> str:
     """The datasource the schema panel shows when the caller names none."""
-    ids = list(engine.list_datasources() or [])
+    ids = _available(engine)
     return dataset if dataset in ids else (ids[0] if ids else dataset)
 
 
@@ -265,7 +271,7 @@ def _datasource_ids(engine, dataset: str) -> List[str]:
     The page offers these as the schema panel's choices, so the order is the
     order they are listed in, and the default leads.
     """
-    ids = list(engine.list_datasources() or [])
+    ids = _available(engine)
     if dataset in ids:
         return [dataset] + [d for d in ids if d != dataset]
     return ids or [dataset]
@@ -274,7 +280,7 @@ def _datasource_ids(engine, dataset: str) -> List[str]:
 def _llm_configs(engine) -> Dict[str, Any]:
     """Provider, model and temperature per configured agent, for a feedback record."""
     return {name: {key: (config or {}).get(key) for key in ("provider", "model", "temperature")}
-            for name, config in (engine.list_llms() or {}).items()}
+            for name, config in engine.llm.list().items()}
 
 
 async def cancel_when_disconnected(request: Request, token: CancellationToken,
@@ -438,7 +444,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.get("/api/schema")
     def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
-        return engine.get_schema(datasource or _default_datasource(engine, dataset))
+        return engine.datasources.schema(datasource or _default_datasource(engine, dataset))
 
     def start_question(req: AskRequest, request: Request, response: Response):
         """``(llms, replaying, miss)`` for a question about to run, or a refusal.
@@ -591,7 +597,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         """The whole saved result as CSV, streamed from its parquet file. Read from the
         engine's own tenant folder only; an unknown, foreign or crafted id is a 404."""
         try:
-            chunks = engine.export_result_csv(request_id, result_id)
+            chunks = engine.results.csv(request_id, result_id)
         except ResultNotFound:
             raise HTTPException(status_code=404, detail="No such result.")
         return StreamingResponse(chunks, media_type="text/csv; charset=utf-8", headers={
@@ -602,7 +608,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
                     offset: int = Query(0, ge=0), limit: int = Query(100, ge=1)) -> Dict[str, Any]:
         """One page of a saved result (``limit`` capped at 1,000), as ``nl2sql-api`` serves it."""
         try:
-            page = engine.get_result_page(request_id, result_id, offset=offset, limit=limit)
+            page = engine.results.page(request_id, result_id, offset=offset, limit=limit)
         except ResultNotFound:
             raise HTTPException(status_code=404, detail="No such result.")
         return page.model_dump(mode="json")
@@ -665,7 +671,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         recordings.
         """
         try:
-            agents = engine.list_llms() or {}
+            # The steps name each agent as the registry does (``astplanner``).
+            agents = {LLM_AGENTS.get(name, name): entry for name, entry in engine.llm.list().items()}
         except Exception:  # an engine without a registry (a plan-only harness)
             agents = {}
         return {"steps": describe_pipeline(agents), "docs": PIPELINE_DOCS,
@@ -724,8 +731,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         if unknown:
             raise HTTPException(status_code=422, detail=f"Unknown entry types: {', '.join(unknown)}.")
         try:
-            return engine.inspect_retrieval(req.query, k=req.k, lambda_mult=req.lambda_mult,
-                                            types=req.types, datasource_id=req.datasource_id or None)
+            return engine.index.inspect(req.query, k=req.k, lambda_mult=req.lambda_mult,
+                                        types=req.types, datasource_id=req.datasource_id or None)
         except Exception as exc:  # no index, a model mismatch, an unreadable collection
             raise HTTPException(status_code=409, detail=str(exc))
 

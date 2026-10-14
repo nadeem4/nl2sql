@@ -43,8 +43,8 @@ def test_two_engines_in_one_process_keep_their_own_config(tmp_path):
         a = _engine(tmp_path / "a", server_a, row_limit=5, plan_cache=False)
         b = _engine(tmp_path / "b", server_b, row_limit=50, plan_cache=True)
         with a, b:
-            a.index_datasource("chinook")
-            b.index_datasource("chinook")
+            a.index.build(["chinook"])
+            b.index.build(["chinook"])
             ra = a.run_query(QUESTION, user_context=ADMIN)
             rb = b.run_query(QUESTION, user_context=ADMIN)
     finally:

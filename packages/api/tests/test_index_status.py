@@ -1,4 +1,5 @@
 """GET /api/v1/index/status reports the engine's real index health, through the facade."""
+from types import SimpleNamespace
 
 HEALTH = {
     "status": "stale",
@@ -14,7 +15,7 @@ HEALTH = {
 
 def test_index_status_is_the_engines_index_health(api_client):
     client, engine = api_client()
-    engine.index_health = lambda: HEALTH
+    engine.index = SimpleNamespace(health=lambda: HEALTH)
 
     response = client.get("/api/v1/index/status")
 

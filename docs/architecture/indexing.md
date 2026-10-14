@@ -31,7 +31,7 @@ catalog in the current implementation.
 
 Chunk types are defined in `nl2sql.indexing.models`:
 
-- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions. The description is the one the datasource was registered with (`description:` in the datasources config, or the `description` passed to `engine.add_datasource`); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the `SAMPLE_QUESTIONS` file.
+- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions. The description is the one the datasource was registered with (`description:` in the datasources config, or the `description` of a `Datasource` passed to `engine.datasources.add`); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the `SAMPLE_QUESTIONS` file.
 - **TableChunk** (`schema.table`): table name, PKs, column list, FK summaries, row counts.
 - **ColumnChunk** (`schema.column`): column type, stats, synonyms, PII flags.
 - **RelationshipChunk** (`schema.relationship`): FK relationships, columns, cardinality.
@@ -61,7 +61,7 @@ as canonical JSON (metrics are left out; nothing indexes them yet). Index
 health compares it with the file as it is now (see [Index health](#index-health)).
 
 **Changing `curated.yaml` does not re-read the schema.**
-`nl2sql index --curated-only` (`rebuild_index(..., curated_only=True)`,
+`nl2sql index --curated-only` (`engine.index.build(curated_only=True)`,
 `IndexingOrchestrator.refresh_curated()`,
 `VectorStore.refresh_curated_chunks()`) writes a new build for each datasource
 the usual way, except that the active build's schema entries are **copied**
@@ -121,11 +121,13 @@ flowchart TD
   each configured datasource in turn, and a failure keeps that datasource's
   previous entries active and exits `1`.
 - Callers that serve questions can hold them back around the switch:
-  `rebuild_index(..., switch_guard=...)`. The playground passes its `RunGate`, so
-  questions in flight finish first.
-- `nl2sql.indexing.rebuild.rebuild_index` is the one entry point for
-  `nl2sql index`, the demo's startup repair and the playground's Rebuild (through
-  `NL2SQL.rebuild_index`).
+  `engine.index.build(..., switch_guard=...)`. The playground passes its
+  `RunGate`, so questions in flight finish first.
+- `nl2sql.indexing.rebuild.rebuild_index`, behind `engine.index.build`, is the
+  one entry point for `nl2sql index`, the demo's startup repair, the
+  playground's Rebuild and the REST index routes. Its `on_datasource` callback
+  gets an `IndexProgress` per datasource (`started`, then `done` with the entry
+  counts or `failed` with the reason): `nl2sql index` prints a line from it.
 
 ### One embedding model per collection
 
@@ -158,7 +160,7 @@ chinook`". Questions keep working meanwhile; the stale entries still name
 queries that exist. A `preferred_tables` entry missing from the datasource's
 latest snapshot is a warning too. `nl2sql doctor` prints it under **Index**,
 `nl2sql demo` rebuilds at startup when it is not `ok`, and the playground and
-`GET /api/v1/index/status` show it (through `NL2SQL.index_health`), the playground
+`GET /api/v1/index/status` show it (through `engine.index.health()`), the playground
 with a Rebuild button.
 
 ## Chunking strategy (as implemented)
@@ -261,7 +263,7 @@ search (the query, the pool with similarity, Chroma distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see [Debugging a run](../observability/debugging.md#retrieval)),
-and the playground's Retrieval inspector (`NL2SQL.inspect_retrieval`) runs the same
+and the playground's Retrieval inspector (`engine.index.inspect`) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the **Copy as text** output.
@@ -288,8 +290,8 @@ Current failure behaviors:
 - Vector store retrieval wrapped by `VECTOR_BREAKER`; failures fast‑fail.
 - Vector retrieval errors in `SchemaRetrieverNode` return empty results with warnings.
 - If no candidates are found, the retriever falls back to full schema snapshot.
-- Enrichment is opt-in: `index_datasource`, `index_all_datasources`,
-  `rebuild_index`, `IndexingOrchestrator` and `nl2sql index` all default to
+- Enrichment is opt-in: `engine.index.build`, `rebuild_index`,
+  `IndexingOrchestrator` and `nl2sql index` all default to
   `enrich=False`; pass `enrich=True` (or `nl2sql index --enrich`) to spend
   tokens on it. It only fills blanks: a table or column comment read from the
   database is never overwritten.

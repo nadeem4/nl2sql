@@ -464,8 +464,14 @@ print(change.changes)  # {"default": {"old": "openai/gpt-5.4", "new": "anthropic
   served. Swapping back hits the old plans again. See
   [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
-The REST API's `POST /llm` still registers one agent at a time until it is
-replaced by `PUT /api/v1/settings/llm`, which calls `engine.llm.replace`.
+`replace` also takes the section as written in `nl2sql.yaml`, as a mapping,
+checked by the same rules as the file. A `${...}` reference is kept in a secret
+field (`api_key`) and is an error anywhere else, so data that did not come
+from your files never reads the environment. `nl2sql-api` serves it as the
+admin-only [`PUT /api/v1/settings/llm`](../api/rest/llm.md): the body is the
+section as JSON, and a bad one is HTTP 422 with the `ConfigError` text. The
+playground's model switch calls `replace` too. `engine.llm.list()` shows the
+model each agent runs on.
 
 ## Embeddings are a separate path
 

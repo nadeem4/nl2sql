@@ -1,131 +1,66 @@
 # Datasource API
 
 ## Purpose
-Register, validate, and inspect datasources backed by adapter implementations.
+`engine.datasources`: the engine's datasources, listed with their status,
+added and removed at runtime, tested, and their indexed schema.
 
 ## Responsibilities
-- Register datasources from `nl2sql.yaml` or programmatically.
-- Validate datasource connections via adapters.
-- Expose adapter capabilities and details.
+- List every configured datasource with its status, capabilities and masked connection.
+- Add a `Datasource` (built, not connected) and remove one.
+- Connect to one datasource on demand, as `check()` does.
+- Return the indexed schema as the planner is given it.
 
 ## Key Modules
-- `packages/nl2sql/src/nl2sql/api/datasource_api.py`
+- `packages/nl2sql/src/nl2sql/api/datasource_api.py` (`DatasourcesAPI`, internal)
+- `packages/nl2sql/src/nl2sql/api/types.py` (`DatasourceInfo`)
 - `packages/nl2sql/src/nl2sql/datasources/registry.py`
 - `packages/nl2sql/src/nl2sql/config/models.py` (`Datasource`)
-- `packages/nl2sql/src/nl2sql/registry.py` (adapter lookup by `type`)
 
 ## Public Surface
 
-### DatasourceAPI.add_datasource
+| method | returns | meaning |
+| --- | --- | --- |
+| `list()` | `list[DatasourceInfo]` | Every configured datasource, in config order, failed ones included. |
+| `get(datasource_id)` | `DatasourceInfo` | One configured datasource. Raises `ValueError` for an unknown id. |
+| `add(datasource)` | `None` | Builds the adapter without connecting, registers it, and adds the `Datasource` to `engine.config`; its description and sample questions are what indexing reads. Raises `ValueError` if the id is taken, the type is unknown, a reference does not resolve or the adapter rejects its connection settings (with every secret masked). Index it next: `engine.index.build([datasource.id])`. |
+| `remove(datasource_id)` | `None` | Takes the datasource out of routing and out of `engine.config`, and closes its adapter's pool. Its index entries stay until the next full `index.build` or `index.clear`. Raises `ValueError` for an unknown id. |
+| `schema(datasource_id)` | `dict` | The indexed schema as the planner is given it: `{"datasource_id", "tables": [...]}`, tables sorted by name, each with `name`, `schema`, `row_count`, `description`, `columns` (`name`, `type`, `nullable`, `primary_key`, `description`) and `foreign_keys` (`columns`, `references_table`, `references_columns`). Read from the latest schema snapshot, not the database; before the first index `tables` is empty. |
+| `test(datasource_id)` | `DatasourceStatus` | Connects to one datasource, as `check()` does: `ready` puts it back in routing, `failed` (stage `connect`, the reason and a fix) keeps it out. Raises `ValueError` for an unknown id. |
 
-Source:
-`packages/nl2sql/src/nl2sql/api/datasource_api.py`
+`DatasourceInfo` is a frozen dataclass, exported from `nl2sql`:
 
-Signature:
-`add_datasource(config: Datasource) -> None`
+| field | meaning |
+| --- | --- |
+| `id` | The datasource id. |
+| `type` | Its `type` (the adapter's engine type for an adapter object). |
+| `description` | Its `description`, or `None`. |
+| `status` | `ready` once `check()` or `test()` connected to it, `failed` when one did not, `unchecked` before either ran. |
+| `capabilities` | The capabilities its adapter declares, sorted. Empty for a failed datasource: nothing is routed to it. |
+| `connection` | The configured `connection`, with every secret field masked as `***`. References (`${env:...}`) are shown masked too. |
+| `reason` | Why it failed, or `None`. |
 
-Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `config` | `Datasource` | yes | A `Datasource` (see [Datasources](../../configuration/datasources.md)). |
+```python
+from nl2sql import NL2SQL, Datasource
 
-Returns:
-`None`.
+engine = NL2SQL.from_config("nl2sql.yaml")
+engine.check()
+[(d.id, d.status) for d in engine.datasources.list()]   # [('shop', 'ready'), ('hr', 'failed')]
+engine.datasources.get("hr").reason
 
-Raises:
-- `ValueError` if the id is already configured, the adapter type is unknown, or a reference does not resolve.
+engine.datasources.add(Datasource(id="ledger", type="sqlite", connection={"database": "ledger.db"}))
+engine.datasources.test("ledger").status                 # 'ready'
+engine.index.build(["ledger"])
+```
 
-Side Effects:
-- Builds the adapter without connecting, registers it, and adds the datasource
-  to `engine.config`. Its description and sample questions are what indexing
-  reads.
+To add every datasource of another `nl2sql.yaml`:
 
-Idempotency:
-- Not idempotent: adding an id that is already configured raises.
+```python
+from nl2sql import load_config
 
-### DatasourceAPI.add_datasource_from_config
+for datasource in load_config("other/nl2sql.yaml").datasources:
+    engine.datasources.add(datasource)
+```
 
-Source:
-`packages/nl2sql/src/nl2sql/api/datasource_api.py`
-
-Signature:
-`add_datasource_from_config(config_path: Union[str, pathlib.Path]) -> None`
-
-Parameters:
-| name | type | required | meaning |
-| --- | --- | --- | --- |
-| `config_path` | `Union[str, pathlib.Path]` | yes | Path to another `nl2sql.yaml`; its datasources are added. |
-
-Returns:
-`None`.
-
-Raises:
-- `ConfigError` if the file does not load, naming every problem.
-- `ValueError` if an id is already configured or an adapter cannot be built.
-
-Side Effects:
-- Adds each datasource as `add_datasource` does: built, not connected.
-
-Idempotency:
-No (registrations happen each call).
-
-### DatasourceAPI.list_datasources
-
-Signature:
-`list_datasources() -> List[str]`
-
-Returns:
-List of available datasource IDs. A datasource `check()` could not connect to
-is not in it; `NL2SQL.list_unavailable_datasources()` maps each one to the
-reason.
-
-### DatasourceAPI.get_adapter
-
-Signature:
-`get_adapter(datasource_id: str) -> DatasourceAdapterProtocol`
-
-Raises:
-`ValueError` if datasource ID is unknown.
-
-Side Effects:
-None.
-
-### DatasourceAPI.get_capabilities
-
-Signature:
-`get_capabilities(datasource_id: str) -> List[str]`
-
-Raises:
-`ValueError` if datasource ID is unknown.
-
-### DatasourceAPI.validate_connection
-
-Signature:
-`validate_connection(ds_id: str) -> bool`
-
-Returns:
-`True` if adapter connection check succeeds.
-
-Raises:
-Adapter-specific exceptions from `test_connection()`.
-
-Side Effects:
-Per-adapter network/database connection attempts.
-
-### DatasourceAPI.get_datasource_details
-
-Signature:
-`get_datasource_details(datasource_id: str) -> Dict[str, Any]`
-
-Returns:
-Adapter-derived metadata (connection args, limits, capabilities). Connection arg
-values whose key contains `password`, `secret`, `token`, or `api_key`
-(case-insensitive) are masked as `"***"` before being returned.
-
-Raises:
-`ValueError` if datasource ID is unknown.
-
-## Behavioral Contracts
-- Adapter discovery is via entry points group `nl2sql.adapters`.
-- Connection secrets are resolved before adapter instantiation.
-- Capabilities default to `SUPPORTS_SQL` if adapter does not declare capabilities.
+See [Datasources](../../configuration/datasources.md) for the `Datasource`
+fields, and [When a datasource fails to start](../../configuration/datasources.md#when-a-datasource-fails-to-start)
+for running degraded.

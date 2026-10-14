@@ -13,6 +13,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL, QueryEvent
+from nl2sql.testing.facade import StubDatasources
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import REPLAY_MISS_MESSAGE, build_app
 from nl2sql.cli.demo.playground.hosted import KEY_HEADER, SESSION_COOKIE, Hosted, Limits, Replay
@@ -38,8 +39,9 @@ class _Engine(NL2SQL):
             SubQueryResult(id="sq1", sql="SELECT 1", status="success")])
         self.seen = []
 
-    def list_datasources(self):
-        return ["chinook"]
+    @property
+    def datasources(self):
+        return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                   cancellation_token=None):

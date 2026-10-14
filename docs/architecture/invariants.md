@@ -340,7 +340,7 @@ Concretely:
 - An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
 - Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapterProtocol`.
 - Nothing outside `nl2sql/cli/` imports the CLI, and `nl2sql.cli.demo` never imports `nl2sql.cli.commands`.
-- `nl2sql_api` imports only the top-level `nl2sql` namespace, and the playground reaches the engine only through `NL2SQL`'s public methods, never `engine.context`.
+- `nl2sql_api` imports only the top-level `nl2sql` namespace. The CLI, the playground and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`).
 - The runtime (`pipeline`, `execution`, `indexing`, `datasources`, `llm`, `auth`, `aggregation`, `schema`, `services`, `context`, `public_api`) never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope. A deferred import inside a function is fine.
 - A provider's API-key environment variable is read in `nl2sql/llm/` only. `PROVIDER_PRESETS` (`llm/registry.py`) is the one table; everything the CLI, the playground, evaluation and the REST API know about providers derives from it through `llm/providers.py`.
 
@@ -355,7 +355,7 @@ A failing test naming the rule and the file, line and import that broke it. Each
 Each rule keeps one thing replaceable. The SDK is what a third-party adapter compiles against, so a dependency there is a dependency every adapter author inherits; an adapter that imported the engine would close the circle and make the split meaningless. Engine code that imports an adapter, or SQLAlchemy, is a second way to reach a database that no new adapter can plug into. And `import nl2sql` loading `nl2sql.evaluation` cost every SDK user the YAML loaders, the gold dataset and the fake LLM before anyone asked a question.
 
 ### Example
-The playground once read `engine.context.ds_registry`, `engine.context.schema_store` and `engine.context.vector_store` through `getattr`, so the schema view, the retrieval inspector and index health existed only in the playground; `nl2sql-api` had a placeholder where index status should be. The fix was four facade methods that both callers use. The rule stops the shortcut being taken again, which is what keeps a second client cheap.
+The playground once read `engine.context.ds_registry`, `engine.context.schema_store` and `engine.context.vector_store` through `getattr`, so the schema view, the retrieval inspector and index health existed only in the playground; `nl2sql-api` had a placeholder where index status should be. The fix was facade methods that both callers use. Later the CLI's `run`, `index` and `trace replay` built on the runtime too; they now use `stream_query`'s events, `engine.index.build`'s `IndexProgress` callback and `engine.traces.replay`. The rule stops the shortcut being taken again, which is what keeps a second client cheap.
 
 ---
 

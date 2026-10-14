@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -42,11 +43,12 @@ def project_stores(tmp_path, monkeypatch):
 class StubDemoEngine:
     """Stands in for the engine ``nl2sql demo`` builds: the config it was built from, nothing that connects.
 
-    ``check()`` reports the index as ``index`` (``ok`` by default, so the demo
-    does not index); ``run_query`` raises unless a test replaces it.
+    ``check()`` reports the index as ``index_status`` (``ok`` by default, so the
+    demo does not index); ``run_query`` raises unless a test replaces it. The
+    namespaces the playground reads answer with nothing configured.
     """
 
-    index = "ok"
+    index_status = "ok"
 
     def __init__(self, config_path, plan_cache=True):
         from nl2sql.config import load_config
@@ -55,20 +57,17 @@ class StubDemoEngine:
         self.config = load_config(config_path)
         self.plan_cache = plan_cache
         self.closed = False
+        self.datasources = SimpleNamespace(list=lambda: [])
+        self.llm = SimpleNamespace(list=lambda: {}, get=lambda agent: {})
+        self.index = SimpleNamespace(health=lambda: {"status": self.index_status})
 
     def check(self):
         from nl2sql.check import CheckReport
 
-        return CheckReport(datasources=[], index=self.index)
+        return CheckReport(datasources=[], index=self.index_status)
 
     def run_query(self, *args, **kwargs):  # pragma: no cover - replaced where a test needs it
         raise AssertionError("the stub engine does not run queries")
-
-    def list_datasources(self):
-        return []
-
-    def list_llms(self):
-        return {}
 
     def close(self):
         self.closed = True

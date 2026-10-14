@@ -1,36 +1,41 @@
 """Service-layer tests (ported from packages/api/test_services_updates.py)."""
 
+from nl2sql import DatasourceInfo, LLMChange, UserContext
 from nl2sql_api.models.datasource import DatasourceRequest
-from nl2sql_api.models.llm import LLMRequest
 from nl2sql_api.services.datasource import DatasourceService
 from nl2sql_api.services.llm import LLMService
 
 
+class FakeDatasources:
+    def __init__(self) -> None:
+        self._ids = []
+
+    def add(self, datasource):
+        self._ids.append(datasource.id)
+
+    def list(self):
+        return [DatasourceInfo(id=i, type="sqlite", description=None, status="unchecked") for i in self._ids]
+
+
+class FakeLLMs:
+    def __init__(self) -> None:
+        self.replaced = []
+
+    def list(self):
+        return {"default": {"provider": "openai", "model": "gpt", "temperature": 0.0, "inherited": False}}
+
+    def get(self, agent):
+        return self.list()[agent]
+
+    def replace(self, section, by=None, via="python"):
+        self.replaced.append((section, by, via))
+        return LLMChange(by={"via": via}, changes={"default": {"old": "openai/gpt", "new": "openai/gpt-2"}})
+
+
 class FakeEngine:
     def __init__(self) -> None:
-        self._datasources = []
-        self._llms = {}
-
-    def add_datasource(self, datasource):
-        self._datasources.append(datasource.id)
-
-    def list_datasources(self):
-        return list(self._datasources)
-
-    def configure_llm(self, config):
-        name = config.get("name", "default")
-        self._llms[name] = config
-
-    def list_llms(self):
-        return {
-            name: {"name": cfg.get("name", name)}
-            for name, cfg in self._llms.items()
-        }
-
-    def get_llm(self, name):
-        if name in self._llms:
-            return self._llms[name]
-        return self._llms.get("default")
+        self.datasources = FakeDatasources()
+        self.llm = FakeLLMs()
 
 
 def test_datasource_service_live_update():
@@ -40,17 +45,15 @@ def test_datasource_service_live_update():
     service.add_datasource(DatasourceRequest(config={"id": "ds-1", "type": "sqlite",
                                                      "connection": {"database": "ds.db"}}))
 
-    assert "ds-1" in service.list_datasources()
+    assert [d["id"] for d in service.list_datasources()] == ["ds-1"]
 
 
-def test_llm_service_live_update():
+def test_llm_service_replaces_the_section_through_the_engine():
     engine = FakeEngine()
     service = LLMService(engine)
 
-    service.configure_llm(
-        LLMRequest(config={"name": "custom", "provider": "openai", "model": "gpt"})
-    )
+    change = service.replace_llm({"provider": "openai", "model": "gpt-2"}, by=UserContext(roles=["admin"]))
 
-    llms = service.list_llms()
-    assert "custom" in llms
-    assert service.get_llm("custom")["name"] == "custom"
+    assert change["changes"]["default"]["new"] == "openai/gpt-2"
+    assert engine.llm.replaced[0][2] == "api"
+    assert service.get_llm("default")["model"] == "gpt"
