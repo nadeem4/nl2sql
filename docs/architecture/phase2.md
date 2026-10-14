@@ -394,6 +394,38 @@ So even a daily session stays well inside $10.
     - `max_age_days` arrives with retention in S4; until then `files` and
       `local` take no keys.
 
+!!! note "Built: the index store and the pointer as the commit (S2)"
+    `nl2sql/storage/chroma.py` is the `chroma` index store on Chroma's public
+    client API, one collection per namespace, with each datasource's
+    `BuildPointer` in the collection's metadata. The engine embeds and ranks:
+    `nl2sql/indexing/retrieval.py` holds the `Retriever` (MMR in numpy over the
+    vectors `query` returns) and `namespace_for`; `indexing/vector_store.py`,
+    `retrieval_trace.py`, `indexing/embeddings.py` (the local embedder moved
+    to `embeddings/local.py`), staging, `full`, `switch_guard`,
+    `EmbeddingModelMismatchError`, `get_latest_snapshot`/`get_latest_version`
+    and `settings.schema.version_mismatch` are deleted. `Runtime.vector_store`
+    is a `Retriever` on the live pointers, `Runtime.pin_index()` pins them for
+    a run (`run_with_graph` calls it), and the index slot takes any
+    `IndexStore`. `engine.index.prune()` and `nl2sql index prune` are added.
+    Building it settled these details:
+
+    - `Entry.metadata` holds scalars only, so a relationship entry stores
+      `from_columns` and `to_columns` comma-joined and the retriever splits
+      them; empty values are left out.
+    - The local embedder uses chromadb's bundled ONNX model function, so
+      `embeddings/local.py` is the one exception to "only `nl2sql/storage/`
+      imports chromadb". `langchain-chroma` is no longer a dependency.
+    - Health keeps `index_version` per datasource (the pointer's schema
+      version, which the playground shows) and drops `snapshot_version`;
+      `stale` now means a datasource without a live build, or whose
+      snapshot is gone.
+    - The `chroma` store opens `index/` on the first write; reads of a missing
+      folder or namespace create nothing.
+    - Snapshot immutability and `keep_snapshots` (so eviction never removes a
+      pointed version) are S3's: until then `settings.schema.max_versions`
+      still evicts the oldest versions, and an unchanged structure still
+      refreshes its stored metadata in place.
+
 ### The config
 
 Every sub-block is optional. A config with only `path` stays valid and means

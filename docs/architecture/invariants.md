@@ -340,6 +340,7 @@ Concretely:
 - The SDK imports only pydantic and the standard library.
 - An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
 - Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapterProtocol`.
+- Only `nl2sql/storage/` imports `chromadb` (or `langchain_chroma`). The engine embeds, ranks and filters through the `IndexStore` interface (`nl2sql_sdk.stores`), so a plugin index store works the same way as the built-in `chroma` one. The one exception is the local embedder, `nl2sql/embeddings/local.py`, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.
 - Nothing outside `nl2sql/cli/` imports the CLI, and `nl2sql.cli.demo` never imports `nl2sql.cli.commands`.
 - `nl2sql_api` imports only the top-level `nl2sql` namespace, and so do the playground and `nl2sql demo`, apart from a named list of exceptions (`STILL_IMPORTED_FROM_INSIDE`: the provider catalogue in `llm/providers.py`, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import `nl2sql.feedback`, `nl2sql.tracing`, `nl2sql.pipeline`, `nl2sql.indexing` or `PROVIDER_PRESETS`: `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.index.inspect_defaults()` and `engine.llm.providers()` serve them. The CLI, the playground and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`).
 - The runtime (`pipeline`, `execution`, `indexing`, `datasources`, `llm`, `policies`, `aggregation`, `schema`, `services`, `context`, `public_api`) never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope. A deferred import inside a function is fine.
@@ -484,9 +485,7 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 ## Gaps
 
 - Column existence enforcement degrades to warnings when `settings.pipeline.strict_columns` is turned off (it is on by default), so missing columns then do not always block execution.
-- Schema version mismatch handling is policy-driven and may only emit warnings (e.g., `settings.schema.version_mismatch: warn`), so mismatch is not always enforced as a hard failure.
 - Semantic-only checks are pattern based: they block a field that opens with `SELECT ... FROM`, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.
-- If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.
 
 ---
 

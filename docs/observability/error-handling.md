@@ -77,7 +77,7 @@ failure that escapes its node is not `UNKNOWN_ERROR`.
 
 - `VECTOR_BREAKER` (`fail_max=5`, `reset_timeout=30`)
 
-Retrieval calls in `VectorStore` are wrapped with `VECTOR_BREAKER`. It is the only breaker instance the system defines: LLM calls and SQL execution are **not** breaker-guarded, and their failures surface as `PipelineError` values in state.
+Retrieval calls in the `Retriever` are wrapped with `VECTOR_BREAKER`. It is the only breaker instance the system defines: LLM calls and SQL execution are **not** breaker-guarded, and their failures surface as `PipelineError` values in state.
 
 ## Failure flow
 

@@ -2,7 +2,8 @@
 
 ## Purpose
 `engine.index`: build the vector index that retrieval and grounding read,
-report its health, clear it, and inspect one search of it.
+report its health, clear it, prune other embedding models' indexes, and
+inspect one search of it.
 
 ## Responsibilities
 - Build the index for some or every datasource, beside the live entries.
@@ -15,7 +16,9 @@ report its health, clear it, and inspect one search of it.
 - `packages/nl2sql/src/nl2sql/api/types.py` (`IndexProgress`)
 - `packages/nl2sql/src/nl2sql/indexing/rebuild.py`
 - `packages/nl2sql/src/nl2sql/indexing/orchestrator.py`
-- `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- `packages/nl2sql/src/nl2sql/indexing/retrieval.py`
+- `packages/nl2sql/src/nl2sql/indexing/health.py`
+- `packages/nl2sql/src/nl2sql/storage/chroma.py`
 - `packages/nl2sql/src/nl2sql/indexing/enrichment_service.py`
 - `packages/nl2sql/src/nl2sql/schema/store.py`
 
@@ -24,17 +27,15 @@ report its health, clear it, and inspect one search of it.
 ### index.build
 
 Signature:
-`build(datasource_ids=None, *, full=False, curated_only=False, enrich=False, on_progress=None, on_datasource=None, switch_guard=None) -> RebuildResult`
+`build(datasource_ids=None, *, curated_only=False, enrich=False, on_progress=None, on_datasource=None) -> RebuildResult`
 
 | name | meaning |
 | --- | --- |
-| `datasource_ids` | Only these datasources; every configured one when `None`. Ignored with `full`. |
-| `full` | Rebuild every datasource into a new collection and swap it in when all succeed. Needed after changing the embedding model. |
-| `curated_only` | Re-index only the verified queries, keeping each datasource's schema entries: no schema read, no model call. Not with `full`. |
+| `datasource_ids` | Only these datasources; every configured one when `None`. |
+| `curated_only` | Re-index only the verified queries, keeping each datasource's schema entries: no schema read, no model call. |
 | `enrich` | Ask the `indexing_enrichment` LLM for table and column descriptions. Off by default: it spends tokens. |
 | `on_progress` | Called with a sentence before each step. |
 | `on_datasource` | Called with an `IndexProgress` as each datasource starts, is done or fails. |
-| `switch_guard` | A context manager factory held around each switch (the playground holds questions in flight back with it). |
 
 Returns a `RebuildResult`: `ok` (every requested datasource's new entries are
 live), `stats` (one dict per indexed datasource: `datasource_id`,
@@ -60,39 +61,50 @@ def show(progress: IndexProgress) -> None:
 result = engine.index.build(["shop"], on_datasource=show)
 ```
 
-Raises:
-- `ValueError` with both `full` and `curated_only`.
-- `EmbeddingModelMismatchError` without `full`, when the collection records a
-  different embedding model (rebuild with `full=True`, `nl2sql index --full`).
-
 A failure of one datasource never raises: it is in `errors`, and that
-datasource keeps its previous entries. Enrichment errors are never raised:
-enrichment is best-effort and degrades to the unenriched snapshot.
+datasource keeps its previous build and schema version. Enrichment errors are
+never raised: enrichment is best-effort and degrades to the unenriched
+snapshot.
 
-Each datasource's new entries are written under a new build id, switched in
-when all are written, and the previous ones deleted. Other datasources'
-entries are never touched.
+The build goes into the namespace of the configured embedding model. Each
+datasource's new entries are written under a new build id, and its build
+pointer (the build id and the schema version it was made from) is switched to
+them when all are written: that switch is the commit. The build it replaces is
+kept for runs in flight, which pinned the pointers when they started; older
+builds are deleted. Other datasources' entries are never touched. A changed
+embedding model needs no special build: its namespace starts empty.
 
 ### index.health
 
 Signature:
 `health() -> dict`
 
-`status` (`ok`, `empty`, `stale`, `missing`), `total`, `counts` by entry
-type, `built_at`, `embedding_model`, one entry per registered datasource
-(`entries`, `index_version`, `snapshot_version`, `built_at`), `problems` and
-`warnings`. `missing` when no vector store is configured. A datasource that
-failed to start is a warning: "Datasource 'x' is unavailable: <reason>".
-`check()` reports its `status`.
+Health of the configured embedding model's index: `status` (`ok`,
+`empty`, `stale`, `missing`), `total`, `counts` by entry type, `built_at`,
+`embedding_model`, `namespace`, one entry per registered datasource
+(`entries`, `index_version`, the schema version its live build was made
+from, and `built_at`), `problems` and `warnings`. `missing` when the model has
+no namespace yet (never indexed, or the model changed): run `nl2sql index`.
+A datasource that failed to start is a warning: "Datasource 'x' is
+unavailable: <reason>". `check()` reports its `status`.
 
 ### index.clear
 
 Signature:
 `clear() -> None`
 
-Deletes and reinitializes the vector store collection, for every datasource.
+Drops the configured embedding model's namespace, for every datasource.
 Every question fails at the resolver until the index is built again; to
 refresh an index, build it instead, which never leaves it empty.
+
+### index.prune
+
+Signature:
+`prune() -> list[str]`
+
+Drops the index namespace of every other embedding model, including 0.5's
+`nl2sql_store` collection, which this version never reads, and returns their
+names. The current model's namespace is kept. `nl2sql index prune` calls it.
 
 ### index.inspect
 
@@ -102,7 +114,7 @@ Signature:
 One MMR search of the live index, as the engine runs it: the candidate pool
 with scores, the picks in order and what was dropped. `types` limits the
 entry types (`schema.table`, ...). It reads index metadata only and needs no
-LLM. Raises `LookupError` when no vector store is configured.
+LLM.
 
 ### index.inspect_defaults
 
@@ -123,5 +135,6 @@ times it) and `types`, every entry type the index holds
   database is never replaced. If the client cannot be built (no API key), the
   endpoint is unreachable, or the call fails, the unenriched snapshot is used
   and indexing continues.
-- Register schema snapshot and version.
-- Build schema chunks and refresh vector store.
+- Store the schema snapshot and its version (nothing reads it yet).
+- Build the chunks, embed them, write them as a new build, and switch the
+  datasource's build pointer to it.

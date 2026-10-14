@@ -148,7 +148,7 @@ At question time a preferred table is ranked first:
   marks them *preferred* (`"preferred":true`) in the planner's schema block,
   and planner instruction 14 says to plan against a preferred table when it
   answers the question.
-- Otherwise `VectorStore.retrieve_schema_context()` results are re-ordered so
+- Otherwise `Retriever.retrieve_schema_context()` results are re-ordered so
   any preferred table it found comes first, and a preferred table it missed is
   added when its similarity is within 0.05 (`PREFERRED_MARGIN`) of the least
   similar table picked.
@@ -182,8 +182,8 @@ section out turns the feature off.
 
 **`nl2sql curated validate`** runs the startup checks plus the ones that need
 the index: every table the SQL reads (`exp.Table` nodes, minus CTE names)
-exists in the datasource's latest indexed schema
-(`schema_store.get_latest_snapshot(datasource_id)`). It prints a report table
+exists in the schema the datasource's live index build was made from
+(the snapshot its build pointer names). It prints a report table
 and exits non-zero on any error, modelled on `nl2sql policy validate`
 (`cli/commands/policy.py`). Like that command it calls a facade class,
 `CuratedAPI` (`nl2sql/api/curated_api.py`, exported from `nl2sql`), so the CLI
@@ -213,24 +213,22 @@ model is `VerifiedQueryChunk(BaseChunk)` in `nl2sql/indexing/models.py`, beside
   `curated.verified_query:<datasource_id>:<query_id>:<n>`.
 
 The entries must be written **in the same build as the datasource's schema
-entries.** `VectorStore.refresh_schema_chunks()` replaces every entry of a
-datasource whose `build_id` is not the new one, so curated entries written on
-their own would be deleted by the next schema re-index, or would delete it.
-`IndexingOrchestrator.index_datasource()` therefore appends the curated chunks
-(built by a small `CuratedChunkBuilder`) to the schema chunks before calling
-`refresh_schema_chunks()`.
+entries.** A build replaces every entry of its datasource, so curated
+entries written on their own would be deleted by the next schema re-index, or
+would delete it. `IndexingOrchestrator.index_datasource()` therefore appends
+the curated chunks (built by a small `CuratedChunkBuilder`) to the schema
+chunks before it writes the build.
 
 Changing `curated.yaml` does **not** need a schema re-index (a change from the
 agreed design; see [Re-index cost](#open-questions)).
 `nl2sql index --curated-only` writes a new build per datasource through the
-same write, switch and delete as any other, except that the active build's
+same write, switch and clean-up as any other, except that the live build's
 schema entries are copied into it with their stored vectors
-(`VectorStore.refresh_curated_chunks()`): no schema read, no enrichment call,
+(`IndexingOrchestrator.refresh_curated()`): no schema read, no enrichment call,
 and only the verified queries are embedded.
 
-**Staleness.** At the switch, `refresh_schema_chunks()` also records
-`curated_hash:<datasource_id>` in the collection metadata, next to
-`build:<datasource_id>` and `built_at:<datasource_id>`: a SHA-256 of that
+**Staleness.** The build's pointer also records `curated_hash`, next to
+its `build_id`, `schema_version` and `built_at`: a SHA-256 of that
 datasource's section of `curated.yaml`, as canonical JSON. `IndexHealth`
 (`nl2sql/indexing/health.py`) compares it with the file as it is now and
 reports "curated.yaml changed for 'chinook' since it was indexed; run
@@ -308,8 +306,8 @@ reply from the preview, as today.
 
 ### The steps
 
-1. **Candidates.** `VectorStore.retrieve_verified_query_candidates(query, datasource_ids, k)`
-   searches entries of type `curated.verified_query` in the active builds of
+1. **Candidates.** `Retriever.retrieve_verified_query_candidates(query, datasource_ids, k)`
+   searches entries of type `curated.verified_query` in the live builds of
    the allowed datasources. It is a plain similarity search, not MMR: several
    phrasings of one query are exactly what should match, so the pool is
    fetched at `k × phrasings`, de-duplicated by `(datasource_id, query_id)`

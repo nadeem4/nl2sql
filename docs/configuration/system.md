@@ -322,7 +322,7 @@ start from.
 | `SCHEMA_STORE_BACKEND` | removed: SQLite at `<path>/state.db` |
 | `SCHEMA_STORE_PATH` | `storage.path` (`<path>/state.db`, which also holds the plan cache and feedback) |
 | `SCHEMA_STORE_MAX_VERSIONS` | `settings.schema.max_versions` |
-| `SCHEMA_VERSION_MISMATCH_POLICY` | `settings.schema.version_mismatch` |
+| `SCHEMA_VERSION_MISMATCH_POLICY` | removed: a run reads the schema version its index build was made from |
 | `PLAN_CACHE_ENABLED` | `settings.pipeline.plan_cache` |
 | `FEEDBACK_ENABLED` | `settings.feedback.enabled` |
 | `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` | `settings.retrieval.full_snapshot_max_tables` |

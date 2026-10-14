@@ -13,7 +13,7 @@
 ## Responsibilities
 
 - Build a semantic query from sub‑query intent, filters, group_by, expected_schema, metrics.
-- Retrieve candidate tables/columns/relationships from `VectorStore`.
+- Retrieve candidate tables/columns/relationships from the run's pinned `Retriever`.
 - Resolve authoritative tables from `SchemaStore`.
 - Fall back to full schema snapshot when retrieval returns no candidates.
 - Rank the datasource's `preferred_tables` first and set `preferred=True` on
@@ -204,4 +204,4 @@ Key contracts:
 ## Related Code
 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
-- `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- `packages/nl2sql/src/nl2sql/indexing/retrieval.py`

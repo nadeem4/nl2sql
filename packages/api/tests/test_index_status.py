@@ -6,10 +6,11 @@ HEALTH = {
     "total": 87,
     "counts": {"schema.table": 11, "schema.column": 64},
     "built_at": "2026-09-22T12:35:42+00:00",
-    "embedding_model": "all-MiniLM-L6-v2",
+    "embedding_model": "local/all-MiniLM-L6-v2",
+    "namespace": "nl2sql__local-all-minilm-l6-v2__384",
     "datasources": [{"datasource_id": "chinook", "entries": 87, "index_version": "v1",
-                     "snapshot_version": "v2", "built_at": "2026-09-22T12:35:42+00:00"}],
-    "problems": ["chinook: the index is behind the latest schema snapshot."],
+                     "built_at": "2026-09-22T12:35:42+00:00"}],
+    "problems": ["Datasource 'chinook' was indexed from schema version v1, which is no longer in the state store."],
 }
 
 

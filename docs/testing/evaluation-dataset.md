@@ -725,7 +725,7 @@ How it runs (`nl2sql/evaluation/retrieval_recall.py`):
   all-MiniLM-L6-v2. Its query is the question alone, since the decomposer
   that would add filters, groupings and expected columns is an LLM.
 - What was sent is read from the retriever's retrieval record
-  (`indexing/retrieval_trace.py`), the one a run trace keeps: the tables and
+  (`indexing/retrieval.py`), the one a run trace keeps: the tables and
   columns the planner is given. A picked table with no picked column is sent
   with all its columns, as in the pipeline.
 

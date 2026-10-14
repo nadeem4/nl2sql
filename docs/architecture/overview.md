@@ -26,7 +26,7 @@ flowchart TD
     subgraph Context[Runtime]
         DS[DatasourceRegistry]
         LLM[LLMRegistry]
-        VS[VectorStore]
+        VS[IndexStore and Retriever]
         SS[SchemaStore]
         RBAC[RBAC]
         AS[ArtifactStore]
@@ -62,7 +62,7 @@ flowchart LR
 
 - **Planner / Decomposer**: `DecomposerNode` produces stable, semantically-scoped sub-queries and, from them, a deterministic `ExecutionDAG`.
 - **Schema Store**: `SchemaStore` persists versioned schema snapshots with fingerprints.
-- **Chunking + Retrieval**: `SchemaChunkBuilder` produces typed chunks; `VectorStore` provides staged retrieval for routing and planning context.
+- **Chunking + Retrieval**: `SchemaChunkBuilder` produces typed chunks; the `Retriever` provides staged retrieval for routing and planning context, over the index store's live builds.
 - **Validation layer**: `LogicalValidatorNode` enforces schema correctness and RBAC.
 - **Execution layer**: `ExecutorNode` routes to capability-driven executor services (e.g., SQL executor).
 - **Adapter / Plugin backend**: adapters implement `DatasourceAdapterProtocol` and are discovered via entry points.

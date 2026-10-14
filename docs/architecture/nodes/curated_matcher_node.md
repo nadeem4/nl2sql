@@ -15,7 +15,7 @@
 ## Responsibilities
 
 - Limit the search to datasources that have verified queries and that the caller's `Scope` reaches (`reaches_datasource()`) (the pinned `datasource_id` only, when one is given).
-- Retrieve candidates with `VectorStore.retrieve_verified_query_candidates()` (top `settings.curated.match_top_k`), skipping a query that is in the index but no longer in the file.
+- Retrieve candidates with `Retriever.retrieve_verified_query_candidates()` (top `settings.curated.match_top_k`), skipping a query that is in the index but no longer in the file.
 - Ask no model when the best similarity is below `settings.curated.match_floor`.
 - Make one structured-output call, `VerifiedQueryChoice`.
 - Check the chosen values (`params.resolve_params`): type, `min`/`max`, `choices`, required.
@@ -61,7 +61,7 @@ Context dependencies (`Runtime`):
 - `vector_store`: `retrieve_verified_query_candidates()`.
 - `policy_engine`: `scope(user_context, datasource_id)`.
 - `ds_registry`: dialect, adapter row limit, `supports()`.
-- `schema_store`: the latest schema version, stamped on the sub-query.
+- `vector_store`: the run's pinned `Retriever`: the candidates, and the schema version of the datasource's live build, stamped on the sub-query.
 - `llm_registry`: the choice's model, agent name `curatedmatcher` (falls back to `default`).
 
 ---

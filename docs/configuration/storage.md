@@ -16,7 +16,7 @@ Everything the engine writes lives under it:
 
 | Under `path` | What | Was (0.4) |
 | --- | --- | --- |
-| `index/` | The vector index (Chroma). The collection name is an internal constant. | `VECTOR_STORE`, `VECTOR_STORE_COLLECTION` |
+| `index/` | The vector index (Chroma), one collection per embedding model: `nl2sql__<model slug>__<dimension>`. | `VECTOR_STORE`, `VECTOR_STORE_COLLECTION` |
 | `state.db` | SQLite: schema snapshots, the plan cache and playground feedback. | `SCHEMA_STORE_PATH` |
 | `traces/` | Run traces (`settings.traces.mode`). | `TRACE_DIR` |
 | `results/` | Result files, `<tenant_id>/<request_id>/<sub_query_id>.parquet`. See [Artifact Store](../storage/artifact-store.md). | `RESULT_ARTIFACT_BASE_URI` |
@@ -37,7 +37,7 @@ results: { type: local }     # <path>/results/
 
 | Slot | Built-in | Holds |
 | --- | --- | --- |
-| `index` | `chroma` | The vector index |
+| `index` | `chroma` | The vector index, one namespace per embedding model, and each datasource's live build |
 | `state` | `sqlite` | Schema snapshots, the plan cache, feedback |
 | `traces` | `files` | Run traces |
 | `results` | `local` | Result files |
@@ -70,11 +70,31 @@ The store interfaces are in [`nl2sql_sdk.stores`](../adapters/sdk.md#interfaces-
 A plugin registers a store in the `nl2sql.stores` entry point group, or in
 code with `registry.add_store(name, cls)`.
 
-!!! note "Built-ins only, for now"
+!!! note "Built-ins only, for now, except the index"
     0.6 moves the engine onto the four store interfaces one slot at a time.
-    Until a slot's move lands, the engine reads that slot through its
-    built-in store only, and refuses any other store there with a problem at
-    `storage.<slot>`.
+    The engine reads its index through `IndexStore`, so any index store
+    works. Until the other slots' moves land, the engine reads `state`,
+    `traces` and `results` through their built-in stores only, and refuses
+    any other store there with a problem at `storage.<slot>`.
+
+## The index
+
+The engine embeds; the index store keeps entries and vectors in a
+**namespace** per embedding model, `nl2sql__<model slug>__<dimension>` (for
+example `nl2sql__local-all-minilm-l6-v2__384`), filters them, and records
+each datasource's live build as a `BuildPointer` (its `build_id` and the
+`schema_version` it was made from). Switching a pointer is the commit, and a
+run reads the pointers once when it starts. See
+[Indexing](../architecture/indexing.md#the-build-pointer-is-the-commit).
+
+- **Changing the embedding model** opens a new, empty namespace: `check()`
+  reports the index `missing`, and `nl2sql index` builds it. Switching back
+  finds the old namespace still built.
+- **`nl2sql index prune`** (`engine.index.prune()`) drops every namespace but
+  the current model's, including 0.5's `nl2sql_store` collection, which 0.6
+  never reads. Run it once after upgrading, and after settling on a new model.
+- The `chroma` store opens `index/` on the first build; reading a missing
+  folder or namespace creates nothing.
 
 ## Sharing
 

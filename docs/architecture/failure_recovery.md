@@ -189,5 +189,5 @@ Replay is not supported. There is no persisted graph state or execution log to r
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/*/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
 - `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
-- `packages/nl2sql/src/nl2sql/indexing/vector_store.py`
+- `packages/nl2sql/src/nl2sql/indexing/retrieval.py`
 - `packages/nl2sql/src/nl2sql/schema/*.py`

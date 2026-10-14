@@ -47,11 +47,24 @@ The store also holds the **plan cache**: validated, executed plans keyed by `(no
 
 The same SQLite file holds the playground's answer ratings, in a `feedback` table (one row per rated run; questions and SQL, never rows). It is written whatever `SCHEMA_STORE_BACKEND` is, at `SCHEMA_STORE_PATH`; `nl2sql feedback clear` empties it and nothing else. See [Feedback and Signals](../observability/feedback.md).
 
-The fingerprint covers **structure only** (tables, columns, keys). Registering a snapshot whose structure matches an existing version returns that version unchanged, so anything keyed on it (the plan cache) stays valid, but the stored **metadata** (statistics, descriptions, enrichment) is replaced by the new snapshot's and the version becomes the latest again. The snapshot store and the chunks built from the same snapshot therefore always agree.
+The fingerprint covers **structure only** (tables, columns, keys). Registering a snapshot whose structure matches an existing version returns that version unchanged, so anything keyed on it (the plan cache) stays valid, but the stored **metadata** (statistics, descriptions, enrichment) is replaced by the new snapshot's. The snapshot store and the chunks built from the same snapshot therefore always agree.
+
+## Which version is live
+
+There is no "latest snapshot" to read. Indexing stores a datasource's
+snapshot first and its index entries second; the index store's
+`BuildPointer` for the datasource then records the `schema_version` the live
+build was made from, and switching that pointer is the commit. Every reader
+(the resolver, the schema retriever, the curated matcher,
+`engine.datasources.schema()`, `engine.curated.validate()`) resolves the
+version through the pointer and reads `get_snapshot(datasource_id,
+schema_version)`. A run reads the pointers once, when it starts. A snapshot
+stored by a build that then failed is named by no pointer, so nothing reads
+it. See [Indexing → The build pointer is the commit](../architecture/indexing.md#the-build-pointer-is-the-commit).
 
 ## Retrieval and authority
 
-Schema retrieval resolves **authoritative** tables/columns from `SchemaStore`, not from the vector store. Vector store chunks are only used to identify candidates; final schema is resolved via snapshot. If retrieval yields no candidates, the retriever falls back to the full snapshot. `schema_version_mismatch_policy` governs mismatches between chunk versions and store versions.
+Schema retrieval resolves **authoritative** tables/columns from `SchemaStore`, not from the index. Index entries are only used to identify candidates; final schema is resolved via the snapshot the live pointer names. If retrieval yields no candidates, the retriever falls back to the full snapshot. The entries and the snapshot come from the same build, so their versions cannot disagree.
 
 See `../architecture/indexing.md` for retrieval stages, chunk types, and vector store behavior.
 

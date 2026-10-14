@@ -16,10 +16,9 @@
 - Choose candidate datasources:
     - an explicit `datasource_id` is used as given;
     - with exactly one datasource registered, that one is used and no vector search runs;
-    - otherwise `VectorStore.retrieve_datasource_candidates()` ranks them.
+    - otherwise `Retriever.retrieve_datasource_candidates()` ranks them.
 - Validate datasource IDs against the registered adapter list.
 - Enforce RBAC datasource access.
-- Detect schema version mismatches and apply the configured policy.
 - Judge answerability over the allowed candidates, refuse with `QUESTION_NOT_ANSWERABLE` when none can answer, and forward only the candidates the verdict names.
 - Give each forwarded datasource its description and a capped table list, for the decomposer to route on.
 - Populate `DatasourceResolverResponse` in `GraphState`.
@@ -56,9 +55,8 @@ From `GraphState`:
 
 Context dependencies (`Runtime`):
 
-- `vector_store`: needed only when more than one datasource is registered and no override is given; missing then, the resolver returns `SCHEMA_RETRIEVAL_FAILED`.
+- `vector_store`: the run's pinned `Retriever`. It ranks the candidates when more than one datasource is registered and no override is given, and gives each datasource's live schema version and snapshot (the snapshot's description and table list feed the answerability check and the decomposer's routing context).
 - `ds_registry`: adapter registry for registered IDs.
-- `schema_store`: latest schema versions, and the latest snapshot's description and table list for the answerability check and the decomposer's routing context.
 - `rbac`: filters allowed datasources.
 - `llm_registry`: the answerability check's model, agent name `datasourceresolver` (falls back to `default`).
 
@@ -66,7 +64,6 @@ Validation performed:
 
 - Datasource override must exist in the registry.
 - RBAC must allow at least one candidate.
-- Version mismatch policy enforced via `settings.schema.version_mismatch`.
 - At least one allowed candidate must be judged able to answer.
 
 ---
@@ -96,7 +93,7 @@ Side effects:
 3. Schema version mismatch policy (`fail` returns `INVALID_STATE`; `warn` adds a warning).
 4. Answerability check over the **allowed** candidates only (see below). An empty verdict returns `QUESTION_NOT_ANSWERABLE`.
 5. Narrow to the verdict. After a vector search, only the allowed candidates the verdict names go forward; a candidate the verdict rejects never reaches the decomposer, and a verdict naming only unknown ids is `QUESTION_NOT_ANSWERABLE`. With an override or a single datasource there is one candidate, and a non-empty verdict accepts it.
-6. Attach routing context to each forwarded datasource, from the latest schema snapshot: `description`, `tables` (sorted bare table names, at most 30) and `more_tables` (how many were left out).
+6. Attach routing context to each forwarded datasource, from the snapshot its live build was made from: `description`, `tables` (sorted bare table names, at most 30) and `more_tables` (how many were left out).
 7. Return `DatasourceResolverResponse` with the forwarded datasources (sorted by id), their IDs as `allowed_datasource_ids`, and unsupported IDs.
 8. On exceptions, log and return `SCHEMA_RETRIEVAL_FAILED` with the exception text; a provider's refusal of the model call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 
@@ -137,7 +134,7 @@ User Query:
 {user_query}
 ```
 
-- `{datasources}` is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: `description` (the datasource description from the latest schema snapshot, which indexing takes from the datasources config) and `tables` (sorted bare table names).
+- `{datasources}` is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: `description` (the datasource description from the live build's snapshot, which indexing takes from the datasources config) and `tables` (sorted bare table names).
 - The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.
 - The verdict refuses and narrows: an empty list refuses the question, and after a vector search only the allowed candidates it names reach the decomposer. It cannot add a datasource the role may not read.
 - For Chinook on its own the rendered prompt is about 260 tokens (`o200k_base`), plus the `AnswerabilityResponse` function schema; the demo now registers three datasources, so its prompt is correspondingly longer.
@@ -213,7 +210,6 @@ Exceptions are caught at the node boundary and logged with `logger.error`.
 
 ## Configuration
 
-- `settings.schema.version_mismatch` (`warn`, `fail` or `ignore`)
 - LLM agent `datasourceresolver` in the LLM config (optional; see [LLM configuration](../../configuration/llm.md#per-node-models))
 
 ---
