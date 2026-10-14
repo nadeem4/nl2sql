@@ -4667,6 +4667,31 @@ capabilities stay separate <code>runtime_checkable</code> protocols, as
 </tbody>
 </table>
 <h2 id="6-loading">6. Loading</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: <code>nl2sql config check</code> (PR 8)</p>
+<p><code>nl2sql.config.check.check_config(path, registry=, connect=)</code> runs steps
+1, 2a and 2b, and with <code>connect</code> step 3, and returns every problem, every
+secret as present or missing, and the datasource statuses;
+<code>nl2sql config check [--connect]</code> prints them by file. Building it settled
+these details:</p>
+<ul>
+<li><code>Runtime.components(cfg, registry)</code> is step 2b without the stores and
+  without the process-global copy; <code>Runtime.from_config</code> is it plus the
+  stores. So the check writes nothing under <code>storage.path</code>.</li>
+<li><code>Config.locate(path)</code> maps a path in the whole config
+  (<code>datasources[0].type</code>) to the file it was read from
+  (<code>datasources/sales.yaml → type</code>). The runtime's problems use it, so
+  <code>NL2SQL(...)</code>'s <code>ConfigError</code> names included files as well.</li>
+<li>Where <code>llm</code> names no <code>api_key</code>, the provider's standard variable is
+  listed with the secrets. A missing LLM key is reported, not a problem,
+  as in the constructor: <code>check()</code> reports it at startup.</li>
+<li>With <code>--connect</code>, any datasource that fails is a problem, <code>required</code> or
+  not. Exit codes: 0, 1 on a problem or a missing config, and 2 for a
+  usage error (Typer's).</li>
+<li>CI's integration job runs it with <code>--connect</code> on the <code>init --demo</code>
+  config before indexing.</li>
+</ul>
+</div>
 <pre class="mermaid"><code>flowchart LR
   D["1. Discover&lt;br/&gt;Registry.default()&lt;br/&gt;entry point names only"] --&gt; L["2. Load and validate&lt;br/&gt;load_config + NL2SQL(cfg)&lt;br/&gt;imports only what the config names"]
   L --&gt; C["3. Connect lazily&lt;br/&gt;engine.check() at startup"]
@@ -5237,6 +5262,10 @@ checklist item. <code>nl2sql-adapter-sdk</code> is simply not published again. W
 users, yanking it adds nothing.</p>
 <h2 id="10-cli-demo-docker-and-docs">10. CLI, demo, Docker and docs</h2>
 <h3 id="cli">CLI</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: <code>nl2sql config check</code> (PR 8)</p>
+<p>See the note in <a href="#6-loading">Loading</a>.</p>
+</div>
 <div class="admonition note">
 <p class="admonition-title">Built: the callers on the new config (PR 7b)</p>
 <p>The CLI takes one global <code>--config</code>; <code>--env</code>, <code>--env-file</code>, every
