@@ -184,7 +184,9 @@ Side effects:
    datasource_id)`, the same one the schema retriever hid tables with) about
    every table in the plan. The schema retriever never showed the planner a
    denied table, so a plan that names one anyway is a model naming a table it
-   was not given, and is refused here.
+   was not given, and is refused here. The policy errors come first in the
+   node's `errors`, before the static ones: such a table is also missing from
+   the planner's schema (`TABLE_NOT_FOUND`), and the denial is the reason.
    Each forbidden table yields a `CRITICAL` `SECURITY_VIOLATION` whose message
    is "You do not have permission to see the data this question requires."
    (it names nothing), with `details` = `{datasource_id, table, roles, rule}`

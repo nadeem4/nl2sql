@@ -324,7 +324,8 @@ def test_plan_naming_a_hidden_table_is_refused():
 
     result = _validator()(state)
 
-    assert any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in result["errors"])
+    # The table is also missing from the planner's schema; the refusal is reported first.
+    assert result["errors"][0].error_code == ErrorCode.SECURITY_VIOLATION
     assert _policy_check(result).passed is False
 
 

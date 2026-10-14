@@ -86,7 +86,7 @@ def test_policy_denial_marks_policy_check_failed(
     by_name = {c.name: c for c in out["logical_validator_response"].checks}
     assert by_name["structure_and_schema"].passed is True
     assert by_name["policy"].passed is False
-    # The default refusal is generic: it names no table (see test_rbac_strict_refusal.py).
+    # The default refusal is generic: it names no table (see test_policy_refusal.py).
     assert by_name["policy"].message == "You do not have permission to see the data this question requires."
 
 

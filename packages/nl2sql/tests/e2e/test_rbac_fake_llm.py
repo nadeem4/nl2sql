@@ -153,7 +153,7 @@ def test_an_unknown_role_is_refused_cleanly(demo_project, tmp_path):
 
     RBAC grants such a caller no datasource, so the resolver refuses before a
     plan exists; the validator-level refusal for the same callers is pinned in
-    ``tests/unit/test_rbac_strict_refusal.py``. (The CLI cannot pass an empty
+    ``tests/unit/test_policy_refusal.py``. (The CLI cannot pass an empty
     role list; through the REST API no role is a 401, see the test below.)
     """
     server, r = _ask(demo_project, tmp_path, _top_customers_rules(), "ghost", "rbac-ghost.yaml")

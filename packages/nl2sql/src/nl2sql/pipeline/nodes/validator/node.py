@@ -948,8 +948,10 @@ class LogicalValidatorNode:
                 )
 
             policy_errors = list(self._validate_policy(state))
-            errors.extend(static_errors)
+            # The refusal comes first: a table the scope hid from the planner
+            # is also missing from its schema, and the denial is the reason.
             errors.extend(policy_errors)
+            errors.extend(static_errors)
 
             role = ",".join(state.user_context.roles) if state.user_context else ""
             checks = [
