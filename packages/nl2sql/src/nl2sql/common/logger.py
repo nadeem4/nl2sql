@@ -1,5 +1,6 @@
 import logging
 import json
+import os
 import time
 import contextvars
 from contextlib import contextmanager
@@ -74,13 +75,15 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 
-def configure_logging(level: str = "INFO", json_format: bool = False):
+def configure_logging(level: Optional[str] = None, json_format: bool = False):
     """Configures the root logger.
 
     Args:
-        level (str): The logging level (default: INFO).
+        level (str): The logging level. Without one, ``NL2SQL_LOG_LEVEL``,
+            else INFO.
         json_format (bool): Whether to use JSON formatting (default: False).
     """
+    level = level or os.environ.get("NL2SQL_LOG_LEVEL") or "INFO"
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
     

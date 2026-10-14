@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import ipaddress
 import logging
-import os
 import threading
 from contextlib import contextmanager
 from pathlib import Path
@@ -45,7 +44,7 @@ from nl2sql.llm.providers import (
     LLM_AGENTS,
     PROVIDER_LABELS,
     VERIFIED_MODELS,
-    env_var_for_key,
+    api_key_from_env,
     looks_like_api_key,
     mask_key,
     provider_for_key,
@@ -57,6 +56,7 @@ from nl2sql.cli.demo.llm_config import (
     persist_api_key,
     point_llm_config_at,
     read_llm,
+    with_api_keys,
     write_llm,
 )
 from nl2sql import load_config
@@ -148,8 +148,13 @@ class SettingsPanel:
     """Reads and writes the demo project's LLM settings for the playground."""
 
     def __init__(self, engine, project_dir: Optional[Path], mode: str, host: str,
-                 allow_settings: bool, hosted: bool = False) -> None:
+                 allow_settings: bool, hosted: bool = False,
+                 api_keys: Optional[Dict[str, str]] = None) -> None:
         self.engine = engine
+        # provider -> key: the keys this process was given as values (the
+        # demo's --api-key, and every key saved here). They reach the engine in
+        # its LLM config, never through the environment.
+        self.api_keys: Dict[str, str] = dict(api_keys or {})
         self.project_dir = Path(project_dir) if project_dir is not None else None
         self.mode = mode
         self.host = host
@@ -292,7 +297,7 @@ class SettingsPanel:
     def _key(self, provider: str) -> Dict[str, Optional[str]]:
         """A provider's key as the panel may show it: masked, and the variable it is in."""
         env_var = self._key_variable(provider)
-        active = os.environ.get(env_var) if (env_var and self.mode == "live") else None
+        active = (self.api_keys.get(provider) or api_key_from_env(provider)) if self.mode == "live" else None
         return {"masked": mask_key(active) if active else None, "env_var": env_var}
 
     def _usable(self, provider: str, default_provider: str) -> bool:
@@ -316,8 +321,9 @@ class SettingsPanel:
     # --- writing ---------------------------------------------------------------
 
     def _reload(self) -> None:
-        """Replaces the engine's LLM with the ``llm`` section of the config the CLI reads."""
-        self.engine.llm.replace(load_config(self.project_dir / "nl2sql.yaml").llm, via="playground")
+        """Replaces the engine's LLM with the config's ``llm`` section and the keys given here."""
+        llm = load_config(self.project_dir / "nl2sql.yaml").llm
+        self.engine.llm.replace(with_api_keys(llm, self.api_keys), via="playground")
 
     def save_key(self, key: str) -> None:
         """Saves ``key`` to ``.env`` and switches the demo to live on it."""
@@ -325,14 +331,14 @@ class SettingsPanel:
         if not looks_like_api_key(key):
             # Deliberately says nothing about the value it was given.
             raise HTTPException(status_code=400, detail=KEY_SHAPE_MESSAGE)
-        variable = env_var_for_key(key)
+        provider = provider_for_key(key)
         with self.gate.change():
             try:
                 persist_api_key(self.project_dir / ENV_FILE, key)
-                os.environ[variable] = key
-                # Off the replay server and its placeholder key: the section
-                # names no key, so the provider's variable is read.
-                point_llm_config_at(self.project_dir, None, provider=provider_for_key(key))
+                # Off the replay server and its placeholder key: llm.yaml names
+                # no key, and the engine is given this one as a value.
+                point_llm_config_at(self.project_dir, None, provider=provider)
+                self.api_keys[provider] = key
                 self._reload()
             except Exception as exc:
                 # The exception's text may quote the key; only its type is kept.

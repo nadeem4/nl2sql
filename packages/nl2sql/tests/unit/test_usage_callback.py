@@ -233,10 +233,11 @@ def test_emits_the_otel_token_counter_per_token_type():
     assert attrs["node"] == "ast_planner" and attrs["model"] == "gpt-4o-2024-08-06"
 
 
-def test_prices_are_read_from_the_llm_prices_setting(monkeypatch):
-    from nl2sql.common.settings import Settings
+def test_prices_are_read_from_llm_prices():
+    from nl2sql.config import LLM
 
-    monkeypatch.setenv("LLM_PRICES", '{"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}}')
-    assert Settings(_env_file=None).llm_prices == {"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10.0}}
-    monkeypatch.delenv("LLM_PRICES")
-    assert Settings(_env_file=None).llm_prices == {}
+    llm = LLM(provider="openai", model="gpt-4o",
+              prices={"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10}})
+    assert llm.prices["gpt-4o"].model_dump(exclude_none=True) == {"input": 2.5, "cached_input": 1.25,
+                                                                   "output": 10.0}
+    assert LLM(provider="openai", model="gpt-4o").prices == {}

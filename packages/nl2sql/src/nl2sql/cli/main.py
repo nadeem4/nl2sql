@@ -425,7 +425,7 @@ def main():
     # entry point owns it: without this call the CLI emits no log output. A
     # command that builds the engine switches to JSON logs when its config's
     # settings.observability.exporter is otlp (cli/common/engine.py).
-    configure_logging(level="INFO")
+    configure_logging()
     # Before any command writes: rich emits symbols a legacy Windows code page
     # cannot encode, and an unconfigured stream turns that into a crash.
     configure_output_encoding()

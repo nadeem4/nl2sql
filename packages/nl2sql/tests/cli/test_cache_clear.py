@@ -6,7 +6,6 @@ import re
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
-from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.plan_cache import PlanCache

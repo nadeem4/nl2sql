@@ -29,7 +29,7 @@ RBAC evaluates `UserContext.roles` against the `policies` section of `nl2sql.yam
 
 ## Source references
 
-- Tenant settings: `packages/nl2sql/src/nl2sql/common/settings.py`
+- Tenant settings: `settings.tenant_id` in `packages/nl2sql/src/nl2sql/config/models.py`
 - Context initialization: `packages/nl2sql/src/nl2sql/runtime.py`
 - Artifact paths: `packages/nl2sql/src/nl2sql/execution/artifacts/store.py`
 - RBAC: `packages/nl2sql/src/nl2sql/auth/rbac.py`

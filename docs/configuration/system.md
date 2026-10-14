@@ -149,12 +149,17 @@ Only these are read directly:
 | Variable | Read by | Purpose |
 | --- | --- | --- |
 | `NL2SQL_CONFIG` | `load_config()` with no path, the CLI, `nl2sql-api` | Path to `nl2sql.yaml`. Without it, `./nl2sql.yaml`. |
+| `NL2SQL_LOG_LEVEL` | `configure_logging()` | The log level when the caller passes none (`DEBUG`, `INFO`, ...). Without it, `INFO`. |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | `nl2sql/llm/` | The fallback key when `llm.api_key` (or an agent's, or `embeddings.api_key`) is not set. |
 
 Anything else from the environment is written in the YAML as `${env:VAR}`.
 There are no generic overrides such as `NL2SQL__SECTION__KEY`. Third-party
-libraries (boto3, the OpenTelemetry SDK) still read their own standard
-variables, and the trace redactor scans the environment for values to mask.
+libraries (the OpenTelemetry SDK) still read their own standard variables, the
+trace redactor scans the environment for values to mask, and `nl2sql
+benchmark` checks `CI`. Nothing in nl2sql writes the environment: a key the
+demo is given travels in the engine's LLM config, and only the `.env` loading
+below adds variables. The architecture tests enforce both
+([invariants](../architecture/invariants.md#an-engine-owns-its-config-no-process-globals)).
 
 ### `.env` files
 

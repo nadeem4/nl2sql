@@ -366,8 +366,9 @@ nothing to upload. Until it has, the domain fails with a certificate error and
 the `hf.space` address keeps working.
 
 **Never give the Space an API key**, as a secret or otherwise. Hosted mode
-clears any provider key it finds in its environment at start-up rather than use
-it, because a key there would be spent by every visitor.
+refuses to start when a provider key variable (`OPENAI_API_KEY`,
+`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`) is set, because a key there would be
+spent by every visitor.
 
 ### Deployed by the release
 

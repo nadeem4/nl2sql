@@ -7,11 +7,9 @@ stores under ``storage.path``, and raises one ``ConfigError`` listing every
 problem. Every node, store and service is handed the runtime. See
 docs/architecture/configuration_v2.md, sections 4, 6 and 8.
 
-Nothing here is shared between engines, apart from one thing that is staged
-out over the next pull requests: the process-global ``settings`` that modules
-not yet moved onto the runtime still read. ``from_config`` copies the
-config's values into it (``_copy_into_global_settings``), so those modules
-read this engine's values. The architecture ratchet test lists them.
+Nothing here is shared between engines, and nothing is process-global: every
+module reads its settings from the runtime it is handed (``ctx.settings``) or
+takes them as parameters, and nothing writes the environment.
 """
 from __future__ import annotations
 
@@ -73,7 +71,6 @@ class Runtime:
                 match the datasources.
         """
         self = cls.components(config, registry)
-        _copy_into_global_settings(config, self.stores)
         self._build_stores()
         return self
 
@@ -432,47 +429,3 @@ def _log_llm_change(change: "LLMChange", tenant_id: Optional[str]) -> None:
     event_logger.log_event("llm.changed", {"by": dict(by), "changes": dict(change.changes)},
                            tenant_id=tenant_id)
 
-
-def _copy_into_global_settings(config: Config, stores: StorePaths) -> None:
-    """Copy this engine's values into the process-global ``settings``.
-
-    Only for the length of the migration (docs/architecture/configuration_v2.md,
-    "Staging it"): the modules not yet moved onto the runtime read the global.
-    The last migration pull request deletes the global and this function.
-    """
-    from nl2sql.common.settings import settings as target
-
-    s = config.settings
-    values: Dict[str, Any] = {
-        "tenant_id": s.tenant_id,
-        "global_timeout_sec": s.pipeline.timeout_s,
-        "plan_cache_enabled": s.pipeline.plan_cache,
-        "logical_validator_strict_columns": s.pipeline.strict_columns,
-        "today": s.pipeline.today,
-        "sql_agent_max_retries": s.pipeline.retries.max,
-        "sql_agent_retry_base_delay_sec": s.pipeline.retries.base_delay_s,
-        "sql_agent_retry_max_delay_sec": s.pipeline.retries.max_delay_s,
-        "sql_agent_retry_jitter_sec": s.pipeline.retries.jitter_s,
-        "schema_retrieval_full_snapshot_max_tables": s.retrieval.full_snapshot_max_tables,
-        "result_row_limit": s.results.row_limit,
-        "result_fetch_batch_size": s.results.fetch_batch_size,
-        "answer_preview_rows": s.results.preview_rows,
-        "trace_mode": s.traces.mode,
-        "trace_sample_rows": s.traces.sample_rows,
-        "trace_max_field_chars": s.traces.max_field_chars,
-        "schema_store_max_versions": s.schema_.max_versions,
-        "schema_version_mismatch_policy": s.schema_.version_mismatch,
-        "curated_enabled": config.curated is not None,
-        "curated_match_top_k": s.curated.match_top_k,
-        "curated_match_floor": s.curated.match_floor,
-        "feedback_enabled": s.feedback.enabled,
-        "observability_exporter": s.observability.exporter,
-        "otlp_endpoint": s.observability.otlp_endpoint,
-        "rbac_refusal_names_tables": config.policies.refusal_names_tables,
-        "llm_prices": {model: price.model_dump(exclude_none=True) for model, price in config.llm.prices.items()},
-        "vector_store_path": str(stores.index),
-        "schema_store_path": str(stores.state),
-        "trace_dir": str(stores.traces),
-        "result_artifact_base_uri": str(stores.results),
-    }
-    target.__dict__.update(values)

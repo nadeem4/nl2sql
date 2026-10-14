@@ -15,9 +15,9 @@ from nl2sql import NL2SQL
 from nl2sql.testing.facade import StubDatasources, StubLLMs
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
-from nl2sql.common.settings import settings
 from nl2sql.feedback import FeedbackStore
 from nl2sql.runtime import StorePaths
+from nl2sql.testing.config import make_config
 
 TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
 
@@ -25,9 +25,11 @@ TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
 class _Engine(NL2SQL):
     """The real facade over an empty context; only ``run_query`` is scripted."""
 
-    def __init__(self, data):
+    def __init__(self, data, feedback=True):
+        config = make_config(data / "config", settings={"feedback": {"enabled": feedback}})
         self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None,
-                                         "stores": StorePaths.under(data), "traces_dir": data / "traces"})()
+                                         "stores": StorePaths.under(data), "traces_dir": data / "traces",
+                                         "config": config})()
 
     @property
     def datasources(self):
@@ -43,13 +45,8 @@ class _Engine(NL2SQL):
             id="sq1", sql="SELECT COUNT(*) FROM Customer", status="success")])
 
 
-@pytest.fixture(autouse=True)
-def _feedback_on(monkeypatch):
-    monkeypatch.setattr(settings, "feedback_enabled", True)
-
-
-def _client(tmp_path, host="127.0.0.1", allow_settings=False, project=True):
-    app = build_app(_Engine(tmp_path / "data"), questions=[], roles=["admin", "viewer"], mode="replay", dataset="chinook",
+def _client(tmp_path, host="127.0.0.1", allow_settings=False, project=True, feedback=True):
+    app = build_app(_Engine(tmp_path / "data", feedback=feedback), questions=[], roles=["admin", "viewer"], mode="replay", dataset="chinook",
                     project_dir=tmp_path if project else None, host=host, allow_settings=allow_settings)
     return TestClient(app, base_url="http://127.0.0.1:8765")
 
@@ -141,11 +138,10 @@ def test_feedback_is_off_outside_a_demo_project(tmp_path):
     assert _ask_and_rate(client).status_code == 403
 
 
-def test_the_setting_turns_feedback_off(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "feedback_enabled", False)
-    client = _client(tmp_path)
+def test_the_setting_turns_feedback_off(tmp_path):
+    client = _client(tmp_path, feedback=False)
 
     read = client.get("/api/feedback").json()
 
-    assert read["available"] is False and "FEEDBACK_ENABLED" in read["reason"]
+    assert read["available"] is False and "settings.feedback.enabled" in read["reason"]
     assert _ask_and_rate(client).status_code == 403

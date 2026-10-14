@@ -30,7 +30,7 @@ produced. A run the playground did not answer is refused with `404`.
 | `POST /api/feedback` | `{"trace_id", "rating": "up" \| "down", "note"}`. Local only, the same gate as Settings, Rebuild and the Retrieval inspector: on a non-loopback `--host` it answers `403` unless `nl2sql demo --allow-settings`, and it refuses another site's page (a foreign `Origin`), a non-loopback hostname and anything but JSON. |
 
 Feedback is available in the playground that `nl2sql demo` starts, and on by
-default. `FEEDBACK_ENABLED=false` turns it off: the control then says so and
+default. `settings.feedback.enabled: false` turns it off: the control then says so and
 `POST /api/feedback` answers `403`.
 
 ## What is stored
@@ -149,7 +149,7 @@ recorded the datasource are skipped too. See
 
 ## Turning it off and clearing it
 
-- `FEEDBACK_ENABLED=false` stops the playground recording ratings.
+- `settings.feedback.enabled: false` stops the playground recording ratings.
 - `nl2sql feedback clear` deletes every rating (`--yes` skips the prompt).
   Schema snapshots and the plan cache are kept, and `nl2sql cache clear`
   never touches the ratings.

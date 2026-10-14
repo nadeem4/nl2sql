@@ -5,25 +5,20 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.common.settings import settings
 from nl2sql.testing.facade import StubLLMs
 
 
 @pytest.fixture(autouse=True)
 def restore_global_state():
-    """Isolate tests from the process environment and the settings singleton.
+    """Isolate tests from the process environment.
 
-    Building an engine copies its config into the module-level ``settings``,
-    and the ``.env`` next to ``nl2sql.yaml`` and ``nl2sql demo`` write
-    ``os.environ``, so every test restores them.
+    The CLI's entry points load the ``.env`` next to ``nl2sql.yaml`` into
+    ``os.environ`` (``load_env_file``), so every test restores it.
     """
     env_snapshot = dict(os.environ)
-    settings_snapshot = dict(settings.__dict__)
     yield
     os.environ.clear()
     os.environ.update(env_snapshot)
-    settings.__dict__.clear()
-    settings.__dict__.update(settings_snapshot)
 
 
 @pytest.fixture
@@ -51,12 +46,13 @@ class StubDemoEngine:
 
     index_status = "ok"
 
-    def __init__(self, config_path, plan_cache=True):
+    def __init__(self, config_path, plan_cache=True, api_keys=None):
         from nl2sql.config import load_config
 
         self.config_path = config_path
         self.config = load_config(config_path)
         self.plan_cache = plan_cache
+        self.api_keys = dict(api_keys or {})
         self.closed = False
         self.datasources = SimpleNamespace(list=lambda: [])
         self.llm = StubLLMs({})
@@ -85,8 +81,8 @@ def demo_engines(monkeypatch):
     """Every engine ``nl2sql demo`` builds, as ``StubDemoEngine`` (or ``demo_engines.cls``)."""
     built = BuiltEngines()
 
-    def _build(config_path, *, plan_cache=True):
-        engine = built.cls(config_path, plan_cache=plan_cache)
+    def _build(config_path, *, plan_cache=True, api_keys=None):
+        engine = built.cls(config_path, plan_cache=plan_cache, api_keys=api_keys)
         built.append(engine)
         return engine
 

@@ -94,7 +94,6 @@ from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.preview import CARD, CARD_ROUTE, with_preview
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.cli.demo.stamp import engine_version
-from nl2sql.common.settings import settings
 from nl2sql.llm.request_key import use_request_llms
 
 # The errors replay mode raises when no recording matches the question. The page
@@ -211,8 +210,8 @@ def _feedback_off_reason(panel) -> Optional[str]:
     """Why answer feedback is off, in its own words; the gate is the settings panel's."""
     if panel.hosted:
         return FEEDBACK_MESSAGE
-    if not settings.feedback_enabled:
-        return "Feedback is turned off (FEEDBACK_ENABLED=false)."
+    if not panel.engine.config.settings.feedback.enabled:
+        return "Feedback is turned off (settings.feedback.enabled is false)."
     if panel.available:
         return None
     if panel.project_dir is None:
@@ -311,7 +310,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
               recorded_questions: int = 0,
               questions_by_datasource: Optional[Dict[str, List[str]]] = None,
               hosted: Optional[Hosted] = None,
-              replay: Optional[Replay] = None) -> FastAPI:
+              replay: Optional[Replay] = None,
+              api_keys: Optional[Dict[str, str]] = None) -> FastAPI:
     """Builds the playground app over ``engine``.
 
     ``recorded_questions`` is how many of ``questions`` the loaded replay
@@ -333,6 +333,11 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     it is on only for a demo project, served on a loopback host or with
     ``allow_settings``; everywhere else it reports why it is off.
 
+    ``api_keys`` (provider -> key) are the keys ``nl2sql demo`` gave the
+    engine as values rather than through the environment (``--api-key``).
+    The settings panel shows them masked, adds the keys saved in it, and
+    passes them all on each time it reloads the engine's LLM.
+
     ``hosted`` turns the public-demo server on (see
     :mod:`nl2sql.cli.demo.playground.hosted`): every question carries the
     visitor's own key in a header, the limits apply, and everything that would
@@ -343,7 +348,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     hosted = hosted or Hosted(enabled=False)
     recordings = replay or hosted.replay
     recorded_with = recordings.recorded_with if recordings is not None else None
-    panel = SettingsPanel(engine, project_dir, mode, host, allow_settings, hosted=hosted.enabled)
+    panel = SettingsPanel(engine, project_dir, mode, host, allow_settings, hosted=hosted.enabled,
+                          api_keys=api_keys)
     index_panel = IndexPanel(engine, panel, _default_datasource(engine, dataset), project_dir)
     app.state.settings_panel = panel
     app.state.index_panel = index_panel

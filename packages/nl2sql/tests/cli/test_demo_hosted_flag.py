@@ -42,23 +42,34 @@ def _meta(served):
 
 
 def test_hosted_serves_a_playground_with_no_key_of_its_own(tmp_path, monkeypatch):
-    import os
-
-    monkeypatch.setenv("OPENAI_API_KEY", "the-owner-key-this-process-started-with")
-
     result, served = _run(tmp_path, monkeypatch, "--hosted", "--host", "0.0.0.0")
 
     assert result.exit_code == 0, result.output
     output = " ".join(result.output.split())
     assert "Hosted mode: the server holds no API key" in output
     assert "6 a minute and 30 a session" in output
-    # Whatever the host exported is gone, so nothing can spend the owner's key.
-    assert not os.environ.get("OPENAI_API_KEY")
     # The config is pointed at a live endpoint; the request's key picks the provider.
     llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text(encoding="utf-8"))
     assert llm.get("base_url") is None and llm.get("api_key") is None
     assert _meta(served)["hosted"] is True
     assert _meta(served)["mode"] == "hosted"
+
+
+@pytest.mark.parametrize("variable", ["OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"])
+def test_hosted_refuses_to_start_with_a_provider_key_in_its_environment(tmp_path, monkeypatch, variable):
+    """Every visitor would spend a key the server holds, and the demo never writes the environment to drop it."""
+    import os
+
+    monkeypatch.setenv(variable, FAKE_KEY)
+
+    result, served = _run(tmp_path, monkeypatch, "--hosted")
+
+    assert result.exit_code == 1
+    output = " ".join(result.output.split())
+    assert f"{variable} is set" in output and "Unset it" in output
+    assert FAKE_KEY not in output
+    assert served == {}
+    assert os.environ[variable] == FAKE_KEY
 
 
 def test_hosted_serves_the_packaged_recordings_to_a_visitor_without_a_key(tmp_path, monkeypatch):
