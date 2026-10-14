@@ -74,8 +74,14 @@ jobs:
       # is opt-in. A datasource that genuinely fails to index exits non-zero
       # and fails this step, which is the intent. The tests below build their
       # own projects and indexes.
+      # `config check --connect` exits 1 on any problem in the written config,
+      # before the index exists, so it also proves the check writes nothing.
       - name: Generate demo data
-        run: nl2sql init --demo demo-ci && nl2sql --config demo-ci/nl2sql.yaml index
+        run: |
+          nl2sql init --demo demo-ci
+          nl2sql --config demo-ci/nl2sql.yaml config check --connect
+          test ! -e demo-ci/.nl2sql
+          nl2sql --config demo-ci/nl2sql.yaml index
 
       # Indexing, datasource resolution, schema retrieval, aggregation,
       # physical validation and the local embedder -- plus tests/e2e, which

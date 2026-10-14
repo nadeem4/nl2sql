@@ -95,6 +95,21 @@ is expected, not a regression.
 
 See `docs/testing/architecture.md` for what each marker means.
 
+### Checking a config
+
+`nl2sql config check` checks a whole config without starting the engine and
+exits 1 on any problem (see `docs/configuration/system.md`). CI's integration
+job runs it with `--connect` on the config `nl2sql init --demo` writes, before
+indexing, and fails if it created anything under `storage.path`. Run the same
+locally after changing the config models, the registry or `init`:
+
+```bash
+nl2sql init --demo /tmp/demo-check
+nl2sql --config /tmp/demo-check/nl2sql.yaml config check --connect
+```
+
+Your own deployment's CI can run it the same way, against its `nl2sql.yaml`.
+
 ### Troubleshooting: stale bytecode after moving a checkout
 
 If tests fail in a checkout you moved or renamed, and the traceback shows bare

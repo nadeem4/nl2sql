@@ -227,6 +227,7 @@ class _Loader:
             raise self._fail()
         config = self._anchor_storage(config)
         config._folder = self.root
+        config._sources = dict(self.sources)
         return config
 
     def _check_version(self, data: Dict[str, Any]) -> None:

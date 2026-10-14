@@ -7,9 +7,10 @@ section 2.
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, PrivateAttr, field_validator, model_validator
 from typing_extensions import Annotated
@@ -28,6 +29,9 @@ class KeepsReferences:
 KEEPS_REFERENCES = KeepsReferences()
 
 Secret = Annotated[str, KEEPS_REFERENCES]
+
+# "datasources[0].type" -> ("datasources", "0", "type"): a section, an item and the rest.
+_SECTION_PATH = re.compile(r"([A-Za-z_]+)(?:\[(\d+)\])?\.?(.*)")
 """A secret value, or a ``${provider:key}`` reference to one, kept unresolved."""
 
 AgentName = Literal[
@@ -370,6 +374,9 @@ class Config(_Model):
     # The folder of the nl2sql.yaml this config was loaded from, set by
     # load_config and kept by every copy; None when it was built in code.
     _folder: Optional[Path] = PrivateAttr(default=None)
+    # Where load_config read each section: ("inline", None), ("file", label)
+    # or, for a datasources folder, ("folder", [label per datasource]).
+    _sources: Dict[str, Tuple[str, Any]] = PrivateAttr(default_factory=dict)
 
     @property
     def folder(self) -> Optional[Path]:
@@ -379,6 +386,26 @@ class Config(_Model):
         DuckDB file) is read from here, as ``storage.path`` is.
         """
         return self._folder
+
+    def locate(self, path: str) -> Tuple[str, str]:
+        """The file a problem at ``path`` is in, and the path inside that file.
+
+        ``path`` is a path in the whole config, ``datasources[0].type``. When
+        ``datasources`` was read from ``datasources/``, that is
+        ``("datasources/sales.yaml", "type")``. A section written inline in
+        ``nl2sql.yaml``, and a config built in code, give
+        ``("nl2sql.yaml", path)``.
+        """
+        match = _SECTION_PATH.fullmatch(path)
+        if match is None:
+            return "nl2sql.yaml", path
+        section, index, rest = match.groups()
+        kind, label = self._sources.get(section, ("inline", None))
+        if kind == "file":
+            return label, path[len(section):].lstrip(".")
+        if kind == "folder" and index is not None and int(index) < len(label):
+            return label[int(index)], rest
+        return "nl2sql.yaml", path
 
     def __eq__(self, other: Any) -> bool:
         # Where a config was loaded from is not part of it: equal sections are an equal config.
