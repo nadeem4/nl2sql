@@ -3,7 +3,7 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, Dict, Any, List
 
-from nl2sql_adapter_sdk.schema import TableRef
+from nl2sql_sdk.schema import TableRef
 
 # Limits a datasource may set beside ``connection`` or under ``options``.
 LIMIT_KEYS = ("row_limit", "statement_timeout_ms", "max_bytes")

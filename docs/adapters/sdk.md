@@ -1,10 +1,10 @@
 # Adapter Interface Reference
 
-The adapter contract lives in the adapter SDK:
+The adapter contract lives in the SDK, `nl2sql-sdk` (imported as `nl2sql_sdk`):
 
 - `nl2sql.datasources.protocols.DatasourceAdapterProtocol`
-- `nl2sql_adapter_sdk.contracts.AdapterRequest`
-- `nl2sql_adapter_sdk.contracts.ResultFrame`
+- `nl2sql_sdk.contracts.AdapterRequest`
+- `nl2sql_sdk.contracts.ResultFrame`
 
 ## Interface: `DatasourceAdapterProtocol`
 
@@ -12,8 +12,8 @@ Adapters expose a capability-driven interface:
 
 ```python
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
-from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_sdk.capabilities import DatasourceCapability
 ```
 
 ### Mandatory Properties
@@ -79,7 +79,7 @@ Returns cost/row estimates. The pipeline does not currently call it, and there i
 
 ### Optional hook: `render_sql(expression)`
 
-`nl2sql_adapter_sdk.protocols.SqlRenderingAdapterProtocol`. The engine builds
+`nl2sql_sdk.protocols.SqlRenderingAdapterProtocol`. The engine builds
 every query as a sqlglot expression tree and, when the adapter has
 `render_sql`, passes it the finished tree and executes the text it returns.
 Without the hook the engine renders `expression.sql(dialect=adapter.get_dialect())`,
@@ -96,7 +96,7 @@ DuckDB use the default.
 
 ### Optional hook: `execute_batches(request, batch_size)`
 
-`nl2sql_adapter_sdk.protocols.StreamingAdapterProtocol`. When the adapter has
+`nl2sql_sdk.protocols.StreamingAdapterProtocol`. When the adapter has
 `execute_batches`, the engine reads the result through it, `RESULT_FETCH_BATCH_SIZE`
 rows at a time (default 10,000), and writes each batch to the sub-query's
 result artifact as it arrives, so a large result is never held whole in memory

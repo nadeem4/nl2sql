@@ -41,11 +41,11 @@ from pathlib import Path
 from typing import Callable, Dict, List, Mapping, Optional
 
 REPO = Path(__file__).resolve().parent.parent
-PACKAGES = ("packages/adapter-sdk", "packages/nl2sql", "packages/api")
+PACKAGES = ("packages/sdk", "packages/nl2sql", "packages/api")
 
 # Wheel filename stem -> the name this script uses for it. Matched whole, up to
-# the `-` before the version: `nl2sql_a*` would match both api and adapter_sdk.
-STEMS = {"nl2sql_engine": "engine", "nl2sql_adapter_sdk": "adapter_sdk", "nl2sql_api": "api"}
+# the `-` before the version, so one stem never matches another that it prefixes.
+STEMS = {"nl2sql_engine": "engine", "nl2sql_sdk": "sdk", "nl2sql_api": "api"}
 
 # The text app.py serves when the React build is missing from the wheel.
 UNBUILT_PAGE = "has not been built"
@@ -67,7 +67,7 @@ def find_wheels(dist: Path) -> Dict[str, Path]:
             raise SystemExit(f"{dist} holds more than one {name} wheel: "
                              f"{', '.join(w.name for w in wheels)}. Empty it and build again.")
     for stem, name in STEMS.items():
-        if name in ("engine", "adapter_sdk") and name not in found:
+        if name in ("engine", "sdk") and name not in found:
             raise SystemExit(f"No {stem} wheel in {dist}. Build with --build, or point --dist at one.")
     return {name: wheels[0] for name, wheels in found.items()}
 
@@ -78,7 +78,7 @@ def wheel_install_args(wheels: Mapping[str, Path], dist: Path) -> List[str]:
     The SDK wheel is named too: the engine pins it to the same version, which
     PyPI does not have until the release is published.
     """
-    return ["--find-links", str(dist), f"{wheels['engine']}[demo]", str(wheels["adapter_sdk"])]
+    return ["--find-links", str(dist), f"{wheels['engine']}[demo]", str(wheels["sdk"])]
 
 
 def wheel_version(wheel: Path) -> str:

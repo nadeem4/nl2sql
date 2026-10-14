@@ -135,7 +135,7 @@ Tests enforce deterministic behavior by:
 
 ## Adapter compliance testing
 
-Adapter SDK includes testing utilities to validate schema introspection and result contracts for new adapters.
+The SDK includes testing utilities to validate schema introspection and result contracts for new adapters.
 
 ## Source references
 

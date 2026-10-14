@@ -1,5 +1,5 @@
 from nl2sql.schema import SqliteSchemaStore
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,

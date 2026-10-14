@@ -1,8 +1,8 @@
 from typing import Any, Dict, Type
 
-from nl2sql_adapter_sdk.protocols import DatasourceAdapterProtocol
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
-from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_sdk.protocols import DatasourceAdapterProtocol
+from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 
 
 def build_adapter(

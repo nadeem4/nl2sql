@@ -5,7 +5,7 @@ from pydantic import SecretStr
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.datasources.models import DatasourceConfig, ConnectionConfig
 from nl2sql.secrets.manager import SecretManager
-from nl2sql_adapter_sdk.contracts import AdapterRequest, ResultFrame
+from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter
 
 

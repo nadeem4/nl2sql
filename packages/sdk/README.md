@@ -1,7 +1,8 @@
-# nl2sql-adapter-sdk
+# nl2sql-sdk
 
-The contracts a database adapter for the
-[nl2sql engine](https://github.com/nadeem4/nl2sql) implements. It depends on
+The interfaces an extension for the
+[nl2sql engine](https://github.com/nadeem4/nl2sql) implements. Today that is
+the database adapter contract; the import package is `nl2sql_sdk`. It depends on
 pydantic and the standard library only, so an adapter built against it inherits
 nothing else.
 
@@ -17,7 +18,7 @@ An adapter is published as an `nl2sql.adapters` entry point, and the engine
 finds it there; it never imports an adapter by name.
 
 ```bash
-pip install nl2sql-adapter-sdk
+pip install nl2sql-sdk
 ```
 
 Writing an adapter:

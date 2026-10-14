@@ -6,7 +6,7 @@ from nl2sql.api.datasource_api import DatasourceAPI
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.datasources.models import DatasourceConfig, ConnectionConfig
 from nl2sql.secrets.manager import SecretManager
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 
 class _StubAdapter:

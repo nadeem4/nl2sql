@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import List, Optional, Protocol, Tuple
 
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
     SchemaSnapshot,

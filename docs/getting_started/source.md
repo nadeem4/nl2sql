@@ -11,7 +11,7 @@ cd nl2sql
 python -m venv venv
 source venv/bin/activate
 
-pip install -e packages/adapter-sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
+pip install -e packages/sdk -e "packages/nl2sql[postgres,duckdb,demo]" -e packages/api
 pip install --group dev
 ```
 

@@ -8,7 +8,7 @@ from nl2sql.execution.dag import (
     LogicalEdge,
 )
 from nl2sql.pipeline.state import GraphState
-from nl2sql_adapter_sdk.contracts import ResultFrame
+from nl2sql_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorCode
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.common.settings import settings

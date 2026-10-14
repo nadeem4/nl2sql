@@ -27,7 +27,7 @@ from nl2sql.pipeline.nodes.curated_matcher import CuratedMatcherNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 
 FAKE_KEY = "-".join(["fake", "key", "for", "matcher"])
 

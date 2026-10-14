@@ -1,7 +1,7 @@
 from typing import Dict, List, Any, Optional, Set
 from threading import RLock
 
-from nl2sql_adapter_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.common.logger import get_logger
 from nl2sql.datasources.discovery import discover_adapters
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol

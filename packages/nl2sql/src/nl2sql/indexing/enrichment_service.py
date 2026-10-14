@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from langchain_core.prompts import ChatPromptTemplate
 
 from nl2sql.schema import SchemaSnapshot
-from nl2sql_adapter_sdk.schema import TableMetadata, ColumnMetadata
+from nl2sql_sdk.schema import TableMetadata, ColumnMetadata
 from nl2sql.common.logger import get_logger
 from nl2sql.llm.wires import structured
 

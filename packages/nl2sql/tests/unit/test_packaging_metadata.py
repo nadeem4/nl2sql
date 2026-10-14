@@ -22,7 +22,7 @@ def _project(package: str) -> dict:
     return tomllib.loads((ROOT / "packages" / package / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
 
-@pytest.mark.parametrize("package", ["nl2sql", "api", "adapter-sdk"])
+@pytest.mark.parametrize("package", ["nl2sql", "api", "sdk"])
 def test_every_distribution_declares_its_license(package):
     assert _project(package)["license"] == "MIT"
 
@@ -42,7 +42,7 @@ def test_engine_dependencies_name_what_the_code_imports():
     assert "python-dotenv" in names
 
 
-PACKAGES = ["nl2sql", "api", "adapter-sdk"]
+PACKAGES = ["nl2sql", "api", "sdk"]
 PROJECT_URLS = {"Homepage", "Documentation", "Source", "Issues", "Demo"}
 
 
@@ -97,3 +97,45 @@ def test_the_api_pins_the_engine_release_it_ships_with():
     config = json.loads((ROOT / "release-please-config.json").read_text(encoding="utf-8"))
     extra = [f["path"] for p in config["packages"].values() for f in p.get("extra-files", [])]
     assert "packages/api/pyproject.toml" in extra
+
+
+def test_the_sdk_is_published_as_nl2sql_sdk():
+    sdk = tomllib.loads((ROOT / "packages" / "sdk" / "pyproject.toml").read_text(encoding="utf-8"))
+    assert sdk["project"]["name"] == "nl2sql-sdk"
+    assert sdk["tool"]["setuptools"]["packages"]["find"]["include"] == ["nl2sql_sdk*"]
+
+
+def test_the_engine_pins_the_sdk_release_it_ships_with():
+    """`nl2sql-adapter-sdk~=0.1` let the engine install any 0.x SDK.
+
+    The three packages release together, so the engine pins the SDK at its own
+    version as a compatible release, and release-please bumps the line.
+    """
+    engine_version = Version(_project("nl2sql")["version"])
+    pin = next(d for d in _project("nl2sql")["dependencies"] if d.startswith("nl2sql-sdk"))
+    spec = SpecifierSet(pin.removeprefix("nl2sql-sdk"))
+    assert str(spec) == f"~={engine_version}", pin
+    assert not any(d.startswith("nl2sql-adapter-sdk") for d in _project("nl2sql")["dependencies"])
+
+    lines = (ENGINE / "pyproject.toml").read_text(encoding="utf-8").splitlines()
+    assert any("nl2sql-sdk" in line and "x-release-please-version" in line for line in lines)
+
+    config = json.loads((ROOT / "release-please-config.json").read_text(encoding="utf-8"))
+    extra = [f["path"] for p in config["packages"].values() for f in p.get("extra-files", [])]
+    assert {"packages/sdk/pyproject.toml", "packages/nl2sql/pyproject.toml"} <= set(extra)
+    assert "packages/adapter-sdk/pyproject.toml" not in extra
+
+
+@pytest.mark.parametrize("workflow", ["test.yml", "publish_pypi.yaml"])
+def test_the_wheel_smoke_test_installs_the_sdk_wheel(workflow):
+    text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    assert "dist/nl2sql_sdk-*.whl" in text
+    assert "packages/sdk " in text
+    assert "adapter-sdk" not in text and "adapter_sdk" not in text
+
+
+def test_pypi_publishes_the_sdk_from_its_own_environment():
+    text = (ROOT / ".github" / "workflows" / "publish_pypi.yaml").read_text(encoding="utf-8")
+    assert "package: nl2sql-sdk" in text
+    assert "stem: nl2sql_sdk" in text
+    assert "environment: pypi-${{ matrix.package }}" in text

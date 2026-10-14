@@ -33,7 +33,7 @@ def _dist(tmp_path, *names):
 
 WHEELS = (
     "nl2sql_engine-0.2.0-py3-none-any.whl",
-    "nl2sql_adapter_sdk-0.2.0-py3-none-any.whl",
+    "nl2sql_sdk-0.2.0-py3-none-any.whl",
     "nl2sql_api-0.2.0-py3-none-any.whl",
     "nl2sql_engine-0.2.0.tar.gz",
 )
@@ -44,20 +44,20 @@ WHEELS = (
 def test_find_wheels_names_each_distribution(check, tmp_path):
     wheels = check.find_wheels(_dist(tmp_path, *WHEELS))
     assert wheels["engine"].name == "nl2sql_engine-0.2.0-py3-none-any.whl"
-    assert wheels["adapter_sdk"].name == "nl2sql_adapter_sdk-0.2.0-py3-none-any.whl"
+    assert wheels["sdk"].name == "nl2sql_sdk-0.2.0-py3-none-any.whl"
     assert wheels["api"].name == "nl2sql_api-0.2.0-py3-none-any.whl"
 
 
-def test_find_wheels_does_not_confuse_api_with_adapter_sdk(check, tmp_path):
+def test_find_wheels_does_not_confuse_api_with_sdk(check, tmp_path):
     # `nl2sql_a*` matches both; the stem has to be matched whole.
     wheels = check.find_wheels(_dist(tmp_path, "nl2sql_engine-1-py3-none-any.whl",
-                                     "nl2sql_adapter_sdk-1-py3-none-any.whl"))
+                                     "nl2sql_sdk-1-py3-none-any.whl"))
     assert "api" not in wheels
 
 
 def test_find_wheels_refuses_a_dist_without_the_engine(check, tmp_path):
     with pytest.raises(SystemExit, match="nl2sql_engine"):
-        check.find_wheels(_dist(tmp_path, "nl2sql_adapter_sdk-1-py3-none-any.whl"))
+        check.find_wheels(_dist(tmp_path, "nl2sql_sdk-1-py3-none-any.whl"))
 
 
 def test_find_wheels_refuses_two_versions_of_one_distribution(check, tmp_path):
@@ -65,7 +65,7 @@ def test_find_wheels_refuses_two_versions_of_one_distribution(check, tmp_path):
     with pytest.raises(SystemExit, match="more than one"):
         check.find_wheels(_dist(tmp_path, "nl2sql_engine-1-py3-none-any.whl",
                                 "nl2sql_engine-2-py3-none-any.whl",
-                                "nl2sql_adapter_sdk-1-py3-none-any.whl"))
+                                "nl2sql_sdk-1-py3-none-any.whl"))
 
 
 def test_install_args_install_the_engine_with_the_demo_extra(check, tmp_path):
@@ -75,7 +75,7 @@ def test_install_args_install_the_engine_with_the_demo_extra(check, tmp_path):
     assert f"{engine}[demo]" in args
     # The SDK is the engine's dependency at a version PyPI may not have yet,
     # so it comes from the same build, and so does anything else it finds.
-    assert str(dist / "nl2sql_adapter_sdk-0.2.0-py3-none-any.whl") in args
+    assert str(dist / "nl2sql_sdk-0.2.0-py3-none-any.whl") in args
     assert args[args.index("--find-links") + 1] == str(dist)
 
 

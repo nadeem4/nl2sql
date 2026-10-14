@@ -35,7 +35,7 @@ RULES = "docs/architecture/invariants.md"
 
 PACKAGES = pathlib.Path(__file__).resolve().parents[3]
 ENGINE = PACKAGES / "nl2sql" / "src" / "nl2sql"
-SDK = PACKAGES / "adapter-sdk" / "src" / "nl2sql_adapter_sdk"
+SDK = PACKAGES / "sdk" / "src" / "nl2sql_sdk"
 ADAPTERS = ENGINE / "adapters"
 SOURCES = [ENGINE, SDK, PACKAGES / "api" / "src" / "nl2sql_api"]
 
@@ -136,12 +136,12 @@ def _broke(rule: str, offenders: list[str]) -> str:
 
 
 # --------------------------------------------------------------------------
-# 1. The adapter SDK depends on nothing
+# 1. The SDK depends on nothing
 # --------------------------------------------------------------------------
 
-def test_the_adapter_sdk_imports_only_pydantic_and_the_stdlib():
+def test_the_sdk_imports_only_pydantic_and_the_stdlib():
     """An adapter author installs the SDK, not the engine."""
-    allowed = {"pydantic", "nl2sql_adapter_sdk"} | set(sys.stdlib_module_names)
+    allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
     offenders = [
         f"{_where(path)}:{lineno} {name}"
         for path in python_files(SDK)
@@ -149,9 +149,33 @@ def test_the_adapter_sdk_imports_only_pydantic_and_the_stdlib():
         if name.partition(".")[0] not in allowed
     ]
     assert not offenders, _broke(
-        "The adapter SDK imports only pydantic and the standard library: it is the "
+        "The SDK imports only pydantic and the standard library: it is the "
         "contract a third-party adapter compiles against, so it must not drag in the "
         "engine, SQLAlchemy or a driver.", offenders)
+
+
+def test_no_file_imports_the_sdk_by_its_old_name():
+    """The SDK is ``nl2sql_sdk``; ``nl2sql_adapter_sdk`` is never published again."""
+    roots = [PACKAGES, PACKAGES.parent / "scripts"]
+    offenders = [
+        f"{path}:{lineno} {name}"
+        for path in python_files(*roots)
+        if "node_modules" not in path.parts
+        for lineno, name, _ in _absolute_imports(path)
+        if name.partition(".")[0] == "nl2sql_adapter_sdk"
+    ]
+    assert not offenders, _broke(
+        "The SDK package is nl2sql_sdk. Import it by that name.", offenders)
+
+
+def _absolute_imports(path: pathlib.Path):
+    """``(lineno, module)`` for every absolute import in any file, inside or outside SOURCES."""
+    for node in ast.walk(_tree(path)):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                yield node.lineno, alias.name, True
+        elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
+            yield node.lineno, node.module, True
 
 
 # --------------------------------------------------------------------------
@@ -161,7 +185,7 @@ def test_the_adapter_sdk_imports_only_pydantic_and_the_stdlib():
 # SQLAlchemy is the shared connection and reflection layer every bundled
 # adapter is built on; sqlglot is the expression vocabulary the engine hands
 # the adapter to render. Both are adapter-layer libraries, not engine ones.
-ADAPTER_LIBRARIES = {"nl2sql_adapter_sdk", "pydantic", "sqlalchemy", "sqlglot", "nl2sql.adapters"}
+ADAPTER_LIBRARIES = {"nl2sql_sdk", "pydantic", "sqlalchemy", "sqlglot", "nl2sql.adapters"}
 
 # The database libraries only an adapter may import.
 DATABASE_LIBRARIES = {"sqlalchemy", "psycopg", "psycopg2", "pymysql", "MySQLdb", "pyodbc", "duckdb",

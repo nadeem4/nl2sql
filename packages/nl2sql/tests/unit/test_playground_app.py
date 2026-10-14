@@ -14,7 +14,7 @@ from nl2sql.cli.demo.playground.app import build_app
 
 REPLAY_MISS_MESSAGE = "No recorded answer for this question. Add an API key to ask it live."
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
-from nl2sql_adapter_sdk.schema import (
+from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
     ForeignKeyContract,

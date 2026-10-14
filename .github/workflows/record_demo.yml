@@ -43,7 +43,7 @@ jobs:
       - name: Install packages
         run: |
           python -m pip install --upgrade pip
-          pip install -e packages/adapter-sdk -e "packages/nl2sql[demo,anthropic]" -e packages/api
+          pip install -e packages/sdk -e "packages/nl2sql[demo,anthropic]" -e packages/api
 
       - name: Cache the local embedding model
         uses: actions/cache@v4
@@ -99,7 +99,7 @@ jobs:
       - name: Install packages and Chromium
         run: |
           python -m pip install --upgrade pip
-          pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]" -e packages/api playwright
+          pip install -e packages/sdk -e "packages/nl2sql[demo]" -e packages/api playwright
           python -m playwright install --with-deps chromium
 
       - name: Cache the local embedding model

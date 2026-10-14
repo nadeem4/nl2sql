@@ -133,7 +133,7 @@ nl2sql demo
 > are on `main` and arrive on PyPI with 0.2.0 (at the time of writing the latest
 > release is 0.1.2). If `pip install "nl2sql-engine[demo]"` warns that the
 > extra does not exist, install from a clone:
-> `pip install -e packages/adapter-sdk -e "packages/nl2sql[demo]"`
+> `pip install -e packages/sdk -e "packages/nl2sql[demo]"`
 > (add `-e packages/api` for the REST server).
 
 ### What to expect
@@ -536,7 +536,7 @@ and [docs/benchmarks.md](docs/benchmarks.md). Details:
 
 ## Project status, limitations and roadmap
 
-The engine is at **0.1.x**. `nl2sql-adapter-sdk`, `nl2sql-engine` and
+The engine is at **0.1.x**. `nl2sql-sdk`, `nl2sql-engine` and
 `nl2sql-api` share one version and are released together
 ([Releasing](docs/development/releasing.md)). Unreleased changes are on `main`;
 see the [changelog](CHANGELOG.md) for what is released.
@@ -581,7 +581,7 @@ fails with the rule's own name. The reasoning behind each is in
 [Invariants](docs/architecture/invariants.md).
 
 Repository layout: `packages/nl2sql` (engine, CLI, adapters),
-`packages/api` (REST API), `packages/adapter-sdk` (adapter contract),
+`packages/api` (REST API), `packages/sdk` (the SDK: the adapter contract),
 `web/playground` (the playground's React source), `docs/` (MkDocs site),
 `benchmarks/` (recorded benchmark runs), `examples/`.
 

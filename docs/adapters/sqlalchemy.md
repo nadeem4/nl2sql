@@ -85,7 +85,7 @@ The base class provides stubs. Override these to implement database-specific opt
 
 #### `execute_batches(request, batch_size)`
 
-Implements the SDK's optional `StreamingAdapterProtocol` (see [the adapter SDK](sdk.md#optional-hook-execute_batchesrequest-batch_size)).
+Implements the SDK's optional `StreamingAdapterProtocol` (see [the SDK](sdk.md#optional-hook-execute_batchesrequest-batch_size)).
 It opens the result with `stream_results=True` and yields it in frames of
 `fetchmany(batch_size)` rows, each with the columns, so no more than one batch
 is held as Python rows. `stream_results` is a server-side cursor on drivers
@@ -99,7 +99,7 @@ result with `fetchall`.
 
 `execute()` catches every `SQLAlchemyError` the query raises and returns it as
 a failed `ResultFrame` (`query_failed(exc)`), with `retryable` from this method
-(see [the adapter SDK](sdk.md)). The default reads the driver's SQLSTATE when
+(see [the SDK](sdk.md)). The default reads the driver's SQLSTATE when
 there is one: class `42` (syntax or an unknown name) and `22` (a data or type
 error) are the query's fault, except `42501`, insufficient privilege. With no
 SQLSTATE it falls back on the error's kind: `ProgrammingError` and `DataError`

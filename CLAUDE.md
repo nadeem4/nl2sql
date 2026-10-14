@@ -8,7 +8,7 @@ name the rule.
 
 ## Package boundaries
 
-- **The adapter SDK imports only pydantic and the standard library.** It is what a third-party adapter compiles against, so anything it imports, every adapter author inherits.
+- **The SDK (`nl2sql_sdk`) imports only pydantic and the standard library.** It is what a third-party adapter compiles against, so anything it imports, every adapter author inherits.
 - **An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library.** An adapter that imported the engine would close the circle and make the split meaningless.
 - **Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver.** Adapters are reached through the `nl2sql.adapters` entry points and `DatasourceAdapterProtocol`, so a datasource this repo has never heard of works the same way.
 - **Nothing outside `nl2sql/cli/` imports the CLI**, and `cli.demo` never imports `cli.commands`. Knowledge an SDK or REST caller also needs belongs in the engine, not behind a command.

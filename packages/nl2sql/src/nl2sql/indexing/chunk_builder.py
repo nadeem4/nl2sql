@@ -9,7 +9,7 @@ from .models import (
     MetricChunk,
 )
 from nl2sql.schema import SchemaSnapshot
-from nl2sql_adapter_sdk.schema import TableRef, ColumnRef
+from nl2sql_sdk.schema import TableRef, ColumnRef
 
 
 class SchemaChunkBuilder:

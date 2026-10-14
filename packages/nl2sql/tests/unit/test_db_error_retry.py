@@ -30,7 +30,7 @@ from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 from nl2sql.pipeline.retry_feedback import latest_attempt
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
-from nl2sql_adapter_sdk.contracts import ResultError, ResultFrame
+from nl2sql_sdk.contracts import ResultError, ResultFrame
 
 
 # --- the executor service keeps the adapter's verdict ----------------------

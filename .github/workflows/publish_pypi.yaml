@@ -70,7 +70,7 @@ jobs:
 
       - name: Build all distributions
         run: |
-          for pkg in packages/adapter-sdk packages/nl2sql packages/api; do
+          for pkg in packages/sdk packages/nl2sql packages/api; do
             python -m build "$pkg" --outdir dist
           done
 
@@ -78,7 +78,7 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install --upgrade pip
-          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_adapter_sdk-*.whl dist/nl2sql_engine-*.whl dist/nl2sql_api-*.whl
+          /tmp/smoke/bin/pip install --find-links dist dist/nl2sql_sdk-*.whl dist/nl2sql_engine-*.whl dist/nl2sql_api-*.whl
           /tmp/smoke/bin/python -c "import nl2sql"
           /tmp/smoke/bin/nl2sql --help
 
@@ -104,7 +104,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       # One package failing must not cancel the other two mid-release. With the
-      # default fail-fast, the adapter-sdk leg failing on v0.1.1 cancelled the
+      # default fail-fast, the SDK leg failing on v0.1.1 cancelled the
       # engine and api legs and skipped `ghcr` and `docs`, so the release landed
       # nowhere. Each leg is an independent upload to an independent project;
       # let the survivors finish and re-publish only what actually failed.
@@ -115,8 +115,8 @@ jobs:
             stem: nl2sql_engine
           - package: nl2sql-api
             stem: nl2sql_api
-          - package: nl2sql-adapter-sdk
-            stem: nl2sql_adapter_sdk
+          - package: nl2sql-sdk
+            stem: nl2sql_sdk
     environment: pypi-${{ matrix.package }}
     permissions:
       id-token: write
@@ -130,8 +130,8 @@ jobs:
 
       # gh-action-pypi-publish uploads everything in packages-dir, so each leg
       # gets a directory holding only its own sdist and wheel. The trailing `-`
-      # in the glob is load-bearing: `nl2sql_a*` would match both nl2sql_api
-      # and nl2sql_adapter_sdk.
+      # in the glob is load-bearing: without it, a stem that prefixes another
+      # package's stem would stage that package's files too.
       - name: Stage the distributions for ${{ matrix.package }}
         run: |
           mkdir -p upload
@@ -170,13 +170,13 @@ jobs:
           packages-dir: upload/
           attestations: false
 
-  # packages/api/Dockerfile installs nl2sql-adapter-sdk, nl2sql-engine and
+  # packages/api/Dockerfile installs nl2sql-sdk, nl2sql-engine and
   # nl2sql-api from the local sources, not from PyPI, and its COPY paths are
   # written relative to the repository root (`./packages/...`). COPY resolves
   # against the build context, so the context must be the repo root and the
   # Dockerfile has to be named explicitly with `file:`. Pointing `context` at
   # packages/api is what broke v0.1.0: buildx looked for
-  # packages/api/packages/adapter-sdk and failed with "not found".
+  # packages/api/packages/... and failed with "not found".
   #
   # `needs: pypi` is kept so the image is only published for a release that
   # actually made it onto PyPI; the build itself no longer depends on it.
