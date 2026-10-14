@@ -69,7 +69,7 @@ it is used and not at the top of the module. The built-in adapters declare:
 | :--- | :--- | :--- | :--- | :--- |
 | `sqlite` | SQLite | `SqliteConnection` | `("sqlite3",)` | none: `sqlite3` ships with Python |
 | `postgres` | PostgreSQL | `PostgresConnection` | `("psycopg2",)` | `nl2sql-engine[postgres]` |
-| `mysql` | MySQL | `MysqlConnection` | `("pymysql",)` | `nl2sql-engine[mysql]` |
+| `mysql` | MySQL | `MysqlConnection` | `("pymysql", "cryptography")` | `nl2sql-engine[mysql]` |
 | `mssql` | SQL Server | `MssqlConnection` | `("pyodbc",)` | `nl2sql-engine[mssql]`, plus Microsoft's ODBC driver |
 | `duckdb` | DuckDB | `DuckdbConnection` | `("duckdb", "duckdb_engine")` | `nl2sql-engine[duckdb]` |
 

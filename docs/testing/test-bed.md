@@ -47,7 +47,8 @@ memory). Loading happens once per data volume, so a later `up` is quick.
 
 Install the drivers the tests use with
 `pip install -e "packages/nl2sql[postgres,mysql,mssql,duckdb]"`. SQL Server
-also needs Microsoft's ODBC Driver 18 for SQL Server on the machine.
+also needs Microsoft's ODBC Driver for SQL Server (17 or 18) on the machine;
+the tests use the newest one installed.
 
 ## The compose file
 

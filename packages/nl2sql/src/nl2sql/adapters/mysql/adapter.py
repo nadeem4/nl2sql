@@ -31,7 +31,9 @@ class MysqlConnection(SQLAlchemyConnection):
 class MysqlAdapter(SQLAlchemyAdapter):
     title = "MySQL"
     connection_model = MysqlConnection
-    driver_modules = ("pymysql",)
+    # cryptography: PyMySQL needs it for MySQL 8's default login,
+    # caching_sha2_password, over a connection without TLS.
+    driver_modules = ("pymysql", "cryptography")
     install_hint = 'pip install "nl2sql-engine[mysql]"'
 
     def url(self, connection: MysqlConnection) -> URL:
@@ -64,8 +66,15 @@ class MysqlAdapter(SQLAlchemyAdapter):
         cursor.close()
 
     def classify(self, exc: BaseException) -> Optional[str]:
-        """MySQL's error number, else the SQLSTATE."""
-        args = getattr(getattr(exc, "orig", None) or exc, "args", ())
+        """MySQL's error number, else the SQLSTATE.
+
+        PyMySQL without ``cryptography`` cannot answer MySQL 8's default
+        login; that is a missing piece of the driver, not a wrong password.
+        """
+        orig = getattr(exc, "orig", None) or exc
+        if "'cryptography' package is required" in str(orig):
+            return "driver"
+        args = getattr(orig, "args", ())
         if args and isinstance(args[0], int) and args[0] in _STAGE_BY_ERROR:
             return _STAGE_BY_ERROR[args[0]]
         return super().classify(exc)

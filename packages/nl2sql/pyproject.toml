@@ -79,14 +79,14 @@ mssql = [
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'", # Optional fallback
 ]
-mysql = ["pymysql>=1.1.0"]
+mysql = ["pymysql[rsa]>=1.1.0"]  # rsa: cryptography, for MySQL 8's default caching_sha2_password login
 postgres = ["psycopg2-binary>=2.9"]
 all = [
     "duckdb",
     "duckdb-engine",
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'",
-    "pymysql>=1.1.0",
+    "pymysql[rsa]>=1.1.0",
     "psycopg2-binary>=2.9",
 ]
 

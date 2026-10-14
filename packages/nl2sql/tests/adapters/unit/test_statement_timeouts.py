@@ -27,7 +27,9 @@ def _fake_pyodbc(monkeypatch):
 
 
 def _mssql(timeout_ms):
-    return MssqlAdapter("ms", MssqlConnection(host="h", user="u", password="p", database="d"),
+    # A named driver: the adapter does not ask pyodbc which ones are installed.
+    return MssqlAdapter("ms", MssqlConnection(host="h", user="u", password="p", database="d",
+                                              driver="ODBC Driver 18 for SQL Server"),
                         Limits(timeout_ms=timeout_ms))
 
 

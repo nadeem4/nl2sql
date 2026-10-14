@@ -141,3 +141,14 @@ def test_pypi_publishes_the_sdk_from_its_own_environment():
     assert "package: nl2sql-sdk" in text
     assert "stem: nl2sql_sdk" in text
     assert "environment: pypi-${{ matrix.package }}" in text
+
+
+@pytest.mark.parametrize("extra", ["mysql", "all"])
+def test_the_mysql_extras_install_cryptography_for_mysql_8_logins(extra):
+    """MySQL 8's default login, ``caching_sha2_password``, needs ``cryptography`` without TLS.
+
+    ``pymysql[rsa]`` is PyMySQL's own name for that dependency.
+    """
+    requirements = [Requirement(r) for r in _project("nl2sql")["optional-dependencies"][extra]]
+    pymysql = next(r for r in requirements if r.name == "pymysql")
+    assert "rsa" in pymysql.extras

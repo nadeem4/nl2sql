@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Any, Dict, Optional
 
 from pydantic import Field, SecretStr
@@ -16,6 +17,22 @@ _STAGE_BY_ERROR = (
 )
 # ODBC's SQLSTATEs for a server that was not reached: the first argument of pyodbc's error.
 _NETWORK_SQLSTATES = {"08001", "08S01", "HYT00"}
+# Microsoft's ODBC drivers for SQL Server, as pyodbc.drivers() names them: "ODBC Driver 18 for SQL Server".
+_SQL_SERVER_DRIVER = re.compile(r"ODBC Driver (\d+) for SQL Server")
+
+
+class OdbcDriverMissing(ImportError):
+    """No Microsoft ODBC Driver for SQL Server is installed: the ``driver`` stage."""
+
+
+def newest_sql_server_driver() -> str:
+    """The newest "ODBC Driver N for SQL Server" that pyodbc can see."""
+    import pyodbc
+
+    versions = {int(m.group(1)): name for name in pyodbc.drivers() if (m := _SQL_SERVER_DRIVER.fullmatch(name))}
+    if not versions:
+        raise OdbcDriverMissing("No Microsoft ODBC Driver for SQL Server is installed.")
+    return versions[max(versions)]
 
 
 class MssqlConnection(SQLAlchemyConnection):
@@ -30,8 +47,9 @@ class MssqlConnection(SQLAlchemyConnection):
     database: str = Field(title="Database")
     user: Optional[str] = Field(None, title="User")
     password: Optional[SecretStr] = Field(None, title="Password")
-    driver: str = Field("ODBC Driver 17 for SQL Server", title="ODBC driver",
-                        json_schema_extra={"group": "advanced"})
+    driver: Optional[str] = Field(None, title="ODBC driver",
+                                  description="Unset: the newest ODBC Driver for SQL Server installed",
+                                  json_schema_extra={"group": "advanced"})
     trusted_connection: bool = Field(False, title="Windows authentication",
                                      json_schema_extra={"group": "advanced"})
     trust_server_certificate: bool = Field(False, title="Trust the server certificate",
@@ -42,10 +60,17 @@ class MssqlAdapter(SQLAlchemyAdapter):
     title = "SQL Server"
     connection_model = MssqlConnection
     driver_modules = ("pyodbc",)
-    install_hint = 'pip install "nl2sql-engine[mssql]", and the Microsoft ODBC Driver for SQL Server'
+    install_hint = ('pip install "nl2sql-engine[mssql]", and Microsoft\'s ODBC Driver for SQL Server: '
+                    'https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server')
 
     def url(self, connection: MssqlConnection) -> URL:
-        query = {"driver": connection.driver}
+        """The connection's ``driver``, else the newest one installed, always encrypting.
+
+        Driver 18 encrypts unless told not to and Driver 17 only when told
+        to, so ``Encrypt=yes`` makes both behave alike, and
+        ``trust_server_certificate`` means the same whichever is used.
+        """
+        query = {"driver": connection.driver or newest_sql_server_driver(), "Encrypt": "yes"}
         if connection.trusted_connection:
             query["Trusted_Connection"] = "yes"
         if connection.trust_server_certificate:

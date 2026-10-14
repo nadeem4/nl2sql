@@ -14,7 +14,7 @@ pip install "nl2sql-engine[all]"
 
 # Core with selected adapters
 pip install "nl2sql-engine[postgres]"
-pip install "nl2sql-engine[mysql,mssql]"
+pip install "nl2sql-engine[mysql,mssql]"   # [mssql] also needs Microsoft's ODBC Driver for SQL Server
 pip install "nl2sql-engine[duckdb]"
 
 # The browser playground behind `nl2sql demo` (adds fastapi + uvicorn).

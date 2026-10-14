@@ -20,6 +20,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL, Engine, make_url
 
+from nl2sql.adapters.mssql.adapter import newest_sql_server_driver
 from nl2sql.config import Datasource
 
 SERVERS = ("postgres", "mysql", "mssql")
@@ -27,8 +28,6 @@ READER = "nl2sql_reader"
 FIX = ("Run `python testbed/passwords.py > testbed/.env` and "
        "`docker compose -f testbed/docker-compose.yml up -d --wait`, then set `REALDB=compose` with "
        "testbed/.env's variables in the environment, or set REALDB_{upper} to the server's URL.")
-
-ODBC_DRIVER = "ODBC Driver 18 for SQL Server"
 
 
 @dataclass(frozen=True)
@@ -82,7 +81,7 @@ class RealServer:
         if user is not None:
             url = url.set(username=user, password=password if password is not None else self.url.password)
         if self.name == "mssql":
-            url = url.update_query_dict({"driver": ODBC_DRIVER, "TrustServerCertificate": "yes"})
+            url = url.update_query_dict({"driver": newest_sql_server_driver(), "TrustServerCertificate": "yes"})
         return url
 
     def engine(self, database: Optional[str] = None, **login: Any) -> Engine:
@@ -93,7 +92,8 @@ class RealServer:
         block: Dict[str, Any] = {"host": self.url.host, "port": self.url.port, "user": self.url.username,
                                  "password": self.url.password, "database": database or self.sample_database}
         if self.name == "mssql":
-            block.update(driver=ODBC_DRIVER, trust_server_certificate=True)
+            # No driver: the adapter picks the newest one installed, which these tests exercise.
+            block.update(trust_server_certificate=True)
         return block
 
 
