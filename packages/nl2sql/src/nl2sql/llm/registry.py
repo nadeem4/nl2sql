@@ -27,32 +27,40 @@ class ProviderPreset(NamedTuple):
 
     Attributes:
         base_url: Endpoint the provider is reached on, or None to let the
-            client resolve its own default.
+            client resolve its own default (``openai_compatible`` has none:
+            the config must give one).
         api_key_env: Environment variable named in errors and used as the
             last-resort source of the key.
-        api_key_placeholder: Stand-in key for providers that authenticate
+        api_key_placeholder: Stand-in key for providers that may authenticate
             nothing. Non-None means the provider needs no real credential.
         wire: The wire type the provider speaks, a key of
             ``nl2sql.llm.wires.WIRES``. Its adapter builds the client.
+        structured_output: How structured answers are asked for when the
+            agent does not say: ``tool_calling``, ``json_schema`` or ``json_mode``.
+        preset_of: The provider this one is a named preset of, built by the
+            same code with this row's endpoint and key.
     """
 
     base_url: Optional[str]
     api_key_env: Optional[str]
     api_key_placeholder: Optional[str] = None
     wire: str = "openai"
+    structured_output: str = "tool_calling"
+    preset_of: Optional[str] = None
 
 
-# OpenAI, OpenRouter and Ollama all speak the OpenAI wire protocol, so one
-# adapter serves all three; only the endpoint differs. A config-supplied
-# ``base_url`` overrides the preset, which is what lets the same path serve
-# vLLM, LiteLLM or any other OpenAI-compatible endpoint.
+# The built-in providers (docs/architecture/phase2.md, section 5). ``openai``
+# and ``anthropic`` are the two services with wires of their own: Anthropic
+# speaks its Messages API, where prompt caching and reliable tool-based
+# structured output work. ``openai_compatible`` is any other server with an
+# OpenAI-style chat API (Azure OpenAI's v1 endpoint, vLLM, LiteLLM, a company
+# gateway): the config gives its ``base_url``. ``openrouter`` and ``ollama``
+# are named presets of it: a fixed endpoint and key variable, no code of their
+# own; a config-supplied ``base_url`` still overrides the preset's.
 #
-# Ollama needs no credential, but ChatOpenAI refuses to construct without an
-# ``api_key`` (``openai.OpenAIError: Missing credentials``), so its preset
-# supplies a placeholder the local daemon ignores.
-#
-# Anthropic speaks its own Messages API, so it has its own wire type: prompt
-# caching and reliable tool-based structured output only work there.
+# ChatOpenAI refuses to construct without an ``api_key`` (``openai.OpenAIError:
+# Missing credentials``), so a provider that may need none sends a placeholder
+# the server ignores. Never ``OPENAI_API_KEY``: that key belongs to OpenAI.
 PROVIDER_PRESETS: Dict[str, ProviderPreset] = {
     "openai": ProviderPreset(
         base_url=None,
@@ -61,18 +69,32 @@ PROVIDER_PRESETS: Dict[str, ProviderPreset] = {
     "openrouter": ProviderPreset(
         base_url="https://openrouter.ai/api/v1",
         api_key_env="OPENROUTER_API_KEY",
+        preset_of="openai_compatible",
     ),
     "ollama": ProviderPreset(
         base_url="http://localhost:11434/v1",
         api_key_env=None,
         api_key_placeholder="ollama",
+        preset_of="openai_compatible",
     ),
     "anthropic": ProviderPreset(
         base_url=None,
         api_key_env="ANTHROPIC_API_KEY",
         wire="anthropic",
     ),
+    "openai_compatible": ProviderPreset(
+        base_url=None,
+        api_key_env=None,
+        api_key_placeholder="not-needed",
+        # Local servers support schema-guided decoding more often than tool calls.
+        structured_output="json_schema",
+    ),
 }
+
+
+# The fields an agent takes from the top of the ``llm`` section unless it sets its own.
+AGENT_FIELDS = ("provider", "model", "temperature", "api_key", "base_url", "structured_output", "max_tokens",
+                "timeout_s", "max_retries", "headers")
 
 
 def wire_for_provider(provider: str) -> Wire:
@@ -93,11 +115,9 @@ def agents_from_config(llm: "LLM") -> Dict[str, Any]:
     def entry(name: str, fields: Dict[str, Any]) -> Any:
         if not isinstance(fields["model"], str):
             return fields["model"]
-        return AgentConfig(name=name, provider=fields["provider"], model=fields["model"],
-                           temperature=fields["temperature"], api_key=fields["api_key"],
-                           base_url=fields["base_url"])
+        return AgentConfig(name=name, **fields)
 
-    top = {field: getattr(llm, field) for field in ("provider", "model", "temperature", "api_key", "base_url")}
+    top = {field: getattr(llm, field) for field in AGENT_FIELDS}
     agents = {"default": entry("default", top)}
     for agent, override in llm.agents.items():
         key = LLM_AGENTS.get(agent, agent)
@@ -452,13 +472,27 @@ class LLMRegistry:
                 extra) is missing.
         """
         from .providers import ResolvedAgent
+        from .wires import STRUCTURED_OUTPUT_KEY
 
         if not api_key:
             api_key = self._api_key_for(agent)
-        return self._provider(agent.provider).create(ResolvedAgent(
+        provider = self._provider(agent.provider)
+        structured_output = agent.structured_output or provider.structured_output
+        headers = {name: self._resolve_secret(value) for name, value in agent.headers.items()}
+        client = provider.create(ResolvedAgent(
             name=agent.name, model=agent.model, temperature=agent.temperature,
-            api_key=api_key, base_url=agent.base_url,
+            api_key=api_key, base_url=agent.base_url, structured_output=structured_output,
+            max_tokens=agent.max_tokens, timeout_s=agent.timeout_s, max_retries=agent.max_retries,
+            headers=headers,
         ))
+        # ``structured()`` reads the method off the client, whichever provider built it.
+        client.metadata = {**(client.metadata or {}), STRUCTURED_OUTPUT_KEY: structured_output}
+        return client
+
+    def _resolve_secret(self, value: Any) -> str:
+        """A header value, its ``${provider:key}`` reference resolved."""
+        resolved = self.secret_manager.resolve_object(value)
+        return resolved.get_secret_value() if hasattr(resolved, "get_secret_value") else str(resolved)
 
     def _resolve_api_key(self, agent: AgentConfig, preset: ProviderPreset):
         """Resolves the API key for an agent, or explains what is missing.
@@ -517,9 +551,10 @@ class LLMRegistry:
         return listed.get(name) or listed["default"]
 
     def list_llms(self) -> Dict[str, Dict[str, Any]]:
-        """Every agent's settings, without keys. An agent given a model object shows its class."""
+        """Every agent's settings, without keys or header values. An agent given a model object shows its class."""
         llms = self.current
-        listed = {name: config.model_dump(exclude={"api_key"}) for name, config in llms.configs.items()}
+        listed = {name: {**config.model_dump(exclude={"api_key", "headers"}), "headers": sorted(config.headers)}
+                  for name, config in llms.configs.items()}
         listed.update({name: {"name": name, "provider": None, "model": type(model).__name__}
                        for name, model in llms.objects.items()})
         return listed

@@ -6,7 +6,8 @@ Adding a wire type (Gemini, Bedrock) is one new adapter module implementing
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+import json
+from typing import Any, Dict, List, Optional
 
 from .anthropic import AnthropicWire
 from .base import Wire, temperature_error
@@ -14,8 +15,14 @@ from .openai import OpenAIWire
 
 WIRES: Dict[str, Wire] = {"openai": OpenAIWire(), "anthropic": AnthropicWire()}
 
-__all__ = ["WIRES", "Wire", "streaming_structured", "structured", "temperature_error", "wire_named",
-           "wire_of"]
+# The client ``metadata`` key ``LLMRegistry`` writes the agent's ``structured_output`` under.
+STRUCTURED_OUTPUT_KEY = "nl2sql_structured_output"
+
+# Each ``structured_output`` setting as LangChain's ``with_structured_output`` names the method.
+_METHODS = {"tool_calling": "function_calling", "json_schema": "json_schema", "json_mode": "json_mode"}
+
+__all__ = ["STRUCTURED_OUTPUT_KEY", "WIRES", "Wire", "streaming_structured", "structured", "temperature_error",
+           "wire_named", "wire_of"]
 
 
 def wire_named(name: Optional[str]) -> Wire:
@@ -29,9 +36,48 @@ def wire_of(llm: Any) -> Wire:
     return next((wire for wire in WIRES.values() if wire.llm_type == llm_type), WIRES["openai"])
 
 
+def _method(llm: Any) -> str:
+    """The agent's ``structured_output`` (set on the client when it was built), else the wire's own."""
+    metadata = getattr(llm, "metadata", None)
+    chosen = metadata.get(STRUCTURED_OUTPUT_KEY) if isinstance(metadata, dict) else None
+    return _METHODS.get(chosen) or wire_of(llm).structured_output_method
+
+
+def _schema_text(schema: Any) -> str:
+    return json.dumps(schema.model_json_schema() if hasattr(schema, "model_json_schema") else schema)
+
+
+def _with_schema(schema: Any) -> Any:
+    """A step putting ``schema`` into the prompt: JSON mode alone asks for JSON, not for which JSON."""
+    from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+    from langchain_core.runnables import RunnableLambda
+
+    instruction = SystemMessage(content="Answer with only a JSON object that matches this JSON schema:\n"
+                                        + _schema_text(schema))
+
+    def add(prompt: Any) -> List[BaseMessage]:
+        if hasattr(prompt, "to_messages"):
+            messages = prompt.to_messages()
+        elif isinstance(prompt, str):
+            messages = [HumanMessage(content=prompt)]
+        else:
+            messages = list(prompt)
+        # After the leading system messages, so a provider that wants them first still has them first.
+        lead = next((i for i, m in enumerate(messages) if not isinstance(m, SystemMessage)), len(messages))
+        return [*messages[:lead], instruction, *messages[lead:]]
+
+    return RunnableLambda(add)
+
+
 def structured(llm: Any, schema: Any) -> Any:
-    """``llm.with_structured_output(schema)`` with the method its wire uses."""
-    return llm.with_structured_output(schema, method=wire_of(llm).structured_output_method)
+    """``llm.with_structured_output(schema)`` with the agent's ``structured_output`` method.
+
+    For ``json_mode`` the schema is added to the prompt, since JSON mode alone
+    does not carry it.
+    """
+    method = _method(llm)
+    chain = llm.with_structured_output(schema, method=method)
+    return _with_schema(schema) | chain if method == "json_mode" else chain
 
 
 def streaming_structured(llm: Any, schema: Any) -> Any:
@@ -48,7 +94,8 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
     from langchain_core.outputs import ChatGeneration, ChatResult
     from langchain_core.runnables import RunnableLambda
 
-    chain = structured(llm, schema)
+    method = _method(llm)
+    chain = llm.with_structured_output(schema, method=method)
     model, parser = chain.first, chain.last
     tools = getattr(model, "kwargs", {}).get("tools")
     repair = getattr(wire_of(llm), "repair_tool_calls", None)
@@ -58,4 +105,5 @@ def streaming_structured(llm: Any, schema: Any) -> Any:
             return message
         return repair(ChatResult(generations=[ChatGeneration(message=message)]), tools).generations[0].message
 
-    return model.bind(stream=True, stream_usage=True) | RunnableLambda(repaired) | parser
+    streamed = model.bind(stream=True, stream_usage=True) | RunnableLambda(repaired) | parser
+    return _with_schema(schema) | streamed if method == "json_mode" else streamed

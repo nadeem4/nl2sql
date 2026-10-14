@@ -3,8 +3,9 @@
 docs/architecture/configuration_v2.md, "Replacing the LLM at runtime":
 
 * the key is an agent's resolved client settings (every field of
-  ``AgentConfig`` but its name), with the resolved API key only as a SHA-256
-  digest, so the key can be logged and never holds a secret;
+  ``AgentConfig`` but its name), with the resolved API key and each header
+  value only as a SHA-256 digest, so the key can be logged and never holds a
+  secret;
 * agents whose settings are equal share one client, and swapping back to an
   earlier LLM reuses the clients built for it;
 * it is an LRU of 16. A client that falls out of it is closed once no
@@ -44,9 +45,11 @@ class ClientKey:
     def of(cls, agent: AgentConfig, api_key: Optional[str]) -> "ClientKey":
         """The key for ``agent`` built with ``api_key`` (the resolved value, or None)."""
         fields = tuple((name, getattr(agent, name)) for name in type(agent).model_fields
-                       if name not in ("name", "api_key"))
-        digest = hashlib.sha256(api_key.encode("utf-8")).hexdigest() if api_key else None
-        return cls(fields=fields, api_key_sha256=digest)
+                       if name not in ("name", "api_key", "headers"))
+        if agent.headers:
+            fields += (("headers", tuple(sorted((header, _sha256(value.get_secret_value()))
+                                                for header, value in agent.headers.items()))),)
+        return cls(fields=fields, api_key_sha256=_sha256(api_key) if api_key else None)
 
     def __str__(self) -> str:
         settings = " ".join(f"{name}={value}" for name, value in self.fields)
@@ -54,6 +57,10 @@ class ClientKey:
 
     def __repr__(self) -> str:
         return f"ClientKey({self})"
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def close_client(client: Any) -> None:
