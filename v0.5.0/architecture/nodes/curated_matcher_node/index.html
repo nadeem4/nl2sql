@@ -1,0 +1,2368 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
+<meta content="Platform Engineering" name="author"/>
+<link href="../ast_planner_node/" rel="prev"/>
+<link href="../datasource_resolver_node/" rel="next"/>
+<link href="../../../assets/favicon.svg" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.7" name="generator"/>
+<title>Curated Matcher - NL2SQL Platform</title>
+<link href="../../../assets/stylesheets/main.ec1eaa64.min.css" rel="stylesheet"/>
+<link href="../../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="purple" data-md-color-primary="teal" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#curatedmatchernode">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="NL2SQL Platform" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Curated Matcher
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="purple" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="lime" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../../overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../getting_started/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../configuration/system/">
+          
+  
+  
+  Configuration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../adapters/">
+          
+  
+  
+  Adapters
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../schema/store/">
+          
+  
+  
+  Schema
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../execution/isolation/">
+          
+  
+  
+  Execution
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../storage/artifact-store/">
+          
+  
+  
+  Storage
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../observability/stack/">
+          
+  
+  
+  Observability
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../security/model/">
+          
+  
+  
+  Security
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../deployment/architecture/">
+          
+  
+  
+  Deployment
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../development/">
+          
+  
+  
+  Development
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../testing/architecture/">
+          
+  
+  
+  Testing
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../api/">
+          
+  
+  
+  API
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../releases/">
+          
+  
+  
+  Releases
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../glossary/">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="NL2SQL Platform" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    NL2SQL Platform
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../graph_state/">
+<span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../determinism/">
+<span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../invariants/">
+<span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../failure_recovery/">
+<span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../curated_answers/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration_v2/">
+<span class="md-ellipsis">
+    
+  
+    Configuration v2 (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_10" id="__nav_2_10_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_10_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../subgraphs/main_pipeline_graph/">
+<span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../subgraphs/sql_agent/">
+<span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_11" id="__nav_2_11_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_2_11_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../">
+<span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../answer_synthesizer_node/">
+<span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ast_planner_node/">
+<span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#overview">
+<span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#responsibilities">
+<span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#position-in-execution-graph">
+<span class="md-ellipsis">
+      
+        Position in Execution Graph
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inputs">
+<span class="md-ellipsis">
+      
+        Inputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#outputs">
+<span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#internal-flow-step-by-step">
+<span class="md-ellipsis">
+      
+        Internal Flow (Step-by-Step)
+      
+    </span>
+</a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-choice-prompt">
+<span class="md-ellipsis">
+      
+        The choice prompt
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#contracts-interfaces">
+<span class="md-ellipsis">
+      
+        Contracts &amp; Interfaces
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#determinism-guarantees">
+<span class="md-ellipsis">
+      
+        Determinism Guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#error-handling">
+<span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retry-idempotency">
+<span class="md-ellipsis">
+      
+        Retry + Idempotency
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#performance-characteristics">
+<span class="md-ellipsis">
+      
+        Performance Characteristics
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#observability">
+<span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../datasource_resolver_node/">
+<span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../decomposer_node/">
+<span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../engine_aggregator_node/">
+<span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../executor_node/">
+<span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../generator_node/">
+<span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../logical_validator_node/">
+<span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../refiner_node/">
+<span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../schema_retriever_node/">
+<span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/pypi/">
+<span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/source/">
+<span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/demo/">
+<span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/system/">
+<span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/datasources/">
+<span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/secrets/">
+<span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/curated/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/sdk/">
+<span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/sqlalchemy/">
+<span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/development/">
+<span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/duckdb/">
+<span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/mssql/">
+<span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/mysql/">
+<span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/postgres/">
+<span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/sqlite/">
+<span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../schema/store/">
+<span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../execution/isolation/">
+<span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../storage/artifact-store/">
+<span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/stack/">
+<span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/debugging/">
+<span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/error-handling/">
+<span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../security/model/">
+<span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../security/multi-tenant/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_11_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/kubernetes/">
+<span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/hosted-demo/">
+<span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_12" type="checkbox"/>
+<label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_12_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_12">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../development/">
+<span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../development/releasing/">
+<span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/add-adapter/">
+<span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/add-chunk-types/">
+<span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/extend-planner/">
+<span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/add-execution-backend/">
+<span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_13" type="checkbox"/>
+<label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_13_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_13">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../testing/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../testing/evaluation-dataset/">
+<span class="md-ellipsis">
+    
+  
+    Evaluation Dataset
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../benchmarks/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_14">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14_2" id="__nav_14_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_14_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/public-facade/">
+<span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14_3" id="__nav_14_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_14_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/health/">
+<span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_15_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.5.0/">
+<span class="md-ellipsis">
+    
+  
+    0.5.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.4.1/">
+<span class="md-ellipsis">
+    
+  
+    0.4.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.4.0/">
+<span class="md-ellipsis">
+    
+  
+    0.4.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.3.0/">
+<span class="md-ellipsis">
+    
+  
+    0.3.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.4/">
+<span class="md-ellipsis">
+    
+  
+    0.2.4
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.3/">
+<span class="md-ellipsis">
+    
+  
+    0.2.3
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.2/">
+<span class="md-ellipsis">
+    
+  
+    0.2.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.1/">
+<span class="md-ellipsis">
+    
+  
+    0.2.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.0/">
+<span class="md-ellipsis">
+    
+  
+    0.2.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.1.2/">
+<span class="md-ellipsis">
+    
+  
+    0.1.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.1.1/">
+<span class="md-ellipsis">
+    
+  
+    0.1.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.1.0/">
+<span class="md-ellipsis">
+    
+  
+    0.1.0
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../glossary/">
+<span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#overview">
+<span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#responsibilities">
+<span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#position-in-execution-graph">
+<span class="md-ellipsis">
+      
+        Position in Execution Graph
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inputs">
+<span class="md-ellipsis">
+      
+        Inputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#outputs">
+<span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#internal-flow-step-by-step">
+<span class="md-ellipsis">
+      
+        Internal Flow (Step-by-Step)
+      
+    </span>
+</a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-choice-prompt">
+<span class="md-ellipsis">
+      
+        The choice prompt
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#contracts-interfaces">
+<span class="md-ellipsis">
+      
+        Contracts &amp; Interfaces
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#determinism-guarantees">
+<span class="md-ellipsis">
+      
+        Determinism Guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#error-handling">
+<span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retry-idempotency">
+<span class="md-ellipsis">
+      
+        Retry + Idempotency
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#performance-characteristics">
+<span class="md-ellipsis">
+      
+        Performance Characteristics
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#observability">
+<span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="curatedmatchernode">CuratedMatcherNode</h1>
+<h2 id="overview">Overview</h2>
+<ul>
+<li>Answers a question with a verified query from <code>curated.yaml</code> when one fits, before the model plans anything.</li>
+<li>Searches only the verified queries of datasources the caller's role may read, asks the model once to pick one and give its parameter values, and checks the values and the role's table access in code.</li>
+<li>Runs the saved SQL with the values as bound parameters, under the row ceiling, and hands the result to the aggregator and the answer synthesizer as a one-sub-query run.</li>
+<li>Falls back to the generated pipeline for anything else, with a reason code; a fallback is never an error of the run.</li>
+<li>Class: <code>CuratedMatcherNode</code></li>
+<li>Source: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py</code></li>
+<li>Design: <a href="../../curated_answers/#matching-at-question-time">Curated answers</a></li>
+</ul>
+<hr/>
+<h2 id="responsibilities">Responsibilities</h2>
+<ul>
+<li>Limit the search to datasources that have verified queries and that <code>rbac.get_allowed_datasources()</code> allows (the pinned <code>datasource_id</code> only, when one is given).</li>
+<li>Retrieve candidates with <code>VectorStore.retrieve_verified_query_candidates()</code> (top <code>settings.curated.match_top_k</code>), skipping a query that is in the index but no longer in the file.</li>
+<li>Ask no model when the best similarity is below <code>settings.curated.match_floor</code>.</li>
+<li>Make one structured-output call, <code>VerifiedQueryChoice</code>.</li>
+<li>Check the chosen values (<code>params.resolve_params</code>): type, <code>min</code>/<code>max</code>, <code>choices</code>, required.</li>
+<li>Check every table the SQL reads against the role's <code>allowed_tables</code> with <code>table_allowed()</code>, and that the SQL is still one read-only query.</li>
+<li>Check the adapter declares <code>SUPPORTS_BOUND_PARAMETERS</code> before running a query with parameters.</li>
+<li>Run the SQL through <code>SqlExecutorService</code> with <code>ExecutorRequest.parameters</code> and <code>max_rows</code>.</li>
+<li>On a hit, fill the state the way a one-sub-query generated run leaves it.</li>
+</ul>
+<hr/>
+<h2 id="position-in-execution-graph">Position in Execution Graph</h2>
+<p>The node is in the graph only when curated answers are on: <code>CURATED_ENABLED</code> is true, the curated file is loaded and holds at least one verified query, and the run executes (a plan-only run has no matcher). Otherwise the graph starts at <code>DatasourceResolverNode</code>, exactly as without curated answers.</p>
+<p>Upstream:
+- Entry point (no upstream nodes).</p>
+<p>Downstream:
+- <code>layer_router</code> on a hit: the scan is already done, so it sends the run to <code>EngineAggregatorNode</code>, then <code>AnswerSynthesizerNode</code>.
+- <code>DatasourceResolverNode</code> on any fallback.</p>
+<pre class="mermaid"><code>flowchart LR
+    Matcher[CuratedMatcherNode] --&gt;|verified| Router[layer_router]
+    Router --&gt; Aggregator[EngineAggregatorNode]
+    Aggregator --&gt; Synth[AnswerSynthesizerNode]
+    Matcher --&gt;|fallback| Resolver[DatasourceResolverNode]</code></pre>
+<hr/>
+<h2 id="inputs">Inputs</h2>
+<p>From <code>GraphState</code>:</p>
+<ul>
+<li><code>user_query</code> (str, required): searched, and shown to the model.</li>
+<li><code>datasource_id</code> (Optional[str]): when set, only this datasource is searched.</li>
+<li><code>user_context</code> (<code>UserContext</code>, required): the role's datasources and tables.</li>
+</ul>
+<p>Context dependencies (<code>Runtime</code>):</p>
+<ul>
+<li><code>curated</code>: the loaded <code>CuratedFileConfig</code>. The matcher reads every query from it, never from the index.</li>
+<li><code>vector_store</code>: <code>retrieve_verified_query_candidates()</code>.</li>
+<li><code>rbac</code>: <code>get_allowed_datasources()</code> and <code>get_allowed_tables()</code>.</li>
+<li><code>ds_registry</code>: dialect, adapter row limit, <code>supports()</code>.</li>
+<li><code>schema_store</code>: the latest schema version, stamped on the sub-query.</li>
+<li><code>llm_registry</code>: the choice's model, agent name <code>curatedmatcher</code> (falls back to <code>default</code>).</li>
+</ul>
+<hr/>
+<h2 id="outputs">Outputs</h2>
+<p>On a hit, mutations to <code>GraphState</code>:</p>
+<ul>
+<li><code>verified_match</code> (<code>VerifiedMatch</code>: <code>datasource_id</code>, <code>query_id</code>, <code>description</code>, <code>params</code>)</li>
+<li><code>decomposer_response</code>: one <code>SubQuery</code> (id <code>verified_&lt;query_id&gt;</code>, intent the question) in one <code>standalone</code> combine group</li>
+<li><code>execution_dag</code>: <code>build_execution_dag()</code> of that response</li>
+<li><code>artifact_refs</code>: the saved result</li>
+<li><code>subgraph_outputs</code>: one <code>SubgraphOutput</code> with <code>plan_source="verified"</code>, the SQL, <code>row_cap</code>, <code>truncated</code>, and the checks <code>read_only</code>, <code>params</code> and <code>policy</code></li>
+<li><code>reasoning</code></li>
+</ul>
+<p>On a fallback: nothing the rest of the graph reads. <code>execution_failed</code> also adds a <code>warnings</code> entry.</p>
+<p>Always, outside the state (the trace keeps the node's whole return):</p>
+<ul>
+<li><code>curated_match</code>: <code>matched</code>, <code>reason</code> (a fallback code or None), <code>detail</code>, <code>floor</code>, <code>candidates</code> (<code>datasource_id</code>, <code>query_id</code>, <code>similarity</code>), <code>choice</code> (the model's <code>query_id</code>, <code>params</code>, <code>reason</code>), <code>params</code> (after checking).</li>
+<li><code>retrieval</code>: the search's record, shaped like the resolver's, when a search ran.</li>
+</ul>
+<hr/>
+<h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
+<ol>
+<li>Searchable datasources: registered, allowed for the role (<code>*</code> allows all), the pinned one alone if pinned, and holding verified queries. None: <code>not_configured</code>, no search and no embedding call.</li>
+<li>Candidates. None (or none still in the file): <code>no_candidates</code>.</li>
+<li>Best similarity below <code>settings.curated.match_floor</code>: <code>below_floor</code>, no model call.</li>
+<li>One <code>VerifiedQueryChoice</code> call. It raised (no recording in a replay, a provider error): <code>model_failed</code>. <code>none_of_these</code>: <code>none_of_these</code>. An id that is not a candidate: <code>unknown_query</code>.</li>
+<li>Values: an unknown name, a name twice, a value that does not parse or is out of bounds: <code>param_invalid</code>; a param with no default left out or empty: <code>param_missing</code>. A param left out takes its default.</li>
+<li>Tables: any table the SQL reads not allowed for the role: <code>policy_denied</code>. The normal pipeline then enforces RBAC as always; the user is not told a verified query exists.</li>
+<li>Capability: a query with params on an adapter without <code>SUPPORTS_BOUND_PARAMETERS</code>: <code>capability_missing</code>.</li>
+<li>Run with the values bound and <code>max_rows</code> set to <code>min(adapter.row_limit or row_limit, row_limit)</code> (<code>row_limit</code> is <code>settings.results.row_limit</code>). Failed or no result: <code>execution_failed</code>, with a warning.</li>
+<li>Fill the state and route to <code>layer_router</code>.</li>
+</ol>
+<h3 id="the-choice-prompt">The choice prompt</h3>
+<p>System message (<code>curated_matcher/prompts.py</code>), then the question after a <code>User Query:</code> line, which <code>nl2sql.llm.replay.extract_question</code> recognises:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>You decide whether one of the verified queries below answers the user's question. A data team wrote and checked each one; you cannot change what a query does, only pick one and give its parameter values.
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>Rules:
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>1. Pick a query only when it answers the whole question as asked: the same measure, the same ranking or grouping, the same filters. A query about something close but different (ranked by another measure, grouped another way, a different entity) does not answer it.
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>2. When no query answers the whole question, set query_id to "none_of_these". When unsure, choose "none_of_these": the question is then answered another way, which is better than a wrong answer.
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a>3. Use the id exactly as listed (datasource.query).
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a>4. Give a value for each parameter the question states, as text: an int as digits, a date as YYYY-MM-DD, a string exactly as one of its choices when it has them. Leave out a parameter the question does not state; never guess a value the question does not give.
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>5. Give the reason in one short sentence.
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a>Verified queries (JSON):
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a>{candidates}
+</code></pre></div>
+<p><code>{candidates}</code> lists, in ranked order, each candidate's qualified id (<code>chinook.top_customers_by_revenue</code>), its description, and its params with type, bounds, choices, default and <code>required</code>. Never the SQL.</p>
+<hr/>
+<h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>def __call__(self, state: GraphState) -&gt; Dict[str, Any]
+</code></pre></div>
+<p>Key contracts:</p>
+<ul>
+<li><code>VerifiedQueryChoice</code>, <code>ParamValue</code>, <code>VerifiedMatch</code> (<code>curated_matcher/schemas.py</code>)</li>
+<li><code>VerifiedQueryCandidate</code> (<code>indexing/models.py</code>)</li>
+<li><code>ExecutorRequest.parameters</code>, <code>ExecutorRequest.max_rows</code></li>
+<li><code>SubgraphOutput</code> with <code>plan_source="verified"</code></li>
+</ul>
+<hr/>
+<h2 id="determinism-guarantees">Determinism Guarantees</h2>
+<ul>
+<li>No model writes or edits the SQL; the model picks an id and supplies values, which code checks and the driver binds.</li>
+<li>The candidates block is serialized with sorted keys in ranked order.</li>
+<li>The search and the choice are as deterministic as the embedding model and the configured temperature and seed.</li>
+</ul>
+<hr/>
+<h2 id="error-handling">Error Handling</h2>
+<p>The node never adds an error to the run. Every failure, including an unexpected exception, is a fallback with a reason code: <code>not_configured</code>, <code>no_candidates</code>, <code>below_floor</code>, <code>none_of_these</code>, <code>model_failed</code>, <code>unknown_query</code>, <code>param_invalid</code>, <code>param_missing</code>, <code>policy_denied</code>, <code>capability_missing</code>, <code>execution_failed</code>.</p>
+<hr/>
+<h2 id="retry-idempotency">Retry + Idempotency</h2>
+<ul>
+<li>No retry: a fallback runs the generated pipeline instead.</li>
+<li>Idempotent for the same input state and the same model answer.</li>
+</ul>
+<hr/>
+<h2 id="performance-characteristics">Performance Characteristics</h2>
+<ul>
+<li>A verified answer costs two model calls (this choice and the answer) instead of four or more.</li>
+<li>Below the floor, or with no candidates, a fallback costs one embedding call and no model call.</li>
+<li>The result is read in batches and the stream stops at <code>max_rows</code>.</li>
+</ul>
+<hr/>
+<h2 id="observability">Observability</h2>
+<ul>
+<li>Logger: <code>curated_matcher</code></li>
+<li>The trace records the node with its <code>curated_match</code> record and the search; the choice call is recorded like every LLM call, under node <code>curated_matcher</code>.</li>
+<li><code>QueryResult.source</code> says <code>verified</code> with the query id and values, or <code>generated</code>.</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+<script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+</body>
+</html>
