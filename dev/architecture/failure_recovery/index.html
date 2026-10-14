@@ -5441,7 +5441,7 @@
 
 <h1 id="failure-recovery-architecture">Failure + Recovery Architecture</h1>
 <h2 id="overview">Overview</h2>
-<p>Failure in this system is represented as structured <code>PipelineError</code> objects accumulated in graph state, explicit exceptions that short-circuit a node/subgraph, or runtime timeouts/cancellations handled by the orchestrator. Most node failures are captured and returned in state rather than raising, so the graph can continue unless routing logic or wrappers explicitly stop or crash. Recovery is limited to a local retry loop inside the SQL agent subgraph; there is no graph-level replay or global retry.</p>
+<p>Failure in this system is represented as structured <code>PipelineError</code> objects accumulated in graph state, explicit exceptions that short-circuit a node/subgraph, or runtime timeouts/cancellations handled by the orchestrator. Most node failures are captured and returned in state rather than raising, so the graph can continue unless routing logic or wrappers explicitly stop or crash. Recovery is limited to a local retry loop inside the SQL agent subgraph, and to parse-and-retry inside each structured LLM call (an answer that does not parse is asked for again, up to the agent's <code>parse_retries</code>, then <code>MODEL_OUTPUT_INVALID</code>; see <a href="../../configuration/llm/#parse-and-retry">Parse-and-retry</a>); there is no graph-level replay or global retry.</p>
 <hr />
 <h2 id="failure-domains">Failure Domains</h2>
 <h3 id="input">Input</h3>

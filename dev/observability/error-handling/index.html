@@ -1245,6 +1245,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#model-output-invalid">
+<span class="md-ellipsis">
+      
+        Model output invalid
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#circuit-breaker">
 <span class="md-ellipsis">
       
@@ -2043,6 +2052,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#model-output-invalid">
+<span class="md-ellipsis">
+      
+        Model output invalid
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#circuit-breaker">
 <span class="md-ellipsis">
       
@@ -2180,6 +2198,24 @@ through what the exception was raised from:</p>
 </ul>
 <p><code>run_with_graph()</code>'s fallback applies the same classification, so a provider
 failure that escapes its node is not <code>UNKNOWN_ERROR</code>.</p>
+<h2 id="model-output-invalid">Model output invalid</h2>
+<p>Every structured call retries an answer that does not parse, up to the
+agent's <code>parse_retries</code> times (see
+<a href="../../configuration/llm/#parse-and-retry">Parse-and-retry</a>). When the last
+answer still does not parse, <code>wires.structured()</code> raises
+<code>StructuredOutputError</code>, and <code>provider_error</code> reports it as
+<code>MODEL_OUTPUT_INVALID</code>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>The ast_planner agent's answer did not match PlanModel after 2 attempts. Set another
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>structured_output for it (tool_calling, json_schema or json_mode), or use a stronger model.
+</code></pre></div>
+<ul>
+<li>The agent is the node that made the call (or, outside a run, the agent whose
+  client it was).</li>
+<li>The last answer's validation errors are in <code>details</code>, which is not sent to
+  callers; the trace has every attempt in the node's <code>llm_calls</code>.</li>
+<li>It is not fatal: like the node's own failure codes, the run's usual retry
+  path still applies.</li>
+</ul>
 <h2 id="circuit-breaker">Circuit breaker</h2>
 <p><code>create_breaker()</code> configures <code>pybreaker.CircuitBreaker</code> instances with observability hooks. The system defines exactly one:</p>
 <ul>

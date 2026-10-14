@@ -4872,6 +4872,7 @@ config's <code>llm</code> section (<a href="../../../configuration/llm/">LLM con
 | <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. Masked in <code>repr</code>, <code>str</code> and JSON dumps. <code>None</code> reads the provider's standard variable. |
 | <code>base_url</code> | <code>Optional[str]</code> | no | Endpoint override; defaults to the provider preset (<code>https://openrouter.ai/api/v1</code> for <code>openrouter</code>, <code>http://localhost:11434/v1</code> for <code>ollama</code>). Required for <code>openai_compatible</code>. |
 | <code>structured_output</code> | <code>Optional[str]</code> | no | <code>tool_calling</code>, <code>json_schema</code> or <code>json_mode</code>. <code>None</code> uses the provider's default. |
+| <code>parse_retries</code> | <code>int</code> | no | Retries of a structured answer that does not parse (default <code>1</code>). |
 | <code>max_tokens</code> | <code>Optional[int]</code> | no | <code>None</code> uses the provider's default (16,000 for <code>anthropic</code>, unset for the others). |
 | <code>timeout_s</code> | <code>Optional[float]</code> | no | Per request. <code>None</code> uses the client library's. |
 | <code>max_retries</code> | <code>Optional[int]</code> | no | Network and rate-limit retries, done by the client. <code>None</code> uses the client library's. |
@@ -4949,7 +4950,7 @@ no key.</p>
 (<code>llm/registry.py</code>) makes one per agent from the <code>llm</code> section. Its fields are
 <code>provider</code>, <code>model</code>, <code>temperature</code> (<code>None</code> sends no temperature parameter),
 <code>api_key</code> (masked in <code>repr</code>, <code>str</code> and JSON dumps; <code>None</code> reads the provider's
-standard variable), <code>base_url</code>, <code>structured_output</code>, <code>max_tokens</code>, <code>timeout_s</code>,
+standard variable), <code>base_url</code>, <code>structured_output</code>, <code>parse_retries</code>, <code>max_tokens</code>, <code>timeout_s</code>,
 <code>max_retries</code>, <code>headers</code> (values masked like the key) and <code>name</code>. <code>LLMFileConfig</code> is a set of agents
 the benchmark compares, one config at a time (<code>LLMFileConfig.from_llm(llm)</code>).
 Neither is part of the public API.</p>
@@ -4980,8 +4981,14 @@ Neither is part of the public API.</p>
   for structured output, with the agent's <code>structured_output</code> method, which the
   registry records on the client it builds (<code>tool_calling</code> is LangChain's
   <code>function_calling</code>); for <code>json_mode</code> it adds the schema to the prompt, since
-  JSON mode alone does not carry it. A model object given in the config uses
-  its wire's <code>structured_output_method</code>. <code>wires.wire_of(llm)</code> picks the adapter
+  JSON mode alone does not carry it. An answer that does not parse is sent
+  back with its validation errors, up to the agent's <code>parse_retries</code> times
+  (recorded on the client too), and then <code>wires.StructuredOutputError(agent,
+  schema, attempts, errors)</code> is raised, which <code>failures.provider_error()</code>
+  reports as <code>MODEL_OUTPUT_INVALID</code>. <code>wires.streaming_structured(llm, schema)</code>
+  is the same with the first answer streamed; a retry is not streamed. A model
+  object given in the config uses its wire's <code>structured_output_method</code> and
+  one retry. <code>wires.wire_of(llm)</code> picks the adapter
   from the client.
   See <a href="../../../configuration/llm/#providers-and-wire-types">LLM configuration → Providers and wire types</a>.</li>
 <li><code>openai</code>, <code>openai_compatible</code>, <code>openrouter</code> and <code>ollama</code> are on the

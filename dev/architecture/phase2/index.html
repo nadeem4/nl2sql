@@ -4195,8 +4195,14 @@ embedder (see <a href="#5-llm-and-embeddings-providers">section 5</a>).</p>
 <p><code>openai_compatible</code>, with <code>openrouter</code> and <code>ollama</code> as its presets;
 <code>structured_output</code>, <code>max_tokens</code>, <code>timeout_s</code>, <code>max_retries</code> and
 <code>headers</code> on <code>LLM</code> and <code>AgentLLM</code>; <code>LLMProvider</code> on interface version 2.
-<code>parse_retries</code> and parse-and-retry come with L2. See
-<a href="../../configuration/llm/">LLM configuration</a>.</p>
+See <a href="../../configuration/llm/">LLM configuration</a>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: parse-and-retry (PR L2)</p>
+<p><code>parse_retries</code> on <code>LLM</code> and <code>AgentLLM</code>; <code>structured()</code> and
+<code>streaming_structured()</code> retry an answer that does not parse;
+<code>StructuredOutputError</code> and <code>MODEL_OUTPUT_INVALID</code>. See
+<a href="../../configuration/llm/#parse-and-retry">Parse-and-retry</a>.</p>
 </div>
 <h3 id="the-llm-config">The LLM config</h3>
 <p>Phase 1's <code>llm</code> section stays flat. Six fields are added to <code>LLM</code> and to

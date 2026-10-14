@@ -1953,6 +1953,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Structured output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parse-and-retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse-and-retry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4858,6 +4875,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Structured output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#parse-and-retry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parse-and-retry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5000,6 +5034,11 @@ with the provider's default model and no key.</p>
 <td><code>structured_output</code></td>
 <td>the provider's</td>
 <td><code>tool_calling</code>, <code>json_schema</code> or <code>json_mode</code>: how structured answers are asked for. See <a href="#structured-output">Structured output</a>.</td>
+</tr>
+<tr>
+<td><code>parse_retries</code></td>
+<td><code>1</code></td>
+<td>How many times a structured answer that does not parse is asked for again, with what was wrong. <code>0</code> asks once. See <a href="#parse-and-retry">Parse-and-retry</a>.</td>
 </tr>
 <tr>
 <td><code>max_tokens</code></td>
@@ -5412,7 +5451,7 @@ an agent. An agent not under <code>agents</code> runs on the top level:</p>
 </table>
 <p>Any other key is an error with "did you mean". An agent takes every field it
 sets (<code>provider</code>, <code>model</code>, <code>temperature</code>, <code>api_key</code>, <code>base_url</code>,
-<code>structured_output</code>, <code>max_tokens</code>, <code>timeout_s</code>, <code>max_retries</code>, <code>headers</code>) and
+<code>structured_output</code>, <code>parse_retries</code>, <code>max_tokens</code>, <code>timeout_s</code>, <code>max_retries</code>, <code>headers</code>) and
 inherits the rest from the top level. Inheritance follows which fields were written, so
 <code>temperature: null</code> on an agent still means "send none". Each node can be on a
 different provider, and so a different wire type. For example, plan on Claude
@@ -5584,6 +5623,25 @@ too.</p>
 <p>Unset, an agent uses its provider's default (the table under
 <a href="#providers-and-wire-types">Providers</a>). The method is never switched
 automatically: the agent's setting is what runs.</p>
+<h3 id="parse-and-retry">Parse-and-retry</h3>
+<p>An answer that does not parse (the parser fails, it does not validate against
+the schema, or the model made no tool call) is asked for again, up to the
+agent's <code>parse_retries</code> times (default <code>1</code>). Each retry adds the model's answer
+and what was wrong with it to the messages:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Your answer did not match the schema: `steps[0].op`: Field required. Answer again with only PlanModel.
+</code></pre></div>
+<p>If the last answer still does not parse, the node reports
+<code>MODEL_OUTPUT_INVALID</code>, whose message names the agent and suggests another
+<code>structured_output</code> or a stronger model; see
+<a href="../../observability/error-handling/#model-output-invalid">Error handling</a>.</p>
+<ul>
+<li>Each retry is a model call of its own, so it is in the run's trace (one more
+  entry in the node's <code>llm_calls</code>) and in its token usage and cost.</li>
+<li>A streamed answer (the answer synthesizer's, when the run streams) that does
+  not parse is retried without streaming.</li>
+<li><code>parse_retries</code> is separate from <code>max_retries</code>, which is the client
+  library's retry of network errors and rate limits.</li>
+</ul>
 <h2 id="timeouts-retries-and-headers">Timeouts, retries and headers</h2>
 <p><code>timeout_s</code>, <code>max_retries</code> and <code>headers</code> go to the client library
 (<code>ChatOpenAI</code> or <code>ChatAnthropic</code>) as its <code>timeout</code>, <code>max_retries</code> and
@@ -5609,9 +5667,9 @@ build one client.</p>
   calling a model. Using that agent raises the same error, naming the agent,
   the provider and the environment variable to set:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>key, but none could be resolved. Set OPENAI_API_KEY ... or in the environment,
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>or give the agent an 'api_key' in the LLM config file.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>ValueError: LLM agent 'default' uses provider 'openai', which requires an API
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>key, but none could be resolved. Set OPENAI_API_KEY ... or in the environment,
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>or give the agent an 'api_key' in the LLM config file.
 </code></pre></div>
 <p>The key is read when the clients are built. A key set in the environment after
 the engine started is used only once the LLM is set again.</p>
@@ -5620,14 +5678,14 @@ with no model.</p>
 <h2 id="replacing-the-llm-at-runtime">Replacing the LLM at runtime</h2>
 <p><code>engine.llm.replace</code> swaps the whole <code>llm</code> section at once, while the engine
 runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">AgentLLM</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">change</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    <span class="n">LLM</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"anthropic"</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"claude-sonnet-5-5"</span><span class="p">,</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>        <span class="n">agents</span><span class="o">=</span><span class="p">{</span><span class="s2">"ast_planner"</span><span class="p">:</span> <span class="n">AgentLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"claude-opus-5-5"</span><span class="p">)}),</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>    <span class="n">by</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>          <span class="c1"># optional: the UserContext making the change</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">)</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">change</span><span class="o">.</span><span class="n">changes</span><span class="p">)</span>  <span class="c1"># {"default": {"old": "openai/gpt-5.4", "new": "anthropic/claude-sonnet-5-5"}, ...}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">LLM</span><span class="p">,</span> <span class="n">AgentLLM</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">change</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">LLM</span><span class="p">(</span><span class="n">provider</span><span class="o">=</span><span class="s2">"anthropic"</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s2">"claude-sonnet-5-5"</span><span class="p">,</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>        <span class="n">agents</span><span class="o">=</span><span class="p">{</span><span class="s2">"ast_planner"</span><span class="p">:</span> <span class="n">AgentLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"claude-opus-5-5"</span><span class="p">)}),</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="n">by</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>          <span class="c1"># optional: the UserContext making the change</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="p">)</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="nb">print</span><span class="p">(</span><span class="n">change</span><span class="o">.</span><span class="n">changes</span><span class="p">)</span>  <span class="c1"># {"default": {"old": "openai/gpt-5.4", "new": "anthropic/claude-sonnet-5-5"}, ...}</span>
 </code></pre></div>
 <ul>
 <li><strong>Validated like the file.</strong> The new section is checked as the <code>llm</code>
@@ -5644,7 +5702,7 @@ runs:</p>
   agent whose provider or model changed, the old and the new one. They never
   hold a key, a key reference or a header.</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>INFO nl2sql.llm: LLM replaced by user=u42 roles=[admin] via api: default: openai/gpt-5.4 -&gt; anthropic/claude-sonnet-5-5; ast_planner: openai/gpt-5.4 -&gt; anthropic/claude-opus-5-5
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>INFO nl2sql.llm: LLM replaced by user=u42 roles=[admin] via api: default: openai/gpt-5.4 -&gt; anthropic/claude-sonnet-5-5; ast_planner: openai/gpt-5.4 -&gt; anthropic/claude-opus-5-5
 </code></pre></div>
 <ul>
 <li><strong>Not saved.</strong> Nothing is written to disk, so a restart goes back to the
@@ -5675,8 +5733,8 @@ Switching embedding providers requires a re-index.</p>
 <h2 id="prices">Prices</h2>
 <p><code>prices</code> gives per-model prices per million tokens, so <code>QueryResult.usage</code>
 reports a <code>cost</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">prices</span><span class="p">:</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">gpt-4o</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> input</span><span class="p">:</span><span class="w"> </span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nt"> cached_input</span><span class="p">:</span><span class="w"> </span><span class="nv">1.25</span><span class="p p-Indicator">,</span><span class="nt"> output</span><span class="p">:</span><span class="w"> </span><span class="nv">10</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">prices</span><span class="p">:</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">gpt-4o</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> input</span><span class="p">:</span><span class="w"> </span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nt"> cached_input</span><span class="p">:</span><span class="w"> </span><span class="nv">1.25</span><span class="p p-Indicator">,</span><span class="nt"> output</span><span class="p">:</span><span class="w"> </span><span class="nv">10</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>Optional <code>cached_input</code> (cache reads) defaults to <code>input</code>; optional
 <code>cache_write</code> (cache writes) defaults to <code>input</code> times the wire's write
