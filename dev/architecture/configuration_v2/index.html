@@ -4139,9 +4139,8 @@ these details:</p>
   deleted; each engine builds its own <code>SecretManager(registry)</code>.</li>
 <li><strong>Per engine.</strong> The embedder is built once from <code>embeddings</code> through the
   registry, or is the <code>instance</code> given; <code>EmbeddingService</code> is deleted. The
-  LLM settings still go through <code>LLMRegistry</code> until PR 9: it takes the
-  <code>llm</code> section (<code>configure(llm)</code>), resolves providers through the
-  registry, and hands back a chat model object given as <code>LLM(model=...)</code>.
+  LLM is the engine's <code>LLMSet</code>, built from the <code>llm</code> section through its
+  <code>LLMClientCache</code> (PR 9, <a href="#replacing-the-llm-at-runtime">Replacing the LLM at runtime</a>).
   <code>Policies.allow_all</code> and <code>default_role</code> are applied by <code>RBAC</code>.</li>
 <li><strong>Stores.</strong> The index is <code>&lt;storage.path&gt;/index/</code> (collection
   <code>nl2sql_store</code>, a constant), the schema store <code>&lt;storage.path&gt;/state.db</code>,
@@ -4280,6 +4279,41 @@ tests, <code>nl2sql config check</code> and notebooks.</p>
 <a href="#__codelineno-18-4" id="__codelineno-18-4" name="__codelineno-18-4"></a>                       <span class="n">agents</span><span class="o">=</span><span class="p">{</span><span class="s2">"ast_planner"</span><span class="p">:</span> <span class="n">AgentLLM</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">"gpt-5.5"</span><span class="p">)}))</span>      <span class="c1"># switch models</span>
 </code></pre></div>
 <h3 id="replacing-the-llm-at-runtime">Replacing the LLM at runtime</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: the LLM client cache and <code>llm.replace</code> (PR 9)</p>
+<p><code>engine.llm.replace(llm, *, by=None, via="python") -&gt; LLMChange</code> is built
+(<code>Runtime.replace_llm</code> in <code>nl2sql/runtime.py</code>), with <code>LLMSet</code> and
+<code>LLMChange</code> in <code>nl2sql/llm/llm_set.py</code> and <code>LLMClientCache</code> in
+<code>nl2sql/llm/client_cache.py</code>. <code>LLMRegistry</code> is now the per-engine holder of
+the current set and the cache; the nodes still ask it for their client by
+name. Building it settled these details:</p>
+<ul>
+<li><strong>The entry point.</strong> <code>replace</code> takes <code>via</code> alongside <code>by</code>, so the entry
+  point (<code>python</code>, <code>api</code>, <code>playground</code>) is known when there is no user.
+  <code>PUT /api/v1/settings/llm</code> arrives in PR 10; until then <code>POST /llm</code>
+  keeps registering one agent through <code>configure_llm</code>, which builds a new
+  set and swaps it, but leaves <code>engine.config.llm</code> as it was.</li>
+<li><strong>Keys.</strong> <code>replace</code> fails with <code>ConfigError</code> when an agent's API key
+  does not resolve (<code>llm.api_key</code>, <code>llm.agents.&lt;agent&gt;.api_key</code>). At
+  construction a key that does not resolve is still <code>check()</code>'s to
+  report, and using that agent raises the reason.</li>
+<li><strong>Clients are built up front</strong>, at construction and on <code>replace</code>, so
+  the key is read then: a key set in the environment later is used only
+  once the LLM is set again.</li>
+<li><strong>Reading the set once.</strong> <code>run_with_graph</code> pins the current set to the
+  run (<code>LLMRegistry.begin_run</code>, a context variable read while the graph is
+  built) and releases it when the graph finishes, which a timed-out run
+  has not yet done. The trace records the run's set.</li>
+<li><strong>Closing.</strong> The built-in wires build <code>ChatOpenAI</code> and <code>ChatAnthropic</code>,
+  which share their library's process-wide connection pool, so there is
+  no HTTP client of their own to close: closing calls the client's
+  <code>close()</code> when it has one (a provider registered in code), and is
+  otherwise dropping the reference.</li>
+<li><strong>The plan cache key</strong> carries the planner as <code>provider/model</code>, the
+  effective one for the run (a caller's per-request model included); a
+  model object is <code>Class/model</code>.</li>
+</ul>
+</div>
 <p>Owner decision 6 keeps a runtime model switch. Changing the model by hand is
 something both the playground and an operator need.</p>
 <p><strong>The entry points</strong></p>
