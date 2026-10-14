@@ -2014,12 +2014,12 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="plugin-adapter-architecture">Plugin / Adapter Architecture</h1>
-<p>Adapters integrate NL2SQL with external datasources. Each adapter implements a <strong>protocol contract</strong>, is discovered via <strong>Python entry points</strong>, and is registered in the <code>DatasourceRegistry</code>.</p>
+<p>Adapters integrate NL2SQL with external datasources. Each adapter implements a <strong>protocol contract</strong>, is found by name in the <strong>registry</strong> (<code>nl2sql.registry</code>, built from Python entry points), and is registered in the <code>DatasourceRegistry</code>.</p>
 <h2 id="discovery-and-registration">Discovery and registration</h2>
 <pre class="mermaid"><code>flowchart TD
     Config[configs/datasources.yaml] --&gt; Registry[DatasourceRegistry]
-    Registry --&gt; Discovery[discover_adapters()]
-    Discovery --&gt; EntryPoints[entry_points('nl2sql.adapters')]
+    Registry --&gt; Lookup["Registry.load('adapter', type)"]
+    Lookup --&gt; EntryPoints["nl2sql.adapters entry points, or a class registered in code"]
     EntryPoints --&gt; AdapterClass[Adapter Class]
     AdapterClass --&gt; AdapterInstance[DatasourceAdapterProtocol instance]</code></pre>
 <h2 id="core-adapter-contract">Core adapter contract</h2>
@@ -2063,13 +2063,13 @@
 <p>To add a new adapter:</p>
 <ol>
 <li>Implement <code>DatasourceAdapterProtocol</code> (or extend a base adapter).</li>
-<li>Publish the adapter class as an <code>nl2sql.adapters</code> entry point.</li>
+<li>Publish the adapter class as an <code>nl2sql.adapters</code> entry point, or register it in code (see <a href="../../extensions/add-adapter/">Adding a New Adapter</a>).</li>
 <li>Configure the datasource in <code>configs/datasources.yaml</code>.</li>
 </ol>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Adapter protocol: <code>packages/sdk/src/nl2sql_sdk/protocols.py</code></li>
-<li>Adapter discovery: <code>packages/nl2sql/src/nl2sql/datasources/discovery.py</code></li>
+<li>Registry: <code>packages/nl2sql/src/nl2sql/registry.py</code></li>
 <li>Datasource registry: <code>packages/nl2sql/src/nl2sql/datasources/registry.py</code></li>
 <li>Example adapter: <code>packages/nl2sql/src/nl2sql/adapters/sqlalchemy_base/adapter.py</code></li>
 </ul>

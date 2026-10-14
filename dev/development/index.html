@@ -1338,6 +1338,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-registry">
+<span class="md-ellipsis">
+      
+        The registry
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#subgraph-extension-overview">
 <span class="md-ellipsis">
       
@@ -1944,6 +1953,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-registry">
+<span class="md-ellipsis">
+      
+        The registry
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#subgraph-extension-overview">
 <span class="md-ellipsis">
       
@@ -1986,6 +2004,63 @@
 <li><code>extensions/extend-planner.md</code> for planner/AST updates.</li>
 <li><code>extensions/add-execution-backend.md</code> for new executor services.</li>
 </ul>
+<h2 id="the-registry">The registry</h2>
+<p>Adapters, LLM providers, embeddings providers and secret providers are all
+found by name through <code>nl2sql.registry.Registry</code>
+(<a href="../architecture/configuration_v2/#5-the-registry">design</a>). Each kind has an
+entry point group, and the built-ins are declared in
+<code>packages/nl2sql/pyproject.toml</code> in the same groups a plugin uses:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Entry point group</th>
+<th>Interface</th>
+<th>Built-ins</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>adapter</code></td>
+<td><code>nl2sql.adapters</code></td>
+<td><code>nl2sql_sdk.DatasourceAdapterProtocol</code></td>
+<td><code>sqlite</code>, <code>postgres</code>, <code>mysql</code>, <code>mssql</code>, <code>duckdb</code></td>
+</tr>
+<tr>
+<td><code>llm</code></td>
+<td><code>nl2sql.llms</code></td>
+<td><code>nl2sql.llm.providers.LLMProvider</code></td>
+<td><code>openai</code>, <code>anthropic</code>, <code>openrouter</code>, <code>ollama</code>, made from <code>PROVIDER_PRESETS</code></td>
+</tr>
+<tr>
+<td><code>embeddings</code></td>
+<td><code>nl2sql.embeddings</code></td>
+<td><code>nl2sql.embeddings.EmbeddingsProvider</code></td>
+<td><code>local</code>, <code>openai</code></td>
+</tr>
+<tr>
+<td><code>secrets</code></td>
+<td><code>nl2sql.secrets</code></td>
+<td><code>nl2sql_sdk.SecretProvider</code></td>
+<td><code>env</code>, <code>aws</code>, <code>azure</code>, <code>hashicorp</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>Registry.default()</code> lists the installed entry points by name and imports
+  none of them. <code>Registry.empty()</code> holds nothing.</li>
+<li><code>add_adapter</code>, <code>add_llm</code>, <code>add_embeddings</code> and <code>add_secrets</code>, and the
+  decorators <code>@registry.adapter(name)</code> and so on, register in code on that
+  registry only. A name already present raises unless <code>replace=True</code>.</li>
+<li><code>names(kind)</code> lists the names; <code>load(kind, name)</code> imports one and checks its
+  <code>interface_version</code>, finds its <code>driver_modules</code> (adapters) or <code>requires</code>
+  (LLM and embeddings providers) without importing them, and reports a name
+  two installed packages declare. A failure is a <code>RegistryError</code> that says how
+  to fix it, and an unknown name suggests the closest one.</li>
+</ul>
+<p>After editing an entry point in <code>pyproject.toml</code>, reinstall the package
+(<code>pip install -e packages/nl2sql</code>): entry points are read from the installed
+metadata, not from the source tree.</p>
 <h2 id="subgraph-extension-overview">Subgraph extension overview</h2>
 <ol>
 <li>Implement a <code>build_*_graph(ctx)</code> function that returns a LangGraph runnable.</li>
@@ -2020,6 +2095,7 @@ output, query result rows — must therefore never reach those APIs unescaped:</
 <p>Tracebacks are printed with <code>console.print(..., markup=False)</code>.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
+<li>Registry: <code>packages/nl2sql/src/nl2sql/registry.py</code></li>
 <li>Subgraph selection: <code>packages/nl2sql/src/nl2sql/pipeline/graph_utils.py</code></li>
 <li>Adapter protocol: <code>packages/sdk/src/nl2sql_sdk/protocols.py</code></li>
 <li>SQL executor: <code>packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py</code></li>

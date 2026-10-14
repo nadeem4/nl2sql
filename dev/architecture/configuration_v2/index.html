@@ -4303,6 +4303,22 @@ normalised intent and run date, the datasource and the schema version
 never served. Entries from the old model stay in the cache, and swapping back
 hits them again.</p>
 <h2 id="5-the-registry">5. The registry</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: the registry (PR 5)</p>
+<p><code>nl2sql/registry.py</code> holds <code>Registry</code> with <code>default()</code>, <code>empty()</code>, the
+<code>add_*</code> methods and decorators for the four Phase 1 kinds, <code>names()</code>, and
+<code>load(kind, name)</code>, which imports a name and runs the load-time checks
+(interface version with the package name, <code>find_spec</code> with the install
+hint, duplicate entry points naming both packages, "did you mean"). It
+raises <code>RegistryError</code>; collecting those into a <code>ConfigError</code> is
+<code>NL2SQL(cfg, registry)</code>'s job, in PR 7a. The built-ins are declared in
+the four entry point groups. <code>LLMProvider</code> and <code>ResolvedAgent</code> live in
+<code>nl2sql.llm.providers</code>, <code>EmbeddingsProvider</code> in <code>nl2sql.embeddings</code>.
+<code>discover_adapters()</code> and <code>nl2sql/secrets/factory.py</code> are deleted: the
+<code>DatasourceRegistry</code>, the secret manager and <code>nl2sql list-adapters</code> use the
+registry. The runtime still builds its LLM clients and embedder from the
+0.4 settings until PR 7a passes a registry in.</p>
+</div>
 <h3 id="what-it-is">What it is</h3>
 <p>A YAML file holds only text. When it says <code>type: postgres</code> or
 <code>provider: anthropic</code>, something has to turn that name into code. The
@@ -4478,8 +4494,8 @@ engine.</p>
 <code>DatasourceAdapterProtocol</code> and the five built-in adapters, and
 <code>nl2sql_sdk.secrets.SecretProvider</code> with the four built-in providers.
 A provider's <code>config_model</code> covers its block apart from <code>id</code> and <code>type</code>.
-Until the registry (PR 5), <code>nl2sql/secrets/factory.py</code> maps the four
-built-in <code>type</code> names to their classes.</p>
+PR 5 replaced the temporary <code>nl2sql/secrets/factory.py</code> table with the
+<code>nl2sql.secrets</code> entry point group.</p>
 </div>
 <p>Each Phase 1 interface carries <code>interface_version: ClassVar[int]</code>. The engine
 accepts exactly the version it was built for, and anything else is a load
