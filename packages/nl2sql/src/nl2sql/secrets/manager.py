@@ -48,7 +48,9 @@ class SecretManager:
         """
         from pydantic import SecretStr
 
-        from .factory import create_provider
+        from nl2sql.registry import Registry
+
+        registry = Registry.default()
 
         for config in configs:
             if config.type == "env":
@@ -66,7 +68,8 @@ class SecretManager:
                         resolved_values.append(resolved)
                         updates[key] = SecretStr(resolved) if isinstance(value, SecretStr) else resolved
 
-                provider = create_provider(config.type, config.options.model_copy(update=updates))
+                provider = registry.load("secrets", config.type).from_config(
+                    config.options.model_copy(update=updates))
             except Exception as e:
                 reason = str(e) or type(e).__name__
                 for value in resolved_values:

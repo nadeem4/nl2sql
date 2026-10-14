@@ -14,21 +14,27 @@ from pydantic import ValidationError
 
 from nl2sql_sdk import SecretProvider
 from nl2sql.secrets import SecretManager, SecretProviderConfig
-from nl2sql.secrets.factory import BUILTIN_PROVIDERS, provider_class
+from nl2sql.registry import Registry
+
+BUILT_IN = ["aws", "azure", "env", "hashicorp"]
+
+
+def provider_class(type_name):
+    return Registry.default().load("secrets", type_name)
 
 FAKE_TOKEN = "-".join(["fake", "vault", "token"])
 
 
 def test_the_built_in_provider_types():
-    assert set(BUILTIN_PROVIDERS) == {"env", "aws", "azure", "hashicorp"}
+    assert set(BUILT_IN) <= set(Registry.default().names("secrets"))
 
 
-@pytest.mark.parametrize("type_name", sorted(BUILTIN_PROVIDERS))
+@pytest.mark.parametrize("type_name", BUILT_IN)
 def test_built_in_provider_declares_interface_version_1(type_name):
     assert provider_class(type_name).interface_version == 1
 
 
-@pytest.mark.parametrize("type_name", sorted(BUILTIN_PROVIDERS))
+@pytest.mark.parametrize("type_name", BUILT_IN)
 def test_built_in_provider_rejects_an_unknown_key(type_name):
     with pytest.raises(ValidationError, match="bogus"):
         provider_class(type_name).config_model.model_validate({"bogus": 1})

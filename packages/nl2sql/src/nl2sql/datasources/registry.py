@@ -3,8 +3,8 @@ from threading import RLock
 
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.common.logger import get_logger
-from nl2sql.datasources.discovery import discover_adapters
 from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql.registry import Registry
 from nl2sql.secrets import SecretManager
 from .models import DatasourceConfig, ConnectionConfig, SECRET_ARG_HINTS, _is_secret_arg  # noqa: F401
 
@@ -37,14 +37,17 @@ class DatasourceRegistry:
     Acts as the factory and cache for DataSourceAdapter instances.
     """
 
-    def __init__(self, secret_manager: SecretManager):
-        """Initializes the registry by eagerly creating adapters for all configs."""
+    def __init__(self, secret_manager: SecretManager, registry: Optional[Registry] = None):
+        """Starts empty. ``registry`` turns a connection ``type`` into an adapter class.
+
+        Defaults to ``Registry.default()``: the built-in and installed adapters.
+        """
         self._adapters: Dict[str, DatasourceAdapterProtocol] = {}
         self._capabilities: Dict[str, Set[str]] = {}
         self._preferred: Dict[str, List[str]] = {}
         self._descriptions: Dict[str, Optional[str]] = {}
         self._unavailable: Dict[str, str] = {}
-        self._available_adapters = discover_adapters()
+        self._registry = registry or Registry.default()
         self._secret_manager = secret_manager
         self._lock = RLock()
 
@@ -164,37 +167,35 @@ class DatasourceRegistry:
         resolved_connection = self.resolved_connection(connection)
         connection_args = resolved_connection.model_dump()
 
-        if conn_type in self._available_adapters:
-            adapter_cls = self._available_adapters[conn_type]
+        # Unknown type, wrong interface version or missing driver: a RegistryError
+        # that says how to fix it.
+        adapter_cls = self._registry.load("adapter", conn_type)
 
-            try:
-                adapter = adapter_cls(
-                    datasource_id=ds_id,
-                    datasource_engine_type=conn_type,
-                    connection_args=connection_args,
-                    statement_timeout_ms=config.options.get("statement_timeout_ms"),
-                    row_limit=config.options.get("row_limit"),
-                    max_bytes=config.options.get("max_bytes"),
-                )
-            except Exception as e:
-                # A pydantic ValidationError renders the whole input dict, which
-                # now holds the plaintext password. Re-raise without the cause so
-                # neither the message nor the traceback carries it.
-                raise ValueError(
-                    redact_connection_secrets(str(e), connection_args)
-                ) from None
-            capabilities = self._read_capabilities(ds_id, adapter)
-            with self._lock:
-                self._adapters[ds_id] = adapter
-                self._capabilities[ds_id] = capabilities
-                self._preferred[ds_id] = list(config.preferred_tables)
-                self._descriptions[ds_id] = config.description
-                self._unavailable.pop(ds_id, None)
-            return adapter
-        else:
-            raise ValueError(
-                f"No adapter found for engine type: '{conn_type}' in datasource '{ds_id}'"
+        try:
+            adapter = adapter_cls(
+                datasource_id=ds_id,
+                datasource_engine_type=conn_type,
+                connection_args=connection_args,
+                statement_timeout_ms=config.options.get("statement_timeout_ms"),
+                row_limit=config.options.get("row_limit"),
+                max_bytes=config.options.get("max_bytes"),
             )
+        except Exception as e:
+            # A pydantic ValidationError renders the whole input dict, which
+            # now holds the plaintext password. Re-raise without the cause so
+            # neither the message nor the traceback carries it.
+            raise ValueError(
+                redact_connection_secrets(str(e), connection_args)
+            ) from None
+        capabilities = self._read_capabilities(ds_id, adapter)
+        with self._lock:
+            self._adapters[ds_id] = adapter
+            self._capabilities[ds_id] = capabilities
+            self._preferred[ds_id] = list(config.preferred_tables)
+            self._descriptions[ds_id] = config.description
+            self._unavailable.pop(ds_id, None)
+        return adapter
+
 
 
     def get_adapter(self, datasource_id: str) -> DatasourceAdapterProtocol:

@@ -8,14 +8,51 @@ All adapters must implement `DatasourceAdapterProtocol`. See `../adapters/sdk.md
 
 If you are building a SQL adapter, extending `BaseSQLAlchemyAdapter` can provide schema introspection and default SQL execution. See `../adapters/sqlalchemy.md`.
 
-## 2. Expose an entry point
+## 2. Register it
 
-Adapters are discovered via `nl2sql.adapters` entry points. Ensure your package exposes:
+The engine finds an adapter by its `type` name in the
+[registry](../architecture/configuration_v2.md#5-the-registry). There are two
+ways to put a name there.
 
+**From a package**, declare an entry point in the `nl2sql.adapters` group of
+your `pyproject.toml`:
+
+```toml
+[project.entry-points."nl2sql.adapters"]
+snowflake = "nl2sql_snowflake.adapter:SnowflakeAdapter"
 ```
-nl2sql.adapters = 
-  postgres = my_pkg.adapters.PostgresAdapter
+
+`Registry.default()` lists every installed entry point by name and imports none
+of them. An adapter is imported when a datasource uses its `type`.
+
+**In your own code**, register the class on a registry you build:
+
+```python
+from nl2sql.registry import Registry
+
+registry = Registry.default()
+
+@registry.adapter("snowflake")
+class SnowflakeAdapter: ...
+
+# or: registry.add_adapter("snowflake", SnowflakeAdapter)
 ```
+
+A registration belongs to that registry only, so two engines or two tests never
+see each other's. Adding a name that is already there, including a built-in,
+raises unless you pass `replace=True`.
+
+When the adapter is loaded, the registry checks three things and stops with a
+message that says how to fix each:
+
+| Check | Fails with |
+|---|---|
+| `interface_version` is the version this engine needs (1) | `nl2sql-snowflake implements adapter interface 0; this engine needs 1.` |
+| every module in `driver_modules` is installed (`importlib.util.find_spec`, without importing it) | the missing modules and your `install_hint` |
+| only one installed package declares the name | both package names |
+
+An unknown `type` suggests the closest registered name. `nl2sql list-adapters`
+shows every registered adapter and whether it can be loaded.
 
 ## 3. Configure the datasource
 
@@ -49,6 +86,6 @@ Ensure `capabilities()` advertises the correct set for routing and execution:
 ## Source references
 
 - Adapter protocol: `packages/sdk/src/nl2sql_sdk/protocols.py`
-- Adapter discovery: `packages/nl2sql/src/nl2sql/datasources/discovery.py`
+- Registry: `packages/nl2sql/src/nl2sql/registry.py`
 - Datasource registry: `packages/nl2sql/src/nl2sql/datasources/registry.py`
 - SQLAlchemy base adapter: `packages/nl2sql/src/nl2sql/adapters/sqlalchemy_base/adapter.py`

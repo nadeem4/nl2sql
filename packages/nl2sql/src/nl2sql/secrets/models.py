@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from .factory import provider_class
+from nl2sql.registry import Registry
 
 
 class SecretProviderConfig(BaseModel):
@@ -32,7 +32,7 @@ class SecretProviderConfig(BaseModel):
         head = {"id": block.pop("id", None), "type": block.pop("type", None)}
         if not isinstance(head["type"], str):
             return {**head, "options": None}
-        provider = provider_class(head["type"])
+        provider = Registry.default().load("secrets", head["type"])
         try:
             options = provider.config_model.model_validate(block)
         except ValidationError as e:

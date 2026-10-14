@@ -15,6 +15,7 @@ from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.indexing.health import inspect_vector_store, preferred_table_warnings
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.secrets.manager import SecretManager
+from nl2sql.testing import adapter_registry
 from nl2sql_sdk.schema import (
     SchemaContract,
     SchemaMetadata,
@@ -56,6 +57,10 @@ def test_a_preferred_name_does_not_match_another_schema():
 
 
 class _StubAdapter:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
         pass
 
@@ -64,8 +69,7 @@ class _StubAdapter:
 
 
 def test_the_registry_keeps_each_datasources_preferred_tables(monkeypatch):
-    monkeypatch.setattr("nl2sql.datasources.registry.discover_adapters", lambda: {"stub": _StubAdapter})
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
 
     registry.register_datasource(_config(preferred_tables=["v_rev"]))
 

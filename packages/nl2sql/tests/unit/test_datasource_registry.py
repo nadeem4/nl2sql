@@ -7,9 +7,14 @@ from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.datasources.models import DatasourceConfig, ConnectionConfig
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql.testing import adapter_registry
 
 
 class _StubAdapter:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
         self.datasource_id = datasource_id
         self.datasource_engine_type = datasource_engine_type
@@ -26,12 +31,8 @@ class _StubAdapter:
 def test_registry_resolves_secrets_and_normalizes_capabilities(monkeypatch):
     # Validates secret resolution and capability normalization because adapters rely on both.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"stub": _StubAdapter},
-    )
     monkeypatch.setenv("SECRET", "resolved")
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
     config = DatasourceConfig(
         id="ds1",
         connection=ConnectionConfig(type="stub", password="${env:SECRET}"),
@@ -53,11 +54,7 @@ def test_registry_resolves_secrets_and_normalizes_capabilities(monkeypatch):
 def test_registry_rejects_unknown_adapter_type(monkeypatch):
     # Validates fail-fast behavior because misconfigured datasources must not register.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"stub": _StubAdapter},
-    )
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
     config = DatasourceConfig(id="bad", connection=ConnectionConfig(type="missing"))
 
     # Act / Assert
@@ -69,14 +66,10 @@ def test_resolved_connection_keeps_non_secret_fields_as_plain_strings(monkeypatc
     # ``ConnectionConfig`` has no per-field types, so resolution must not guess
     # which values are secrets -- the adapter's own model declares that.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"stub": _StubAdapter},
-    )
     monkeypatch.setenv("DEMO_HOST", "analytics_db")
     monkeypatch.setenv("DEMO_USER", "ref_admin")
     monkeypatch.setenv("DEMO_PASSWORD", "ref-pw")
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
     connection = ConnectionConfig(
         type="stub",
         host="${env:DEMO_HOST}",
@@ -98,13 +91,9 @@ def test_adapter_config_model_still_masks_the_resolved_password(monkeypatch):
     # The plain string must still land as a ``SecretStr`` on fields declared that
     # way, otherwise dropping the wrap would trade a bug for a leak.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"stub": _StubAdapter},
-    )
     monkeypatch.setenv("DEMO_USER", "ref_admin")
     monkeypatch.setenv("DEMO_PASSWORD", "ref-pw")
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
     adapter = registry.register_datasource(
         DatasourceConfig(
             id="ds_pg",
@@ -134,15 +123,11 @@ def test_fully_env_resolved_datasource_registers(monkeypatch):
     # from the environment was unregisterable, because a wrapped non-password
     # field was not unwrapped.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"postgres": PostgresAdapter},
-    )
     monkeypatch.setenv("DEMO_REF_HOST", "analytics_db")
     monkeypatch.setenv("DEMO_REF_PORT", "5432")
     monkeypatch.setenv("DEMO_REF_USER", "ref_admin")
     monkeypatch.setenv("DEMO_REF_PASSWORD", "ref-pw")
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
     config = DatasourceConfig(
         id="analytics_db",
         connection=ConnectionConfig(
@@ -168,12 +153,8 @@ def test_registration_errors_do_not_echo_the_resolved_password(monkeypatch):
     # A pydantic ValidationError renders the whole input dict, and `nl2sql doctor`
     # prints that message verbatim. The plaintext must not survive the trip.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"postgres": PostgresAdapter},
-    )
     monkeypatch.setenv("DEMO_REF_PASSWORD", "s3cret-pw")
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
     config = DatasourceConfig(
         id="analytics_db",
         connection=ConnectionConfig(
@@ -198,12 +179,8 @@ def test_datasource_details_mask_the_resolved_password(monkeypatch):
     # `get_datasource_details` returns the connection args to callers, so the
     # masking that SecretStr used to provide has to be applied explicitly.
     # Arrange
-    monkeypatch.setattr(
-        "nl2sql.datasources.registry.discover_adapters",
-        lambda: {"postgres": PostgresAdapter},
-    )
     monkeypatch.setenv("DEMO_REF_PASSWORD", "s3cret-pw")
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry({"postgres": PostgresAdapter}))
     registry.register_datasource(
         DatasourceConfig(
             id="ds",

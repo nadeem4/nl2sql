@@ -17,11 +17,16 @@ from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, resolve_subgraph
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql.testing import adapter_registry
 
 SQL = DatasourceCapability.SUPPORTS_SQL
 
 
 class _Adapter:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     caps = {SQL}
 
     def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
@@ -45,14 +50,17 @@ class _Broken(_Adapter):
 
 
 class _NoCapabilities:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
         pass
 
 
 def registry_with(monkeypatch, **adapters) -> DatasourceRegistry:
     """A registry with one datasource per keyword, named and typed by it."""
-    monkeypatch.setattr("nl2sql.datasources.registry.discover_adapters", lambda: dict(adapters))
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry(dict(adapters)))
     for name in adapters:
         registry.register_datasource(DatasourceConfig(id=name, connection=ConnectionConfig(type=name)))
     return registry

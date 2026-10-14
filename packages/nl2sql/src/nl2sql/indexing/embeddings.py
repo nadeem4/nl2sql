@@ -8,12 +8,12 @@ from langchain_openai import OpenAIEmbeddings
 
 from nl2sql.common.logger import get_logger
 from nl2sql.common.settings import secret_value, settings
+from nl2sql.embeddings.local import LOCAL_EMBEDDING_MODEL
 
 logger = get_logger(__name__)
 
 SUPPORTED_EMBEDDING_PROVIDERS: Tuple[str, ...] = ("openai", "local")
 
-LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 LOCAL_EMBEDDING_DIMENSION = 384
 
 # Output dimensions of the embedding models this project knows about. Used only

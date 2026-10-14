@@ -1,17 +1,18 @@
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
-from nl2sql.datasources.discovery import discover_adapters
+from nl2sql.registry import Registry, RegistryError
 
 from nl2sql.cli.common.decorators import handle_cli_errors
 
 @handle_cli_errors
 def list_available_adapters() -> None:
-    """Discovers and displays all installed Datasource Adapters."""
+    """Lists the adapters the registry knows, and whether each one can be used."""
     console = Console()
-    adapters = discover_adapters()
+    registry = Registry.default()
+    names = registry.names("adapter")
 
-    if not adapters:
+    if not names:
         # `\[` in a normal string is not an escape sequence; Python 3.12 warns
         # about it. `escape()` is how rich is meant to be told the brackets are
         # literal text, not markup.
@@ -26,7 +27,12 @@ def list_available_adapters() -> None:
     table.add_column("Class", style="magenta")
     table.add_column("Status", style="green")
 
-    for name, cls in adapters.items():
-        table.add_row(name, f"{cls.__module__}.{cls.__name__}", "Active")
+    for name in names:
+        try:
+            cls = registry.load("adapter", name)
+        except RegistryError as e:
+            table.add_row(name, "", f"[red]{escape(str(e))}[/red]")
+        else:
+            table.add_row(name, f"{cls.__module__}.{cls.__name__}", "Ready")
 
     console.print(table)

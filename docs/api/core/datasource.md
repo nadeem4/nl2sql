@@ -12,7 +12,7 @@ Register, validate, and inspect datasources backed by adapter implementations.
 - `packages/nl2sql/src/nl2sql/api/datasource_api.py`
 - `packages/nl2sql/src/nl2sql/datasources/registry.py`
 - `packages/nl2sql/src/nl2sql/datasources/models.py`
-- `packages/nl2sql/src/nl2sql/datasources/discovery.py`
+- `packages/nl2sql/src/nl2sql/registry.py` (adapter lookup by `type`)
 
 ## Public Surface
 

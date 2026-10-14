@@ -9,6 +9,36 @@ This guide focuses on **extension points**: adapters, executors, subgraphs, chun
 - `extensions/extend-planner.md` for planner/AST updates.
 - `extensions/add-execution-backend.md` for new executor services.
 
+## The registry
+
+Adapters, LLM providers, embeddings providers and secret providers are all
+found by name through `nl2sql.registry.Registry`
+([design](../architecture/configuration_v2.md#5-the-registry)). Each kind has an
+entry point group, and the built-ins are declared in
+`packages/nl2sql/pyproject.toml` in the same groups a plugin uses:
+
+| Kind | Entry point group | Interface | Built-ins |
+|---|---|---|---|
+| `adapter` | `nl2sql.adapters` | `nl2sql_sdk.DatasourceAdapterProtocol` | `sqlite`, `postgres`, `mysql`, `mssql`, `duckdb` |
+| `llm` | `nl2sql.llms` | `nl2sql.llm.providers.LLMProvider` | `openai`, `anthropic`, `openrouter`, `ollama`, made from `PROVIDER_PRESETS` |
+| `embeddings` | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` | `local`, `openai` |
+| `secrets` | `nl2sql.secrets` | `nl2sql_sdk.SecretProvider` | `env`, `aws`, `azure`, `hashicorp` |
+
+- `Registry.default()` lists the installed entry points by name and imports
+  none of them. `Registry.empty()` holds nothing.
+- `add_adapter`, `add_llm`, `add_embeddings` and `add_secrets`, and the
+  decorators `@registry.adapter(name)` and so on, register in code on that
+  registry only. A name already present raises unless `replace=True`.
+- `names(kind)` lists the names; `load(kind, name)` imports one and checks its
+  `interface_version`, finds its `driver_modules` (adapters) or `requires`
+  (LLM and embeddings providers) without importing them, and reports a name
+  two installed packages declare. A failure is a `RegistryError` that says how
+  to fix it, and an unknown name suggests the closest one.
+
+After editing an entry point in `pyproject.toml`, reinstall the package
+(`pip install -e packages/nl2sql`): entry points are read from the installed
+metadata, not from the source tree.
+
 ## Subgraph extension overview
 
 1. Implement a `build_*_graph(ctx)` function that returns a LangGraph runnable.
@@ -48,6 +78,7 @@ Tracebacks are printed with `console.print(..., markup=False)`.
 
 ## Source references
 
+- Registry: `packages/nl2sql/src/nl2sql/registry.py`
 - Subgraph selection: `packages/nl2sql/src/nl2sql/pipeline/graph_utils.py`
 - Adapter protocol: `packages/sdk/src/nl2sql_sdk/protocols.py`
 - SQL executor: `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`

@@ -10,13 +10,28 @@ and the REST API all read it from here.
 
 from __future__ import annotations
 
+import os
 import re
-from typing import Dict, Optional, Tuple
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Protocol, Tuple, runtime_checkable
 
-from .registry import PROVIDER_PRESETS
+from .registry import PROVIDER_PRESETS, ProviderPreset
+from .wires import WIRES
+from .wires.anthropic import EXTRA_HINT
+
+if TYPE_CHECKING:
+    from langchain_core.language_models import BaseChatModel
 
 __all__ = [
+    "ANTHROPIC",
     "ANTHROPIC_ENV",
+    "LLMProvider",
+    "LLM_PROVIDERS",
+    "OLLAMA",
+    "OPENAI",
+    "OPENROUTER",
+    "ResolvedAgent",
+    "api_key_from_env",
     "KEY_SHAPE_MESSAGE",
     "DEFAULT_ANTHROPIC_MODEL",
     "DEFAULT_MODELS",
@@ -185,3 +200,103 @@ def mask_key(key: str) -> str:
     if not key or len(key) < 12:
         return "***"
     return f"{key[:3]}...{key[-4:]}"
+
+
+def api_key_from_env(provider: str) -> Optional[str]:
+    """The key in ``provider``'s own variable, when it has one and it is set.
+
+    The fallback when the config gives no key. Provider key variables are read
+    here, in ``nl2sql/llm/``, and nowhere else: the embeddings providers ask
+    this function too.
+    """
+    preset = PROVIDER_PRESETS.get(provider)
+    return os.environ.get(preset.api_key_env) if preset and preset.api_key_env else None
+
+
+@dataclass(frozen=True)
+class ResolvedAgent:
+    """One agent's LLM settings, with its key already resolved.
+
+    ``api_key`` is the value, never a ``${provider:key}`` reference. None means
+    the provider's own variable (or no key, for a provider that needs none).
+    """
+
+    name: str
+    model: str
+    temperature: Optional[float]
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+
+@runtime_checkable
+class LLMProvider(Protocol):
+    """An LLM provider: the code behind ``provider: <name>`` in the LLM config.
+
+    Registered under the ``nl2sql.llms`` entry point group, or in code with
+    ``Registry.add_llm``. The registry checks ``interface_version`` and finds
+    each of ``requires`` before the provider is used, reporting
+    ``install_hint`` when one is missing.
+    """
+
+    interface_version: ClassVar[int]
+    label: str
+    api_key_env: Optional[str]
+    requires: Tuple[str, ...]
+    install_hint: str
+
+    def create(self, agent: ResolvedAgent) -> "BaseChatModel":
+        """The chat client for ``agent``. Builds it without calling the model."""
+        ...
+
+
+_WIRE_REQUIRES = {"openai": ("langchain_openai",), "anthropic": ("langchain_anthropic",)}
+_WIRE_HINTS = {"openai": 'pip install "nl2sql-engine"', "anthropic": EXTRA_HINT.split(": ", 1)[1]}
+
+
+@dataclass(frozen=True)
+class _PresetProvider:
+    """A built-in provider, made from its entry in ``PROVIDER_PRESETS``."""
+
+    interface_version: ClassVar[int] = 1
+    name: str
+
+    @property
+    def preset(self) -> ProviderPreset:
+        # Read on every use: PROVIDER_PRESETS stays the one table.
+        return PROVIDER_PRESETS[self.name]
+
+    @property
+    def label(self) -> str:
+        return PROVIDER_LABELS[self.name]
+
+    @property
+    def api_key_env(self) -> Optional[str]:
+        return self.preset.api_key_env
+
+    @property
+    def requires(self) -> Tuple[str, ...]:
+        return _WIRE_REQUIRES[self.preset.wire]
+
+    @property
+    def install_hint(self) -> str:
+        return _WIRE_HINTS[self.preset.wire]
+
+    def create(self, agent: ResolvedAgent) -> "BaseChatModel":
+        """Raises ValueError naming the key variable when there is no key."""
+        api_key = agent.api_key or self.preset.api_key_placeholder or api_key_from_env(self.name)
+        if not api_key:
+            raise ValueError(f"LLM agent '{agent.name}' uses provider '{self.name}', which requires an "
+                             f"API key, but none was given. Set {self.api_key_env} or give the agent an "
+                             "'api_key'.")
+        base_url = agent.base_url or self.preset.base_url
+        kwargs = {"base_url": base_url} if base_url else {}
+        return WIRES[self.preset.wire].build_client(agent.model, agent.temperature, api_key=api_key,
+                                                    tags=[agent.name], **kwargs)
+
+
+# The built-in providers, one per preset: the ``nl2sql.llms`` entry points name these.
+LLM_PROVIDERS: Dict[str, LLMProvider] = {name: _PresetProvider(name) for name in PROVIDER_PRESETS}
+OPENAI = LLM_PROVIDERS["openai"]
+ANTHROPIC = LLM_PROVIDERS["anthropic"]
+OPENROUTER = LLM_PROVIDERS["openrouter"]
+OLLAMA = LLM_PROVIDERS["ollama"]

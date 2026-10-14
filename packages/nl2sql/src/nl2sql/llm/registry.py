@@ -251,7 +251,7 @@ class LLMRegistry:
                                         "base_url": None, "api_key": None})
 
     def _build_client(self, agent: AgentConfig, api_key: Optional[str] = None) -> BaseChatModel:
-        """Builds the client for one agent through its provider's wire adapter.
+        """Builds the client for one agent through its provider in ``LLM_PROVIDERS``.
 
         Args:
             agent: Validated configuration for the agent.
@@ -265,19 +265,15 @@ class LLMRegistry:
             ValueError: If the wire's optional dependency (the anthropic
                 extra) is missing.
         """
-        preset = PROVIDER_PRESETS[agent.provider]
-        api_key = api_key or self._resolve_api_key(agent, preset)
+        from .providers import LLM_PROVIDERS, ResolvedAgent
 
-        base_url = agent.base_url or preset.base_url
-        kwargs = {"base_url": base_url} if base_url else {}
-
-        return WIRES[preset.wire].build_client(
-            agent.model,
-            agent.temperature,
-            api_key=api_key,
-            tags=[agent.name],
-            **kwargs,
-        )
+        api_key = api_key or self._resolve_api_key(agent, PROVIDER_PRESETS[agent.provider])
+        if hasattr(api_key, "get_secret_value"):
+            api_key = api_key.get_secret_value()
+        return LLM_PROVIDERS[agent.provider].create(ResolvedAgent(
+            name=agent.name, model=agent.model, temperature=agent.temperature,
+            api_key=api_key, base_url=agent.base_url,
+        ))
 
     def _resolve_api_key(self, agent: AgentConfig, preset: ProviderPreset):
         """Resolves the API key for an agent, or explains what is missing.

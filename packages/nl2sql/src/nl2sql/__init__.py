@@ -30,6 +30,7 @@ _EXPORTS = {
     "nl2sql.common.errors": ("ErrorSeverity", "ErrorCode", "PipelineError"),
     "nl2sql.common.cancellation": ("CancellationToken",),
     "nl2sql.auth.models": ("UserContext",),
+    "nl2sql.registry": ("Registry",),
     # The benchmark lives in nl2sql.evaluation, which the runtime never needs.
     "nl2sql.api.benchmark_api": ("BenchmarkAPI",),
     "nl2sql.evaluation.types": ("BenchmarkConfig",),
@@ -78,4 +79,5 @@ __all__ = [
     "QueryEvent",
     "configure_logging",
     "BenchmarkConfig",
+    "Registry",
 ]
