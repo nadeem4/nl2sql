@@ -215,6 +215,92 @@ library, so the engine can validate the entry before building anything.
 
 ---
 
+## Interfaces: the stores
+
+A store keeps one part of the engine's data: the vector `index`, the `state`
+(schema snapshots, plan cache, feedback), the run `traces` or the `results`.
+The storage config names one per slot by `type` (see
+[Storage](../configuration/storage.md)). The four interfaces live in
+`nl2sql_sdk.stores`, which imports only pydantic and the standard library.
+
+Every store class has the same four members, whatever its slot:
+
+| Member | Description |
+| :--- | :--- |
+| `interface_version` | `1`. The engine accepts exactly the version it was built for. |
+| `slot` | `"index"`, `"state"`, `"traces"` or `"results"`: the sub-block it fills. The engine refuses a store in another slot. |
+| `config_model` | A pydantic model for the store's sub-block apart from `type`. Set `extra="forbid"`, so a misspelt key is an error, and hold credentials as `SecretStr`. |
+| `from_config(cfg, *, folder)` | Builds the store from a validated `config_model` instance, after the engine has resolved any `${provider:key}` in it. `folder` is `storage.path`. It should write nothing: `nl2sql config check` builds the stores too. |
+
+The slots' methods:
+
+| Interface | Methods |
+| :--- | :--- |
+| `IndexStore` | `open(namespace, dimension)`, `add(namespace, entries)`, `query(namespace, vector, k, where=None, with_vectors=False)`, `get(namespace, where, with_vectors=False)`, `delete(namespace, where)`, `pointers(namespace)`, `set_pointers(namespace, updates)` (atomic), `namespaces()`, `drop(namespace)`, `close()` |
+| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `keep_snapshots(datasource_id, keep)`, `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `lock(name, ttl_s)`, `close()` |
+| `TraceStore` | `write(trace_id, document)`, `get(trace_id)`, `purge(older_than)` |
+| `ResultStore` | `write(key, chunks)`, `open(key)`, `exists(key)`, `purge(older_than)`. Bytes only: the engine writes the Parquet. |
+
+The models they exchange: `Entry` (`id`, `text`, `vector`, `metadata`), `Hit`
+(an entry with its `distance`, and its `vector` when asked for), `Filter`
+(`eq`, `ne` and `in`, all of which must hold) and `BuildPointer` (which build
+of a datasource is live, and the `schema_version` it was built from). The
+engine embeds; a store keeps the vectors it is handed.
+
+A results store, sketched:
+
+```python
+from datetime import datetime
+from pathlib import Path
+from typing import BinaryIO, ClassVar, Iterable, Self
+
+from pydantic import BaseModel, ConfigDict
+
+
+class BucketConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bucket: str
+
+
+class BucketResults:
+    interface_version: ClassVar[int] = 1
+    slot: ClassVar[str] = "results"
+    config_model: ClassVar[type[BaseModel]] = BucketConfig
+
+    def __init__(self, client, bucket: str):
+        self.client, self.bucket = client, bucket
+
+    @classmethod
+    def from_config(cls, cfg: BucketConfig, *, folder: Path) -> Self:
+        import acme_blob  # the client library, imported only here
+        return cls(acme_blob.Client(), cfg.bucket)
+
+    def write(self, key: str, chunks: Iterable[bytes]) -> int:
+        return self.client.put(self.bucket, key, b"".join(chunks))
+
+    def open(self, key: str) -> BinaryIO:
+        return self.client.open(self.bucket, key)
+
+    def exists(self, key: str) -> bool:
+        return self.client.exists(self.bucket, key)
+
+    def purge(self, older_than: datetime) -> int:
+        return self.client.delete_before(self.bucket, older_than)
+```
+
+Declare it in the `nl2sql.stores` entry point group
+(`bucket = "acme_nl2sql.results:BucketResults"`), or register it in code with
+`registry.add_store("bucket", BucketResults)`. Then `results: {type: bucket,
+bucket: nl2sql-results}`.
+
+!!! note "Built-ins only, for now"
+    The engine moves onto these interfaces one slot at a time during 0.6
+    (the index, then the state, then the traces and results). Until a slot's
+    move lands, the engine refuses a plugin store in that slot.
+
+---
+
 ## Compliance Testing
 
 All adapters should pass the compliance test suite (schema introspection, type mapping,

@@ -17,7 +17,7 @@ PUBLIC_SURFACE = {
     "ErrorSeverity", "ErrorCode", "PipelineError",
     # The config, and building an engine from it
     "Config", "load_config", "load_env_file", "ConfigError", "Registry", "Datasource", "Limits", "LLM",
-    "AgentLLM", "Embeddings", "Policies", "Role", "Storage", "Secrets", "Curated", "Settings",
+    "AgentLLM", "Embeddings", "Policies", "Role", "Storage", "StoreConfig", "Secrets", "Curated", "Settings",
     "CheckReport", "DatasourceStatus", "EngineNotReady",
     # Entry-point hooks
     "configure_logging",

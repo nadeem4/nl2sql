@@ -219,7 +219,7 @@ submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 return (`DatasourceInfo`, `IndexProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
-`Role`, `Storage`, `Secrets`, `Curated`, `Settings`), what `check()` reports
+`Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`), what `check()` reports
 (`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
 (`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the benchmark's
 `BenchmarkAPI` and `BenchmarkConfig`. The list is fixed by

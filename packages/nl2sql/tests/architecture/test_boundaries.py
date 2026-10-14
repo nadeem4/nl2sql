@@ -158,6 +158,18 @@ def test_the_sdk_imports_only_pydantic_and_the_stdlib():
         "engine, SQLAlchemy or a driver.", offenders)
 
 
+def test_the_sdk_stores_module_imports_only_pydantic():
+    """A store plugin (Qdrant, S3) installs the SDK for ``nl2sql_sdk.stores``, not the engine."""
+    path = SDK / "stores.py"
+    allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
+    assert path.is_file(), "nl2sql_sdk/stores.py holds the four store interfaces."
+    offenders = [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                 if name.partition(".")[0] not in allowed]
+    assert not offenders, _broke(
+        "nl2sql_sdk.stores imports only pydantic and the standard library: a store "
+        "plugin compiles against it without the engine.", offenders)
+
+
 def test_no_file_imports_the_sdk_by_its_old_name():
     """The SDK is ``nl2sql_sdk``; ``nl2sql_adapter_sdk`` is never published again."""
     roots = [PACKAGES, PACKAGES.parent / "scripts"]

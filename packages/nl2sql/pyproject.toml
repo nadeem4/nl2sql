@@ -127,6 +127,13 @@ aws = "nl2sql.secrets.providers.aws:AwsSecretProvider"
 azure = "nl2sql.secrets.providers.azure:AzureSecretProvider"
 hashicorp = "nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"
 
+# One group for the four store slots, so a store's name is unique across them.
+[project.entry-points."nl2sql.stores"]
+chroma = "nl2sql.storage.chroma:ChromaIndex"
+sqlite = "nl2sql.storage.sqlite:SqliteState"
+files = "nl2sql.storage.files:FilesTraces"
+local = "nl2sql.storage.local:LocalResults"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["nl2sql*"]

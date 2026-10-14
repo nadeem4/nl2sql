@@ -11,7 +11,7 @@ This guide focuses on **extension points**: adapters, executors, subgraphs, chun
 
 ## The registry
 
-Adapters, LLM providers, embeddings providers and secret providers are all
+Adapters, LLM providers, embeddings providers, secret providers and stores are all
 found by name through `nl2sql.registry.Registry`
 ([design](../architecture/configuration_v2.md#5-the-registry)). Each kind has an
 entry point group, and the built-ins are declared in
@@ -23,10 +23,11 @@ entry point group, and the built-ins are declared in
 | `llm` | `nl2sql.llms` | `nl2sql.llm.providers.LLMProvider` | `openai`, `anthropic`, `openrouter`, `ollama`, made from `PROVIDER_PRESETS` |
 | `embeddings` | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` (version 2: `create` and `describe`) | `local`, `openai`, `openai_compatible` |
 | `secrets` | `nl2sql.secrets` | `nl2sql_sdk.SecretProvider` | `env`, `aws`, `azure`, `hashicorp` |
+| `store` | `nl2sql.stores` | `nl2sql_sdk.stores` (four interfaces, one per slot) | `chroma`, `sqlite`, `files`, `local` |
 
 - `Registry.default()` lists the installed entry points by name and imports
   none of them. `Registry.empty()` holds nothing.
-- `add_adapter`, `add_llm`, `add_embeddings` and `add_secrets`, and the
+- `add_adapter`, `add_llm`, `add_embeddings`, `add_secrets` and `add_store`, and the
   decorators `@registry.adapter(name)` and so on, register in code on that
   registry only. A name already present raises unless `replace=True`.
 - `names(kind)` lists the names; `load(kind, name)` imports one and checks its
