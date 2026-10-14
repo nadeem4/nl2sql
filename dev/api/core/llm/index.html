@@ -4838,11 +4838,16 @@ config's <code>llm</code> section (<a href="../../../configuration/llm/">LLM con
 <p>Fields:
 | name | type | required | meaning |
 | --- | --- | --- | --- |
-| <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>anthropic</code>, <code>openrouter</code> or <code>ollama</code>. |
+| <code>provider</code> | <code>str</code> | yes | Provider name: <code>openai</code>, <code>anthropic</code>, <code>openai_compatible</code>, its presets <code>openrouter</code> and <code>ollama</code>, or one a plugin registers. |
 | <code>model</code> | <code>str</code> | yes | Model identifier. |
 | <code>temperature</code> | <code>Optional[float]</code> | no | Sampling temperature (default <code>0.0</code>). <code>None</code> (<code>null</code> in YAML) sends no temperature parameter, for models that accept only their default. |
 | <code>api_key</code> | <code>Optional[SecretStr]</code> | no | API key or secret reference. Masked in <code>repr</code>, <code>str</code> and JSON dumps. <code>None</code> reads the provider's standard variable. |
-| <code>base_url</code> | <code>Optional[str]</code> | no | Endpoint override; defaults to the provider preset (<code>https://openrouter.ai/api/v1</code> for <code>openrouter</code>, <code>http://localhost:11434/v1</code> for <code>ollama</code>). |
+| <code>base_url</code> | <code>Optional[str]</code> | no | Endpoint override; defaults to the provider preset (<code>https://openrouter.ai/api/v1</code> for <code>openrouter</code>, <code>http://localhost:11434/v1</code> for <code>ollama</code>). Required for <code>openai_compatible</code>. |
+| <code>structured_output</code> | <code>Optional[str]</code> | no | <code>tool_calling</code>, <code>json_schema</code> or <code>json_mode</code>. <code>None</code> uses the provider's default. |
+| <code>max_tokens</code> | <code>Optional[int]</code> | no | <code>None</code> uses the provider's default (16,000 for <code>anthropic</code>, unset for the others). |
+| <code>timeout_s</code> | <code>Optional[float]</code> | no | Per request. <code>None</code> uses the client library's. |
+| <code>max_retries</code> | <code>Optional[int]</code> | no | Network and rate-limit retries, done by the client. <code>None</code> uses the client library's. |
+| <code>headers</code> | <code>Dict[str, SecretStr]</code> | no | Sent with every request. A value may be a <code>${provider:key}</code> reference, resolved when the client is built. Values are masked in <code>repr</code>, <code>str</code> and JSON dumps, and <code>list()</code> shows only the header names. |
 | <code>name</code> | <code>str</code> | no | Agent name (default <code>default</code>). |</p>
 <h3 id="llmfileconfig">LLMFileConfig</h3>
 <p>A set of agents the benchmark compares, one config at a time:
@@ -4916,46 +4921,71 @@ no key.</p>
 (<code>llm/registry.py</code>) makes one per agent from the <code>llm</code> section. Its fields are
 <code>provider</code>, <code>model</code>, <code>temperature</code> (<code>None</code> sends no temperature parameter),
 <code>api_key</code> (masked in <code>repr</code>, <code>str</code> and JSON dumps; <code>None</code> reads the provider's
-standard variable), <code>base_url</code> and <code>name</code>. <code>LLMFileConfig</code> is a set of agents
+standard variable), <code>base_url</code>, <code>structured_output</code>, <code>max_tokens</code>, <code>timeout_s</code>,
+<code>max_retries</code>, <code>headers</code> (values masked like the key) and <code>name</code>. <code>LLMFileConfig</code> is a set of agents
 the benchmark compares, one config at a time (<code>LLMFileConfig.from_llm(llm)</code>).
 Neither is part of the public API.</p>
 <h2 id="behavioral-contracts">Behavioral Contracts</h2>
 <ul>
-<li>Providers supported in the core registry are <code>openai</code>, <code>anthropic</code>,
-  <code>openrouter</code> and <code>ollama</code>, held in <code>PROVIDER_PRESETS</code> in <code>llm/registry.py</code>;
-  anything else raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
-  ones.</li>
+<li>The built-in providers are <code>openai</code>, <code>anthropic</code> and <code>openai_compatible</code>,
+  and <code>openrouter</code> and <code>ollama</code>, which are named presets of <code>openai_compatible</code>
+  with no code path of their own. They are rows of <code>PROVIDER_PRESETS</code> in
+  <code>llm/registry.py</code>, which stays the one table of key variables, and
+  <code>LLM_PROVIDERS</code> in <code>llm/providers.py</code> makes one <code>LLMProvider</code> per row. Any
+  other provider is a plugin: a class implementing <code>LLMProvider</code>, interface
+  version 2, registered with <code>registry.add_llm</code> or the <code>nl2sql.llms</code> entry
+  point group. An unregistered name raises <code>ValueError: Unsupported LLM
+  provider</code>, naming the valid ones.</li>
+<li><code>LLMProvider</code> version 2 has <code>interface_version</code>, <code>label</code>, <code>api_key_env</code>,
+  <code>requires</code>, <code>install_hint</code>, <code>structured_output</code> (the method an agent that
+  sets none is asked with) and <code>create(agent: ResolvedAgent)</code>. <code>ResolvedAgent</code>
+  carries the agent's <code>name</code>, <code>model</code>, <code>temperature</code>, resolved <code>api_key</code>,
+  <code>base_url</code>, <code>structured_output</code> (the agent's, else the provider's),
+  <code>max_tokens</code>, <code>timeout_s</code>, <code>max_retries</code> and resolved <code>headers</code>; neither the
+  key nor a header value is in its <code>repr</code>. A provider of another version is
+  rejected when it is loaded.</li>
 <li>Each preset names a wire type (<code>ProviderPreset.wire</code>), and the client is
   built by that wire's adapter in <code>llm/wires/</code> (<code>WIRES[preset.wire].build_client</code>).
   The <code>Wire</code> protocol (<code>llm/wires/base.py</code>) is <code>build_client(model, temperature,
   **kwargs)</code>, <code>structured_output_method</code>, <code>mark_cache(payload)</code> and
   <code>read_usage(response)</code>. <code>wires.structured(llm, schema)</code> is how every node asks
-  for structured output; <code>wires.wire_of(llm)</code> picks the adapter from the client.
+  for structured output, with the agent's <code>structured_output</code> method, which the
+  registry records on the client it builds (<code>tool_calling</code> is LangChain's
+  <code>function_calling</code>); for <code>json_mode</code> it adds the schema to the prompt, since
+  JSON mode alone does not carry it. A model object given in the config uses
+  its wire's <code>structured_output_method</code>. <code>wires.wire_of(llm)</code> picks the adapter
+  from the client.
   See <a href="../../../configuration/llm/#providers-and-wire-types">LLM configuration → Providers and wire types</a>.</li>
-<li><code>openai</code>, <code>openrouter</code> and <code>ollama</code> are on the <code>openai</code> wire, served by
-  <code>ConfiguredChatOpenAI</code> (<code>llm/wires/openai.py</code>), and differ only by preset:
-  <code>openai</code> uses the client's own default endpoint, <code>openrouter</code> defaults to
-  <code>https://openrouter.ai/api/v1</code>, <code>ollama</code> to <code>http://localhost:11434/v1</code>. A
-  config-supplied <code>base_url</code> overrides the preset, which also lets the same path
-  serve any other OpenAI-compatible endpoint (vLLM, LiteLLM, a local proxy).</li>
+<li><code>openai</code>, <code>openai_compatible</code>, <code>openrouter</code> and <code>ollama</code> are on the
+  <code>openai</code> wire, served by <code>ConfiguredChatOpenAI</code> (<code>llm/wires/openai.py</code>).
+  <code>openai</code> uses the client's own default endpoint. <code>openai_compatible</code> has no
+  endpoint of its own: without a <code>base_url</code> its agent raises a <code>ValueError</code>
+  asking for one. <code>openrouter</code> defaults to <code>https://openrouter.ai/api/v1</code> and
+  <code>ollama</code> to <code>http://localhost:11434/v1</code>; a config-supplied <code>base_url</code>
+  overrides either.</li>
 <li><code>anthropic</code> is on the <code>anthropic</code> wire, served by <code>CachingChatAnthropic</code>
   (<code>llm/wires/anthropic_client.py</code>), a <code>langchain-anthropic</code> <code>ChatAnthropic</code>
   whose requests go through the adapter's <code>mark_cache</code> (a
   <code>cache_control: {"type": "ephemeral"}</code> breakpoint on the last system block),
-  with <code>max_tokens=16000</code>, and whose tool calls go through the adapter's
+  with <code>max_tokens=16000</code> unless the agent sets <code>max_tokens</code>, and whose tool calls go through the adapter's
   <code>repair_tool_calls</code> (arguments Claude nested under a single key the schema
   does not declare -- <code>input</code>, <code>query</code>, ... -- are unwrapped). It needs the <code>nl2sql-engine[anthropic]</code> extra;
   without it <code>get_llm()</code> raises a <code>ValueError</code> naming the extra. See
   <a href="../../../configuration/llm/#anthropic-claude">LLM configuration → Anthropic</a>.</li>
 <li><code>openai</code>, <code>anthropic</code> and <code>openrouter</code> require an API key (<code>OPENAI_API_KEY</code>,
-  <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code>); <code>ollama</code> does not, and its preset
-  supplies the placeholder key <code>ChatOpenAI</code> insists on.</li>
+  <code>ANTHROPIC_API_KEY</code>, <code>OPENROUTER_API_KEY</code>). <code>openai_compatible</code> and <code>ollama</code>
+  do not: without an <code>api_key</code> their preset supplies the placeholder key
+  <code>ChatOpenAI</code> insists on. <code>openai_compatible</code> never reads <code>OPENAI_API_KEY</code>.</li>
+<li><code>max_tokens</code>, <code>timeout_s</code>, <code>max_retries</code> and <code>headers</code> reach the client
+  when set (<code>ChatOpenAI</code>'s and <code>ChatAnthropic</code>'s <code>max_tokens</code>, <code>timeout</code>,
+  <code>max_retries</code> and <code>default_headers</code>); unset, the client's own default holds.</li>
 <li>The engine's LLM is one immutable <code>LLMSet</code> (each agent's settings and
   client), built when the engine is created and on every <code>replace</code>, without a
   model call. A run reads it once, when it starts (<code>LLMRegistry.begin_run</code>), so
   a run never mixes two sets.</li>
 <li>Clients come from the engine's <code>LLMClientCache</code>, an LRU of 16 keyed on the
-  agent's resolved settings with the API key only as a SHA-256 digest. Agents
+  agent's resolved settings with the API key and each header value only as a
+  SHA-256 digest. Agents
   with equal settings share one client, and swapping back reuses cached
   clients. A client that falls out of the cache is closed (its <code>close()</code>, when
   it has one) once no set in use holds it; <code>engine.close()</code> closes them all.</li>

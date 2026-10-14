@@ -1934,10 +1934,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#other-openai-compatible-endpoints" class="md-nav__link">
+  <a href="#any-other-openai-style-server-openai_compatible" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Other OpenAI-compatible endpoints
+        Any other OpenAI-style server (openai_compatible)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeouts-retries-and-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timeouts, retries and headers
       
     </span>
   </a>
@@ -4789,10 +4811,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#other-openai-compatible-endpoints" class="md-nav__link">
+  <a href="#any-other-openai-style-server-openai_compatible" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Other OpenAI-compatible endpoints
+        Any other OpenAI-style server (openai_compatible)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeouts-retries-and-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Timeouts, retries and headers
       
     </span>
   </a>
@@ -4902,7 +4946,7 @@ with the provider's default model and no key.</p>
 <tr>
 <td><code>provider</code></td>
 <td>required</td>
-<td><code>openai</code>, <code>anthropic</code>, <code>openrouter</code>, <code>ollama</code>, or a provider a plugin registers. A misspelt or uninstalled one is a <code>ConfigError</code> with "did you mean".</td>
+<td><code>openai</code>, <code>anthropic</code>, <code>openai_compatible</code>, its presets <code>openrouter</code> and <code>ollama</code>, or a provider a plugin registers; see <a href="#providers-and-wire-types">Providers</a>. A misspelt or uninstalled one is a <code>ConfigError</code> with "did you mean".</td>
 </tr>
 <tr>
 <td><code>model</code></td>
@@ -4922,7 +4966,32 @@ with the provider's default model and no key.</p>
 <tr>
 <td><code>base_url</code></td>
 <td>the provider's</td>
-<td>An endpoint override; see <a href="#other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</a>.</td>
+<td>An endpoint override. Required for <code>openai_compatible</code>; see <a href="#any-other-openai-style-server-openai_compatible">Any other OpenAI-style server</a>.</td>
+</tr>
+<tr>
+<td><code>structured_output</code></td>
+<td>the provider's</td>
+<td><code>tool_calling</code>, <code>json_schema</code> or <code>json_mode</code>: how structured answers are asked for. See <a href="#structured-output">Structured output</a>.</td>
+</tr>
+<tr>
+<td><code>max_tokens</code></td>
+<td>the provider's</td>
+<td>The most tokens one answer may use. Unset, Anthropic gets 16,000 and the other providers send none.</td>
+</tr>
+<tr>
+<td><code>timeout_s</code></td>
+<td>the client library's</td>
+<td>Seconds one request may take.</td>
+</tr>
+<tr>
+<td><code>max_retries</code></td>
+<td>the client library's</td>
+<td>Network and rate-limit retries, done by the client library.</td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td><code>{}</code></td>
+<td>HTTP headers sent with every request, such as a gateway's team or routing header. A value may be a <code>${env:VAR}</code> or <code>${provider:key}</code> reference, resolved when the client is built. Values never print: not in a <code>repr</code>, a log, <code>engine.llm.list()</code> or the cache key.</td>
 </tr>
 <tr>
 <td><code>agents</code></td>
@@ -4957,7 +5026,7 @@ lives in one adapter per wire type, in <code>nl2sql/llm/wires/</code>:</p>
 <td><code>openai</code></td>
 <td><code>wires/openai.py</code></td>
 <td><code>ChatOpenAI</code></td>
-<td><code>openai</code>, <code>openrouter</code>, <code>ollama</code>, and any OpenAI-compatible endpoint</td>
+<td><code>openai</code>, <code>openai_compatible</code>, <code>openrouter</code>, <code>ollama</code></td>
 </tr>
 <tr>
 <td><code>anthropic</code></td>
@@ -4981,12 +5050,12 @@ wire they are on:</p>
 <tr>
 <td><strong>Client</strong></td>
 <td><code>ConfiguredChatOpenAI</code>, <code>seed=42</code></td>
-<td><code>CachingChatAnthropic</code>, <code>max_tokens=16000</code></td>
+<td><code>CachingChatAnthropic</code>, <code>max_tokens=16000</code> unless the agent sets one</td>
 </tr>
 <tr>
 <td><strong>Structured output</strong></td>
-<td>tool call (<code>function_calling</code>)</td>
-<td>forced tool call (<code>function_calling</code>)</td>
+<td>the agent's <code>structured_output</code></td>
+<td>the agent's <code>structured_output</code></td>
 </tr>
 <tr>
 <td><strong>Prompt caching</strong></td>
@@ -5002,55 +5071,75 @@ wire they are on:</p>
 </table>
 <p>Both adapters also turn a model's HTTP 400 on <code>temperature</code> into the same
 "set <code>temperature: null</code>" error (see <a href="#temperature">Temperature</a>).</p>
-<p>The providers:</p>
+<p>The built-in providers are deliberately few: <code>openai</code>, <code>anthropic</code> and
+<code>openai_compatible</code>. <code>openrouter</code> and <code>ollama</code> are named presets of
+<code>openai_compatible</code>: a fixed endpoint and key variable, and no code of their
+own.</p>
 <table>
 <thead>
 <tr>
 <th>provider</th>
 <th>wire type</th>
-<th>default endpoint</th>
-<th>API key</th>
+<th>key variable</th>
+<th><code>base_url</code></th>
+<th>default <code>structured_output</code></th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>openai</code></td>
 <td><code>openai</code></td>
-<td>OpenAI's own API</td>
-<td>required (<code>OPENAI_API_KEY</code>)</td>
+<td><code>OPENAI_API_KEY</code></td>
+<td>optional</td>
+<td><code>tool_calling</code></td>
 </tr>
 <tr>
 <td><code>anthropic</code></td>
 <td><code>anthropic</code></td>
-<td>Anthropic's own API</td>
-<td>required (<code>ANTHROPIC_API_KEY</code>)</td>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>optional</td>
+<td><code>tool_calling</code></td>
+</tr>
+<tr>
+<td><code>openai_compatible</code></td>
+<td><code>openai</code></td>
+<td>none: write <code>api_key</code> (usually <code>${env:...}</code>) if the server needs one</td>
+<td><strong>required</strong></td>
+<td><code>json_schema</code></td>
 </tr>
 <tr>
 <td><code>openrouter</code></td>
-<td><code>openai</code></td>
-<td><code>https://openrouter.ai/api/v1</code></td>
-<td>required (<code>OPENROUTER_API_KEY</code>)</td>
+<td>preset of <code>openai_compatible</code></td>
+<td><code>OPENROUTER_API_KEY</code></td>
+<td>fixed: <code>https://openrouter.ai/api/v1</code></td>
+<td><code>tool_calling</code></td>
 </tr>
 <tr>
 <td><code>ollama</code></td>
-<td><code>openai</code></td>
-<td><code>http://localhost:11434/v1</code></td>
-<td>not required</td>
+<td>preset of <code>openai_compatible</code></td>
+<td>none</td>
+<td>fixed: <code>http://localhost:11434/v1</code> (a <code>base_url</code> may override it)</td>
+<td><code>tool_calling</code></td>
 </tr>
 </tbody>
 </table>
-<p>Any other value raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
+<p>There is no Azure provider: Azure OpenAI's v1 endpoint is <code>openai_compatible</code>
+(see <a href="#any-other-openai-style-server-openai_compatible">the <code>base_url</code> table</a>).
+Any other name raises <code>ValueError: Unsupported LLM provider</code>, naming the valid
 providers. Every agent picks its own provider, so one question can use several;
 see <a href="#per-node-models">Per-node models</a>.</p>
 <h3 id="adding-a-provider">Adding a provider</h3>
 <ul>
-<li><strong>A provider that speaks an existing wire type</strong> (a gateway, a hosted
-  OpenAI-compatible service) is one entry in <code>PROVIDER_PRESETS</code> in
-  <code>nl2sql/llm/registry.py</code>: its endpoint, key variable and <code>wire</code>. Nothing else
-  changes. For a one-off endpoint you don't even need that: set <code>base_url</code> on an
-  <code>openai</code> agent (see
-  <a href="#other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</a>).</li>
-<li><strong>A new wire type</strong> (Gemini, Bedrock) is one new adapter module in
+<li><strong>Another OpenAI-style server</strong> needs no new provider: use
+  <code>openai_compatible</code> with its <code>base_url</code> (see
+  <a href="#any-other-openai-style-server-openai_compatible">Any other OpenAI-style server</a>).</li>
+<li><strong>Anything else</strong> (Azure with Entra ID sign-in, Bedrock, Gemini) is a plugin:
+  a class implementing <code>LLMProvider</code> (<code>nl2sql/llm/providers.py</code>, interface
+  version 2: <code>interface_version = 2</code>, <code>label</code>, <code>api_key_env</code>, <code>requires</code>,
+  <code>install_hint</code>, <code>structured_output</code> and <code>create(agent)</code>), registered with
+  <code>registry.add_llm</code> or under the <code>nl2sql.llms</code> entry point group. A provider
+  built for another interface version is rejected when it is loaded.</li>
+<li><strong>A new wire type</strong> inside the engine (Gemini, Bedrock) is one new adapter module in
   <code>nl2sql/llm/wires/</code> implementing the <code>Wire</code> protocol in <code>wires/base.py</code>
   (<code>build_client</code>, <code>structured_output_method</code>, <code>mark_cache</code>, <code>read_usage</code>), one
   entry in <code>WIRES</code> in <code>wires/__init__.py</code>, and presets that name it. Add a case
@@ -5062,11 +5151,9 @@ see <a href="#per-node-models">Per-node models</a>.</p>
 owner's account (probed 2026-09-20) it accepted <code>temperature: 0</code> with a limit of
 500,000 tokens per minute, against 30,000 for the previous default <code>gpt-4o</code> -
 less than one question with a single retry needs (about 33,500 tokens).</p>
-<p>Every node asks for structured output as a tool call. The planner used to use
-<code>langchain-openai</code>'s default, a <code>json_schema</code> response format; it now uses a
-tool call like the other nodes, because that is what the openai wire's
-adapter uses for every node, and what OpenRouter's and Ollama's models support
-most widely.</p>
+<p>Every node asks for structured output as a tool call, OpenAI's default
+<code>structured_output</code>: it is what OpenRouter's and Ollama's models support most
+widely too. See <a href="#structured-output">Structured output</a>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5.4</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
@@ -5118,7 +5205,7 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
 <p>How the engine uses it:</p>
 <ul>
 <li><strong>Structured output</strong> is a forced tool call (<code>with_structured_output</code>'s
-  <code>function_calling</code> method), for every node. Anthropic's native JSON outputs
+  <code>function_calling</code> method, <code>structured_output: tool_calling</code>), for every node. Anthropic's native JSON outputs
   (<code>output_config.format</code>) do not accept recursive schemas, and the planner's
   <code>PlanModel</code> is recursive; neither does strict tool use (<code>strict: true</code>).
   Claude now and then nests a tool call's arguments one level down under a key
@@ -5155,9 +5242,9 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   cached. The decomposer's prefix is the same for every question; the
   planner's and refiner's include the retrieved tables, so they hit when a
   sub-query retrieves the same tables again (a retry, or a similar question).</li>
-<li><strong><code>max_tokens</code></strong> is 16,000 per call: every node call is non-streaming, and
-  the SDK refuses a non-streaming call whose <code>max_tokens</code> could outlast its
-  timeout.</li>
+<li><strong><code>max_tokens</code></strong> is 16,000 per call unless the agent sets <code>max_tokens</code>:
+  every node call but the streamed answer is non-streaming, and the SDK
+  refuses a non-streaming call whose <code>max_tokens</code> could outlast its timeout.</li>
 <li><strong>Usage.</strong> Cache reads and writes are reported as <code>cached_input_tokens</code> and
   <code>cache_write_input_tokens</code>, with each input token counted once (see
   <a href="../../api/core/query/">Query API → usage</a>). With a price in <code>llm.prices</code>, a cache
@@ -5172,7 +5259,7 @@ each answer under the same name and question an OpenAI one would get, so replay
 recordings are made this way; see
 <a href="../../deployment/hosted-demo/#recorded-answers-without-a-key">Hosted demo</a>.</p>
 <h3 id="openrouter">OpenRouter</h3>
-<p><a href="https://openrouter.ai">OpenRouter</a> is an OpenAI-compatible gateway: a single
+<p>A preset of <code>openai_compatible</code>. <a href="https://openrouter.ai">OpenRouter</a> is an OpenAI-compatible gateway: a single
 API key reaches Anthropic, Google, Meta and hundreds of other models. Models are
 named <code>&lt;vendor&gt;/&lt;model&gt;</code>, for example <code>anthropic/claude-sonnet-4.5</code> or
 <code>google/gemini-2.5-pro</code>.</p>
@@ -5181,8 +5268,9 @@ named <code>&lt;vendor&gt;/&lt;model&gt;</code>, for example <code>anthropic/cla
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 </code></pre></div>
 <h3 id="ollama">Ollama</h3>
-<p><a href="https://ollama.com">Ollama</a> exposes an OpenAI-compatible API on
-<code>http://localhost:11434/v1</code>, so it needs no <code>api_key</code> and no <code>base_url</code>: start
+<p>A preset of <code>openai_compatible</code>. <a href="https://ollama.com">Ollama</a> exposes an
+OpenAI-compatible API on <code>http://localhost:11434/v1</code>, so it needs no <code>api_key</code>
+and no <code>base_url</code>: start
 the daemon, pull a model, and point <code>llm.yaml</code> at it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ollama</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">llama3.1</span>
@@ -5295,8 +5383,9 @@ an agent. An agent not under <code>agents</code> runs on the top level:</p>
 </tbody>
 </table>
 <p>Any other key is an error with "did you mean". An agent takes every field it
-sets (<code>provider</code>, <code>model</code>, <code>temperature</code>, <code>api_key</code>, <code>base_url</code>) and inherits
-the rest from the top level. Inheritance follows which fields were written, so
+sets (<code>provider</code>, <code>model</code>, <code>temperature</code>, <code>api_key</code>, <code>base_url</code>,
+<code>structured_output</code>, <code>max_tokens</code>, <code>timeout_s</code>, <code>max_retries</code>, <code>headers</code>) and
+inherits the rest from the top level. Inheritance follows which fields were written, so
 <code>temperature: null</code> on an agent still means "send none". Each node can be on a
 different provider, and so a different wire type. For example, plan on Claude
 and run everything else on OpenAI, with one cheaper node that only accepts its
@@ -5361,24 +5450,125 @@ Anthropic replaces a model the new provider does not serve (a <code>gpt-</code> 
 Anthropic, a <code>claude-</code> one on OpenAI) with that provider's default and its
 temperature. Every provider key saved in the demo's <code>.env</code> is loaded at
 start-up, so each step finds its own.</p>
-<h2 id="other-openai-compatible-endpoints">Other OpenAI-compatible endpoints</h2>
-<p>A config-supplied <code>base_url</code> always overrides the provider preset. That is what
-lets the same code path serve any other OpenAI-compatible endpoint — vLLM,
-LiteLLM, a local proxy — without a new provider:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">meta-llama/Llama-3.1-70B-Instruct</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:LOCAL_LLM_KEY}"</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://localhost:8000/v1</span>
+<h2 id="any-other-openai-style-server-openai_compatible">Any other OpenAI-style server (<code>openai_compatible</code>)</h2>
+<p><code>openai_compatible</code> is any server with an OpenAI-style chat API. Its
+<code>base_url</code> is required, and it reads no key variable: write <code>api_key</code> (usually
+<code>${env:...}</code>) if the server needs one. Without one it sends a placeholder,
+because the OpenAI client refuses to start without a key; it never sends
+<code>OPENAI_API_KEY</code>, which belongs to OpenAI.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># llm.yaml</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://vllm:8000/v1</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">qwen3-32b</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:VLLM_KEY}"</span><span class="w">          </span><span class="c1"># optional for this provider</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="nt">structured_output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json_schema</span><span class="w">      </span><span class="c1"># the default for openai_compatible</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="nt">max_tokens</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="nt">timeout_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="nt">max_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> X-Team</span><span class="p">:</span><span class="w"> </span><span class="nv">analytics</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="nt">agents</span><span class="p">:</span>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span><span class="nt">answer_synthesizer</span><span class="p">:</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">    </span><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span><span class="w">     </span><span class="c1"># Azure OpenAI's v1 endpoint</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://my-resource.openai.azure.com/openai/v1/</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">    </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:AZURE_OPENAI_API_KEY}"</span>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">    </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gpt-5-4-prod</span><span class="w">             </span><span class="c1"># the Azure deployment name</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">    </span><span class="nt">structured_output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tool_calling</span>
 </code></pre></div>
-<p>Pick the provider whose credential behaviour matches the endpoint: <code>openai</code> or
-<code>openrouter</code> if the endpoint expects a key, <code>ollama</code> if it accepts any key.</p>
+<table>
+<thead>
+<tr>
+<th>Server</th>
+<th><code>provider</code></th>
+<th><code>base_url</code></th>
+<th><code>model</code></th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Azure OpenAI (v1 endpoint)</td>
+<td><code>openai_compatible</code></td>
+<td><code>https://&lt;resource&gt;.openai.azure.com/openai/v1/</code></td>
+<td>the deployment name</td>
+<td><code>api_key: "${env:AZURE_OPENAI_API_KEY}"</code>; set <code>structured_output: tool_calling</code></td>
+</tr>
+<tr>
+<td>vLLM</td>
+<td><code>openai_compatible</code></td>
+<td><code>http://&lt;host&gt;:8000/v1</code></td>
+<td>the served model, e.g. <code>qwen3-32b</code></td>
+<td><code>json_schema</code> works with its guided decoding</td>
+</tr>
+<tr>
+<td>Ollama</td>
+<td><code>ollama</code></td>
+<td>preset: <code>http://localhost:11434/v1</code>; set it for another host</td>
+<td>a pulled model, e.g. <code>llama3.1</code></td>
+<td>no key</td>
+</tr>
+<tr>
+<td>LiteLLM proxy</td>
+<td><code>openai_compatible</code></td>
+<td><code>http://&lt;host&gt;:4000/v1</code></td>
+<td>a model name the proxy routes</td>
+<td><code>api_key</code> is the proxy's key, if it has one</td>
+</tr>
+<tr>
+<td>OpenRouter</td>
+<td><code>openrouter</code></td>
+<td>preset: <code>https://openrouter.ai/api/v1</code></td>
+<td><code>&lt;vendor&gt;/&lt;model&gt;</code></td>
+<td><code>OPENROUTER_API_KEY</code></td>
+</tr>
+</tbody>
+</table>
+<p>LM Studio, llama.cpp's server and a company gateway are <code>openai_compatible</code>
+too.</p>
+<h2 id="structured-output">Structured output</h2>
+<p>Every node asks for a typed answer (the plan, the decomposition, the answer).
+<code>structured_output</code> says how:</p>
+<table>
+<thead>
+<tr>
+<th><code>structured_output</code></th>
+<th>What is sent</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tool_calling</code></td>
+<td>a forced tool call whose arguments are the answer</td>
+<td>OpenAI, Anthropic, Azure, OpenRouter, Ollama</td>
+</tr>
+<tr>
+<td><code>json_schema</code></td>
+<td>a response format carrying the JSON schema, which the server decodes against</td>
+<td>local servers with schema-guided decoding (vLLM, LM Studio)</td>
+</tr>
+<tr>
+<td><code>json_mode</code></td>
+<td>JSON mode, with the schema added to the prompt, since JSON mode alone does not carry it</td>
+<td>a server with neither of the above</td>
+</tr>
+</tbody>
+</table>
+<p>Unset, an agent uses its provider's default (the table under
+<a href="#providers-and-wire-types">Providers</a>). The method is never switched
+automatically: the agent's setting is what runs.</p>
+<h2 id="timeouts-retries-and-headers">Timeouts, retries and headers</h2>
+<p><code>timeout_s</code>, <code>max_retries</code> and <code>headers</code> go to the client library
+(<code>ChatOpenAI</code> or <code>ChatAnthropic</code>) as its <code>timeout</code>, <code>max_retries</code> and
+<code>default_headers</code>; <code>max_tokens</code> as its <code>max_tokens</code>. Left unset, the client
+library's own default holds (for Anthropic's <code>max_tokens</code>, 16,000). These
+retries are the client library's, for network errors and rate limits.</p>
 <h2 id="clients-are-built-when-the-llm-is-set">Clients are built when the LLM is set</h2>
 <p>The engine builds every agent's client when it is created, and again when the
 LLM is replaced, without calling a model. Each engine keeps its clients in its
-own cache (an LRU of 16), keyed on the agent's resolved settings: provider,
-model, <code>base_url</code>, temperature and the API key. The key enters the cache key
-only as a SHA-256 digest, so a cache key can be logged and never holds a
-secret. Agents with equal settings share one client: seven agents on one model
+own cache (an LRU of 16), keyed on the agent's resolved settings: every
+field of the agent, and the API key. The key and each header value enter the
+cache key only as a SHA-256 digest, so a cache key can be logged and never
+holds a secret. Agents with equal settings share one client: seven agents on one model
 build one client.</p>
 <p>A missing key does not stop the engine from starting:</p>
 <ul>
@@ -5441,7 +5631,7 @@ runs:</p>
 </ul>
 <p><code>replace</code> also takes the section as written in <code>nl2sql.yaml</code>, as a mapping,
 checked by the same rules as the file. A <code>${...}</code> reference is kept in a secret
-field (<code>api_key</code>) and is an error anywhere else, so data that did not come
+field (<code>api_key</code>, a <code>headers</code> value) and is an error anywhere else, so data that did not come
 from your files never reads the environment. <code>nl2sql-api</code> serves it as the
 admin-only <a href="../../api/rest/llm/"><code>PUT /api/v1/settings/llm</code></a>: the body is the
 section as JSON, and a bad one is HTTP 422 with the <code>ConfigError</code> text. The
@@ -5475,10 +5665,10 @@ reports tokens only and <code>cost</code> is <code>null</code>. No prices are bu
   its key unset, and indexing still works - the schema is indexed without
   LLM-written descriptions. It never replaces a comment read from the database.</li>
 <li><code>nl2sql init --provider</code> takes <code>openai</code>, <code>anthropic</code> or <code>openrouter</code>, the
-  providers with a default model, and writes no key. <code>nl2sql demo --api-key</code>
+  providers with a default model, and writes no key. For <code>openai_compatible</code>
+  or <code>ollama</code>, edit <code>llm.yaml</code> as shown above. <code>nl2sql demo --api-key</code>
   picks the provider from the key's shape (<code>sk-ant-</code> is Anthropic, <code>sk-or-</code> is
-  OpenRouter, anything else is OpenAI). To use Ollama, edit <code>llm.yaml</code> as shown
-  above.</li>
+  OpenRouter, anything else is OpenAI).</li>
 </ul>
 
 
