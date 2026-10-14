@@ -30,6 +30,24 @@ class DatasourceInfo:
 
 
 @dataclass(frozen=True)
+class DatasourceType:
+    """One adapter the engine's registry can name, as ``engine.datasources.types()`` reports it.
+
+    ``installed`` is whether every one of its driver modules is found; when
+    one is not, ``install_hint`` says what to install. ``connection_schema``
+    is the JSON Schema of its connection model: the Connect a database form.
+    A secret field is ``"format": "password", "writeOnly": true``, and a field
+    in the ``advanced`` group carries ``"group": "advanced"``.
+    """
+
+    name: str
+    title: str
+    installed: bool
+    install_hint: str
+    connection_schema: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class IndexProgress:
     """One datasource's step in ``engine.index.build``, handed to its ``on_datasource`` callback.
 

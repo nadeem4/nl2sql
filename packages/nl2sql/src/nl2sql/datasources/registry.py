@@ -54,6 +54,26 @@ def connection_errors(error: ValidationError, model: Type[BaseModel]) -> str:
     return " ".join(lines)
 
 
+def with_index_scope(datasource: "Datasource") -> "Datasource":
+    """``datasource`` with its ``index`` validated as an ``IndexScope``.
+
+    A ``Datasource`` validates ``index`` when it is built, but
+    ``model_copy(update=...)`` does not, so a datasource added at runtime is
+    checked again here.
+
+    Raises:
+        ValueError: one line per problem, naming the ``index`` field.
+    """
+    index = datasource.index
+    try:
+        scope = IndexScope.model_validate(index.model_dump() if isinstance(index, BaseModel) else index)
+    except ValidationError as error:
+        raise ValueError(" ".join(
+            f"{'.'.join(str(part) for part in ('index', *problem['loc']))}: {problem['msg']}"
+            for problem in error.errors(include_input=False, include_url=False))) from None
+    return datasource.model_copy(update={"index": scope})
+
+
 class DatasourceRegistry:
     """The adapters one engine built, one per datasource, and which of them are available.
 
@@ -123,6 +143,15 @@ class DatasourceRegistry:
         except ValidationError as error:
             raise ValueError(connection_errors(error, model)) from None
 
+    def build(self, adapter_cls: Any, datasource: "Datasource") -> DatasourceAdapter:
+        """``adapter_cls`` built for ``datasource``, without connecting and without registering it.
+
+        Raises:
+            ValueError: the connection does not validate (``connection_for``).
+        """
+        connection = self.connection_for(adapter_cls, datasource)
+        return adapter_cls(datasource.id, connection, datasource.limits, folder=self._base_dir)
+
     def register_datasources(self, datasources: List["Datasource"]) -> None:
         """Registers every datasource that can be built; records the rest as unavailable.
 
@@ -153,9 +182,7 @@ class DatasourceRegistry:
         """
         adapter = datasource.adapter
         if adapter is None:
-            adapter_cls = self._registry.load("adapter", datasource.type)
-            connection = self.connection_for(adapter_cls, datasource)
-            adapter = adapter_cls(datasource.id, connection, datasource.limits, folder=self._base_dir)
+            adapter = self.build(self._registry.load("adapter", datasource.type), datasource)
         capabilities = self._read_capabilities(datasource.id, adapter)
         with self._lock:
             self._adapters[datasource.id] = adapter

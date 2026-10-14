@@ -12,7 +12,7 @@ PUBLIC_SURFACE = {
     # Saved results
     "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return
-    "DatasourceInfo", "IndexProgress", "LLMChange",
+    "DatasourceInfo", "DatasourceType", "IndexProgress", "LLMChange",
     # Errors
     "ErrorSeverity", "ErrorCode", "PipelineError",
     # The config, and building an engine from it

@@ -1283,6 +1283,17 @@ job, PostgreSQL, MySQL and SQL Server in the `realdb` job.
 
 ### `engine.datasources`: the methods behind Connect a database
 
+!!! note "Built: B5"
+    `types()` returns `DatasourceType`s (exported from `nl2sql`), `test()`
+    takes an id or a `Datasource`, and `add()` validates `index` as an
+    `IndexScope` again, since `model_copy(update=...)` skips validation. Filled
+    in on the way: `Registry.load(..., require_installed=False)` and
+    `missing_modules` describe an adapter without its driver; a `Datasource`
+    that cannot be built fails `test()` at `config` (unknown type, or a
+    connection the model rejects) or `driver` (the install hint is the fix),
+    and an adapter that names no stage still reports `connect` until B3
+    classifies. The REST routes and the form are Phase 4.
+
 | Method | What it does |
 |---|---|
 | `types() -> list[DatasourceType]` | Every adapter the engine's registry can name: `name`, `title`, `installed` (its driver modules are found), `install_hint`, and `connection_schema` (the model's JSON Schema). Adapter modules import without their driver, so the schema is there even before the driver is installed. |

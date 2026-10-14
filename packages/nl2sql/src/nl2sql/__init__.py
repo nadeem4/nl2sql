@@ -15,7 +15,7 @@ from .public_api import NL2SQL
 # import engine submodules.
 _EXPORTS = {
     "nl2sql.api.query_api": ("QueryResult", "AnswerSource", "SubQueryResult", "RowSample"),
-    "nl2sql.api.types": ("DatasourceInfo", "IndexProgress"),
+    "nl2sql.api.types": ("DatasourceInfo", "DatasourceType", "IndexProgress"),
     "nl2sql.llm.llm_set": ("LLMChange",),
     "nl2sql.execution.artifacts.results": ("MAX_RESULT_PAGE_SIZE", "ResultManifest", "ResultNotFound",
                                            "ResultPage", "ResultSummary"),
@@ -91,6 +91,7 @@ __all__ = [
     "DatasourceStatus",
     "EngineNotReady",
     "DatasourceInfo",
+    "DatasourceType",
     "IndexProgress",
     "LLMChange",
 ]

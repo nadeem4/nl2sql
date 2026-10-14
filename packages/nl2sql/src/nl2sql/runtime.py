@@ -306,8 +306,12 @@ class Runtime:
         """Builds and registers ``datasource`` (not connected), and adds it to ``config``.
 
         Raises:
-            ValueError: its id is taken, or its adapter cannot be built.
+            ValueError: its id is taken, its ``index`` is not a valid
+                ``IndexScope``, or its adapter cannot be built.
         """
+        from nl2sql.datasources.registry import with_index_scope
+
+        datasource = with_index_scope(datasource)
         with self._lock:
             config = self._config.with_datasource(datasource)
             self.ds_registry.register_datasource(datasource)
@@ -417,6 +421,42 @@ class Runtime:
             fix=check.fix or f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
                              "is reachable from this machine. The log has the driver's error.")
 
+    def try_datasource(self, datasource: "Datasource") -> DatasourceStatus:
+        """Builds ``datasource``'s adapter, tests its connection and closes it. Registers nothing.
+
+        A failure is reported, never raised, with the stage it failed at:
+        ``config`` (an unknown ``type``, or a connection the adapter's model
+        rejects), ``driver`` (a driver module is missing; the fix is the
+        adapter's install hint), or the stage the adapter's
+        ``test_connection`` names. An ``adapter`` object is tested as given
+        and not closed: the caller owns it.
+        """
+        from nl2sql.datasources.registry import close_adapter
+        from nl2sql.registry import missing_modules
+
+        def failed(stage: str, reason: str, fix: Optional[str]) -> DatasourceStatus:
+            return DatasourceStatus(id=datasource.id, status="failed", required=datasource.required, stage=stage,
+                                    reason=reason, fix=fix)
+
+        if datasource.adapter is not None:
+            return _connection_status(datasource, _test_connection(datasource.adapter))
+        try:
+            adapter_cls = self.registry.load("adapter", datasource.type, require_installed=False)
+        except RegistryError as e:
+            return failed("config", str(e), "Set type to one of the names engine.datasources.types() lists.")
+        missing = missing_modules("adapter", adapter_cls)
+        if missing:
+            return failed("driver", f"The adapter '{datasource.type}' needs {', '.join(missing)}, which is not "
+                                    "installed.", getattr(adapter_cls, "install_hint", None) or None)
+        try:
+            adapter = self.ds_registry.build(adapter_cls, datasource)
+        except Exception as e:
+            return failed("config", str(e) or type(e).__name__, "Correct the connection fields named above.")
+        try:
+            return _connection_status(datasource, _test_connection(adapter))
+        finally:
+            close_adapter(adapter)
+
     def close(self) -> None:
         """Disposes the adapters' pools, closes the LLM clients and the stores. Calling it again does nothing."""
         with self._lock:
@@ -433,6 +473,25 @@ class Runtime:
                     close()
                 except Exception as e:
                     logger.warning(f"Closing {type(store).__name__} failed: {e}")
+
+
+def _test_connection(adapter: Any) -> ConnectionCheck:
+    """``adapter.test_connection()``; an exception is a failed check with its message."""
+    try:
+        return adapter.test_connection()
+    except Exception as e:
+        return ConnectionCheck(ok=False, message=str(e) or type(e).__name__)
+
+
+def _connection_status(datasource: "Datasource", check: ConnectionCheck) -> DatasourceStatus:
+    """``check`` as the status of a datasource that is not added: its stage, message and fix."""
+    if check.ok:
+        return DatasourceStatus(id=datasource.id, status="ready", required=datasource.required)
+    return DatasourceStatus(
+        id=datasource.id, status="failed", required=datasource.required, stage=check.stage or "connect",
+        reason=check.message or "The connection test failed.",
+        fix=check.fix or f"Check the connection for '{datasource.id}', and that the database is reachable from "
+                         "this machine.")
 
 
 def _llm_providers(llm: "LLM"):
