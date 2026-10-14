@@ -7,7 +7,8 @@ report its health, clear it, and inspect one search of it.
 ## Responsibilities
 - Build the index for some or every datasource, beside the live entries.
 - Report each datasource's progress as it goes, for a console or a job.
-- Report the index's health, clear it, and run one inspected search.
+- Report the index's health, clear it, and run one inspected search (and say
+  what that search uses by default).
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/indexing_api.py` (`IndexAPI`, internal)
@@ -102,6 +103,18 @@ One MMR search of the live index, as the engine runs it: the candidate pool
 with scores, the picks in order and what was dropped. `types` limits the
 entry types (`schema.table`, ...). It reads index metadata only and needs no
 LLM. Raises `LookupError` when no vector store is configured.
+
+### index.inspect_defaults
+
+Signature:
+`inspect_defaults() -> dict`
+
+What `inspect` searches with when not told otherwise, which is what the
+pipeline's own retrieval uses: `k` (8 picks), `lambda_mult` (1 is relevance
+only, 0 is difference only), `fetch_multiplier` (the candidate pool is `k`
+times it) and `types`, every entry type the index holds
+(`schema.datasource`, `schema.table`, `schema.column`, `schema.relationship`,
+`schema.metric`). The playground's Retrieval inspector starts from it.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.

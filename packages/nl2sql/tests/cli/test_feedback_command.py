@@ -124,9 +124,12 @@ def test_clear_removes_the_ratings(tmp_path, project_stores):
     store.close()
 
 
-def test_commands_without_a_store_file_create_nothing(project_stores):
-    path = project_stores.state
+def test_commands_on_a_project_with_no_feedback_report_nothing(project_stores):
+    listed = runner.invoke(app, ["feedback", "list"])
+    cleared = runner.invoke(app, ["feedback", "clear", "--yes"])
+    stats = runner.invoke(app, ["feedback", "stats"])
 
-    for args in (["feedback", "list"], ["feedback", "clear", "--yes"], ["feedback", "stats"]):
-        assert runner.invoke(app, args).exit_code == 0
-    assert not path.exists()
+    assert (listed.exit_code, cleared.exit_code, stats.exit_code) == (0, 0, 0)
+    assert "No feedback recorded" in _out(listed)
+    assert "Cleared 0" in _out(cleared)
+    assert "0 runs" in _out(stats)

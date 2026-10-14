@@ -56,6 +56,7 @@ from typing import List, Optional, Tuple
 from nl2sql.llm.providers import (
     ANTHROPIC_UPSTREAM,
     KEYED_PROVIDERS,
+    OLLAMA_BASE_URL,
     PROVIDER_KEYS,
     UPSTREAMS,
     env_var_for_key,
@@ -72,8 +73,7 @@ from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_
 from nl2sql.cli.demo.defaults import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION
 from nl2sql.cli.demo.stamp import outdated_warning, write_stamp
 from rich.markup import escape
-from nl2sql.llm.registry import PROVIDER_PRESETS
-from nl2sql.config import load_env_file
+from nl2sql import load_env_file
 from nl2sql.llm.replay import RecordingProxy, ReplayStore
 from nl2sql.testing.fake_llm import FakeLLMServer
 
@@ -103,7 +103,7 @@ REPLAY_KEY = "replay"
 PROXY_KEY = "proxy"
 
 # Ollama's own API sits next to the OpenAI-compatible /v1 its preset names.
-OLLAMA_TAGS_URL = PROVIDER_PRESETS["ollama"].base_url.rsplit("/v1", 1)[0] + "/api/tags"
+OLLAMA_TAGS_URL = OLLAMA_BASE_URL.rsplit("/v1", 1)[0] + "/api/tags"
 
 
 def _ollama_reachable() -> bool:
@@ -336,7 +336,7 @@ def _record_all(engine, questions: List[str], proxy, store: ReplayStore, store_p
     Their recordings are dropped before the file is written, so replay never
     serves a half-run and the question counts as not recorded.
     """
-    from nl2sql.auth.models import UserContext
+    from nl2sql import UserContext
 
     failed: List[str] = []
     for question in questions:

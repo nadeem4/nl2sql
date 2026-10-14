@@ -74,6 +74,22 @@ Signature:
 One agent's entry from `list()`. Raises `ValueError` for a name that is not an
 agent, listing the agents.
 
+### llm.providers
+
+Signature:
+`providers() -> list[dict]`
+
+Each LLM provider this engine can use: the built-ins whose client library is
+installed, and any a plugin or `Registry.add_llm` registered. Each has `name`,
+`label`, `key_variable` (the environment variable it reads its key from;
+`None` for one that needs no key, such as `ollama`) and `key_present` (whether
+that variable is set). Never the key.
+
+```python
+engine.llm.providers()[0]
+# {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False}
+```
+
 ### llm.replace
 
 Source:

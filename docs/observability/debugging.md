@@ -304,9 +304,10 @@ dropped entries greyed, the picks in order as a row of chips, and a second row
 naming the entries MMR passed over because they repeat an earlier pick. The **Retrieval** inspector at the top of the page
 runs the same search for any text (see the
 [demo guide](../getting_started/demo.md#the-retrieval-inspector)). The page
-fetches the file from `GET /api/trace/{trace_id}`, which serves only files
-directly inside the traces folder and rejects any id that is not a plain token, so
-`../` or an absolute path never reaches the filesystem.
+fetches the trace from `GET /api/trace/{trace_id}`, which reads it with
+`engine.traces.get`: only files directly inside the engine's traces folder, and
+any id that is not a plain token is rejected, so `../` or an absolute path never
+reaches the filesystem.
 
 Below the run, **Was this answer right?** records a rating keyed by the same
 trace id; `nl2sql feedback stats` reads the ratings together with the traces in

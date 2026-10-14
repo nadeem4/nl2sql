@@ -17,6 +17,7 @@ from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.common.settings import settings
 from nl2sql.feedback import FeedbackStore
+from nl2sql.runtime import StorePaths
 
 TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
 
@@ -24,8 +25,9 @@ TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
 class _Engine(NL2SQL):
     """The real facade over an empty context; only ``run_query`` is scripted."""
 
-    def __init__(self):
-        self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None})()
+    def __init__(self, data):
+        self._runtime = type("Ctx", (), {"schema_store": None, "vector_store": None, "ds_registry": None,
+                                         "stores": StorePaths.under(data), "traces_dir": data / "traces"})()
 
     @property
     def datasources(self):
@@ -42,13 +44,12 @@ class _Engine(NL2SQL):
 
 
 @pytest.fixture(autouse=True)
-def _store_in_tmp(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "schema_store_path", str(tmp_path / "data" / "schema_store.db"))
+def _feedback_on(monkeypatch):
     monkeypatch.setattr(settings, "feedback_enabled", True)
 
 
 def _client(tmp_path, host="127.0.0.1", allow_settings=False, project=True):
-    app = build_app(_Engine(), questions=[], roles=["admin", "viewer"], mode="replay", dataset="chinook",
+    app = build_app(_Engine(tmp_path / "data"), questions=[], roles=["admin", "viewer"], mode="replay", dataset="chinook",
                     project_dir=tmp_path if project else None, host=host, allow_settings=allow_settings)
     return TestClient(app, base_url="http://127.0.0.1:8765")
 
@@ -65,7 +66,7 @@ def test_a_rating_is_stored_with_what_the_server_answered(tmp_path):
 
     assert response.status_code == 200, response.text
     assert response.json()["saved"]["rating"] == "down"
-    store = FeedbackStore(tmp_path / "data" / "schema_store.db")
+    store = FeedbackStore(tmp_path / "data" / "state.db")
     [row] = store.list()
     store.close()
     assert row["trace_id"] == TRACE_ID and row["question"] == "How many customers?"
@@ -110,7 +111,7 @@ def test_feedback_is_refused_on_a_remote_bind_without_the_flag(tmp_path, host):
     assert read["available"] is False and "entries" not in read
     assert "--allow-settings" in read["reason"]
     assert response.status_code == 403
-    assert not (tmp_path / "data" / "schema_store.db").exists()
+    assert not (tmp_path / "data" / "state.db").exists()
 
 
 def test_feedback_is_allowed_on_a_remote_bind_with_the_flag(tmp_path):

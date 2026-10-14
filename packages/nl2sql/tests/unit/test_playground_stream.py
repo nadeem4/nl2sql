@@ -126,7 +126,7 @@ def project(tmp_path):
 
 def _hosted(engine, project, limits=None, recorded=()):
     replay = Replay(base_url="http://127.0.0.1:9/v1", questions=list(recorded)) if recorded else None
-    return _app(engine, mode="hosted", trace_dir=project / "traces", project_dir=project, host="0.0.0.0",
+    return _app(engine, mode="hosted", project_dir=project, host="0.0.0.0",
                 hosted=Hosted(enabled=True, limits=limits, replay=replay), base_url="http://demo.example:7860")
 
 

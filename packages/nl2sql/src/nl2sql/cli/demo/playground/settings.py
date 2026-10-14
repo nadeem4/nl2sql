@@ -30,6 +30,7 @@ until the registry is reloaded.
 from __future__ import annotations
 
 import ipaddress
+import logging
 import os
 import threading
 from contextlib import contextmanager
@@ -59,10 +60,8 @@ from nl2sql.cli.demo.llm_config import (
     write_llm,
 )
 from nl2sql import load_config
-from nl2sql.common.logger import get_logger
-from nl2sql.llm.registry import PROVIDER_PRESETS
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # What each LLM node does, for the page. The nodes and their agent names are
 # ``LLM_AGENTS``; anything not listed there uses ``default``.
@@ -244,7 +243,7 @@ class SettingsPanel:
                 "default_model": self.default_model,
                 "providers": [
                     {"id": name, "label": PROVIDER_LABELS.get(name, name), "usable": True,
-                     "env_var": (PROVIDER_PRESETS[name].api_key_env if name in PROVIDER_PRESETS else None),
+                     "env_var": self._key_variable(name),
                      "models": [{"id": model, "temperature": temp} for model, temp in models.items()]}
                     for name, models in VERIFIED_MODELS.items()
                 ],
@@ -283,10 +282,16 @@ class SettingsPanel:
             "files": {"llm": LLM_FILE.as_posix(), "env": ENV_FILE.as_posix()},
         }
 
+    def _key_variable(self, provider: str) -> Optional[str]:
+        """The variable ``provider`` reads its key from, as ``engine.llm.providers()`` names it."""
+        for described in self.engine.llm.providers():
+            if described["name"] == provider:
+                return described["key_variable"]
+        return None
+
     def _key(self, provider: str) -> Dict[str, Optional[str]]:
         """A provider's key as the panel may show it: masked, and the variable it is in."""
-        preset = PROVIDER_PRESETS.get(provider)
-        env_var = preset.api_key_env if preset else None
+        env_var = self._key_variable(provider)
         active = os.environ.get(env_var) if (env_var and self.mode == "live") else None
         return {"masked": mask_key(active) if active else None, "env_var": env_var}
 

@@ -24,7 +24,8 @@ Twenty-one routes:
                                starts and ends, the result manifest, the answer as it is
                                written, then ``final`` (what ``/api/ask`` returns) or
                                ``error``; the same refusals, before the stream starts
-``GET  /api/trace/{trace_id}`` one run trace, read only from the traces directory
+``GET  /api/trace/{trace_id}`` one run trace (``engine.traces.get``), read only from the
+                               engine's traces folder
 ``GET  /api/query/{request_id}/results/{result_id}``
                                one page of a run's saved result (``offset``, ``limit``
                                capped at 1,000), as ``nl2sql-api`` serves it
@@ -32,9 +33,9 @@ Twenty-one routes:
                                the whole saved result as CSV, streamed; both read the
                                engine's own tenant folder only, so an unknown, foreign
                                or crafted id is a 404
-``GET  /api/pipeline``         every step of a run in order, which five call a model, and the
-                               model each of those is configured to use, and the model
-                               the replay recordings were made with
+``GET  /api/pipeline``         every step of a run in order, which call a model, and the
+                               model each of those is configured to use (``engine.about()``),
+                               and the model the replay recordings were made with
 ``GET  /api/settings``         the settings panel: masked key, verified models, one model per node
 ``POST /api/settings/key``     save an API key to ``.env`` and switch to live
 ``POST /api/settings/models``  write a model per LLM node into ``llm.yaml``
@@ -42,10 +43,12 @@ Twenty-one routes:
                                and the state of a running rebuild
 ``POST /api/index/rebuild``    rebuild the datasource's snapshot and vector entries
 ``GET  /api/retrieval``        whether the Retrieval inspector is on, and its choices
+                               (``engine.index.inspect_defaults()``)
 ``POST /api/retrieval``        one MMR search of the live index: the pool with scores,
                                the picks in order, and what was dropped
 ``GET  /api/feedback``         whether answer feedback is on, the counts and the ratings
 ``POST /api/feedback``         rate a run this playground answered: up or down, and a note
+                               (``engine.feedback``)
 
 Hosted mode (``nl2sql demo --hosted``, see
 :mod:`nl2sql.cli.demo.playground.hosted`) changes these: ``/api/ask`` (and
@@ -62,7 +65,10 @@ the settings panel's (see ``settings.py``): the current mode, and the gate that
 keeps a settings change from landing under a running question; and the index
 panel's (see ``index_panel.py``): the one rebuild that may be running; and the
 last runs it answered, so a rating is stored with what the server returned
-rather than what a page claims (see ``nl2sql.feedback``).
+rather than what a page claims (``engine.feedback.record``).
+
+It is a client of the facade like any other: everything it reads from the
+engine is a public method or namespace (a boundary test holds it to that).
 """
 from __future__ import annotations
 
@@ -81,21 +87,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken, QueryEvent, QueryResult, ResultNotFound
+from nl2sql import CancellationToken, QueryEvent, QueryResult, ResultNotFound, UserContext
 
-from nl2sql.auth.models import UserContext
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted, Replay
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
 from nl2sql.cli.demo.playground.preview import CARD, CARD_ROUTE, with_preview
 from nl2sql.cli.demo.playground.settings import SettingsPanel
 from nl2sql.cli.demo.stamp import engine_version
 from nl2sql.common.settings import settings
-from nl2sql.feedback import NOTE_MAX_CHARS, FeedbackStore, run_record, run_signals
-from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.llm.request_key import use_request_llms
-from nl2sql.pipeline.steps import describe_pipeline
-from nl2sql.tracing.document import find_trace, load_trace
-from nl2sql.tracing.trace import engine_info
 
 # The errors replay mode raises when no recording matches the question. The page
 # turns these into "this question has no recording" rather than a crash report.
@@ -185,16 +185,16 @@ class RebuildRequest(BaseModel):
     enrich: bool = False
 
 
-# The entry types the index holds, in the order the inspector lists them.
-ENTRY_TYPES = ["schema.datasource", "schema.table", "schema.column", "schema.relationship", "schema.metric"]
-
-
 class RetrievalRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     k: int = Field(default=8, ge=1, le=50)
     lambda_mult: float = Field(default=0.7, ge=0.0, le=1.0)
     types: List[str] = Field(default_factory=list)
     datasource_id: Optional[str] = None
+
+
+# The longest note a rating keeps (the feedback table keeps no more).
+NOTE_MAX_CHARS = 280
 
 
 class FeedbackRequest(BaseModel):
@@ -225,11 +225,6 @@ def _feedback_off_reason(panel) -> Optional[str]:
     )
 
 
-def _engine_version() -> str:
-    info = engine_info()
-    return f"{info['version']} ({info['git_sha']})" if info.get("git_sha") else str(info["version"])
-
-
 def _retrieval_off_reason(panel) -> Optional[str]:
     """Why the inspector is off, in its own words; the gate is the settings panel's."""
     if panel.available or panel.hosted:
@@ -244,6 +239,11 @@ def _retrieval_off_reason(panel) -> Optional[str]:
         "values, to anyone who can open this page. Restart it on 127.0.0.1, or pass "
         "--allow-settings if you trust everyone who can reach it."
     )
+
+
+def _counts(rows: List[Dict[str, Any]]) -> Dict[str, int]:
+    """How many ratings are up and how many down."""
+    return {rating: sum(1 for r in rows if r.get("rating") == rating) for rating in ("up", "down")}
 
 
 def _read_page() -> str:
@@ -277,10 +277,17 @@ def _datasource_ids(engine, dataset: str) -> List[str]:
     return ids or [dataset]
 
 
-def _llm_configs(engine) -> Dict[str, Any]:
-    """Provider, model and temperature per configured agent, for a feedback record."""
-    return {name: {key: (config or {}).get(key) for key in ("provider", "model", "temperature")}
-            for name, config in engine.llm.list().items()}
+# What a remembered run keeps of its result: what a rating stores, and no rows.
+_RATED_FIELDS = ("trace_id", "status", "errors", "source", "usage")
+_RATED_SUB_QUERY_FIELDS = ("sql", "datasource_id", "retry_count", "plan_source", "validation")
+
+
+def _rated_part(body: Dict[str, Any]) -> Dict[str, Any]:
+    """The part of a run's result ``engine.feedback.record`` reads; never its rows or answer."""
+    kept = {key: body.get(key) for key in _RATED_FIELDS}
+    kept["sub_queries"] = [{key: s.get(key) for key in _RATED_SUB_QUERY_FIELDS}
+                           for s in body.get("sub_queries") or [] if isinstance(s, dict)]
+    return kept
 
 
 async def cancel_when_disconnected(request: Request, token: CancellationToken,
@@ -299,7 +306,7 @@ async def cancel_when_disconnected(request: Request, token: CancellationToken,
 
 
 def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset: str,
-              trace_dir: Optional[pathlib.Path] = None, project_dir: Optional[pathlib.Path] = None,
+              project_dir: Optional[pathlib.Path] = None,
               host: str = "127.0.0.1", allow_settings: bool = False,
               recorded_questions: int = 0,
               questions_by_datasource: Optional[Dict[str, List[str]]] = None,
@@ -341,12 +348,9 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     app.state.settings_panel = panel
     app.state.index_panel = index_panel
     app.state.hosted = hosted
-    # trace id -> what feedback would store for that run; never its rows.
+    # trace id -> the run as a rating would store it: question, role, result; never its rows.
     recent: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
     recent_lock = threading.Lock()
-
-    def trace_directory() -> pathlib.Path:
-        return pathlib.Path(trace_dir) if trace_dir is not None else pathlib.Path(settings.trace_dir)
 
     def feedback_guard(request: Request) -> None:
         # Local only, exactly like Settings and Rebuild.
@@ -363,14 +367,13 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         panel.guard(request)
 
     def remember(req: AskRequest, body: Dict[str, Any]) -> None:
-        if not body.get("trace_id") or _feedback_off_reason(panel):
+        trace_id = body.get("trace_id")
+        if not trace_id or _feedback_off_reason(panel):
             return
-        record = run_record(body, question=req.question, role=req.role,
-                            llm_configs=_llm_configs(engine),
-                            engine_version=_engine_version())
+        run = {"result": _rated_part(body), "question": req.question, "role": req.role}
         with recent_lock:
-            recent[record["trace_id"]] = record
-            recent.move_to_end(record["trace_id"])
+            recent[trace_id] = run
+            recent.move_to_end(trace_id)
             while len(recent) > RECENT_RUNS:
                 recent.popitem(last=False)
 
@@ -579,17 +582,16 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         return _event_stream(body(), cookies)
 
     @app.get("/api/trace/{trace_id}")
-    def trace(trace_id: str) -> FileResponse:
-        """One trace file. The id is validated as a plain token and the file must
-        sit directly in the traces directory, so no path can lead outside it."""
+    def trace(trace_id: str) -> Dict[str, Any]:
+        """One trace document. ``engine.traces.get`` validates the id as a plain
+        token and reads only the engine's traces folder, so no path can lead outside it."""
         try:
-            path = find_trace(trace_id, trace_directory())
+            doc = engine.traces.get(trace_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Not a valid trace id.")
-        if path is None:
+        if doc is None:
             raise HTTPException(status_code=404, detail="No trace with that id.")
-        return FileResponse(path, media_type="application/json", filename=path.name,
-                            content_disposition_type="inline")
+        return doc
 
     # The CSV route first: ``{result_id}`` would otherwise match ``x.csv``.
     @app.get("/api/query/{request_id}/results/{result_id}.csv")
@@ -619,14 +621,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         if reason:
             return {"available": False, "reason": reason}
         panel.guard_read(request)
-        path = pathlib.Path(settings.schema_store_path)
-        if not path.exists():
-            return {"available": True, "reason": None, "counts": {"up": 0, "down": 0}, "entries": []}
-        store = FeedbackStore(path)
-        try:
-            return {"available": True, "reason": None, "counts": store.counts(), "entries": store.list(limit=50)}
-        finally:
-            store.close()
+        rows = engine.feedback.list()
+        return {"available": True, "reason": None, "counts": _counts(rows), "entries": rows[:50]}
 
     @app.post("/api/feedback", dependencies=[Depends(feedback_guard)])
     def save_feedback(req: FeedbackRequest) -> Dict[str, Any]:
@@ -634,49 +630,30 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         server's own record of the run; the page sends only the id, the rating
         and the note."""
         with recent_lock:
-            record = dict(recent[req.trace_id]) if req.trace_id in recent else None
-        if record is None:
+            run = recent.get(req.trace_id)
+        if run is None:
             raise HTTPException(status_code=404,
                                 detail="Ask a question first: feedback rates a run this playground answered.")
-        try:
-            path = find_trace(req.trace_id, trace_directory())
-            if path is not None:
-                # The trace also sees validator rejections a retry fixed.
-                doc = load_trace(path)
-                record.update(run_signals(doc.get("result") or {}, doc))
-                if "SECURITY_VIOLATION" in record["error_codes"]:
-                    record["sql"] = []
-        except (ValueError, OSError):
-            pass  # the run's own signals stand
-        store = FeedbackStore(pathlib.Path(settings.schema_store_path))
-        try:
-            saved = store.save(record, rating=req.rating, note=req.note)
-            counts = store.counts()
-        finally:
-            store.close()
-        return {"saved": saved, "counts": counts}
+        # The engine reads the run's trace too: it sees validator rejections a retry fixed.
+        saved = engine.feedback.record(run["result"], question=run["question"], role=run["role"],
+                                       rating=req.rating, note=req.note)
+        return {"saved": saved, "counts": _counts(engine.feedback.list())}
 
     @app.get("/api/pipeline")
     def pipeline() -> Dict[str, Any]:
         """Every step of a run, and the model each model step is configured on.
 
-        Read from :mod:`nl2sql.pipeline.steps`, which a test holds against the
+        Read from ``engine.about()``, whose steps a test holds against the
         graphs themselves, so the page cannot describe a pipeline that is not
-        the one running. Only a provider and a model are taken from the LLM
-        configuration; never a key.
+        the one running. Only a provider and a model come with each step;
+        never a key.
 
         ``recorded_with`` names the model the replay recordings were made
         with. The steps keep the configured models, which a run with a key
         uses; the page shows the recorded one, marked, while it answers from
         recordings.
         """
-        try:
-            # The steps name each agent as the registry does (``astplanner``).
-            agents = {LLM_AGENTS.get(name, name): entry for name, entry in engine.llm.list().items()}
-        except Exception:  # an engine without a registry (a plan-only harness)
-            agents = {}
-        return {"steps": describe_pipeline(agents), "docs": PIPELINE_DOCS,
-                "recorded_with": recorded_with}
+        return {"steps": engine.about()["steps"], "docs": PIPELINE_DOCS, "recorded_with": recorded_with}
 
     @app.get("/api/settings")
     def read_settings() -> Dict[str, Any]:
@@ -708,9 +685,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.get("/api/retrieval")
     def retrieval_options() -> Dict[str, Any]:
-        from nl2sql.indexing.vector_store import VectorStore
-
         reason = _retrieval_off_reason(panel)
+        defaults = engine.index.inspect_defaults()
         return {
             # Hosted, the panel is off but the inspector is on, so the
             # inspector's own reason is the one that decides.
@@ -718,16 +694,15 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             "reason": reason,
             "datasource_id": index_panel.datasource_id,
             "datasources": [d["datasource_id"] for d in index_panel.health().get("datasources", [])],
-            "types": ENTRY_TYPES,
-            "defaults": {"k": 8, "lambda_mult": VectorStore.LAMBDA_MULT,
-                         "fetch_multiplier": VectorStore.FETCH_MULTIPLIER},
+            "types": defaults.pop("types"),
+            "defaults": defaults,
         }
 
     @app.post("/api/retrieval", dependencies=[Depends(retrieval_guard)])
     def retrieval(req: RetrievalRequest) -> Dict[str, Any]:
         """One MMR search of the live index, as the engine runs it. It reads index
         metadata only; the embedder is local, so it costs nothing."""
-        unknown = sorted(set(req.types) - set(ENTRY_TYPES))
+        unknown = sorted(set(req.types) - set(engine.index.inspect_defaults()["types"]))
         if unknown:
             raise HTTPException(status_code=422, detail=f"Unknown entry types: {', '.join(unknown)}.")
         try:

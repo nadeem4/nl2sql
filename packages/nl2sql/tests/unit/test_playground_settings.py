@@ -28,6 +28,8 @@ from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql import NL2SQL, load_config
 from nl2sql.llm import LLMRegistry
+from nl2sql.registry import Registry
+from nl2sql.runtime import StorePaths
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.config import make_config
 
@@ -81,6 +83,9 @@ class _Context:
         self.vector_store = None
         self.ds_registry = type("R", (), {"list_ids": staticmethod(lambda: [])})()
         self.llm_registry = LLMRegistry(SecretManager())
+        self.registry = Registry.default()
+        self.stores = StorePaths.under(project / ".nl2sql")
+        self.traces_dir = project / "traces"
         self.config = load_config(project / "nl2sql.yaml")
         self.replace_llm(self.config.llm)
         self.tenant_id = "default_tenant"
@@ -115,7 +120,7 @@ class _Engine(NL2SQL):
 def _app(project, engine=None, host="127.0.0.1", allow_settings=False, mode="replay"):
     engine = engine or _Engine(project)
     app = build_app(engine, questions=["q1"], roles=["admin"], mode=mode, dataset="chinook",
-                    trace_dir=project / "traces", project_dir=project, host=host,
+                    project_dir=project, host=host,
                     allow_settings=allow_settings)
     # The Host header a browser on this machine sends.
     return engine, TestClient(app, base_url="http://127.0.0.1:8765")
@@ -246,7 +251,8 @@ def test_a_saved_key_is_never_returned_by_any_route(project):
     # The trace route has something real to serve.
     (project / "traces").mkdir()
     trace_id = "0b8f7d2e-1111-4222-8333-944455556666"
-    (project / "traces" / f"20260921T000000Z_{trace_id}.json").write_text('{"trace_id": "x"}', encoding="utf-8")
+    (project / "traces" / f"20260921T000000Z_{trace_id}.json").write_text(
+        '{"trace_format_version": 1, "trace_id": "%s"}' % trace_id, encoding="utf-8")
 
     responses = _every_route_response(client, trace_id)
 

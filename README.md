@@ -449,11 +449,13 @@ again reuses the validated plan from the plan cache (`sq.plan_source == "cache"`
 still validated for the caller's role.
 
 Everything else on `NL2SQL` is a namespace: `engine.datasources` (list, get,
-add, remove, schema, test), `engine.index` (build, health, clear, inspect),
-`engine.llm` (list, get, replace), `engine.policies` (roles, allows, allowed,
-validate), `engine.curated` (validate, test), `engine.results` (manifest,
-page, csv), `engine.traces` (replay) and `engine.benchmark`. The CLI, the
-playground and `nl2sql-api` use nothing else. Feedback is not on the facade; it is read through the CLI. See
+add, remove, schema, test), `engine.index` (build, health, clear, inspect,
+inspect_defaults), `engine.llm` (list, get, providers, replace),
+`engine.policies` (roles, allows, allowed, validate), `engine.curated`
+(validate, test), `engine.results` (manifest, page, csv), `engine.feedback`
+(record, list, stats, export, clear), `engine.traces` (get, replay) and
+`engine.benchmark`; `engine.about()` describes the engine and each step of a
+run. The CLI, the playground and `nl2sql-api` use nothing else. See
 [the public facade](docs/api/core/public-facade.md) and
 [`examples/`](examples/).
 

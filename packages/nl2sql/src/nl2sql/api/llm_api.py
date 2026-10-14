@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
 
 from nl2sql.runtime import Runtime, _config_agent_names
 
@@ -46,6 +46,19 @@ class LLMAPI:
         if agent not in listed:
             raise ValueError(f"Unknown agent '{agent}'. The agents are: {', '.join(listed)}.")
         return listed[agent]
+
+    def providers(self) -> List[Dict[str, Any]]:
+        """Each LLM provider this engine can use: ``name``, ``label``, ``key_variable`` and ``key_present``.
+
+        The built-ins whose client library is installed, and any provider a
+        plugin or ``Registry.add_llm`` registered. ``key_variable`` is the
+        environment variable the provider reads its key from (None for one that
+        needs no key, such as ``ollama``); ``key_present`` says whether it is
+        set. Never the key.
+        """
+        from nl2sql.llm.providers import describe_providers
+
+        return describe_providers(self._ctx.registry)
 
     def replace(self, llm: Union["LLM", Mapping[str, Any]], *, by: Optional["UserContext"] = None,
                 via: str = "python") -> "LLMChange":

@@ -305,6 +305,146 @@ def test_traces_replay_names_a_datasource_that_is_not_configured(engine):
         engine.traces.replay(trace)
 
 
+TRACE_ID = "0b8f7d2e-1111-4222-8333-944455556666"
+
+
+def _write_trace(engine, trace_id=TRACE_ID, **fields):
+    """A trace file in the engine's traces folder, named as the trace writer names it."""
+    import json
+
+    folder = Path(engine.config.storage.path) / "traces"
+    folder.mkdir(parents=True, exist_ok=True)
+    doc = {"trace_format_version": 1, "trace_id": trace_id, "nodes": [], **fields}
+    (folder / f"20260921T101112000000Z_{trace_id}.json").write_text(json.dumps(doc), encoding="utf-8")
+    return doc
+
+
+def test_traces_get_reads_one_trace_from_the_engines_folder(engine):
+    _write_trace(engine)
+
+    assert engine.traces.get(TRACE_ID)["trace_id"] == TRACE_ID
+    assert engine.traces.get("not-recorded") is None
+    with pytest.raises(ValueError):
+        engine.traces.get("../outside")
+
+
+# ---------------------------------------------------------------- feedback
+
+def _answered(trace_id=TRACE_ID, sql="SELECT COUNT(*) FROM customers", codes=()):
+    """A run's ``QueryResult`` as JSON, as a caller holds it after the question."""
+    return {"trace_id": trace_id, "status": "success" if not codes else "error",
+            "errors": [{"error_code": c} for c in codes],
+            "sub_queries": [{"id": "sq1", "sql": sql, "datasource_id": "shop", "status": "success"}],
+            "source": {"type": "generated"},
+            "usage": {"calls": [{"node": "ast_planner", "model": "gpt-planner"}]}}
+
+
+def test_feedback_record_stores_what_the_run_returned(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        saved = engine.feedback.record(_answered(), question="How many customers?", role="viewer",
+                                       rating="down", note="wrong number")
+        [row] = engine.feedback.list()
+
+    assert saved["rating"] == "down" and row["trace_id"] == TRACE_ID
+    assert row["question"] == "How many customers?" and row["role"] == "viewer" and row["note"] == "wrong number"
+    assert row["sql"] == ["SELECT COUNT(*) FROM customers"] and row["datasource_ids"] == ["shop"]
+    assert row["models"] == {"ast_planner": {"provider": "openai", "model": "gpt-planner"}}
+    assert row["engine_version"]
+
+
+def test_feedback_record_reads_the_runs_trace_and_keeps_no_sql_for_a_refused_run(engine):
+    _write_trace(engine, nodes=[{"node": "logical_validator", "status": "error"}],
+                 result={"errors": [{"error_code": "SECURITY_VIOLATION"}], "sub_queries": []})
+
+    engine.feedback.record(_answered(), question="q", role="viewer", rating="down")
+    [row] = engine.feedback.list()
+
+    assert row["validator_failures"] == 1
+    assert row["error_codes"] == ["SECURITY_VIOLATION"] and row["sql"] == []
+
+
+def test_feedback_list_is_newest_first_and_takes_a_limit(engine):
+    for trace_id in ("first", "second"):
+        engine.feedback.record(_answered(trace_id), question=trace_id, role="admin", rating="up")
+
+    assert [r["trace_id"] for r in engine.feedback.list()] == ["second", "first"]
+    assert len(engine.feedback.list(limit=1)) == 1
+
+
+def test_feedback_stats_counts_the_ratings_and_the_traces(engine):
+    engine.feedback.record(_answered("rated"), question="q", role="admin", rating="up")
+    _write_trace(engine, "traced", result={"errors": [{"error_code": "QUESTION_NOT_ANSWERABLE"}]})
+
+    stats = engine.feedback.stats()
+
+    assert stats["runs"] == 2 and stats["feedback"]["up"] == 1
+    assert stats["refusals"]["by_code"] == {"QUESTION_NOT_ANSWERABLE": 1}
+    assert engine.feedback.stats(traces=Path(engine.config.storage.path) / "elsewhere")["runs"] == 1
+
+
+def test_feedback_export_writes_the_thumbs_up_runs_as_draft_gold_entries(engine, tmp_path):
+    import yaml
+
+    engine.feedback.record(_answered("one"), question="How many customers?", role="admin", rating="up")
+    engine.feedback.record(_answered("two"), question="Bad", role="admin", rating="down")
+
+    report = engine.feedback.export(tmp_path / "drafts.yaml")
+
+    drafts = yaml.safe_load((tmp_path / "drafts.yaml").read_text(encoding="utf-8"))
+    assert report == {"written": 1, "skipped": 0}
+    assert [d["question"] for d in drafts] == ["How many customers?"]
+
+
+def test_feedback_export_never_writes_the_gold_set(engine):
+    from nl2sql.evaluation.gold import GOLD_DATASET_PATH
+
+    before = GOLD_DATASET_PATH.read_bytes()
+    with pytest.raises(ValueError, match="gold set"):
+        engine.feedback.export(GOLD_DATASET_PATH)
+    assert GOLD_DATASET_PATH.read_bytes() == before
+
+
+def test_feedback_clear_empties_the_table(engine):
+    engine.feedback.record(_answered(), question="q", role="admin", rating="up")
+
+    assert engine.feedback.clear() == 1
+    assert engine.feedback.list() == []
+
+
+# ---------------------------------------------------------------- about, providers, inspector defaults
+
+def test_about_lists_each_step_with_its_agent_and_model_and_the_engine(tmp_path):
+    with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
+        about = engine.about()
+
+    steps = {s["node"]: s for s in about["steps"]}
+    assert about["version"] and "python" in about
+    assert steps["ast_planner"]["agent"] == "astplanner" and steps["ast_planner"]["model"] == "gpt-planner"
+    assert steps["decomposer"]["model"] == "gpt-test" and steps["decomposer"]["kind"] == "model"
+    assert steps["generator"]["kind"] == "code" and steps["generator"]["model"] is None
+    assert "sk-test" not in str(about)
+
+
+def test_llm_providers_lists_the_installed_providers_and_whether_each_key_is_set(engine, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-0000000000000000000000")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    providers = {p["name"]: p for p in engine.llm.providers()}
+
+    assert providers["openai"] == {"name": "openai", "label": "OpenAI", "key_variable": "OPENAI_API_KEY",
+                                   "key_present": True}
+    assert providers["openrouter"]["key_present"] is False
+    assert providers["ollama"]["key_variable"] is None
+    assert "sk-test" not in str(providers)
+
+
+def test_index_inspect_defaults_are_the_searchs_own(engine):
+    defaults = engine.index.inspect_defaults()
+
+    assert defaults["k"] == 8 and 0 < defaults["lambda_mult"] <= 1 and defaults["fetch_multiplier"] >= 1
+    assert "schema.table" in defaults["types"]
+
+
 # ---------------------------------------------------------------- questions
 
 def test_run_query_takes_the_question_and_keyword_options(engine):

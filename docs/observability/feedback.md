@@ -6,6 +6,10 @@ guardrail rates the engine already records for every run. `nl2sql feedback`
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
 set, and thumbs-up generated answers as proposed verified queries.
 
+The playground and `nl2sql feedback` are both built on `engine.feedback`
+(`record`, `list`, `stats`, `export`, `clear`), which any Python caller can use
+too: see [the public facade](../api/core/public-facade.md#feedback).
+
 ## Rating an answer in the playground
 
 After a run, below **Cost & time**, the playground asks **Was this answer

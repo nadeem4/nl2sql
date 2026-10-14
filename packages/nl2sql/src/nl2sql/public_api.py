@@ -10,11 +10,12 @@ from __future__ import annotations
 import os
 import pathlib
 from functools import cached_property
-from typing import TYPE_CHECKING, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Union
 
 if TYPE_CHECKING:
     from nl2sql.api.curated_api import CuratedAPI
     from nl2sql.api.datasource_api import DatasourcesAPI
+    from nl2sql.api.feedback_api import FeedbackAPI
     from nl2sql.api.indexing_api import IndexAPI
     from nl2sql.api.llm_api import LLMAPI
     from nl2sql.api.policy_api import PoliciesAPI
@@ -99,14 +100,14 @@ class NL2SQL:
 
     @cached_property
     def index(self) -> "IndexAPI":
-        """The vector index: ``build``, ``health``, ``clear``, ``inspect``."""
+        """The vector index: ``build``, ``health``, ``clear``, ``inspect``, ``inspect_defaults``."""
         from nl2sql.api.indexing_api import IndexAPI
 
         return IndexAPI(self._runtime)
 
     @cached_property
     def llm(self) -> "LLMAPI":
-        """The models the agents run on: ``list``, ``get``, ``replace``."""
+        """The models the agents run on: ``list``, ``get``, ``providers``, ``replace``."""
         from nl2sql.api.llm_api import LLMAPI
 
         return LLMAPI(self._runtime)
@@ -134,10 +135,17 @@ class NL2SQL:
 
     @cached_property
     def traces(self) -> "TracesAPI":
-        """Recorded runs: ``replay``."""
+        """Recorded runs: ``get``, ``replay``."""
         from nl2sql.api.traces_api import TracesAPI
 
         return TracesAPI(self._runtime)
+
+    @cached_property
+    def feedback(self) -> "FeedbackAPI":
+        """Answer ratings and the guardrail rates: ``record``, ``list``, ``stats``, ``export``, ``clear``."""
+        from nl2sql.api.feedback_api import FeedbackAPI
+
+        return FeedbackAPI(self._runtime)
 
     @cached_property
     def _queries(self) -> "QueryAPI":
@@ -151,6 +159,27 @@ class NL2SQL:
     def config(self) -> "Config":
         """The current frozen ``Config``. Secrets appear as references only."""
         return self._runtime.config
+
+    def about(self) -> Dict[str, Any]:
+        """The engine, and every step of a run with the model each model step is configured on.
+
+        ``version`` (of ``nl2sql-engine``), ``git_sha`` (when running from a
+        checkout), ``python``, and ``steps``: one dict per pipeline step in the
+        order a run takes them, with its ``node``, ``label``, what it ``does``,
+        its ``kind`` (``model`` or ``code``), its ``parent`` (the SQL agent, for
+        the steps nested in it) and, for a model step, its ``agent`` and the
+        ``provider`` and ``model`` it runs on. Never a key.
+        """
+        from nl2sql.llm.providers import LLM_AGENTS
+        from nl2sql.pipeline.steps import describe_pipeline
+        from nl2sql.tracing.trace import engine_info
+
+        try:
+            # The steps name each agent as the nodes ask for it (``astplanner``).
+            agents = {LLM_AGENTS.get(name, name): entry for name, entry in self.llm.list().items()}
+        except Exception:  # an engine whose LLMs cannot be listed still has its steps
+            agents = {}
+        return {**engine_info(), "steps": describe_pipeline(agents)}
 
     def check(self) -> "CheckReport":
         """Connect to each datasource, check every agent's API key resolves, and report the index.

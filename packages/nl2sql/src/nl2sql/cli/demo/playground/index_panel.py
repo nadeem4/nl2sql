@@ -21,6 +21,7 @@ its steps (the first run downloads a 79 MB embedding model).
 """
 from __future__ import annotations
 
+import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,9 +31,8 @@ from fastapi import HTTPException
 
 from nl2sql.cli.demo.playground.hosted import REBUILD_MESSAGE
 from nl2sql.cli.demo.stamp import engine_version, outdated_warning, read_stamp
-from nl2sql.common.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _now() -> str:

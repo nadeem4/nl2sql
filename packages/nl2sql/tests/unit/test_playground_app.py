@@ -52,6 +52,7 @@ class _Context:
         self.schema_store = _SchemaStore(snapshot)
         self.vector_store = None
         self.ds_registry = _Registry(datasources)
+        self.traces_dir = None
 
 
 class _SchemaStore:
@@ -387,7 +388,9 @@ def _trace_client(tmp_path):
         '{"trace_format_version": 1, "trace_id": "%s", "nodes": []}' % _TRACE_ID, encoding="utf-8")
     # A file that must stay unreachable: one directory up from the traces.
     (tmp_path / "20260921T101112000000Z_outside.json").write_text('{"secret": true}', encoding="utf-8")
-    app = build_app(_Engine(), questions=[], roles=["admin"], mode="live", dataset="chinook", trace_dir=traces)
+    engine = _Engine()
+    engine._runtime.traces_dir = traces
+    app = build_app(engine, questions=[], roles=["admin"], mode="live", dataset="chinook")
     return TestClient(app)
 
 
