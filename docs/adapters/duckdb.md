@@ -16,6 +16,10 @@ The SQLAlchemy dialect lives in `duckdb-engine`, which ships in its own extra:
 pip install "nl2sql-engine[duckdb]"
 ```
 
+The extra keeps SQLAlchemy below 2.1: `duckdb-engine` reads a schema with
+SQLAlchemy's PostgreSQL reflection, which from 2.1 queries
+`pg_catalog.pg_collation`, a table DuckDB does not have.
+
 ## Configuration
 
 **Type**: `duckdb`

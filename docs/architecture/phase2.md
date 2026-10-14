@@ -1342,7 +1342,9 @@ job, PostgreSQL, MySQL and SQL Server in the `realdb` job.
     new `QUERY_TIMEOUT` from the SQLAlchemy base. The kit found two
     misclassified refusals, fixed in the base: MySQL's "command denied"
     (SQLSTATE 42000) and DuckDB's write to a read-only file were both
-    `retryable`.
+    `retryable`. It also found that SQLAlchemy 2.1 breaks every DuckDB
+    snapshot (`duckdb-engine` inherits PostgreSQL reflection, which now
+    queries `pg_collation`), so the `duckdb` extra keeps SQLAlchemy below 2.1.
 
 ### `engine.datasources`: the methods behind Connect a database
 
