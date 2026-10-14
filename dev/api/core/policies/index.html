@@ -4743,15 +4743,17 @@ the datasources.</p>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/policy_api.py</code> (<code>PoliciesAPI</code>, internal)</li>
-<li><code>packages/nl2sql/src/nl2sql/policies/models.py</code> (<code>UserContext</code>)</li>
+<li><code>packages/sdk/src/nl2sql_sdk/policy.py</code> (<code>UserContext</code>, <code>Grant</code>, <code>PolicyCheck</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/policies/scope.py</code> (<code>PolicyEngine</code>, <code>Scope</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/policies/check.py</code> (building a <code>policies.check</code> block)</li>
 <li><code>packages/nl2sql/src/nl2sql/policies/patterns.py</code> (the pattern rules)</li>
 <li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>Policies</code>, <code>Role</code>)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <h3 id="usercontext">UserContext</h3>
-<p>Exported from <code>nl2sql</code>. Fields: <code>user_id</code> (optional), <code>tenant_id</code> (optional)
-and <code>roles</code> (a list).</p>
+<p>Exported from <code>nl2sql</code>; defined in <code>nl2sql_sdk.policy</code>, so a policy check
+needs only the SDK. Fields: <code>user_id</code> (optional), <code>tenant_id</code> (optional) and
+<code>roles</code> (a list).</p>
 <table>
 <thead>
 <tr>
@@ -4796,7 +4798,7 @@ and <code>roles</code> (a list).</p>
 <tr>
 <td><code>reaches_datasource()</code></td>
 <td><code>bool</code></td>
-<td>Whether any role reaches the datasource: one of its allow patterns can match inside it.</td>
+<td>Whether any role reaches the datasource (one of its allow patterns can match inside it) and, with a policy check, the check's grant does too.</td>
 </tr>
 <tr>
 <td><code>allows(schema, table)</code></td>
@@ -4806,7 +4808,7 @@ and <code>roles</code> (a list).</p>
 <tr>
 <td><code>rule_for(schema, table)</code></td>
 <td><code>str</code> or <code>None</code></td>
-<td>Why it may not be read (the deny pattern, or the missing allow), for the log; <code>None</code> when it may.</td>
+<td>Why it may not be read (the deny pattern, or the missing allow, of a role or of the policy check), for the log; <code>None</code> when it may.</td>
 </tr>
 </tbody>
 </table>
@@ -4834,6 +4836,10 @@ and <code>roles</code> (a list).</p>
   architecture test <code>test_every_access_decision_goes_through_scope</code> holds it.</li>
 <li>Inside a run, <code>PolicyEngine.scope</code> builds each datasource's scope once and
   returns the same one, so every step of the run decides the same way.</li>
+<li>With a policy check, the check's <code>Grant</code> is intersected with the roles, it
+  is asked once per caller and datasource per run (and on every <code>scope()</code>
+  call outside a run), and any exception from it denies the datasource. See
+  <a href="../../../configuration/policies/#a-policy-check">A policy check</a>.</li>
 </ul>
 
 

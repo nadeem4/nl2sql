@@ -4527,8 +4527,18 @@ scopes pinned (<code>PolicyEngine.run</code>), every call site on <code>Scope</c
 retriever hiding denied tables, and the demo roles rewritten. Beyond the
 table below, <code>engine.policies.allowed()</code> is replaced by
 <code>engine.policies.scope()</code>, since a flat table list cannot say what a deny
-does. The <code>check</code> block and <code>PolicyCheck</code> come with P2. See
-<a href="../../configuration/policies/">Policies</a>.</p>
+does. See <a href="../../configuration/policies/">Policies</a>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: <code>PolicyCheck</code> (PR P2)</p>
+<p><code>nl2sql_sdk.policy</code> (<code>UserContext</code>, <code>Grant</code>, <code>PolicyCheck</code>), the
+<code>policies.check</code> block (or a check object), the intersection with the
+roles, failing closed, and the <code>policy_check</code> registry kind. The runtime
+builds the block through the registry, and <code>PolicyEngine.run</code> makes the
+check asked once per caller and datasource per run. A <code>grant</code> that
+returns something other than a <code>Grant</code>, or a pattern that does not parse,
+fails closed like an exception. See
+<a href="../../configuration/policies/#a-policy-check">A policy check</a>.</p>
 </div>
 <h3 id="the-config_1">The config</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="c1"># policies.yaml</span>

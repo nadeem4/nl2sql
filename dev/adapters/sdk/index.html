@@ -2364,6 +2364,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interface-policycheck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface: PolicyCheck
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#compliance-testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4940,6 +4951,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interface-policycheck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface: PolicyCheck
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#compliance-testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4974,6 +4996,9 @@ extension implements. It depends on pydantic and the standard library only.</p>
 <li>Adapters: <code>nl2sql_sdk.protocols.DatasourceAdapterProtocol</code>, with
   <code>nl2sql_sdk.contracts.AdapterRequest</code> and <code>nl2sql_sdk.contracts.ResultFrame</code></li>
 <li>Secret providers: <code>nl2sql_sdk.secrets.SecretProvider</code></li>
+<li>Stores: the four protocols in <code>nl2sql_sdk.stores</code></li>
+<li>Policy checks: <code>nl2sql_sdk.policy.PolicyCheck</code>, with <code>UserContext</code> and
+  <code>Grant</code></li>
 </ul>
 <p>Everything is also exported from <code>nl2sql_sdk</code> itself.</p>
 <h2 id="interface-datasourceadapterprotocol">Interface: <code>DatasourceAdapterProtocol</code></h2>
@@ -5372,6 +5397,42 @@ bucket: nl2sql-results}</code>.</p>
 (the index, then the state, then the traces and results). Until a slot's
 move lands, the engine refuses a plugin store in that slot.</p>
 </div>
+<hr />
+<h2 id="interface-policycheck">Interface: <code>PolicyCheck</code></h2>
+<p>A policy check asks an outside service what a caller may read. The policies
+config names one by <code>type</code> in its <code>check</code> block (see
+<a href="../../configuration/policies/#a-policy-check">A policy check</a>). It lives in
+<code>nl2sql_sdk.policy</code>, with <code>UserContext</code> (who is asking) and <code>Grant</code> (<code>allow</code>
+and <code>deny</code> patterns, written like a role's).</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Member</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>interface_version</code></td>
+<td style="text-align: left;"><code>1</code>. The engine accepts exactly the version it was built for.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>config_model</code></td>
+<td style="text-align: left;">A pydantic model for the <code>check</code> block apart from <code>type</code>. Set <code>extra="forbid"</code>, so a misspelt key is an error.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>from_config(cfg)</code></td>
+<td style="text-align: left;">Builds the check from a validated <code>config_model</code> instance, after the engine has resolved any <code>${provider:key}</code> in it.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>grant(user, datasource_id)</code></td>
+<td style="text-align: left;">Returns the <code>Grant</code> for <code>user</code> in <code>datasource_id</code>. Asked once per caller and datasource per run. Intersected with the roles; any exception denies the datasource for the run.</td>
+</tr>
+</tbody>
+</table>
+<p>Declare it in the <code>nl2sql.policy_checks</code> entry point group, or register it in
+code with <code>registry.add_policy_check(name, cls)</code> or
+<code>@registry.policy_check(name)</code>. No check is built in.</p>
 <hr />
 <h2 id="compliance-testing">Compliance Testing</h2>
 <p>All adapters should pass the compliance test suite (schema introspection, type mapping,
