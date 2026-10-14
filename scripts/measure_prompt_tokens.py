@@ -71,8 +71,11 @@ class _Capture:
         raise _Stop()
 
 
-def _node(cls):
-    ctx = SimpleNamespace(llm_registry=SimpleNamespace(get_llm=lambda _name: None))
+def _node(cls, today=None):
+    from nl2sql.config import Settings
+
+    ctx = SimpleNamespace(llm_registry=SimpleNamespace(get_llm=lambda _name: None),
+                          settings=Settings.model_validate({"pipeline": {"today": today}}))
     node = cls.__new__(cls)
     try:
         cls.__init__(node, ctx)
@@ -103,15 +106,17 @@ def _sub_query(question: str):
     )
 
 
-def render_planner(question: str, tables) -> Tuple[List, Dict]:
+def render_planner(question: str, tables, today=None) -> Tuple[List, Dict]:
+    """The planner's prompt; ``today`` pins the run date (``settings.pipeline.today``)."""
     from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
     from nl2sql.pipeline.state import SubgraphExecutionState
 
     state = SubgraphExecutionState(trace_id="measure", sub_query=_sub_query(question), relevant_tables=tables)
-    return _render(_node(ASTPlannerNode), state)
+    return _render(_node(ASTPlannerNode, today), state)
 
 
-def render_refiner(question: str, tables) -> Tuple[List, Dict]:
+def render_refiner(question: str, tables, today=None) -> Tuple[List, Dict]:
+    """The refiner's prompt; ``today`` pins the run date (``settings.pipeline.today``)."""
     from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
     from nl2sql.pipeline.nodes.refiner.node import RefinerNode
     from nl2sql.pipeline.state import SubgraphExecutionState
@@ -123,7 +128,7 @@ def render_refiner(question: str, tables) -> Tuple[List, Dict]:
         errors=[PipelineError(node="logical_validator", message=RETRY_ERROR,
                               severity=ErrorSeverity.ERROR, error_code=ErrorCode.COLUMN_NOT_FOUND)],
     )
-    return _render(_node(RefinerNode), state)
+    return _render(_node(RefinerNode, today), state)
 
 
 def render_decomposer(question: str) -> Tuple[List, Dict]:

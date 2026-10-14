@@ -15,6 +15,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
 from nl2sql.indexing.vector_store import VectorStore
+from nl2sql.testing.runtime import fake_runtime
 
 VOCAB = ["genre", "track", "sales", "invoice", "customer", "artist", "album", "employee", "name", "price"]
 
@@ -197,7 +198,7 @@ def _resolver(store, ds_ids=("chinook", "sales")):
     from nl2sql.pipeline.nodes.datasource_resolver.schemas import AnswerabilityResponse
 
     llm = ChatOpenAI(model="gpt-4o", api_key="sk-fake-never-called")
-    node = DatasourceResolverNode(SimpleNamespace(
+    node = DatasourceResolverNode(fake_runtime(
         vector_store=store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["*"]),
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),
@@ -279,8 +280,10 @@ def _retriever_store(tmp_path) -> VectorStore:
     return store
 
 
-def _retriever(tmp_path, allowed_tables):
-    return SchemaRetrieverNode(SimpleNamespace(
+def _retriever(tmp_path, allowed_tables, full_snapshot_max_tables=15):
+    # With 0, no snapshot is small enough to send whole: the vector search always runs.
+    return SchemaRetrieverNode(fake_runtime(
+        settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}},
         vector_store=_retriever_store(tmp_path),
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _chinook_snapshot(),
                                      get_snapshot=lambda _id, _v: _chinook_snapshot()),
@@ -296,10 +299,8 @@ def _sub_query_state():
     )
 
 
-def test_the_schema_retriever_records_its_searches_and_what_survived(tmp_path, monkeypatch):
-    monkeypatch.setattr("nl2sql.pipeline.nodes.schema_retriever.node.settings.schema_retrieval_full_snapshot_max_tables", 0)
-
-    out = _retriever(tmp_path, ["*"])(_sub_query_state())
+def test_the_schema_retriever_records_its_searches_and_what_survived(tmp_path):
+    out = _retriever(tmp_path, ["*"], full_snapshot_max_tables=0)(_sub_query_state())
 
     retrieval = out["retrieval"]
     assert retrieval["skipped"] is False
@@ -311,10 +312,8 @@ def test_the_schema_retriever_records_its_searches_and_what_survived(tmp_path, m
     assert all(e["similarity"] is not None for s in retrieval["searches"] for e in s["pool"])
 
 
-def test_the_trace_withholds_column_scores_for_tables_the_role_cannot_read(tmp_path, monkeypatch):
-    monkeypatch.setattr("nl2sql.pipeline.nodes.schema_retriever.node.settings.schema_retrieval_full_snapshot_max_tables", 0)
-
-    out = _retriever(tmp_path, ["chinook.Genre"])(_sub_query_state())
+def test_the_trace_withholds_column_scores_for_tables_the_role_cannot_read(tmp_path):
+    out = _retriever(tmp_path, ["chinook.Genre"], full_snapshot_max_tables=0)(_sub_query_state())
 
     columns = [e for s in out["retrieval"]["searches"] for e in s["pool"] if e["type"] == "schema.column"]
     assert columns

@@ -71,7 +71,7 @@ Side effects:
 
 1. Validate presence of datasource ID and plan.
 2. Resolve adapter and dialect.
-3. Compute effective limit from plan/adapter row limit: `row_limit` is the datasource's `row_limit` bounded by the `RESULT_ROW_LIMIT` ceiling (100,000), or the ceiling when the datasource sets none; the limit is `min(plan.limit or row_limit, row_limit)`. When the cap is what bounds the query, record it as `row_cap`.
+3. Compute effective limit from plan/adapter row limit: `row_limit` is the datasource's `row_limit` bounded by the `settings.results.row_limit` ceiling (100,000), or the ceiling when the datasource sets none; the limit is `min(plan.limit or row_limit, row_limit)`. When the cap is what bounds the query, record it as `row_cap`.
 4. Traverse AST with `SqlVisitor` to build `sqlglot` expression tree.
    - Every operator becomes the node sqlglot's parser would build (`+` -> `exp.Add`, `*` -> `exp.Mul`, `IS NOT` -> `NOT ... IS ...`, and so on), wherever it is nested. An operator with no mapping raises; it is never rendered as a function named after the operator.
    - An operand that is itself an operator is parenthesised, because sqlglot prints a hand-built tree without adding the parentheses its parser would have seen (`(a + b) * c` would otherwise print as `a + b * c`).

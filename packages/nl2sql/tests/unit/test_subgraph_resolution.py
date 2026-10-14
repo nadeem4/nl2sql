@@ -13,6 +13,8 @@ from nl2sql_sdk.capabilities import DatasourceCapability
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from nl2sql.testing.runtime import fake_runtime
+
 
 def _ctx_with_capabilities(capabilities_by_id):
     # Mirrors DatasourceRegistry.supports: an unknown datasource supports nothing.
@@ -172,8 +174,8 @@ def test_scan_layer_router_dispatches_sql_capable_datasource_to_sql_agent():
 def test_sql_agent_subgraph_builds():
     # Validates subgraph builder because sql_agent must compile without runtime deps.
     # Arrange
-    ctx = SimpleNamespace(
-        tenant_id="t1",
+    ctx = fake_runtime(
+        settings={"tenant_id": "t1"},
         llm_registry=SimpleNamespace(get_llm=lambda _name: MagicMock()),
         vector_store=SimpleNamespace(),
         schema_store=SimpleNamespace(),

@@ -17,16 +17,18 @@ from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
-from nl2sql.common.settings import settings
+from nl2sql.config import PipelineSettings
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _col(alias: str, name: str):
     return Expr(kind="column", alias=alias, column_name=name)
 
 
-def _ctx():
+def _ctx(strict_columns=True):
     rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac)
+    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac,
+                        settings={"pipeline": {"strict_columns": strict_columns}})
 
 
 def test_logical_validator_rejects_missing_plan():
@@ -183,7 +185,7 @@ def test_logical_validator_ambiguous_column_without_alias():
     assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND for e in result["errors"])
 
 
-def test_logical_validator_column_not_found_strict_vs_warning(monkeypatch):
+def test_logical_validator_column_not_found_strict_vs_warning():
     # Validates strict columns toggle because severity depends on settings.
     plan = PlanModel(
         query_type="READ",
@@ -199,24 +201,19 @@ def test_logical_validator_column_not_found_strict_vs_warning(monkeypatch):
         user_context=UserContext(),
     )
 
-    monkeypatch.setattr(settings, "logical_validator_strict_columns", False)
-    node = LogicalValidatorNode(_ctx())
+    node = LogicalValidatorNode(_ctx(strict_columns=False))
     result = node(state)
     assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND and e.severity.value == "WARNING" for e in result["errors"])
 
-    monkeypatch.setattr(settings, "logical_validator_strict_columns", True)
-    node = LogicalValidatorNode(_ctx())
+    node = LogicalValidatorNode(_ctx(strict_columns=True))
     result = node(state)
     assert any(e.error_code == ErrorCode.COLUMN_NOT_FOUND and e.severity.value == "ERROR" for e in result["errors"])
 
 
-def test_strict_columns_is_on_by_default(monkeypatch):
+def test_strict_columns_is_on_by_default():
     # An unresolved column used to be a WARNING by default, so the plan went
     # on to the database and failed there instead of being retried here.
-    from nl2sql.common.settings import Settings
-
-    monkeypatch.delenv("LOGICAL_VALIDATOR_STRICT_COLUMNS", raising=False)
-    assert Settings().logical_validator_strict_columns is True
+    assert PipelineSettings().strict_columns is True
 
 
 def test_logical_validator_rejects_join_not_in_relationships():
@@ -368,7 +365,7 @@ def test_logical_validator_accepts_fk_join_from_retriever_output():
 
     snapshot = _album_artist_snapshot()
     retriever = SchemaRetrieverNode(
-        SimpleNamespace(
+        fake_runtime(
             vector_store=None,
             schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: snapshot),
         )
@@ -409,7 +406,7 @@ def test_logical_validator_still_rejects_non_fk_join_with_qualified_names():
 
     snapshot = _album_artist_snapshot()
     retriever = SchemaRetrieverNode(
-        SimpleNamespace(
+        fake_runtime(
             vector_store=None,
             schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: snapshot),
         )

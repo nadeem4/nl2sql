@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Dict, Any, List
 from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
@@ -24,7 +23,9 @@ class ExecutorNode:
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ds_registry = ctx.ds_registry
-        self.executor = SqlExecutorService(ctx.ds_registry)
+        self.executor = SqlExecutorService(ctx.ds_registry, ctx.artifact_store,
+                                          fetch_batch_size=ctx.settings.results.fetch_batch_size)
+        self.max_retries = ctx.settings.pipeline.retries.max
         self.tenant_id = ctx.tenant_id
         self.rbac = getattr(ctx, "rbac", None)
 
@@ -55,7 +56,7 @@ class ExecutorNode:
             allowed_tables = self.rbac.get_allowed_tables(state.user_context)
             default = default_schema(self.ds_registry, ds_id)
             already_retried = any(e.error_code == ErrorCode.VALUE_NOT_FOUND for e in state.errors)
-            can_retry = not already_retried and state.retry_count < settings.sql_agent_max_retries
+            can_retry = not already_retried and state.retry_count < self.max_retries
             errors = check_values(
                 plan,
                 self.ds_registry.get_adapter(ds_id),

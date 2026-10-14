@@ -15,7 +15,6 @@ from types import SimpleNamespace
 from langgraph.graph import END
 
 from nl2sql.common.errors import ErrorCode
-from nl2sql.common.settings import settings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
@@ -28,6 +27,7 @@ from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.routes import aggregator_route
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql_sdk.contracts import ResultFrame
 
 
@@ -35,7 +35,7 @@ from nl2sql_sdk.contracts import ResultFrame
 
 def _generate(plan_limit):
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    node = GeneratorNode(SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
+    node = GeneratorNode(fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
     plan = PlanModel(tables=[TableRef(name="users", alias="u")],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],
                      joins=[], limit=plan_limit)
@@ -72,7 +72,7 @@ def test_the_subgraph_output_records_the_row_cap():
                                                           node_id="sq1", trace_id="t1", tenant_id="t",
                                                           artifact=_artifact(5))}
 
-    wrapped = wrap_subgraph(_Sub(), "sql_agent", SimpleNamespace(), execute=True)
+    wrapped = wrap_subgraph(_Sub(), "sql_agent", fake_runtime(), execute=True)
     out = wrapped({"trace_id": "t1", "subgraph_id": "sql_agent:sq1:t1", "user_context": None,
                    "decomposer_response": DecomposerResponse(
                        sub_queries=[SubQuery(id="sq1", datasource_id="ds", intent="q")], combine_groups=[])})
@@ -82,8 +82,7 @@ def test_the_subgraph_output_records_the_row_cap():
 
 # --- the aggregator refuses a join on a capped input, warns on a union ------
 
-def _combine_state(tmp_path, monkeypatch, operation, rows_left, rows_right, cap=3):
-    monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
+def _combine_state(tmp_path, operation, rows_left, rows_right, cap=3):
     store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
                                               path_template="<request_id>/<sub_query_id>.parquet"))
 
@@ -107,10 +106,10 @@ def _combine_state(tmp_path, monkeypatch, operation, rows_left, rows_right, cap=
     return GraphState(user_query="q", execution_dag=dag, artifact_refs=refs, subgraph_outputs=outputs)
 
 
-def test_a_join_with_an_input_cut_short_by_the_cap_is_refused(tmp_path, monkeypatch):
-    state = _combine_state(tmp_path, monkeypatch, "join", rows_left=3, rows_right=2)
+def test_a_join_with_an_input_cut_short_by_the_cap_is_refused(tmp_path):
+    state = _combine_state(tmp_path, "join", rows_left=3, rows_right=2)
 
-    out = EngineAggregatorNode(SimpleNamespace())(state)
+    out = EngineAggregatorNode(fake_runtime(results=tmp_path))(state)
 
     [error] = out["errors"]
     assert error.error_code == ErrorCode.RESULT_TRUNCATED
@@ -119,20 +118,20 @@ def test_a_join_with_an_input_cut_short_by_the_cap_is_refused(tmp_path, monkeypa
     assert aggregator_route(SimpleNamespace(aggregator_response=out["aggregator_response"])) == END
 
 
-def test_a_compare_with_a_capped_input_is_refused_too(tmp_path, monkeypatch):
-    state = _combine_state(tmp_path, monkeypatch, "compare", rows_left=2, rows_right=3)
+def test_a_compare_with_a_capped_input_is_refused_too(tmp_path):
+    state = _combine_state(tmp_path, "compare", rows_left=2, rows_right=3)
 
-    out = EngineAggregatorNode(SimpleNamespace())(state)
+    out = EngineAggregatorNode(fake_runtime(results=tmp_path))(state)
 
     assert [e.error_code for e in out["errors"]] == [ErrorCode.RESULT_TRUNCATED]
 
 
-def test_a_union_with_a_capped_input_runs_and_warns(tmp_path, monkeypatch):
-    state = _combine_state(tmp_path, monkeypatch, "union", rows_left=3, rows_right=2)
+def test_a_union_with_a_capped_input_runs_and_warns(tmp_path):
+    state = _combine_state(tmp_path, "union", rows_left=3, rows_right=2)
     # A union needs matching columns.
     state.artifact_refs["sq_b"] = state.artifact_refs["sq_a"]
 
-    out = EngineAggregatorNode(SimpleNamespace())(state)
+    out = EngineAggregatorNode(fake_runtime(results=tmp_path))(state)
 
     assert not out.get("errors")
     assert len(out["aggregator_response"].terminal_results["combine_g1"]) == 6
@@ -141,10 +140,10 @@ def test_a_union_with_a_capped_input_runs_and_warns(tmp_path, monkeypatch):
     assert warning["sub_query_id"] == "sq_a"
 
 
-def test_inputs_under_the_cap_join_as_before(tmp_path, monkeypatch):
-    state = _combine_state(tmp_path, monkeypatch, "join", rows_left=2, rows_right=2)
+def test_inputs_under_the_cap_join_as_before(tmp_path):
+    state = _combine_state(tmp_path, "join", rows_left=2, rows_right=2)
 
-    out = EngineAggregatorNode(SimpleNamespace())(state)
+    out = EngineAggregatorNode(fake_runtime(results=tmp_path))(state)
 
     assert not out.get("errors") and not out.get("warnings")
     assert len(out["aggregator_response"].terminal_results["combine_g1"]) == 2

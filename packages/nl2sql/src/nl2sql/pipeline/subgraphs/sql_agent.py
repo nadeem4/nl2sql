@@ -4,7 +4,6 @@ from langgraph.graph import END, StateGraph
 
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.common.settings import settings
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.schema_retriever import SchemaRetrieverNode
@@ -46,6 +45,7 @@ def build_sql_agent_graph(
     logical_validator = LogicalValidatorNode(ctx)
     refiner = RefinerNode(ctx)
     generator = GeneratorNode(ctx)
+    retries = ctx.settings.pipeline.retries
 
     def _get_retry_count(state: SubgraphExecutionState) -> int:
         return state.retry_count
@@ -78,11 +78,11 @@ def build_sql_agent_graph(
                     )
                 ]
             }
-        if count >= settings.sql_agent_max_retries:
+        if count >= retries.max:
             return {"retry_count": count}
 
-        base_delay = min(settings.sql_agent_retry_max_delay_sec, settings.sql_agent_retry_base_delay_sec * (2 ** count))
-        jitter = random.uniform(0.0, settings.sql_agent_retry_jitter_sec)
+        base_delay = min(retries.max_delay_s, retries.base_delay_s * (2 ** count))
+        jitter = random.uniform(0.0, retries.jitter_s)
         sleep_time = base_delay + jitter
 
         token = _token(config)
@@ -114,7 +114,7 @@ def build_sql_agent_graph(
                  if not all(e.is_retryable for e in state.errors):
                      return "end"
 
-            if _get_retry_count(state) < settings.sql_agent_max_retries:
+            if _get_retry_count(state) < retries.max:
                 return "retry"
             return "end"
         return "ok"
@@ -137,7 +137,7 @@ def build_sql_agent_graph(
         # Critical/Fatal errors stop execution immediately
         if not all(e.is_retryable for e in blocking):
             return "end"
-        if _get_retry_count(state) < settings.sql_agent_max_retries:
+        if _get_retry_count(state) < retries.max:
             return "retry"
         return "end" if blocking else "ok"
 
@@ -158,7 +158,7 @@ def build_sql_agent_graph(
         if _is_cancelled(config):
             return "end"
         count = _get_retry_count(state)
-        if count >= settings.sql_agent_max_retries:
+        if count >= retries.max:
             return "end"
         errors = getattr(state.executor_response, "errors", None) or []
         if errors:

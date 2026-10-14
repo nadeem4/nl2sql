@@ -17,6 +17,7 @@ from nl2sql.pipeline.events import RunEvents
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AggregatedResponse
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.runtime import fake_runtime
 
 ANSWER = {"summary": "Rock sells the most tracks, with 1,297 of them.", "format_type": "text",
           "content": "Rock leads with 1,297 tracks, ahead of Latin with 579 and Metal with 374.",
@@ -108,7 +109,7 @@ def test_the_answer_synthesizer_streams_only_when_the_run_asks_it_to():
     server = FakeLLMServer([Rule("AggregatedResponse", ANSWER)]).start()
     try:
         llm = _openai(server)
-        ctx = SimpleNamespace(llm_registry=SimpleNamespace(get_llm=lambda name: llm))
+        ctx = fake_runtime(llm_registry=SimpleNamespace(get_llm=lambda name: llm))
         node = AnswerSynthesizerNode(ctx)
         state = GraphState(user_query="q", aggregator_response=AggregatorResponse(
             terminal_results={"sq_1": [{"genre": "Rock", "tracks": 1297}]}))

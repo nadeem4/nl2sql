@@ -34,6 +34,7 @@ from nl2sql.pipeline.nodes.generator.node import (
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _col(alias: str, name: str) -> Expr:
@@ -74,7 +75,7 @@ def _adapter():
 def _ctx():
     registry = SimpleNamespace(get_adapter=lambda _id: _adapter())
     rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return SimpleNamespace(ds_registry=registry, rbac=rbac)
+    return fake_runtime(ds_registry=registry, rbac=rbac)
 
 
 def _state(plan: PlanModel) -> SubgraphExecutionState:
@@ -302,7 +303,7 @@ def test_a_registry_without_an_adapter_does_not_break_validation():
     # Unit callers build the validator with a bare namespace as its registry;
     # the dialect lookup must degrade rather than raise.
     # Arrange
-    ctx = SimpleNamespace(
+    ctx = fake_runtime(
         ds_registry=SimpleNamespace(),
         rbac=SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"]),
     )

@@ -13,6 +13,7 @@ from nl2sql.api.query_api import result_from_state
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.settings import settings
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline import runtime
 from nl2sql.tracing.recorder import TraceRecorder
 
@@ -70,9 +71,13 @@ def trace_dir(tmp_path, monkeypatch):
 
 
 def _run(monkeypatch, mode, errors):
-    monkeypatch.setattr(settings, "trace_mode", mode)
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _FakeGraph(_planner_run(errors)))
-    return runtime.run_with_graph(None, "how many customers?", user_context=UserContext(roles=["admin"]))
+    # The run reads the mode from its runtime. The trace's settings snapshot is
+    # still taken from the process-global settings until tracing moves onto the
+    # runtime, so the global carries the same mode.
+    monkeypatch.setattr(settings, "trace_mode", mode)
+    ctx = fake_runtime(settings={"traces": {"mode": mode}})
+    return runtime.run_with_graph(ctx, "how many customers?", user_context=UserContext(roles=["admin"]))
 
 
 def test_default_mode_is_on_failure(monkeypatch):
@@ -122,6 +127,16 @@ def test_on_failure_skips_a_clean_run(trace_dir, monkeypatch):
 
 def test_always_writes_a_clean_run(trace_dir, monkeypatch):
     _run(monkeypatch, "always", [])
+    assert len(list(trace_dir.glob("*.json"))) == 1
+
+
+def test_the_mode_is_the_runtime_s_not_the_global(trace_dir, monkeypatch):
+    monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _FakeGraph(_planner_run([])))
+    monkeypatch.setattr(settings, "trace_mode", "off")
+
+    runtime.run_with_graph(fake_runtime(settings={"traces": {"mode": "always"}}), "how many customers?",
+                           user_context=UserContext(roles=["admin"]))
+
     assert len(list(trace_dir.glob("*.json"))) == 1
 
 

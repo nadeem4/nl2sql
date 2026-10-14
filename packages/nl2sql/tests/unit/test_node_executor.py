@@ -9,6 +9,7 @@ from nl2sql.pipeline.nodes.executor.node import ExecutorNode
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.testing import adapter_registry
+from nl2sql.testing.runtime import fake_runtime
 
 
 class FakeAdapter:
@@ -34,7 +35,7 @@ def _ctx(adapters, monkeypatch):
     registry = DatasourceRegistry(SecretManager(), adapter_registry(dict(adapters)))
     for ds_id in adapters:
         registry.register_datasource(Datasource(id=ds_id, type=ds_id))
-    return SimpleNamespace(ds_registry=registry, tenant_id="t1")
+    return fake_runtime(ds_registry=registry, settings={"tenant_id": "t1"})
 
 
 def _state(datasource_id):

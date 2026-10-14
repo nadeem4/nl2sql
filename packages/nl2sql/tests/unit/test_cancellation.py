@@ -14,6 +14,20 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.api import query_api
 from nl2sql.pipeline import runtime
+from nl2sql.testing.runtime import fake_runtime
+
+
+def _ctx(timeout_s=60):
+    """A runtime whose run times out after ``timeout_s`` seconds.
+
+    The config allows whole seconds only; a test needs a fraction of one, so
+    the value is set without validation.
+    """
+    ctx = fake_runtime()
+    pipeline = ctx.config.settings.pipeline.model_copy(update={"timeout_s": timeout_s})
+    settings = ctx.config.settings.model_copy(update={"pipeline": pipeline})
+    ctx.config = ctx.config.model_copy(update={"settings": settings})
+    return ctx
 
 
 def test_tokens_are_independent():
@@ -60,8 +74,8 @@ def test_each_run_gets_its_own_token(monkeypatch):
 
     _use_fake_graph(monkeypatch, on_invoke)
 
-    runtime.run_with_graph(None, "first query", user_context=_USER)
-    runtime.run_with_graph(None, "second query", user_context=_USER)
+    runtime.run_with_graph(_ctx(), "first query", user_context=_USER)
+    runtime.run_with_graph(_ctx(), "second query", user_context=_USER)
 
     assert len(seen) == 2
     assert seen[0] is not seen[1]
@@ -78,7 +92,7 @@ def test_cancelled_run_returns_cancelled_error(monkeypatch):
 
     _use_fake_graph(monkeypatch, on_invoke)
 
-    result = runtime.run_with_graph(None, "cancelled query", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(), "cancelled query", user_context=_USER)
 
     assert "final_answer" not in result
     assert len(result["errors"]) == 1
@@ -89,7 +103,6 @@ def test_cancelled_run_returns_cancelled_error(monkeypatch):
 
 
 def test_run_exceeding_timeout_returns_pipeline_timeout_error(monkeypatch):
-    monkeypatch.setattr(runtime.settings, "global_timeout_sec", 0.05)
 
     def on_invoke(state, config):
         time.sleep(0.5)
@@ -97,7 +110,7 @@ def test_run_exceeding_timeout_returns_pipeline_timeout_error(monkeypatch):
 
     _use_fake_graph(monkeypatch, on_invoke)
 
-    result = runtime.run_with_graph(None, "slow query", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(0.05), "slow query", user_context=_USER)
 
     assert len(result["errors"]) == 1
     error = result["errors"][0]
@@ -112,7 +125,6 @@ def test_a_timed_out_run_tells_the_caller_so(monkeypatch):
     # every caller through QueryAPI and the REST route saw `final_answer: null`
     # with nothing but a PIPELINE_TIMEOUT code.
     # Arrange
-    monkeypatch.setattr(runtime.settings, "global_timeout_sec", 0.05)
 
     def on_invoke(state, config):
         time.sleep(0.5)
@@ -121,7 +133,7 @@ def test_a_timed_out_run_tells_the_caller_so(monkeypatch):
     _use_fake_graph(monkeypatch, on_invoke)
 
     # Act
-    result = query_api.result_from_state(runtime.run_with_graph(None, "slow query", user_context=_USER))
+    result = query_api.result_from_state(runtime.run_with_graph(_ctx(0.05), "slow query", user_context=_USER))
 
     # Assert
     assert result.status == "error"
@@ -149,7 +161,7 @@ def test_routing_error_keeps_its_own_error_code(monkeypatch):
     _use_fake_graph(monkeypatch, on_invoke)
 
     # Act
-    result = runtime.run_with_graph(None, "unroutable query", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(), "unroutable query", user_context=_USER)
 
     # Assert
     assert len(result["errors"]) == 1
@@ -174,7 +186,7 @@ def test_unexpected_crash_still_reports_unknown_error_with_a_stack_trace(monkeyp
     _use_fake_graph(monkeypatch, on_invoke)
 
     # Act
-    result = runtime.run_with_graph(None, "crashing query", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(), "crashing query", user_context=_USER)
 
     # Assert
     assert len(result["errors"]) == 1
@@ -196,10 +208,9 @@ def test_timeout_fires_promptly_and_cancels_token(monkeypatch):
         return {"final_answer": "late"}
 
     _use_fake_graph(monkeypatch, on_invoke)
-    monkeypatch.setattr(runtime.settings, "global_timeout_sec", 0.2)
 
     start = time.perf_counter()
-    result = runtime.run_with_graph(None, "slow query", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(0.2), "slow query", user_context=_USER)
     elapsed = time.perf_counter() - start
 
     assert elapsed < 1.0, f"timeout surfaced after {elapsed:.2f}s"
@@ -215,7 +226,7 @@ def test_run_from_worker_thread_does_not_raise(monkeypatch):
 
     def worker():
         try:
-            box["result"] = runtime.run_with_graph(None, "q", user_context=_USER)
+            box["result"] = runtime.run_with_graph(_ctx(), "q", user_context=_USER)
         except BaseException as exc:  # noqa: BLE001
             box["exc"] = exc
 
@@ -268,7 +279,7 @@ def test_a_cancelled_run_never_starts_the_next_step(monkeypatch):
                         lambda ctx, execute=True: _two_step_graph(first, second))
 
     # Act
-    result = runtime.run_with_graph(None, "q", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(), "q", user_context=_USER)
 
     # Assert
     assert ran == ["first"], "the step after the cancel still ran"
@@ -294,7 +305,7 @@ def test_a_cancelled_run_makes_no_further_model_call(monkeypatch):
     monkeypatch.setattr(runtime, "build_graph",
                         lambda ctx, execute=True: _two_step_graph(first, lambda s: {}))
 
-    result = runtime.run_with_graph(None, "q", user_context=_USER)
+    result = runtime.run_with_graph(_ctx(), "q", user_context=_USER)
 
     assert calls == [], "a model was called after the run was cancelled"
     assert [e.error_code for e in result["errors"]] == [ErrorCode.CANCELLED]
@@ -309,7 +320,7 @@ def test_the_caller_s_token_is_the_one_the_run_obeys(monkeypatch):
         return {"final_answer": "ok"}
 
     _use_fake_graph(monkeypatch, on_invoke)
-    runtime.run_with_graph(None, "q", user_context=_USER, cancellation_token=token)
+    runtime.run_with_graph(_ctx(), "q", user_context=_USER, cancellation_token=token)
 
     assert seen["token"] is token
 

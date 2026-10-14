@@ -31,6 +31,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _col(name: str) -> Expr:
@@ -49,7 +50,7 @@ def _plan(**kwargs) -> PlanModel:
 
 def _ctx(dialect: str = "sqlite", row_limit: int = 1000):
     adapter = SimpleNamespace(row_limit=row_limit, max_bytes=1000, get_dialect=lambda: dialect)
-    return SimpleNamespace(
+    return fake_runtime(
         ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter),
         rbac=SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"]),
     )

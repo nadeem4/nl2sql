@@ -32,6 +32,7 @@ from nl2sql.pipeline.nodes.refiner.node import RefinerNode
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.fake_llm import FakeLLMServer
+from nl2sql.testing.runtime import fake_runtime
 
 FAKE_KEY = "-".join(["sk", "proj", "nodes" + "n" * 30 + "0000"])
 MASKED = "sk-proj-" + "*" * 30 + "0000"
@@ -49,7 +50,7 @@ def _rate_limited():
 def _mock_ctx():
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     return ctx
 
@@ -108,7 +109,7 @@ def rejecting_registry():
 
 
 def _resolver_ctx(registry):
-    return SimpleNamespace(
+    return fake_runtime(
         vector_store=None,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: ["ds1"]),
         ds_registry=SimpleNamespace(get_capabilities=lambda _id: {"supports_sql"}, list_ids=lambda: ["ds1"]),

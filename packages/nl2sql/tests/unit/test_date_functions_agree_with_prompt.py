@@ -23,6 +23,7 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 DATE = Expr(kind="column", alias="t1", column_name="d")
 # Every name in the allow-list that works on a date or time.
@@ -35,7 +36,7 @@ def _unsupported_message(func_name):
         tables=[TableRef(name="T", alias="t1")],
         select_items=[SelectItem(alias="v", expr=Expr(kind="func", func_name=func_name, args=[DATE]))],
     )
-    node = LogicalValidatorNode(SimpleNamespace(
+    node = LogicalValidatorNode(fake_runtime(
         ds_registry=SimpleNamespace(), rbac=SimpleNamespace(get_allowed_tables=lambda _: ["*"])))
     state = SubgraphExecutionState(
         trace_id="t",

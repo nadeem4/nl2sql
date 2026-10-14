@@ -33,8 +33,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Sequence
 
 from nl2sql.auth import UserContext
-from nl2sql.common.settings import settings
-from nl2sql.runtime import Runtime
+from nl2sql.runtime import Runtime, pinned_config
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH, GoldQuestion, load_gold_dataset
 
 
@@ -150,15 +149,12 @@ def run_retrieval_recall(ctx: Runtime, dataset_path: pathlib.Path = GOLD_DATASET
         if not dataset:
             raise ValueError(f"No answerable question matches: {', '.join(question_ids)}")
 
-    saved = settings.schema_retrieval_full_snapshot_max_tables
-    settings.schema_retrieval_full_snapshot_max_tables = 0  # force the vector search on a small schema
-    try:
+    # Force the vector search on a small schema.
+    with pinned_config(ctx, {"settings.retrieval.full_snapshot_max_tables": 0}):
         results = []
         for q in dataset:
             results.append({**score_question(q, _sent(ctx, q, q.datasource)), "datasource_id": q.datasource,
                             "retrieved_datasource_id": _retrieved_datasource(ctx, q.question)})
-    finally:
-        settings.schema_retrieval_full_snapshot_max_tables = saved
 
     from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 

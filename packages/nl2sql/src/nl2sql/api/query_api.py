@@ -390,12 +390,7 @@ class QueryAPI:
 
     def _results(self, tenant_id: Optional[str]) -> ResultReader:
         """A reader of one tenant's saved results: ``tenant_id``, else the engine's own."""
-        store = getattr(self._ctx, "artifact_store", None)
-        if store is None:
-            from nl2sql.execution.artifacts import build_artifact_store
-
-            store = build_artifact_store()
-        return ResultReader(store, tenant_id or getattr(self._ctx, "tenant_id", None) or "")
+        return ResultReader(self._ctx.artifact_store, tenant_id or getattr(self._ctx, "tenant_id", None) or "")
 
     def get_result_manifest(self, request_id: str, tenant_id: Optional[str] = None) -> ResultManifest:
         """

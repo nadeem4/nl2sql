@@ -32,7 +32,6 @@ def test_cache_clear_removes_the_cached_plans_and_keeps_the_schema(tmp_path, mon
     path = tmp_path / "data" / "schema_store.db"
     store = SqliteSchemaStore(path=path)
     cache = PlanCache(store)
-    monkeypatch.setattr(settings, "plan_cache_enabled", True)
     cache.put(_sq("How many customers are there?"), _plan())
     cache.put(_sq("How many albums are there?"), _plan())
     store.close()

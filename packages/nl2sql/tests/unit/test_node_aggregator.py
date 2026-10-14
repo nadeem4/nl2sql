@@ -11,15 +11,17 @@ from nl2sql.pipeline.state import GraphState
 from nl2sql_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorCode
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
-from nl2sql.common.settings import settings
+from nl2sql.testing.runtime import fake_runtime
+
+TEMPLATE = "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet"
 
 
 
 
-def test_aggregator_filters_rows_deterministically(monkeypatch):
+def test_aggregator_filters_rows_deterministically():
     # Validates post-filter logic because aggregation must be deterministic.
     # Arrange
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
 
     scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
@@ -35,18 +37,13 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
-        monkeypatch.setattr(
-            settings,
-            "result_artifact_path_template",
-            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
         store = ArtifactStore(
             ArtifactStoreConfig(
                 base_uri=tmpdir,
-                path_template=settings.result_artifact_path_template,
+                path_template=TEMPLATE,
             )
         )
+        node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1, "value": 5}, {"id": 2, "value": 20}]),
             {
@@ -71,10 +68,10 @@ def test_aggregator_filters_rows_deterministically(monkeypatch):
         assert [r["id"] for r in rows] == [2]
 
 
-def test_aggregator_join_requires_keys(monkeypatch):
+def test_aggregator_join_requires_keys():
     # Validates join guardrails because joins without keys must fail fast.
     # Arrange
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
 
     scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[])
@@ -94,18 +91,13 @@ def test_aggregator_join_requires_keys(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
-        monkeypatch.setattr(
-            settings,
-            "result_artifact_path_template",
-            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
         store = ArtifactStore(
             ArtifactStoreConfig(
                 base_uri=tmpdir,
-                path_template=settings.result_artifact_path_template,
+                path_template=TEMPLATE,
             )
         )
+        node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         left_artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1}]),
             {
@@ -142,7 +134,7 @@ def test_aggregator_join_requires_keys(monkeypatch):
 def test_aggregator_requires_execution_dag():
     # Validates DAG requirement because aggregation must fail without a plan.
     # Arrange
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
     state = GraphState(user_query="q", execution_dag=None)
 
@@ -153,9 +145,9 @@ def test_aggregator_requires_execution_dag():
     assert result["errors"][0].error_code == ErrorCode.AGGREGATOR_FAILED
 
 
-def test_aggregator_post_aggregate_sum(monkeypatch):
+def test_aggregator_post_aggregate_sum():
     # Validates post-aggregate because aggregations must be computed deterministically.
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
 
     scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
@@ -175,18 +167,13 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
-        monkeypatch.setattr(
-            settings,
-            "result_artifact_path_template",
-            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
         store = ArtifactStore(
             ArtifactStoreConfig(
                 base_uri=tmpdir,
-                path_template=settings.result_artifact_path_template,
+                path_template=TEMPLATE,
             )
         )
+        node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"value": 5}, {"value": 7}]),
             {
@@ -209,9 +196,9 @@ def test_aggregator_post_aggregate_sum(monkeypatch):
         assert rows[0]["value"] == 12
 
 
-def test_aggregator_post_sort_limit(monkeypatch):
+def test_aggregator_post_sort_limit():
     # Validates sort/limit because ordering and truncation must be enforced.
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
 
     scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
@@ -242,18 +229,13 @@ def test_aggregator_post_sort_limit(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
-        monkeypatch.setattr(
-            settings,
-            "result_artifact_path_template",
-            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
         store = ArtifactStore(
             ArtifactStoreConfig(
                 base_uri=tmpdir,
-                path_template=settings.result_artifact_path_template,
+                path_template=TEMPLATE,
             )
         )
+        node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"value": 1}, {"value": 3}, {"value": 2}]),
             {
@@ -276,9 +258,9 @@ def test_aggregator_post_sort_limit(monkeypatch):
         assert rows == [{"value": 3}]
 
 
-def test_aggregator_union_combines_rows(monkeypatch):
+def test_aggregator_union_combines_rows():
     # Validates union because combined result should include all rows.
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
 
     scan_left = LogicalNode(node_id="sq_left", kind="scan", inputs=[])
@@ -298,18 +280,13 @@ def test_aggregator_union_combines_rows(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
-        monkeypatch.setattr(
-            settings,
-            "result_artifact_path_template",
-            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
         store = ArtifactStore(
             ArtifactStoreConfig(
                 base_uri=tmpdir,
-                path_template=settings.result_artifact_path_template,
+                path_template=TEMPLATE,
             )
         )
+        node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         left_artifact = store.create_artifact_ref(
             ResultFrame.from_row_dicts([{"id": 1}]),
             {
@@ -344,7 +321,7 @@ def test_aggregator_union_combines_rows(monkeypatch):
 
 def test_aggregator_missing_artifact_reference():
     # Validates missing artifact handling because inputs may be incomplete.
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     node = EngineAggregatorNode(ctx)
 
     scan = LogicalNode(node_id="sq_1", kind="scan", inputs=[])
@@ -356,7 +333,7 @@ def test_aggregator_missing_artifact_reference():
     assert result["errors"][0].error_code == ErrorCode.AGGREGATOR_FAILED
 
 
-def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
+def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason():
     # chinook_009, the shape recorded in
     # benchmarks/tier2/chinook/2026-09-23_de42c40_gpt-5.4.json: two sub-queries
     # each selecting one column aliased `customer`, joined, then a post-combine
@@ -364,7 +341,7 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
     # three tier 2 runs; what reached the caller was polars' own `unable to
     # find column "right.customer"; valid columns: ["customer"]`.
     # Arrange
-    node = EngineAggregatorNode(SimpleNamespace())
+    node = EngineAggregatorNode(fake_runtime())
 
     jazz = LogicalNode(node_id="sq_jazz", kind="scan", inputs=[])
     rock = LogicalNode(node_id="sq_rock", kind="scan", inputs=[])
@@ -392,18 +369,13 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason(monkeypatch):
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        monkeypatch.setattr(settings, "result_artifact_base_uri", tmpdir)
-        monkeypatch.setattr(
-            settings,
-            "result_artifact_path_template",
-            "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
         store = ArtifactStore(
             ArtifactStoreConfig(
                 base_uri=tmpdir,
-                path_template=settings.result_artifact_path_template,
+                path_template=TEMPLATE,
             )
         )
+        node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         refs = {}
         for node_id, names in (("sq_jazz", ["Ann", "Bo"]), ("sq_rock", ["Bo", "Cy"])):
             refs[node_id] = store.create_artifact_ref(

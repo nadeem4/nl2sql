@@ -15,6 +15,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import (
 )
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _col(alias: str, name: str):
@@ -25,7 +26,7 @@ def test_generator_selects_columns_in_the_plan_s_list_order():
     # Validates deterministic ordering because column order affects clients.
     # Arrange
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
@@ -53,7 +54,7 @@ def test_generator_applies_limit_clamp():
     # Validates limit clamping because adapters enforce row limits.
     # Arrange
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
@@ -79,7 +80,7 @@ def test_generator_raises_on_unknown_join_alias():
     # Validates join alias enforcement because invalid aliases must fail fast.
     # Arrange
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
@@ -110,7 +111,7 @@ def test_generator_raises_on_unknown_join_alias():
 def test_generator_requires_datasource_id():
     # Validates datasource requirement because SQL generation depends on adapter dialect.
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     plan = PlanModel(
@@ -133,7 +134,7 @@ def test_generator_requires_datasource_id():
 def test_generator_requires_plan():
     # Validates missing plan handling because generator must fail closed.
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     state = SubgraphExecutionState(
@@ -154,7 +155,7 @@ def test_generator_emits_the_requested_sort_direction():
     is dropped, so every "top N by <aggregate>" answer came back ascending.
     """
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     count_id = Expr(
@@ -194,7 +195,7 @@ def test_generator_keeps_the_then_result_of_a_case():
     import sqlite3
 
     adapter = SimpleNamespace(row_limit=5, max_bytes=1000, get_dialect=lambda: "sqlite")
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     node = GeneratorNode(ctx)
 
     is_jazz = Expr(kind="binary", op="=", left=_col("u", "genre"), right=Expr(kind="literal", value="Jazz"))

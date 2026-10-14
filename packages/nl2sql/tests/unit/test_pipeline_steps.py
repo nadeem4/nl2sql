@@ -13,6 +13,7 @@ import pytest
 from nl2sql.configs.curated import CuratedFileConfig
 from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.pipeline.steps import PIPELINE_STEPS, SQL_AGENT_STEP, describe_pipeline
+from nl2sql.testing.runtime import fake_runtime
 
 CURATED = CuratedFileConfig.model_validate({"datasources": {"ds": {"verified_queries": [
     {"id": "q", "description": "d", "questions": ["How many?"], "sql": "SELECT 1"}]}}})
@@ -37,7 +38,7 @@ def graph_nodes(monkeypatch):
         monkeypatch.setattr(sql_agent, name, _blank)
 
     # With curated answers configured, so the optional curated matcher is in the graph too.
-    ctx = SimpleNamespace(curated=CURATED)
+    ctx = fake_runtime(curated=CURATED)
     top = set(control.build_graph(ctx, execute=True).nodes)
     inner = set(sql_agent.build_sql_agent_graph(ctx, execute=True).nodes)
     # LangGraph adds its own entry node; it is not a step of the pipeline.

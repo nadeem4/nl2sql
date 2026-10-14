@@ -8,11 +8,11 @@ exactly as it already did. No authorisation decision changes.
 """
 from __future__ import annotations
 
-from types import SimpleNamespace
 
 from nl2sql import NL2SQL, QueryResult, UserContext
 from nl2sql.api.query_api import QueryAPI
 from nl2sql.pipeline import runtime
+from nl2sql.testing.runtime import fake_runtime
 
 
 class _FakeGraph:
@@ -28,7 +28,7 @@ def _engine(monkeypatch):
     graph = _FakeGraph()
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: graph)
     engine = NL2SQL.__new__(NL2SQL)
-    engine.query = QueryAPI(SimpleNamespace())
+    engine.query = QueryAPI(fake_runtime())
     return engine, graph
 
 

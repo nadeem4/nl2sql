@@ -7,7 +7,6 @@ if TYPE_CHECKING:
 import polars as pl
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.common.settings import settings
 from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
@@ -29,7 +28,8 @@ class EngineAggregatorNode:
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ctx = ctx
-        self.service = AggregationService(PolarsDuckdbEngine())
+        self.service = AggregationService(PolarsDuckdbEngine(ctx.artifact_store))
+        self.preview_rows = ctx.settings.results.preview_rows
 
     def _capped_combine_inputs(self, state: GraphState) -> List[Tuple[str, str, int]]:
         """``(operation, sub_query_id, row_cap)`` for each combine input that hit its row cap.
@@ -115,7 +115,7 @@ class EngineAggregatorNode:
         return ref.model_copy(update={"sub_query_id": None})
 
     def _tenant_id(self) -> str:
-        return getattr(self.ctx, "tenant_id", None) or settings.tenant_id
+        return self.ctx.tenant_id
 
     def _write_manifest(self, state: GraphState, saved: Dict[str, ArtifactRef]) -> List[ResultSummary]:
         """Writes the run's ``manifest.json`` beside its results: each result's columns,
@@ -148,9 +148,8 @@ class EngineAggregatorNode:
         return seen
 
     def _preview(self, ref: ArtifactRef) -> List[Dict[str, Any]]:
-        """The first ``ANSWER_PREVIEW_ROWS`` rows of a saved result, read from its artifact."""
-        rows = int(settings.answer_preview_rows)
-        return self.service.engine.artifact_store.scan_parquet(ref).head(rows).collect().to_dicts()
+        """The first ``settings.results.preview_rows`` rows of a saved result, read from its artifact."""
+        return self.service.engine.artifact_store.scan_parquet(ref).head(self.preview_rows).collect().to_dicts()
 
     def _truncated(self, refused: List[Tuple[str, str, int]]) -> Dict[str, Any]:
         """Refuses a join/compare over an input cut short by the row cap."""

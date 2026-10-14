@@ -20,6 +20,7 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 NAME = Expr(kind="column", alias="t1", column_name="Name")
 
@@ -35,7 +36,7 @@ def _errors(expr, where="select"):
         order_by=[OrderItem(expr=expr)] if where == "order_by" else [],
     )
     rbac = SimpleNamespace(get_allowed_tables=lambda _: ["*"])
-    node = LogicalValidatorNode(SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac))
+    node = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac))
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="q"),

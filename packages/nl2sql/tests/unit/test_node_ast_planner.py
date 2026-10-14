@@ -7,6 +7,7 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery, ExpectedColumn
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
 from nl2sql.common.errors import ErrorCode
+from nl2sql.testing.runtime import fake_runtime
 
 
 def test_ast_planner_successful_plan():
@@ -14,7 +15,7 @@ def test_ast_planner_successful_plan():
     # Arrange
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
@@ -52,7 +53,7 @@ def test_ast_planner_failure_returns_error():
     # Arrange
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
@@ -76,7 +77,7 @@ def test_ast_planner_none_plan_is_a_planning_failure():
     # AttributeError that happens to land in the except.
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()

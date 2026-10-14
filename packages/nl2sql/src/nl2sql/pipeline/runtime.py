@@ -15,7 +15,7 @@ from nl2sql.auth import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
-from nl2sql.common.settings import run_date, settings
+from nl2sql.common.dates import run_date
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
@@ -161,14 +161,16 @@ def run_with_graph(
         datasource_id=datasource_id,
     )
 
-    timeout_sec = settings.global_timeout_sec
+    settings = ctx.settings
+    timeout_sec = settings.pipeline.timeout_s
     timing = NodeTimingCallback()
-    usage = TokenUsageCallback(prices=settings.llm_prices)
+    usage = TokenUsageCallback(prices={model: price.model_dump(exclude_none=True)
+                                       for model, price in ctx.config.llm.prices.items()})
     recorder = TraceRecorder()
     started_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     # The date the prompts were told; a trace replay pins it, or every planner
     # prompt recorded on another day would differ from the replayed one.
-    today = run_date().isoformat()
+    today = run_date(settings.pipeline.today).isoformat()
     t0 = time.perf_counter()
 
     def _telemetry() -> Dict:
@@ -179,7 +181,7 @@ def run_with_graph(
         """Stamps the trace id and, if the trace was written, where it went."""
         out.setdefault("trace_id", initial_state.trace_id)
         path = write_run_trace(
-            trace_mode or settings.trace_mode,
+            trace_mode or settings.traces.mode,
             trace_id=initial_state.trace_id,
             request={
                 "question": user_query,

@@ -9,11 +9,11 @@ from .schemas import PlanModel, ASTPlannerResponse
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import run_date
+from nl2sql.common.dates import run_date
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
-from nl2sql.pipeline.plan_cache import PlanCache
+from nl2sql.pipeline.plan_cache import plan_cache_for
 from nl2sql.pipeline.retry_feedback import as_planner_feedback
 
 if TYPE_CHECKING:
@@ -59,9 +59,10 @@ class ASTPlannerNode:
             ctx (Runtime): The context of the pipeline.
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.today = ctx.settings.pipeline.today
         # Plans are read here and written by the sub-query wrapper once one has
         # validated and executed (nl2sql.pipeline.graph_utils).
-        self.plan_cache = PlanCache(getattr(ctx, "schema_store", None))
+        self.plan_cache = plan_cache_for(ctx)
         self.llm = ctx.llm_registry.get_llm(self.node_name)
 
         self.prompt = PLANNER_PROMPT
@@ -124,7 +125,7 @@ class ASTPlannerNode:
                     "expected_schema": expected_schema,
                     "semantic_context": semantic_context,
                     "user_query": query_text,
-                    "today": run_date().isoformat(),
+                    "today": run_date(self.today).isoformat(),
                 }
             )
             if plan is None:

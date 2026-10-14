@@ -7,7 +7,7 @@ import polars as pl
 
 from nl2sql.aggregation.columns import missing_columns_message, post_op_columns, resolve_key
 from nl2sql.execution.contracts import ArtifactRef
-from nl2sql.execution.artifacts import build_artifact_store
+from nl2sql.execution.artifacts import ArtifactStore
 
 
 # Every frame here is a polars LazyFrame, or a DataFrame a caller passed in:
@@ -89,8 +89,8 @@ def _aggregate(frame: Frame, attributes: Dict[str, Any]) -> Frame:
 
 
 class PolarsDuckdbEngine:
-    def __init__(self):
-        self.artifact_store = build_artifact_store()
+    def __init__(self, artifact_store: ArtifactStore):
+        self.artifact_store = artifact_store
 
     def load_scan(self, artifact: ArtifactRef) -> pl.LazyFrame:
         """A sub-query's artifact as a polars scan: read only when the result is written."""

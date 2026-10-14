@@ -144,10 +144,12 @@ See `../failure_recovery.md` for retry scope and recovery behavior.
 
 ## Configuration
 
-- `SQL_AGENT_MAX_RETRIES`
-- `SQL_AGENT_RETRY_BASE_DELAY_SEC`
-- `SQL_AGENT_RETRY_MAX_DELAY_SEC`
-- `SQL_AGENT_RETRY_JITTER_SEC`
+Read from the runtime's `settings.pipeline.retries` when the subgraph is built:
+
+- `max` (default `3`)
+- `base_delay_s` (default `1.0`)
+- `max_delay_s` (default `10.0`)
+- `jitter_s` (default `0.5`)
 
 ---
 

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from nl2sql.api.query_api import AnswerSource, QueryResult
 from nl2sql.configs.llm import AgentConfig, LLMFileConfig
 from nl2sql.evaluation import tier2
+from nl2sql.testing.runtime import fake_runtime
 
 QUESTIONS = [SimpleNamespace(id="q0", question="?", tags=["join"], difficulty="easy"),
              SimpleNamespace(id="q1", question="?", tags=["join"], difficulty="easy")]
@@ -21,7 +22,7 @@ def _row(question, role, status):
             "reason": "", "sql": "SELECT 1", "rows": 1, "gold_rows": 1}
 
 
-def _fake_runner(seen, sources):
+def _fake_runner(seen, sources, pins):
     """A runner whose q0 is answered by a verified query when curated answers are on."""
     class _Runner:
         def __init__(self, config, ctx, workers, before_case):
@@ -32,6 +33,7 @@ def _fake_runner(seen, sources):
 
         def run_case(self, question, role):
             seen.append(self.ctx.curated)
+            pins.append((self.ctx.config.policies.refusal_names_tables, self.ctx.settings.pipeline.plan_cache))
             verified = self.ctx.curated is not None and question.id == "q0"
             source = sources.get(question.id) if verified else None
             result = QueryResult(source=source or AnswerSource())
@@ -40,16 +42,20 @@ def _fake_runner(seen, sources):
 
 
 def _ctx(curated):
-    return SimpleNamespace(curated=curated, llm_registry=SimpleNamespace(replace_llms=lambda _agents: None))
+    # The demo names forbidden tables and caches plans; tier 2 pins both off for its run.
+    return fake_runtime(policies={"refusal_names_tables": True}, curated=curated,
+                        llm_registry=SimpleNamespace(replace_llms=lambda _agents: None))
 
 
 def _run(monkeypatch, ctx, **kwargs):
-    seen = []
+    seen, pins = [], []
     sources = {"q0": AnswerSource(type="verified", id="top_customers", datasource_id="chinook")}
-    monkeypatch.setattr(tier2, "BenchmarkRunner", _fake_runner(seen, sources))
+    monkeypatch.setattr(tier2, "BenchmarkRunner", _fake_runner(seen, sources, pins))
     cfg = LLMFileConfig(default=AgentConfig(provider="openai", model="gpt-5.4"))
     board = tier2.run_tier2(ctx, SimpleNamespace(dataset_path="gold.yaml", roles=["admin"]), {"a": cfg},
                             max_cost=1.0, **kwargs)
+    assert pins == [(False, False)] * len(QUESTIONS)
+    assert ctx.config.policies.refusal_names_tables is True and ctx.settings.pipeline.plan_cache is True
     return board, seen
 
 

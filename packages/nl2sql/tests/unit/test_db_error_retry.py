@@ -18,7 +18,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
-from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
@@ -31,6 +30,7 @@ from nl2sql.pipeline.retry_feedback import latest_attempt
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 from nl2sql_sdk.contracts import ResultError, ResultFrame
+from nl2sql.testing.runtime import fake_runtime
 
 
 # --- the executor service keeps the adapter's verdict ----------------------
@@ -38,7 +38,7 @@ from nl2sql_sdk.contracts import ResultError, ResultFrame
 def _service(frame: ResultFrame) -> SqlExecutorService:
     adapter = SimpleNamespace(execute=lambda _request: frame)
     registry = SimpleNamespace(supports=lambda *_a: True, get_adapter=lambda _id: adapter)
-    return SqlExecutorService(registry)
+    return SqlExecutorService(registry, fake_runtime().artifact_store, fetch_batch_size=10_000)
 
 
 def _request() -> ExecutorRequest:
@@ -82,11 +82,9 @@ def _db_error(retryable: bool) -> PipelineError:
         error_code=ErrorCode.EXECUTION_FAILED if retryable else ErrorCode.DB_EXECUTION_ERROR)
 
 
-def _graph(monkeypatch, executor_errors):
+def _graph(monkeypatch, executor_errors, max_retries=3):
     """A subgraph whose executor fails with ``executor_errors[i]`` on attempt i (none once they run out)."""
     calls = {"planner": 0, "executor": 0, "refiner": 0}
-    monkeypatch.setattr(settings, "sql_agent_retry_base_delay_sec", 0)
-    monkeypatch.setattr(settings, "sql_agent_retry_jitter_sec", 0)
 
     def planner(state):
         calls["planner"] += 1
@@ -114,7 +112,8 @@ def _graph(monkeypatch, executor_errors):
     }
     for name, node in nodes.items():
         monkeypatch.setattr(f"nl2sql.pipeline.subgraphs.sql_agent.{name}", lambda _ctx, node=node: node)
-    graph = build_sql_agent_graph(SimpleNamespace())
+    graph = build_sql_agent_graph(fake_runtime(settings={"pipeline": {"retries": {
+        "max": max_retries, "base_delay_s": 0, "jitter_s": 0}}}))
     state = SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"))
     return graph.invoke(state), calls
 
@@ -135,8 +134,7 @@ def test_a_refusal_ends_the_sub_query(monkeypatch):
 
 
 def test_database_retries_stop_at_the_retry_budget(monkeypatch):
-    monkeypatch.setattr(settings, "sql_agent_max_retries", 2)
-    result, calls = _graph(monkeypatch, [_db_error(retryable=True)] * 10)
+    result, calls = _graph(monkeypatch, [_db_error(retryable=True)] * 10, max_retries=2)
 
     assert calls["executor"] == 3
     assert result["retry_count"] == 2
@@ -169,7 +167,7 @@ def test_latest_attempt_is_the_errors_since_the_previous_refinement():
 def test_the_planner_is_told_only_the_latest_attempt_without_traces():
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
@@ -197,7 +195,7 @@ def test_the_refiner_is_told_only_the_latest_attempt():
             captured.update(inputs)
             return "The column is FirstName."
 
-    node = RefinerNode(SimpleNamespace(llm_registry=SimpleNamespace(get_llm=lambda _name: None)))
+    node = RefinerNode(fake_runtime(llm_registry=SimpleNamespace(get_llm=lambda _name: None)))
     node.chain = _Chain()
 
     node(SubgraphExecutionState(trace_id="t", errors=[FIRST, FEEDBACK_1, SECOND]))

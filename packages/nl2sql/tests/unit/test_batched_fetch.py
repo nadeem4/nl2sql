@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import polars as pl
 import pytest
 
-from nl2sql.common.settings import settings
+from nl2sql.config import ResultSettings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
@@ -60,11 +60,11 @@ class _StreamingAdapter:
             yield ResultFrame(columns=COLUMNS, rows=chunk, row_count=len(chunk), bytes=10 * len(chunk))
 
 
-def _service(tmp_path, monkeypatch, adapter):
-    monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
-    monkeypatch.setattr(settings, "result_artifact_path_template", "<tenant_id>/<request_id>/<sub_query_id>.parquet")
+def _service(tmp_path, adapter, batch_size=10_000):
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
+                                              path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
     registry = SimpleNamespace(get_adapter=lambda ds: adapter, supports=lambda ds, cap: True)
-    return SqlExecutorService(registry)
+    return SqlExecutorService(registry, store, fetch_batch_size=batch_size)
 
 
 def _run(service):
@@ -83,8 +83,7 @@ def test_the_streaming_protocol_is_part_of_the_sdk():
 
 def test_a_result_larger_than_a_batch_is_written_batch_by_batch(tmp_path, monkeypatch):
     adapter = _StreamingAdapter(_rows(23))
-    service = _service(tmp_path / "streamed", monkeypatch, adapter)
-    monkeypatch.setattr(settings, "result_fetch_batch_size", 5)
+    service = _service(tmp_path / "streamed", adapter, batch_size=5)
 
     response = _run(service)
 
@@ -96,14 +95,14 @@ def test_a_result_larger_than_a_batch_is_written_batch_by_batch(tmp_path, monkey
     assert response.metrics["row_count"] == 23
     assert response.metrics["bytes_returned"] == 230
 
-    one_shot = _service(tmp_path / "one_shot", monkeypatch, _OneShotAdapter(_rows(23)))
+    one_shot = _service(tmp_path / "one_shot", _OneShotAdapter(_rows(23)))
     expected = _read(one_shot, _run(one_shot).artifact)
     assert _read(service, response.artifact).equals(expected)
     assert _read(service, response.artifact)["note"].dtype == pl.String
 
 
 def test_an_adapter_without_execute_batches_still_works(tmp_path, monkeypatch):
-    service = _service(tmp_path, monkeypatch, _OneShotAdapter(_rows(7)))
+    service = _service(tmp_path, _OneShotAdapter(_rows(7)))
 
     response = _run(service)
 
@@ -113,8 +112,7 @@ def test_an_adapter_without_execute_batches_still_works(tmp_path, monkeypatch):
 
 
 def test_a_failure_mid_stream_fails_the_sub_query_and_leaves_no_artifact(tmp_path, monkeypatch):
-    service = _service(tmp_path, monkeypatch, _StreamingAdapter(_rows(23), fail_after=2))
-    monkeypatch.setattr(settings, "result_fetch_batch_size", 5)
+    service = _service(tmp_path, _StreamingAdapter(_rows(23), fail_after=2), batch_size=5)
 
     response = _run(service)
 
@@ -128,7 +126,7 @@ def test_an_empty_streamed_result_keeps_its_columns(tmp_path, monkeypatch):
         def execute_batches(self, request, batch_size):
             yield ResultFrame(columns=COLUMNS, rows=[], row_count=0)
 
-    service = _service(tmp_path, monkeypatch, _Empty([]))
+    service = _service(tmp_path, _Empty([]))
 
     response = _run(service)
 
@@ -137,7 +135,7 @@ def test_an_empty_streamed_result_keeps_its_columns(tmp_path, monkeypatch):
 
 
 def test_the_batch_size_has_a_setting():
-    assert settings.result_fetch_batch_size == 10_000
+    assert ResultSettings().fetch_batch_size == 10_000
 
 
 def test_the_store_writes_batches_to_one_artifact(tmp_path):

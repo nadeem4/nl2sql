@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
 from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 from nl2sql.datasources.models import matches_table
 from .schema import Table, Column
@@ -36,6 +35,7 @@ class SchemaRetrieverNode:
         self.schema_store = ctx.schema_store
         self.rbac = getattr(ctx, "rbac", None)
         self.ds_registry = getattr(ctx, "ds_registry", None)
+        self.full_snapshot_max_tables = ctx.settings.retrieval.full_snapshot_max_tables
 
     def _preferred(self, datasource_id: str) -> Callable[[TableRef], bool]:
         """Whether a table is one of the datasource's ``preferred_tables``."""
@@ -260,7 +260,7 @@ class SchemaRetrieverNode:
             snapshot = self._resolve_snapshot(datasource_id, schema_version)
             readable = self._readable(state, datasource_id)
             preferred = self._preferred(datasource_id)
-            limit = settings.schema_retrieval_full_snapshot_max_tables
+            limit = self.full_snapshot_max_tables
             if snapshot and len(snapshot.contract.tables) <= limit:
                 tables_out = self._build_tables_from_snapshot(
                     snapshot, resolved_tables=None, schema_version=schema_version,

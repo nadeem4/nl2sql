@@ -4,8 +4,8 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from nl2sql.common.settings import settings
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig, build_artifact_store
+from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts.store import DEFAULT_PATH_TEMPLATE
 from nl2sql_sdk.contracts import ResultFrame
 
 
@@ -91,25 +91,10 @@ class TestPathTemplate:
         # Validates the shipped default against the keys the SQL executor supplies.
         # Arrange
         with tempfile.TemporaryDirectory() as tmpdir:
-            store = ArtifactStore(_local_config(tmpdir, settings.result_artifact_path_template))
+            store = ArtifactStore(_local_config(tmpdir, DEFAULT_PATH_TEMPLATE))
 
             # Act
             artifact = store.create_artifact_ref(_frame(), _executor_metadata())
 
             # Assert
             assert Path(artifact.uri) == Path(tmpdir).resolve() / "t1" / "r1" / "sq_1.parquet"
-
-
-class TestFactory:
-    def test_the_store_writes_under_the_results_folder_the_settings_name(self, monkeypatch, tmp_path):
-        # Validates the one remaining location: the remote backends were removed in 0.5.
-        # Arrange
-        monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path / "results"))
-
-        # Act
-        artifact = build_artifact_store().create_artifact_ref(_frame(), _executor_metadata())
-
-        # Assert
-        assert Path(artifact.uri).is_relative_to((tmp_path / "results").resolve())
-        assert artifact.backend == "local"
-

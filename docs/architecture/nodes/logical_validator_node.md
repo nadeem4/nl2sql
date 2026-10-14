@@ -183,7 +183,7 @@ Side effects:
    Each forbidden table yields a `CRITICAL` `SECURITY_VIOLATION` whose message
    is "You do not have permission to see the data this question requires."
    (it names nothing), with `details` = `{datasource_id, table, roles}` for the
-   trace, and a warning log line. `RBAC_REFUSAL_NAMES_TABLES=true` puts the role
+   trace, and a warning log line. `policies.refusal_names_tables: true` puts the role
    and table in the message instead. An unknown role, or no role, allows no
    table and is refused the same way. The decision reads only the policy and
    the plan's table list, never the model's reasoning.
@@ -253,7 +253,7 @@ Emits `PipelineError` with:
 
 ## Configuration
 
-- `settings.logical_validator_strict_columns` (`LOGICAL_VALIDATOR_STRICT_COLUMNS`, default `true`) controls severity of missing column errors: `ERROR` (blocking, retried) when on, `WARNING` when off.
+- `settings.pipeline.strict_columns` (default `true`) controls severity of missing column errors: `ERROR` (blocking, retried) when on, `WARNING` when off.
 
 ---
 

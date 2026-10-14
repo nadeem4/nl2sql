@@ -13,7 +13,6 @@ import yaml
 
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
@@ -107,9 +106,6 @@ def indexed_env() -> SimpleNamespace:
     collection_name = f"itest_resolver_{uuid.uuid4().hex}"
     vector_store_path = tmp_dir / "chroma"
     schema_store_path = tmp_dir / "schema_store.db"
-    monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
-    monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
     ctx = Runtime.from_config(make_demo_config(tmp_dir))
     orchestrator = IndexingOrchestrator(ctx)
@@ -175,7 +171,7 @@ def test_datasource_resolver_real_queries(
     assert prompt.endswith(user_query)
 
 
-def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[Runtime, str]:
+def _build_schema_mismatch_context(indexed_env, tmp_path: Path, policy) -> tuple[Runtime, str]:
     from nl2sql.config import demo_config
 
     base_ds = demo_config().datasources[0].model_dump(mode="json", exclude_defaults=True,
@@ -195,7 +191,8 @@ def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[Runtime
     # version mismatch is between an index entry and the store, and with one
     # datasource no index entry is read.
     datasources = [base_ds, {**base_ds, "id": "chinook_copy"}]
-    ctx = _use_fake_judge(Runtime.from_config(make_demo_config(tmp_path, datasources=datasources), stores=stores))
+    config = make_demo_config(tmp_path, datasources=datasources, settings={"schema": {"version_mismatch": policy}})
+    ctx = _use_fake_judge(Runtime.from_config(config, stores=stores))
 
     adapter = ctx.ds_registry.get_adapter("chinook")
     snapshot = adapter.fetch_schema_snapshot()
@@ -213,11 +210,7 @@ def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[Runtime
 
 
 def test_datasource_resolver_schema_mismatch_warn(indexed_env, tmp_path, monkeypatch) -> None:
-    ctx, _new_version = _build_schema_mismatch_context(indexed_env, tmp_path)
-    monkeypatch.setattr(
-        "nl2sql.pipeline.nodes.datasource_resolver.node.settings.schema_version_mismatch_policy",
-        "warn",
-    )
+    ctx, _new_version = _build_schema_mismatch_context(indexed_env, tmp_path, "warn")
 
     node = DatasourceResolverNode(ctx)
     result = node(
@@ -231,11 +224,7 @@ def test_datasource_resolver_schema_mismatch_warn(indexed_env, tmp_path, monkeyp
 
 
 def test_datasource_resolver_schema_mismatch_fail(indexed_env, tmp_path, monkeypatch) -> None:
-    ctx, _new_version = _build_schema_mismatch_context(indexed_env, tmp_path)
-    monkeypatch.setattr(
-        "nl2sql.pipeline.nodes.datasource_resolver.node.settings.schema_version_mismatch_policy",
-        "fail",
-    )
+    ctx, _new_version = _build_schema_mismatch_context(indexed_env, tmp_path, "fail")
 
     node = DatasourceResolverNode(ctx)
     result = node(

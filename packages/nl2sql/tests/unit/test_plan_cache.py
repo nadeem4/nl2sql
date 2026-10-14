@@ -9,27 +9,21 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
-from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.pipeline.graph_utils import wrap_subgraph
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
-from nl2sql.pipeline.plan_cache import PlanCache, normalize_question
+from nl2sql.pipeline.plan_cache import PlanCache, normalize_question, plan_cache_for
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.schema import InMemorySchemaStore, SqliteSchemaStore
-
-
-@pytest.fixture(autouse=True)
-def _cache_on(monkeypatch):
-    monkeypatch.setattr(settings, "plan_cache_enabled", True)
+from nl2sql.testing.runtime import fake_runtime
 
 
 @pytest.fixture(params=["sqlite", "memory"])
@@ -116,23 +110,20 @@ def test_a_different_question_misses(store):
     assert cache.get(_sq(intent="How many customers are there in Brazil?")) is None
 
 
-def test_a_plan_cached_on_one_day_misses_on_the_next(store, monkeypatch):
+def test_a_plan_cached_on_one_day_misses_on_the_next(store):
     """"The last 30 days" is planned as literal dates from the run date.
 
     Served on another day, yesterday's plan would answer for yesterday's
     window, so the run date is part of the key.
     """
-    cache = PlanCache(store)
-    monkeypatch.setattr(settings, "today", date(2013, 12, 31))
-    cache.put(_sq(intent="Invoices in the last 30 days"), _plan("as of 2013-12-31"))
+    PlanCache(store, today=date(2013, 12, 31)).put(_sq(intent="Invoices in the last 30 days"),
+                                                   _plan("as of 2013-12-31"))
 
-    monkeypatch.setattr(settings, "today", date(2014, 1, 1))
-    assert cache.get(_sq(intent="Invoices in the last 30 days")) is None
+    assert PlanCache(store, today=date(2014, 1, 1)).get(_sq(intent="Invoices in the last 30 days")) is None
 
 
-def test_a_plan_cached_today_still_hits_today(store, monkeypatch):
-    cache = PlanCache(store)
-    monkeypatch.setattr(settings, "today", date(2013, 12, 31))
+def test_a_plan_cached_today_still_hits_today(store):
+    cache = PlanCache(store, today=date(2013, 12, 31))
     cache.put(_sq(intent="Invoices in the last 30 days"), _plan("as of 2013-12-31"))
 
     assert cache.get(_sq(intent="invoices in the last 30 days")).reasoning == "as of 2013-12-31"
@@ -154,16 +145,22 @@ def test_putting_again_replaces_the_plan(store):
     assert cache.get(_sq()).reasoning == "second"
 
 
-def test_the_disable_setting_turns_off_reads_and_writes(store, monkeypatch):
-    cache = PlanCache(store)
-    cache.put(_sq(), _plan())
+def test_the_disable_setting_turns_off_reads_and_writes(store):
+    PlanCache(store).put(_sq(), _plan())
 
-    monkeypatch.setattr(settings, "plan_cache_enabled", False)
-    assert cache.get(_sq()) is None
-    assert cache.put(_sq(intent="another question"), _plan()) is False
+    off = PlanCache(store, enabled=False)
+    assert off.get(_sq()) is None
+    assert off.put(_sq(intent="another question"), _plan()) is False
 
-    monkeypatch.setattr(settings, "plan_cache_enabled", True)
-    assert cache.get(_sq(intent="another question")) is None
+    assert PlanCache(store).get(_sq(intent="another question")) is None
+
+
+def test_the_planner_and_the_wrapper_take_the_cache_setting_from_the_runtime(store):
+    PlanCache(store).put(_sq(), _plan("cached"))
+
+    assert plan_cache_for(fake_runtime(schema_store=store)).get(_sq()).reasoning == "cached"
+    off = fake_runtime(schema_store=store, settings={"pipeline": {"plan_cache": False}})
+    assert plan_cache_for(off).get(_sq()) is None
 
 
 def test_clear_removes_every_cached_plan(store):
@@ -200,7 +197,7 @@ def test_the_sqlite_cache_lives_in_the_schema_store_file_and_survives_a_reopen(t
 def test_an_unreadable_cached_plan_is_a_miss(tmp_path):
     store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
     try:
-        store.put_cached_plan(*PlanCache._key(_sq()), "{not json")
+        store.put_cached_plan(*PlanCache(store)._key(_sq()), "{not json")
         assert PlanCache(store).get(_sq()) is None
     finally:
         store.close()
@@ -222,7 +219,7 @@ def test_a_plan_cached_before_the_ordinal_fields_were_dropped_is_a_miss(tmp_path
     store = SqliteSchemaStore(path=tmp_path / "schema_store.db")
     try:
         cache = PlanCache(store)
-        store.put_cached_plan(*PlanCache._key(_sq()), stale)
+        store.put_cached_plan(*PlanCache(store)._key(_sq()), stale)
 
         assert cache.get(_sq()) is None
 
@@ -238,7 +235,7 @@ def test_a_plan_cached_before_the_ordinal_fields_were_dropped_is_a_miss(tmp_path
 def _planner(store):
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock(), schema_store=store)
+    ctx = fake_runtime(llm_registry=MagicMock(), schema_store=store)
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
@@ -325,7 +322,7 @@ def _executed(artifact=None, errors=()):
 
 
 def _run_wrapped(store, returned, execute=True):
-    ctx = SimpleNamespace(schema_store=store)
+    ctx = fake_runtime(schema_store=store)
     return wrap_subgraph(_Sub(returned), "sql_agent", ctx, execute=execute)(_wrapper_state())
 
 

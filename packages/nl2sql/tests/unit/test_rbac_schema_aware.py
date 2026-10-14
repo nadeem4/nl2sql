@@ -35,6 +35,7 @@ from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql_sdk.schema import TableRef
 
 DS = "shop"
@@ -155,7 +156,7 @@ def _validator_allows(rbac: RBAC, schema, table) -> bool:
         ast_planner_response=ASTPlannerResponse(plan=plan),
         user_context=UserContext(roles=["r"]),
     )
-    node = LogicalValidatorNode(SimpleNamespace(ds_registry=_registry(), rbac=rbac))
+    node = LogicalValidatorNode(fake_runtime(ds_registry=_registry(), rbac=rbac))
     return not node._validate_policy(state)
 
 
@@ -221,8 +222,7 @@ def test_the_executor_value_check_asks_with_the_schema(monkeypatch):
         select_items=[SelectItem(expr=Expr(kind="column", alias="a", column_name="id"))],
         joins=[],
     )
-    node = executor_module.ExecutorNode.__new__(executor_module.ExecutorNode)
-    node.rbac, node.ds_registry = _rbac(f"{DS}.sales.orders"), _registry()
+    node = executor_module.ExecutorNode(fake_runtime(rbac=_rbac(f"{DS}.sales.orders"), ds_registry=_registry()))
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id=DS, intent="orders"),
@@ -269,7 +269,7 @@ def test_the_refusal_names_the_schema_only_outside_the_default_one():
             ast_planner_response=ASTPlannerResponse(plan=plan),
             user_context=UserContext(roles=["r"]),
         )
-        node = LogicalValidatorNode(SimpleNamespace(ds_registry=_registry(), rbac=rbac))
+        node = LogicalValidatorNode(fake_runtime(ds_registry=_registry(), rbac=rbac))
         return node._validate_policy(state)[0].details["table"]
 
     assert refused(None) == f"{DS}.orders"

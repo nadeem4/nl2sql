@@ -41,6 +41,7 @@ from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 
 from nl2sql.datasets import CHINOOK_DB_PATH as CHINOOK
+from nl2sql.testing.runtime import fake_runtime
 DATE = Expr(kind="column", alias="t1", column_name="InvoiceDate")
 
 
@@ -61,7 +62,7 @@ def _state(plan):
 
 
 def _sql(plan, adapter):
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     result = GeneratorNode(ctx)(_state(plan))
     assert not result.get("errors"), result.get("errors")
     return result["generator_response"].sql_draft

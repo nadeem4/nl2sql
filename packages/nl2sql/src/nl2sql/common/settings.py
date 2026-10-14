@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any, Dict, Literal, Optional
 import os
 from pydantic import AliasChoices, Field, SecretStr
@@ -323,11 +323,6 @@ def load_settings() -> Settings:
 
 
 settings = load_settings()
-
-def run_date() -> date:
-    """Today, for the prompts: ``NL2SQL_TODAY`` when set, else the UTC date."""
-    return settings.today or datetime.now(timezone.utc).date()
-
 
 def reload_settings() -> Settings:
     """Re-read settings from the environment and refresh the module singleton.

@@ -11,7 +11,6 @@ from langchain_core.documents import Document
 from nl2sql.auth import UserContext
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
-from nl2sql.common.settings import settings
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
 from .prompts import ANSWERABILITY_PROMPT
@@ -50,6 +49,7 @@ class DatasourceResolverNode:
         self.rbac = ctx.rbac
         self.ds_registry = ctx.ds_registry
         self.schema_store = ctx.schema_store
+        self.version_mismatch = ctx.settings.schema_.version_mismatch
         # Registered as agent "datasourceresolver"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.answerability_chain = ANSWERABILITY_PROMPT | structured(self.llm, AnswerabilityResponse)
@@ -140,7 +140,7 @@ class DatasourceResolverNode:
                 if ds.schema_version_mismatch
         ]
         if mismatches:
-            policy = (settings.schema_version_mismatch_policy or "warn").lower()
+            policy = self.version_mismatch
             message = (
                 "Schema version mismatch for datasources: "
                 + ", ".join(sorted(mismatches))

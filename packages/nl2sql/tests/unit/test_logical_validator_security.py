@@ -7,13 +7,14 @@ from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode
+from nl2sql.testing.runtime import fake_runtime
 
 
 def test_logical_validator_enforces_policy_namespace():
     # Validates security enforcement because unauthorized tables must be blocked.
     # Arrange
     rbac = SimpleNamespace(get_allowed_tables=lambda _: ["ds1.allowed"])
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac)
+    ctx = fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
     node = LogicalValidatorNode(ctx)
 
     plan = PlanModel(
@@ -40,7 +41,7 @@ def test_logical_validator_enforces_policy_namespace():
 def test_logical_validator_missing_datasource_id_fails_closed():
     # Validates security enforcement when datasource_id is missing.
     rbac = SimpleNamespace(get_allowed_tables=lambda _: ["*"])
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac)
+    ctx = fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
     node = LogicalValidatorNode(ctx)
 
     plan = PlanModel(
