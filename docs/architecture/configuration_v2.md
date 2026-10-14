@@ -86,6 +86,28 @@ Two rules from earlier decisions apply throughout:
 
 ## 2. The config files
 
+!!! note "Built: the models and `load_config` (PR 2)"
+    The models, `load_config`, `ConfigError`, `load_env_file` and the
+    `nl2sql.testing.config.make_config` test helper are in `nl2sql.config`.
+    Nothing reads them yet: the engine is moved onto them in PR 7a, and they
+    are exported from `nl2sql` from then on. Until PR 7b this section stays the
+    reference. Building them settled these details:
+
+    - In `Settings`, the `schema` group is the attribute `schema_` in Python,
+      because `schema` would shadow a pydantic method. The YAML key is
+      `schema`.
+    - `Policies.allow_all()` (the shorthand) and the `allow_all` field share a
+      name: the shorthand answers on the class, the field on an instance.
+      `default_role` must name one of the `roles`.
+    - A secret provider's own keys (everything but `id` and `type`) keep their
+      references, like a datasource's `connection`, until the provider's
+      `config_model` (PR 4) says which of them are secrets.
+    - Outside secret fields and `connection`, only `${env:...}` resolves at
+      load. Another provider's reference there is an error that names the
+      field.
+    - `datasources` is required in code as well as in the file; `[]` is
+      enough.
+
 ### The table of contents
 
 `nl2sql.yaml` is short. `nl2sql init` writes it with each section in its own
@@ -166,6 +188,7 @@ connection:
   password: "${env:SALES_DB_PASSWORD}"
 limits: { row_limit: 1000, timeout_ms: 8000 }
 preferred_tables: [public.revenue_daily]
+domains: [revenue, customers, orders]
 sample_questions:
   - What was revenue by region last quarter?
   - Which customers placed the most orders this year?
@@ -237,6 +260,7 @@ names are the YAML keys.
 | `limits` | `Limits` | `Limits()` | `options.row_limit`, `options.statement_timeout_ms`, `options.max_bytes` and the top-level fold |
 | `preferred_tables` | `list[str]` | `[]` | `preferred_tables` |
 | `sample_questions` | `list[str]` | `[]` | `sample_questions.yaml`, keyed by datasource |
+| `domains` | `list[str]` | `[]` | new: a routing hint written by people. The domains generated at indexing are separate and stored with the index. Routing does not read it yet (a later phase). |
 | `required` | `bool` | `False` | new: `engine.check()` fails if this datasource cannot connect |
 | `adapter` | adapter object | `None` | new: pass a built adapter instead of `type` (code only) |
 
@@ -863,6 +887,14 @@ hashicorp = "nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"
 
 ### Interfaces and versions
 
+!!! note "Built: the two SDK interfaces"
+    PR 4 built the adapter and secret provider rows below: the attributes on
+    `DatasourceAdapterProtocol` and the five built-in adapters, and
+    `nl2sql_sdk.secrets.SecretProvider` with the four built-in providers.
+    A provider's `config_model` covers its block apart from `id` and `type`.
+    Until the registry (PR 5), `nl2sql/secrets/factory.py` maps the four
+    built-in `type` names to their classes.
+
 Each Phase 1 interface carries `interface_version: ClassVar[int]`. The engine
 accepts exactly the version it was built for, and anything else is a load
 error: "`nl2sql-snowflake` implements adapter interface 0; this engine needs
@@ -1109,7 +1141,7 @@ def test_two_engines_in_one_process_keep_their_own_config(tmp_path, fake_llm):
 ## 9. The SDK rename: `nl2sql-sdk`
 
 !!! note "Built"
-    The rename is built (PR 1). The `secrets` module comes with PR 4.
+    The rename is built (PR 1), and so is the `secrets` module (PR 4).
 
 | What | 0.4 | 0.5 |
 |---|---|---|

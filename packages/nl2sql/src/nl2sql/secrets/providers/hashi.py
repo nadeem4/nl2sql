@@ -1,46 +1,49 @@
-from typing import Optional
-import os
 import logging
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 logger = logging.getLogger(__name__)
 
+
+class HashiCorpSecretConfig(BaseModel):
+    """Settings for HashiCorp Vault (KV version 2, token auth)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(..., description="URL of the Vault server.")
+    token: SecretStr = Field(..., description="Vault token.")
+    mount_point: str = Field("secret", description="Mount point of the KV v2 secrets engine.")
+
+
 class HashiCorpSecretProvider:
-    """Fetches secrets from HashiCorp Vault."""
-    
-    def __init__(self):
+    """Reads ``${id:path:field}`` from HashiCorp Vault's KV v2 engine.
+
+    The key is the secret's path and, after a colon, the field to read; a key
+    without a colon reads the field ``value``.
+    """
+
+    interface_version = 1
+    config_model = HashiCorpSecretConfig
+
+    def __init__(self, client: Any, mount_point: str = "secret"):
+        self.client = client
+        self.mount_point = mount_point
+
+    @classmethod
+    def from_config(cls, cfg: HashiCorpSecretConfig) -> "HashiCorpSecretProvider":
         try:
             import hvac
-            url = os.environ.get("VAULT_ADDR", "http://localhost:8200")
-            token = os.environ.get("VAULT_TOKEN")
-            
-            # Simple Token Auth for now, can extend to AppRole later
-            self.client = hvac.Client(url=url, token=token)
-            self._available = True
         except ImportError:
-            self.client = None
-            self._available = False
-            logger.warning("HashiCorp Secret Provider initialized but 'hvac' missing. Install 'nl2sql-engine[hashicorp]'.")
+            raise ImportError("Missing dependency 'hvac'. Install 'nl2sql-engine[hashicorp]'.") from None
+        client = hvac.Client(url=cfg.url, token=cfg.token.get_secret_value())
+        return cls(client, cfg.mount_point)
 
     def get_secret(self, key: str) -> Optional[str]:
-        if not self._available or not self.client:
-             raise ImportError("HashiCorp Secret Provider is not available.")
-             
+        path, _, field = key.partition(":")
         try:
-            # key is assumed to be path/to/secret:key or just path (if single value?)
-            # Let's assume standard kv v2: "secret/data/my-app:password"
-            # Format: "mount/path:key"
-            
-            if ":" in key:
-                path, field = key.split(":", 1)
-            else:
-                path = key
-                field = "value" # Default field?
-
-            # Using KV V2
-            response = self.client.secrets.kv.v2.read_secret_version(path=path)
-            data = response['data']['data']
-            return data.get(field)
-            
+            response = self.client.secrets.kv.v2.read_secret_version(path=path, mount_point=self.mount_point)
         except Exception as e:
             logger.error(f"Failed to fetch secret '{key}' from Vault: {e}")
             return None
+        return response["data"]["data"].get(field or "value")

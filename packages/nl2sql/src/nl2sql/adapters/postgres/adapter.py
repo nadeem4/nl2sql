@@ -23,6 +23,9 @@ class PostgresConnectionConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
 class PostgresAdapter(BaseSQLAlchemyAdapter):
+    interface_version = 1
+    driver_modules = ("psycopg2",)
+    install_hint = 'pip install "nl2sql-engine[postgres]"'
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
         """Constructs the Postgres connection URI.

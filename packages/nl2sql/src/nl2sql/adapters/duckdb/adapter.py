@@ -26,6 +26,9 @@ class DuckdbConnectionConfig(BaseModel):
 
 
 class DuckdbAdapter(BaseSQLAlchemyAdapter):
+    interface_version = 1
+    driver_modules = ("duckdb", "duckdb_engine")
+    install_hint = 'pip install "nl2sql-engine[duckdb]"'
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
         """Constructs the DuckDB connection URI.
