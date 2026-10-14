@@ -1191,6 +1191,8 @@ Phase 1. OpenTelemetry moves in Phase 3.
     False})` in `nl2sql/runtime.py`. That swaps `ctx.config` for the run and
     puts it back, with the same one-engine-at-a-time caveat the global had.
     Node tests build their context with `nl2sql.testing.runtime.fake_runtime`.
+    With the pipeline on the runtime, `tests/e2e/test_two_engines_fake_llm.py`
+    passes, so it is a normal test from this PR on rather than from PR 13.
 
 Each step is one green PR, and no release happens in between:
 

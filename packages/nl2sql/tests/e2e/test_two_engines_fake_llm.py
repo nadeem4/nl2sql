@@ -1,15 +1,17 @@
 """Two engines in one process never share anything.
 
 docs/architecture/configuration_v2.md, section 8. Written in PR 7a as a strict
-expected failure: the pipeline still reads the process-global ``settings``,
-which each engine overwrites from its own config, so the second engine's row
-limit leaks into the first. PR 13 deletes the global and turns this into a
-normal test.
+expected failure, while the pipeline read the process-global ``settings`` and
+the second engine's row limit leaked into the first. It passes since PR 11
+moved the pipeline onto each engine's runtime.
 """
 from __future__ import annotations
 
 import os
 
+# Imported first: polars sets _RJEM_MALLOC_CONF in the environment when it is
+# first imported, which is the library's write, not the engine's.
+import polars  # noqa: F401
 import pytest
 
 from nl2sql import LLM, NL2SQL, UserContext
@@ -33,7 +35,6 @@ def _engine(folder, server, *, row_limit: int, plan_cache: bool) -> NL2SQL:
 
 
 @pytest.mark.e2e
-@pytest.mark.xfail(strict=True, reason="settings is a process global until PR 13 deletes it")
 def test_two_engines_in_one_process_keep_their_own_config(tmp_path):
     env_before = dict(os.environ)
     server_a = FakeLLMServer(RULES_ALBUMS_PER_ARTIST).start()
