@@ -4304,6 +4304,14 @@ need no change there.</p>
 Retries are counted in the run's trace and in token usage. A streamed answer
 that fails to parse is retried without streaming.</p>
 <h3 id="embeddings">Embeddings</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: embeddings providers v2 (PR E1)</p>
+<p><code>openai_compatible</code>, <code>base_url</code> and <code>dimension</code> on the <code>embeddings</code>
+section, <code>EmbeddingInfo</code> and <code>describe()</code> on interface version 2, and the
+one-call probe as <code>Runtime.embedding_info</code>. The index does not read it
+yet: namespaces per model come with S2. See
+<a href="../../configuration/embeddings/">Embeddings</a>.</p>
+</div>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-10-1" id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="c1"># embeddings.yaml</span>
 <a href="#__codelineno-10-2" id="__codelineno-10-2" name="__codelineno-10-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span>
 <a href="#__codelineno-10-3" id="__codelineno-10-3" name="__codelineno-10-3"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://ollama:11434/v1</span>

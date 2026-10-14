@@ -1893,6 +1893,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openai_compatible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        openai_compatible
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-and-dimension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model and dimension
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-a-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a provider
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4543,6 +4582,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Providers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#openai_compatible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        openai_compatible
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-and-dimension" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model and dimension
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#writing-a-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing a provider
+      
+    </span>
+  </a>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4592,17 +4670,27 @@ during retrieval. <code>nl2sql init</code> writes the key-free local provider:</
 <tr>
 <td><code>provider</code></td>
 <td>required</td>
-<td><code>local</code>, <code>openai</code>, or a provider a plugin registers.</td>
+<td><code>local</code>, <code>openai</code>, <code>openai_compatible</code>, or a provider a plugin registers.</td>
 </tr>
 <tr>
 <td><code>model</code></td>
 <td>the provider's default</td>
-<td>The embedding model.</td>
+<td>The embedding model. Required for <code>openai_compatible</code>.</td>
 </tr>
 <tr>
 <td><code>api_key</code></td>
 <td>the provider's standard variable</td>
 <td>A <code>${env:VAR}</code> or <code>${provider:key}</code> reference, resolved when the embedder is built.</td>
+</tr>
+<tr>
+<td><code>base_url</code></td>
+<td>none</td>
+<td>The server's URL, for <code>openai</code> and <code>openai_compatible</code>. An error for <code>local</code>.</td>
+</tr>
+<tr>
+<td><code>dimension</code></td>
+<td>the provider's</td>
+<td>The model's output dimension. Write it only when the provider does not know it and you want to skip the probe (see <a href="#model-and-dimension">Model and dimension</a>).</td>
 </tr>
 </tbody>
 </table>
@@ -4614,8 +4702,9 @@ object instead of a provider name. Each engine builds its own embedder once.</p>
 <tr>
 <th><code>provider</code></th>
 <th>Model</th>
-<th>Dimensions</th>
+<th>Dimension</th>
 <th>API key</th>
+<th><code>base_url</code></th>
 </tr>
 </thead>
 <tbody>
@@ -4624,17 +4713,27 @@ object instead of a provider name. Each engine builds its own embedder once.</p>
 <td><code>all-MiniLM-L6-v2</code> (ONNX, bundled with chromadb); the only model</td>
 <td>384</td>
 <td>none</td>
+<td>not allowed</td>
 </tr>
 <tr>
 <td><code>openai</code></td>
 <td><code>model</code>, default <code>text-embedding-3-small</code></td>
-<td>1536</td>
+<td>known for OpenAI's own models (1536, or 3072 for <code>text-embedding-3-large</code>)</td>
 <td><code>api_key</code>, else <code>OPENAI_API_KEY</code></td>
+<td>optional</td>
+</tr>
+<tr>
+<td><code>openai_compatible</code></td>
+<td><code>model</code>, required</td>
+<td><code>dimension:</code>, else probed</td>
+<td><code>api_key</code> if the server needs one</td>
+<td>required</td>
 </tr>
 </tbody>
 </table>
-<p>An <code>openai</code> section with no key resolving is a <code>ConfigError</code> when the engine
-is built, naming the variable.</p>
+<p>An <code>openai</code> section with no key resolving, an <code>openai_compatible</code> section
+without <code>model</code> or <code>base_url</code>, or a <code>local</code> section with a <code>base_url</code>, is a
+<code>ConfigError</code> when the engine is built, naming the problem.</p>
 <p>Notes on the <code>local</code> provider:</p>
 <ul>
 <li><strong>No extra dependency.</strong> The model ships with <code>chromadb</code>, which is already a
@@ -4646,10 +4745,70 @@ is built, naming the variable.</p>
   step. It does not make querying key-free: answering a question still needs a
   chat model (see <a href="../llm/">LLMs</a>).</li>
 </ul>
+<h3 id="openai_compatible"><code>openai_compatible</code></h3>
+<p>Any server with an OpenAI-style embeddings API: Azure OpenAI's v1 endpoint,
+Ollama, vLLM, LiteLLM, LM Studio or a company gateway. There is no
+Azure-specific provider; Azure uses this one.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># embeddings.yaml: Ollama</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://ollama:11434/v1</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nomic-embed-text</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">dimension</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">768</span><span class="w">            </span><span class="c1"># optional: skips the probe</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># embeddings.yaml: Azure OpenAI's v1 endpoint</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">provider</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openai_compatible</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://my-resource.openai.azure.com/openai/v1/</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:AZURE_OPENAI_API_KEY}"</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">embed-prod</span><span class="w">          </span><span class="c1"># the Azure deployment name</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nt">dimension</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1536</span>
+</code></pre></div>
+<ul>
+<li><strong>No key variable.</strong> <code>OPENAI_API_KEY</code> is never read: that key belongs to
+  OpenAI, not to your server. Write <code>api_key</code> (usually <code>${env:...}</code>) if the
+  server needs one; without it a placeholder is sent, because the OpenAI client
+  refuses to start without a key.</li>
+<li><strong>Text, not tokens.</strong> The text is sent as is. (The <code>openai</code> provider sends
+  OpenAI's token ids, which other servers' models cannot read.)</li>
+</ul>
+<h2 id="model-and-dimension">Model and dimension</h2>
+<p>The engine needs the embedder's model and dimension to know which index it
+reads and writes. A provider reports them as
+<code>EmbeddingInfo(provider, model, dimension)</code>:</p>
+<ul>
+<li><code>local</code> and <code>openai</code> with OpenAI's own models know the dimension.</li>
+<li><code>openai_compatible</code> knows it only when you write <code>dimension:</code>.</li>
+<li>An <code>instance</code> reports its <code>model</code> attribute (or its class name) and the
+  <code>dimension:</code> of the section, if any.</li>
+</ul>
+<p>When the dimension is unknown, the engine embeds the text <code>"dimension probe"</code>
+once, the first time it needs the dimension, and keeps the answer for the
+engine's life. Building the engine never calls the model. Writing
+<code>dimension:</code> skips that one call; it must be what the model returns.</p>
+<h2 id="writing-a-provider">Writing a provider</h2>
+<p>A plugin implements <code>nl2sql.embeddings.EmbeddingsProvider</code>, interface
+version 2, and registers it under the <code>nl2sql.embeddings</code> entry point group or
+with <code>registry.add_embeddings</code> (see <a href="../../development/#the-registry">the registry</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.embeddings</span><span class="w"> </span><span class="kn">import</span> <span class="n">EmbeddingInfo</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyProvider</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">interface_version</span> <span class="o">=</span> <span class="mi">2</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">default_model</span> <span class="o">=</span> <span class="s2">"my-model"</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">requires</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"my_sdk"</span><span class="p">,)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">install_hint</span> <span class="o">=</span> <span class="s1">'pip install "nl2sql-my-embeddings"'</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">):</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="sd">"""The LangChain embeddings object for ``cfg``. No model call; ValueError for a bad section."""</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>        <span class="o">...</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">):</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">        </span><span class="sd">"""What ``create(cfg)`` embeds with. None as the dimension means "probe it"."""</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="k">return</span> <span class="n">EmbeddingInfo</span><span class="p">(</span><span class="s2">"mine"</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">model</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_model</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">dimension</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="switching-providers">Switching providers</h2>
-<p><strong>Switching providers requires a re-index.</strong> The two providers produce vectors
-of different dimensionality, so an existing index cannot be read with the
-other provider. Retrieving from an index whose vectors disagree with the
+<p><strong>Switching providers requires a re-index.</strong> Different embedding models
+produce different vectors, often of different dimensionality, so an existing
+index cannot be read with another provider. Retrieving from an index whose vectors disagree with the
 configured provider raises <code>EmbeddingDimensionMismatchError</code> naming both
 providers. The check runs on the read path only, so the fix is to re-run
 <code>nl2sql index --full</code>; alternatively, point <a href="../storage/"><code>storage.path</code></a> at a
