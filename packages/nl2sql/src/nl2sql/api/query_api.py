@@ -14,7 +14,7 @@ from typing import Optional, List, Dict, Any, Iterator, Literal
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
 from nl2sql.pipeline.runtime import run_with_graph
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorSeverity
 from nl2sql.execution.artifacts.results import ResultSummary

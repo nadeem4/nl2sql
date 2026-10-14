@@ -218,14 +218,14 @@ def test_allow_all_cannot_be_combined_with_roles(extra):
 def test_role_has_no_role_field():
     with pytest.raises(ValidationError):
         Role(description="d", role="analyst")
-    role = Role(description="d", allowed_datasources=["sales"], allowed_tables=["sales.public.*"])
-    assert role.allowed_tables == ["sales.public.*"]
+    role = Role(description="d", allow=["sales"], deny=["sales.audit.*"])
+    assert (role.allow, role.deny) == (["sales"], ["sales.audit.*"])
 
 
-@pytest.mark.parametrize("table", ["sales", "sales..orders", "sales.*.orders", "a.b.c.d"])
-def test_role_rejects_a_badly_formed_table(table):
-    with pytest.raises(ValidationError, match="Invalid table"):
-        Role(description="d", allowed_tables=[table])
+@pytest.mark.parametrize("pattern", ["", "sales..orders", "a.b.c.d"])
+def test_role_rejects_a_badly_formed_pattern(pattern):
+    with pytest.raises(ValidationError, match="Invalid pattern"):
+        Role(description="d", allow=[pattern])
 
 
 # ---------------------------------------------------------------- Storage

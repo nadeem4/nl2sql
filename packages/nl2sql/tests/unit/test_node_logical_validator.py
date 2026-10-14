@@ -15,7 +15,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import (
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery, ExpectedColumn
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode
 from nl2sql.config import PipelineSettings
 from nl2sql.testing.runtime import fake_runtime
@@ -26,8 +26,7 @@ def _col(alias: str, name: str):
 
 
 def _ctx(strict_columns=True):
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac,
+    return fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True},
                         settings={"pipeline": {"strict_columns": strict_columns}})
 
 
@@ -368,6 +367,7 @@ def test_logical_validator_accepts_fk_join_from_retriever_output():
         fake_runtime(
             vector_store=None,
             schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: snapshot),
+            policies={"allow_all": True},
         )
     )
     relevant_tables = retriever(
@@ -409,6 +409,7 @@ def test_logical_validator_still_rejects_non_fk_join_with_qualified_names():
         fake_runtime(
             vector_store=None,
             schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: snapshot),
+            policies={"allow_all": True},
         )
     )
     relevant_tables = retriever(

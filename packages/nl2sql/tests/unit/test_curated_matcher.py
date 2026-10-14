@@ -15,9 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter
-from nl2sql.auth import UserContext
-from nl2sql.auth.models import RolePolicy
-from nl2sql.auth.rbac import RBAC
+from nl2sql.policies import UserContext
 from nl2sql.config import Settings
 from nl2sql.config import Curated
 from nl2sql.indexing.models import VerifiedQueryCandidate
@@ -69,12 +67,9 @@ CURATED = {
 }
 
 POLICIES = {
-    "analyst": RolePolicy(description="all", role="analyst", allowed_datasources=["shop"],
-                          allowed_tables=["shop.Customer", "shop.Invoice", "shop.InvoiceLine"]),
-    "viewer": RolePolicy(description="no sales", role="viewer", allowed_datasources=["shop"],
-                         allowed_tables=["shop.Customer"]),
-    "outsider": RolePolicy(description="other data", role="outsider", allowed_datasources=["other"],
-                           allowed_tables=["other.*"]),
+    "analyst": {"description": "all", "allow": ["shop.main.Customer", "shop.main.Invoice", "shop.main.InvoiceLine"]},
+    "viewer": {"description": "no sales", "allow": ["shop.main.Customer"]},
+    "outsider": {"description": "other data", "allow": ["other"]},
 }
 
 TOP = VerifiedQueryCandidate(datasource_id="shop", query_id="top_customers_by_revenue", score=0.82,
@@ -154,7 +149,7 @@ def _ctx(db, server, candidates, capabilities=None, curated=None, settings=None)
         results=db.parent / "artifacts",
         curated=Curated.model_validate(curated or CURATED),
         vector_store=vector_store,
-        rbac=RBAC(POLICIES),
+        policies={"roles": POLICIES},
         ds_registry=_Registry(adapter, capabilities),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
         llm_registry=registry,
@@ -368,8 +363,7 @@ def test_capability_missing(db):
 def test_execution_failed(db):
     broken = json.loads(json.dumps(CURATED))
     broken["datasources"]["shop"]["verified_queries"][1]["sql"] = "SELECT COUNT(*) FROM NoSuchTable"
-    analyst = POLICIES["analyst"].model_copy(update={"allowed_tables": ["shop.*"]})
-    POLICIES["analyst_all"] = analyst
+    POLICIES["analyst_all"] = {"description": "all", "allow": ["shop"]}
     try:
         out, _, _ = _run(db, {"query_id": "shop.customer_count", "params": [], "reason": ""},
                          role="analyst_all", curated=broken)

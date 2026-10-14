@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
@@ -40,8 +40,8 @@ def _col(alias, name):
 
 
 def _ctx(allowed=("*",)):
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: list(allowed))
-    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
+    roles = {"admin": {"description": "d", "allow": list(allowed)}}
+    return fake_runtime(ds_registry=SimpleNamespace(), policies={"roles": roles})
 
 
 def _tables():
@@ -213,7 +213,7 @@ def test_column_errors_in_where_and_having_are_reported():
 def test_rbac_denial_still_fires_when_column_resolution_fails():
     # Security: policy enforcement must never be skipped because logical
     # validation already failed.
-    node = LogicalValidatorNode(_ctx(allowed=["ds1.allowed"]))
+    node = LogicalValidatorNode(_ctx(allowed=["ds1.main.allowed"]))
     plan = _joined_plan([SelectItem(expr=_col("o", "nope"))])
 
     result = node(_state(plan, roles=["user"]))
@@ -248,7 +248,7 @@ def test_missing_table_is_reported_as_table_not_found():
 def test_rbac_denial_still_fires_when_static_validation_crashes(monkeypatch):
     # Security: an unexpected failure inside structural/column validation must
     # not short-circuit policy enforcement.
-    node = LogicalValidatorNode(_ctx(allowed=["ds1.allowed"]))
+    node = LogicalValidatorNode(_ctx(allowed=["ds1.main.allowed"]))
     monkeypatch.setattr(
         LogicalValidatorNode,
         "_validate_static",

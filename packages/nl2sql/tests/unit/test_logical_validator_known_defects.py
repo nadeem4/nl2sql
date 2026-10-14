@@ -11,7 +11,7 @@ test ever put a literal filter through validation at all.
 
 from types import SimpleNamespace
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
@@ -30,8 +30,7 @@ from nl2sql.testing.runtime import fake_runtime
 
 
 def _ctx():
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
+    return fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True})
 
 
 def _state(plan, tables):

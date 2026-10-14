@@ -14,18 +14,18 @@ config out as files.
 from .chinook import (
     CHINOOK_DATASOURCE,
     CHINOOK_QUESTIONS,
-    CHINOOK_TABLES_BY_ROLE,
+    CHINOOK_ROLES,
     CHINOOK_VERIFIED_QUERIES,
 )
 from .support import (
     SUPPORT_DATASOURCE,
     SUPPORT_QUESTIONS,
-    SUPPORT_TABLES_BY_ROLE,
+    SUPPORT_ROLES,
 )
 from .webanalytics import (
     WEBANALYTICS_DATASOURCE,
     WEBANALYTICS_QUESTIONS,
-    WEBANALYTICS_TABLES_BY_ROLE,
+    WEBANALYTICS_ROLES,
 )
 
 # (datasource id, packaged file name, datasource config). The file name is both
@@ -62,47 +62,25 @@ DEMO_QUESTIONS = [
     *WEBANALYTICS_QUESTIONS,
 ]
 
-_TABLES_BY_ROLE = {
-    "chinook": CHINOOK_TABLES_BY_ROLE,
-    "support": SUPPORT_TABLES_BY_ROLE,
-    "webanalytics": WEBANALYTICS_TABLES_BY_ROLE,
-}
+_ROLES = (CHINOOK_ROLES, SUPPORT_ROLES, WEBANALYTICS_ROLES)
 
 
-def _qualified(role: str) -> list[str]:
-    """Every ``datasource.table`` a role may read, across the three databases."""
-    return [
-        f"{ds_id}.{table}"
-        for ds_id, by_role in _TABLES_BY_ROLE.items()
-        for table in by_role[role]
-    ]
+def _patterns(role: str, description: str) -> dict:
+    """One role's allow and deny patterns, merged across the three databases."""
+    allow = [p for roles in _ROLES for p in roles[role].get("allow", [])]
+    deny = [p for roles in _ROLES for p in roles[role].get("deny", [])]
+    return {"description": description, "allow": allow, **({"deny": deny} if deny else {})}
 
 
-def _datasources_for(role: str) -> list[str]:
-    """The datasources a role may reach, dropping any it has no table in."""
-    return [ds_id for ds_id, by_role in _TABLES_BY_ROLE.items() if by_role[role]]
-
-
-# The demo's RBAC, one policy per role across all three datasources. Admin sees
-# everything; the analyst reads no employee or agent table; the viewer reads no
-# customer, invoice or ticket-message data, which leaves it the music catalog
-# and the non-identifying half of web analytics, and no support access at all.
+# The demo's policies, one role across all three datasources. Admin sees
+# everything; the analyst reads every database but the employee and agent
+# tables, which it denies; the viewer is an allow list with no customer,
+# invoice or ticket-message data, which leaves it the music catalog and the
+# non-identifying half of web analytics, and no support access at all.
 DEMO_POLICIES = {
-    "admin": {
-        "description": "Every table in every demo database",
-        "allowed_datasources": ["*"],
-        "allowed_tables": ["*"],
-    },
-    "analyst": {
-        "description": "Everything except employee and support-agent records",
-        "allowed_datasources": _datasources_for("analyst"),
-        "allowed_tables": _qualified("analyst"),
-    },
-    "viewer": {
-        "description": "Music catalog and anonymous web traffic; no customers, sales or support",
-        "allowed_datasources": _datasources_for("viewer"),
-        "allowed_tables": _qualified("viewer"),
-    },
+    "admin": {"description": "Every table in every demo database", "allow": ["*"]},
+    "analyst": _patterns("analyst", "Everything except employee and support-agent records"),
+    "viewer": _patterns("viewer", "Music catalog and anonymous web traffic; no customers, sales or support"),
 }
 
 __all__ = [

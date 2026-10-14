@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.outputs import ChatGeneration, LLMResult
 
 from nl2sql.api.query_api import result_from_state
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline import runtime

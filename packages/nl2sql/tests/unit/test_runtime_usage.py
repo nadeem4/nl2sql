@@ -6,7 +6,7 @@ import uuid
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, LLMResult
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.pipeline import runtime
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 from nl2sql.testing.runtime import fake_runtime

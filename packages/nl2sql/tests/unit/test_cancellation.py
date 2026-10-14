@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Annotated, TypedDict
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.exceptions import PipelineExecutionError

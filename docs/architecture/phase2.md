@@ -785,6 +785,16 @@ As in Phase 1, the engine accepts exactly the version it was built for.
 
 ## 6. Policies, step 1
 
+!!! note "Built: globs and `Scope` (PR P1)"
+    `allow` and `deny` on `Role`, the pattern rules, `PolicyEngine.scope` and
+    `Scope` in `nl2sql/policies/` (which replaces `nl2sql/auth/`), a run's
+    scopes pinned (`PolicyEngine.run`), every call site on `Scope`, the
+    retriever hiding denied tables, and the demo roles rewritten. Beyond the
+    table below, `engine.policies.allowed()` is replaced by
+    `engine.policies.scope()`, since a flat table list cannot say what a deny
+    does. The `check` block and `PolicyCheck` come with P2. See
+    [Policies](../configuration/policies.md).
+
 ### The config
 
 ```yaml

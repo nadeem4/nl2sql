@@ -16,7 +16,7 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 
 from nl2sql import LLM, NL2SQL, AgentLLM, ConfigError, Embeddings, Registry
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.plan_cache import plan_cache_for

@@ -44,8 +44,8 @@ The file is a YAML list. Each entry:
 | `alt_gold_result` | The rows each `alt_gold_sql` returns, in the same order. Generated, never typed. Omitted with `alt_gold_sql` |
 
 `expected` follows the demo policy in `nl2sql/datasets/chinook.py`
-(`CHINOOK_POLICIES`): a role gets `refused` when any of `needed_tables` is
-outside its `allowed_tables`, and `allowed` otherwise. Questions the database
+(`CHINOOK_POLICIES`): a role gets `refused` when its scope does not allow
+any of `needed_tables`, and `allowed` otherwise. Questions the database
 cannot answer are `unanswerable` for every role. The `rbac-denial` tag marks
 exactly the questions some role is refused.
 

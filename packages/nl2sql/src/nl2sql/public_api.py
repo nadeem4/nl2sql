@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from nl2sql.api.query_api import QueryAPI, QueryResult
     from nl2sql.api.results_api import ResultsAPI
     from nl2sql.api.traces_api import TracesAPI
-    from nl2sql.auth.models import UserContext
+    from nl2sql.policies import UserContext
     from nl2sql.check import CheckReport
     from nl2sql.common.cancellation import CancellationToken
     from nl2sql.config import LLM, Config

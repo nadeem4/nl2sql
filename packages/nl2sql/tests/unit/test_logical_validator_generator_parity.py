@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.auth import UserContext
+from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
@@ -74,8 +74,7 @@ def _adapter():
 
 def _ctx():
     registry = SimpleNamespace(get_adapter=lambda _id: _adapter())
-    rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return fake_runtime(ds_registry=registry, rbac=rbac)
+    return fake_runtime(ds_registry=registry, policies={"allow_all": True})
 
 
 def _state(plan: PlanModel) -> SubgraphExecutionState:
@@ -305,7 +304,7 @@ def test_a_registry_without_an_adapter_does_not_break_validation():
     # Arrange
     ctx = fake_runtime(
         ds_registry=SimpleNamespace(),
-        rbac=SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"]),
+        policies={"allow_all": True},
     )
 
     # Act

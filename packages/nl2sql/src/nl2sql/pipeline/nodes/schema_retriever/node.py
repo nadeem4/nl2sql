@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
-from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
 from nl2sql.datasources.models import matches_table
@@ -33,7 +32,7 @@ class SchemaRetrieverNode:
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
         self.schema_store = ctx.schema_store
-        self.rbac = getattr(ctx, "rbac", None)
+        self.policy_engine = ctx.policy_engine
         self.ds_registry = getattr(ctx, "ds_registry", None)
         self.full_snapshot_max_tables = ctx.settings.retrieval.full_snapshot_max_tables
 
@@ -69,22 +68,22 @@ class SchemaRetrieverNode:
                 near.append(entry["table"])
         return near
 
-    def _readable(self, state: SubgraphExecutionState, datasource_id: str) -> Callable[[TableRef], bool]:
-        """Whether the caller's role may read a table's data.
+    def _visible(self, state: SubgraphExecutionState, datasource_id: str,
+                 snapshot: Optional[SchemaSnapshot]) -> Dict[str, Any]:
+        """The snapshot's tables the caller's scope allows, by key.
 
-        Structure yes, data no: the planner sees every table's name, columns,
-        types, keys and relationships, so a question that needs a forbidden
-        table still plans against it and the validator refuses it. What a
-        forbidden table loses is its data: sample values and column statistics
-        never reach the prompt, the LLM provider or the run trace. The same
-        ``table_allowed`` rule the validator enforces decides it. With no RBAC
-        configured nothing is readable, so the default is to strip.
+        A denied table is hidden from the planner entirely: its name, columns,
+        keys, relationships and data never reach the prompt, the LLM provider
+        or the run trace. The vector searches run over these tables only, so
+        the top ``k`` is filled with readable ones. A plan that names a hidden
+        table anyway is refused by the logical validator, which asks the same
+        ``Scope``.
         """
-        if self.rbac is None:
-            return lambda _ref: False
-        allowed = self.rbac.get_allowed_tables(state.user_context)
-        default = default_schema(self.ds_registry, datasource_id)
-        return lambda ref: table_allowed(allowed, datasource_id, ref.table_name, ref.schema_name, default)
+        if not snapshot:
+            return {}
+        scope = self.policy_engine.scope(state.user_context, datasource_id)
+        return {key: contract for key, contract in snapshot.contract.tables.items()
+                if scope.allows(contract.table.schema_name, contract.table.table_name)}
 
     def _build_semantic_query(self, sub_query: SubQuery) -> str:
         parts: List[str] = []
@@ -131,21 +130,19 @@ class SchemaRetrieverNode:
         resolved_tables: Optional[Dict[str, Set[str]]] = None,
         schema_version: Optional[str] = None,
         *,
-        readable: Callable[[TableRef], bool],
+        visible: Dict[str, Any],
         preferred: Callable[[TableRef], bool] = lambda _ref: False,
     ) -> List[Table]:
+        """The planner's tables: ``resolved_tables`` (all of ``visible`` when empty), never a hidden one."""
         if not snapshot:
             return []
 
         tables_out: List[Table] = []
-        table_keys = (
-            list(snapshot.contract.tables.keys())
-            if not resolved_tables
-            else list(resolved_tables.keys())
-        )
+        table_keys = list(visible) if not resolved_tables else list(resolved_tables.keys())
+        visible_names = {contract.table.full_name for contract in visible.values()}
 
         for table_key in table_keys:
-            table_contract = snapshot.contract.tables.get(table_key)
+            table_contract = visible.get(table_key)
             table_metadata = snapshot.metadata.tables.get(table_key)
             if not table_contract:
                 continue
@@ -154,7 +151,6 @@ class SchemaRetrieverNode:
             if not resolved_columns:
                 resolved_columns = set(table_contract.columns.keys())
 
-            with_data = readable(table_contract.table)
             columns: List[Column] = []
             for col_key, col_contract in table_contract.columns.items():
                 if col_key not in resolved_columns:
@@ -167,7 +163,7 @@ class SchemaRetrieverNode:
                         type=col_contract.data_type,
                         stats=(
                             col_metadata.statistics.model_dump()
-                            if with_data and col_metadata and col_metadata.statistics
+                            if col_metadata and col_metadata.statistics
                             else {}
                         ),
                         description=col_metadata.description if col_metadata else ""
@@ -176,6 +172,9 @@ class SchemaRetrieverNode:
 
             relationships = []
             for fk in table_contract.foreign_keys:
+                # A key into a hidden table would name it.
+                if fk.referred_table.full_name not in visible_names:
+                    continue
                 relationships.append(
                     {
                         "from_table": table_contract.table.full_name,
@@ -208,30 +207,6 @@ class SchemaRetrieverNode:
         return tables_out
 
     @staticmethod
-    def _withhold_unreadable(
-        searches: List[Dict[str, Any]],
-        snapshot: Optional[SchemaSnapshot],
-        readable: Callable[[TableRef], bool],
-    ) -> None:
-        """Structure yes, data no, in the trace too.
-
-        A column entry's embedded text carries the column's statistics and
-        sample values, so its similarity to the question says something about
-        that data. For a table the role cannot read, the entry keeps its name,
-        rank and whether it was picked, and loses its scores.
-        """
-        tables = snapshot.contract.tables if snapshot else {}
-        for search in searches:
-            for entry in search.get("pool", []):
-                if entry.get("type") != "schema.column":
-                    continue
-                contract = tables.get(entry.get("table"))
-                if contract is not None and readable(contract.table):
-                    continue
-                entry.update(similarity=None, distance=None, mmr_score=None, redundancy=None,
-                             withheld="The role cannot read this table's data.")
-
-    @staticmethod
     def _retrieval(query: str, searches: List[Dict[str, Any]], tables_out: List[Table],
                    reason: Optional[str] = None) -> Dict[str, Any]:
         """What the vector searches retrieved and what survived, for the run trace.
@@ -258,21 +233,21 @@ class SchemaRetrieverNode:
             query = self._build_semantic_query(sub_query)
 
             snapshot = self._resolve_snapshot(datasource_id, schema_version)
-            readable = self._readable(state, datasource_id)
+            visible = self._visible(state, datasource_id, snapshot)
             preferred = self._preferred(datasource_id)
             limit = self.full_snapshot_max_tables
-            if snapshot and len(snapshot.contract.tables) <= limit:
+            if snapshot and len(visible) <= limit:
                 tables_out = self._build_tables_from_snapshot(
                     snapshot, resolved_tables=None, schema_version=schema_version,
-                    readable=readable, preferred=preferred,
+                    visible=visible, preferred=preferred,
                 )
                 return {
                     "relevant_tables": tables_out,
                     "retrieval": self._retrieval(
                         query, [], tables_out,
                         reason=(
-                            f"The schema has {len(snapshot.contract.tables)} tables (limit {limit}), "
-                            "so the full schema is sent without retrieval."
+                            f"The caller may read {len(visible)} tables (limit {limit}), "
+                            "so all of them are sent without retrieval."
                         ),
                     ),
                     "reasoning": [
@@ -291,9 +266,12 @@ class SchemaRetrieverNode:
             schema_docs = []
             column_docs = []
 
-            if self.vector_store:
+            # Only the tables the caller may read are searched, so the top k is
+            # filled with readable ones.
+            searchable = [contract.table.full_name for contract in visible.values()]
+            if self.vector_store and searchable:
                 schema_docs = self.vector_store.retrieve_schema_context(
-                    query, datasource_id, k=self.TABLE_K, explain=searches
+                    query, datasource_id, k=self.TABLE_K, explain=searches, tables=searchable
                 )
                 if schema_docs:
                     for doc in schema_docs:
@@ -304,7 +282,7 @@ class SchemaRetrieverNode:
                         tables[table].update([])
                 else:
                     column_docs = self.vector_store.retrieve_column_candidates(
-                        query, datasource_id, k=self.TABLE_K, explain=searches
+                        query, datasource_id, k=self.TABLE_K, explain=searches, tables=searchable
                     )
                     for doc in column_docs:
                         table = doc.metadata.get("table")
@@ -334,17 +312,15 @@ class SchemaRetrieverNode:
                     to_table = doc.metadata.get("to_table")
                     if from_table:
                         tables[from_table].update(doc.metadata.get("from_columns"))
-                    if to_table:
+                    if to_table and to_table in searchable:
                         tables[to_table].update(doc.metadata.get("to_columns"))
-
-            self._withhold_unreadable(searches, snapshot, readable)
 
             if not tables:
                 relevant_tables = self._build_tables_from_snapshot(
                     snapshot,
                     resolved_tables=None,
                     schema_version=schema_version,
-                    readable=readable,
+                    visible=visible,
                     preferred=preferred,
                 )
                 return {
@@ -372,11 +348,9 @@ class SchemaRetrieverNode:
                 snapshot,
                 resolved_tables=tables,
                 schema_version=schema_version,
-                readable=readable,
+                visible=visible,
                 preferred=preferred,
             )
-
-
 
             return {
                 "relevant_tables": relevant_tables,

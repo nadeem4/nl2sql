@@ -286,7 +286,7 @@ def test_nothing_outside_the_adapters_imports_a_database_library():
 # not here: it names adapters to install and configure them, which is registry
 # knowledge, not SQL. Neither is datasets/, whose literals are file names.
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
-                "schema", "services", "datasources", "auth", "tracing", "runtime.py", "public_api.py"]
+                "schema", "services", "datasources", "policies", "tracing", "runtime.py", "public_api.py"]
 
 DIALECT_NAMES = re.compile(r"(?i)\b(sqlite|postgres|postgresql|mysql|mssql|tsql|duckdb|snowflake|bigquery)\b")
 
@@ -509,7 +509,7 @@ def test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2s
 #    tests/unit/test_import_hygiene.py)
 # --------------------------------------------------------------------------
 
-RUNTIME = ["pipeline", "execution", "indexing", "datasources", "llm", "auth", "aggregation", "schema",
+RUNTIME = ["pipeline", "execution", "indexing", "datasources", "llm", "policies", "aggregation", "schema",
            "services", "runtime.py", "public_api.py"]
 
 
@@ -609,6 +609,53 @@ def test_aggregation_never_imports_the_pipeline():
     assert not offenders, _broke(
         "nl2sql.aggregation never imports nl2sql.pipeline. The DAG models both need live "
         "in nl2sql.execution.dag.", offenders)
+
+
+# --------------------------------------------------------------------------
+# 9b. Every access decision goes through a Scope
+# --------------------------------------------------------------------------
+
+POLICIES = ENGINE / "policies"
+# The places that decide table access. Each asks the caller's Scope.
+ACCESS_DECISIONS = [
+    "pipeline/nodes/datasource_resolver/node.py",
+    "pipeline/nodes/curated_matcher/node.py",
+    "pipeline/nodes/schema_retriever/node.py",
+    "pipeline/nodes/validator/node.py",
+    "pipeline/nodes/executor/node.py",
+    "api/policy_api.py",
+]
+# The 0.5 access helpers. A second way to decide is how two nodes come to disagree.
+OLD_ACCESS_NAMES = {"table_allowed", "get_allowed_tables", "get_allowed_datasources", "RBAC", "RolePolicy"}
+
+
+def test_every_access_decision_goes_through_scope():
+    engine_files = [p for p in python_files(ENGINE) if POLICIES not in p.parents and ADAPTERS not in p.parents]
+    offenders = []
+    for path in engine_files:
+        for lineno, imported, _ in imports(path):
+            # Pattern matching is the policies package's alone; the config only
+            # asks it whether a pattern is well formed.
+            if imported == "fnmatch" or (imported.startswith("nl2sql.policies.patterns")
+                                         and _where(path) != "nl2sql/src/nl2sql/config/models.py"):
+                offenders.append(f"{_where(path)}:{lineno} imports {imported}")
+            if imported.startswith("nl2sql.auth"):
+                offenders.append(f"{_where(path)}:{lineno} imports {imported}")
+        for node in ast.walk(_tree(path)):
+            name = node.id if isinstance(node, ast.Name) else node.attr if isinstance(node, ast.Attribute) else None
+            if name in OLD_ACCESS_NAMES:
+                offenders.append(f"{_where(path)}:{node.lineno} uses {name}")
+    for relative in ACCESS_DECISIONS:
+        path = ENGINE / relative
+        calls = [n for n in ast.walk(_tree(path))
+                 if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "scope"]
+        if not calls:
+            offenders.append(f"{_where(path)} decides access without asking a Scope")
+    assert not offenders, _broke(
+        "Every place that decides table access asks the caller's Scope "
+        "(PolicyEngine.scope), and nothing outside nl2sql/policies/ matches policy patterns. "
+        "One decision, made one way, is what keeps the planner, the validator and the "
+        "executor from disagreeing about a table.", offenders)
 
 
 # --------------------------------------------------------------------------

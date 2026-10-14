@@ -77,11 +77,11 @@ def test_schema_render_does_not_depend_on_table_or_key_order():
     assert render_schema_for_prompt([a, b]) == render_schema_for_prompt([b_reordered, a])
 
 
-def test_a_table_the_role_cannot_read_sends_no_sample_values(measure):
+def test_a_table_the_role_cannot_read_is_not_in_the_prompt(measure):
     tables = measure.chinook_tables(readable=lambda ref: ref.table_name != "Customer")
     rows = {json.loads(line)["name"]: json.loads(line) for line in render_schema_for_prompt(tables).splitlines()}
 
-    assert not any("sample_values" in c for c in rows["Customer"]["columns"])
+    assert "Customer" not in rows
     assert any("sample_values" in c for c in rows["Genre"]["columns"])
 
 

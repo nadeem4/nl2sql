@@ -146,21 +146,23 @@ appears without a key too, on the guided questions a verified query answers.
 ### The roles
 
 `policies.yaml` is written with three roles, spanning all three
-datasources, so the RBAC check is visible without editing anything:
+datasources, so the policy check is visible without editing anything:
 
-| Role | May read |
-| --- | --- |
-| `admin` | every table in every demo database |
-| `analyst` | everything except employee and support-agent records - no `chinook.Employee`, no `support.agents` |
-| `viewer` | no customer, invoice or ticket-message data: the Chinook music catalog plus `webanalytics.devices`, `webanalytics.page_views` and `webanalytics.referrers`, and no access to `support` at all |
+| Role | Patterns | May read |
+| --- | --- | --- |
+| `admin` | `allow: ["*"]` | every table in every demo database |
+| `analyst` | `allow: [chinook, support, webanalytics]`, `deny: [chinook.main.Employee, support.main.agents]` | everything except employee and support-agent records |
+| `viewer` | `allow:` the seven Chinook catalog tables and `webanalytics.main.devices`, `webanalytics.main.page_views`, `webanalytics.main.referrers` | no customer, invoice or ticket-message data, and no access to `support` at all |
 
-Ask the `viewer` role about customers and the logical validator refuses the plan
-with a `SECURITY_VIOLATION` before any SQL is generated. The planner saw the
-`Customer` and `Invoice` tables' columns but none of their sample values or
-statistics. `policies.yaml` sets `refusal_names_tables: true`, so the demo's
-refusal names the role and table; outside the demo the message is the generic
-"You do not have permission to see the data this question requires." See
-[Security Model](../security/model.md#strict-refusal).
+Ask the `viewer` role about customers and no model ever sees the `Customer`
+or `Invoice` tables: they are hidden from the planner, so the answer is that
+the connected data cannot answer the question. A plan that names a hidden
+table anyway is refused by the logical validator with a `SECURITY_VIOLATION`
+before any SQL is generated. `policies.yaml` sets `refusal_names_tables:
+true`, so the demo's refusal names the role and table; outside the demo the
+message is the generic "You do not have permission to see the data this
+question requires." See
+[Security Model](../security/model.md#hidden-tables-and-strict-refusal).
 
 ### API keys in the demo
 

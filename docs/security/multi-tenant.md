@@ -25,11 +25,11 @@ Tenant isolation is **not** applied to indexing; the vector store and schema sto
 
 ## Authorization model
 
-RBAC evaluates `UserContext.roles` against the `policies` section of `nl2sql.yaml`. The validator enforces datasource/table scope at planning time.
+`PolicyEngine` turns `UserContext.roles` and the `policies` section of `nl2sql.yaml` into a `Scope` per datasource. The schema retriever hides denied tables from the planner, and the validator enforces the scope at planning time.
 
 ## Source references
 
 - Tenant settings: `settings.tenant_id` in `packages/nl2sql/src/nl2sql/config/models.py`
 - Context initialization: `packages/nl2sql/src/nl2sql/runtime.py`
 - Artifact paths: `packages/nl2sql/src/nl2sql/execution/artifacts/store.py`
-- RBAC: `packages/nl2sql/src/nl2sql/auth/rbac.py`
+- Policies: `packages/nl2sql/src/nl2sql/policies/scope.py`
