@@ -8,7 +8,7 @@
 <meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
 <meta content="Platform Engineering" name="author"/>
 <link href="../../extensions/add-execution-backend/" rel="prev"/>
-<link href="../evaluation-dataset/" rel="next"/>
+<link href="../test-bed/" rel="next"/>
 <link href="../../assets/favicon.svg" rel="icon"/>
 <meta content="mkdocs-1.6.1, mkdocs-material-9.7.7" name="generator"/>
 <title>Testing Architecture - NL2SQL Platform</title>
@@ -1562,6 +1562,18 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../test-bed/">
+<span class="md-ellipsis">
+    
+  
+    Real-Database Test Bed
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../evaluation-dataset/">
 <span class="md-ellipsis">
     
@@ -2119,7 +2131,8 @@
 <a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>  cli/              # CLI command tests
 <a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a>  adapters/         # Cross-dialect adapter contract tests
 <a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a>  sqlalchemy_base/  # SQLAlchemy base adapter tests
-<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>packages/api/tests/ # FastAPI route and service tests (stubbed engine)
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>  realdb/           # Against real PostgreSQL, MySQL and SQL Server (the test bed)
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a>packages/api/tests/ # FastAPI route and service tests (stubbed engine)
 </code></pre></div>
 <p><code>pytest.ini</code> is the single source of truth for pytest configuration - test
 paths, markers, and <code>addopts</code>. Do not add a <code>[tool.pytest.ini_options]</code> table
@@ -2127,8 +2140,8 @@ to <code>pyproject.toml</code>: pytest reads only one config file, and <code>pyt
 so such a table is silently ignored. Dev/test tooling lives in the root
 <code>pyproject.toml</code> under <code>[dependency-groups] dev</code> (<code>pip install --group dev</code>).</p>
 <h2 id="markers-and-what-ci-runs">Markers and what CI runs</h2>
-<p>Two independent things can make a test unrunnable in CI, so they are two
-markers. A test may carry both.</p>
+<p>Three independent things can make a test unrunnable in the fast job, so they
+are three markers. A test may carry more than one.</p>
 <table>
 <thead>
 <tr>
@@ -2148,10 +2161,16 @@ markers. A test may carry both.</p>
 <td>Needs a real <code>OPENAI_API_KEY</code>. Costs money per run.</td>
 <td>Nothing in CI - never selected.</td>
 </tr>
+<tr>
+<td><code>realdb</code></td>
+<td>Needs a real PostgreSQL, MySQL or SQL Server: the <a href="../test-bed/">test bed</a>.</td>
+<td><code>testbed/docker-compose.yml</code>, in the <code>realdb</code> workflow</td>
+</tr>
 </tbody>
 </table>
 <p>Everything under <code>packages/nl2sql/tests/integration/</code> is marked <code>integration</code>
-automatically by <code>packages/nl2sql/tests/conftest.py</code>. The <code>llm</code> marker is
+automatically by <code>packages/nl2sql/tests/conftest.py</code>, and everything under
+<code>packages/nl2sql/tests/realdb/</code> is marked <code>realdb</code> the same way. The <code>llm</code> marker is
 declared per module, next to a comment saying which call needs the key. Only
 four modules carry it - <code>test_ast_planner_real_data.py</code>,
 <code>test_decomposer_real_data.py</code>, <code>test_logical_validator_real_data.py</code> and
@@ -2161,7 +2180,7 @@ optional enrichment pass when no LLM is available, so tests that index real
 data run key-free.</p>
 <p><code>.github/workflows/test.yml</code> has two test jobs over the source tree:</p>
 <ul>
-<li><strong><code>test</code></strong> runs <code>pytest -m "not integration"</code> across Python 3.12 and 3.13.
+<li><strong><code>test</code></strong> runs <code>pytest -m "not integration and not realdb"</code> across Python 3.12 and 3.13.
   This is the fast job and must stay fast.</li>
 <li><strong><code>integration</code></strong> runs <code>pytest -m "integration and not llm"</code> on one Python
   version, after writing and indexing a demo project (<code>nl2sql init --demo
@@ -2171,6 +2190,10 @@ data run key-free.</p>
   aggregation and the local embedder against the real Chinook database; run
   it with <code>--collect-only -q</code> for the current list.</li>
 </ul>
+<p>A separate workflow, <code>.github/workflows/realdb.yml</code>, runs <code>pytest -m realdb</code>
+against the <a href="../test-bed/">test bed</a> on GitHub's runners: on pull requests that
+change database-facing code, nightly on <code>main</code>, and on demand before a
+release. Its <code>realdb-gate</code> job always runs and is the required check.</p>
 <p>Three more jobs test the package rather than the source tree:</p>
 <ul>
 <li>

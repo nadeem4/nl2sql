@@ -2027,6 +2027,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../testing/test-bed/">
+<span class="md-ellipsis">
+    
+  
+    Real-Database Test Bed
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../testing/evaluation-dataset/">
 <span class="md-ellipsis">
     
@@ -3310,6 +3322,24 @@ database to test against.</p>
 <li><strong>Release 0.6</strong> follows the last Wave B pull request.</li>
 </ul>
 <h2 id="3-the-real-database-test-bed">3. The real-database test bed</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: the compose file, the <code>realdb</code> marker and the CI workflow (PR T1)</p>
+<p><code>testbed/</code> holds the compose file, <code>wide_schema.py</code>, <code>samples.py</code> (the
+pinned samples with their checksums), <code>passwords.py</code>, the servers' init
+scripts and <code>gate.py</code>; <code>packages/nl2sql/tests/realdb/</code> holds the
+fixtures; and <code>.github/workflows/realdb.yml</code> runs them. Four details
+differ from the first draft of this section. The passwords have no
+default: <code>testbed/passwords.py</code> writes random ones to the git-excluded
+<code>testbed/.env</code>, and CI generates new ones per run, so no password is
+written in the repository. Pagila is pinned to commit <code>5ba5a57</code>, because
+later commits need PostgreSQL 18. The <code>audit</code> schema is a small 21st
+schema beside the 20 numbered ones that hold the 1,200 tables.
+<code>datasource()</code> defaults to the server's own sample database (Pagila,
+Sakila or AdventureWorksLT) and passes other keywords to <code>Datasource</code>,
+since <code>Datasource.index</code> arrives with B1. The GCP VM and
+<code>scripts/testbed.py</code> are PR T2. See
+<a href="../../testing/test-bed/">The real-database test bed</a>.</p>
+</div>
 <h3 id="what-it-is">What it is</h3>
 <p>One file, <code>testbed/docker-compose.yml</code>, defines the whole test bed. The same
 file runs in three places (owner decision 2):</p>
@@ -3520,7 +3550,8 @@ everything. Loading happens once per data volume, so a second <code>up</code> is
 is loaded. Each server also gets a login <code>nl2sql_reader</code> with read grants on
 its sample database only; the conformance kit uses it for the <code>permission</code>
 stage of <code>test_connection</code>.</p>
-<p>The file reads four variables, each with a default for local use and CI:</p>
+<p>The file reads four variables. The bind address has a default; the
+passwords do not, so no password is written in the repository:</p>
 <table>
 <thead>
 <tr>
@@ -3537,23 +3568,21 @@ stage of <code>test_connection</code>.</p>
 </tr>
 <tr>
 <td><code>TESTBED_POSTGRES_PASSWORD</code></td>
-<td><code>Nl2sql-Testbed-1</code></td>
+<td>none: required; <code>testbed/passwords.py</code> makes random ones, and CI makes new ones per run</td>
 <td>from Secret Manager</td>
 </tr>
 <tr>
 <td><code>TESTBED_MYSQL_PASSWORD</code></td>
-<td><code>Nl2sql-Testbed-1</code></td>
+<td>none: required; <code>testbed/passwords.py</code> makes random ones, and CI makes new ones per run</td>
 <td>from Secret Manager</td>
 </tr>
 <tr>
 <td><code>TESTBED_MSSQL_PASSWORD</code></td>
-<td><code>Nl2sql-Testbed-1</code></td>
+<td>none: required; <code>testbed/passwords.py</code> makes random ones, and CI makes new ones per run</td>
 <td>from Secret Manager</td>
 </tr>
 </tbody>
 </table>
-<p>The default password is a throwaway for containers bound to <code>127.0.0.1</code> or
-to a CI runner. It never protects anything reachable from outside.</p>
 <table>
 <thead>
 <tr>
@@ -3582,9 +3611,11 @@ to a CI runner. It never protects anything reachable from outside.</p>
 </table>
 <p>The ports avoid a clash with a database already installed locally.</p>
 <h3 id="local-use">Local use</h3>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>testbed/docker-compose.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--wait
-<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="nv">REALDB</span><span class="o">=</span>compose<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>realdb
-<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>testbed/docker-compose.yml<span class="w"> </span>down<span class="w">        </span><span class="c1"># add -v to drop the data</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>python<span class="w"> </span>testbed/passwords.py<span class="w"> </span>&gt;<span class="w"> </span>testbed/.env<span class="w">               </span><span class="c1"># once</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>testbed/docker-compose.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--wait
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="nb">set</span><span class="w"> </span>-a<span class="p">;</span><span class="w"> </span>.<span class="w"> </span>testbed/.env<span class="p">;</span><span class="w"> </span><span class="nb">set</span><span class="w"> </span>+a
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="nv">REALDB</span><span class="o">=</span>compose<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span>realdb
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>testbed/docker-compose.yml<span class="w"> </span>down<span class="w">        </span><span class="c1"># add -v to drop the data</span>
 </code></pre></div>
 <h3 id="ci-the-realdb-workflow">CI: the <code>realdb</code> workflow</h3>
 <p>A new workflow, <code>.github/workflows/realdb.yml</code>, with three jobs (owner
@@ -3645,7 +3676,7 @@ on GitHub's runners; no cloud credentials are involved.</p>
 <tbody>
 <tr>
 <td><code>REALDB=compose</code></td>
-<td>The compose servers on <code>127.0.0.1</code>, at the published ports, with the default password</td>
+<td>The compose servers on <code>127.0.0.1</code>, at the published ports, with the passwords in <code>TESTBED_*_PASSWORD</code></td>
 </tr>
 <tr>
 <td><code>REALDB_POSTGRES</code>, <code>REALDB_MYSQL</code>, <code>REALDB_MSSQL</code></td>
