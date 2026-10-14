@@ -1,11 +1,11 @@
 import threading
-from typing import Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import Field
 from sqlalchemy import Connection, Engine, event, text
 
-from nl2sql_sdk import ConnectionModel, DatasourceCapability
-from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
+from nl2sql_sdk import ConnectionModel, DatasourceCapability, ForeignKeyContract, IndexIssue, TableRef
+from nl2sql_sdk.sqlalchemy import ReflectedTable, SQLAlchemyAdapter
 
 # Connection.info key of the running statement's interrupt timer.
 _TIMER = "nl2sql_statement_timer"
@@ -85,6 +85,61 @@ class DuckdbAdapter(SQLAlchemyAdapter):
         # DuckDB qualifies schema names with their catalog; only the attached
         # database's own schemas carry user tables.
         return {"system.main", "system.information_schema", "temp.main"}
+
+    def schema_names(self, conn: Connection) -> List[str]:
+        """``catalog.schema`` of each schema in ``duckdb_schemas()``.
+
+        Read from DuckDB's own catalog: duckdb-engine reflects with SQLAlchemy's
+        PostgreSQL reflection, which queries ``pg_catalog`` tables DuckDB lacks.
+        """
+        rows = conn.execute(text(
+            "SELECT database_name, schema_name FROM duckdb_schemas() "
+            "WHERE schema_name NOT LIKE 'pg\\_%' ESCAPE '\\' ORDER BY database_name, schema_name"))
+        return [f"{database}.{name}" for database, name in rows]
+
+    def reflect(self, conn: Connection, schema: str, wants_table: Callable[[str], bool],
+                issues: List[IndexIssue]) -> Dict[str, ReflectedTable]:
+        """Tables and views from ``duckdb_tables()``, ``duckdb_views()``, ``duckdb_columns()``
+        and ``duckdb_constraints()``, with DuckDB's own type names (``DECIMAL(10,2)``, ``VARCHAR[]``)."""
+        where = "WHERE schema_name = :schema AND (:database = '' OR database_name = :database)"
+        database, _, name = schema.rpartition(".")
+        params = {"schema": name, "database": database}
+        comments = dict(conn.execute(text(
+            f"SELECT table_name, comment FROM duckdb_tables() {where} "
+            f"UNION ALL SELECT view_name, comment FROM duckdb_views() {where} AND NOT internal"), params).all())
+        wanted = {table for table in comments if wants_table(table)}
+        if not wanted:
+            return {}
+
+        columns: Dict[str, List[Dict[str, Any]]] = {}
+        for table, column, data_type, nullable, comment in conn.execute(text(
+                f"SELECT table_name, column_name, data_type, is_nullable, comment FROM duckdb_columns() "
+                f"{where} ORDER BY table_name, column_index"), params):
+            if table in wanted:
+                columns.setdefault(table, []).append(
+                    {"name": column, "type": data_type, "nullable": nullable, "comment": comment})
+
+        primary_keys: Dict[str, set] = {}
+        foreign_keys: Dict[str, List[ForeignKeyContract]] = {}
+        for table, kind, constrained, referred_table, referred in conn.execute(text(
+                f"SELECT table_name, constraint_type, constraint_column_names, referenced_table, "
+                f"referenced_column_names FROM duckdb_constraints() {where} "
+                f"AND constraint_type IN ('PRIMARY KEY', 'FOREIGN KEY') ORDER BY table_name, constraint_index"),
+                params):
+            if kind == "PRIMARY KEY":
+                primary_keys[table] = set(constrained)
+            else:
+                # DuckDB keeps a foreign key in its own schema.
+                foreign_keys.setdefault(table, []).append(ForeignKeyContract(
+                    constrained_columns=list(constrained),
+                    referred_table=TableRef(schema_name=schema, table_name=referred_table),
+                    referred_columns=list(referred)))
+
+        return {
+            table: ReflectedTable(columns=columns[table], primary_key=primary_keys.get(table, set()),
+                                  foreign_keys=foreign_keys.get(table, []), comment=comments[table])
+            for table in sorted(wanted) if table in columns
+        }
 
     def row_estimates(self, conn: Connection, schema: str) -> Dict[str, int]:
         """``duckdb_tables().estimated_size``. ``schema`` is ``catalog.schema``, as DuckDB lists it."""

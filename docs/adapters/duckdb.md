@@ -6,7 +6,8 @@ In-process analytical adapter for local files and ad-hoc analysis.
     This adapter extends `SQLAlchemyAdapter`. It overrides `build_engine()` to
     open a file with `read_only=True` and to enforce `limits.timeout_ms`: DuckDB
     runs in-process and has no statement timeout setting, so the adapter
-    interrupts a statement that runs too long.
+    interrupts a statement that runs too long. It overrides `schema_names()`
+    and `reflect()` to read DuckDB's own catalog (see below).
 
 ## Installation
 
@@ -16,9 +17,12 @@ The SQLAlchemy dialect lives in `duckdb-engine`, which ships in its own extra:
 pip install "nl2sql-engine[duckdb]"
 ```
 
-The extra keeps SQLAlchemy below 2.1: `duckdb-engine` reads a schema with
-SQLAlchemy's PostgreSQL reflection, which from 2.1 queries
-`pg_catalog.pg_collation`, a table DuckDB does not have.
+The adapter reads a schema from DuckDB's own catalog (`duckdb_schemas()`,
+`duckdb_tables()`, `duckdb_views()`, `duckdb_columns()` and
+`duckdb_constraints()`) rather than through `duckdb-engine`'s reflection,
+which reuses SQLAlchemy's PostgreSQL reflection and queries `pg_catalog`
+tables DuckDB does not have. A column's type is DuckDB's own name:
+`DECIMAL(10,2)`, `VARCHAR[]`, `JSON`.
 
 ## Configuration
 

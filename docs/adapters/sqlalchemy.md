@@ -52,12 +52,12 @@ has no server to protect: the SQLite and DuckDB connections are plain
 
 `fetch_schema_snapshot(scope, on_table=None)`:
 
-1. **The scope first.** The database's schemas are listed, and a schema in
+1. **The scope first.** The database's schemas are listed (`schema_names`), and a schema in
    `system_schemas()` or one the scope does not want (`scope.wants_schema`) is
    dropped before any query names it. So is a table the scope does not want.
    An excluded schema costs nothing.
-2. **Reflect once.** Each remaining schema is reflected with
-   `inspector.get_multi_columns`, `get_multi_pk_constraint`,
+2. **Reflect once.** Each remaining schema is read by `reflect`, by default
+   with `inspector.get_multi_columns`, `get_multi_pk_constraint`,
    `get_multi_foreign_keys` and `get_multi_table_comment`, for the wanted
    tables and views together. A dialect whose multi-table reflection fails is
    read one table at a time; a table that still cannot be read is an issue
@@ -132,6 +132,26 @@ and `information_schema`; MySQL `mysql`, `information_schema`,
 `performance_schema` and `sys`; SQL Server `sys` and `INFORMATION_SCHEMA`;
 DuckDB its `system` and `temp` catalogs.
 
+#### `schema_names(conn) -> list[str]`
+
+The database's schemas, as `fetch_schema_snapshot` lists them and
+`test_connection` checks it can. The default asks SQLAlchemy's inspector
+(`get_schema_names()`).
+
+#### `reflect(conn, schema, wants_table, issues) -> dict[str, ReflectedTable]`
+
+Each table and view of `schema` that `wants_table(name)` accepts, keyed by
+name. A `ReflectedTable` (from `nl2sql_sdk.sqlalchemy`) holds `columns`
+(dicts with `name`, `type`, and optionally `nullable` and `comment`; `type`
+is a SQLAlchemy type or the database's own type name), `primary_key` (the
+column names), `foreign_keys` (`ForeignKeyContract`s) and `comment`. A table
+that cannot be read is an `IndexIssue` appended to `issues`. The default
+reflects with SQLAlchemy's inspector, as described above. Override it, with
+`schema_names`, when the dialect's reflection does not work on the database:
+DuckDB reads `duckdb_tables()`, `duckdb_views()`, `duckdb_columns()` and
+`duckdb_constraints()`, because `duckdb-engine` reuses PostgreSQL reflection,
+which queries `pg_catalog` tables DuckDB lacks.
+
 #### `row_estimates(conn, schema) -> dict[str, int] | None`
 
 The catalog's row count of each table in `schema`, read from the database's
@@ -148,7 +168,7 @@ none. A table left out of the dictionary has no estimate.
 
 #### `column_profile(sa_type) -> ColumnProfile`
 
-What a column of the reflected SQLAlchemy type gets under `profile: stats`:
+What a column of the reflected type gets under `profile: stats`:
 `ColumnProfile(min_max, distinct, values)`. Its null share is always read, and
 `values` is only a permission: the scope's `sample_values` must be on too. The
 default, `nl2sql_sdk.sqlalchemy.column_profile`:

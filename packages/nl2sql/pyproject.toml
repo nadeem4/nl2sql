@@ -73,10 +73,7 @@ azure = ["azure-identity", "azure-keyvault-secrets"]
 # The browser playground `nl2sql demo` serves. The built page ships inside the
 # wheel, so this extra adds only the server.
 demo = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
-# duckdb-engine reads a schema with SQLAlchemy's PostgreSQL reflection, which
-# from SQLAlchemy 2.1 joins pg_catalog.pg_collation, a table DuckDB lacks: every
-# DuckDB index build fails. The conformance kit found it.
-duckdb = ["duckdb", "duckdb-engine", "SQLAlchemy>=2.0,<2.1"]
+duckdb = ["duckdb", "duckdb-engine"]
 hashicorp = ["hvac"]
 mssql = [
     "pyodbc>=4.0.0",
@@ -87,7 +84,6 @@ postgres = ["psycopg2-binary>=2.9"]
 all = [
     "duckdb",
     "duckdb-engine",
-    "SQLAlchemy>=2.0,<2.1",
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'",
     "pymysql>=1.1.0",

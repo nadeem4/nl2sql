@@ -5,7 +5,7 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Union
+from typing import Any, Callable, Dict, Iterator, List, Literal, NamedTuple, Optional, Set, Union
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveFloat, PositiveInt
 from sqlalchemy import URL, Connection, Engine, case, column, create_engine, event, func, inspect, literal_column, \
@@ -121,9 +121,18 @@ def driver_message(exc: BaseException) -> str:
     return first if len(first) <= _MAX_MESSAGE else first[: _MAX_MESSAGE - 3] + "..."
 
 
-def _read_catalog(conn: Connection) -> None:
-    """Lists the schemas: what ``test_connection`` asks of a connection to show it can index."""
-    inspect(conn).get_schema_names()
+class ReflectedTable(NamedTuple):
+    """One table or view as ``reflect`` reads it.
+
+    ``columns`` are dicts in SQLAlchemy's reflected-column shape: ``name``,
+    ``type`` (a SQLAlchemy type, or the database's own type name), and
+    optionally ``nullable`` and ``comment``.
+    """
+
+    columns: List[Dict[str, Any]]
+    primary_key: Set[str]
+    foreign_keys: List[ForeignKeyContract]
+    comment: Optional[str]
 
 
 def _by_name(reflected: Dict[Any, Any]) -> Dict[str, Any]:
@@ -136,8 +145,8 @@ class SQLAlchemyAdapter:
 
     A subclass sets the class attributes of ``DatasourceAdapter`` and
     implements ``url`` and ``get_dialect``. Its other overridable methods are
-    ``session_setup``, ``classify``, ``system_schemas``, ``row_estimates``,
-    ``column_profile`` and ``render_sql``. Building one never connects: the SQLAlchemy engine is
+    ``session_setup``, ``classify``, ``system_schemas``, ``schema_names``,
+    ``reflect``, ``row_estimates``, ``column_profile`` and ``render_sql``. Building one never connects: the SQLAlchemy engine is
     created on first use, so the driver is imported then.
     """
 
@@ -202,6 +211,54 @@ class SQLAlchemyAdapter:
     def system_schemas(self) -> set[str]:
         """The database's own schemas, never indexed whatever the scope says. Matched ignoring case."""
         return set()
+
+    def schema_names(self, conn: Connection) -> List[str]:
+        """The database's schemas, as ``fetch_schema_snapshot`` and ``test_connection`` list them.
+
+        The default asks SQLAlchemy's inspector. Override it, with ``reflect``,
+        when the dialect's reflection does not work on the database.
+        """
+        return inspect(conn).get_schema_names()
+
+    def reflect(self, conn: Connection, schema: str, wants_table: Callable[[str], bool],
+                issues: List[IndexIssue]) -> Dict[str, ReflectedTable]:
+        """Each table and view of ``schema`` that ``wants_table(name)`` accepts, by name.
+
+        The default reflects with SQLAlchemy's inspector, once per schema
+        (``get_multi_*``), falling back to one table at a time; a table that
+        cannot be read is an ``IndexIssue`` in ``issues`` and is left out
+        when its columns cannot be read. Views are read like tables: a
+        datasource's ``preferred_tables`` are usually views its data team built.
+        """
+        inspector = inspect(conn)
+        names = set(inspector.get_table_names(schema=schema))
+        try:
+            names.update(inspector.get_view_names(schema=schema))
+        except Exception as exc:
+            self._rollback(conn)
+            logger.warning(f"Could not list the views of {schema} in {self}: {driver_message(exc)}")
+        wanted = sorted(n for n in names if wants_table(n))
+        if not wanted:
+            return {}
+
+        columns = self._each(conn, inspector, "columns", schema, wanted, issues, required=True)
+        pks = self._each(conn, inspector, "pk_constraint", schema, wanted, issues)
+        fks = self._each(conn, inspector, "foreign_keys", schema, wanted, issues)
+        comments = (self._each(conn, inspector, "table_comment", schema, wanted, issues)
+                    if inspector.dialect.supports_comments else {})
+        return {
+            name: ReflectedTable(
+                columns=columns[name],
+                primary_key=set((pks.get(name) or {}).get("constrained_columns") or []),
+                foreign_keys=[ForeignKeyContract(constrained_columns=fk["constrained_columns"],
+                                                 referred_table=TableRef(schema_name=fk.get("referred_schema") or schema,
+                                                                         table_name=fk["referred_table"]),
+                                                 referred_columns=fk["referred_columns"])
+                              for fk in fks.get(name) or []],
+                comment=(comments.get(name) or {}).get("text"),
+            )
+            for name in wanted if name in columns
+        }
 
     def row_estimates(self, conn: Connection, schema: str) -> Optional[Dict[str, int]]:
         """The catalog's row count of each table in ``schema``, or None when the database keeps none.
@@ -299,7 +356,7 @@ class SQLAlchemyAdapter:
                 conn.execute(text("SELECT 1"))
                 info = conn.dialect.server_version_info
                 try:
-                    _read_catalog(conn)
+                    self.schema_names(conn)
                 except Exception as e:
                     return self._failed_check(e, "permission")
         except Exception as e:
@@ -465,25 +522,26 @@ class SQLAlchemyAdapter:
                               on_table: Optional[Callable[[str], None]] = None) -> SchemaSnapshot:
         """The schema of the tables and views ``scope`` wants, with their metadata.
 
-        Each schema is reflected once (``get_multi_*``), after the scope has
-        left out the schemas and tables it does not want, so an excluded
-        schema costs no query. Row counts are the catalog's estimates
+        Each schema is read once (``reflect``), after the scope has left out
+        the schemas and tables it does not want, so an excluded schema costs
+        no query. Row counts are the catalog's estimates
         (``row_estimates``); ``COUNT(*)`` runs only under ``profile: stats``
         for a table with none. What a table or column is indexed without is
         an ``IndexIssue`` on the snapshot. ``on_table`` is called with each
         table's ``schema.table`` as it is profiled.
         """
-        inspector = inspect(self.engine)
         system = {name.lower() for name in self.system_schemas()}
-        schemas = sorted(s for s in inspector.get_schema_names()
-                         if s.lower() not in system and scope.wants_schema(s))
         issues: List[IndexIssue] = []
         contracts: Dict[str, TableContract] = {}
         metadata: Dict[str, TableMetadata] = {}
 
         with self.engine.connect() as conn:
+            schemas = sorted(s for s in self.schema_names(conn)
+                             if s.lower() not in system and scope.wants_schema(s))
             for schema in schemas:
-                reflected = self._reflect(inspector, schema, scope, issues)
+                reflected = self.reflect(
+                    conn, schema, lambda name: scope.wants_table(TableRef(schema_name=schema, table_name=name)),
+                    issues)
                 if not reflected:
                     continue
                 estimates = self._estimates(conn, schema, issues)
@@ -517,42 +575,7 @@ class SQLAlchemyAdapter:
             issues=issues,
         )
 
-    def _reflect(self, inspector: Inspector, schema: str, scope: IndexScope,
-                 issues: List[IndexIssue]) -> Dict[str, tuple]:
-        """``{name: (columns, primary key columns, foreign keys, comment)}`` of each wanted table and view.
-
-        Views are read like tables: a datasource's ``preferred_tables`` are
-        usually views its data team built.
-        """
-        names = set(inspector.get_table_names(schema=schema))
-        try:
-            names.update(inspector.get_view_names(schema=schema))
-        except Exception as exc:
-            logger.warning(f"Could not list the views of {schema} in {self}: {driver_message(exc)}")
-        wanted = sorted(n for n in names if scope.wants_table(TableRef(schema_name=schema, table_name=n)))
-        if not wanted:
-            return {}
-
-        columns = self._each(inspector, "columns", schema, wanted, issues, required=True)
-        pks = self._each(inspector, "pk_constraint", schema, wanted, issues)
-        fks = self._each(inspector, "foreign_keys", schema, wanted, issues)
-        comments = (self._each(inspector, "table_comment", schema, wanted, issues)
-                    if inspector.dialect.supports_comments else {})
-        return {
-            name: (
-                columns[name],
-                set((pks.get(name) or {}).get("constrained_columns") or []),
-                [ForeignKeyContract(constrained_columns=fk["constrained_columns"],
-                                    referred_table=TableRef(schema_name=fk.get("referred_schema") or schema,
-                                                            table_name=fk["referred_table"]),
-                                    referred_columns=fk["referred_columns"])
-                 for fk in fks.get(name) or []],
-                (comments.get(name) or {}).get("text"),
-            )
-            for name in wanted if name in columns
-        }
-
-    def _each(self, inspector: Inspector, what: str, schema: str, names: List[str],
+    def _each(self, conn: Connection, inspector: Inspector, what: str, schema: str, names: List[str],
               issues: List[IndexIssue], required: bool = False) -> Dict[str, Any]:
         """``inspector.get_multi_<what>`` for ``names``, falling back to one table at a time.
 
@@ -563,6 +586,7 @@ class SQLAlchemyAdapter:
             return _by_name(getattr(inspector, f"get_multi_{what}")(
                 schema=schema, filter_names=names, kind=ObjectKind.ANY))
         except Exception as exc:
+            self._rollback(conn)
             logger.warning(f"Reflecting the {what} of {schema} at once failed in {self}, "
                            f"reading each table: {driver_message(exc)}")
         found, first_error = {}, None
@@ -570,6 +594,7 @@ class SQLAlchemyAdapter:
             try:
                 found[name] = getattr(inspector, f"get_{what}")(name, schema=schema)
             except Exception as exc:
+                self._rollback(conn)
                 first_error = first_error or exc
                 issues.append(IndexIssue(table=f"{schema}.{name}", stage="reflect",
                                          message=f"{what.replace('_', ' ')} not read: {driver_message(exc)}"))
