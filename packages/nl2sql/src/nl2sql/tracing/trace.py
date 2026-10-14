@@ -88,7 +88,9 @@ def settings_snapshot() -> Dict[str, Any]:
 
 
 def _llm_configs(ctx: Any) -> Dict[str, Any]:
-    configs = getattr(getattr(ctx, "llm_registry", None), "_configs", None) or {}
+    # The run's own set: the trace is written while the run still reads it.
+    llms = getattr(getattr(ctx, "llm_registry", None), "current", None)
+    configs = getattr(llms, "configs", None) or {}
     return {
         name: {"provider": getattr(cfg, "provider", None), "model": getattr(cfg, "model", None),
                "temperature": getattr(cfg, "temperature", None)}

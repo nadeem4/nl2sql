@@ -2,7 +2,7 @@
 
 ``Runtime.from_config(cfg, registry)`` resolves every name the config uses
 through the registry, builds the secret manager, the adapters (not
-connected), the LLM settings (no model call), the embedder and the local
+connected), the LLM clients (no model call), the embedder and the local
 stores under ``storage.path``, and raises one ``ConfigError`` listing every
 problem. Every node, store and service is handed the runtime. See
 docs/architecture/configuration_v2.md, sections 4, 6 and 8.
@@ -27,9 +27,12 @@ from nl2sql.config.errors import Problem
 from nl2sql.registry import Registry, RegistryError
 
 if TYPE_CHECKING:
-    from nl2sql.config import Datasource
+    from nl2sql.auth import UserContext
+    from nl2sql.config import LLM, Datasource
+    from nl2sql.llm.llm_set import LLMChange
 
 logger = get_logger(__name__)
+llm_logger = get_logger("nl2sql.llm")
 
 # The vector index's collection: an internal constant, one per index folder.
 INDEX_COLLECTION = "nl2sql_store"
@@ -104,15 +107,12 @@ class Runtime:
                 problem(f"datasources[{i}].connection", str(e) or type(e).__name__)
 
         self.llm_registry = LLMRegistry(self.secret_manager, self.registry)
-        llm_ok = True
-        for path, provider in _llm_providers(config):
-            try:
-                self.registry.load("llm", provider)
-            except RegistryError as e:
-                llm_ok = False
-                problem(path, str(e))
-        if llm_ok:
-            self.llm_registry.configure(config.llm)
+        llm_problems = _llm_provider_problems(config.llm, self.registry, source)
+        problems.extend(llm_problems)
+        if not llm_problems:
+            # Clients are built now (no model call); a key that does not
+            # resolve is check()'s to report, not the constructor's.
+            self.llm_registry.swap(self.llm_registry.build_from(config.llm))
 
         self.embedder = None
         try:
@@ -129,6 +129,7 @@ class Runtime:
                 problem(f"curated.datasources.{issue.datasource_id}", str(issue))
 
         if problems:
+            self.llm_registry.close()
             raise ConfigError(problems, source=source)
 
         self._config = config
@@ -171,7 +172,7 @@ class Runtime:
 
     @property
     def config(self) -> Config:
-        """The current config. It changes only when a datasource is added in code."""
+        """The current config. It changes only when a datasource is added or the LLM is replaced."""
         with self._lock:
             return self._config
 
@@ -211,6 +212,39 @@ class Runtime:
             self.ds_registry.register_datasource(datasource)
             self._config = config
 
+    def replace_llm(self, llm: "LLM", *, by: Optional["UserContext"] = None, via: str = "python") -> "LLMChange":
+        """Swaps in ``llm`` as one step, and logs and audits the change. Never calls a model.
+
+        ``llm`` is validated as the ``llm`` section of ``nl2sql.yaml`` is, and
+        every agent's API key must resolve. The new clients are built first;
+        then the LLM set and ``config.llm`` are swapped together under the
+        engine's lock. Runs in flight finish on the old set.
+
+        Raises:
+            ConfigError: a provider is unknown or uninstalled, or an agent's
+                key does not resolve. Nothing has changed.
+        """
+        from nl2sql.config import LLM
+        from nl2sql.llm.llm_set import LLMChange
+
+        source = "LLM"
+        if not isinstance(llm, LLM):
+            raise TypeError(f"replace takes an LLM, not {type(llm).__name__}.")
+        problems = _llm_provider_problems(llm, self.registry, source)
+        if problems:
+            raise ConfigError(problems, source=source)
+        new = self.llm_registry.build_from(llm)
+        if new.missing:
+            self.llm_registry.discard(new)
+            raise ConfigError([Problem(file=source, path=_llm_key_path(name), message=message)
+                               for name, message in new.missing.items()], source=source)
+        with self._lock:
+            old = self.llm_registry.swap(new)
+            self._config = self._config.model_copy(update={"llm": llm})
+        change = LLMChange(by=_who(by, via), changes=_llm_changes(old, new))
+        _log_llm_change(change, tenant_id=self.tenant_id)
+        return change
+
     # ------------------------------------------------------------ lifecycle
 
     def check_datasources(self) -> List[DatasourceStatus]:
@@ -236,12 +270,13 @@ class Runtime:
         return statuses
 
     def close(self) -> None:
-        """Disposes the adapters' pools and closes the stores. Calling it again does nothing."""
+        """Disposes the adapters' pools, closes the LLM clients and the stores. Calling it again does nothing."""
         with self._lock:
             if self._closed:
                 return
             self._closed = True
         self.ds_registry.close()
+        self.llm_registry.close()
         for store in (getattr(self, "schema_store", None), getattr(self, "vector_store", None)):
             close = getattr(store, "close", None)
             if callable(close):
@@ -251,9 +286,8 @@ class Runtime:
                     logger.warning(f"Closing {type(store).__name__} failed: {e}")
 
 
-def _llm_providers(config: Config):
+def _llm_providers(llm: "LLM"):
     """``(path, provider name)`` for every provider the ``llm`` section names."""
-    llm = config.llm
     if isinstance(llm.model, str):
         yield "llm.provider", llm.provider
     for agent, override in llm.agents.items():
@@ -288,6 +322,71 @@ def _replaced(model: Any, path: List[str], value: Any) -> Any:
     head, *rest = path
     new = _replaced(getattr(model, head), rest, value) if rest else value
     return model.model_copy(update={head: new})
+
+
+def _llm_provider_problems(llm: "LLM", registry: Registry, source: str) -> List[Problem]:
+    """A problem for every provider in ``llm`` the registry cannot load."""
+    problems = []
+    for path, provider in _llm_providers(llm):
+        try:
+            registry.load("llm", provider)
+        except RegistryError as e:
+            problems.append(Problem(file=source, path=path, message=str(e)))
+    return problems
+
+
+def _config_agent_names() -> Dict[str, str]:
+    """The ``llm`` section's agent names, by the name the nodes ask ``get_llm`` for."""
+    from typing import get_args
+
+    from nl2sql.config.models import AgentName
+    from nl2sql.llm.providers import LLM_AGENTS
+
+    names = {"default": "default"}
+    names.update({LLM_AGENTS.get(name, name): name for name in get_args(AgentName)})
+    return names
+
+
+def _llm_key_path(agent: str) -> str:
+    """Where in the ``llm`` section agent ``agent``'s key is set."""
+    name = _config_agent_names().get(agent, agent)
+    return "llm.api_key" if name == "default" else f"llm.agents.{name}.api_key"
+
+
+def _llm_changes(old, new) -> Dict[str, Dict[str, str]]:
+    """Each agent whose effective provider or model differs between two LLM sets."""
+    def describe(llms, key: str) -> Optional[str]:
+        try:
+            return llms.describe(key)
+        except ValueError:
+            return None
+
+    changes = {}
+    for key, name in _config_agent_names().items():
+        before, after = describe(old, key), describe(new, key)
+        if before != after:
+            changes[name] = {"old": before, "new": after}
+    return changes
+
+
+def _who(by: Optional["UserContext"], via: str) -> Dict[str, Any]:
+    """Who made a change: the entry point, and the user and their roles when known."""
+    who: Dict[str, Any] = {"via": via}
+    if by is not None:
+        who = {"user_id": by.user_id, "roles": list(by.roles), **who}
+    return who
+
+
+def _log_llm_change(change: "LLMChange", tenant_id: Optional[str]) -> None:
+    """One INFO line and one ``llm.changed`` audit record. Neither ever holds a key."""
+    from nl2sql.common.event_logger import event_logger
+
+    by = change.by
+    who = f"by user={by['user_id']} roles=[{','.join(by['roles'])}] " if "user_id" in by else ""
+    what = "; ".join(f"{agent}: {c['old']} -> {c['new']}" for agent, c in change.changes.items())
+    llm_logger.info(f"LLM replaced {who}via {by['via']}: {what or 'no provider or model changed'}")
+    event_logger.log_event("llm.changed", {"by": dict(by), "changes": dict(change.changes)},
+                           tenant_id=tenant_id)
 
 
 def _copy_into_global_settings(config: Config, stores: StorePaths) -> None:

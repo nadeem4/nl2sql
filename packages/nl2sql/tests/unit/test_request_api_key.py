@@ -29,12 +29,18 @@ SECOND_KEY = "-".join(["sk", "proj", "requestkeytwo" + "b" * 24 + "8e2f"])
 ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "requestkey" + "c" * 24 + "5d9a"])
 
 
-@pytest.fixture
-def registry():
+def _registry() -> LLMRegistry:
     reg = LLMRegistry(SecretManager())
     reg.register_llm(AgentConfig(provider="openai", model="gpt-4o", temperature=0.0,
                                  api_key="${env:OPENAI_API_KEY}", name="default"))
     return reg
+
+
+@pytest.fixture
+def registry(monkeypatch):
+    # The process has no key of its own: clients are built when the LLM is set.
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    return _registry()
 
 
 def test_the_bound_key_builds_the_client_and_is_cached_nowhere(registry, monkeypatch):
@@ -61,8 +67,9 @@ def test_each_key_gets_its_own_client(registry, monkeypatch):
     assert second.openai_api_key.get_secret_value() == SECOND_KEY
 
 
-def test_a_bound_key_does_not_disturb_the_process_key(registry, monkeypatch):
+def test_a_bound_key_does_not_disturb_the_process_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "the-owner-key-for-this-process")
+    registry = _registry()
 
     own = registry.get_llm("default")
     with use_api_key(FIRST_KEY):
@@ -76,15 +83,15 @@ def test_a_bound_key_does_not_disturb_the_process_key(registry, monkeypatch):
 
 
 def test_a_key_from_another_provider_moves_the_agent_to_that_provider(registry):
-    moved = LLMRegistry._for_key(registry._config_for("default"), ANTHROPIC_KEY)
-    unmoved = LLMRegistry._for_key(registry._config_for("default"), FIRST_KEY)
+    moved = LLMRegistry._for_key(registry.current.config_for("default"), ANTHROPIC_KEY)
+    unmoved = LLMRegistry._for_key(registry.current.config_for("default"), FIRST_KEY)
 
     # A gpt- model means nothing to Anthropic, so the model moves with the key.
     assert (moved.provider, moved.model) == ("anthropic", "claude-opus-5")
     assert moved.base_url is None
     # A key from the configured provider changes nothing but the credential,
     # which is what keeps a pinned model, and a test's fake endpoint, in force.
-    assert unmoved is registry._config_for("default")
+    assert unmoved is registry.current.config_for("default")
 
 
 def test_the_trace_redactor_knows_the_bound_key():
@@ -156,7 +163,7 @@ def test_a_request_with_no_key_at_all_names_the_step_and_its_provider():
 
 
 def test_a_chosen_model_on_the_configured_provider_keeps_the_configured_endpoint(registry):
-    config = registry._config_for("default").model_copy(update={"base_url": "http://fake/v1"})
+    config = registry.current.config_for("default").model_copy(update={"base_url": "http://fake/v1"})
     llms = RequestLLMs(keys={"openai": FIRST_KEY}, models={"astplanner": ("openai", "gpt-4.1")})
 
     moved, key = LLMRegistry._for_request(config, "astplanner", llms)
@@ -169,7 +176,7 @@ def test_a_chosen_model_on_the_configured_provider_keeps_the_configured_endpoint
 
 
 def test_a_chosen_model_on_another_provider_drops_the_endpoint_and_the_key_reference(registry):
-    config = registry._config_for("default").model_copy(update={"base_url": "http://fake/v1"})
+    config = registry.current.config_for("default").model_copy(update={"base_url": "http://fake/v1"})
     llms = RequestLLMs(keys={"openai": FIRST_KEY, "anthropic": ANTHROPIC_KEY},
                        models={"astplanner": ("anthropic", "claude-opus-5")})
 
@@ -225,7 +232,7 @@ def test_a_request_endpoint_moves_a_step_on_another_provider_onto_the_openai_wir
                                  api_key="${env:ANTHROPIC_API_KEY}", name="default"))
     replay = RequestLLMs(keys={"openai": "replay-only"}, fallback="replay-only", base_url=REPLAY_URL)
 
-    config, key = LLMRegistry._for_request(reg._config_for("default"), "astplanner", replay)
+    config, key = LLMRegistry._for_request(reg.current.config_for("default"), "astplanner", replay)
 
     assert (config.provider, config.base_url, key) == ("openai", REPLAY_URL, "replay-only")
 

@@ -7,11 +7,15 @@ Provides functionality for configuring LLMs programmatically or via config.
 from __future__ import annotations
 
 import pathlib
-from typing import Union, Dict, Any
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from nl2sql.runtime import Runtime
-from nl2sql.llm.registry import LLMRegistry
 from nl2sql.llm.models import AgentConfig
+
+if TYPE_CHECKING:
+    from nl2sql.auth import UserContext
+    from nl2sql.config import LLM
+    from nl2sql.llm.llm_set import LLMChange
 
 
 class LLM_API:
@@ -22,7 +26,19 @@ class LLM_API:
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
         self._registry = ctx.llm_registry
-    
+
+    def replace(self, llm: "LLM", *, by: Optional["UserContext"] = None, via: str = "python") -> "LLMChange":
+        """Replace the whole ``llm`` section at once: validated, atomic, logged. Never calls a model.
+
+        ``llm`` is validated as ``llm.yaml`` is, and every agent's API key
+        must resolve; an invalid one raises ``ConfigError`` and changes
+        nothing. Runs already in flight finish on the old LLM. The change is
+        logged (one INFO line) and audited, naming ``by`` (or ``via``, the
+        entry point) and each agent's old and new provider and model, never a
+        key. It is not written to any file.
+        """
+        return self._ctx.replace_llm(llm, by=by, via=via)
+
     def configure_llm(
         self,
         config: Union[AgentConfig, Dict[str, Any]]

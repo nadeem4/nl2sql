@@ -1,11 +1,14 @@
 import os
+from contextvars import ContextVar
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional
 
 from langchain_core.language_models import BaseChatModel
 
 from nl2sql.common.env_hint import active_env_file
 from nl2sql.secrets import SecretManager
+from .client_cache import ClientKey, LLMClientCache
+from .llm_set import LLMSet
 from .models import AgentConfig
 from .request_key import RequestLLMs, current_request_llms
 from .wires import WIRES, Wire
@@ -13,6 +16,11 @@ from .wires import WIRES, Wire
 if TYPE_CHECKING:
     from nl2sql.config import LLM
     from nl2sql.registry import Registry
+
+# The set the run in this context reads (``LLMRegistry.begin_run``). The
+# pipeline's clients are built while its graph is built, in the run's own
+# thread, so a context variable is enough to give every node the same set.
+_RUN_LLMS: ContextVar[Optional[LLMSet]] = ContextVar("nl2sql_run_llms", default=None)
 
 
 class ProviderPreset(NamedTuple):
@@ -98,85 +106,221 @@ def agents_from_config(llm: "LLM") -> Dict[str, Any]:
     return agents
 
 
+class RunLLMs:
+    """The ``LLMSet`` one run reads, pinned to the run's context until ``end()``.
+
+    ``unpin()`` stops this context reading the run's set; ``release()`` lets
+    the engine retire it, and close clients only it held, once the run's
+    graph has finished. ``end()`` does both. Each runs once.
+    """
+
+    def __init__(self, owner: "LLMRegistry", llms: LLMSet, token: Any):
+        self.llms = llms
+        self._owner = owner
+        self._token = token
+        self._released = False
+
+    def unpin(self) -> None:
+        if self._token is not None:
+            _RUN_LLMS.reset(self._token)
+            self._token = None
+
+    def release(self) -> None:
+        with self._owner._lock:
+            if self._released:
+                return
+            self._released = True
+        self._owner._end_run(self.llms)
+
+    def end(self) -> None:
+        self.unpin()
+        self.release()
+
+
 class LLMRegistry:
-    """Each agent's LLM settings, and the clients built from them on first use.
+    """One engine's LLM: the current ``LLMSet``, and the ``LLMClientCache`` its clients come from.
 
     ``registry`` turns a provider name into its ``LLMProvider``; without one,
-    the built-in providers are used.
+    the built-in providers are used. Each engine has its own, so nothing here
+    is shared between engines.
     """
 
     def __init__(self, secret_manager: SecretManager, registry: Optional["Registry"] = None):
         self.secret_manager = secret_manager
-        self.llms = {}
-        self._configs: Dict[str, AgentConfig] = {}
-        # Agents given a chat model object instead of a provider and model name.
-        self._objects: Dict[str, BaseChatModel] = {}
         self._registry = registry
+        self._cache = LLMClientCache()
         self._lock = RLock()
+        self._current = LLMSet()
+        # id(set) -> runs in flight on it.
+        self._runs: Dict[int, int] = {}
 
-    def configure(self, llm: "LLM") -> None:
-        """Replaces every agent with those in the ``llm`` section, as one step."""
-        agents = agents_from_config(llm)
-        configs = {name: agent for name, agent in agents.items() if isinstance(agent, AgentConfig)}
+    # ------------------------------------------------------------ building
+
+    def build(self, agents: Mapping[str, Any], llm: Optional["LLM"] = None) -> LLMSet:
+        """A new set from ``agents`` (name -> ``AgentConfig`` or chat model object). Swaps nothing.
+
+        Every client is built now, through the cache, without calling a model.
+        An agent whose API key does not resolve gets no client: ``missing``
+        says why, and ``get_llm`` raises it.
+
+        Raises:
+            ValueError: an agent names an unknown provider or no model.
+        """
+        configs = {name: agent if agent.name == name else agent.model_copy(update={"name": name})
+                   for name, agent in agents.items() if isinstance(agent, AgentConfig)}
+        objects = {name: agent for name, agent in agents.items() if name not in configs}
         for agent in configs.values():
             self._validate(agent)
+        clients, keys, errors, missing = {}, {}, {}, {}
+        for name, agent in configs.items():
+            try:
+                api_key = self._api_key_for(agent)
+            except ValueError as e:
+                errors[name], missing[name] = e, str(e)
+                continue
+            key = ClientKey.of(agent, api_key)
+            try:
+                clients[name] = self._cache.acquire(key, lambda agent=agent, api_key=api_key:
+                                                    self._build_client(agent, api_key=api_key))
+            except Exception as e:  # noqa: BLE001 - raised by get_llm, where it was raised before
+                errors[name] = e
+                continue
+            keys[name] = key
+        return LLMSet(configs=configs, objects=objects, clients=clients, keys=keys, errors=errors,
+                      missing=missing, llm=llm)
+
+    def build_from(self, llm: "LLM") -> LLMSet:
+        """A new set from the ``llm`` section. Swaps nothing."""
+        return self.build(agents_from_config(llm), llm)
+
+    def swap(self, llms: LLMSet) -> LLMSet:
+        """Makes ``llms`` the current set and returns the old one. Runs in flight keep theirs."""
         with self._lock:
-            self._configs = configs
-            self._objects = {name: agent for name, agent in agents.items() if name not in configs}
-            self.llms = {}
+            old, self._current = self._current, llms
+        self._retire_if_unused(old)
+        return old
 
-    def _provider(self, name: str):
-        """The ``LLMProvider`` for ``name``, through the registry when there is one."""
-        if self._registry is not None:
-            return self._registry.load("llm", name)
-        from .providers import LLM_PROVIDERS
+    def discard(self, llms: LLMSet) -> None:
+        """Gives back a set that was built and never swapped in."""
+        self._release_keys(llms)
 
-        return LLM_PROVIDERS[name]
+    def close(self) -> None:
+        """Closes every client. The engine is shutting down."""
+        self._cache.close()
+
+    # ------------------------------------------------------------ runs
+
+    def begin_run(self) -> RunLLMs:
+        """Pins the current set to this run: ``get_llm`` in this context reads it until ``unpin``."""
+        with self._lock:
+            llms = self._current
+            self._runs[id(llms)] = self._runs.get(id(llms), 0) + 1
+        return RunLLMs(self, llms, _RUN_LLMS.set(llms))
+
+    def _end_run(self, llms: LLMSet) -> None:
+        with self._lock:
+            left = self._runs.get(id(llms), 0) - 1
+            if left > 0:
+                self._runs[id(llms)] = left
+                return
+            self._runs.pop(id(llms), None)
+        self._retire_if_unused(llms)
+
+    def _retire_if_unused(self, llms: LLMSet) -> None:
+        with self._lock:
+            if llms is self._current or self._runs.get(id(llms)):
+                return
+        self._release_keys(llms)
+
+    def _release_keys(self, llms: LLMSet) -> None:
+        for key in llms.keys.values():
+            self._cache.release(key)
+
+    # ------------------------------------------------------------ reading
+
+    @property
+    def current(self) -> LLMSet:
+        """The set this context reads: its run's, inside a run, otherwise the engine's current one."""
+        pinned = _RUN_LLMS.get()
+        if pinned is not None:
+            return pinned
+        with self._lock:
+            return self._current
+
+    @property
+    def llms(self) -> Dict[str, BaseChatModel]:
+        """The clients the current set built, by agent name."""
+        return dict(self.current.clients)
 
     def missing_keys(self) -> Dict[str, str]:
         """Each agent whose API key does not resolve, mapped to the reason. No model is called."""
-        with self._lock:
-            configs = dict(self._configs)
-        missing = {}
-        for name, agent in configs.items():
-            preset = PROVIDER_PRESETS.get(agent.provider)
-            if preset is None:
-                continue
-            try:
-                self._resolve_api_key(agent, preset)
-            except ValueError as e:
-                missing[name] = str(e)
-        return missing
+        return dict(self.current.missing)
+
+    def get_llm(self, name: str) -> BaseChatModel:
+        """Returns the client for an agent, from the current set.
+
+        When the caller brought its own keys (:mod:`nl2sql.llm.request_key`)
+        the client is built from them, and from the caller's choice of provider
+        and model for this step, and cached nowhere, so it belongs to that
+        request and to nothing else.
+
+        Args:
+            name: Agent name; falls back to the 'default' agent.
+
+        Returns:
+            BaseChatModel: That agent's client (``ChatOpenAI``, or
+            ``ChatAnthropic`` for the anthropic provider).
+
+        Raises:
+            ValueError: If neither the named agent nor a 'default' agent is
+                configured, or if the provider needs an API key that cannot be
+                resolved.
+        """
+        llms = self.current
+        request = current_request_llms()
+        if request and llms.object_for(name) is None:
+            config, key = self._for_request(llms.config_for(name), name, request)
+            return self._build_client(config, api_key=key)
+        return llms.client(name)
+
+    def effective(self, name: str) -> str:
+        """``provider/model`` agent ``name`` runs on in this context, the request's choice included."""
+        llms = self.current
+        request = current_request_llms()
+        if request and llms.object_for(name) is None:
+            config, _ = self._for_request(llms.config_for(name), name, request)
+            return f"{config.provider}/{config.model}"
+        return llms.describe(name)
+
+    # ------------------------------------------------------------ the 0.4 entry points
 
     def register_llms(self, config: Dict[str, AgentConfig]):
-        """Registers each agent under its key in ``config``.
+        """Sets each agent under its key in ``config`` and keeps the others, as one swap.
 
         The key is the agent's name (``decomposer``, ``astplanner``, ...). An
         entry's own ``name`` field defaults to 'default', so trusting it made
         every unnamed entry under ``agents`` overwrite, and then be overwritten
         by, the default agent.
         """
-        for key, agent in config.items():
-            self.register_llm(agent if agent.name == key else agent.model_copy(update={"name": key}))
+        current = self.current
+        self.swap(self.build({**current.objects, **current.configs, **config}, current.llm))
+
+    def register_llm(self, agent: AgentConfig):
+        """Sets one agent and keeps the others, as one swap.
+
+        Raises:
+            ValueError: If the provider is unknown or the model is empty.
+        """
+        self.register_llms({agent.name: agent})
 
     def replace_llms(self, config: Dict[str, AgentConfig]):
-        """Replaces every agent with those in ``config``, as one step.
+        """Replaces every agent with those in ``config``, as one swap.
 
         Unlike ``register_llms`` this also forgets agents the new config no
         longer names, so they fall back to 'default'. Every entry is validated
         before anything changes: an invalid config leaves the old one in place.
-        Clients already handed out are untouched; the next ``get_llm`` builds
-        from the new config.
         """
-        named = {
-            key: agent if agent.name == key else agent.model_copy(update={"name": key})
-            for key, agent in config.items()
-        }
-        for agent in named.values():
-            self._validate(agent)
-        with self._lock:
-            self._configs = named
-            self.llms = {}
+        self.swap(self.build(config))
 
     def _validate(self, agent: AgentConfig) -> None:
         known = self._registry.names("llm") if self._registry is not None else sorted(PROVIDER_PRESETS)
@@ -188,77 +332,35 @@ class LLMRegistry:
         if not agent.model or not agent.model.strip():
             raise ValueError(
                 f"LLM agent '{agent.name}' has no model configured. "
-                "Set 'model' for it in configs/llm.yaml."
+                "Set 'model' for it in the llm section."
             )
 
-    def register_llm(self, agent: AgentConfig):
-        """Validates an agent's configuration and records it for later use.
+    def _provider(self, name: str):
+        """The ``LLMProvider`` for ``name``, through the registry when there is one."""
+        if self._registry is not None:
+            return self._registry.load("llm", name)
+        from .providers import LLM_PROVIDERS
 
-        The client itself is built on first ``get_llm`` so that constructing a
-        context does not require credentials for every configured agent. What is
-        genuinely misconfiguration - an unknown provider, a missing model - still
-        fails here rather than mid-query.
+        return LLM_PROVIDERS[name]
 
-        Args:
-            agent: Configuration for one agent.
-
-        Raises:
-            ValueError: If the provider is unknown or the model is empty.
-        """
-        self._validate(agent)
-
-        with self._lock:
-            self._configs[agent.name] = agent
-            # A re-registration replaces any client built from the old config.
-            self.llms.pop(agent.name, None)
-
-    def get_llm(self, name: str) -> BaseChatModel:
-        """Returns the client for an agent, building it on first use.
-
-        When the caller brought its own keys (:mod:`nl2sql.llm.request_key`)
-        the client is built from them, and from the caller's choice of provider
-        and model for this step, and cached nowhere, so it belongs to that
-        request and to nothing else.
-
-        Args:
-            name: Agent name; falls back to the 'default' agent.
-
-        Returns:
-            BaseChatModel: The cached client for that agent (``ChatOpenAI``, or
-            ``ChatAnthropic`` for the anthropic provider).
+    def _api_key_for(self, agent: AgentConfig) -> Optional[str]:
+        """The resolved key ``agent``'s client is built with, or None for a provider's own business.
 
         Raises:
-            ValueError: If neither the named agent nor a 'default' agent is
-                registered, or if the provider needs an API key that cannot be
-                resolved.
+            ValueError: the provider needs a key and none resolves.
         """
-        request = current_request_llms()
-        with self._lock:
-            if not request and (name in self._objects or (name not in self._configs and "default" in self._objects)):
-                return self._objects.get(name) or self._objects["default"]
-            if request:
-                config, key = self._for_request(self._config_for(name), name, request)
-                return self._build_client(config, api_key=key)
-            if name in self.llms:
-                return self.llms[name]
+        preset = PROVIDER_PRESETS.get(agent.provider)
+        if preset is not None:
+            api_key = self._resolve_api_key(agent, preset)
+        elif agent.api_key is not None:
+            # A provider registered in code: its key is the config's, or its own business.
+            api_key = self.secret_manager.resolve_object(agent.api_key)
+        else:
+            api_key = None
+        if hasattr(api_key, "get_secret_value"):
+            api_key = api_key.get_secret_value()
+        return api_key or None
 
-            config = self._config_for(name)
-            if config.name in self.llms:
-                return self.llms[config.name]
-
-            client = self._build_client(config)
-            self.llms[config.name] = client
-            return client
-
-    def _config_for(self, name: str) -> AgentConfig:
-        config = self._configs.get(name) or self._configs.get("default")
-        if config is None:
-            raise ValueError(
-                f"No LLM named '{name}' is configured and no 'default' LLM has "
-                "been registered. Add it to configs/llm.yaml (under 'agents', or "
-                "as the 'default' agent)."
-            )
-        return config
 
     @staticmethod
     def _for_request(agent: AgentConfig, name: str, request: RequestLLMs):
@@ -340,14 +442,8 @@ class LLMRegistry:
         """
         from .providers import ResolvedAgent
 
-        preset = PROVIDER_PRESETS.get(agent.provider)
-        if not api_key and preset is not None:
-            api_key = self._resolve_api_key(agent, preset)
-        elif not api_key and agent.api_key is not None:
-            # A provider registered in code: its key is the config's, or its own business.
-            api_key = self.secret_manager.resolve_object(agent.api_key)
-        if hasattr(api_key, "get_secret_value"):
-            api_key = api_key.get_secret_value()
+        if not api_key:
+            api_key = self._api_key_for(agent)
         return self._provider(agent.provider).create(ResolvedAgent(
             name=agent.name, model=agent.model, temperature=agent.temperature,
             api_key=api_key, base_url=agent.base_url,
@@ -411,8 +507,8 @@ class LLMRegistry:
 
     def list_llms(self) -> Dict[str, Dict[str, Any]]:
         """Every agent's settings, without keys. An agent given a model object shows its class."""
-        with self._lock:
-            listed = {name: config.model_dump(exclude={"api_key"}) for name, config in self._configs.items()}
-            listed.update({name: {"name": name, "provider": None, "model": type(model).__name__}
-                           for name, model in self._objects.items()})
-            return listed
+        llms = self.current
+        listed = {name: config.model_dump(exclude={"api_key"}) for name, config in llms.configs.items()}
+        listed.update({name: {"name": name, "provider": None, "model": type(model).__name__}
+                       for name, model in llms.objects.items()})
+        return listed

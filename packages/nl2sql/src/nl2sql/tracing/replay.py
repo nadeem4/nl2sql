@@ -232,12 +232,14 @@ def _install_playback_clients(ctx: Any, playback: TracePlayback) -> None:
 
     registry = ctx.llm_registry
     http_client = httpx.Client(transport=playback)
-    with registry._lock:
-        for name, cfg in registry._configs.items():
-            registry.llms[name] = build_chat_client(
-                cfg.model, cfg.temperature, api_key="trace-replay", tags=[name],
-                base_url="http://trace-replay.invalid/v1", http_client=http_client, max_retries=0,
-            )
+    llms = registry.current
+    registry.swap(llms.with_clients({
+        name: build_chat_client(
+            cfg.model, cfg.temperature, api_key="trace-replay", tags=[name],
+            base_url="http://trace-replay.invalid/v1", http_client=http_client, max_retries=0,
+        )
+        for name, cfg in llms.configs.items()
+    }))
 
 
 class _AfterDivergence(logging.Filter):
