@@ -2293,10 +2293,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compliance-testing" class="md-nav__link">
+  <a href="#running-the-conformance-kit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compliance Testing
+        Running the conformance kit
       
     </span>
   </a>
@@ -4686,10 +4686,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compliance-testing" class="md-nav__link">
+  <a href="#running-the-conformance-kit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compliance Testing
+        Running the conformance kit
       
     </span>
   </a>
@@ -4858,10 +4858,145 @@ the <a href="../sqlalchemy/#session_setupdbapi_connection">reference</a>).</p>
 <blockquote>
 <p>See the <strong><a href="../sdk/">Adapter Interface Reference</a></strong> for the method signatures and compliance guide.</p>
 </blockquote>
-<h2 id="compliance-testing">Compliance Testing</h2>
-<p>Regardless of which path you choose, your adapter <strong>MUST</strong> pass the compliance test suite to ensure it handles types and errors correctly.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># See Adapter Interface Reference for test setup</span>
+<h2 id="running-the-conformance-kit">Running the conformance kit</h2>
+<p>Whichever path you choose, run the conformance kit against a real database
+before you publish. It is a pytest test class, <code>AdapterConformance</code>, in
+<code>nl2sql_sdk.testing</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-sdk[testing]"</span><span class="w">   </span><span class="c1"># adds pytest and sqlglot</span>
 </code></pre></div>
+<p>Subclass it in a test module (the name must start with <code>Test</code>) and give it
+four fixtures:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Fixture</th>
+<th style="text-align: left;">What it gives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>connection</code></td>
+<td style="text-align: left;">The <code>ConnectionModel</code> of a database the tests may write the kit's seed into</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>adapter_factory</code></td>
+<td style="text-align: left;"><code>adapter_factory(connection, limits)</code>: your adapter, built the way the engine builds it</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>seed</code></td>
+<td style="text-align: left;"><code>seed(statements)</code>: runs each SQL statement with a <em>writable</em> connection, outside your adapter</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>sleep_sql</code></td>
+<td style="text-align: left;"><code>sleep_sql(seconds)</code>: a query that runs at least that long</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_engine</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterConformance</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">MyAdapter</span><span class="p">,</span> <span class="n">MyConnection</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestMyAdapterConformance</span><span class="p">(</span><span class="n">AdapterConformance</span><span class="p">):</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">connection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="k">return</span> <span class="n">MyConnection</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">"127.0.0.1"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s2">"..."</span><span class="p">)</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">adapter_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        <span class="k">return</span> <span class="k">lambda</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span><span class="p">:</span> <span class="n">MyAdapter</span><span class="p">(</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span><span class="p">)</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">seed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>        <span class="n">admin</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="s2">"mydb://admin:...@127.0.0.1/kit"</span><span class="p">)</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">statements</span><span class="p">):</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>            <span class="k">with</span> <span class="n">admin</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span><span class="o">.</span><span class="n">execution_options</span><span class="p">(</span><span class="n">isolation_level</span><span class="o">=</span><span class="s2">"AUTOCOMMIT"</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>                <span class="k">for</span> <span class="n">statement</span> <span class="ow">in</span> <span class="n">statements</span><span class="p">:</span>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>                    <span class="n">conn</span><span class="o">.</span><span class="n">exec_driver_sql</span><span class="p">(</span><span class="n">statement</span><span class="p">)</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>        <span class="k">return</span> <span class="n">run</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">sleep_sql</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>        <span class="k">return</span> <span class="k">lambda</span> <span class="n">seconds</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"SELECT pg_sleep(</span><span class="si">{</span><span class="n">seconds</span><span class="si">}</span><span class="s2">)"</span>
+</code></pre></div>
+<p>Each test writes the kit's seed first and drops it after: two schemas
+(<code>kit_a</code>, <code>kit_b</code>), a view, a mixed-case table, and boolean, uuid and json
+columns. It is written once and transpiled to your <code>get_dialect()</code> with
+sqlglot. Two class attributes adapt it:</p>
+<ul>
+<li><code>schemas = ("main",)</code> for a database with one schema, such as SQLite: the
+  seed then creates no schema, and the check that needs two is skipped.</li>
+<li><code>column_types = {"uuid": "CHAR(36)"}</code> for a database without one of the
+  three types (MySQL has no uuid, SQL Server 2022 no json).</li>
+</ul>
+<p>A database with logins can also give <code>limited_login</code>: the <code>ConnectionModel</code>
+of a second login whose password holds <code>@ : / # %</code> and that can read
+<code>kit_a</code> but not <code>kit_b</code>. It may request the <code>seeded</code> fixture to grant on the
+seed. Without it, the two checks that need it are skipped.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Check</th>
+<th style="text-align: left;">Passes when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Dialect</td>
+<td style="text-align: left;"><code>get_dialect()</code> is a name <code>sqlglot.Dialect.get_or_raise</code> accepts</td>
+</tr>
+<tr>
+<td style="text-align: left;">Connection model</td>
+<td style="text-align: left;">An unknown key fails; a password with <code>@ : / # %</code> connects; no secret appears in <code>repr</code>, <code>str</code>, a validation error or a failed check</td>
+</tr>
+<tr>
+<td style="text-align: left;">Stages</td>
+<td style="text-align: left;">Good settings are <code>ok</code>; a wrong password is <code>auth</code>, a closed port <code>network</code>, a missing database <code>database</code> (skipped when the model has no such field)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Scope</td>
+<td style="text-align: left;">System schemas stay out even when named; include and exclude rules hold; views are included; mixed-case names keep their case</td>
+</tr>
+<tr>
+<td style="text-align: left;">Odd columns</td>
+<td style="text-align: left;">Profiling the boolean, uuid and json columns gives statistics or an <code>IndexIssue</code>, never an exception</td>
+</tr>
+<tr>
+<td style="text-align: left;">Row estimates</td>
+<td style="text-align: left;">Every table has a row count and says where it came from</td>
+</tr>
+<tr>
+<td style="text-align: left;">Bound parameters</td>
+<td style="text-align: left;"><code>1; DROP TABLE kit_people</code> passed as a parameter is a value</td>
+</tr>
+<tr>
+<td style="text-align: left;">Read-only</td>
+<td style="text-align: left;">If <code>ENFORCES_READ_ONLY</code> is declared, an <code>INSERT</code> and a <code>CREATE TABLE</code> through <code>execute</code> fail, are not retryable and change nothing</td>
+</tr>
+<tr>
+<td style="text-align: left;">Timeout</td>
+<td style="text-align: left;">If <code>ENFORCES_TIMEOUT</code> is declared, <code>sleep_sql(5)</code> with a one-second limit fails within three seconds as <code>QUERY_TIMEOUT</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Errors</td>
+<td style="text-align: left;">A missing column is <code>retryable</code>; a permission error is not</td>
+</tr>
+<tr>
+<td style="text-align: left;">Streaming</td>
+<td style="text-align: left;">If the adapter has <code>execute_batches</code>, its frames match <code>execute</code>'s result</td>
+</tr>
+</tbody>
+</table>
+<p>A capability you do not declare is not checked: its test is reported as
+skipped, with the reason, so <code>pytest -rs</code> shows what your adapter does not
+promise. The five built-in adapters run the kit: SQLite and DuckDB in
+<code>packages/nl2sql/tests/adapters/unit/test_conformance.py</code>, PostgreSQL, MySQL
+and SQL Server in <code>packages/nl2sql/tests/realdb/test_conformance.py</code>.</p>
 
 
 

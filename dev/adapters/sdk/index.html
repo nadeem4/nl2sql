@@ -2380,10 +2380,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compliance-testing" class="md-nav__link">
+  <a href="#the-conformance-kit-nl2sql_sdktesting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compliance Testing
+        The conformance kit: nl2sql_sdk.testing
       
     </span>
   </a>
@@ -4972,10 +4972,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#compliance-testing" class="md-nav__link">
+  <a href="#the-conformance-kit-nl2sql_sdktesting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Compliance Testing
+        The conformance kit: nl2sql_sdk.testing
       
     </span>
   </a>
@@ -5010,6 +5010,9 @@ extension implements. Its core depends on pydantic and the standard library only
   <code>SQLAlchemyConnection</code>, installed with <code>pip install "nl2sql-sdk[sqlalchemy]"</code>.
   The one part of the SDK that imports SQLAlchemy; see
   <a href="../sqlalchemy/">SQLAlchemy adapters</a>.</li>
+<li>The conformance kit: <code>nl2sql_sdk.testing.AdapterConformance</code>, installed
+  with <code>pip install "nl2sql-sdk[testing]"</code>, a pytest test class every adapter
+  should pass; see <a href="#the-conformance-kit-nl2sql_sdktesting">the conformance kit</a>.</li>
 <li>Secret providers: <code>nl2sql_sdk.secrets.SecretProvider</code></li>
 <li>Stores: the four protocols in <code>nl2sql_sdk.stores</code></li>
 <li>Policy checks: <code>nl2sql_sdk.policy.PolicyCheck</code>, with <code>UserContext</code> and
@@ -5588,9 +5591,15 @@ and <code>deny</code> patterns, written like a role's).</p>
 code with <code>registry.add_policy_check(name, cls)</code> or
 <code>@registry.policy_check(name)</code>. No check is built in.</p>
 <hr />
-<h2 id="compliance-testing">Compliance Testing</h2>
-<p>All adapters should pass the compliance test suite (schema introspection, type mapping,
-error handling, and result contract validation).</p>
+<h2 id="the-conformance-kit-nl2sql_sdktesting">The conformance kit: <code>nl2sql_sdk.testing</code></h2>
+<p><code>AdapterConformance</code>, installed with <code>pip install "nl2sql-sdk[testing]"</code>
+(adds pytest and sqlglot), is a pytest test class an adapter's own tests
+subclass. It checks what this page promises through <code>DatasourceAdapter</code>
+alone: the dialect, the connection model, <code>test_connection</code>'s stages, the
+index scope, profiling, bound parameters, every declared capability, error
+classification and streaming. Like the SQLAlchemy base, it is an extra: the
+SDK core never imports it. How to run it, with its fixtures and the full
+list of checks: <a href="../development/#running-the-conformance-kit">Running the conformance kit</a>.</p>
 
 
 

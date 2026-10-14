@@ -5119,6 +5119,12 @@ databases proves nothing.</p>
 </table>
 <p>Test code may name dialects and use SQLAlchemy directly; the boundary tests
 cover <code>packages/*/src</code>, not the tests.</p>
+<p><code>test_conformance.py</code> runs the adapter conformance kit
+(<code>nl2sql_sdk.testing</code>) on each server. Its seed goes into schemas <code>kit_a</code>
+and <code>kit_b</code> of the sample database (databases of those names on MySQL),
+written with the admin login and dropped after each test. Its
+<code>limited_login</code> is a login <code>nl2sql_kit</code> the test makes, whose password holds
+<code>@ : / # %</code> and which may read <code>kit_a</code> only.</p>
 <h2 id="ci-the-realdb-workflow">CI: the <code>realdb</code> workflow</h2>
 <p><code>.github/workflows/realdb.yml</code> runs the test bed on GitHub's runners. No
 cloud credentials are involved.</p>

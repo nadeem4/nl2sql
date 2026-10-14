@@ -4748,6 +4748,9 @@ interrupts a statement that runs too long.</p>
 <p>The SQLAlchemy dialect lives in <code>duckdb-engine</code>, which ships in its own extra:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[duckdb]"</span>
 </code></pre></div>
+<p>The extra keeps SQLAlchemy below 2.1: <code>duckdb-engine</code> reads a schema with
+SQLAlchemy's PostgreSQL reflection, which from 2.1 queries
+<code>pg_catalog.pg_collation</code>, a table DuckDB does not have.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>duckdb</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># datasources/warehouse.yaml</span>
@@ -4808,8 +4811,8 @@ when running in <strong>Docker</strong>.</p>
 <h3 id="statement-timeout">Statement Timeout</h3>
 <p>When <code>limits.timeout_ms</code> is set, each statement starts a timer that calls the
 DuckDB connection's <code>interrupt()</code> once the limit passes. DuckDB stops the query and
-raises <code>InterruptException</code>, which the adapter reports as a refusal
-(<code>QUERY_REFUSED</code>) that the engine does not retry. The timer is cancelled as soon as
+raises <code>InterruptException</code>, which the adapter reports as a timeout
+(<code>QUERY_TIMEOUT</code>) that the engine does not retry. The timer is cancelled as soon as
 the statement finishes or fails, so it never touches a later query. The limit
 covers running the statement; DuckDB materialises the result while it runs, so
 fetching rows afterwards is not timed.</p>

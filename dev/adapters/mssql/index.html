@@ -4800,8 +4800,8 @@ is <code>db_datareader</code>.</strong></p>
 pooled connection.
 pyodbc counts whole seconds, so <code>limits.timeout_ms</code> is rounded <strong>up</strong>:
 <code>1500</code> becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
-limit passes, the driver cancels the query and the adapter reports it as a refusal
-(<code>QUERY_REFUSED</code>), which the engine does not retry.</p>
+limit passes, the driver cancels the query and the adapter reports it as a timeout
+(<code>QUERY_TIMEOUT</code>), which the engine does not retry.</p>
 <h2 id="requirements">Requirements</h2>
 <p>You must have the MS ODBC Driver installed in your Docker image or local environment.</p>
 <p><a href="https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server">Download ODBC Driver for SQL Server</a></p>

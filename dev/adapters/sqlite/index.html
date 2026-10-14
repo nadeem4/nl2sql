@@ -4764,7 +4764,7 @@ lock. So when <code>limits.timeout_ms</code> is set, each statement installs a p
 handler with its own deadline. SQLite calls it every 10,000 steps of its
 virtual machine, while the statement runs and while its rows are fetched; once
 the deadline has passed, the handler stops the statement, which fails with
-"interrupted" and is reported as a refusal (<code>QUERY_REFUSED</code>) that the engine
+"interrupted" and is reported as a timeout (<code>QUERY_TIMEOUT</code>) that the engine
 does not retry. The next statement on the connection gets a new deadline.</p>
 <h2 id="hints">Hints</h2>
 <ul>

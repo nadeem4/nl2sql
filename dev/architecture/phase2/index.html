@@ -5265,6 +5265,25 @@ subclasses. The author provides three fixtures:</p>
 </table>
 <p>The kit proves itself on the five built-ins: SQLite and DuckDB in the unit
 job, PostgreSQL, MySQL and SQL Server in the <code>realdb</code> job.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: B4</p>
+<p><code>nl2sql_sdk.testing.AdapterConformance</code>, with the <code>testing</code> extra and a
+boundary test (pytest, sqlglot, pydantic, the SDK core and the standard
+library only). Filled in on the way: the kit also takes a <code>connection</code>
+fixture (the stage checks vary it) and an optional <code>limited_login</code>, a
+second login whose password holds <code>@ : / # %</code> and that cannot read
+<code>kit_b</code>, for the password and permission checks, since each needs a
+login of its own; the test bed's <code>nl2sql_reader</code> cannot read the seed,
+so the <code>realdb</code> tests make <code>nl2sql_kit</code>. <code>schemas</code> and <code>column_types</code>
+adapt the seed to a database with one schema (SQLite) or without a type
+(MySQL's uuid, SQL Server 2022's json). The "timeout error code" is a
+new <code>QUERY_TIMEOUT</code> from the SQLAlchemy base. The kit found two
+misclassified refusals, fixed in the base: MySQL's "command denied"
+(SQLSTATE 42000) and DuckDB's write to a read-only file were both
+<code>retryable</code>. It also found that SQLAlchemy 2.1 breaks every DuckDB
+snapshot (<code>duckdb-engine</code> inherits PostgreSQL reflection, which now
+queries <code>pg_collation</code>), so the <code>duckdb</code> extra keeps SQLAlchemy below 2.1.</p>
+</div>
 <h3 id="enginedatasources-the-methods-behind-connect-a-database"><code>engine.datasources</code>: the methods behind Connect a database</h3>
 <div class="admonition note">
 <p class="admonition-title">Built: B5</p>

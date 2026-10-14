@@ -5402,15 +5402,20 @@ the host, port and firewall" for <code>network</code>, and so on.</p>
 <h4 id="is_retryable_errorexc-bool"><code>is_retryable_error(exc) -&gt; bool</code></h4>
 <p><code>execute()</code> catches every <code>SQLAlchemyError</code> the query raises and returns it as
 a failed <code>ResultFrame</code> (<code>query_failed(exc)</code>), with <code>retryable</code> from this method
-(see <a href="../sdk/">the SDK</a>). The default reads the driver's SQLSTATE when
-there is one: class <code>42</code> (syntax or an unknown name) and <code>22</code> (a data or type
-error) are the query's fault, except <code>42501</code>, insufficient privilege. With no
-SQLSTATE it falls back on the error's kind: <code>ProgrammingError</code> and <code>DataError</code>
-are retryable unless the message says permission or access was denied;
-<code>OperationalError</code> (timeouts, connections, locks) is not. The message the
-engine sees is the driver's first line, at most 200 characters, prefixed
-"The database rejected the query:"; a refusal gets a generic message instead,
-and the full error goes to the log.</p>
+(see <a href="../sdk/">the SDK</a>). A message saying permission or access was denied
+(MySQL's "command denied" included), or that the database is read-only, is a
+refusal whatever else the error says. Otherwise the default reads the driver's
+SQLSTATE when there is one: class <code>42</code> (syntax or an unknown name) and <code>22</code> (a
+data or type error) are the query's fault, except <code>42501</code>, insufficient
+privilege. With no SQLSTATE it falls back on the error's kind:
+<code>ProgrammingError</code> and <code>DataError</code> are retryable; <code>OperationalError</code>
+(timeouts, connections, locks) is not. The message the engine sees is the
+driver's first line, at most 200 characters, prefixed "The database rejected
+the query:"; a refusal gets a generic message instead, and the full error goes
+to the log. Its <code>error_code</code> is <code>QUERY_REJECTED</code> for a retryable error,
+<code>QUERY_TIMEOUT</code> for a statement stopped at <code>limits.timeout_ms</code> (the driver
+reports a timeout, a cancelled statement or an interrupt), and <code>QUERY_REFUSED</code>
+for any other refusal.</p>
 <p>Override it when your driver reports a query mistake another way. SQLite does:
 it raises <code>OperationalError</code> with no SQLSTATE for <code>no such column</code> as well as
 for a read-only database, so <code>SqliteAdapter</code> reads the message.</p>
