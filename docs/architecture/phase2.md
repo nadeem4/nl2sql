@@ -29,7 +29,7 @@ SQL Server first, and the adapter work is proven on it.
 
 ## Owner decisions
 
-The owner answered every question this design raised. Each answer is written
+The owner answered every question this design raised, and confirmed the choices it made on its own. Each answer is written
 into the section it affects.
 
 | # | Decision | Where |
@@ -40,7 +40,12 @@ into the section it affects.
 | 4 | **SQL Server declares `ENFORCES_READ_ONLY` false,** `check()` warns, and the docs recommend a login with only `db_datareader`. | [Read-only and timeouts, honestly](#read-only-and-timeouts-honestly) |
 | 5 | **Two-part policy patterns are rejected,** with the fix in the message. | [Pattern rules](#pattern-rules) |
 | 6 | **No S3 or ADLS result store in 0.6.** The `ResultStore` interface ships with a docs example; a community plugin can come later. | [The interfaces](#the-interfaces) |
-| 7 | **Built-in LLM providers stay minimal: `openai`, `anthropic` and `openai_compatible`.** There is no `azure_openai`; Azure's v1 endpoint, vLLM, Ollama, LiteLLM and OpenRouter all use `openai_compatible` with a `base_url`. Everything else is a plugin through the provider interface and the registry. The same holds for embeddings. `openrouter` and `ollama` stop being built-ins. | [LLM and embeddings providers](#5-llm-and-embeddings-providers) |
+| 7 | **Built-in LLM providers stay minimal: `openai`, `anthropic` and `openai_compatible`.** There is no `azure_openai`; Azure's v1 endpoint, vLLM, LiteLLM and any other OpenAI-style server use `openai_compatible` with a `base_url`. `openrouter` and `ollama` stay as named presets of `openai_compatible`: a fixed `base_url` and key variable, with no code path of their own. Everything else is a plugin through the provider interface and the registry. The same holds for embeddings. | [LLM and embeddings providers](#5-llm-and-embeddings-providers) |
+| 8 | **Read-only always.** There is no per-datasource `read_only` setting: every adapter makes its session read-only whenever it can. | [Read-only and timeouts, honestly](#read-only-and-timeouts-honestly) |
+| 9 | **Sample values are off by default** (`index.sample_values: false`); the demo turns them on. | [`IndexScope`: what gets indexed](#indexscope-what-gets-indexed) |
+| 10 | **Policy patterns match regardless of case,** so a deny cannot be dodged by `Orders` against `orders`. | [Pattern rules](#pattern-rules) |
+| 11 | **A `PolicyCheck` is called once per user and datasource per run,** with no cache across runs. | [The `PolicyCheck` extension point](#the-policycheck-extension-point) |
+| 12 | **The runtime price table moves to Phase 3** with the cost observer, and **the REST routes for Connect a database to Phase 4**; Phase 2 ships the package methods. | [Not in Phase 2](#not-in-phase-2) |
 
 ## Where Phase 1 left us
 
@@ -49,7 +54,7 @@ into the section it affects.
 | Config | One typed `Config` from `nl2sql.yaml` and split files; strict keys; `${provider:key}` references | Nothing for Phase 2 to fix |
 | Registry | `Registry.default()`, `add_*` and decorators for adapters, LLMs, embeddings and secrets | No store or policy-check kinds yet |
 | Storage | `storage.path` only. Under it: Chroma in `index/`, `state.db`, `traces/`, `results/` | One store class per thing, opened by path, Chroma private attributes used throughout, and bug B5 |
-| LLMs | `openai`, `anthropic`, `openrouter`, `ollama`; per-agent provider, model, temperature, key and `base_url` | Two near-duplicate presets instead of one general OpenAI-compatible provider; one malformed structured answer ends the run |
+| LLMs | `openai`, `anthropic`, `openrouter`, `ollama`; per-agent provider, model, temperature, key and `base_url` | No general OpenAI-compatible provider that the presets build on; one malformed structured answer ends the run |
 | Embeddings | `local` and `openai` | No `base_url`; a model change is refused instead of building a new index |
 | Policies | `allow_all`, `default_role`, `admin_roles`, `refusal_names_tables`, roles with `allowed_datasources` and `allowed_tables` | No deny; no globs; five call sites of `table_allowed`; denied tables still shown to the planner; no extension point |
 | Adapters | Interface version 1 with `driver_modules` and `install_hint`; typed connection models hidden inside each adapter | Unknown connection keys are ignored, read-only is enforced only on SQLite with an option, `test_connection` returns a bool, profiling reflects twice and counts every row |
@@ -62,7 +67,7 @@ into the section it affects.
 |---|---|
 | **A real-database test bed** | PostgreSQL with Pagila, MySQL with Sakila and SQL Server 2022 with AdventureWorksLT, plus a generated schema of 1,200 tables in 20 schemas. One `docker-compose.yml` runs them locally, on GitHub's runners in CI, and on one small GCP VM started on demand. A `realdb` pytest marker and fixtures point the same tests at any of them. |
 | **Four stores** | `storage` gets `index`, `state`, `traces` and `results`, each with a `type`, behind four small interfaces in the SDK. The index's build pointer is the commit, which fixes bug B5. The index has one namespace per embedding model. |
-| **Fewer, more general LLM providers** | `openai`, `anthropic` and `openai_compatible` (any server with an OpenAI-style API at a `base_url`: Azure's v1 endpoint, vLLM, Ollama, LiteLLM, OpenRouter). Each provider declares how it returns structured output, and a malformed answer is retried with the error fed back. |
+| **A general LLM provider** | `openai`, `anthropic` and `openai_compatible` (any server with an OpenAI-style API at a `base_url`: Azure's v1 endpoint, vLLM, LiteLLM), with `openrouter` and `ollama` kept as named presets of it. Each provider declares how it returns structured output, and a malformed answer is retried with the error fed back. |
 | **Embeddings providers** | `local`, `openai` and `openai_compatible`, `base_url` on the hosted ones, and a known model and dimension for every embedder. |
 | **Policies, step 1** | Allow and deny globs over `datasource.schema.table`, one `Scope` object used at every place access is decided, denied tables hidden from the planner, and a `PolicyCheck` extension point. |
 | **Adapter SDK v2** | A typed `ConnectionModel` per adapter (which also drives a generated form), `IndexScope`, type-aware profiling with catalog row estimates, honest read-only and timeout capabilities checked against real servers, `test_connection` that names the failed stage, the SQLAlchemy base made public as an SDK extra, and a conformance kit run against all five built-in adapters. |
@@ -649,22 +654,22 @@ The built-ins stay minimal (owner decision 7):
 | `openai` | OpenAI | `OPENAI_API_KEY` | optional | `tool_calling` |
 | `anthropic` | Anthropic | `ANTHROPIC_API_KEY` | optional | `tool_calling` |
 | **`openai_compatible`** | OpenAI | none: write `api_key` (usually `${env:...}`) if the server needs one | **required** | `json_schema` |
+| `openrouter` | preset of `openai_compatible` | `OPENROUTER_API_KEY` | fixed: `https://openrouter.ai/api/v1` | `tool_calling` |
+| `ollama` | preset of `openai_compatible` | none | fixed: `http://localhost:11434/v1` (a `base_url` may override it) | `tool_calling` |
 
 - **`openai_compatible`** is any server with an OpenAI-style chat API:
   Azure OpenAI's v1 endpoint (`https://<resource>.openai.azure.com/openai/v1/`,
-  with `model` as the deployment name), vLLM, Ollama
-  (`http://localhost:11434/v1`), LiteLLM, LM Studio, llama.cpp's server,
-  OpenRouter (`https://openrouter.ai/api/v1`) or a company gateway. Without
-  `api_key` it sends a placeholder, because the OpenAI client refuses to start
-  without one. Its default is `json_schema` because local servers support
-  schema-guided decoding more often than tool calls; set `tool_calling` for
-  Azure or OpenRouter.
-- **`openrouter` and `ollama` are removed** as built-ins: each was only a
-  preset `base_url` on the OpenAI wire. `PROVIDER_PRESETS` keeps `openai`,
-  `anthropic` and `openai_compatible`, and stays the one table of key
-  variables. `nl2sql init --provider` accepts `openai` and `anthropic`, the
-  demo's key detection drops the `sk-or-` prefix, and the docs show the
-  `base_url` for each common server.
+  with `model` as the deployment name), vLLM, LiteLLM, LM Studio, llama.cpp's
+  server or a company gateway. Without `api_key` it sends a placeholder,
+  because the OpenAI client refuses to start without one. Its default is
+  `json_schema` because local servers support schema-guided decoding more
+  often than tool calls; set `tool_calling` for Azure.
+- **`openrouter` and `ollama` stay**, as named presets of `openai_compatible`:
+  a `PROVIDER_PRESETS` row each, with a fixed `base_url`, a key variable (or a
+  placeholder key for Ollama) and a default `structured_output`, and no code
+  path of their own. `nl2sql init --provider openrouter` and the demo's
+  `sk-or-` key detection keep working. `PROVIDER_PRESETS` stays the one table
+  of key variables.
 - **Anything else is a plugin**: a class implementing `LLMProvider`,
   registered with `registry.add_llm` or the `nl2sql.llms` entry point group.
   An Azure provider with Entra ID sign-in, Bedrock or Gemini would each be
@@ -738,7 +743,7 @@ As in Phase 1, the engine accepts exactly the version it was built for.
 | Today | 0.6 |
 |---|---|
 | `structured()` with no retry | Parse-and-retry as above |
-| `openrouter` and `ollama` presets, `DEFAULT_OPENROUTER_MODEL`, `OPENROUTER_ENV`, the `sk-or-` key prefix | Deleted; `openai_compatible` covers them |
+| `openrouter` and `ollama` as their own providers on the OpenAI wire | Presets of `openai_compatible`: same names, same key variables, one code path |
 | Anthropic `max_tokens` fixed at 16,000 | `max_tokens` from the agent |
 | `embeddings/openai.py` without `base_url` | `base_url` passed through; `openai_compatible` added beside it (Azure, Ollama and other servers use it) |
 | `VectorStore` dimension checks and the model-mismatch error | Deleted: the namespace carries the model and dimension |
@@ -1140,7 +1145,7 @@ Phase 1 decided.
 | Kind | Entry point group | Interface | Version in 0.6 | Built-ins |
 |---|---|---|---|---|
 | adapter | `nl2sql.adapters` | `nl2sql_sdk.DatasourceAdapter` | **2** | sqlite, postgres, mysql, mssql, duckdb |
-| llm | `nl2sql.llms` | `nl2sql.llm.LLMProvider` | **2** | openai, anthropic, **openai_compatible** (openrouter and ollama removed) |
+| llm | `nl2sql.llms` | `nl2sql.llm.LLMProvider` | **2** | openai, anthropic, **openai_compatible**, and its presets openrouter and ollama |
 | embeddings | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` | **2** | local, openai, **openai_compatible** |
 | secrets | `nl2sql.secrets` | `nl2sql_sdk.secrets.SecretProvider` | 1 | env, aws, azure, hashicorp |
 | **store** | `nl2sql.stores` | `nl2sql_sdk.stores` (four protocols) | **1** | chroma, sqlite, files, local |
@@ -1236,7 +1241,7 @@ flowchart TD
 | S1 | **Store interfaces.** `nl2sql_sdk.stores` (four protocols, `Entry`, `Filter`, `BuildPointer`); `StoreConfig` and the four `Storage` sub-blocks; the `store` registry kind and `nl2sql.stores` group; slot checks. The built-ins are thin wrappers over today's classes. | — | `test_storage_with_only_path_is_valid`, `test_store_type_in_the_wrong_slot_names_the_installed_ones`, `test_store_block_keys_are_validated_by_its_config_model`, `test_store_object_is_used_as_given`, `test_the_sdk_stores_module_imports_only_pydantic` | `configuration/storage.md`, `adapters/sdk.md` (stores) |
 | E1 | **Embeddings providers v2.** `openai_compatible`, `base_url`, `dimension`, `describe()`, the one-call probe. | — | `test_openai_compatible_needs_a_model_and_base_url`, `test_base_url_is_an_error_for_local`, `test_known_dimension_needs_no_call`, `test_unknown_dimension_is_probed_once`, `test_no_azure_embeddings_provider_is_built_in` | `configuration/embeddings.md` |
 | P1 | **Policies: globs and `Scope`.** `allow`/`deny`, the pattern rules, `PolicyEngine.scope`, a run's scopes pinned, every call site on `Scope`, the retriever hiding denied tables, `nl2sql/auth` to `nl2sql/policies`. Demo roles rewritten. | — | `test_deny_beats_allow_within_a_role`, `test_union_across_roles_keeps_each_roles_deny`, `test_two_part_pattern_is_rejected_with_the_fix`, `test_matching_ignores_case`, `test_denied_table_never_reaches_the_planner_prompt`, `test_plan_naming_a_hidden_table_is_refused`, `test_every_access_decision_goes_through_scope` (architecture), the tier 1 benchmark per demo role | `configuration/policies.md`, `security/model.md`, `architecture/nodes/schema_retriever_node.md`, `logical_validator_node.md` |
-| L1 | **LLM providers and agent fields.** `openai_compatible`; `openrouter` and `ollama` removed (with `init --provider`, the demo's key detection and their constants); `structured_output`, `max_tokens`, `timeout_s`, `max_retries`, `headers`; provider interface version 2. | — | `test_built_in_llm_providers_are_openai_anthropic_and_openai_compatible`, `test_openai_compatible_requires_base_url`, `test_openai_compatible_sends_a_placeholder_key`, `test_agent_inherits_each_new_field`, `test_headers_never_print`, `test_json_mode_puts_the_schema_in_the_prompt` (fake LLM), `test_provider_version_1_is_rejected` | `configuration/llm.md` (a `base_url` table for Azure, vLLM, Ollama, LiteLLM, OpenRouter), `getting_started/*` where they name OpenRouter or Ollama |
+| L1 | **LLM providers and agent fields.** `openai_compatible`; `openrouter` and `ollama` become its presets (no code path of their own); `structured_output`, `max_tokens`, `timeout_s`, `max_retries`, `headers`; provider interface version 2. | — | `test_built_in_llm_providers_are_openai_anthropic_openai_compatible_and_its_presets`, `test_openrouter_and_ollama_build_through_openai_compatible`, `test_init_provider_openrouter_still_works`, `test_openai_compatible_requires_base_url`, `test_openai_compatible_sends_a_placeholder_key`, `test_agent_inherits_each_new_field`, `test_headers_never_print`, `test_json_mode_puts_the_schema_in_the_prompt` (fake LLM), `test_provider_version_1_is_rejected` | `configuration/llm.md` (a `base_url` table for Azure, vLLM, Ollama, LiteLLM, OpenRouter), the provider list in `api/core/llm.md` |
 | S2 | **Index store and the pointer as commit (B5).** The `chroma` store on Chroma's public API; the engine embeds; MMR in the engine; pointers record `schema_version`; readers resolve through the pinned pointer; namespaces per model; `index.prune()`; staging, `full` and `switch_guard` deleted; `version_mismatch` deleted. | S1, E1 | `test_failed_build_leaves_the_live_schema_version` (B5), `test_readers_use_the_pointers_schema_version`, `test_run_pins_pointers_across_a_rebuild`, `test_model_change_opens_an_empty_namespace` (B25), `test_switching_back_finds_the_old_namespace_built`, `test_prune_keeps_only_the_current_namespace`, `test_only_storage_imports_chromadb` | `architecture/indexing.md`, `schema/store.md`, `configuration/storage.md`, `configuration/settings.md` (`schema.version_mismatch` removed) |
 | P2 | **`PolicyCheck`.** `nl2sql_sdk.policy` (`UserContext`, `Grant`, `PolicyCheck`); `policies.check`; intersection; fail closed; the registry kind. | P1 | `test_check_cannot_widen_yaml_roles`, `test_yaml_roles_cannot_widen_the_check`, `test_check_exception_denies_and_logs`, `test_check_is_called_once_per_datasource_per_run`, `test_allow_all_with_a_check_uses_the_check` | `configuration/policies.md` (with the HTTP example), `security/model.md` |
 | S3 | **State store.** The `sqlite` state store: immutable snapshots, plan cache, feedback, `nl2sql_meta` migrations (migration 1 adopts a 0.5 file), the lock; `FeedbackStore` and `schema/` stores folded in; `health.py` through the stores. | S2 | `test_snapshot_rows_are_never_updated`, `test_keep_snapshots_keeps_every_pointed_version`, `test_a_05_state_file_is_adopted`, `test_lock_blocks_a_second_holder_and_expires`, `test_index_build_holds_the_lock`, `test_only_storage_imports_sqlite3` | `schema/store.md`, `observability/feedback.md` |
@@ -1268,8 +1273,7 @@ The waves, with at most four PRs at once:
   (`allow`/`deny` replace `allowed_datasources`/`allowed_tables`; two-part
   patterns are rejected), denied tables hidden from the planner,
   `sample_values` off by default, strict connection keys, adapter interface
-  version 2, LLM and embeddings provider interface version 2, `openrouter`
-  and `ollama` replaced by `openai_compatible`, and the
+  version 2, LLM and embeddings provider interface version 2, and the
   deleted `index.build(full=..., switch_guard=...)` arguments and
   `settings.schema.version_mismatch`.
 - Before tagging, the `realdb` workflow is run on demand on `main`, and the
@@ -1278,17 +1282,5 @@ The waves, with at most four PRs at once:
 
 ## 14. Open questions
 
-None. The owner answered all seven; see [Owner decisions](#owner-decisions).
-
-### Choices made without asking
-
-The design made these choices itself. The owner may confirm or change each.
-
-| Choice | Where |
-|---|---|
-| There is no per-datasource `read_only` setting: every adapter makes its session read-only whenever it can. | [Read-only and timeouts, honestly](#read-only-and-timeouts-honestly) |
-| Policy patterns match regardless of case, so a deny cannot be dodged by `Orders` against `orders`. | [Pattern rules](#pattern-rules) |
-| A `PolicyCheck` is called once per user and datasource per run, with no cache across runs. | [The `PolicyCheck` extension point](#the-policycheck-extension-point) |
-| Sample values are off by default (`index.sample_values: false`); the demo turns them on. | [`IndexScope`: what gets indexed](#indexscope-what-gets-indexed) |
-| The runtime price table owned by `llm/` moves to Phase 3, with the cost observer. | [Not in Phase 2](#not-in-phase-2) |
-| The REST routes for Connect a database move to Phase 4; Phase 2 ships the package methods. | [Not in Phase 2](#not-in-phase-2) |
+None. The owner answered all seven and confirmed the design's own choices;
+see [Owner decisions](#owner-decisions).
