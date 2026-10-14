@@ -161,3 +161,88 @@ def test_mssql_init_marks_itself_loaded_and_keeps_running():
     lines = [line for line in (TESTBED / "mssql" / "init.sh").read_text(encoding="utf-8").splitlines()
              if line.strip() and not line.lstrip().startswith("#")]
     assert lines[-2:] == ["touch /tmp/loaded", "exec sleep infinity"]
+
+
+def test_mssql_has_time_to_shut_down_cleanly():
+    """Docker's default 10 s grace ends in SIGKILL, and SQL Server then recovers its databases on the next start."""
+    import re
+
+    import yaml
+
+    mssql = yaml.safe_load((TESTBED / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["mssql"]
+    grace = re.fullmatch(r"(\d+)s", str(mssql.get("stop_grace_period", "")))
+    assert grace and int(grace.group(1)) >= 60, mssql.get("stop_grace_period")
+
+
+# A stand-in for sqlcmd: it logs each call, and answers the readiness query by
+# failing (no logins yet) FAIL times, then reporting a database not yet ONLINE
+# RECOVERING times, then 0. Any DB_ID check says the database exists.
+FAKE_SQLCMD = """#!/bin/bash
+echo "$*" >> "$FAKE_LOG"
+case "$*" in
+  *state_desc*)
+    n=$(cat "$FAKE_COUNT" 2>/dev/null || echo 0); echo $((n + 1)) > "$FAKE_COUNT"
+    if [ "$n" -lt "$FAIL" ]; then echo "Login failed for user 'sa'." >&2; exit 1; fi
+    if [ "$n" -lt $((FAIL + RECOVERING)) ]; then echo 1; else echo 0; fi ;;
+  *DB_ID*) echo 1 ;;
+esac
+"""
+
+
+def _bash():
+    import os
+    import shutil
+
+    if os.name == "nt":        # never WSL's bash.exe from System32
+        found = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "bin" / "bash.exe"
+        return str(found) if found.exists() else None
+    return shutil.which("bash")
+
+
+def _run_init(tmp_path, fail, recovering):
+    """Run init.sh with sqlcmd, sleep and touch faked; return the process and the logged sqlcmd calls."""
+    import os
+    import subprocess
+
+    bash = _bash()
+    if bash is None:
+        pytest.skip("needs bash")
+    fake = tmp_path / "fakebin"
+    fake.mkdir()
+    (fake / "sqlcmd").write_text(FAKE_SQLCMD, encoding="utf-8", newline="\n")
+    (fake / "sleep").write_text("#!/bin/bash\n:\n", encoding="utf-8", newline="\n")
+    (fake / "touch").write_text("#!/bin/bash\n:\n", encoding="utf-8", newline="\n")
+    script = (TESTBED / "mssql" / "init.sh").read_text(encoding="utf-8")
+    assert "/opt/mssql-tools18/bin/sqlcmd" in script
+    (tmp_path / "init.sh").write_text(script.replace("/opt/mssql-tools18/bin/sqlcmd", "sqlcmd"),
+                                      encoding="utf-8", newline="\n")
+    env = {**os.environ, "FAKE_LOG": "log", "FAKE_COUNT": "count", "FAIL": str(fail),
+           "RECOVERING": str(recovering), "MSSQL_SA_PASSWORD": "pw"}
+    done = subprocess.run([bash, "-c", 'chmod +x fakebin/*; PATH="$PWD/fakebin:$PATH" exec bash ./init.sh'],
+                          cwd=tmp_path, env=env, capture_output=True, text=True, timeout=120)
+    log = (tmp_path / "log").read_text(encoding="utf-8").splitlines() if (tmp_path / "log").exists() else []
+    return done, log
+
+
+def test_mssql_init_waits_until_the_samples_are_online(tmp_path):
+    """After an unclean stop SQL Server recovers each database on start; opening one too early fails the login."""
+    done, log = _run_init(tmp_path, fail=3, recovering=4)
+
+    assert done.returncode == 0, done.stderr
+    readiness = [i for i, line in enumerate(log) if "state_desc" in line]
+    assert len(readiness) == 8
+    for i in readiness:
+        assert "-d master" in log[i] and "sys.databases" in log[i]
+        assert "AdventureWorksLT2022" in log[i] and "wide" in log[i]
+    opens = [i for i, line in enumerate(log) if "DB_ID" in line or "-d AdventureWorksLT2022" in line]
+    assert opens and min(opens) > max(readiness)
+
+
+def test_mssql_init_gives_up_when_a_sample_never_comes_online(tmp_path):
+    done, log = _run_init(tmp_path, fail=0, recovering=10_000)
+
+    assert done.returncode != 0
+    assert "not online" in done.stderr
+    readiness = [line for line in log if "state_desc" in line]
+    assert 100 <= len(readiness) <= 200                   # about five minutes of 2 s polls, then stop
+    assert not any("DB_ID" in line or "-d AdventureWorksLT2022" in line for line in log)

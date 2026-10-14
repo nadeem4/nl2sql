@@ -3,7 +3,7 @@
     python scripts/testbed.py up                    # start the VM, compose up, open the IAP tunnels
     python scripts/testbed.py run -- pytest -m realdb
     python scripts/testbed.py status
-    python scripts/testbed.py down                  # close the tunnels, stop the VM; safe to repeat
+    python scripts/testbed.py down                  # close the tunnels, stop the servers, then the VM; safe to repeat
 
 ``run`` is ``up``, then the command with ``REALDB_POSTGRES``, ``REALDB_MYSQL``
 and ``REALDB_MSSQL`` in its environment, then ``down`` in a ``finally``: also
@@ -77,6 +77,13 @@ COMPOSE = ("IFS= read -r TESTBED_POSTGRES_PASSWORD && IFS= read -r TESTBED_MYSQL
            " && export TESTBED_POSTGRES_PASSWORD TESTBED_MYSQL_PASSWORD TESTBED_MSSQL_PASSWORD TESTBED_BIND=0.0.0.0"
            " && sudo -E docker compose -f testbed/docker-compose.yml up -d --wait")
 
+# Runs on the VM before it stops: stopping the VM kills SQL Server instead of
+# shutting it down. `stop` needs no password, but the compose file requires the
+# three variables to be set, so they get a placeholder.
+STOP_SERVERS = ("sudo TESTBED_POSTGRES_PASSWORD=unused TESTBED_MYSQL_PASSWORD=unused"
+                " TESTBED_MSSQL_PASSWORD=unused docker compose -f testbed/docker-compose.yml stop")
+SERVERS_STOP_TIMEOUT = 180      # seconds; SQL Server alone may take its 60 s grace period
+
 # On Windows gcloud drives PuTTY's plink and, by default, feeds it "y" to accept
 # the host key instead of passing this script's stdin on, so the passwords would
 # never arrive. The copy and the Docker wait keep that default, which caches the
@@ -149,7 +156,7 @@ def up(target: Target) -> Dict[str, str]:
     secrets = passwords(target)
     print(f"Starting {target.instance} ...", file=sys.stderr)
     call(["compute", "instances", "start", target.instance, *target.flags])
-    ssh = ["--tunnel-through-iap", "--quiet", "--strict-host-key-checking=no", *target.flags]
+    ssh = _ssh(target)
     with tempfile.TemporaryDirectory() as staging:
         # Only the repository's files: never a local testbed/.env.
         copy = Path(staging) / "testbed"
@@ -185,11 +192,31 @@ def open_tunnels(target: Target) -> None:
 
 
 def down(target: Target) -> None:
-    """Close the tunnels this script opened and stop the VM. Safe to repeat."""
+    """Close the tunnels this script opened, stop the servers cleanly, then the VM. Safe to repeat."""
     for pid in _load():
         _kill(pid)
     STATE.unlink(missing_ok=True)
+    stop_servers(target)
     call(["compute", "instances", "stop", target.instance, *target.flags])
+
+
+def stop_servers(target: Target) -> None:
+    """``docker compose stop`` on the VM, bounded; a failure is reported and the VM is stopped anyway."""
+    print("Stopping the servers ...", file=sys.stderr)
+    try:
+        code = subprocess.run([gcloud(), "compute", "ssh", target.instance, *_ssh(target),
+                               f"--command={STOP_SERVERS}"],
+                              stdin=subprocess.DEVNULL, timeout=SERVERS_STOP_TIMEOUT).returncode
+        failure = f"exit code {code}" if code else ""
+    except subprocess.TimeoutExpired:
+        failure = f"no answer in {SERVERS_STOP_TIMEOUT} s"
+    if failure:
+        print(f"testbed: could not stop the servers cleanly ({failure}; the VM may already be stopped);"
+              " stopping the VM anyway.", file=sys.stderr)
+
+
+def _ssh(target: Target) -> List[str]:
+    return ["--tunnel-through-iap", "--quiet", "--strict-host-key-checking=no", *target.flags]
 
 
 def realdb_environment(secrets: Dict[str, str]) -> Dict[str, str]:

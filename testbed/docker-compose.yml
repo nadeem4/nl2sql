@@ -89,6 +89,9 @@ services:
       # The server itself reads the .bak during RESTORE.
       - samples:/samples:ro
       - mssql-data:/var/opt/mssql
+    # Docker's default 10 s ends in SIGKILL, and the next start then recovers
+    # every database before it can be opened. A clean shutdown checkpoints them.
+    stop_grace_period: 60s
     # Healthy only once mssql-init has finished: it creates the reader login last.
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q \"IF SUSER_ID('nl2sql_reader') IS NULL THROW 50000, 'not loaded yet', 1\""]

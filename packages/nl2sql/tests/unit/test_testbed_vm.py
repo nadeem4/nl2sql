@@ -7,7 +7,8 @@ prints a password for ``secrets versions access``, a state for ``instances
 describe``, and for ``start-iap-tunnel`` it listens on the local port until it
 is killed. ``FAKE_GCLOUD_FLAKY=scp`` makes the first ``FAKE_GCLOUD_FLAKY_TIMES``
 ``scp`` calls fail the way plink does while the SSH key propagates. No cloud
-resource is touched.
+resource is touched. ``FAKE_GCLOUD_FAIL`` fails a call naming it as an
+argument or inside its ``--command``; ``FAKE_GCLOUD_HANG`` makes such a call hang.
 """
 from __future__ import annotations
 
@@ -46,8 +47,11 @@ FAKE_GCLOUD = textwrap.dedent('''
             sys.stderr.write("FATAL ERROR: Remote side unexpectedly closed network connection\\n")
             sys.exit(1)
 
+    hang = os.environ.get("FAKE_GCLOUD_HANG")
+    if hang and any(hang in a for a in argv):
+        time.sleep(30)
     fail = os.environ.get("FAKE_GCLOUD_FAIL")
-    if fail and fail in argv:
+    if fail and (fail in argv or any(fail in a for a in argv if a.startswith("--command="))):
         sys.stderr.write("fake gcloud: " + fail + " failed\\n")
         sys.exit(1)
     if argv[:3] == ["secrets", "versions", "access"]:
@@ -308,3 +312,52 @@ def test_status_never_prints_a_password(tb, monkeypatch, capfd):
     for password in PASSWORDS.values():
         assert password not in printed.out + printed.err
     assert len([c for c in tb.calls() if c["argv"][0] == "secrets"]) == accessed
+
+
+def _stops_servers(c):
+    return c["argv"][:2] == ["compute", "ssh"] and any(
+        a.startswith("--command=") and "docker compose -f testbed/docker-compose.yml stop" in a for a in c["argv"])
+
+
+def test_down_stops_the_servers_cleanly_before_the_vm(tb):
+    """Stopping the VM kills SQL Server mid-flight; `compose stop` shuts every server down first."""
+    assert tb.main(["up"]) == 0
+    assert tb.main(["down"]) == 0
+
+    calls = tb.calls()
+    stops = [i for i, c in enumerate(calls) if _stops_servers(c)]
+    vm_stop = max(i for i, c in enumerate(calls) if _kinds([c]) == ["compute instances stop"])
+    assert stops and stops[-1] < vm_stop
+    ssh = calls[stops[-1]]["argv"]
+    assert "--tunnel-through-iap" in ssh and "--strict-host-key-checking=no" in ssh
+    for password in PASSWORDS.values():
+        assert password not in " ".join(ssh)
+
+
+def test_run_stops_the_servers_before_the_vm(tb):
+    assert tb.main(["run", "--", sys.executable, "-c", "pass"]) == 0
+
+    calls = tb.calls()
+    assert _stops_servers(calls[-2]) and _kinds(calls)[-1] == "compute instances stop"
+
+
+def test_a_failing_server_stop_still_stops_the_vm(tb, monkeypatch, capsys):
+    assert tb.main(["up"]) == 0
+    monkeypatch.setenv("FAKE_GCLOUD_FAIL", "docker-compose.yml stop")
+
+    assert tb.main(["down"]) == 0
+
+    assert "could not stop the servers" in capsys.readouterr().err
+    assert _stops_servers(tb.calls()[-2])
+    _stopped(tb)
+
+
+def test_a_hanging_server_stop_is_bounded_and_still_stops_the_vm(tb, monkeypatch, capsys):
+    assert tb.main(["up"]) == 0
+    monkeypatch.setenv("FAKE_GCLOUD_HANG", "docker-compose.yml stop")
+    monkeypatch.setattr(tb, "SERVERS_STOP_TIMEOUT", 1)
+
+    assert tb.main(["down"]) == 0
+
+    assert "could not stop the servers" in capsys.readouterr().err
+    _stopped(tb)
