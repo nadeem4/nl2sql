@@ -144,13 +144,10 @@ def test_trace_redactor_collects_the_real_value_not_the_mask(monkeypatch):
     assert FAKE_KEY not in snapshot and FAKE_CONN not in snapshot
 
 
-@pytest.mark.parametrize("kind", ["azure", "hashi"])
-def test_secret_provider_clients_get_the_plain_credential(kind, monkeypatch):
+def _fake_secret_clients(monkeypatch) -> dict:
+    """Stand-ins for hvac and the Azure SDK that record what they were given."""
     import sys
     import types
-
-    from nl2sql.secrets.factory import SecretProviderFactory
-    from nl2sql.secrets.models import AzureSecretConfig, HashiCorpSecretConfig
 
     seen = {}
 
@@ -158,46 +155,44 @@ def test_secret_provider_clients_get_the_plain_credential(kind, monkeypatch):
         def __init__(self, **kwargs):
             seen.update(kwargs)
 
-    module = types.ModuleType(f"nl2sql.secrets.providers.{kind}")
-    setattr(module, "AzureSecretProvider" if kind == "azure" else "HashiCorpSecretProvider", Recorder)
-    monkeypatch.setitem(sys.modules, f"nl2sql.secrets.providers.{kind}", module)
+    monkeypatch.setitem(sys.modules, "hvac", types.SimpleNamespace(Client=Recorder))
+    monkeypatch.setitem(sys.modules, "azure.identity",
+                        types.SimpleNamespace(ClientSecretCredential=Recorder, DefaultAzureCredential=Recorder))
+    monkeypatch.setitem(sys.modules, "azure.keyvault.secrets",
+                        types.SimpleNamespace(SecretClient=lambda **kwargs: None))
+    return seen
+
+
+@pytest.mark.parametrize("kind", ["azure", "hashicorp"])
+def test_secret_provider_clients_get_the_plain_credential(kind, monkeypatch):
+    from nl2sql.secrets import SecretManager, SecretProviderConfig
+
+    seen = _fake_secret_clients(monkeypatch)
 
     if kind == "azure":
-        config = AzureSecretConfig(id="kv", vault_url="https://kv", client_id="c", tenant_id="t",
-                                   client_secret=FAKE_PASSWORD)
+        config = SecretProviderConfig(id="kv", type="azure", vault_url="https://kv", client_id="c",
+                                      tenant_id="t", client_secret=FAKE_PASSWORD)
         assert FAKE_PASSWORD not in repr(config)
-        SecretProviderFactory.create(config)
+        SecretManager().configure([config])
         assert seen["client_secret"] == FAKE_PASSWORD
     else:
-        config = HashiCorpSecretConfig(id="vault", url="https://vault", token=FAKE_PASSWORD)
+        config = SecretProviderConfig(id="vault", type="hashicorp", url="https://vault", token=FAKE_PASSWORD)
         assert FAKE_PASSWORD not in repr(config)
-        SecretProviderFactory.create(config)
+        SecretManager().configure([config])
         assert seen["token"] == FAKE_PASSWORD
 
 
 def test_secret_manager_resolves_an_env_reference_in_a_secret_field(monkeypatch):
-    import sys
-    import types
+    from nl2sql.secrets import SecretManager, SecretProviderConfig
 
-    from nl2sql.secrets import SecretManager
-    from nl2sql.secrets.models import HashiCorpSecretConfig
-
-    seen = {}
-
-    class Recorder:
-        def __init__(self, **kwargs):
-            seen.update(kwargs)
-
-    module = types.ModuleType("nl2sql.secrets.providers.hashi")
-    module.HashiCorpSecretProvider = Recorder
-    monkeypatch.setitem(sys.modules, "nl2sql.secrets.providers.hashi", module)
+    seen = _fake_secret_clients(monkeypatch)
     monkeypatch.setenv("NEVERPRINT_VAULT_TOKEN", FAKE_PASSWORD)
 
     manager = SecretManager()
-    manager.configure([HashiCorpSecretConfig(id="vault", url="https://vault",
-                                             token="${env:NEVERPRINT_VAULT_TOKEN}")])
+    manager.configure([SecretProviderConfig(id="vault", type="hashicorp", url="https://vault",
+                                            token="${env:NEVERPRINT_VAULT_TOKEN}")])
     assert seen["token"] == FAKE_PASSWORD
-    assert isinstance(manager._providers["vault"], Recorder)
+    assert "vault" in manager._providers
 
 
 # --- config writers still write the real value or the reference --------------

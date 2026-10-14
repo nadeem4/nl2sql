@@ -1,20 +1,51 @@
-# Adapter Interface Reference
+# SDK Interface Reference
 
-The adapter contract lives in the SDK, `nl2sql-sdk` (imported as `nl2sql_sdk`):
+The SDK, `nl2sql-sdk` (imported as `nl2sql_sdk`), holds the interfaces an
+extension implements. It depends on pydantic and the standard library only.
 
-- `nl2sql.datasources.protocols.DatasourceAdapterProtocol`
-- `nl2sql_sdk.contracts.AdapterRequest`
-- `nl2sql_sdk.contracts.ResultFrame`
+- Adapters: `nl2sql_sdk.protocols.DatasourceAdapterProtocol`, with
+  `nl2sql_sdk.contracts.AdapterRequest` and `nl2sql_sdk.contracts.ResultFrame`
+- Secret providers: `nl2sql_sdk.secrets.SecretProvider`
+
+Everything is also exported from `nl2sql_sdk` itself.
 
 ## Interface: `DatasourceAdapterProtocol`
 
 Adapters expose a capability-driven interface:
 
 ```python
-from nl2sql.datasources.protocols import DatasourceAdapterProtocol
+from nl2sql_sdk.protocols import DatasourceAdapterProtocol
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql_sdk.capabilities import DatasourceCapability
 ```
+
+### Class attributes
+
+Three class attributes let the engine check an adapter before it builds one.
+
+| Attribute | Type | Description |
+| :--- | :--- | :--- |
+| `interface_version` | `int` | The version of this interface the adapter was written for: `1`. The engine accepts exactly the version it was built for, and any other version is a load error. |
+| `driver_modules` | `tuple[str, ...]` | The modules the adapter needs to connect, for example `("psycopg2",)`. The engine looks for each one with `importlib.util.find_spec` before it builds the adapter. |
+| `install_hint` | `str` | What to install when a driver module is missing, for example `pip install "nl2sql-engine[postgres]"`. |
+
+```python
+class SnowflakeAdapter:
+    interface_version = 1
+    driver_modules = ("snowflake.connector",)
+    install_hint = 'pip install "nl2sql-snowflake"'
+```
+
+The adapter module must import without its driver, so import the driver where
+it is used and not at the top of the module. The built-in adapters declare:
+
+| Adapter | `driver_modules` | Extra |
+| :--- | :--- | :--- |
+| `sqlite` | `("sqlite3",)` | none: `sqlite3` ships with Python |
+| `postgres` | `("psycopg2",)` | `nl2sql-engine[postgres]` |
+| `mysql` | `("pymysql",)` | `nl2sql-engine[mysql]` |
+| `mssql` | `("pyodbc",)` | `nl2sql-engine[mssql]`, plus Microsoft's ODBC driver |
+| `duckdb` | `("duckdb", "duckdb_engine")` | `nl2sql-engine[duckdb]` |
 
 ### Mandatory Properties
 
@@ -115,9 +146,8 @@ The contract:
 `stream_results`, a server-side cursor on drivers that have one (see
 [SQLAlchemy adapters](sqlalchemy.md)).
 
-The hook is an optional protocol rather than a new required method so that the
-SDK change is additive: `DatasourceAdapterProtocol` is unchanged, and no
-third-party adapter has to be touched or re-released.
+The hook is an optional protocol rather than a required method, so an adapter
+without it needs no change.
 
 ### Result types every adapter returns
 
@@ -132,6 +162,56 @@ every database:
 The engine already wraps a date part in `CAST(... AS INT)` and a truncation
 in a `YYYY-MM-DD` format; an adapter that rewrites the inner nodes keeps
 those wrappers.
+
+---
+
+## Interface: `SecretProvider`
+
+A secret provider is where `${id:key}` references are read from. The secrets
+config names one by `type` (see [Secrets](../configuration/secrets.md)).
+
+```python
+from typing import ClassVar, Optional, Self
+
+from pydantic import BaseModel, ConfigDict, SecretStr
+
+
+class AcmeVaultConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    token: SecretStr
+
+
+class AcmeVaultSecretProvider:
+    interface_version: ClassVar[int] = 1
+    config_model: ClassVar[type[BaseModel]] = AcmeVaultConfig
+
+    def __init__(self, client):
+        self.client = client
+
+    @classmethod
+    def from_config(cls, cfg: AcmeVaultConfig) -> Self:
+        try:
+            import acme_vault  # the client library, imported only here
+        except ImportError:
+            raise ImportError("Missing dependency 'acme-vault'. Install 'nl2sql-acme-vault'.") from None
+        return cls(acme_vault.Client(cfg.url, cfg.token.get_secret_value()))
+
+    def get_secret(self, key: str) -> Optional[str]:
+        return self.client.read(key)
+```
+
+| Member | Description |
+| :--- | :--- |
+| `interface_version` | `1`. The engine accepts exactly the version it was built for. |
+| `config_model` | A pydantic model for the provider's entry in the secrets config, apart from `id` and `type`. Set `extra="forbid"`, so a misspelt key fails when the config loads, and hold credentials as `SecretStr`, so they never print. |
+| `from_config(cfg)` | Builds the provider from a validated `config_model` instance, after the engine has resolved any `${env:...}` in it. Raise `ImportError` naming what to install when the client library is missing. |
+| `get_secret(key)` | Returns the secret stored under `key`, or `None` when there is none. |
+
+A provider reads its settings from its entry only, never from the
+environment. The module that defines it must import without its client
+library, so the engine can validate the entry before building anything.
 
 ---
 

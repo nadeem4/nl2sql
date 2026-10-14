@@ -887,6 +887,14 @@ hashicorp = "nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"
 
 ### Interfaces and versions
 
+!!! note "Built: the two SDK interfaces"
+    PR 4 built the adapter and secret provider rows below: the attributes on
+    `DatasourceAdapterProtocol` and the five built-in adapters, and
+    `nl2sql_sdk.secrets.SecretProvider` with the four built-in providers.
+    A provider's `config_model` covers its block apart from `id` and `type`.
+    Until the registry (PR 5), `nl2sql/secrets/factory.py` maps the four
+    built-in `type` names to their classes.
+
 Each Phase 1 interface carries `interface_version: ClassVar[int]`. The engine
 accepts exactly the version it was built for, and anything else is a load
 error: "`nl2sql-snowflake` implements adapter interface 0; this engine needs
@@ -1133,7 +1141,7 @@ def test_two_engines_in_one_process_keep_their_own_config(tmp_path, fake_llm):
 ## 9. The SDK rename: `nl2sql-sdk`
 
 !!! note "Built"
-    The rename is built (PR 1). The `secrets` module comes with PR 4.
+    The rename is built (PR 1), and so is the `secrets` module (PR 4).
 
 | What | 0.4 | 0.5 |
 |---|---|---|

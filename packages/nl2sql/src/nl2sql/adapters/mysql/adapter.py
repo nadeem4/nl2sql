@@ -24,6 +24,9 @@ class MysqlConnectionConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
 class MysqlAdapter(BaseSQLAlchemyAdapter):
+    interface_version = 1
+    driver_modules = ("pymysql",)
+    install_hint = 'pip install "nl2sql-engine[mysql]"'
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
         """Constructs the MySQL connection URI.

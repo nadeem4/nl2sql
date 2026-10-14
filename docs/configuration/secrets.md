@@ -22,14 +22,41 @@ why the shipped `configs/secrets.yaml` is usable as-is.
 Each provider has:
 
 - `id`: unique provider ID used in secret references (e.g. `${aws-main:db_password}`)
-- `type`: `aws`, `azure`, `hashi`, or `env`
+- `type`: `aws`, `azure`, `hashicorp`, or `env`
 
-Provider-specific fields:
+Every other key is the provider's own setting:
 
-- **aws**: `region_name`, `profile_name`
-- **azure**: `vault_url`, `client_id`, `client_secret`, `tenant_id`
-- **hashi**: `url`, `token`, `mount_point`
-- **env**: no additional fields
+| `type` | Settings | Extra to install |
+| --- | --- | --- |
+| `aws` | `region_name`, `profile_name`, both optional (boto3's own lookup fills them in) | `nl2sql-engine[aws]` |
+| `azure` | `vault_url` (required), `client_id`, `client_secret`, `tenant_id`. Without all three credentials the provider signs in with `DefaultAzureCredential`. | `nl2sql-engine[azure]` |
+| `hashicorp` | `url` and `token` (both required), `mount_point` (default `secret`) | `nl2sql-engine[hashicorp]` |
+| `env` | none | none |
+
+```yaml
+version: 1
+providers:
+  - id: vault
+    type: hashicorp
+    url: "https://vault.internal:8200"
+    token: "${env:VAULT_TOKEN}"
+```
+
+The settings are strict. An unknown or misspelt key, or a missing required
+one, fails when the config loads, and the message names the key.
+
+A provider reads its settings from its entry only. It never falls back to an
+environment variable such as `VAULT_ADDR`, `VAULT_TOKEN` or
+`AZURE_KEYVAULT_URL`: when a value comes from the environment, write the
+field as an `${env:...}` reference, as `token` does above.
+
+The HashiCorp key is the secret's path and, after a colon, the field:
+`${vault:apps/sales:password}` reads the field `password` of `apps/sales` in
+the KV version 2 engine at `mount_point`. Without a colon it reads the field
+`value`.
+
+Each provider implements the `SecretProvider` interface from the SDK; see
+[SDK reference → SecretProvider](../adapters/sdk.md#interface-secretprovider).
 
 ## Secret references
 
@@ -43,7 +70,7 @@ A provider listed in `secrets.yaml` that cannot start fails startup at once
 "Connectivity check failed"). The error names the provider and the reason:
 
 ```text
-Secret provider 'vault' (type 'hashi') failed to start: Missing dependency 'hvac'.
+Secret provider 'vault' (type 'hashicorp') failed to start: Missing dependency 'hvac'.
 Install 'nl2sql-engine[hashicorp]'. Fix or remove this entry in the secrets config.
 ```
 

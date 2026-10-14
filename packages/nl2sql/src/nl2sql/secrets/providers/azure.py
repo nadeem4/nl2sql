@@ -1,49 +1,58 @@
-from typing import Optional
-import os
 import logging
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 logger = logging.getLogger(__name__)
 
-class AzureSecretProvider:
-    """Fetches secrets from Azure Key Vault."""
-    
-    def __init__(self, vault_url: Optional[str] = None, client_id: Optional[str] = None, client_secret: Optional[str] = None, tenant_id: Optional[str] = None):
-        try:
-            from azure.identity import DefaultAzureCredential, ClientSecretCredential
-            from azure.keyvault.secrets import SecretClient
-            
-            self.vault_url = vault_url or os.environ.get("AZURE_KEYVAULT_URL")
-            if not self.vault_url:
-                raise ValueError("Vault URL is required. specific via config or 'AZURE_KEYVAULT_URL'.")
-                
-            if client_id and client_secret and tenant_id:
-                credential = ClientSecretCredential(
-                    tenant_id=tenant_id,
-                    client_id=client_id,
-                    client_secret=client_secret
-                )
-            else:
-                credential = DefaultAzureCredential()
 
-            self.client = SecretClient(vault_url=self.vault_url, credential=credential)
-            self._available = True
+class AzureSecretConfig(BaseModel):
+    """Settings for Azure Key Vault.
+
+    Without all three of ``client_id``, ``client_secret`` and ``tenant_id``
+    the provider signs in with ``DefaultAzureCredential`` (managed identity,
+    the Azure CLI, and so on).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    vault_url: str = Field(..., description="URL of the Key Vault.")
+    client_id: Optional[str] = Field(None, description="Service principal client ID.")
+    client_secret: Optional[SecretStr] = Field(None, description="Service principal secret.")
+    tenant_id: Optional[str] = Field(None, description="Azure tenant ID.")
+
+
+class AzureSecretProvider:
+    """Reads ``${id:secret-name}`` from Azure Key Vault."""
+
+    interface_version = 1
+    config_model = AzureSecretConfig
+
+    def __init__(self, client: Any):
+        self.client = client
+
+    @classmethod
+    def from_config(cls, cfg: AzureSecretConfig) -> "AzureSecretProvider":
+        try:
+            from azure.identity import ClientSecretCredential, DefaultAzureCredential
+            from azure.keyvault.secrets import SecretClient
         except ImportError:
-            self.client = None
-            self._available = False
-            logger.warning("Azure Secret Provider initialized but dependencies missing. Install 'nl2sql-engine[azure]'.")
-        except Exception as e:
-            self.client = None
-            self._available = False
-            logger.warning(f"Azure Secret Provider initialization failed: {e}")
+            raise ImportError("Missing dependencies 'azure-identity' and 'azure-keyvault-secrets'. "
+                              "Install 'nl2sql-engine[azure]'.") from None
+
+        if cfg.client_id and cfg.client_secret and cfg.tenant_id:
+            credential = ClientSecretCredential(
+                tenant_id=cfg.tenant_id,
+                client_id=cfg.client_id,
+                client_secret=cfg.client_secret.get_secret_value(),
+            )
+        else:
+            credential = DefaultAzureCredential()
+        return cls(SecretClient(vault_url=cfg.vault_url, credential=credential))
 
     def get_secret(self, key: str) -> Optional[str]:
-        if not self._available or not self.client:
-             raise ImportError("Azure Secret Provider is not available.")
-             
         try:
-            # key is the Secret Name
-            secret = self.client.get_secret(key)
-            return secret.value
+            return self.client.get_secret(key).value
         except Exception as e:
             logger.error(f"Failed to fetch secret '{key}' from Azure Key Vault: {e}")
             return None

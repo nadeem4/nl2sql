@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import os
-import re
-from typing import Optional, Dict, Type, List, Any
-from .interfaces import SecretProvider
-from .providers.env import EnvironmentSecretProvider
+from typing import Dict, List, Any
+from nl2sql_sdk import SecretProvider
+from .providers.env import EnvSecretProvider
 from .models import SecretProviderConfig
 import logging
 
@@ -12,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 class SecretManager:
     """Manages secret resolution using registered providers."""
-    
+
     def __init__(self):
         self._providers: Dict[str, SecretProvider] = {
-            "env": EnvironmentSecretProvider()
+            "env": EnvSecretProvider()
         }
         self._default_provider = "env"
         # Every value a reference resolved to, so a run trace can redact them.
@@ -32,12 +30,12 @@ class SecretManager:
     def configure(self, configs: List[SecretProviderConfig]) -> None:
         """Configures providers from a list of configuration objects.
         
-        This method implements a Two-Phase Loading strategy:
-        1. Bootstrap: It assumes the 'env' provider is already active.
-        2. Resolution: It resolves configuration values (like client_secret) that may contain
-           secret references (e.g., "${env:VAR}") using the existing providers.
-        3. Registration: It instantiates and registers the new providers.
-        
+        Each provider's block was validated by its ``config_model`` when the
+        config loaded. For each entry this method:
+        1. resolves the references in the block (e.g. ``token: "${env:VAULT_TOKEN}"``)
+           with the providers already registered, ``env`` among them;
+        2. builds the provider with its ``from_config`` and registers it under ``id``.
+
         Args:
             configs: A list of SecretProviderConfig objects.
 
@@ -50,7 +48,7 @@ class SecretManager:
         """
         from pydantic import SecretStr
 
-        from .factory import SecretProviderFactory
+        from .factory import create_provider
 
         for config in configs:
             if config.type == "env":
@@ -59,7 +57,8 @@ class SecretManager:
             resolved_values = []
             try:
                 updates = {}
-                for key, value in config.model_dump(exclude={"id", "type"}).items():
+                for key in type(config.options).model_fields:
+                    value = getattr(config.options, key)
                     # Credential fields are SecretStr; a reference in one is resolved too.
                     raw = value.get_secret_value() if isinstance(value, SecretStr) else value
                     if isinstance(raw, str) and raw.startswith("${") and raw.endswith("}"):
@@ -67,8 +66,7 @@ class SecretManager:
                         resolved_values.append(resolved)
                         updates[key] = SecretStr(resolved) if isinstance(value, SecretStr) else resolved
 
-                resolved_config = config.model_copy(update=updates)
-                provider = SecretProviderFactory.create(resolved_config)
+                provider = create_provider(config.type, config.options.model_copy(update=updates))
             except Exception as e:
                 reason = str(e) or type(e).__name__
                 for value in resolved_values:

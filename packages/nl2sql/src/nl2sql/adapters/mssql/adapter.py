@@ -26,6 +26,9 @@ class MssqlConnectionConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
 class MssqlAdapter(BaseSQLAlchemyAdapter):
+    interface_version = 1
+    driver_modules = ("pyodbc",)
+    install_hint = 'pip install "nl2sql-engine[mssql]", and the Microsoft ODBC Driver for SQL Server'
 
     def construct_uri(self, args: Dict[str, Any]) -> str:
         """Constructs the MSSQL connection URI.

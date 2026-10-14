@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterator, Optional, Protocol, Set, runtime_checkable
+from typing import Any, ClassVar, Dict, Iterator, Optional, Protocol, Set, Tuple, runtime_checkable
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultFrame
@@ -6,7 +6,27 @@ from .contracts import AdapterRequest, ResultFrame
 
 @runtime_checkable
 class DatasourceAdapterProtocol(Protocol):
-    """Contract for adapter implementations."""
+    """Contract for adapter implementations.
+
+    Three class attributes tell the engine whether it can use the adapter
+    before it builds one:
+
+    - ``interface_version``: the version of this contract the adapter was
+      written for. It is 1. The engine accepts exactly the version it was
+      built for, and anything else is a load error.
+    - ``driver_modules``: the modules the adapter imports to connect, such as
+      ``("psycopg2",)``. The engine looks for each with
+      ``importlib.util.find_spec`` before building the adapter.
+    - ``install_hint``: what to install when one of them is missing, such as
+      ``pip install "nl2sql-engine[postgres]"``.
+
+    An adapter module must import without its driver: import the driver where
+    it is used, not at the top of the module.
+    """
+
+    interface_version: ClassVar[int]
+    driver_modules: ClassVar[Tuple[str, ...]]
+    install_hint: ClassVar[str]
 
     datasource_id: str
     datasource_engine_type: str
