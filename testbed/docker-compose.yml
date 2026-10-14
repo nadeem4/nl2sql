@@ -96,19 +96,27 @@ services:
       timeout: 10s
       retries: 180
 
-  # One-shot: restores AdventureWorksLT, loads the wide schema and creates the
-  # reader login. Skips each database that already exists.
+  # Restores AdventureWorksLT, loads the wide schema and creates the reader
+  # login, skipping each database that already exists, then idles. It does not
+  # exit: `up --wait` fails on any exited container that no service waits on,
+  # and on a second `up` the skipping run exits at once. Healthy once loaded.
   mssql-init:
     image: mcr.microsoft.com/mssql/server:2022-latest
     depends_on:
       mssql:
         condition: service_started
     entrypoint: ["/bin/bash", "/testbed/mssql/init.sh"]
+    init: true
     environment:
       MSSQL_SA_PASSWORD: ${TESTBED_MSSQL_PASSWORD:?}
     volumes:
       - ./:/testbed:ro
       - samples:/samples:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/loaded"]
+      interval: 5s
+      timeout: 5s
+      retries: 180
     restart: "no"
 
 volumes:

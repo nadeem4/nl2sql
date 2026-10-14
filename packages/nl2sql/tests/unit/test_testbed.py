@@ -133,3 +133,31 @@ def test_the_compose_file_holds_no_password(testbed):
     assert {name for name, _ in uses} == {"TESTBED_POSTGRES_PASSWORD", "TESTBED_MYSQL_PASSWORD",
                                           "TESTBED_MSSQL_PASSWORD"}
     assert all(rest.startswith(":?") for _, rest in uses), uses
+
+
+def test_up_wait_survives_a_repeat_start():
+    """``up -d --wait`` fails on a container that has exited, unless a dependent waits for it to complete.
+
+    On a repeat start a one-shot that skips its work exits at once, so every
+    service is either awaited with ``service_completed_successfully`` or has a
+    healthcheck, which a container passes only while it runs.
+    """
+    import yaml
+
+    services = yaml.safe_load((TESTBED / "docker-compose.yml").read_text(encoding="utf-8"))["services"]
+    awaited = {name for service in services.values() for name, dependency in service.get("depends_on", {}).items()
+               if dependency.get("condition") == "service_completed_successfully"}
+    unchecked = [name for name, service in services.items() if name not in awaited and "healthcheck" not in service]
+    assert not unchecked, unchecked
+
+
+def test_mssql_init_marks_itself_loaded_and_keeps_running():
+    """Its healthcheck reads the mark init.sh writes last, and the script then idles instead of exiting."""
+    import yaml
+
+    init = yaml.safe_load((TESTBED / "docker-compose.yml").read_text(encoding="utf-8"))["services"]["mssql-init"]
+    assert "/tmp/loaded" in " ".join(init["healthcheck"]["test"])
+    assert init.get("init") is True                       # `sleep` as PID 1 would ignore SIGTERM
+    lines = [line for line in (TESTBED / "mssql" / "init.sh").read_text(encoding="utf-8").splitlines()
+             if line.strip() and not line.lstrip().startswith("#")]
+    assert lines[-2:] == ["touch /tmp/loaded", "exec sleep infinity"]

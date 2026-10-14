@@ -1,5 +1,5 @@
 #!/bin/bash
-# The `mssql-init` one-shot: restore AdventureWorksLT, load the wide schema
+# The `mssql-init` service: restore AdventureWorksLT, load the wide schema
 # into `wide`, then create the reader login, which may read AdventureWorksLT
 # only. Each database that already exists is skipped, so a second `up` is
 # quick. The reader login is created last: the `mssql` healthcheck waits for it.
@@ -46,3 +46,8 @@ BEGIN
   ALTER ROLE db_datareader ADD MEMBER nl2sql_reader;
 END"
 echo "mssql-init: ready"
+# Mark the load done for the healthcheck and stay up: `docker compose up --wait`
+# fails on an exited container, and a second `up` skips everything and would
+# exit at once. /tmp is the container's own, so a restart starts unmarked.
+touch /tmp/loaded
+exec sleep infinity

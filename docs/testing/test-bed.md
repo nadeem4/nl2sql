@@ -57,10 +57,14 @@ also needs Microsoft's ODBC Driver 18 for SQL Server on the machine.
 | `postgres` | `postgres:16` | Starts after `samples`. On its first start, `testbed/postgres/init.sh` (the image's own init mechanism) loads Pagila and the wide schema and creates the reader login. |
 | `mysql` | `mysql:8.0` | The same with Sakila, through `testbed/mysql/init.sh`. The `mysql` client handles Sakila's `DELIMITER` blocks. |
 | `mssql` | `mcr.microsoft.com/mssql/server:2022-latest` | The server. Its healthcheck passes only once `mssql-init` has finished. |
-| `mssql-init` | the same image, for its `sqlcmd` | One-shot. Runs `testbed/mssql/init.sh`: restores AdventureWorksLT from the `.bak`, loads the wide schema and creates the reader login. Skips each database that already exists. |
+| `mssql-init` | the same image, for its `sqlcmd` | Runs `testbed/mssql/init.sh`: restores AdventureWorksLT from the `.bak`, loads the wide schema and creates the reader login, skipping each database that already exists. Then it marks itself loaded for its healthcheck and idles instead of exiting. |
 
 Every server has a healthcheck that passes only once it is loaded, so
-`up --wait` is enough before running tests.
+`up --wait` is enough before running tests. `--wait` fails on an exited
+container unless another service waits for it to complete, as the servers
+wait for `samples`. Nothing waits for `mssql-init`, and on a later `up` it
+skips everything and would exit at once, so it stays running instead; that is
+what makes the same `up -d --wait` work on every start.
 
 The file reads four variables:
 
@@ -311,13 +315,16 @@ gcloud compute firewall-rules create nl2sql-testbed-allow-iap --network=nl2sql-t
 
 # 4. The VM: e2-standard-2, Debian 12, a 30 GB standard disk, an ephemeral external IP,
 #    no service account. Its startup script installs Docker and the compose plugin once.
+#    printf writes it with LF line endings, which an inline script typed in Git Bash on
+#    Windows does not get: with CRLF the VM fails to run it (exit 127) and Docker never arrives.
+printf '%s\n' '#!/bin/bash' \
+    'command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh' > startup.sh
 gcloud compute instances create $VM --project=$PROJECT --zone=$ZONE \
     --machine-type=e2-standard-2 --image-family=debian-12 --image-project=debian-cloud \
     --boot-disk-size=30GB --boot-disk-type=pd-standard \
     --network=nl2sql-testbed --subnet=nl2sql-testbed --tags=nl2sql-testbed \
     --no-service-account --no-scopes \
-    --metadata=startup-script='#!/bin/bash
-command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh'
+    --metadata-from-file=startup-script=startup.sh
 gcloud compute instances stop $VM --zone=$ZONE --project=$PROJECT    # stopped until a session needs it
 
 # 5. The nightly stop: a service account that may only stop this VM, and a scheduler job
