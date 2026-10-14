@@ -5024,6 +5024,30 @@ Node tests build their context with <code>nl2sql.testing.runtime.fake_runtime</c
 With the pipeline on the runtime, <code>tests/e2e/test_two_engines_fake_llm.py</code>
 passes, so it is a normal test from this PR on rather than from PR 13.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: step 2, indexing and the rest (PR 12)</p>
+<p><code>indexing</code>, <code>services</code>, <code>tracing</code> and <code>evaluation</code> no longer read the
+global; <code>secrets</code> and <code>feedback</code> already did not, and the embedder and
+the secret manager have been per runtime since PR 7a. The trace writer
+takes its sizes and folder from <code>ctx.settings.traces</code> and
+<code>ctx.traces_dir</code>, and its <code>settings</code> snapshot is the run's <code>settings</code>
+section. <code>tracing.replay</code> caps the replayed result with the run's
+<code>settings.traces</code>. The curated search takes <code>k</code> from the caller's
+<code>settings.curated.match_top_k</code>, index health reads <code>state.db</code> directly,
+and <code>PipelineMonitorCallback</code> takes <code>settings.observability</code> as a
+parameter. <code>pinned_config</code> and the <code>Runtime.config</code> setter are deleted:
+evaluation (tiers 1 and 2, retrieval recall) and trace replay call
+<code>ctx.derive({"settings.pipeline.plan_cache": False, ...})</code>, which returns
+a run-scoped runtime built from <code>derived_config</code> (dotted paths over
+<code>model_copy</code>). It shares the adapters, embedder, stores and the engine's
+<code>LLMClientCache</code>, and has its own config, curated answers and <code>LLMSet</code>,
+built through that cache from the derived <code>llm</code> section
+(<code>LLMRegistry.derive</code>). An <code>llm.replace</code> on the engine is therefore what
+the next run starts from, equal agent settings share one client, and a
+run that replaces its LLMs (tier 1's gold-plan fake, tier 2's configs,
+replay's playback clients) never changes the engine's. <code>nl2sql.runtime</code> stays on the ratchet list
+for the copy step, which PR 13 deletes.</p>
+</div>
 <p>Each step is one green PR, and no release happens in between:</p>
 <ol>
 <li><strong>The switch PR (7a in the plan)</strong> introduces <code>Runtime.from_config(cfg)</code>.

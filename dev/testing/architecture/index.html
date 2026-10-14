@@ -1454,6 +1454,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#settings-in-tests">
+<span class="md-ellipsis">
+      
+        Settings in tests
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#runtime-coverage-targets">
 <span class="md-ellipsis">
       
@@ -1989,6 +1998,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#settings-in-tests">
+<span class="md-ellipsis">
+      
+        Settings in tests
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#runtime-coverage-targets">
 <span class="md-ellipsis">
       
@@ -2145,6 +2163,29 @@ order-dependent tests - shared class-level caches, leaked globals, fixtures that
 do not unwind - into loud local failures rather than intermittent CI ones. Each
 run prints the seed it used; reproduce a failure with
 <code>pytest -p randomly --randomly-seed=&lt;seed&gt;</code>.</p>
+<h2 id="settings-in-tests">Settings in tests</h2>
+<p>The engine reads its settings from its runtime, not from a process global
+(<a href="../../architecture/configuration_v2/#8-process-globals">configuration v2, section 8</a>),
+so a test sets them on the runtime it builds:</p>
+<ul>
+<li><strong>One node or service:</strong> <code>nl2sql.testing.runtime.fake_runtime(settings=...,
+  policies=..., traces_dir=..., **attrs)</code> builds a stand-in runtime with a real
+  config. Settings are written as in YAML: <code>settings={"traces": {"mode":
+  "always"}}</code>.</li>
+<li><strong>A whole engine:</strong> <code>Runtime.from_config(make_config(tmp_path, ...))</code>. An
+  <code>Embeddings(instance=FakeEmbeddings(size=8))</code> keeps it free of any model.</li>
+<li><strong>One run with different settings:</strong> <code>ctx.derive({"settings.pipeline.plan_cache":
+  True})</code> returns a run-scoped runtime with a derived config, its own curated
+  answers and its own <code>LLMSet</code>, sharing the stores and the engine's LLM
+  client cache. Evaluation and trace replay
+  use it the same way; the runtime it came from never changes.
+  <code>tests/unit/test_run_scoped_runtime.py</code> pins that down.</li>
+</ul>
+<p>Monkeypatching <code>nl2sql.common.settings.settings</code> changes nothing the
+pipeline, indexing, tracing or evaluation read. The global goes in a later
+pull request; until then <code>READS_THE_SETTINGS_GLOBAL</code> in
+<code>tests/architecture/test_boundaries.py</code> lists the modules still reading it,
+and it may only shrink.</p>
 <pre class="mermaid"><code>flowchart TD
     Unit[Unit Tests] --&gt; Core[Core Components]
     Integration[Integration Tests] --&gt; Pipeline[Pipeline Nodes]

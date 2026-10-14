@@ -4622,6 +4622,9 @@ it too.</p>
 read it, print its timeline, or replay it through the pipeline without calling
 the model again.</p>
 <h2 id="when-a-trace-is-written">When a trace is written</h2>
+<p>Each engine reads these from the <code>settings.traces</code> section of its config, so
+two engines in one process trace by their own settings. The 0.4 variable each
+one is still set from by the CLI and the playground is in brackets.</p>
 <table>
 <thead>
 <tr>
@@ -4632,27 +4635,25 @@ the model again.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>TRACE_MODE</code></td>
+<td><code>settings.traces.mode</code> (<code>TRACE_MODE</code>)</td>
 <td><code>on_failure</code></td>
 <td><code>off</code>, <code>on_failure</code> or <code>always</code>.</td>
 </tr>
 <tr>
-<td><code>TRACE_DIR</code></td>
-<td><code>traces</code></td>
-<td>Directory, relative to the working directory. Add it to <code>.gitignore</code> (this repository does).</td>
-</tr>
-<tr>
-<td><code>TRACE_SAMPLE_ROWS</code></td>
+<td><code>settings.traces.sample_rows</code> (<code>TRACE_SAMPLE_ROWS</code>)</td>
 <td><code>50</code></td>
 <td>Result rows kept in the trace.</td>
 </tr>
 <tr>
-<td><code>TRACE_MAX_FIELD_CHARS</code></td>
+<td><code>settings.traces.max_field_chars</code> (<code>TRACE_MAX_FIELD_CHARS</code>)</td>
 <td><code>20000</code></td>
 <td>Longest string kept in a node's recorded inputs and outputs.</td>
 </tr>
 </tbody>
 </table>
+<p>Traces go to the engine's trace folder, <code>traces/</code> under <code>storage.path</code>
+(<code>TRACE_DIR</code> for the CLI and the playground, default <code>traces</code> relative to the
+working directory). Add it to <code>.gitignore</code> (this repository does).</p>
 <p><code>on_failure</code> writes a trace when the run returned errors, needed a retry in any
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
 A run that recovered on retry therefore still leaves a trace.</p>
@@ -4689,7 +4690,7 @@ by time.</p>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">"llm"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"configured"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"openai"</span><span class="p">,</span><span class="w"> </span><span class="nt">"model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">,</span><span class="w"> </span><span class="nt">"temperature"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">}},</span>
 <a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">          </span><span class="nt">"by_node"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"decomposer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ast_planner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">,</span><span class="w"> </span><span class="nt">"refiner"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">,</span>
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">                      </span><span class="nt">"answer_synthesizer"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gpt-5.4"</span><span class="p">}},</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">"settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"every setting except those that can hold a credential"</span><span class="p">},</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">"settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"the run's settings section: pipeline, retrieval, results, traces, schema, ..."</span><span class="p">},</span>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">"limits"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"sample_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_field_chars"</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_list_items"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="nt">"note"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">},</span>
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">"nodes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"... one entry per node execution, below ..."</span><span class="p">],</span>
 <a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"the QueryResult, rows capped"</span><span class="p">}</span>
@@ -4815,8 +4816,9 @@ attempts stay in the node entries and in the result's <code>warnings</code>.</p>
   <code>api_key=</code>, <code>AccountKey=</code>, <code>token=</code> pairs;</li>
 <li>the string value of any key named like <code>api_key</code>, <code>password</code>, <code>secret</code>,
   <code>authorization</code>, <code>access_key</code>, <code>connection_string</code> or <code>credential(s)</code>;</li>
-<li>the settings snapshot leaves out every setting whose name could hold a
-  credential (<code>openai_api_key</code>, <code>result_artifact_adls_connection_string</code>).</li>
+<li>the settings snapshot is the <code>settings</code> section only, which holds no
+  credential: keys live in the <code>llm</code>, <code>embeddings</code> and <code>datasources</code> sections
+  as references, and their resolved values are redacted as above.</li>
 </ul>
 <p>A test runs a real question with the fake key <code>sk-test-not-a-real-key-1234</code> in
 the environment and asserts that string appears nowhere in the file. Redaction
@@ -4825,8 +4827,8 @@ prompts, schema and a sample of result rows.</p>
 <h3 id="capping">Capping</h3>
 <p>Node inputs and outputs, and the result, are capped so a trace stays readable:
 result rows (<code>rows</code>, and the aggregator's <code>terminal_results</code>) keep
-<code>TRACE_SAMPLE_ROWS</code> rows, other lists keep 200 items, and strings keep
-<code>TRACE_MAX_FIELD_CHARS</code> characters. Every cut leaves a <code>[truncated]</code> marker
+<code>settings.traces.sample_rows</code> rows, other lists keep 200 items, and strings
+keep <code>settings.traces.max_field_chars</code> characters. Every cut leaves a <code>[truncated]</code> marker
 saying how much was dropped. <strong>LLM messages and raw responses are never cut</strong>,
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.</p>
@@ -4865,9 +4867,16 @@ served. It then compares the replayed <code>QueryResult</code> with the recorded
   recorded run used the cache, replay uses it too, and reports a divergence
   (<code>missing</code>) when the cached plan has since been cleared.</li>
 <li><strong>Date.</strong> The planner and refiner prompts carry today's date, and the trace
-  records it as <code>request.today</code>. Replay pins <code>NL2SQL_TODAY</code> to that date, so a
-  trace recorded yesterday replays without diverging. A trace written before
-  the date was recorded replays with the current setting.</li>
+  records it as <code>request.today</code>. Replay pins <code>settings.pipeline.today</code> to that
+  date, so a trace recorded yesterday replays without diverging. A trace
+  written before the date was recorded replays with the current setting.</li>
+<li><strong>Its own runtime.</strong> The pinned date, the plan cache choice and a zero retry
+  back-off go into a config derived from the engine's
+  (<code>Runtime.derive</code>), and the replay runs on a runtime built from it, with
+  its own playback clients. The engine's config and LLMs are never changed,
+  so a query running on the same engine meanwhile is unaffected. The replayed
+  result is capped with that runtime's <code>settings.traces</code> sizes, as the
+  recording was.</li>
 <li><strong>Exit code</strong>: 0 when the replayed result matches the recording, 1 on a
   divergence, a different result, or a datasource that cannot be reached.</li>
 </ul>
