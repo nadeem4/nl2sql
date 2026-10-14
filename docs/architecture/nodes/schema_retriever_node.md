@@ -65,7 +65,7 @@ From `SubgraphExecutionState`:
 From `Runtime`:
 
 - `vector_store` (optional)
-- `schema_store` (required for authoritative resolution)
+- `state` (the state store; required for authoritative resolution)
 - `ds_registry` (optional): `get_preferred_tables(datasource_id)`
 
 Validation performed:

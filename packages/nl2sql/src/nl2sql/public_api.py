@@ -274,6 +274,14 @@ class NL2SQL:
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
                                           user_context=user_context, cancellation_token=cancellation_token)
 
+    def clear_plan_cache(self) -> int:
+        """Remove every cached plan from the state store; returns how many there were.
+
+        Schema snapshots and feedback stay. The next run of each question calls the planner.
+        """
+        self._ensure_open()
+        return self._runtime.state.clear_plans()
+
 
 def _demo_llm() -> "LLM":
     """The demo's LLM when none is given: the first provider whose key variable is set."""

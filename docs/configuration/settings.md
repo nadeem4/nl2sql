@@ -92,7 +92,7 @@ The tenant id for requests that name none. Result files are kept per tenant.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `max_versions` | `3` | Schema snapshots kept per datasource in `<storage.path>/state.db`. |
+| `max_versions` | `3` | The newest schema snapshots kept per datasource in the state store, besides every version a build pointer names and the one a build just replaced. |
 
 ## `curated`
 

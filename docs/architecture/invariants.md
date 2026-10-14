@@ -268,7 +268,7 @@ is an internal constant.
 
 ### Enforcement Points
 - `Config` in `nl2sql.config` (the section is required)
-- `Runtime.from_config()` in `nl2sql.runtime` (`StorePaths.under`)
+- `Runtime.from_config()` in `nl2sql.runtime` (each slot's store, built with `folder=storage.path`)
 
 ### Failure Behavior
 A config without `storage` is a `ConfigError` from `load_config`, or a
@@ -341,6 +341,7 @@ Concretely:
 - An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
 - Nothing outside `nl2sql/adapters/` (and the SDK's SQLAlchemy base) imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapter`.
 - Only `nl2sql/storage/` imports `chromadb` (or `langchain_chroma`). The engine embeds, ranks and filters through the `IndexStore` interface (`nl2sql_sdk.stores`), so a plugin index store works the same way as the built-in `chroma` one. The one exception is the local embedder, `nl2sql/embeddings/local.py`, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.
+- Only `nl2sql/storage/` imports `sqlite3`. Schema snapshots, the plan cache, feedback and the index lock are reached through the `StateStore` interface, so a plugin state store works the same way as the built-in `sqlite` one. The SQLite adapter (its driver) and `nl2sql/evaluation/gold.py` (which runs gold SQL on the demo's Chinook file) read a datasource, not the engine's state, and are exempt.
 - Nothing outside `nl2sql/cli/` imports the CLI, and `nl2sql.cli.demo` never imports `nl2sql.cli.commands`.
 - `nl2sql_api` imports only the top-level `nl2sql` namespace, and so do the playground and `nl2sql demo`, apart from a named list of exceptions (`STILL_IMPORTED_FROM_INSIDE`: the provider catalogue in `llm/providers.py`, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import `nl2sql.feedback`, `nl2sql.tracing`, `nl2sql.pipeline`, `nl2sql.indexing` or `PROVIDER_PRESETS`: `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.index.inspect_defaults()` and `engine.llm.providers()` serve them. The CLI, the playground and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`).
 - The runtime (`pipeline`, `execution`, `indexing`, `datasources`, `llm`, `policies`, `aggregation`, `schema`, `services`, `context`, `public_api`) never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope. A deferred import inside a function is fine.
@@ -420,7 +421,7 @@ No engine module names a database dialect or writes one database's SQL. The plan
 - The plan's one function vocabulary: `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions` (see *Plan Functions Are Known Functions*)
 
 ### Failure Behavior
-A failing test naming the literal and where it was written. The documented exceptions are the engine's own SQLite metadata store (`schema/store.py`, `schema/sqlite_store.py`), the in-process polars/DuckDB compute engine (`aggregation/engines/polars_duckdb.py`), and the plan's function allow-list.
+A failing test naming the literal and where it was written. The documented exceptions are the engine's own state store, a SQLite file by default (`storage/sqlite.py`), the in-process polars/DuckDB compute engine (`aggregation/engines/polars_duckdb.py`), and the plan's function allow-list.
 
 ### Why It Exists
 SQL that only one database understands, written in the engine, is wrong for every other database — and it is wrong silently, because it parses. A dialect name in engine code is worse: it is a switch statement that every future adapter has to be added to, in a repo whose point is that adapters are pluggable.
@@ -504,7 +505,7 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - `packages/nl2sql/src/nl2sql/execution/dag.py`
 - `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
 - `packages/nl2sql/src/nl2sql/runtime.py`
-- `packages/nl2sql/src/nl2sql/schema/store.py`
+- `packages/nl2sql/src/nl2sql/storage/sqlite.py`
 - `packages/nl2sql/src/nl2sql/pipeline/runtime.py`
 - `packages/nl2sql/src/nl2sql/policies/scope.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/functions.py`

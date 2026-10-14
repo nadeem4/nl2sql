@@ -331,6 +331,27 @@ def test_only_storage_imports_chromadb():
         "way as the built-in one.", offenders)
 
 
+# The SQLite adapter's driver is sqlite3, and the gold set's SQL runs on the
+# demo's Chinook file to score a benchmark: both read a datasource, not the
+# engine's own state.
+STATE_LIBRARY_EXCEPTIONS = {"nl2sql/src/nl2sql/evaluation/gold.py"}
+
+
+def test_only_storage_imports_sqlite3():
+    """The engine keeps its state through ``StateStore``; SQLite is one state store among any."""
+    offenders = []
+    for path in python_files(*SOURCES):
+        if path.is_relative_to(STORAGE) or path.is_relative_to(ADAPTERS) or _where(path) in STATE_LIBRARY_EXCEPTIONS:
+            continue
+        offenders += [f"{_where(path)}:{lineno} {name}"
+                      for lineno, name, _ in imports(path)
+                      if name.partition(".")[0] == "sqlite3"]
+    assert not offenders, _broke(
+        "Only nl2sql/storage/ imports sqlite3. Snapshots, the plan cache, feedback and the lock "
+        "are reached through the StateStore interface (nl2sql_sdk.stores), so a plugin state "
+        "store works the same way as the built-in one.", offenders)
+
+
 # --------------------------------------------------------------------------
 # 5-6. Dialect knowledge lives in the adapter
 # --------------------------------------------------------------------------
@@ -339,7 +360,8 @@ def test_only_storage_imports_chromadb():
 # not here: it names adapters to install and configure them, which is registry
 # knowledge, not SQL. Neither is datasets/, whose literals are file names.
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
-                "schema", "services", "datasources", "policies", "tracing", "runtime.py", "public_api.py"]
+                "schema", "services", "datasources", "policies", "tracing", "storage", "runtime.py",
+                "public_api.py"]
 
 DIALECT_NAMES = re.compile(r"(?i)\b(sqlite|postgres|postgresql|mysql|mssql|tsql|duckdb|snowflake|bigquery)\b")
 
@@ -351,12 +373,11 @@ DIALECT_ONLY_SQL = re.compile(
     r"|ILIKE|NVL|IIF|GROUP_CONCAT|STRING_AGG|LISTAGG)\b")
 
 # Two things that carry a database's name without being a datasource: the
-# engine's own metadata store, a SQLite file by default (a setting and the store
-# that implements it), and the in-process polars/DuckDB compute engine that
-# combines sub-query results already fetched through an adapter.
+# engine's own state store, a SQLite file by default (the built-in ``sqlite``
+# store), and the in-process polars/DuckDB compute engine that combines
+# sub-query results already fetched through an adapter.
 DIALECT_NAME_EXCEPTIONS = {
-    "nl2sql/src/nl2sql/schema/store.py",
-    "nl2sql/src/nl2sql/schema/sqlite_store.py",
+    "nl2sql/src/nl2sql/storage/sqlite.py",
     "nl2sql/src/nl2sql/aggregation/engines/polars_duckdb.py",
 }
 
@@ -866,3 +887,21 @@ def test_only_entry_points_load_dotenv():
 def test_the_settings_global_is_gone():
     assert not (ENGINE / "common" / "settings.py").exists()
     assert not (ENGINE / "common" / "env_hint.py").exists()
+
+
+def test_no_tracked_file_holds_a_merge_conflict_marker():
+    """A conflict left in a rebase must fail CI, not render on the docs site."""
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True
+    ).stdout.split()
+    marker = re.compile(r"^(<{7}|>{7})( |$)", re.MULTILINE)
+    found = []
+    for name in tracked:
+        path = REPO / name
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        if marker.search(text):
+            found.append(name)
+    assert not found, f"Merge conflict markers in: {found}"

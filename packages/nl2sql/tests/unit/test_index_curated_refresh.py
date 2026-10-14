@@ -10,14 +10,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from index_helpers import TestIndex  # same directory
+from index_helpers import TestIndex, memory_state  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.config import Curated
 from nl2sql.indexing import enrichment_service, orchestrator as orchestrator_module
 from nl2sql.indexing.curated import curated_hash
 from nl2sql.indexing.rebuild import rebuild_index
-from nl2sql.schema import InMemorySchemaStore
 from nl2sql_sdk.stores import Filter
 from nl2sql_sdk import IndexScope
 from nl2sql_sdk.schema import (
@@ -68,7 +67,7 @@ class _NoLLM:
 
 def _ctx(tmp_path, curated):
     adapter = _Adapter()
-    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=InMemorySchemaStore()).ctx
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), state=memory_state()).ctx
     ctx.llm_registry = _NoLLM()
     ctx.ds_registry = SimpleNamespace(list_adapters=lambda: [adapter], get_index_scope=lambda _ds: IndexScope(),
                                       get_sample_questions=lambda _ds: [],

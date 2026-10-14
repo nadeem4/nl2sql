@@ -20,7 +20,7 @@ inspect one search of it.
 - `packages/nl2sql/src/nl2sql/indexing/health.py`
 - `packages/nl2sql/src/nl2sql/storage/chroma.py`
 - `packages/nl2sql/src/nl2sql/indexing/enrichment_service.py`
-- `packages/nl2sql/src/nl2sql/schema/store.py`
+- `packages/nl2sql/src/nl2sql/storage/sqlite.py`
 
 ## Public Surface
 

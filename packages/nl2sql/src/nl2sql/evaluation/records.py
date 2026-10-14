@@ -123,7 +123,7 @@ def database_identity(ctx, datasource_ids: Optional[Sequence[str]] = None) -> Di
     split into a new series. Without them every registered datasource is
     described, which is right only when the run really used all of them.
     """
-    from nl2sql.schema.protocol import generate_schema_fingerprint
+    from nl2sql.schema.fingerprint import generate_schema_fingerprint
 
     ids = sorted(set(datasource_ids)) if datasource_ids is not None else sorted(ctx.ds_registry.list_ids())
     parts = []

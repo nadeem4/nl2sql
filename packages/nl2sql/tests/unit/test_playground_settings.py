@@ -32,7 +32,6 @@ from nl2sql.cli.demo.playground.app import build_app
 from nl2sql import NL2SQL, load_config
 from nl2sql.llm import LLMRegistry
 from nl2sql.registry import Registry
-from nl2sql.runtime import StorePaths
 from nl2sql.storage.files import FilesTraces
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.config import make_config
@@ -99,7 +98,6 @@ class _Context:
         self.ds_registry = _EmptyRegistry()
         self.llm_registry = LLMRegistry(SecretManager())
         self.registry = Registry.default()
-        self.stores = StorePaths.under(project / ".nl2sql")
         self.traces = FilesTraces(project / "traces")
         self.config = load_config(project / "nl2sql.yaml")
         self.replace_llm(self.config.llm)

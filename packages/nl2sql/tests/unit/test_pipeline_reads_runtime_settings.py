@@ -23,7 +23,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import SubgraphExecutionState
-from nl2sql.schema import InMemorySchemaStore
+from index_helpers import memory_state  # same directory
 from nl2sql_sdk.contracts import ResultFrame
 from nl2sql.testing.runtime import stub_ds_registry
 
@@ -81,7 +81,7 @@ def _plan():
 
 
 def test_a_plan_cache_turned_off_in_the_settings_neither_reads_nor_writes():
-    store = InMemorySchemaStore()
+    store = memory_state()
 
     assert PlanCache(store, enabled=False).put(_sub_query(), _plan()) is False
     assert PlanCache(store, enabled=True).put(_sub_query(), _plan()) is True
@@ -89,7 +89,7 @@ def test_a_plan_cache_turned_off_in_the_settings_neither_reads_nor_writes():
 
 
 def test_the_plan_cache_keys_on_the_date_it_is_given():
-    store = InMemorySchemaStore()
+    store = memory_state()
     PlanCache(store, today=dt.date(2013, 12, 31)).put(_sub_query(), _plan())
 
     assert PlanCache(store, today=dt.date(2013, 12, 31)).get(_sub_query()) == _plan()

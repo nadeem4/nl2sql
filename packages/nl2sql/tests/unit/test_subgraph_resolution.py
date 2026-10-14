@@ -178,7 +178,7 @@ def test_sql_agent_subgraph_builds():
         settings={"tenant_id": "t1"},
         llm_registry=SimpleNamespace(get_llm=lambda _name: MagicMock()),
         vector_store=SimpleNamespace(),
-        schema_store=SimpleNamespace(),
+        state=SimpleNamespace(),
         policies={"allow_all": True},
         ds_registry=SimpleNamespace(get_adapter=lambda _id: SimpleNamespace(get_dialect=lambda: "sqlite")),
     )

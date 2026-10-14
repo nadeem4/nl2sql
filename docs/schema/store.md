@@ -4,7 +4,7 @@ The schema layer provides **authoritative, versioned snapshots** and **structure
 
 - **Schema contracts**: structural schema (tables, columns, foreign keys).
 - **Schema metadata**: descriptive enrichment and statistics.
-- **Schema store**: versioned persistence with fingerprinting.
+- **The state store**: immutable, versioned snapshots, kept by `storage.state`.
 - **Schema retrieval**: staged lookup via schema chunks.
 
 ## Schema contracts and metadata
@@ -28,27 +28,77 @@ Metadata complements contracts:
   with the datasource's `index.sample_values`. See
   [Reading a schema](../adapters/sqlalchemy.md#reading-a-schema)
 
-## Snapshotting and fingerprinting
+## The state store
 
-Each `SchemaSnapshot` (contract + metadata) is versioned using a **deterministic fingerprint**:
+Snapshots are kept by the engine's **state store**, the `storage.state` slot
+(see [Storage](../configuration/storage.md)). The built-in one is `sqlite`, a
+file at `<storage.path>/state.db`; any store implementing
+`nl2sql_sdk.stores.StateStore` can take its place. The same store holds the
+plan cache, the playground's answer ratings and the index build lock.
 
-- Fingerprint uses datasource ID, engine type, sorted tables, sorted columns, and sorted foreign keys.
-- Resulting hash is used to deduplicate identical snapshots.
+### Snapshots are immutable
 
-## Schema store backends
+`put_snapshot(snapshot)` stores a snapshot as a new row and returns its
+`schema_version`, `YYYYMMDDhhmmss_<hash8>` (the time it was stored, and a hash
+of its contract and metadata). A stored snapshot is never changed: in the
+`sqlite` store a trigger refuses any `UPDATE` of the `schema_snapshots` table.
 
-`build_schema_store()` constructs a store based on settings:
+- Storing a snapshot whose contract and metadata are identical to a stored one
+  returns that version, and writes nothing.
+- A snapshot with the same structure but new metadata (statistics,
+  descriptions, enrichment) is a **new version**. A run that pinned the old
+  version keeps reading exactly the snapshot its index build was made from.
 
-- `InMemorySchemaStore`: in-memory, versioned snapshots.
-- `SqliteSchemaStore`: persistent storage with indexes on fingerprint and timestamps. One connection serves every thread, and each use of it holds one lock, so a server reading the schema and the index health on two workers at once is safe.
+The structural fingerprint (`nl2sql.schema.generate_schema_fingerprint`:
+datasource ID, engine type, sorted tables, columns and foreign keys) is still
+stored beside each row, and benchmark records use it to identify a database.
 
-Schema versions are timestamped and include a fingerprint prefix (e.g., `YYYYMMDDhhmmss_<fp8>`). Old versions are evicted beyond `schema_store_max_versions`.
+### Which snapshots are kept
 
-The store also holds the **plan cache**: validated, executed plans keyed by `(normalised sub-query intent, run date and planner model, datasource_id, schema_version)`, in the `plan_cache` table of the SQLite store (a dict in the in-memory one). Evicting a schema version deletes its cached plans; `nl2sql cache clear` deletes them all and keeps the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+After each build of a datasource, indexing calls
+`keep_snapshots(datasource_id, keep)`, which deletes every other snapshot of
+the datasource and the plans cached on them. `keep` is:
 
-The same SQLite file holds the playground's answer ratings, in a `feedback` table (one row per rated run; questions and SQL, never rows). It is written whatever `SCHEMA_STORE_BACKEND` is, at `SCHEMA_STORE_PATH`; `nl2sql feedback clear` empties it and nothing else. See [Feedback and Signals](../observability/feedback.md).
+- every version a build pointer names, in **every** index namespace, so
+  switching back to an earlier embedding model still finds its snapshot;
+- the version the build just replaced, which runs in flight may have pinned;
+- the newest `settings.schema.max_versions` (default 3).
 
-The fingerprint covers **structure only** (tables, columns, keys). Registering a snapshot whose structure matches an existing version returns that version unchanged, so anything keyed on it (the plan cache) stays valid, but the stored **metadata** (statistics, descriptions, enrichment) is replaced by the new snapshot's. The snapshot store and the chunks built from the same snapshot therefore always agree.
+Nothing else deletes a snapshot; there is no age limit.
+
+### The plan cache and feedback
+
+The **plan cache** holds validated, executed plans keyed by `(normalised
+sub-query intent, run date and planner model, datasource_id, schema_version)`
+(`get_plan`, `put_plan`). Deleting a snapshot deletes its cached plans;
+`nl2sql cache clear` (`engine.clear_plan_cache()`) deletes them all and keeps
+the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+
+The playground's **answer ratings** are kept too (`add_feedback`,
+`list_feedback`, `clear_feedback`): one row per rated run, questions and SQL,
+never rows. `nl2sql feedback clear` empties them and nothing else. See
+[Feedback and Signals](../observability/feedback.md).
+
+### Migrations
+
+The `sqlite` store records each migration it has applied in a `nl2sql_meta`
+table, and the engine applies the pending ones when it starts
+(`StateStore.migrate()`). Migration 1 creates 0.5's three tables
+(`schema_snapshots`, `plan_cache`, `feedback`) if they are missing, so a 0.5
+`state.db` is adopted as it is; migration 2 adds the feedback columns that
+came later; migration 3 adds the immutability trigger and the `locks` table.
+
+### The lock
+
+`lock(name, ttl_s)` is a lease held for a `with` block: in the `sqlite` store,
+a `locks` row taken in a `BEGIN IMMEDIATE` transaction, with an expiry. Every
+`engine.index.build()` holds the `index` lock, so `nl2sql index` is safe to run
+while `nl2sql-api` serves the same `storage.path`: a second build started
+meanwhile fails at once and says until when the lease runs. The lease expires
+after an hour, so a build that died cannot block forever.
+
+The `sqlite` store opens its file on first use, never when it is built, and
+is safe to share between threads: each use of its one connection holds a lock.
 
 ## Which version is live
 
@@ -65,14 +115,16 @@ it. See [Indexing → The build pointer is the commit](../architecture/indexing.
 
 ## Retrieval and authority
 
-Schema retrieval resolves **authoritative** tables/columns from `SchemaStore`, not from the index. Index entries are only used to identify candidates; final schema is resolved via the snapshot the live pointer names. If retrieval yields no candidates, the retriever falls back to the full snapshot. The entries and the snapshot come from the same build, so their versions cannot disagree.
+Schema retrieval resolves **authoritative** tables/columns from the state store, not from the index. Index entries are only used to identify candidates; final schema is resolved via the snapshot the live pointer names. If retrieval yields no candidates, the retriever falls back to the full snapshot. The entries and the snapshot come from the same build, so their versions cannot disagree.
 
 See `../architecture/indexing.md` for retrieval stages, chunk types, and vector store behavior.
 
 ## Source references
 
 - Contracts and metadata: `packages/sdk/src/nl2sql_sdk/schema.py`
-- Fingerprinting: `packages/nl2sql/src/nl2sql/schema/protocol.py`
-- Schema store factory: `packages/nl2sql/src/nl2sql/schema/store.py`
-- Sqlite store: `packages/nl2sql/src/nl2sql/schema/sqlite_store.py`
+- Fingerprinting: `packages/nl2sql/src/nl2sql/schema/fingerprint.py`
+- The `StateStore` interface: `packages/sdk/src/nl2sql_sdk/stores.py`
+- The `sqlite` state store: `packages/nl2sql/src/nl2sql/storage/sqlite.py`
+- Which snapshots are kept: `packages/nl2sql/src/nl2sql/indexing/orchestrator.py`
+- The index lock: `packages/nl2sql/src/nl2sql/indexing/rebuild.py`
 - Schema retriever: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`

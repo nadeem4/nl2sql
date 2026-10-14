@@ -31,7 +31,7 @@ class SchemaRetrieverNode:
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.vector_store = ctx.vector_store
-        self.schema_store = ctx.schema_store
+        self.state = ctx.state
         self.policy_engine = ctx.policy_engine
         self.ds_registry = getattr(ctx, "ds_registry", None)
         self.full_snapshot_max_tables = ctx.settings.retrieval.full_snapshot_max_tables
@@ -120,7 +120,7 @@ class SchemaRetrieverNode:
     def _resolve_snapshot(self, datasource_id: str, schema_version: Optional[str]) -> Optional[SchemaSnapshot]:
         """The snapshot of ``schema_version``, else of the datasource's live build (the run's pinned pointer)."""
         if schema_version:
-            return self.schema_store.get_snapshot(datasource_id, schema_version) if self.schema_store else None
+            return self.state.get_snapshot(datasource_id, schema_version) if self.state else None
         return self.vector_store.snapshot(datasource_id) if self.vector_store else None
 
     def _build_tables_from_snapshot(

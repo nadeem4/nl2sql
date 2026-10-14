@@ -29,9 +29,10 @@ Matching is exact after :func:`normalize_question`, never by similarity.
 A cached plan is never trusted: the logical validator, generator and executor
 run on it every time, so a policy change or a less privileged role still
 refuses it. Only plans that validated and executed are stored (by the sub-query
-wrapper, which knows the outcome). Entries live in the schema store
-(``state.db`` under ``storage.path``), and ``settings.pipeline.plan_cache: false``
-turns reads and writes off.
+wrapper, which knows the outcome). Entries live in the state store
+(``storage.state``; ``state.db`` under ``storage.path`` by default), and
+``settings.pipeline.plan_cache: false`` turns reads and writes off. An entry
+goes when its schema version's snapshot is deleted.
 """
 from __future__ import annotations
 
@@ -60,9 +61,9 @@ def normalize_question(text: str) -> str:
 
 
 class PlanCache:
-    """Reads and writes validated plans in the schema store.
+    """Reads and writes validated plans in the state store.
 
-    Every failure (no store, a store without a cache, an unreadable entry) is a
+    Every failure (no store, a store that fails, an unreadable entry) is a
     miss: the planner then runs as if there were no cache. ``enabled`` and
     ``today`` are the run's ``settings.pipeline.plan_cache`` and
     ``settings.pipeline.today``; ``planner`` is the run's planner model, as
@@ -77,7 +78,7 @@ class PlanCache:
         self._planner = planner
 
     def _usable(self) -> bool:
-        return self._enabled and hasattr(self._store, "get_cached_plan")
+        return self._enabled and self._store is not None
 
     def _key(self, sub_query: Any) -> Optional[tuple]:
         if sub_query is None or not sub_query.schema_version:
@@ -108,7 +109,7 @@ class PlanCache:
         if key is None:
             return None
         try:
-            raw = self._store.get_cached_plan(*key)
+            raw = self._store.get_plan(*key)
             plan = PlanModel.model_validate_json(raw) if raw else None
         except Exception as exc:
             logger.warning("Ignoring an unreadable cached plan: %s", exc)
@@ -125,17 +126,11 @@ class PlanCache:
         if key is None:
             return False
         try:
-            self._store.put_cached_plan(*key, plan.model_dump_json())
+            self._store.put_plan(*key, plan.model_dump_json())
         except Exception as exc:
             logger.warning("Could not cache the plan: %s", exc)
             return False
         return True
-
-    def clear(self) -> int:
-        """Removes every cached plan; returns how many there were."""
-        if not hasattr(self._store, "clear_plan_cache"):
-            return 0
-        return self._store.clear_plan_cache()
 
 
 def planner_of(ctx: Any) -> Optional[str]:
@@ -148,7 +143,7 @@ def planner_of(ctx: Any) -> Optional[str]:
 
 
 def plan_cache_for(ctx: Any, planner: Optional[str] = None) -> PlanCache:
-    """The plan cache of a runtime: its schema store, its ``settings.pipeline`` and its planner model.
+    """The plan cache of a runtime: its state store, its ``settings.pipeline`` and its planner model.
 
     ``planner`` is the run's ``planner_of(ctx)``, read now when not given.
     The planner node and the sub-query wrapper both read it while the graph
@@ -156,5 +151,5 @@ def plan_cache_for(ctx: Any, planner: Optional[str] = None) -> PlanCache:
     """
     pipeline = ctx.settings.pipeline
     planner = planner or planner_of(ctx)
-    return PlanCache(getattr(ctx, "schema_store", None), enabled=pipeline.plan_cache, today=pipeline.today,
+    return PlanCache(getattr(ctx, "state", None), enabled=pipeline.plan_cache, today=pipeline.today,
                      planner=planner)

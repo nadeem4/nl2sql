@@ -19,7 +19,6 @@ from nl2sql.cli.console import console
 if TYPE_CHECKING:
     from nl2sql import NL2SQL
     from nl2sql.config import Config
-    from nl2sql.runtime import StorePaths
 
 
 def config_option(ctx: typer.Context) -> Optional[Path]:
@@ -41,13 +40,6 @@ def load_project_config(ctx: typer.Context) -> "Config":
         return load_config(config_option(ctx))
     except ConfigError as error:
         _fail(error)
-
-
-def store_paths(ctx: typer.Context) -> "StorePaths":
-    """Where the configured engine keeps its index, state, traces and results, without building it."""
-    from nl2sql.runtime import StorePaths
-
-    return StorePaths.under(load_project_config(ctx).storage.path)
 
 
 def build_engine(ctx: typer.Context, *, check: bool = True) -> "NL2SQL":

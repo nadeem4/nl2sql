@@ -163,14 +163,14 @@ def _demo_ctx():
 
 def _fingerprinted_per_datasource(monkeypatch):
     """Fingerprint each contract by its datasource, Chinook's being the one the committed runs recorded."""
-    import nl2sql.schema.protocol as protocol
+    import nl2sql.schema.fingerprint as protocol
     digests = {"chinook": CHINOOK["schema_fingerprint"].ljust(64, "0")}
     monkeypatch.setattr(protocol, "generate_schema_fingerprint",
                         lambda c: digests.get(c.datasource_id, hashlib.sha256(c.datasource_id.encode()).hexdigest()))
 
 
 def test_database_identity_fingerprints_the_live_schema_snapshot(monkeypatch):
-    import nl2sql.schema.protocol as protocol
+    import nl2sql.schema.fingerprint as protocol
     ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook"]),
                           vector_store=SimpleNamespace(snapshot={
                               "chinook": _snapshot("chinook", 2, 3)}.get))

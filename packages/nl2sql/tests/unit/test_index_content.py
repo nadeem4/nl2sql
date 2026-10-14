@@ -10,12 +10,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from index_helpers import TestIndex  # same directory
+from index_helpers import TestIndex, memory_state  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
-from nl2sql.schema import InMemorySchemaStore
-from nl2sql.schema.sqlite_store import SqliteSchemaStore
 from nl2sql_sdk.stores import Filter
 from nl2sql_sdk import IndexScope
 from nl2sql_sdk.schema import (
@@ -61,8 +59,8 @@ class _Adapter:
         return self.snapshot
 
 
-def _ctx(tmp_path, description=DESCRIPTION, questions=QUESTIONS, schema_store=None):
-    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), schema_store=schema_store or InMemorySchemaStore()).ctx
+def _ctx(tmp_path, description=DESCRIPTION, questions=QUESTIONS, state=None):
+    ctx = TestIndex(tmp_path, FakeEmbeddings(size=8), state=state or memory_state()).ctx
     ctx.ds_registry = SimpleNamespace(
         get_index_scope=lambda _ds: IndexScope(), get_sample_questions=lambda _ds: list(questions),
         get_description=lambda _ds: description,
@@ -108,7 +106,7 @@ def test_the_snapshot_stores_the_configured_description_too(tmp_path):
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter())
 
-    assert ctx.schema_store.get_snapshot("chinook", _live_version(ctx)).metadata.description == DESCRIPTION
+    assert ctx.state.get_snapshot("chinook", _live_version(ctx)).metadata.description == DESCRIPTION
 
 
 def test_a_description_the_database_reports_is_kept_when_none_is_configured(tmp_path):
@@ -119,30 +117,20 @@ def test_a_description_the_database_reports_is_kept_when_none_is_configured(tmp_
     assert "from the catalog" in _datasource_text(ctx)
 
 
-# --- 4. re-indexing an unchanged schema refreshes the stored metadata ----------
+# --- 4. re-indexing a schema that returns reuses its immutable snapshot ----------
 
 
-@pytest.fixture(params=["sqlite", "memory"])
-def store(request, tmp_path):
-    if request.param == "sqlite":
-        s = SqliteSchemaStore(tmp_path / "schema.db")
-        yield s
-        s._connection.close()
-    else:
-        yield InMemorySchemaStore()
+def test_reindexing_new_statistics_stores_a_new_version_and_keeps_the_old_one(tmp_path):
+    """Snapshots are immutable: changed metadata is a new version, never an update."""
+    ctx = _ctx(tmp_path)
+    orchestrator = IndexingOrchestrator(ctx)
+    orchestrator.index_datasource(_Adapter(_snapshot(row_count=10)))
+    first = _live_version(ctx)
 
+    orchestrator.index_datasource(_Adapter(_snapshot(row_count=11)))
 
-def test_reregistering_an_unchanged_structure_keeps_the_version_and_updates_metadata(store):
-    first, _ = store.register_snapshot(_snapshot(description="old", row_count=10))
-
-    second, evicted = store.register_snapshot(_snapshot(description="new", row_count=11))
-
-    assert second == first
-    assert evicted == []
-    stored = store.get_snapshot("chinook", first)
-    assert stored.metadata.description == "new"
-    assert next(iter(stored.metadata.tables.values())).row_count == 11
-    assert store.list_versions("chinook") == [first]
+    assert _live_version(ctx) != first
+    assert next(iter(ctx.state.get_snapshot("chinook", first).metadata.tables.values())).row_count == 10
 
 
 def _changed() -> SchemaSnapshot:
@@ -154,8 +142,8 @@ def _changed() -> SchemaSnapshot:
 def test_a_structure_that_returns_after_a_change_reuses_its_version_and_the_pointer_names_it(tmp_path):
     """Structure A, then B, then A again: A's version is reused, and the build
     pointer names it, so readers use A's snapshot and not B's."""
-    store = SqliteSchemaStore(tmp_path / "schema.db")
-    ctx = _ctx(tmp_path, schema_store=store)
+    store = memory_state()
+    ctx = _ctx(tmp_path, state=store)
     orchestrator = IndexingOrchestrator(ctx)
     orchestrator.index_datasource(_Adapter())
     a1 = _live_version(ctx)
@@ -175,8 +163,8 @@ def test_health_sees_an_index_rebuilt_on_a_returning_structure_as_current(tmp_pa
     pointer, so the index is current and no start would rebuild it."""
     from nl2sql.indexing.health import index_health
 
-    store = SqliteSchemaStore(tmp_path / "schema.db")
-    ctx = _ctx(tmp_path, schema_store=store)
+    store = memory_state()
+    ctx = _ctx(tmp_path, state=store)
     orchestrator = IndexingOrchestrator(ctx)
     for snapshot in (_snapshot(), _changed(), _snapshot()):
         orchestrator.index_datasource(_Adapter(snapshot))
