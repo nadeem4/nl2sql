@@ -810,8 +810,17 @@ As in Phase 1, the engine accepts exactly the version it was built for.
     retriever hiding denied tables, and the demo roles rewritten. Beyond the
     table below, `engine.policies.allowed()` is replaced by
     `engine.policies.scope()`, since a flat table list cannot say what a deny
-    does. The `check` block and `PolicyCheck` come with P2. See
-    [Policies](../configuration/policies.md).
+    does. See [Policies](../configuration/policies.md).
+
+!!! note "Built: `PolicyCheck` (PR P2)"
+    `nl2sql_sdk.policy` (`UserContext`, `Grant`, `PolicyCheck`), the
+    `policies.check` block (or a check object), the intersection with the
+    roles, failing closed, and the `policy_check` registry kind. The runtime
+    builds the block through the registry, and `PolicyEngine.run` makes the
+    check asked once per caller and datasource per run. A `grant` that
+    returns something other than a `Grant`, or a pattern that does not parse,
+    fails closed like an exception. See
+    [A policy check](../configuration/policies.md#a-policy-check).
 
 ### The config
 
