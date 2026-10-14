@@ -20,7 +20,7 @@ from nl2sql.cli.generators.datasources import DatasourceGenerator
 from nl2sql.cli.generators.llm import LLMGenerator
 from nl2sql.cli.generators.policies import PolicyGenerator
 
-from .datasets import (
+from nl2sql.datasets.demo import (
     DEMO_CURATED,
     DEMO_DATABASES,
     DEMO_DATASOURCES,
@@ -49,6 +49,27 @@ CURATED_HEADER = """# The demo's verified queries: SQL a person wrote and review
 # with `nl2sql --env demo index --curated-only`.
 # See docs/configuration/curated.md.
 """
+
+
+def _v1_datasource(config: Dict[str, Any]) -> Dict[str, Any]:
+    """A demo datasource (``nl2sql.yaml`` shape) in the 0.4 file shape ``setup --demo`` writes.
+
+    ``setup`` is deleted in 0.5 together with this function; ``nl2sql init
+    --demo`` writes the new config.
+    """
+    connection = dict(config["connection"])
+    connection["database"] = f"data/{connection['database']}"
+    return {
+        "id": config["id"],
+        "description": config["description"],
+        "connection": {"type": config["type"], **connection},
+        "options": dict(config["limits"]),
+    }
+
+
+def _v1_policies(roles: Dict[str, Any]) -> Dict[str, Any]:
+    """The demo roles with the ``role`` field the 0.4 policy file repeats."""
+    return {name: {**role, "role": name} for name, role in roles.items()}
 
 
 def _load_demo_env(env_path: pathlib.Path) -> None:
@@ -99,7 +120,7 @@ class DemoManager:
                 shutil.copyfile(source, db_path)
 
         self.print_step("Writing datasources config...")
-        ds_configs = [DatasourceConfig(**config) for config in DEMO_DATASOURCES]
+        ds_configs = [DatasourceConfig(**_v1_datasource(config)) for config in DEMO_DATASOURCES]
         file_config = DatasourceFileConfig(datasources=ds_configs)
         content = DatasourceGenerator.generate(file_config)
         ds_path = self.project_root / "configs" / "datasources.demo.yaml"
@@ -107,7 +128,7 @@ class DemoManager:
         with open(ds_path, "w", encoding="utf-8") as f:
             f.write(content)
 
-        self._write_common_artifacts(DEMO_POLICIES, DEMO_QUESTIONS_BY_DATASOURCE)
+        self._write_common_artifacts(_v1_policies(DEMO_POLICIES), DEMO_QUESTIONS_BY_DATASOURCE)
 
         self.print_step("Writing .env.demo configuration...")
         secrets = {}
@@ -146,7 +167,7 @@ class DemoManager:
         curated_path = self.project_root / "configs" / "curated.demo.yaml"
         with open(curated_path, "w", encoding="utf-8") as f:
             f.write(CURATED_HEADER)
-            yaml.dump(DEMO_CURATED, f, Dumper=_CuratedDumper, sort_keys=False, allow_unicode=True, width=120)
+            yaml.dump({"version": 1, **DEMO_CURATED}, f, Dumper=_CuratedDumper, sort_keys=False, allow_unicode=True, width=120)
 
         self.print_step("Writing LLM config...")
         llm_config = LLMFileConfig(**DEMO_LLM_CONFIG)

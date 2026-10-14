@@ -43,6 +43,12 @@ Detailed schemas for each file:
 - [Policies](../configuration/policies.md)
 - [Secrets](../configuration/secrets.md)
 
+!!! note "0.5: `nl2sql init`"
+    From 0.5 the engine reads one `nl2sql.yaml` instead of these files.
+    `nl2sql init` writes it, and in Python
+    `nl2sql.config.init_project("my-project")` writes the same files. See
+    [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
+
 ### Configuration paths at startup
 
 You can pass config paths directly when creating the engine:

@@ -7,8 +7,10 @@ repository and sharing Chinook's customer identities; no third-party data is
 involved in either. ``README.md`` describes the tables and how to regenerate
 them.
 
-``nl2sql demo`` copies all three into the demo project, and the gold evaluation
-dataset reads Chinook directly.
+``nl2sql demo`` and ``nl2sql init --demo`` copy all three into the demo project,
+and the gold evaluation dataset reads Chinook directly. The demo's datasources,
+roles, sample questions and verified queries are in ``chinook``, ``support``,
+``webanalytics`` and ``demo`` here.
 """
 from pathlib import Path
 

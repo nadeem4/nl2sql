@@ -15,7 +15,7 @@ from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.cli.commands import demo as demo_cmd
 from nl2sql.cli.demo import stamp
-from nl2sql.cli.demo.datasets import DEMO_DATABASES
+from nl2sql.datasets.demo import DEMO_DATABASES
 from nl2sql.indexing.vector_store import VectorStore
 from nl2sql.schema.sqlite_store import SqliteSchemaStore
 

@@ -1182,6 +1182,31 @@ users, yanking it adds nothing.
 
 ### CLI
 
+!!! note "Built: `nl2sql init` (PR 6)"
+    `nl2sql init` is in the CLI, and `setup` stays until PR 7b. The engine
+    writes the files: `nl2sql.config.init_project(folder, demo=, provider=,
+    force=)` returns the paths it wrote, after loading them with
+    `load_config`. `nl2sql.config.demo_config(llm=, path=, data_dir=)` builds
+    the demo `Config` that `NL2SQL.demo()` (PR 7a) uses, and `init --demo`
+    writes that same config out, so the two cannot drift. Building it settled
+    these details:
+
+    - The demo's datasources, roles, sample questions and verified queries
+      moved from `nl2sql.cli.demo` to `nl2sql.datasets` (`chinook`,
+      `support`, `webanalytics`, `demo`), in the `nl2sql.yaml` shape, so the
+      engine can build the demo without importing the CLI.
+    - `--provider` accepts the providers with a default model (`openai`,
+      `anthropic`, `openrouter`). `llm.yaml` gets that model and the
+      provider's default temperature (none for Anthropic).
+    - If any file `init` would write exists, it names them all and writes
+      nothing. `.gitignore` is never overwritten: the missing lines are
+      appended.
+    - A demo datasource's `database` is written as `data/<name>.sqlite`,
+      relative to `nl2sql.yaml`. `load_config` keeps `connection` as
+      written, so the runtime (PR 7a) has to resolve a relative SQLite path
+      against the config's folder, as it does `storage.path`.
+      `demo_config()` points at the packaged files instead.
+
 | Change | Detail |
 |---|---|
 | **One global `--config PATH`** | On the app callback, before the subcommand: `nl2sql --config prod/nl2sql.yaml index`. Without it, `NL2SQL_CONFIG`, then `./nl2sql.yaml`. |

@@ -142,7 +142,7 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
 
     from nl2sql import NL2SQL
     from nl2sql.cli.commands.demo import REPLAY_STREAM_DELAY, replay_recordings
-    from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
     from nl2sql.cli.demo.llm_config import point_llm_config_at
     from nl2sql.cli.demo.playground.app import build_app
     from nl2sql.cli.demo.playground.hosted import Hosted, Limits, Replay

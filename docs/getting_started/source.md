@@ -35,6 +35,11 @@ Create config files in your working directory:
 
 Start from `configs/datasources.example.yaml` and `configs/policies.example.json`.
 
+!!! note "0.5: `nl2sql init`"
+    From 0.5 the engine reads one `nl2sql.yaml` instead. `nl2sql init` writes
+    it, with each section in its own file, and `nl2sql init --demo` writes the
+    demo's. See [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
+
 ## Run locally
 
 Python API:

@@ -95,7 +95,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     from nl2sql.cli import console
     from nl2sql.cli.commands import demo
-    from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
     from nl2sql.llm.replay import ReplayStore
 
     # This script is an entry point of its own, so the CLI's `main()` -- which

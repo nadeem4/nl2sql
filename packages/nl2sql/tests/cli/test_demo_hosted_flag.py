@@ -78,7 +78,7 @@ def test_hosted_serves_a_playground_with_no_key_of_its_own(tmp_path, monkeypatch
 
 
 def test_hosted_serves_the_packaged_recordings_to_a_visitor_without_a_key(tmp_path, monkeypatch):
-    from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS
+    from nl2sql.datasets.demo import CHINOOK_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore
 
     shipped = tmp_path / "shipped"
