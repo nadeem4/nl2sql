@@ -114,6 +114,19 @@ flowchart LR
 
 ## 3. The real-database test bed
 
+!!! note "Built: the compose file, the `realdb` marker and the CI workflow (PR T1)"
+    `testbed/` holds the compose file, `wide_schema.py`, `samples.py` (the
+    pinned samples with their checksums), the servers' init scripts and
+    `gate.py`; `packages/nl2sql/tests/realdb/` holds the fixtures; and
+    `.github/workflows/realdb.yml` runs them. Three details differ from the
+    text below. Pagila is pinned to commit `5ba5a57`, because later commits
+    need PostgreSQL 18. The `audit` schema is a small 21st schema beside the
+    20 numbered ones that hold the 1,200 tables. `datasource()` defaults to
+    the server's own sample database (Pagila, Sakila or AdventureWorksLT)
+    and passes other keywords to `Datasource`, since `Datasource.index`
+    arrives with B1. The GCP VM and `scripts/testbed.py` are PR T2. See
+    [The real-database test bed](../testing/test-bed.md).
+
 ### What it is
 
 One file, `testbed/docker-compose.yml`, defines the whole test bed. The same

@@ -44,11 +44,14 @@ name the rule.
 ## Checks
 
 ```bash
-pytest -m "not integration" -q
+pytest -m "not integration and not realdb" -q
 nl2sql init --demo demo-ci   # the demo project: nl2sql.yaml, its section files and the sample databases
 EMBEDDING_PROVIDER=local pytest -m "integration and not llm" -q
+docker compose -f testbed/docker-compose.yml up -d --wait   # the real-database test bed
+REALDB=compose pytest -m realdb -q
 mkdocs build --strict
 ```
 
-Integration tests skip loudly without the demo databases, so a green run that
-skipped them proves nothing.
+Integration tests skip loudly without the demo databases, and `realdb` tests
+without the test bed, so a green run that skipped them proves nothing. CI's
+`realdb` workflow sets `REALDB_REQUIRED=1`, which turns that skip into a failure.

@@ -1,0 +1,8 @@
+version: 2
+secret:
+  ignored_matches:
+    # The real-database test bed's documented throwaway default, for
+    # containers bound to 127.0.0.1 or to a CI runner. It protects nothing
+    # reachable from outside (docs/testing/test-bed.md).
+    - name: test bed default password
+      match: Nl2sql-Testbed-1

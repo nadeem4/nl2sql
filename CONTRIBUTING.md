@@ -93,6 +93,24 @@ OPENAI_API_KEY=sk-... pytest -m integration
 The `llm`-marked tests fail, rather than skip, without `OPENAI_API_KEY`. That
 is expected, not a regression.
 
+### Real databases
+
+Tests marked `realdb` run against real PostgreSQL, MySQL and SQL Server
+servers: the test bed, one compose file under `testbed/`. With Docker
+running:
+
+```bash
+docker compose -f testbed/docker-compose.yml up -d --wait
+REALDB=compose pytest -m realdb
+docker compose -f testbed/docker-compose.yml down        # add -v to drop the data
+```
+
+The first `up` downloads the sample databases and loads them, which takes
+several minutes; later ones reuse the data volumes. Without the test bed the
+`realdb` tests skip with that fix in the message. CI runs them in the
+`realdb` workflow when a pull request changes database-facing code. See
+`docs/testing/test-bed.md`.
+
 See `docs/testing/architecture.md` for what each marker means.
 
 ### Checking a config
