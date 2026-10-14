@@ -440,5 +440,19 @@ def test_an_included_file_that_does_not_parse_is_named(tmp_path):
     assert "Not valid YAML" in error.problems[0].message
 
 
+def test_datasource_domains_load_from_yaml(tmp_path):
+    write(tmp_path, "datasources/sales.yaml", "type: sqlite\ndomains: [revenue, customers]\n")
+    cfg = load_config(write(tmp_path, "nl2sql.yaml",
+                            MINIMAL.replace("datasources: []", "datasources: { file: datasources/ }")))
+    assert cfg.datasources[0].domains == ["revenue", "customers"]
+
+
+def test_datasource_domains_reject_non_string_items(tmp_path):
+    write(tmp_path, "datasources/sales.yaml", "type: sqlite\ndomains: [revenue, {a: 1}]\n")
+    error = load_error(write(tmp_path, "nl2sql.yaml",
+                             MINIMAL.replace("datasources: []", "datasources: { file: datasources/ }")))
+    assert [(p.file, p.path) for p in error.problems] == [("datasources/sales.yaml", "domains[1]")]
+
+
 def test_load_config_returns_a_config(tmp_path):
     assert isinstance(load_config(write(tmp_path, "nl2sql.yaml", MINIMAL)), Config)

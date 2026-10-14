@@ -188,6 +188,7 @@ connection:
   password: "${env:SALES_DB_PASSWORD}"
 limits: { row_limit: 1000, timeout_ms: 8000 }
 preferred_tables: [public.revenue_daily]
+domains: [revenue, customers, orders]
 sample_questions:
   - What was revenue by region last quarter?
   - Which customers placed the most orders this year?
@@ -259,6 +260,7 @@ names are the YAML keys.
 | `limits` | `Limits` | `Limits()` | `options.row_limit`, `options.statement_timeout_ms`, `options.max_bytes` and the top-level fold |
 | `preferred_tables` | `list[str]` | `[]` | `preferred_tables` |
 | `sample_questions` | `list[str]` | `[]` | `sample_questions.yaml`, keyed by datasource |
+| `domains` | `list[str]` | `[]` | new: a routing hint written by people. The domains generated at indexing are separate and stored with the index. Routing does not read it yet (a later phase). |
 | `required` | `bool` | `False` | new: `engine.check()` fails if this datasource cannot connect |
 | `adapter` | adapter object | `None` | new: pass a built adapter instead of `type` (code only) |
 

@@ -102,6 +102,7 @@ def test_datasource_defaults():
     assert ds.limits == Limits()
     assert ds.preferred_tables == []
     assert ds.sample_questions == []
+    assert ds.domains == []
     assert ds.required is False
     assert ds.adapter is None
 

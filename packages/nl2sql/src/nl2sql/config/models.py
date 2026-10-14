@@ -66,6 +66,9 @@ class Datasource(_Model):
     limits: Limits = Field(default_factory=Limits)
     preferred_tables: List[str] = Field(default_factory=list)
     sample_questions: List[str] = Field(default_factory=list)
+    # Routing hint written by people. Domains generated at indexing are separate
+    # and stored with the index.
+    domains: List[str] = Field(default_factory=list)
     required: bool = False
     # A built adapter, instead of ``type`` (code only).
     adapter: Any = None
