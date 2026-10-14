@@ -5279,9 +5279,9 @@ now, and a provider only once its key is saved. See
 <p>The playground's <strong>Pipeline</strong> page reads the same configuration back: it lists
 every step of a run and, for each of the six a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
-asked. It is served by <code>GET /api/pipeline</code> from <code>nl2sql.pipeline.steps</code>, which
-takes its six model steps from <code>LLM_AGENTS</code> rather than repeating the table
-above. See <a href="../../getting_started/demo/#the-pipeline-page">the Pipeline page</a>.</p>
+asked. It is served by <code>GET /api/pipeline</code> from <code>engine.about()</code>, whose steps
+(<code>nl2sql.pipeline.steps</code>) take their six model steps from <code>LLM_AGENTS</code> rather
+than repeating the table above. See <a href="../../getting_started/demo/#the-pipeline-page">the Pipeline page</a>.</p>
 <p>On the <strong>hosted demo</strong> (<code>nl2sql demo --hosted</code>) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model
 per step in their own browser tab, and both travel with each question: a key

@@ -4816,13 +4816,57 @@ settled these details:</p>
   <code>DatasourceInfo</code> and <code>DELETE</code> removes.</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: the playground off the engine's internals (PR 10b)</p>
+<p><code>engine.feedback</code>, <code>engine.traces.get</code>, <code>engine.about()</code>,
+<code>engine.llm.providers()</code> and <code>engine.index.inspect_defaults()</code> are built,
+and the playground, <code>nl2sql demo</code> and <code>nl2sql feedback</code> use them. Building
+it settled these details:</p>
+<ul>
+<li><strong><code>feedback.record(result, *, question, role, rating, note=None)</code></strong>
+  takes the run's <code>QueryResult</code> (or its JSON) and builds the stored row
+  from it and from the run's trace, so <code>run_record</code> moved behind the
+  facade too: the playground remembers the part of each answered result a
+  rating reads (no rows) and hands it over when the page rates the run.
+  <code>list(limit=None)</code>, <code>stats(*, traces=None)</code>, <code>export(path)</code> (refuses the
+  gold set's path with <code>ValueError</code>, returns <code>{"written", "skipped"}</code>) and
+  <code>clear()</code> complete it. <code>nl2sql feedback</code> builds the engine without
+  <code>check()</code>; the state store the engine opens holds the table, so the
+  commands no longer avoid creating <code>state.db</code>.</li>
+<li><strong><code>traces.get(trace_id)</code></strong> returns the document or <code>None</code>, and raises
+  <code>ValueError</code> for an id that is not a plain token; the playground's
+  <code>build_app</code> lost its <code>trace_dir</code> argument.</li>
+<li><strong><code>about()</code></strong> is <code>engine_info()</code> (<code>version</code>, <code>git_sha</code>, <code>python</code>) plus
+  <code>steps</code>, <code>describe_pipeline</code> over <code>llm.list()</code>. <strong><code>llm.providers()</code></strong>
+  lists what the engine's registry can load: <code>name</code>, <code>label</code>,
+  <code>key_variable</code>, <code>key_present</code>. <strong><code>index.inspect_defaults()</code></strong> is <code>k</code>,
+  <code>lambda_mult</code>, <code>fetch_multiplier</code> and the entry <code>types</code>: the "retrieval
+  inspector's defaults" the playground read from <code>VectorStore</code>.</li>
+<li>Every new method returns plain dicts, so the export list is unchanged.</li>
+<li><strong>The stricter boundary test</strong> is
+  <code>test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2sql</code>:
+  <code>nl2sql_api</code> imports the top-level <code>nl2sql</code> only; the playground and
+  <code>cli/commands/demo.py</code> import the top-level <code>nl2sql</code>, their own CLI
+  package, and <code>STILL_IMPORTED_FROM_INSIDE</code>, a named list that only
+  shrinks: <code>nl2sql.common.settings</code> (until PR 13), <code>nl2sql.llm.providers</code>
+  (the provider catalogue the CLI reads, per CLAUDE.md),
+  <code>nl2sql.llm.request_key</code> (<code>use_request_llms</code>, until Phase 4), and
+  <code>nl2sql demo</code>'s replay machinery, questions and <code>init_project</code>
+  (<code>nl2sql.llm.replay</code>, <code>nl2sql.testing.fake_llm</code>, <code>nl2sql.datasets.demo</code>,
+  <code>nl2sql.config</code>). <code>nl2sql.feedback</code>, <code>nl2sql.tracing</code>,
+  <code>nl2sql.pipeline</code>, <code>nl2sql.indexing</code> and <code>PROVIDER_PRESETS</code> are out.</li>
+<li>Left for PR 13: the playground still reads <code>settings.feedback_enabled</code>
+  from the global, and the settings panel and <code>nl2sql demo</code> still write a
+  key into <code>os.environ</code>.</li>
+</ul>
+</div>
 <h3 id="the-new-shape">The new shape</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-23-1" id="__codelineno-23-1" name="__codelineno-23-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <a href="#__codelineno-23-2" id="__codelineno-23-2" name="__codelineno-23-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">datasource_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">execute</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cancellation_token</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <a href="#__codelineno-23-3" id="__codelineno-23-3" name="__codelineno-23-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">close</span><span class="p">();</span> <span class="n">engine</span><span class="o">.</span><span class="n">config</span><span class="p">;</span> <span class="n">engine</span><span class="o">.</span><span class="n">about</span><span class="p">()</span>
 <a href="#__codelineno-23-4" id="__codelineno-23-4" name="__codelineno-23-4"></a>
 <a href="#__codelineno-23-5" id="__codelineno-23-5" name="__codelineno-23-5"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span>   <span class="c1"># list, get, add, remove, schema, test</span>
-<a href="#__codelineno-23-6" id="__codelineno-23-6" name="__codelineno-23-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span>         <span class="c1"># build, health, clear, inspect</span>
+<a href="#__codelineno-23-6" id="__codelineno-23-6" name="__codelineno-23-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span>         <span class="c1"># build, health, clear, inspect, inspect_defaults</span>
 <a href="#__codelineno-23-7" id="__codelineno-23-7" name="__codelineno-23-7"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span>           <span class="c1"># list, get, providers, replace</span>
 <a href="#__codelineno-23-8" id="__codelineno-23-8" name="__codelineno-23-8"></a><span class="n">engine</span><span class="o">.</span><span class="n">policies</span>      <span class="c1"># roles, allows, allowed, validate</span>
 <a href="#__codelineno-23-9" id="__codelineno-23-9" name="__codelineno-23-9"></a><span class="n">engine</span><span class="o">.</span><span class="n">curated</span>       <span class="c1"># validate, test</span>

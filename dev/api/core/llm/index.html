@@ -3761,6 +3761,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmproviders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.providers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4679,6 +4690,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmproviders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.providers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4791,6 +4813,17 @@ its class as <code>model</code> and no provider. Never a key.</p>
 <code>get(agent: str) -&gt; dict</code></p>
 <p>One agent's entry from <code>list()</code>. Raises <code>ValueError</code> for a name that is not an
 agent, listing the agents.</p>
+<h3 id="llmproviders">llm.providers</h3>
+<p>Signature:
+<code>providers() -&gt; list[dict]</code></p>
+<p>Each LLM provider this engine can use: the built-ins whose client library is
+installed, and any a plugin or <code>Registry.add_llm</code> registered. Each has <code>name</code>,
+<code>label</code>, <code>key_variable</code> (the environment variable it reads its key from;
+<code>None</code> for one that needs no key, such as <code>ollama</code>) and <code>key_present</code> (whether
+that variable is set). Never the key.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">providers</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False}</span>
+</code></pre></div>
 <h3 id="llmreplace">llm.replace</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/llm_api.py</code> (<code>Runtime.replace_llm</code> in

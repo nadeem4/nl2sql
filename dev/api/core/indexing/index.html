@@ -3788,6 +3788,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#indexinspect_defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.inspect_defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4656,6 +4667,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#indexinspect_defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.inspect_defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4697,7 +4719,8 @@ report its health, clear it, and inspect one search of it.</p>
 <ul>
 <li>Build the index for some or every datasource, beside the live entries.</li>
 <li>Report each datasource's progress as it goes, for a console or a job.</li>
-<li>Report the index's health, clear it, and run one inspected search.</li>
+<li>Report the index's health, clear it, and run one inspected search (and say
+  what that search uses by default).</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
@@ -4822,6 +4845,15 @@ refresh an index, build it instead, which never leaves it empty.</p>
 with scores, the picks in order and what was dropped. <code>types</code> limits the
 entry types (<code>schema.table</code>, ...). It reads index metadata only and needs no
 LLM. Raises <code>LookupError</code> when no vector store is configured.</p>
+<h3 id="indexinspect_defaults">index.inspect_defaults</h3>
+<p>Signature:
+<code>inspect_defaults() -&gt; dict</code></p>
+<p>What <code>inspect</code> searches with when not told otherwise, which is what the
+pipeline's own retrieval uses: <code>k</code> (8 picks), <code>lambda_mult</code> (1 is relevance
+only, 0 is difference only), <code>fetch_multiplier</code> (the candidate pool is <code>k</code>
+times it) and <code>types</code>, every entry type the index holds
+(<code>schema.datasource</code>, <code>schema.table</code>, <code>schema.column</code>, <code>schema.relationship</code>,
+<code>schema.metric</code>). The playground's Retrieval inspector starts from it.</p>
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
 <li>Fetch schema via adapter.</li>

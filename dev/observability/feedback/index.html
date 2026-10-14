@@ -4611,6 +4611,9 @@ small signals help: a person's rating of an answer in the playground, and the
 guardrail rates the engine already records for every run. <code>nl2sql feedback</code>
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
 set, and thumbs-up generated answers as proposed verified queries.</p>
+<p>The playground and <code>nl2sql feedback</code> are both built on <code>engine.feedback</code>
+(<code>record</code>, <code>list</code>, <code>stats</code>, <code>export</code>, <code>clear</code>), which any Python caller can use
+too: see <a href="../../api/core/public-facade/#feedback">the public facade</a>.</p>
 <h2 id="rating-an-answer-in-the-playground">Rating an answer in the playground</h2>
 <p>After a run, below <strong>Cost &amp; time</strong>, the playground asks <strong>Was this answer
 right?</strong> with two buttons, <strong>👍 Right</strong> and <strong>👎 Wrong</strong>. A click saves the
