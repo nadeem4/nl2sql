@@ -4699,10 +4699,12 @@
 </div>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>sqlite</code></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">connection</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"sqlite"</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="s">"./my_data.db"</span><span class="w"> </span><span class="c1"># Absolute or relative path</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># datasources/my_data.yaml</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sqlite</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">connection</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_data.db</span><span class="w"> </span><span class="c1"># Absolute or relative path</span>
 </code></pre></div>
+<p><code>database</code> is the only key (<code>SqliteConnection</code>); any other is an error.</p>
 <p>A relative <code>database</code> is read from the folder of <code>nl2sql.yaml</code> when the config
 was loaded from a file (so <code>nl2sql init --demo</code> can write <code>data/chinook.sqlite</code>),
 and from the working directory when it was built in code. The DuckDB adapter
@@ -4714,7 +4716,10 @@ does the same.</p>
 <h3 id="connection-details">Connection Details</h3>
 <ul>
 <li><strong>Driver</strong>: Built-in <code>sqlite3</code>.</li>
-<li><strong>URI Constructed</strong>: <code>sqlite:///{database}</code></li>
+<li><strong>URI Constructed</strong>: <code>sqlite:///file:{database}?mode=ro&amp;uri=true</code>. The file is
+  always opened read-only: the driver refuses every write before any SQL is
+  parsed, and a file that does not exist is an error rather than a new, empty
+  database. There is no setting to turn it off; the engine never writes.</li>
 </ul>
 <h2 id="features">Features</h2>
 <table>

@@ -1812,10 +1812,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
         Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index
       
     </span>
   </a>
@@ -4607,10 +4629,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#limits" class="md-nav__link">
     <span class="md-ellipsis">
       
         Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Index
       
     </span>
   </a>
@@ -4684,12 +4728,14 @@ datasource, so each team can own its own database's file:</p>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nl2sql</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:SALES_DB_PASSWORD}"</span>
 <a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nt">limits</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> row_limit</span><span class="p">:</span><span class="w"> </span><span class="nv">1000</span><span class="p p-Indicator">,</span><span class="nt"> timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="nv">8000</span><span class="p p-Indicator">,</span><span class="nt"> max_bytes</span><span class="p">:</span><span class="w"> </span><span class="nv">10485760</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nt">preferred_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">public.revenue_daily</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">v_monthly_sales</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">revenue</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customers</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">orders</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="nt">sample_questions</span><span class="p">:</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What was revenue by region last quarter?</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Which customers placed the most orders this year?</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="nt">index</span><span class="p">:</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">exclude_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*.*_audit"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="nt">preferred_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">public.revenue_daily</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">v_monthly_sales</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">revenue</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customers</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">orders</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="nt">sample_questions</span><span class="p">:</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What was revenue by region last quarter?</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Which customers placed the most orders this year?</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>The section can also be a file holding the list
 (<code>datasources: {file: datasources.yaml}</code>), or the list written inline in
@@ -4722,12 +4768,17 @@ datasource, so each team can own its own database's file:</p>
 <tr>
 <td><code>connection</code></td>
 <td><code>{}</code></td>
-<td>The adapter's own connection settings (host, port, database, driver, <code>options</code>, ...), validated by the adapter. Every value may be a <code>${provider:key}</code> reference and keeps it until the adapter is built. A relative SQLite or DuckDB <code>database</code> is relative to <code>nl2sql.yaml</code>.</td>
+<td>The adapter's connection settings, validated against its connection model; see <a href="#connection">Connection</a>. Every value may be a <code>${provider:key}</code> reference and keeps it until the adapter is built. A relative SQLite or DuckDB <code>database</code> is relative to <code>nl2sql.yaml</code>.</td>
 </tr>
 <tr>
 <td><code>limits</code></td>
 <td>none</td>
 <td><code>row_limit</code>, <code>timeout_ms</code>, <code>max_bytes</code>; see <a href="#limits">Limits</a>.</td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td>everything</td>
+<td>What of the database is indexed; see <a href="#index">Index</a>.</td>
 </tr>
 <tr>
 <td><code>preferred_tables</code></td>
@@ -4753,16 +4804,61 @@ datasource, so each team can own its own database's file:</p>
 </table>
 <p>In Python, <code>Datasource(id=..., adapter=MyAdapter(...))</code> passes a built adapter
 object instead of <code>type</code>.</p>
+<h2 id="connection">Connection</h2>
+<p>Each adapter declares its <code>connection</code> keys in a connection model, and the
+keys are strict: a key the model does not have is an error when the engine is
+built, with the field it was probably meant to be.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>datasources[0].connection: connection.hostname: unknown key 'hostname'. Did you mean 'host'?
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Adapter</th>
+<th>Keys</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sqlite</code></td>
+<td><code>database</code> (the file)</td>
+</tr>
+<tr>
+<td><code>duckdb</code></td>
+<td><code>database</code> (the file, or <code>:memory:</code>)</td>
+</tr>
+<tr>
+<td><code>postgres</code></td>
+<td><code>host</code>, <code>port</code> (5432), <code>database</code>, <code>user</code>, <code>password</code>, <code>sslmode</code> (<code>disable</code>, <code>prefer</code> (default), <code>require</code>, <code>verify-full</code>)</td>
+</tr>
+<tr>
+<td><code>mysql</code></td>
+<td><code>host</code>, <code>port</code> (3306), <code>database</code>, <code>user</code>, <code>password</code></td>
+</tr>
+<tr>
+<td><code>mssql</code></td>
+<td><code>host</code>, <code>port</code> (1433), <code>database</code>, <code>user</code>, <code>password</code>, <code>driver</code> (<code>ODBC Driver 17 for SQL Server</code>), <code>trusted_connection</code> (false), <code>trust_server_certificate</code> (false)</td>
+</tr>
+</tbody>
+</table>
+<p>In Python, <code>connection</code> may also be the adapter's model, used as given:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.adapters.postgres.adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">PostgresConnection</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"postgres"</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>           <span class="n">connection</span><span class="o">=</span><span class="n">PostgresConnection</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">"db.internal"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s2">"nl2sql"</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                                         <span class="n">password</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">"SALES_DB_PASSWORD"</span><span class="p">]))</span>
+</code></pre></div>
+<p>The model's JSON Schema (<code>PostgresConnection.model_json_schema()</code>) describes
+the form for connecting that database; a password is <code>"format": "password"</code>.</p>
 <h2 id="limits">Limits</h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">limits</span><span class="p">:</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span><span class="w">       </span><span class="c1"># the most rows one sub-query returns</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span><span class="w">      </span><span class="c1"># the longest one statement may run</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">limits</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span><span class="w">       </span><span class="c1"># the most rows one sub-query returns</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8000</span><span class="w">      </span><span class="c1"># the longest one statement may run</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">max_bytes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10485760</span>
 </code></pre></div>
 <ul>
 <li><code>timeout_ms</code>: Postgres, MySQL, SQL Server and DuckDB enforce it (SQL Server
   rounds up to whole seconds); SQLite does not, and uses it only as its
-  lock-wait timeout. See each <a href="../../adapters/">adapter page</a> for how.</li>
+  lock-wait timeout. A SQLite file is always opened read-only. See each <a href="../../adapters/">adapter page</a> for how.</li>
 <li><code>row_limit</code>: unset, it is <code>settings.results.row_limit</code> (100,000); set higher,
   <code>settings.results.row_limit</code> still bounds it. A result that reaches it is
   flagged as truncated and the answer says so. It is applied before results
@@ -4773,6 +4869,69 @@ object instead of <code>type</code>.</p>
 </ul>
 <p>There is one place for each limit: the 0.4 <code>options:</code> bag and the top-level
 spellings are gone.</p>
+<h2 id="index">Index</h2>
+<p><code>index</code> says what of the database is indexed. Every key is optional, and an
+unknown key is an error.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">index</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">include_schemas</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">public</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">reporting</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">exclude_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*.*_audit"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"public.tmp_*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">exclude_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"public.customers.email"</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>include_schemas</code></td>
+<td>every schema but the database's system schemas</td>
+<td>Schema globs</td>
+</tr>
+<tr>
+<td><code>exclude_schemas</code></td>
+<td>none</td>
+<td>Schema globs, applied after include</td>
+</tr>
+<tr>
+<td><code>include_tables</code>, <code>exclude_tables</code></td>
+<td>all, none</td>
+<td><code>schema.table</code> globs; a pattern with no schema is an error with the fix (<code>'*.tmp_*'</code>)</td>
+</tr>
+<tr>
+<td><code>exclude_columns</code></td>
+<td>none</td>
+<td><code>schema.table.column</code> globs: the column is neither indexed nor profiled. This is not access control: use <a href="../policies/">policies</a>.</td>
+</tr>
+<tr>
+<td><code>profile</code></td>
+<td><code>stats</code></td>
+<td><code>catalog</code> or <code>stats</code></td>
+</tr>
+<tr>
+<td><code>sample_values</code></td>
+<td><code>false</code></td>
+<td>Whether text columns' values are stored in the index</td>
+</tr>
+<tr>
+<td><code>max_profile_rows</code></td>
+<td>1,000,000</td>
+<td>A table estimated above this is profiled from the catalog only</td>
+</tr>
+</tbody>
+</table>
+<p>Every glob ignores case, and an exclude wins over an include. A SQLite
+database has one schema, <code>main</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built so far</p>
+<p>The schema, table and column rules are applied. <code>profile</code>,
+<code>sample_values</code> and <code>max_profile_rows</code> are validated, and take effect with
+the profiling rework later in 0.6; until then every column is profiled
+and text values are kept, as in 0.5.</p>
+</div>
 <h2 id="preferred-tables">Preferred tables</h2>
 <p>The package never creates a view. The data team creates it in the database,
 lists it under <code>preferred_tables</code>, and runs <code>nl2sql index</code>; every built-in
@@ -4824,7 +4983,7 @@ datasource as <code>UNAVAILABLE</code>.</p>
 <ul>
 <li>Use <code>${env:VAR}</code> for environment variables, or <code>${provider:key}</code> for a secret
   from a provider in the <a href="../secrets/"><code>secrets</code> section</a>.</li>
-<li>Adapter-specific fields under <code>connection</code> are passed through to the adapter.</li>
+<li>The keys under <code>connection</code> are the adapter's; see <a href="#connection">Connection</a>.</li>
 <li>From Python, <code>engine.datasources.add(Datasource(...))</code> adds one to a running
   engine (built, not connected), and <code>engine.datasources.remove(id)</code> takes one
   out; <code>nl2sql-api</code>'s <code>POST /api/v1/datasource</code> takes

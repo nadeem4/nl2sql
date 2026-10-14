@@ -2255,10 +2255,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#construct_uriargs-dictstr-any-str" class="md-nav__link">
+  <a href="#urlconnection-url-str" class="md-nav__link">
     <span class="md-ellipsis">
       
-        construct_uri(args: Dict[str, Any]) -&gt; str
+        url(connection) -&gt; URL | str
       
     </span>
   </a>
@@ -2283,10 +2283,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#connect" class="md-nav__link">
+  <a href="#build_engine-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        connect()
+        build_engine() -&gt; Engine
       
     </span>
   </a>
@@ -4770,10 +4770,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#construct_uriargs-dictstr-any-str" class="md-nav__link">
+  <a href="#urlconnection-url-str" class="md-nav__link">
     <span class="md-ellipsis">
       
-        construct_uri(args: Dict[str, Any]) -&gt; str
+        url(connection) -&gt; URL | str
       
     </span>
   </a>
@@ -4798,10 +4798,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#connect" class="md-nav__link">
+  <a href="#build_engine-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        connect()
+        build_engine() -&gt; Engine
       
     </span>
   </a>
@@ -4934,12 +4934,13 @@
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Default Schema</strong></td>
-<td style="text-align: left;"><code>default_schema</code> reports the schema an unqualified table resolves to (<code>inspect(engine).default_schema_name</code>); RBAC reads a two-part <code>datasource.table</code> policy entry as that table in this schema.</td>
+<td style="text-align: left;"><code>default_schema()</code> reports the schema an unqualified table resolves to (<code>inspect(engine).default_schema_name</code>); RBAC reads a two-part <code>datasource.table</code> policy entry as that table in this schema.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="column-statistics">Column statistics</h3>
-<p><code>fetch_schema_snapshot()</code> profiles every column of every table and view on one
+<p><code>fetch_schema_snapshot(scope)</code> profiles every column of every table and view
+the datasource's <a href="../../configuration/datasources/#index"><code>index</code> scope</a> wants, on one
 connection, one column at a time, so one column the database cannot profile
 does not fail the datasource's index:</p>
 <ul>
@@ -4965,35 +4966,35 @@ does not fail the datasource's index:</p>
   skipped <code>MIN</code>/<code>MAX</code> by type; a table that only skipped by type logs at debug.</li>
 </ul>
 <h3 id="required-class-attributes">Required class attributes</h3>
-<p><code>interface_version = 1</code>, <code>driver_modules</code> (the DBAPI driver your URL names,
-for example <code>("psycopg2",)</code>) and <code>install_hint</code>. See
+<p><code>title</code>, <code>connection_model</code> (a <code>ConnectionModel</code> subclass), <code>driver_modules</code>
+(the DBAPI driver your URL names, for example <code>("psycopg2",)</code>) and
+<code>install_hint</code>. The base class sets <code>interface_version = 2</code>. See
 <a href="../sdk/#class-attributes">Class attributes</a>.</p>
 <h3 id="required-overrides">Required Overrides</h3>
-<h4 id="construct_uriargs-dictstr-any-str"><code>construct_uri(args: Dict[str, Any]) -&gt; str</code></h4>
-<p>Converts a configuration dictionary into a SQLAlchemy connection string.</p>
-<ul>
-<li><strong>Args</strong>: <code>args</code> - The <code>connection</code> dictionary from <code>datasources.yaml</code>.</li>
-<li><strong>Returns</strong>: A valid URL (e.g., <code>postgresql://...</code>).</li>
-</ul>
+<h4 id="urlconnection-url-str"><code>url(connection) -&gt; URL | str</code></h4>
+<p>Turns the validated <code>connection_model</code> instance into a SQLAlchemy URL. Build it
+with <code>sqlalchemy.URL.create</code>, so a password holding <code>@ : / # %</code> is escaped.</p>
 <h3 id="optional-overrides">Optional Overrides</h3>
-<h4 id="connect"><code>connect()</code></h4>
-<p>Override to provide custom connection arguments (e.g., timeouts, isolation levels).</p>
-<p>The base class keeps <code>statement_timeout_ms</code> but does not enforce it: SQLAlchemy has
+<h4 id="build_engine-engine"><code>build_engine() -&gt; Engine</code></h4>
+<p>Creates the SQLAlchemy engine from <code>url(connection)</code>, on first use: building
+the adapter creates none. Override it to pass driver settings (timeouts,
+isolation levels).</p>
+<p>The base class keeps <code>limits.timeout_ms</code> but does not enforce it: SQLAlchemy has
 no generic statement timeout and silently ignores an <code>execution_options["timeout"]</code>.
-Each adapter enforces it in <code>connect()</code> the way its driver allows: Postgres with
+Each adapter enforces it in <code>build_engine()</code> the way its driver allows: Postgres with
 <code>statement_timeout</code>, MySQL with <code>MAX_EXECUTION_TIME</code>, SQL Server with pyodbc's
 query timeout, DuckDB by interrupting the connection. An adapter that does nothing
 here has no statement timeout.</p>
 <h4 id="close"><code>close()</code></h4>
-<p>Disposes the connection pool. The engine calls an adapter's <code>close()</code>, when it
-has one, once, from <code>engine.close()</code>. Building an adapter never connects:
-<code>create_engine</code> opens no connection until the first query or <code>test_connection()</code>.</p>
+<p>Disposes the connection pool, if one was made. The engine calls an adapter's
+<code>close()</code> once, from <code>engine.close()</code>. Building an adapter never connects: the
+engine (and the driver import) is made on the first query or <code>test_connection()</code>.</p>
 <h4 id="local_pathpath-str"><code>local_path(path) -&gt; str</code></h4>
-<p>For a file-based database. The engine passes each adapter <code>base_dir</code>, the
+<p>For a file-based database. The engine passes each adapter <code>folder</code>, the
 folder of the <code>nl2sql.yaml</code> the datasource came from (None when the config was
 built in code). <code>local_path</code> reads a relative path from there, and leaves an
 absolute path and <code>:memory:</code> as they are. The SQLite and DuckDB adapters call it
-in <code>construct_uri</code>.</p>
+in <code>url</code>.</p>
 <h4 id="get_dialect-str"><code>get_dialect() -&gt; str</code></h4>
 <p>Returns the <strong>sqlglot</strong> dialect name the engine renders SQL in: <code>postgres</code>,
 <code>tsql</code>, <code>mysql</code>, <code>duckdb</code>, <code>sqlite</code>, or any other name

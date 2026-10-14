@@ -2288,7 +2288,7 @@
 <h2 id="execution-artifacts-and-aggregation">Execution, artifacts, and aggregation</h2>
 <p>Executors produce <code>ResultFrame</code> objects, which are persisted via <code>ArtifactStore</code> and referenced by <code>ArtifactRef</code>. Aggregation reads artifacts and applies the logical DAG.</p>
 <pre class="mermaid"><code>sequenceDiagram
-    participant Adapter as DatasourceAdapterProtocol
+    participant Adapter as DatasourceAdapter
     participant Exec as SqlExecutorService
     participant Store as ArtifactStore
     participant Agg as AggregationService

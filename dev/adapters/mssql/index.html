@@ -4718,20 +4718,25 @@
 <p>This adapter extends <code>BaseSQLAlchemyAdapter</code> but provides specialized <code>dry_run</code> logic using <code>SET NOEXEC ON</code> to safely validate T-SQL.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>mssql</code></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">connection</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"mssql"</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"localhost"</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1433</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"sa"</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:DB_PASS}"</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="s">"my_db"</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="s">"ODBC</span><span class="nv"> </span><span class="s">Driver</span><span class="nv"> </span><span class="s">17</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">SQL</span><span class="nv"> </span><span class="s">Server"</span><span class="w"> </span><span class="c1"># Default</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">trusted_connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># datasources/my_db.yaml</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mssql</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">connection</span><span class="p">:</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">localhost</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1433</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sa</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:DB_PASS}"</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_db</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="s">"ODBC</span><span class="nv"> </span><span class="s">Driver</span><span class="nv"> </span><span class="s">17</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">SQL</span><span class="nv"> </span><span class="s">Server"</span><span class="w"> </span><span class="c1"># Default</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">trusted_connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">               </span><span class="c1"># true: log in as the account the engine runs under</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">trust_server_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">         </span><span class="c1"># true: accept a self-signed certificate (ODBC Driver 18 encrypts by default)</span>
 </code></pre></div>
+<p>The keys are <code>MssqlConnection</code>'s (<code>nl2sql.adapters.mssql.adapter</code>), and any
+other key is an error; see <a href="../../configuration/datasources/#connection">Connection</a>.</p>
 <h3 id="connection-details">Connection Details</h3>
 <ul>
 <li><strong>Driver</strong>: <code>pyodbc</code>. <strong>Requires system ODBC headers installed.</strong></li>
-<li><strong>URI Constructed</strong>: <code>mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}</code>.
+<li><strong>URI Constructed</strong>: <code>mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}</code>, plus
+  <code>Trusted_Connection=yes</code> and <code>TrustServerCertificate=yes</code> when set.
   Built with SQLAlchemy's <code>URL.create</code>, so the user name and password are
   percent-escaped: a password containing <code>@ : / # %</code> works as written.</li>
 </ul>
@@ -4765,7 +4770,7 @@
 <h3 id="statement-timeout">Statement Timeout</h3>
 <p>SQL Server has no session setting for a statement timeout, so the adapter sets
 pyodbc's query timeout (<code>Connection.timeout</code>) on every new pooled connection.
-pyodbc counts whole seconds, so <code>statement_timeout_ms</code> is rounded <strong>up</strong>:
+pyodbc counts whole seconds, so <code>limits.timeout_ms</code> is rounded <strong>up</strong>:
 <code>1500</code> becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
 limit passes, the driver cancels the query and the adapter reports it as a refusal
 (<code>QUERY_REFUSED</code>), which the engine does not retry.</p>

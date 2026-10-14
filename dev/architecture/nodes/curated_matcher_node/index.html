@@ -2300,7 +2300,7 @@
 <li>Values: an unknown name, a name twice, a value that does not parse or is out of bounds: <code>param_invalid</code>; a param with no default left out or empty: <code>param_missing</code>. A param left out takes its default.</li>
 <li>Tables: any table the SQL reads not allowed for the role: <code>policy_denied</code>. The normal pipeline then enforces the policy as always; the user is not told a verified query exists.</li>
 <li>Capability: a query with params on an adapter without <code>SUPPORTS_BOUND_PARAMETERS</code>: <code>capability_missing</code>.</li>
-<li>Run with the values bound and <code>max_rows</code> set to <code>min(adapter.row_limit or row_limit, row_limit)</code> (<code>row_limit</code> is <code>settings.results.row_limit</code>). Failed or no result: <code>execution_failed</code>, with a warning.</li>
+<li>Run with the values bound and <code>max_rows</code> set to <code>min(limits.row_limit or row_limit, row_limit)</code> (<code>limits</code> is the datasource's, <code>row_limit</code> is <code>settings.results.row_limit</code>). Failed or no result: <code>execution_failed</code>, with a warning.</li>
 <li>Fill the state and route to <code>layer_router</code>.</li>
 </ol>
 <h3 id="the-choice-prompt">The choice prompt</h3>

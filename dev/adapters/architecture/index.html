@@ -2093,15 +2093,21 @@
     Registry --&gt; Lookup["Registry.load('adapter', type)"]
     Lookup --&gt; EntryPoints["nl2sql.adapters entry points, or a class registered in code"]
     EntryPoints --&gt; AdapterClass[Adapter Class]
-    AdapterClass --&gt; AdapterInstance[DatasourceAdapterProtocol instance]</code></pre>
+    AdapterClass --&gt; Validate["connection validated against connection_model"]
+    Validate --&gt; AdapterInstance["adapter_cls(id, connection, limits, folder=...)"]</code></pre>
 <h2 id="core-adapter-contract">Core adapter contract</h2>
 <pre class="mermaid"><code>classDiagram
-    class DatasourceAdapterProtocol {
+    class DatasourceAdapter {
+        +interface_version 2
+        +title
+        +connection_model
         +capabilities() Set
-        +connect()
-        +fetch_schema_snapshot()
-        +execute(AdapterRequest) ResultFrame
         +get_dialect() str
+        +default_schema() str
+        +test_connection() ConnectionCheck
+        +fetch_schema_snapshot(IndexScope) SchemaSnapshot
+        +execute(AdapterRequest) ResultFrame
+        +close()
     }
     class AdapterRequest {
         +plan_type
@@ -2117,13 +2123,13 @@
     }</code></pre>
 <p>See <code>sdk.md</code> for the authoritative adapter interface reference and required fields/methods.</p>
 <h2 id="capability-driven-routing">Capability-driven routing</h2>
-<p>Adapters expose capabilities (<code>supports_sql</code>, <code>supports_rest</code>). The registry reads them once, at registration, and <code>DatasourceRegistry.supports(datasource_id, *capabilities)</code> is the one check every consumer asks. It fails closed: an unknown datasource, or an adapter whose <code>capabilities()</code> is missing or raises, supports nothing. These capabilities drive:</p>
+<p>Adapters expose capabilities (<code>supports_sql</code>, <code>supports_bound_parameters</code>, <code>enforces_read_only</code>, <code>enforces_timeout</code>). The registry reads them once, at registration, and <code>DatasourceRegistry.supports(datasource_id, *capabilities)</code> is the one check every consumer asks. It fails closed: an unknown datasource, or an adapter whose <code>capabilities()</code> is missing or raises, supports nothing. These capabilities drive:</p>
 <ul>
 <li><strong>Subgraph selection</strong> (<code>resolve_subgraph()</code> in routing).</li>
 <li><strong>Executor selection</strong> (<code>ExecutorNode._supports_sql()</code> and <code>SqlExecutorService.validate_request()</code>, gating the SQL executor).</li>
 </ul>
 <pre class="mermaid"><code>flowchart TD
-    Adapter[DatasourceAdapterProtocol] --&gt; Caps["capabilities(), read once"]
+    Adapter[DatasourceAdapter] --&gt; Caps["capabilities(), read once"]
     Caps --&gt; Check["DatasourceRegistry.supports() (fails closed)"]
     Check --&gt; Exec[ExecutorNode capability gate]
     Check --&gt; Subgraph[resolve_subgraph()]
@@ -2134,7 +2140,7 @@
 <h2 id="extensibility-model">Extensibility model</h2>
 <p>To add a new adapter:</p>
 <ol>
-<li>Implement <code>DatasourceAdapterProtocol</code> (or extend a base adapter).</li>
+<li>Implement <code>DatasourceAdapter</code> (or extend a base adapter), with a <code>connection_model</code>.</li>
 <li>Publish the adapter class as an <code>nl2sql.adapters</code> entry point, or register it in code (see <a href="../../extensions/add-adapter/">Adding a New Adapter</a>).</li>
 <li>Configure the datasource in the <code>datasources</code> section of <code>nl2sql.yaml</code>, with <code>type:</code> set to the adapter's name.</li>
 </ol>

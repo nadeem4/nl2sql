@@ -2160,7 +2160,7 @@
 <li><strong>Chunking + Retrieval</strong>: <code>SchemaChunkBuilder</code> produces typed chunks; the <code>Retriever</code> provides staged retrieval for routing and planning context, over the index store's live builds.</li>
 <li><strong>Validation layer</strong>: <code>LogicalValidatorNode</code> enforces schema correctness and RBAC.</li>
 <li><strong>Execution layer</strong>: <code>ExecutorNode</code> routes to capability-driven executor services (e.g., SQL executor).</li>
-<li><strong>Adapter / Plugin backend</strong>: adapters implement <code>DatasourceAdapterProtocol</code> and are discovered via entry points.</li>
+<li><strong>Adapter / Plugin backend</strong>: adapters implement <code>DatasourceAdapter</code> and are discovered via entry points.</li>
 <li><strong>Artifact store</strong>: executor results are persisted as Parquet artifacts and referenced by <code>ArtifactRef</code>.</li>
 <li><strong>Observability</strong>: structured logs, OpenTelemetry metrics, and audit events.</li>
 </ul>

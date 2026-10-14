@@ -2599,9 +2599,8 @@ any of the three databases (the rail's <strong>Showing</strong> switcher), which
 answered a run, the per-node <strong>Debug</strong> drill-down with its traces, and the
 retrieval inspector read-only.</p>
 <h2 id="read-only-sample-data">Read-only sample data</h2>
-<p>The demo's three SQLite databases are configured with <code>read_only: true</code> under
-their connection options, which opens them through SQLite's own URI form with
-<code>mode=ro</code>. The driver refuses a write before any SQL is parsed, under the RBAC
+<p>The SQLite adapter opens every database file through SQLite's own URI form
+with <code>mode=ro</code>, so the demo's three databases are read-only with no setting. The driver refuses a write before any SQL is parsed, under the RBAC
 policy and the validator rather than instead of them. This is not specific to
 hosted mode: nothing in the engine writes to a demo database, so they are opened
 read-only everywhere.</p>

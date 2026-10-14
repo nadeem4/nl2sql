@@ -4774,6 +4774,20 @@ that names a hidden table anyway is still refused by the validator. With
 <h2 id="7-adapter-sdk-v2-wave-b">7. Adapter SDK v2 (Wave B)</h2>
 <p>Wave B is built on the test bed. Every behaviour below that touches a
 database has a <code>realdb</code> test.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: B1, the contract</p>
+<p><code>ConnectionModel</code>, <code>Limits</code>, <code>IndexScope</code>, <code>ConnectionCheck</code>,
+<code>IndexIssue</code>, the two enforcement capabilities and <code>DatasourceAdapter</code>
+version 2 are in <code>nl2sql_sdk</code>; the five built-ins declare public, strict
+connection models (B18) and build their engine on first use; a
+datasource has <code>index:</code>; the engine validates <code>connection</code> against the
+adapter's model. Filled in on the way: the SQLAlchemy base already
+applies <code>IndexScope</code>'s schema, table and column rules, SQLite is already
+always <code>mode=ro</code> (its <code>options</code> bag went with strict keys), and
+<code>test_connection</code> returns a <code>ConnectionCheck</code> with the driver's message
+and no stage yet (B3 classifies). The pool settings, <code>profile</code>,
+<code>sample_values</code> and <code>max_profile_rows</code> come with B2.</p>
+</div>
 <h3 id="the-contract">The contract</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-15-1" id="__codelineno-15-1" name="__codelineno-15-1"></a><span class="c1"># nl2sql_sdk (core: pydantic and the standard library)</span>
 <a href="#__codelineno-15-2" id="__codelineno-15-2" name="__codelineno-15-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ConnectionModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>

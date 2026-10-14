@@ -2858,13 +2858,13 @@ generated SQL does not need:</p>
   a set operation, or a <code>WITH</code> around one), and no node anywhere in the tree
   is a write or DDL (<code>Insert</code>, <code>Update</code>, <code>Delete</code>, <code>Merge</code>, <code>Create</code>, <code>Drop</code>,
   <code>Alter</code>, <code>Command</code>). This is checked at load and again before running. The
-  datasource's own read-only connection (for SQLite <code>options.read_only</code>) and
+  datasource's own read-only connection (SQLite always opens read-only) and
   database grants stay the backstop, as they are for generated SQL.</li>
 <li><strong>Policies.</strong> Every table read must be allowed for the asker (step 5 above). A
   view is checked by its own name, as policies name it; what the view reads
   underneath is the database's grant to decide.</li>
 <li><strong>Row limit.</strong> The row ceiling is the one the generator uses:
-  <code>min(adapter.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)</code>. Rather than
+  <code>min(limits.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)</code>, from the datasource's <code>limits</code>. Rather than
   rewrite a person's SQL to add a <code>LIMIT</code> (which would mean rendering their
   placeholders back through sqlglot in every dialect), the executor stops
   reading the stream at the ceiling. <code>ExecutorRequest</code> gains <code>max_rows</code>; the
@@ -2877,7 +2877,7 @@ generated SQL does not need:</p>
   paging (<code>engine.results.page</code>) and CSV export (<code>engine.results.csv</code>) work for a
   verified answer as for any other.</li>
 <li><strong>Time.</strong> The run is inside <code>run_with_graph()</code>'s <code>GLOBAL_TIMEOUT_SEC</code> like
-  every node, and the datasource's <code>statement_timeout_ms</code> applies.</li>
+  every node, and the datasource's <code>limits.timeout_ms</code> applies.</li>
 </ul>
 <h2 id="bound-parameters-through-the-adapter">Bound parameters through the adapter</h2>
 <p>The SDK already has a place for them: <code>AdapterRequest.parameters</code>

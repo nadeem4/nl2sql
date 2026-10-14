@@ -4670,7 +4670,7 @@
 <h1 id="adding-a-new-adapter">Adding a New Adapter</h1>
 <p>This guide describes how to add a new datasource adapter and make it available to NL2SQL.</p>
 <h2 id="1-implement-the-adapter-contract">1. Implement the adapter contract</h2>
-<p>All adapters must implement <code>DatasourceAdapterProtocol</code>. See <code>../adapters/sdk.md</code> for the authoritative contract and required fields/methods.</p>
+<p>All adapters implement <code>DatasourceAdapter</code>, version 2, and declare a <code>connection_model</code>. See <code>../adapters/sdk.md</code> for the authoritative contract and required fields/methods.</p>
 <p>If you are building a SQL adapter, extending <code>BaseSQLAlchemyAdapter</code> can provide schema introspection and default SQL execution. See <code>../adapters/sqlalchemy.md</code>.</p>
 <h2 id="2-register-it">2. Register it</h2>
 <p>The engine finds an adapter by its <code>type</code> name in the
@@ -4707,8 +4707,8 @@ message that says how to fix each:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>interface_version</code> is the version this engine needs (1)</td>
-<td><code>nl2sql-snowflake implements adapter interface 0; this engine needs 1.</code></td>
+<td><code>interface_version</code> is the version this engine needs (2)</td>
+<td><code>nl2sql-snowflake implements adapter interface 1; this engine needs 2.</code></td>
 </tr>
 <tr>
 <td>every module in <code>driver_modules</code> is installed (<code>importlib.util.find_spec</code>, without importing it)</td>
@@ -4730,21 +4730,24 @@ its own file in <code>datasources/</code>:</p>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Sales</span><span class="nv"> </span><span class="s">warehouse"</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nt">connection</span><span class="p">:</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:PG_HOST}"</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:PG_USER}"</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:PG_PASSWORD}"</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sales</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:PG_USER}"</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:PG_PASSWORD}"</span>
 </code></pre></div>
 <p>References under <code>connection</code> are resolved by the engine's <code>SecretManager</code>
-when the adapter is built.</p>
+when the adapter is built, and the block is then validated against the
+adapter's <code>connection_model</code>: an unknown key is an error.</p>
 <h2 id="4-validate-capabilities">4. Validate capabilities</h2>
 <p>Ensure <code>capabilities()</code> advertises the correct set for routing and execution:</p>
 <ul>
 <li><code>supports_sql</code> if SQL execution is supported.</li>
-<li><code>supports_rest</code> if REST execution is supported.</li>
 <li><code>supports_bound_parameters</code> if <code>execute</code> (and <code>execute_batches</code>) bind
   <code>AdapterRequest.parameters</code> by name to <code>:name</code> placeholders through the
   driver. Without it, a verified query with parameters is never sent to the
   adapter. Adapters built on <code>BaseSQLAlchemyAdapter</code> inherit both the binding
   and the capability.</li>
+<li><code>enforces_read_only</code> and <code>enforces_timeout</code> only when the session cannot
+  write, and a statement past <code>limits.timeout_ms</code> is stopped, on a real server.</li>
 </ul>
 <h2 id="source-references">Source references</h2>
 <ul>
