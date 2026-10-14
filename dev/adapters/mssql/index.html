@@ -4726,16 +4726,24 @@
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sa</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:DB_PASS}"</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_db</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="s">"ODBC</span><span class="nv"> </span><span class="s">Driver</span><span class="nv"> </span><span class="s">17</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">SQL</span><span class="nv"> </span><span class="s">Server"</span><span class="w"> </span><span class="c1"># Default</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="s">"ODBC</span><span class="nv"> </span><span class="s">Driver</span><span class="nv"> </span><span class="s">18</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">SQL</span><span class="nv"> </span><span class="s">Server"</span><span class="w"> </span><span class="c1"># Optional: unset picks the newest one installed</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">trusted_connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">               </span><span class="c1"># true: log in as the account the engine runs under</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">trust_server_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">         </span><span class="c1"># true: accept a self-signed certificate (ODBC Driver 18 encrypts by default)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">trust_server_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">         </span><span class="c1"># true: accept a self-signed certificate</span>
 </code></pre></div>
 <p>The keys are <code>MssqlConnection</code>'s (<code>nl2sql.adapters.mssql.adapter</code>), and any
 other key is an error; see <a href="../../configuration/datasources/#connection">Connection</a>.</p>
 <h3 id="connection-details">Connection Details</h3>
 <ul>
-<li><strong>Driver</strong>: <code>pyodbc</code>. <strong>Requires system ODBC headers installed.</strong></li>
-<li><strong>URI Constructed</strong>: <code>mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}</code>, plus
+<li><strong>Driver</strong>: <code>pyodbc</code>, with one of Microsoft's ODBC drivers (see <a href="#requirements">Requirements</a>).</li>
+<li><strong>ODBC driver</strong>: the <code>driver</code> you set, else the newest <code>ODBC Driver N for SQL Server</code>
+  that <code>pyodbc.drivers()</code> lists, so a machine with only Driver 17 works without
+  configuration. With none installed, <code>nl2sql check</code> fails at the <code>driver</code> stage
+  and says where to download one.</li>
+<li><strong>Encryption</strong>: always on (<code>Encrypt=yes</code>). Driver 18 encrypts by default and
+  Driver 17 does not, so the adapter asks for it: the connection behaves the same
+  whichever driver is used. A server with a self-signed certificate (a local or
+  test server) needs <code>trust_server_certificate: true</code>.</li>
+<li><strong>URI Constructed</strong>: <code>mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}&amp;Encrypt=yes</code>, plus
   <code>Trusted_Connection=yes</code> and <code>TrustServerCertificate=yes</code> when set.
   Built with SQLAlchemy's <code>URL.create</code>, so the user name and password are
   percent-escaped: a password containing <code>@ : / # %</code> works as written.</li>
@@ -4763,7 +4771,7 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 <tr>
 <td style="text-align: left;"><strong>Connection stages</strong></td>
 <td style="text-align: left;">SQL Server's error number</td>
-<td style="text-align: left;">18456 is <code>auth</code>, 4060 <code>database</code>, 916 <code>permission</code>; ODBC's <code>08001</code>, <code>08S01</code> and <code>HYT00</code> are <code>network</code>.</td>
+<td style="text-align: left;">18456 is <code>auth</code>, 4060 <code>database</code>, 916 <code>permission</code>; ODBC's <code>08001</code>, <code>08S01</code> and <code>HYT00</code> are <code>network</code>; no ODBC Driver for SQL Server installed is <code>driver</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
@@ -4803,7 +4811,9 @@ pyodbc counts whole seconds, so <code>limits.timeout_ms</code> is rounded <stron
 limit passes, the driver cancels the query and the adapter reports it as a timeout
 (<code>QUERY_TIMEOUT</code>), which the engine does not retry.</p>
 <h2 id="requirements">Requirements</h2>
-<p>You must have the MS ODBC Driver installed in your Docker image or local environment.</p>
+<p><code>pip install "nl2sql-engine[mssql]"</code> installs <code>pyodbc</code>. You also need
+Microsoft's ODBC Driver for SQL Server (17 or 18) in your Docker image or local
+environment; the adapter uses the newest one installed.</p>
 <p><a href="https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server">Download ODBC Driver for SQL Server</a></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Debian / Ubuntu</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>unixodbc-dev

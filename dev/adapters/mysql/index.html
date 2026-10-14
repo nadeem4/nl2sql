@@ -4656,7 +4656,11 @@
 other key is an error; see <a href="../../configuration/datasources/#connection">Connection</a>.</p>
 <h3 id="connection-details">Connection Details</h3>
 <ul>
-<li><strong>Driver</strong>: <code>pymysql</code> (Pure Python).</li>
+<li><strong>Driver</strong>: <code>pymysql</code> (Pure Python), with <code>cryptography</code>. MySQL 8's default
+  login, <code>caching_sha2_password</code>, needs <code>cryptography</code> on a connection without
+  TLS. <code>pip install "nl2sql-engine[mysql]"</code> installs both (<code>pymysql[rsa]</code>);
+  without <code>cryptography</code>, <code>nl2sql check</code> fails at the <code>driver</code> stage with that
+  install command.</li>
 <li><strong>URI Constructed</strong>: <code>mysql+pymysql://{user}:{pass}@{host}:{port}/{db}</code>.
   Built with SQLAlchemy's <code>URL.create</code>, so the user name and password are
   percent-escaped: a password containing <code>@ : / # %</code> works as written.</li>
@@ -4684,7 +4688,7 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 <tr>
 <td style="text-align: left;"><strong>Connection stages</strong></td>
 <td style="text-align: left;">MySQL's error number</td>
-<td style="text-align: left;">1045 is <code>auth</code>, 1049 <code>database</code>, 1044 <code>permission</code>, 2003 and 2005 <code>network</code>.</td>
+<td style="text-align: left;">1045 is <code>auth</code>, 1049 <code>database</code>, 1044 <code>permission</code>, 2003 and 2005 <code>network</code>; PyMySQL's "'cryptography' package is required" is <code>driver</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
