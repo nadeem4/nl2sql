@@ -3770,7 +3770,7 @@ Windows and CI runs Linux. It calls <code>gcloud</code> (found with <code>shutil
 </tr>
 <tr>
 <td><code>down</code></td>
-<td>Closes any tunnels it opened and stops the VM. Safe to run again.</td>
+<td>Closes any tunnels it opened, runs <code>docker compose stop</code> on the VM (bounded; a failure is reported, not fatal) so SQL Server shuts down cleanly, then stops the VM. Safe to run again.</td>
 </tr>
 <tr>
 <td><code>status</code></td>
