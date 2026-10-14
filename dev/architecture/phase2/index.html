@@ -3542,7 +3542,7 @@ everything. Loading happens once per data volume, so a second <code>up</code> is
 <tr>
 <td><code>mssql-init</code></td>
 <td>the same image (it ships <code>sqlcmd</code>)</td>
-<td>One-shot, after <code>mssql</code> is healthy. Restores AdventureWorksLT from the <code>.bak</code>, loads the wide schema, and creates the test logins. Skips each step whose database already exists.</td>
+<td>After <code>mssql</code> starts. Restores AdventureWorksLT from the <code>.bak</code>, loads the wide schema, and creates the test logins. Skips each step whose database already exists. Then it idles, healthy, instead of exiting: nothing waits for it to complete, and <code>--wait</code> fails on an exited container, which a skipping second <code>up</code> would otherwise produce.</td>
 </tr>
 </tbody>
 </table>
