@@ -5269,8 +5269,8 @@ answers against.</p>
 </tbody>
 </table>
 <p><code>expected</code> follows the demo policy in <code>nl2sql/datasets/chinook.py</code>
-(<code>CHINOOK_POLICIES</code>): a role gets <code>refused</code> when any of <code>needed_tables</code> is
-outside its <code>allowed_tables</code>, and <code>allowed</code> otherwise. Questions the database
+(<code>CHINOOK_POLICIES</code>): a role gets <code>refused</code> when its scope does not allow
+any of <code>needed_tables</code>, and <code>allowed</code> otherwise. Questions the database
 cannot answer are <code>unanswerable</code> for every role. The <code>rbac-denial</code> tag marks
 exactly the questions some role is refused.</p>
 <p>Where <code>ORDER BY</code> has ties, <code>gold_sql</code> breaks them on a key (<code>CustomerId</code>,

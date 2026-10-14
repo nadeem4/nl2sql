@@ -2282,7 +2282,7 @@
 <h1 id="logicalvalidatornode">LogicalValidatorNode</h1>
 <h2 id="overview">Overview</h2>
 <ul>
-<li>Validates the AST plan (<code>PlanModel</code>) against schema and RBAC policies.</li>
+<li>Validates the AST plan (<code>PlanModel</code>) against schema and policies.</li>
 <li>Exists to enforce correctness and security before SQL generation.</li>
 <li>Sits between <code>ASTPlannerNode</code> and <code>GeneratorNode</code> in the SQL agent subgraph.</li>
 <li>Class: <code>LogicalValidatorNode</code></li>
@@ -2293,13 +2293,13 @@
 <ul>
 <li>Validate aliases, joins, and column references.</li>
 <li>Reject any plan the generator could not build (see <em>Buildability</em> below).</li>
-<li>Enforce RBAC table access using strict datasource namespacing.</li>
+<li>Enforce table access through the caller's <code>Scope</code>, with strict datasource namespacing.</li>
 </ul>
 <p>Literal filter values are <strong>not</strong> validated against a column's sampled values.
 The adapter records every value of a text column with at most 50 distinct
 values, but only the five most frequent of a larger one: a retrieval hint, not
 the column's domain. Treating it as an allowlist rejected correct filters on
-any higher-cardinality column. Safety comes from the RBAC
+any higher-cardinality column. Safety comes from the policy
 table allowlist and from schema resolution, neither of which depends on stats.
 A value that turns out not to exist is caught after execution instead, and
 only when the result is empty (see
@@ -2358,7 +2358,7 @@ emits a <code>PlanModel</code>, never SQL.</p>
 <ul>
 <li><code>ast_planner_response.plan</code> (required)</li>
 <li><code>relevant_tables</code> (required)</li>
-<li><code>user_context</code> (required for RBAC)</li>
+<li><code>user_context</code> (required for the policy check)</li>
 <li><code>sub_query.datasource_id</code> (required for namespacing)</li>
 <li><code>sub_query.expected_schema</code> (optional validation)</li>
 </ul>
@@ -2448,12 +2448,20 @@ was validated, not only what failed. The names are fixed and always in this orde
 <li><code>_validate_buildable()</code> runs last and is the <strong>buildability</strong> check: it
      calls the generator's own <code>_build_query()</code> and throws the tree away. See
      below.</li>
-<li>Run <code>_validate_policy()</code> for RBAC enforcement. This always runs, even when
+<li>Run <code>_validate_policy()</code> for policy enforcement. This always runs, even when
    static validation failed or raised — the security check is never skipped.
+   It asks the caller's <code>Scope</code> (<code>ctx.policy_engine.scope(user_context,
+   datasource_id)</code>, the same one the schema retriever hid tables with) about
+   every table in the plan. The schema retriever never showed the planner a
+   denied table, so a plan that names one anyway is a model naming a table it
+   was not given, and is refused here. The policy errors come first in the
+   node's <code>errors</code>, before the static ones: such a table is also missing from
+   the planner's schema (<code>TABLE_NOT_FOUND</code>), and the denial is the reason.
    Each forbidden table yields a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code> whose message
    is "You do not have permission to see the data this question requires."
-   (it names nothing), with <code>details</code> = <code>{datasource_id, table, roles}</code> for the
-   trace, and a warning log line. <code>policies.refusal_names_tables: true</code> puts the role
+   (it names nothing), with <code>details</code> = <code>{datasource_id, table, roles, rule}</code>
+   for the trace (<code>rule</code> is <code>Scope.rule_for</code>: the deny pattern, or the missing
+   allow), and a warning log line. <code>policies.refusal_names_tables: true</code> puts the role
    and table in the message instead. An unknown role, or no role, allows no
    table and is refused the same way. The decision reads only the policy and
    the plan's table list, never the model's reasoning.</li>

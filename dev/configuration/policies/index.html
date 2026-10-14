@@ -1868,38 +1868,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#table-entries" class="md-nav__link">
+  <a href="#patterns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Table entries
+        Patterns
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Table entries">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#two-part-entries-and-the-default-schema" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Two-part entries and the default schema
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-rule-everywhere" class="md-nav__link">
+  <a href="#denied-tables-are-hidden" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One rule everywhere
+        Denied tables are hidden
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-scope-everywhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One Scope everywhere
       
     </span>
   </a>
@@ -4585,38 +4579,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#table-entries" class="md-nav__link">
+  <a href="#patterns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Table entries
+        Patterns
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Table entries">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#two-part-entries-and-the-default-schema" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Two-part entries and the default schema
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-rule-everywhere" class="md-nav__link">
+  <a href="#denied-tables-are-hidden" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One rule everywhere
+        Denied tables are hidden
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-scope-everywhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One Scope everywhere
       
     </span>
   </a>
@@ -4658,20 +4646,29 @@ what. <code>nl2sql init</code> writes it to <code>policies.yaml</code>.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># policies.yaml</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">allow_all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
-<p>For anything shared, write roles:</p>
+<p>For anything shared, write roles. Each role allows and denies tables with
+patterns over <code>datasource.schema.table</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># policies.yaml</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">default_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">viewer</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">admin_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">admin</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">refusal_names_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">roles</span><span class="p">:</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">admin</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Every table in every database</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">allowed_datasources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">analyst</span><span class="p">:</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sales, except the audit schema</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">allowed_datasources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"sales.public.*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Everything</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">analyst</span><span class="p">:</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sales, except the audit schema and PII tables</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="nt">deny</span><span class="p">:</span><span class="w">  </span><span class="p p-Indicator">[</span><span class="nv">sales.audit.*</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"sales.*.*_pii"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">viewer</span><span class="p">:</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Reporting views and support tickets</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales.reporting.*</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">support.public.tickets</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>The same in Python:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Policies</span><span class="p">,</span> <span class="n">Role</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">Policies</span><span class="p">(</span><span class="n">default_role</span><span class="o">=</span><span class="s2">"viewer"</span><span class="p">,</span> <span class="n">admin_roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">],</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>         <span class="n">roles</span><span class="o">=</span><span class="p">{</span><span class="s2">"analyst"</span><span class="p">:</span> <span class="n">Role</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s2">"Sales"</span><span class="p">,</span> <span class="n">allow</span><span class="o">=</span><span class="p">[</span><span class="s2">"sales"</span><span class="p">],</span> <span class="n">deny</span><span class="o">=</span><span class="p">[</span><span class="s2">"sales.audit.*"</span><span class="p">])})</span>
 </code></pre></div>
 <h2 id="fields">Fields</h2>
 <table>
@@ -4701,21 +4698,21 @@ what. <code>nl2sql init</code> writes it to <code>policies.yaml</code>.</p>
 <tr>
 <td><code>refusal_names_tables</code></td>
 <td><code>false</code></td>
-<td>Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table and role are always in the log and the run trace. The demo (<code>nl2sql init --demo</code>) sets it, since showing a refusal is its point. See <a href="../../security/model/#strict-refusal">Security Model</a>.</td>
+<td>Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table, the role and the rule that denied it are always in the log and the run trace. The demo (<code>nl2sql init --demo</code>) sets it, since showing a refusal is its point. See <a href="../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.</td>
 </tr>
 <tr>
 <td><code>roles</code></td>
 <td><code>{}</code></td>
-<td>Role name to policy: <code>description</code>, <code>allowed_datasources</code> (ids or <code>*</code>) and <code>allowed_tables</code> (entries below).</td>
+<td>Role name to its <code>description</code>, <code>allow</code> patterns and <code>deny</code> patterns.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="table-entries">Table entries</h2>
+<h2 id="patterns">Patterns</h2>
 <table>
 <thead>
 <tr>
-<th>Entry</th>
-<th>Allows</th>
+<th>Pattern</th>
+<th>Matches</th>
 </tr>
 </thead>
 <tbody>
@@ -4724,64 +4721,91 @@ what. <code>nl2sql init</code> writes it to <code>policies.yaml</code>.</p>
 <td>every table in every datasource</td>
 </tr>
 <tr>
-<td><code>datasource.*</code></td>
+<td><code>datasource</code></td>
 <td>every table in every schema of one datasource</td>
 </tr>
 <tr>
-<td><code>datasource.schema.*</code></td>
-<td>every table in one schema</td>
-</tr>
-<tr>
 <td><code>datasource.schema.table</code></td>
-<td>one table in one schema</td>
+<td>the tables whose datasource, schema and table each match</td>
+</tr>
+</tbody>
+</table>
+<p>Each part is an <code>fnmatch</code> glob, so <code>sales.audit.*</code> is every table in the
+<code>audit</code> schema of <code>sales</code>, <code>sales.*.*_pii</code> is every table ending in <code>_pii</code> in
+any schema, and <code>sal*</code> is every datasource whose id starts with <code>sal</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Two parts</strong></td>
+<td>Rejected when the config loads, with the fix: "<code>'sales.orders' has two parts: write 'sales.&lt;schema&gt;.orders', or 'sales.&lt;schema&gt;.*'</code>". A two-part pattern could mean a table in any schema.</td>
 </tr>
 <tr>
-<td><code>datasource.table</code></td>
-<td>that table in the datasource's <strong>default schema only</strong></td>
+<td><strong>Case</strong></td>
+<td>Matching ignores case, so a deny cannot be dodged by <code>Orders</code> against <code>orders</code>.</td>
+</tr>
+<tr>
+<td><strong>Schemas</strong></td>
+<td>SQLite and DuckDB tables are in <code>main</code>. A plan table with no schema is in the adapter's default schema: the one an unqualified name resolves to (<code>public</code> on PostgreSQL by default, <code>dbo</code> on SQL Server, the connected database on MySQL, <code>main</code> on SQLite and DuckDB; <code>main</code> when the adapter cannot say).</td>
+</tr>
+<tr>
+<td><strong>Within a role</strong></td>
+<td>Deny beats allow.</td>
+</tr>
+<tr>
+<td><strong>Across roles</strong></td>
+<td>A caller may read a table if <em>some</em> role allows it and that same role does not deny it. One role's deny never takes away what another role allows.</td>
+</tr>
+<tr>
+<td><strong>Datasource access</strong></td>
+<td>Implied: a role reaches a datasource when one of its allow patterns can match inside it, unless it denies the whole datasource.</td>
+</tr>
+<tr>
+<td><strong>Unknown datasources</strong></td>
+<td>A pattern naming a datasource that is not configured is reported by <code>nl2sql policy validate</code>, not refused at startup, because datasources can be added at runtime.</td>
 </tr>
 </tbody>
 </table>
 <p>Access is decided on the schema as well as the table. The plan names the
-schema a table is read from, and the SQL is written with it, so a grant of
-<code>sales.orders</code> does not let a plan read <code>audit.orders</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">allowed_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">warehouse.sales.orders</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"warehouse.reference.*"</span><span class="p p-Indicator">]</span>
+schema a table is read from, and the SQL is written with it, so an allow of
+<code>warehouse.sales.orders</code> does not let a plan read <code>warehouse.audit.orders</code>.</p>
+<h2 id="denied-tables-are-hidden">Denied tables are hidden</h2>
+<p>A table the caller may not read never reaches a model. The schema retriever
+searches only the readable tables, so the planner's prompt is filled with
+tables the caller can use, and a denied table's name, columns, keys,
+relationships and data are not in it. The answerability judge and the
+decomposer see only the readable table names too.</p>
+<p>So a question that needs only denied tables gets "no data for that question"
+rather than a refusal. A plan that names a hidden table anyway is still
+refused by the logical validator with <code>SECURITY_VIOLATION</code>; with
+<code>refusal_names_tables: true</code> the refusal names the table, for debugging.</p>
+<h2 id="one-scope-everywhere">One <code>Scope</code> everywhere</h2>
+<p>Every place that decides access asks the same <code>Scope</code>: what one caller may
+read in one datasource, built by <code>PolicyEngine.scope(user, datasource_id)</code>
+from the roles, <code>allow_all</code> and <code>default_role</code>. The datasource resolver, the
+curated matcher, the schema retriever, the logical validator, the executor's
+value check and <code>engine.policies.allows()</code> all ask it, so they cannot
+disagree. A run builds each datasource's scope once and keeps it, so every
+step of the run decides the same way.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">policies</span><span class="o">.</span><span class="n">scope</span><span class="p">(</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]),</span> <span class="s2">"sales"</span><span class="p">)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">scope</span><span class="o">.</span><span class="n">reaches_datasource</span><span class="p">()</span>          <span class="c1"># True</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">scope</span><span class="o">.</span><span class="n">allows</span><span class="p">(</span><span class="s2">"audit"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">)</span>        <span class="c1"># False</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">scope</span><span class="o">.</span><span class="n">rule_for</span><span class="p">(</span><span class="s2">"audit"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">)</span>      <span class="c1"># "role 'analyst' denies 'sales.audit.*'"</span>
 </code></pre></div>
-<h3 id="two-part-entries-and-the-default-schema">Two-part entries and the default schema</h3>
-<p>A two-part <code>datasource.table</code> entry predates schemas in policies. It is
-read as that table in the datasource's default schema, never in any schema:</p>
-<ul>
-<li>The default schema is the one the adapter reports: the schema an unqualified
-  table name resolves to on that connection (<code>public</code> on PostgreSQL by default,
-  <code>dbo</code> on SQL Server, the connected database on MySQL, <code>main</code> on SQLite and
-  DuckDB).</li>
-<li>If an adapter cannot report one, <code>main</code> is the default.</li>
-<li>A table the plan names without a schema is in the default schema.</li>
-</ul>
-<p>So on a PostgreSQL datasource <code>warehouse</code>, <code>warehouse.orders</code> allows
-<code>public.orders</code> and refuses <code>audit.orders</code>. On SQLite and DuckDB, which have
-the one schema, two-part entries mean what they always did.</p>
-<p>The first two-part entry loaded logs a warning, once per process, saying it is
-read as the default schema. To grant a table outside the default schema, write
-the three-part form.</p>
-<p>An entry has two or three dot-separated parts (or is <code>*</code>), no part is empty,
-and <code>*</code> may only be the last part: <code>datasource.*.orders</code> is rejected when the
-config is loaded.</p>
-<h2 id="one-rule-everywhere">One rule everywhere</h2>
-<p><code>table_allowed()</code> in <code>nl2sql/auth/rbac.py</code> is the only place an entry is
-matched. The logical validator (which refuses the plan), the schema retriever
-(which strips the statistics of tables the role cannot read), the executor's
-value check (which only probes readable tables) and the curated matcher (which
-only answers with a verified query whose tables are all readable) call it with
-the same datasource, schema and table, so they cannot disagree.</p>
 <h2 id="checking-the-policies">Checking the policies</h2>
-<p><code>nl2sql policy validate</code> checks that every datasource and table rule a role
-names is a configured datasource, against the config <code>--config</code> names:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql.yaml<span class="w"> </span>policy<span class="w"> </span>validate
+<p><code>nl2sql policy validate</code> checks that every pattern a role names matches a
+configured datasource, against the config <code>--config</code> names:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql.yaml<span class="w"> </span>policy<span class="w"> </span>validate
 </code></pre></div>
-<p>A role naming a datasource that is not configured is <code>MISSING</code>, and the
-command exits 1. From Python, <code>engine.policy.validate_policies()</code> returns the
-same report; after <code>engine.check()</code>, a role naming a datasource that failed to
-connect is <code>UNAVAILABLE</code>.</p>
+<p>A pattern that matches no configured datasource is <code>MISSING</code>, and the command
+exits 1. From Python, <code>engine.policies.validate()</code> returns the same report;
+after <code>engine.check()</code>, a pattern that matches only a datasource that failed
+to connect is <code>UNAVAILABLE</code>.</p>
 
 
 

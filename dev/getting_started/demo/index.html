@@ -5105,36 +5105,42 @@ them. See <a href="../../configuration/curated/#in-the-demo">Curated answers</a>
 appears without a key too, on the guided questions a verified query answers.</p>
 <h3 id="the-roles">The roles</h3>
 <p><code>policies.yaml</code> is written with three roles, spanning all three
-datasources, so the RBAC check is visible without editing anything:</p>
+datasources, so the policy check is visible without editing anything:</p>
 <table>
 <thead>
 <tr>
 <th>Role</th>
+<th>Patterns</th>
 <th>May read</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>admin</code></td>
+<td><code>allow: ["*"]</code></td>
 <td>every table in every demo database</td>
 </tr>
 <tr>
 <td><code>analyst</code></td>
-<td>everything except employee and support-agent records - no <code>chinook.Employee</code>, no <code>support.agents</code></td>
+<td><code>allow: [chinook, support, webanalytics]</code>, <code>deny: [chinook.main.Employee, support.main.agents]</code></td>
+<td>everything except employee and support-agent records</td>
 </tr>
 <tr>
 <td><code>viewer</code></td>
-<td>no customer, invoice or ticket-message data: the Chinook music catalog plus <code>webanalytics.devices</code>, <code>webanalytics.page_views</code> and <code>webanalytics.referrers</code>, and no access to <code>support</code> at all</td>
+<td><code>allow:</code> the seven Chinook catalog tables and <code>webanalytics.main.devices</code>, <code>webanalytics.main.page_views</code>, <code>webanalytics.main.referrers</code></td>
+<td>no customer, invoice or ticket-message data, and no access to <code>support</code> at all</td>
 </tr>
 </tbody>
 </table>
-<p>Ask the <code>viewer</code> role about customers and the logical validator refuses the plan
-with a <code>SECURITY_VIOLATION</code> before any SQL is generated. The planner saw the
-<code>Customer</code> and <code>Invoice</code> tables' columns but none of their sample values or
-statistics. <code>policies.yaml</code> sets <code>refusal_names_tables: true</code>, so the demo's
-refusal names the role and table; outside the demo the message is the generic
-"You do not have permission to see the data this question requires." See
-<a href="../../security/model/#strict-refusal">Security Model</a>.</p>
+<p>Ask the <code>viewer</code> role about customers and no model ever sees the <code>Customer</code>
+or <code>Invoice</code> tables: they are hidden from the planner, so the answer is that
+the connected data cannot answer the question. A plan that names a hidden
+table anyway is refused by the logical validator with a <code>SECURITY_VIOLATION</code>
+before any SQL is generated. <code>policies.yaml</code> sets <code>refusal_names_tables:
+true</code>, so the demo's refusal names the role and table; outside the demo the
+message is the generic "You do not have permission to see the data this
+question requires." See
+<a href="../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.</p>
 <h3 id="api-keys-in-the-demo">API keys in the demo</h3>
 <p><code>embeddings.yaml</code> says <code>provider: local</code>, so schema chunks are
 embedded with the key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb

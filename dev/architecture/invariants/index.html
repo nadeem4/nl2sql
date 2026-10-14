@@ -1509,15 +1509,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#datasource-access-is-rbac-gated" class="md-nav__link">
+  <a href="#datasource-access-is-policy-gated" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Datasource Access Is RBAC-Gated
+        Datasource Access Is Policy-Gated
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Datasource Access Is RBAC-Gated">
+    <nav class="md-nav" aria-label="Datasource Access Is Policy-Gated">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6803,15 +6803,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#datasource-access-is-rbac-gated" class="md-nav__link">
+  <a href="#datasource-access-is-policy-gated" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Datasource Access Is RBAC-Gated
+        Datasource Access Is Policy-Gated
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Datasource Access Is RBAC-Gated">
+    <nav class="md-nav" aria-label="Datasource Access Is Policy-Gated">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -7870,25 +7870,26 @@
 <hr />
 <h2 id="policy-enforcement-is-namespaced-and-fail-closed">Policy Enforcement Is Namespaced and Fail-Closed</h2>
 <h3 id="definition_10">Definition</h3>
-<p>Allowed tables must be namespaced as <code>datasource.*</code>, <code>datasource.schema.*</code>, <code>datasource.schema.table</code> or <code>datasource.table</code>, and policy checks fail if datasource ID is missing. Access is decided on datasource, schema and table: a two-part <code>datasource.table</code> means that table in the datasource's default schema only, and a table the plan names without a schema is in the default schema. One function, <code>table_allowed()</code> in <code>nl2sql.auth.rbac</code>, decides for every node.</p>
+<p>A role allows and denies tables with patterns that are <code>*</code>, <code>datasource</code> or <code>datasource.schema.table</code> (each part a glob, matched regardless of case); a two-part pattern is rejected when the config loads. Policy checks fail if the datasource ID is missing. Access is decided on datasource, schema and table: a table the plan names without a schema is in the adapter's default schema. Deny beats allow within a role; across roles a table is readable when some role allows it and that same role does not deny it. Every place that decides table access asks one <code>Scope</code> (<code>PolicyEngine.scope(user, datasource_id)</code> in <code>nl2sql.policies</code>), and nothing outside <code>nl2sql/policies/</code> matches a policy pattern. A run builds each datasource's scope once and keeps it.</p>
 <h3 id="enforcement-points_10">Enforcement Points</h3>
 <ul>
-<li><code>RolePolicy.validate_namespace()</code> in <code>nl2sql.auth.models</code></li>
+<li><code>Role</code> in <code>nl2sql.config.models</code> (the pattern shape, through <code>nl2sql.policies.patterns.parse_pattern</code>)</li>
 <li><code>LogicalValidatorNode._validate_policy()</code> in <code>nl2sql.pipeline.nodes.validator.node</code></li>
-<li><code>table_allowed()</code> and <code>default_schema()</code> in <code>nl2sql.auth.rbac</code>, called with the same datasource, schema and table by the validator, the schema retriever, the executor's value check and the curated matcher</li>
+<li><code>Scope</code> and <code>PolicyEngine</code> in <code>nl2sql.policies.scope</code>, asked with the same datasource, schema and table by the datasource resolver, the curated matcher, the schema retriever (which hides denied tables from the planner), the validator, the executor's value check and <code>engine.policies.allows()</code></li>
+<li><code>test_every_access_decision_goes_through_scope</code> in <code>packages/nl2sql/tests/architecture/test_boundaries.py</code></li>
 </ul>
 <h3 id="failure-behavior_10">Failure Behavior</h3>
-<p><code>ValueError</code> for invalid policy format; <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with <code>VALIDATOR_CRASH</code>. The user-facing refusal names no table unless <code>RBAC_REFUSAL_NAMES_TABLES</code> is set; the table and roles are in the error's <code>details</code>.</p>
+<p><code>ValueError</code> for an invalid pattern; <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if datasource ID is missing or a table is not allowed. An unknown role, or no role, allows nothing and is refused the same way, never with <code>VALIDATOR_CRASH</code>. The user-facing refusal names no table unless <code>policies.refusal_names_tables</code> is set; the table, the roles and the rule are in the error's <code>details</code>.</p>
 <h3 id="why-it-exists_10">Why It Exists</h3>
 <p>Ensures access control boundaries are explicit and enforced.</p>
 <hr />
-<h2 id="datasource-access-is-rbac-gated">Datasource Access Is RBAC-Gated</h2>
+<h2 id="datasource-access-is-policy-gated">Datasource Access Is Policy-Gated</h2>
 <h3 id="definition_11">Definition</h3>
-<p>Only datasources permitted by RBAC may be selected or resolved.</p>
+<p>Only datasources the caller's scope reaches (<code>Scope.reaches_datasource()</code>) may be selected or resolved.</p>
 <h3 id="enforcement-points_11">Enforcement Points</h3>
 <ul>
 <li><code>DatasourceResolverNode._get_allowed_datasource_ids()</code> and <code>__call__()</code> in <code>nl2sql.pipeline.nodes.datasource_resolver.node</code></li>
-<li><code>CuratedMatcherNode._searchable()</code> and <code>_check_access()</code> in <code>nl2sql.pipeline.nodes.curated_matcher.node</code>: the verified-query search covers only datasources the role may read, and every table a verified query's SQL reads must pass <code>table_allowed()</code></li>
+<li><code>CuratedMatcherNode._searchable()</code> and <code>_check_access()</code> in <code>nl2sql.pipeline.nodes.curated_matcher.node</code>: the verified-query search covers only datasources the role may read, and every table a verified query's SQL reads must pass <code>Scope.allows()</code></li>
 </ul>
 <h3 id="failure-behavior_11">Failure Behavior</h3>
 <p>Returns <code>PipelineError</code> with <code>SECURITY_VIOLATION</code> if no allowed datasource is available. The check runs before the resolver's answerability LLM call, so a denied caller triggers no model call and the model only ever sees datasources the role may read. It runs on every path, including the single-datasource shortcut that skips the vector search. The curated matcher refuses nothing itself: a verified query on a datasource or table the role may not read is never offered or never run, and the run falls back (<code>policy_denied</code>) to the resolver, which refuses as above.</p>
@@ -8000,7 +8001,7 @@ different <code>storage.path</code> values never share a store.</p>
 <li>Nothing outside <code>nl2sql/adapters/</code> imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the <code>nl2sql.adapters</code> entry points and <code>DatasourceAdapterProtocol</code>.</li>
 <li>Nothing outside <code>nl2sql/cli/</code> imports the CLI, and <code>nl2sql.cli.demo</code> never imports <code>nl2sql.cli.commands</code>.</li>
 <li><code>nl2sql_api</code> imports only the top-level <code>nl2sql</code> namespace, and so do the playground and <code>nl2sql demo</code>, apart from a named list of exceptions (<code>STILL_IMPORTED_FROM_INSIDE</code>: the provider catalogue in <code>llm/providers.py</code>, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import <code>nl2sql.feedback</code>, <code>nl2sql.tracing</code>, <code>nl2sql.pipeline</code>, <code>nl2sql.indexing</code> or <code>PROVIDER_PRESETS</code>: <code>engine.feedback</code>, <code>engine.traces.get</code>, <code>engine.about()</code>, <code>engine.index.inspect_defaults()</code> and <code>engine.llm.providers()</code> serve them. The CLI, the playground and <code>nl2sql_api</code> reach the engine only through <code>NL2SQL</code>'s public methods and namespaces, never the runtime behind them (<code>engine._runtime</code>, a namespace's <code>_ctx</code>).</li>
-<li>The runtime (<code>pipeline</code>, <code>execution</code>, <code>indexing</code>, <code>datasources</code>, <code>llm</code>, <code>auth</code>, <code>aggregation</code>, <code>schema</code>, <code>services</code>, <code>context</code>, <code>public_api</code>) never imports <code>nl2sql.evaluation</code> or <code>nl2sql.feedback</code> at module scope. A deferred import inside a function is fine.</li>
+<li>The runtime (<code>pipeline</code>, <code>execution</code>, <code>indexing</code>, <code>datasources</code>, <code>llm</code>, <code>policies</code>, <code>aggregation</code>, <code>schema</code>, <code>services</code>, <code>context</code>, <code>public_api</code>) never imports <code>nl2sql.evaluation</code> or <code>nl2sql.feedback</code> at module scope. A deferred import inside a function is fine.</li>
 <li>A provider's API-key environment variable is read in <code>nl2sql/llm/</code> only. <code>PROVIDER_PRESETS</code> (<code>llm/registry.py</code>) is the one table; everything the CLI, the playground, evaluation and the REST API know about providers derives from it through <code>llm/providers.py</code>.</li>
 </ul>
 <h3 id="enforcement-points_19">Enforcement Points</h3>
@@ -8106,7 +8107,7 @@ different <code>storage.path</code> values never share a store.</p>
 <ul>
 <li><strong>State</strong>: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Execution</strong>: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded</li>
-<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound</li>
+<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound</li>
 <li><strong>Determinism</strong>: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed</li>
 <li><strong>Resource bounds</strong>: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Boundaries</strong>: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter</li>
@@ -8138,7 +8139,7 @@ different <code>storage.path</code> values never share a store.</p>
 <li><code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/schema/store.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/auth/models.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/policies/scope.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/functions.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/registry.py</code></li>
 <li><code>packages/sdk/src/nl2sql_sdk/protocols.py</code></li>

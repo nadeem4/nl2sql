@@ -2298,13 +2298,17 @@
 <li>Rank the datasource's <code>preferred_tables</code> first and set <code>preferred=True</code> on
   them, on the full-snapshot path and the retrieval path; see
   <a href="#preferred-tables">Preferred tables</a>.</li>
-<li>Strip column statistics (<code>sample_values</code>, <code>min_value</code>, <code>max_value</code>,
-  <code>distinct_count</code>, <code>null_percentage</code>) from every table the caller's role
-  cannot read, on every path, while keeping its name, columns, types, keys and
-  relationships ("structure yes, data no"). The rule is RBAC's
-  <code>table_allowed</code>, the one the logical validator refuses with; with no RBAC in
-  the context, every table is stripped. See
-  <a href="../../../security/model/#strict-refusal">Security Model</a>.</li>
+<li>Hide every table the caller may not read, on every path. The caller's
+  <code>Scope</code> (<code>ctx.policy_engine.scope(user_context, datasource_id)</code>, the one the
+  logical validator refuses with) filters the snapshot's tables <em>before</em>
+  anything is chosen: the full-snapshot path sends the readable tables only
+  (and compares their count, not the snapshot's, with
+  <code>full_snapshot_max_tables</code>), and the vector searches run with
+  <code>tables=&lt;the readable tables&gt;</code>, so the top <code>k</code> is filled with readable ones.
+  A hidden table's name, columns, keys, statistics and data never reach the
+  prompt or the run trace, and a relationship from a readable table into a
+  hidden one is dropped. See
+  <a href="../../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.</li>
 <li>The tables it returns keep every statistic, but the planner and refiner
   prompts render them with <code>render_schema_for_prompt</code> (<code>schema.py</code>), which
   sends only <code>sample_values</code> and, for date, time and numeric columns other
@@ -2378,8 +2382,8 @@ matched against snapshot tables by bare name or <code>schema.table</code>, case 
   them only; with no preferred tables the block is byte-identical to before.
   Planner instruction 14 tells the model to plan against a preferred table
   when it answers the question.</li>
-<li>RBAC is unchanged: a preferred table the role cannot read is ranked and
-  marked, and loses its statistics like any other unreadable table.</li>
+<li>Being preferred never shows a hidden table: a preferred table the caller's
+  scope denies is left out like any other.</li>
 </ul>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>

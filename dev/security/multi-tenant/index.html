@@ -2051,13 +2051,13 @@
 <p>This ensures per-tenant isolation for artifacts, and downstream aggregation only reads referenced artifacts from the current request.</p>
 <p>Tenant isolation is <strong>not</strong> applied to indexing; the vector store and schema store are global in the current implementation (see <code>../architecture/indexing.md</code>).</p>
 <h2 id="authorization-model">Authorization model</h2>
-<p>RBAC evaluates <code>UserContext.roles</code> against the <code>policies</code> section of <code>nl2sql.yaml</code>. The validator enforces datasource/table scope at planning time.</p>
+<p><code>PolicyEngine</code> turns <code>UserContext.roles</code> and the <code>policies</code> section of <code>nl2sql.yaml</code> into a <code>Scope</code> per datasource. The schema retriever hides denied tables from the planner, and the validator enforces the scope at planning time.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Tenant settings: <code>settings.tenant_id</code> in <code>packages/nl2sql/src/nl2sql/config/models.py</code></li>
 <li>Context initialization: <code>packages/nl2sql/src/nl2sql/runtime.py</code></li>
 <li>Artifact paths: <code>packages/nl2sql/src/nl2sql/execution/artifacts/store.py</code></li>
-<li>RBAC: <code>packages/nl2sql/src/nl2sql/auth/rbac.py</code></li>
+<li>Policies: <code>packages/nl2sql/src/nl2sql/policies/scope.py</code></li>
 </ul>
 </article>
 </div>

@@ -4746,8 +4746,8 @@ before the generator is reached. That node:</p>
 <ul>
 <li>resolves every column against the retrieved schema snapshot using
   <code>sqlglot.optimizer.qualify</code>;</li>
-<li>enforces RBAC table policy via <code>RBAC.get_allowed_tables()</code>
-  (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/auth/rbac.py"><code>auth/rbac.py</code></a>),
+<li>enforces the table policy through the caller's <code>Scope</code>
+  (<a href="https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/policies/scope.py"><code>policies/scope.py</code></a>),
   failing closed when no datasource ID is present.</li>
 </ul>
 <p>An unvalidated plan never becomes SQL, so it never reaches an adapter. This is
@@ -4808,7 +4808,7 @@ is raised. Treat <code>max_bytes</code> as documentation of intent, not a limit.
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;">AST validation + RBAC</td>
+<td style="text-align: left;">AST validation + policies</td>
 <td style="text-align: left;"><code>pipeline/nodes/validator/node.py</code></td>
 <td style="text-align: left;">What SQL may be generated at all</td>
 </tr>

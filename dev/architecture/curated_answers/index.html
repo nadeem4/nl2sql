@@ -2598,8 +2598,8 @@ warning in <code>nl2sql doctor</code> and the index status, not an error.</p>
   added when its similarity is within 0.05 (<code>PREFERRED_MARGIN</code>) of the least
   similar table picked.</li>
 </ul>
-<p>Nothing about RBAC changes: a preferred table the role may not read is
-withheld exactly like any other (<code>SchemaRetrieverNode._withhold_unreadable</code>).</p>
+<p>Nothing about access changes: a preferred table the caller's scope denies is
+hidden from the planner exactly like any other.</p>
 <h2 id="validation">Validation</h2>
 <p>The file is checked at three moments, each catching what it can.</p>
 <p><strong>At startup</strong>, <code>Runtime.from_config</code> checks the config's <code>curated</code>
@@ -2707,8 +2707,8 @@ decomposer, means a verified answer also skips the resolver's answerability
 call: a verified answer costs two model calls (the match and the reply)
 instead of four or more. The matcher does the one thing from the resolver it
 needs itself: it limits the search to datasources the role may read,
-<code>rbac.get_allowed_datasources(user_context)</code>, before searching, so
-<em>Datasource access is RBAC-gated</em> holds on this path too and the model only
+<code>Scope.reaches_datasource()</code> for each datasource, before searching, so
+<em>Datasource access is policy-gated</em> holds on this path too and the model only
 ever sees candidates from readable datasources. When the caller pinned a
 datasource (<code>GraphState.datasource_id</code>), only that one is searched.</p>
 <p>When it does not answer, the matcher returns nothing but its own trace record
@@ -2783,10 +2783,10 @@ question, and never sees the SQL.
    required param (no default) left empty all fall back. A param the model
    left out takes its default.
 5. <strong>Access.</strong> Every table the SQL reads (sqlglot <code>exp.Table</code> nodes, CTE names
-   excluded) must pass <code>table_allowed()</code> with its schema (the datasource's
-   default schema when the SQL names none), the function the logical
-   validator and executor already use. If one does
-   not, the run falls back, and the normal pipeline then enforces RBAC as it
+   excluded) must pass <code>Scope.allows()</code> with its schema (the datasource's
+   default schema when the SQL names none), the scope the logical
+   validator and executor already ask. If one does
+   not, the run falls back, and the normal pipeline then enforces the policy as it
    always does. The user is not told a verified query exists that they may
    not use.
 6. <strong>Run.</strong> The saved SQL runs with the bound params through
@@ -2850,7 +2850,7 @@ generated SQL does not need:</p>
   <code>Alter</code>, <code>Command</code>). This is checked at load and again before running. The
   datasource's own read-only connection (for SQLite <code>options.read_only</code>) and
   database grants stay the backstop, as they are for generated SQL.</li>
-<li><strong>RBAC.</strong> Every table read must be allowed for the asker (step 5 above). A
+<li><strong>Policies.</strong> Every table read must be allowed for the asker (step 5 above). A
   view is checked by its own name, as policies name it; what the view reads
   underneath is the database's grant to decide.</li>
 <li><strong>Row limit.</strong> The row ceiling is the one the generator uses:
@@ -3046,7 +3046,7 @@ open: it needs the owner's key.</p>
   curated config model, the read-only check and the matcher.</li>
 <li><strong>SQL Generation Enforces a Row Limit Cap</strong> extends to verified SQL, through
   the executor's <code>max_rows</code>.</li>
-<li><strong>Datasource Access Is RBAC-Gated</strong> gains the matcher as an enforcement
+<li><strong>Datasource Access Is Policy-Gated</strong> gains the matcher as an enforcement
   point.</li>
 <li><a href="../determinism/"><code>determinism.md</code></a>'s "the AST is checked ... before any SQL
   exists, on every path" becomes "on every generated path"; a verified path
@@ -3150,7 +3150,7 @@ both the full-snapshot and the retrieval paths, planner instruction 14, views
 in the SQLAlchemy base adapter's snapshot, and the index health warning for a
 preferred table that is not indexed.
 Tests: <code>tests/unit/test_schema_retriever_preferred.py</code> (ordering, the
-<em>preferred</em> marker, an unreadable preferred table still withheld),
+<em>preferred</em> marker, a denied preferred table still hidden),
 <code>tests/unit/test_datasource_preferred_tables.py</code> (config, registry, warning)
 and <code>tests/adapters/unit/test_snapshot_views.py</code> (SQLite and DuckDB).</p>
 <p><strong>6. Feedback proposals.</strong>

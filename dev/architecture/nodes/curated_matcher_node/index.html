@@ -2221,12 +2221,12 @@
 <hr/>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
-<li>Limit the search to datasources that have verified queries and that <code>rbac.get_allowed_datasources()</code> allows (the pinned <code>datasource_id</code> only, when one is given).</li>
+<li>Limit the search to datasources that have verified queries and that the caller's <code>Scope</code> reaches (<code>reaches_datasource()</code>) (the pinned <code>datasource_id</code> only, when one is given).</li>
 <li>Retrieve candidates with <code>VectorStore.retrieve_verified_query_candidates()</code> (top <code>settings.curated.match_top_k</code>), skipping a query that is in the index but no longer in the file.</li>
 <li>Ask no model when the best similarity is below <code>settings.curated.match_floor</code>.</li>
 <li>Make one structured-output call, <code>VerifiedQueryChoice</code>.</li>
 <li>Check the chosen values (<code>params.resolve_params</code>): type, <code>min</code>/<code>max</code>, <code>choices</code>, required.</li>
-<li>Check every table the SQL reads against the role's <code>allowed_tables</code> with <code>table_allowed()</code>, and that the SQL is still one read-only query.</li>
+<li>Check every table the SQL reads against the caller's <code>Scope</code> (<code>allows()</code>), and that the SQL is still one read-only query.</li>
 <li>Check the adapter declares <code>SUPPORTS_BOUND_PARAMETERS</code> before running a query with parameters.</li>
 <li>Run the SQL through <code>SqlExecutorService</code> with <code>ExecutorRequest.parameters</code> and <code>max_rows</code>.</li>
 <li>On a hit, fill the state the way a one-sub-query generated run leaves it.</li>
@@ -2256,7 +2256,7 @@
 <ul>
 <li><code>curated</code>: the loaded <code>CuratedFileConfig</code>. The matcher reads every query from it, never from the index.</li>
 <li><code>vector_store</code>: <code>retrieve_verified_query_candidates()</code>.</li>
-<li><code>rbac</code>: <code>get_allowed_datasources()</code> and <code>get_allowed_tables()</code>.</li>
+<li><code>policy_engine</code>: <code>scope(user_context, datasource_id)</code>.</li>
 <li><code>ds_registry</code>: dialect, adapter row limit, <code>supports()</code>.</li>
 <li><code>schema_store</code>: the latest schema version, stamped on the sub-query.</li>
 <li><code>llm_registry</code>: the choice's model, agent name <code>curatedmatcher</code> (falls back to <code>default</code>).</li>
@@ -2286,7 +2286,7 @@
 <li>Best similarity below <code>settings.curated.match_floor</code>: <code>below_floor</code>, no model call.</li>
 <li>One <code>VerifiedQueryChoice</code> call. It raised (no recording in a replay, a provider error): <code>model_failed</code>. <code>none_of_these</code>: <code>none_of_these</code>. An id that is not a candidate: <code>unknown_query</code>.</li>
 <li>Values: an unknown name, a name twice, a value that does not parse or is out of bounds: <code>param_invalid</code>; a param with no default left out or empty: <code>param_missing</code>. A param left out takes its default.</li>
-<li>Tables: any table the SQL reads not allowed for the role: <code>policy_denied</code>. The normal pipeline then enforces RBAC as always; the user is not told a verified query exists.</li>
+<li>Tables: any table the SQL reads not allowed for the role: <code>policy_denied</code>. The normal pipeline then enforces the policy as always; the user is not told a verified query exists.</li>
 <li>Capability: a query with params on an adapter without <code>SUPPORTS_BOUND_PARAMETERS</code>: <code>capability_missing</code>.</li>
 <li>Run with the values bound and <code>max_rows</code> set to <code>min(adapter.row_limit or row_limit, row_limit)</code> (<code>row_limit</code> is <code>settings.results.row_limit</code>). Failed or no result: <code>execution_failed</code>, with a warning.</li>
 <li>Fill the state and route to <code>layer_router</code>.</li>

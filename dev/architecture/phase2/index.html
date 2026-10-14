@@ -4488,6 +4488,17 @@ engine's life. Writing <code>dimension:</code> skips that one paid call.</p>
 </tbody>
 </table>
 <h2 id="6-policies-step-1">6. Policies, step 1</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: globs and <code>Scope</code> (PR P1)</p>
+<p><code>allow</code> and <code>deny</code> on <code>Role</code>, the pattern rules, <code>PolicyEngine.scope</code> and
+<code>Scope</code> in <code>nl2sql/policies/</code> (which replaces <code>nl2sql/auth/</code>), a run's
+scopes pinned (<code>PolicyEngine.run</code>), every call site on <code>Scope</code>, the
+retriever hiding denied tables, and the demo roles rewritten. Beyond the
+table below, <code>engine.policies.allowed()</code> is replaced by
+<code>engine.policies.scope()</code>, since a flat table list cannot say what a deny
+does. The <code>check</code> block and <code>PolicyCheck</code> come with P2. See
+<a href="../../configuration/policies/">Policies</a>.</p>
+</div>
 <h3 id="the-config_1">The config</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="c1"># policies.yaml</span>
 <a href="#__codelineno-11-2" id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="nt">default_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">viewer</span>
