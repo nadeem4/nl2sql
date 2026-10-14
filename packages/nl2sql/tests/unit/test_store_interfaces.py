@@ -129,16 +129,29 @@ def test_store_object_in_the_wrong_slot_is_rejected(tmp_path):
 
 
 def test_a_plugin_store_is_refused_until_the_engine_reads_its_slot_through_the_interface(tmp_path):
+    class MemoState(MemoTraces):
+        slot = "state"
+
     registry = Registry.default()
-    registry.add_store("memo", MemoTraces)
-    storage = Storage(path=tmp_path / ".nl2sql", traces=StoreConfig(type="memo"))
+    registry.add_store("memo", MemoState)
+    storage = Storage(path=tmp_path / ".nl2sql", state=StoreConfig(type="memo"))
 
     with pytest.raises(ConfigError) as error:
         Runtime.components(_config(tmp_path, storage), registry)
 
     [problem] = error.value.problems
-    assert problem.path == "storage.traces"
-    assert "'files'" in problem.message
+    assert problem.path == "storage.state"
+    assert "'sqlite'" in problem.message
+
+
+def test_a_plugin_trace_store_is_used(tmp_path):
+    registry = Registry.default()
+    registry.add_store("memo", MemoTraces)
+    storage = Storage(path=tmp_path / ".nl2sql", traces=StoreConfig(type="memo"))
+
+    runtime = Runtime.components(_config(tmp_path, storage), registry)
+
+    assert isinstance(runtime.traces, MemoTraces)
 
 
 def test_store_registry_kind():

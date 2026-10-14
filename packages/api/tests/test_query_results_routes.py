@@ -14,7 +14,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL, UserContext, ResultManifest, ResultSummary
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.testing.config import make_config
 from nl2sql_api.auth import get_user_context
 from nl2sql_api.dependencies import get_engine
@@ -32,7 +33,7 @@ def _save(store, tenant, request, rows):
 
 @pytest.fixture
 def client(tmp_path):
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
     engine = NL2SQL.__new__(NL2SQL)

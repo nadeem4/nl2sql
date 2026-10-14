@@ -1,3 +1,3 @@
-from .store import ArtifactStore, ArtifactStoreConfig
+from .store import ArtifactStore
 
-__all__ = ["ArtifactStore", "ArtifactStoreConfig"]
+__all__ = ["ArtifactStore"]

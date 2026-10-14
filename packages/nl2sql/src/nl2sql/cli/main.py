@@ -35,6 +35,7 @@ from nl2sql.cli.commands.trace import app as trace_app, replay_command
 from nl2sql.cli.commands.cache import app as cache_app
 from nl2sql.cli.commands.config_check import app as config_app
 from nl2sql.cli.commands.feedback import app as feedback_app
+from nl2sql.cli.commands.storage import app as storage_app
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import configure_output_encoding
 from nl2sql.cli.types import RunConfig
@@ -52,6 +53,7 @@ app.add_typer(curated_app, name="curated", help="The curated answers file: `nl2s
 app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
 app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
+app.add_typer(storage_app, name="storage", help="Retention for traces and results (`nl2sql storage purge`).")
 
 
 def _version_callback(value: bool) -> None:
@@ -115,7 +117,7 @@ def run(
 @trace_app.command("replay")
 def trace_replay(
     ctx: typer.Context,
-    target: Annotated[str, typer.Argument(help="A trace file, or a trace id in <storage.path>/traces")],
+    target: Annotated[str, typer.Argument(help="A trace file, or a trace id in the trace store")],
 ):
     """
     Re-run a traced question feeding back the recorded LLM responses (no model calls).

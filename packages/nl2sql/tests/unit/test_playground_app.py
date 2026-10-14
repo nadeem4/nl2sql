@@ -52,7 +52,7 @@ class _Context:
         # Every datasource's live build is the one ``snapshot`` was indexed from.
         self.vector_store = _LiveIndex(snapshot)
         self.ds_registry = _Registry(datasources)
-        self.traces_dir = None
+        self.traces = None
 
 
 class _LiveIndex:
@@ -391,7 +391,9 @@ def _trace_client(tmp_path):
     # A file that must stay unreachable: one directory up from the traces.
     (tmp_path / "20260921T101112000000Z_outside.json").write_text('{"secret": true}', encoding="utf-8")
     engine = _Engine()
-    engine._runtime.traces_dir = traces
+    from nl2sql.storage.files import FilesTraces
+
+    engine._runtime.traces = FilesTraces(traces)
     app = build_app(engine, questions=[], roles=["admin"], mode="live", dataset="chinook")
     return TestClient(app)
 

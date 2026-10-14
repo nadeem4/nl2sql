@@ -295,9 +295,10 @@ command has `--help`.
 | `nl2sql curated validate` | Check the `curated` section (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | |
 | `nl2sql curated test` | Run every verified query once against its database, read-only, with each param's default or example bound; reports pass/fail per query and exits 1 on any failure | |
 | `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in the `curated` section's shape, for review; never writes a file of the config | `--out PATH` (default: print to stdout) |
-| `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in `<storage.path>/traces` |
+| `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |
 | `nl2sql cache clear` | Empty the plan cache in `<storage.path>/state.db`; schema snapshots are kept | |
+| `nl2sql storage purge` | Delete traces and results older than their store's `max_age_days` (14 and 7 days by default); `nl2sql-api` does this at startup and once a day | |
 | `nl2sql feedback list` | Playground ratings, newest first | `--limit` (default 50) |
 | `nl2sql feedback stats` | Ratings plus guardrail rates: refusals, refiner retries, validator rejections, errors, plan-cache hits | `--json`, `--traces DIR` |
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft gold entries to a separate YAML for review | `--out` (default `feedback_gold_drafts.yaml`) |

@@ -15,7 +15,8 @@ from types import SimpleNamespace
 from langgraph.graph import END
 
 from nl2sql.common.errors import ErrorCode
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
 from nl2sql.pipeline.graph_utils import wrap_subgraph
@@ -85,8 +86,7 @@ def test_the_subgraph_output_records_the_row_cap():
 # --- the aggregator refuses a join on a capped input, warns on a union ------
 
 def _combine_state(tmp_path, operation, rows_left, rows_right, cap=3):
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
-                                              path_template="<request_id>/<sub_query_id>.parquet"))
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template="<request_id>/<sub_query_id>.parquet")
 
     def scan(sq_id, n):
         frame = ResultFrame.from_row_dicts([{"customer_id": i, f"v_{sq_id}": i} for i in range(n)])

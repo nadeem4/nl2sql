@@ -1,3 +1,6 @@
+import asyncio
+import contextlib
+import logging
 from typing import Tuple
 
 from fastapi import FastAPI
@@ -10,6 +13,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from .routes import query, health, datasource, llm, indexing
 from nl2sql import NL2SQL, configure_logging, load_env_file
 from .auth import warn_if_body_role_trusted
+
+logger = logging.getLogger("nl2sql_api")
 
 
 @asynccontextmanager
@@ -33,8 +38,35 @@ async def lifespan(app: FastAPI):
         raise
     warn_if_body_role_trusted(engine.config.api)
     app.state.engine = engine
+    # Retention: once now, then once a day while the API serves.
+    await asyncio.to_thread(_purge, engine)
+    purging = asyncio.create_task(purge_daily(engine))
     yield
+    purging.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await purging
     engine.close()
+
+
+# How often the API applies retention (engine.storage.purge()) after the purge at startup.
+PURGE_INTERVAL_S = 24 * 60 * 60
+
+
+def _purge(engine) -> None:
+    """``engine.storage.purge()``, logged; a failure is logged and never stops the API."""
+    try:
+        counts = engine.storage.purge()
+    except Exception:
+        logger.warning("Storage purge failed; it is tried again in a day.", exc_info=True)
+        return
+    logger.info("Storage purge: %s", ", ".join(f"{slot} {n}" for slot, n in counts.items()) or "nothing to purge")
+
+
+async def purge_daily(engine, interval_s: float = PURGE_INTERVAL_S) -> None:
+    """Calls ``engine.storage.purge()`` every ``interval_s`` seconds until cancelled."""
+    while True:
+        await asyncio.sleep(interval_s)
+        await asyncio.to_thread(_purge, engine)
 
 
 def _app_version() -> str:

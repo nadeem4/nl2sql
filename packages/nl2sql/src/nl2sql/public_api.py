@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from nl2sql.api.policy_api import PoliciesAPI
     from nl2sql.api.query_api import QueryAPI, QueryResult
     from nl2sql.api.results_api import ResultsAPI
+    from nl2sql.api.storage_api import StorageAPI
     from nl2sql.api.traces_api import TracesAPI
     from nl2sql.policies import UserContext
     from nl2sql.check import CheckReport
@@ -139,6 +140,13 @@ class NL2SQL:
         from nl2sql.api.traces_api import TracesAPI
 
         return TracesAPI(self._runtime)
+
+    @cached_property
+    def storage(self) -> "StorageAPI":
+        """Where the engine keeps its data, and retention: ``info``, ``purge``."""
+        from nl2sql.api.storage_api import StorageAPI
+
+        return StorageAPI(self._runtime)
 
     @cached_property
     def feedback(self) -> "FeedbackAPI":

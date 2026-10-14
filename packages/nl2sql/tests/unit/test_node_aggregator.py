@@ -10,7 +10,8 @@ from nl2sql.execution.dag import (
 from nl2sql.pipeline.state import GraphState
 from nl2sql_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorCode
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.testing.runtime import fake_runtime
 
 TEMPLATE = "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet"
@@ -38,10 +39,7 @@ def test_aggregator_filters_rows_deterministically():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         store = ArtifactStore(
-            ArtifactStoreConfig(
-                base_uri=tmpdir,
-                path_template=TEMPLATE,
-            )
+            LocalResults(tmpdir), path_template=TEMPLATE
         )
         node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         artifact = store.create_artifact_ref(
@@ -92,10 +90,7 @@ def test_aggregator_join_requires_keys():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         store = ArtifactStore(
-            ArtifactStoreConfig(
-                base_uri=tmpdir,
-                path_template=TEMPLATE,
-            )
+            LocalResults(tmpdir), path_template=TEMPLATE
         )
         node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         left_artifact = store.create_artifact_ref(
@@ -168,10 +163,7 @@ def test_aggregator_post_aggregate_sum():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         store = ArtifactStore(
-            ArtifactStoreConfig(
-                base_uri=tmpdir,
-                path_template=TEMPLATE,
-            )
+            LocalResults(tmpdir), path_template=TEMPLATE
         )
         node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         artifact = store.create_artifact_ref(
@@ -230,10 +222,7 @@ def test_aggregator_post_sort_limit():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         store = ArtifactStore(
-            ArtifactStoreConfig(
-                base_uri=tmpdir,
-                path_template=TEMPLATE,
-            )
+            LocalResults(tmpdir), path_template=TEMPLATE
         )
         node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         artifact = store.create_artifact_ref(
@@ -281,10 +270,7 @@ def test_aggregator_union_combines_rows():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         store = ArtifactStore(
-            ArtifactStoreConfig(
-                base_uri=tmpdir,
-                path_template=TEMPLATE,
-            )
+            LocalResults(tmpdir), path_template=TEMPLATE
         )
         node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         left_artifact = store.create_artifact_ref(
@@ -370,10 +356,7 @@ def test_the_jazz_but_never_rock_dag_is_refused_with_the_reason():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         store = ArtifactStore(
-            ArtifactStoreConfig(
-                base_uri=tmpdir,
-                path_template=TEMPLATE,
-            )
+            LocalResults(tmpdir), path_template=TEMPLATE
         )
         node = EngineAggregatorNode(fake_runtime(artifact_store=store))
         refs = {}

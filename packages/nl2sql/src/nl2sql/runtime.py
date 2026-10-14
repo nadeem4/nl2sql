@@ -208,19 +208,18 @@ class Runtime:
     def _resolve_stores(self, config: Config, problem) -> List[Any]:
         """The four ``storage`` slots' stores, built through the registry. Writes nothing.
 
-        The engine reads its index through the ``IndexStore`` interface, so
-        any index store works. Until Phase 2 moves the rest of the engine
-        onto its store interfaces (S3 and S4), it reads ``state``, ``traces``
-        and ``results`` only through their built-in stores, so another store
-        in one of those slots is a problem rather than silently unused.
+        The engine reads its index, traces and results through the
+        ``IndexStore``, ``TraceStore`` and ``ResultStore`` interfaces, so any
+        store works in those slots. Until Phase 2 moves the engine onto the
+        ``StateStore`` interface (S3), it reads ``state`` only through the
+        built-in store, so another store there is a problem rather than
+        silently unused.
         """
         from nl2sql.config.models import BUILT_IN_STORES, STORE_SLOTS
         from nl2sql.storage import build_store
-        from nl2sql.storage.files import FilesTraces
-        from nl2sql.storage.local import LocalResults
         from nl2sql.storage.sqlite import SqliteState
 
-        built_ins = {"state": SqliteState, "traces": FilesTraces, "results": LocalResults}
+        built_ins = {"state": SqliteState}
 
         stores: List[Any] = []
         for slot in STORE_SLOTS:
@@ -240,10 +239,11 @@ class Runtime:
 
     def _build_stores(self) -> None:
         from nl2sql.execution import ExecutionStore
+        from nl2sql.execution.artifacts import ArtifactStore
 
         self.schema_store = self.state.schema_store(self._config.settings.schema_.max_versions)
         self.execution_store = ExecutionStore()
-        self.artifact_store = self.results.artifact_store()
+        self.artifact_store = ArtifactStore(self.results)
 
     # ------------------------------------------------------------ the index
 
@@ -295,10 +295,6 @@ class Runtime:
     @property
     def tenant_id(self) -> str:
         return self.config.settings.tenant_id
-
-    @property
-    def traces_dir(self) -> Path:
-        return self.traces.directory
 
     @property
     def closed(self) -> bool:
@@ -429,7 +425,8 @@ class Runtime:
             self._closed = True
         self.ds_registry.close()
         self.llm_registry.close()
-        for store in (getattr(self, "schema_store", None), getattr(self, "index", None)):
+        for store in (getattr(self, "schema_store", None), getattr(self, "index", None),
+                      getattr(self, "traces", None), getattr(self, "results", None)):
             close = getattr(store, "close", None)
             if callable(close):
                 try:

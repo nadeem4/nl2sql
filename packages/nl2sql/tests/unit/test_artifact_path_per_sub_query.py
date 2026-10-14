@@ -13,7 +13,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.artifacts.store import DEFAULT_PATH_TEMPLATE
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
@@ -31,7 +32,7 @@ def _metadata(sub_query_id):
 
 
 def _store(base_uri, template):
-    return ArtifactStore(ArtifactStoreConfig(base_uri=str(base_uri), path_template=template))
+    return ArtifactStore(LocalResults(str(base_uri)), path_template=template)
 
 
 def test_the_default_template_names_the_sub_query():
@@ -45,7 +46,7 @@ def test_two_sub_queries_of_one_run_get_two_artifacts_under_the_default(tmp_path
     second = store.create_artifact_ref(_frame("b"), _metadata("sq_b"))
 
     assert first.uri != second.uri
-    assert Path(first.uri) == tmp_path.resolve() / "t1" / "r1" / "sq_a.parquet"
+    assert first.uri == "t1/r1/sq_a.parquet"
     assert store.read_result_frame(first).to_row_dicts() == [{"id": 1, "value": "a"}]
     assert store.read_result_frame(second).to_row_dicts() == [{"id": 1, "value": "b"}]
 
@@ -58,8 +59,8 @@ def test_a_custom_template_without_the_sub_query_is_made_unique(tmp_path):
     first = store.create_artifact_ref(_frame("a"), _metadata("sq_a"))
     second = store.create_artifact_ref(_frame("b"), _metadata("sq_b"))
 
-    assert Path(first.uri) == tmp_path.resolve() / "t1" / "r1-sq_a.parquet"
-    assert Path(second.uri) == tmp_path.resolve() / "t1" / "r1-sq_b.parquet"
+    assert first.uri == "t1/r1-sq_a.parquet"
+    assert second.uri == "t1/r1-sq_b.parquet"
     assert first.path_template == "<tenant_id>/<request_id>-<sub_query_id>.parquet"
 
 
@@ -68,7 +69,7 @@ def test_a_template_without_an_extension_is_made_unique_too(tmp_path):
 
     artifact = store.create_artifact_ref(_frame("a"), _metadata("sq_a"))
 
-    assert Path(artifact.uri) == tmp_path.resolve() / "t1" / "r1-sq_a"
+    assert artifact.uri == "t1/r1-sq_a"
 
 
 @pytest.mark.parametrize("template", ["<tenant_id>/<request_id>/<sub_query_id>.parquet",
@@ -79,7 +80,7 @@ def test_a_template_that_already_names_the_sub_query_is_left_alone(tmp_path, tem
 
     artifact = store.create_artifact_ref(_frame("a"), metadata)
 
-    assert Path(artifact.uri) == tmp_path.resolve() / "t1" / "r1" / "sq_a.parquet"
+    assert artifact.uri == "t1/r1/sq_a.parquet"
     assert artifact.path_template == template
 
 
@@ -103,7 +104,7 @@ class _Adapter:
 def test_the_executor_writes_each_sub_query_of_a_run_to_its_own_artifact(tmp_path, template):
     adapters = {"chinook": _Adapter("music"), "support": _Adapter("tickets")}
     registry = SimpleNamespace(get_adapter=lambda ds: adapters[ds], supports=lambda ds, cap: True)
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=template))
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template=template)
     service = SqlExecutorService(registry, store, fetch_batch_size=10_000)
 
     def run(node_id, ds):

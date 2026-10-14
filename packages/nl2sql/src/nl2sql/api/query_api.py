@@ -80,7 +80,8 @@ class QueryResult(BaseModel):
     manifest: node id, columns, row count, truncated), never their rows; read
     those by ``trace_id`` with ``engine.results.page`` or ``engine.results.csv``.
     ``trace_path`` is where this run's trace file was written, or None when
-    ``TRACE_MODE`` did not write one.
+    ``settings.traces.mode`` did not keep one or the trace store is not the
+    ``files`` store (read it with ``engine.traces.get(trace_id)``).
     """
     sub_queries: List[SubQueryResult] = Field(default_factory=list)
     final_answer: Optional[Dict[str, Any]] = None

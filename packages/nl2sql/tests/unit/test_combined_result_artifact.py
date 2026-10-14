@@ -15,7 +15,8 @@ import polars as pl
 import pytest
 
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
@@ -30,7 +31,7 @@ TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
 
 @pytest.fixture()
 def store(tmp_path):
-    return ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
+    return ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
 
 
 def _scan(store, sub_query_id, rows):
@@ -65,7 +66,7 @@ def test_the_combined_result_is_saved_in_the_request_folder(store, tmp_path):
     assert isinstance(saved, ArtifactRef)
     assert saved.row_count == 45
     assert saved.columns == ["id", "name"]
-    assert Path(saved.uri).parent == Path(refs["sq1"].uri).parent == tmp_path / "t1" / "run-1"
+    assert Path(saved.uri).parent == Path(refs["sq1"].uri).parent == Path("t1") / "run-1"
     assert Path(saved.uri) != Path(refs["sq1"].uri)
     assert store.read_parquet(saved).to_dicts() == rows
 

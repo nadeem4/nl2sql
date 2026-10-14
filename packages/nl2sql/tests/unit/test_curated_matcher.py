@@ -238,13 +238,14 @@ def test_a_match_runs_the_verified_sql_with_bound_params_and_fills_the_state(db)
 
 
 def test_the_rows_are_the_verified_querys_rows(db):
-    from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+    from nl2sql.execution.artifacts import ArtifactStore
+    from nl2sql.storage.local import LocalResults
 
     out, _, _ = _run(db, CHOOSE_TOP)
 
     [artifact] = out["artifact_refs"].values()
-    assert artifact.uri.startswith(str((db.parent / "artifacts").resolve()))
-    frame = ArtifactStore(ArtifactStoreConfig(base_uri=str(db.parent / "artifacts"))).read_parquet(artifact)
+    assert (db.parent / "artifacts" / artifact.uri).is_file()
+    frame = ArtifactStore(LocalResults(str(db.parent / "artifacts"))).read_parquet(artifact)
     assert frame["customer"].to_list() == ["Bo", "Ana"]
     assert frame["revenue"].to_list() == [8.0, 3.0]
 

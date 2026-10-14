@@ -18,7 +18,7 @@ from nl2sql.execution.dag import (
     LogicalEdge,
 )
 from nl2sql.pipeline.state import GraphState
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql_sdk.contracts import ResultFrame
 from nl2sql.common.errors import ErrorSeverity
 
@@ -64,10 +64,7 @@ def test_aggregator_real_data(demo_env) -> None:
     )
 
     store = ArtifactStore(
-        ArtifactStoreConfig(
-            base_uri=demo_env.ctx.artifact_store.config.base_uri,
-            path_template="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-        )
+        demo_env.ctx.results, path_template="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet"
     )
     artifact = store.create_artifact_ref(
         ResultFrame.from_row_dicts([{"value": 5}, {"value": 20}]),

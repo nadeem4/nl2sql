@@ -76,15 +76,16 @@ class FeedbackAPI:
     def stats(self, *, traces: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
         """Rates over recorded runs: the ratings plus the run traces in ``traces``.
 
-        ``traces`` defaults to the engine's own traces folder. Each run counts
+        ``traces`` defaults to the engine's own traces folder, the ``files``
+        store's (with another trace store, only the ratings count). Each run counts
         once. Reports the feedback, refusals, refiner retries, validator
         failures and errors (each as runs and a rate over all runs), and the
         plan cache's hit rate over planned sub-queries.
         """
         from nl2sql.feedback import compute_stats, load_traces
 
-        folder = Path(traces) if traces is not None else self._ctx.traces_dir
-        return compute_stats(self.list(), load_traces(folder))
+        folder = Path(traces) if traces is not None else getattr(self._ctx.traces, "directory", None)
+        return compute_stats(self.list(), load_traces(folder) if folder is not None else [])
 
     def export(self, path: Union[str, Path]) -> Dict[str, int]:
         """Write the thumbs-up runs to ``path`` as draft gold entries, for a person to review.
@@ -122,9 +123,9 @@ class FeedbackAPI:
         return registry.list_llms() if registry is not None else {}
 
     def _trace(self, trace_id: str) -> Optional[Dict[str, Any]]:
-        from nl2sql.api.traces_api import read_trace
+        from nl2sql.tracing.document import validate_trace_id
 
         try:
-            return read_trace(self._ctx.traces_dir, trace_id)
+            return self._ctx.traces.get(validate_trace_id(trace_id))
         except (ValueError, OSError):
             return None

@@ -21,7 +21,8 @@ import pytest
 
 from nl2sql import NL2SQL, QueryResult, ResultManifest, ResultNotFound, ResultPage, ResultSummary
 from nl2sql.api.query_api import result_from_state
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.artifacts import results as results_module
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
@@ -37,7 +38,7 @@ ROWS = [{"id": i, "name": f"n{i}"} for i in range(45)]
 
 @pytest.fixture()
 def store(tmp_path):
-    return ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
+    return ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
 
 
 def _dag():

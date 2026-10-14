@@ -77,3 +77,58 @@ def test_the_api_logs_at_the_level_its_env_file_names(tmp_path, monkeypatch):
         root.handlers[:] = handlers
         if hasattr(app.state, "engine"):
             del app.state.engine
+
+
+def test_api_purges_at_startup(tmp_path, monkeypatch):
+    """Retention runs when the API starts (and once a day after): old traces and results go."""
+    import time
+
+    monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=False)))
+    traces = tmp_path / ".nl2sql" / "traces"
+    results = tmp_path / ".nl2sql" / "results" / "default" / "old-run"
+    traces.mkdir(parents=True)
+    results.mkdir(parents=True)
+    old_trace = traces / "20200101T000000000000Z_old-run.json"
+    new_trace = traces / "20990101T000000000000Z_new-run.json"
+    old_result = results / "manifest.json"
+    for path in (old_trace, new_trace, old_result):
+        path.write_text("{}", encoding="utf-8")
+    then = time.time() - 30 * 86400
+    for path in (old_trace, old_result):
+        os.utime(path, (then, then))
+
+    try:
+        with TestClient(app):
+            assert not old_trace.exists() and not old_result.exists()
+            assert new_trace.exists()
+    finally:
+        if hasattr(app.state, "engine"):
+            del app.state.engine
+
+
+def test_the_daily_purge_runs_until_shutdown_and_survives_a_failure():
+    import asyncio
+    from types import SimpleNamespace
+
+    from nl2sql_api.main import purge_daily
+
+    calls = []
+
+    def purge():
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError("disk busy")
+        return {"traces": 0, "results": 0}
+
+    engine = SimpleNamespace(storage=SimpleNamespace(purge=purge))
+
+    async def run():
+        task = asyncio.create_task(purge_daily(engine, interval_s=0.01))
+        while len(calls) < 3:
+            await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(run())
+    assert len(calls) >= 3

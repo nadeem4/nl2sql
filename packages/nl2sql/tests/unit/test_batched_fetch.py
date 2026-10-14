@@ -14,7 +14,8 @@ import polars as pl
 import pytest
 
 from nl2sql.config import ResultSettings
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql_sdk import StreamingAdapterProtocol
@@ -61,8 +62,7 @@ class _StreamingAdapter:
 
 
 def _service(tmp_path, adapter, batch_size=10_000):
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
-                                              path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet")
     registry = SimpleNamespace(get_adapter=lambda ds: adapter, supports=lambda ds, cap: True)
     return SqlExecutorService(registry, store, fetch_batch_size=batch_size)
 
@@ -139,8 +139,7 @@ def test_the_batch_size_has_a_setting():
 
 
 def test_the_store_writes_batches_to_one_artifact(tmp_path):
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
-                                              path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet")
     frames = [ResultFrame(columns=COLUMNS, rows=chunk, row_count=len(chunk))
               for chunk in (_rows(12)[:4], _rows(12)[4:8], _rows(12)[8:])]
 

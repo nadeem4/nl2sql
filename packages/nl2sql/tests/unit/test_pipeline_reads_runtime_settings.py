@@ -13,7 +13,8 @@ from types import SimpleNamespace
 
 from nl2sql.common.dates import run_date
 from nl2sql.config import Policies, Settings
-from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.storage.local import LocalResults
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, Expr, PlanModel, SelectItem, TableRef
@@ -110,7 +111,7 @@ class _StreamingAdapter:
 def test_the_executor_writes_to_the_store_and_batch_size_it_is_given(tmp_path):
     adapter = _StreamingAdapter()
     registry = SimpleNamespace(get_adapter=lambda ds: adapter, supports=lambda ds, cap: True)
-    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path / "results")))
+    store = ArtifactStore(LocalResults(str(tmp_path / "results")))
     service = SqlExecutorService(registry, store, fetch_batch_size=7)
 
     response = service.execute(ExecutorRequest(node_id="sq1", trace_id="r1", subgraph_name="sql_agent",
@@ -118,4 +119,4 @@ def test_the_executor_writes_to_the_store_and_batch_size_it_is_given(tmp_path):
 
     assert response.errors == []
     assert adapter.batch_sizes == [7]
-    assert response.artifact.uri.startswith(str((tmp_path / "results").resolve()))
+    assert (tmp_path / "results" / response.artifact.uri).is_file()
