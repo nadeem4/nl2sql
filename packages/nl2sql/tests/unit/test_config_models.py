@@ -171,7 +171,9 @@ def test_agent_names_are_the_node_names():
 def test_agent_records_which_fields_it_sets():
     agent = AgentLLM(model="x", temperature=None)
     assert agent.model_fields_set == {"model", "temperature"}
-    assert AgentLLM.model_fields.keys() == {"provider", "model", "temperature", "api_key", "base_url"}
+    assert AgentLLM.model_fields.keys() == {"provider", "model", "temperature", "api_key", "base_url",
+                                            "structured_output", "max_tokens", "timeout_s", "max_retries",
+                                            "headers"}
 
 
 def test_price_fields():

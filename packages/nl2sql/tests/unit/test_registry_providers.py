@@ -1,6 +1,6 @@
 """The built-in LLM and embeddings providers the registry hands out.
 
-The four LLM providers are made from ``PROVIDER_PRESETS``, which stays the one
+The five LLM providers are made from ``PROVIDER_PRESETS``, which stays the one
 table of key variables. See docs/architecture/configuration_v2.md,
 "Interfaces and versions".
 """
@@ -18,7 +18,7 @@ def test_one_llm_provider_per_preset():
     assert set(LLM_PROVIDERS) == set(PROVIDER_PRESETS)
     for name, provider in LLM_PROVIDERS.items():
         assert provider.api_key_env == PROVIDER_PRESETS[name].api_key_env
-        assert provider.interface_version == 1
+        assert provider.interface_version == 2
         assert provider.label
 
 
