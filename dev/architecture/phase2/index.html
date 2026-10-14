@@ -3818,6 +3818,29 @@ creates cloud resources by itself.</p>
 </table>
 <p>So even a daily session stays well inside $10.</p>
 <h2 id="4-storage-four-stores">4. Storage: four stores</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: the interfaces, config and registry kind (S1)</p>
+<p><code>nl2sql_sdk.stores</code> holds the four protocols with <code>Entry</code>, <code>Hit</code>,
+<code>Filter</code> and <code>BuildPointer</code>; <code>StoreConfig</code> and the four <code>Storage</code>
+sub-blocks are in <code>nl2sql/config/models.py</code>; the <code>store</code> registry kind
+(<code>add_store</code>, <code>@registry.store</code>, group <code>nl2sql.stores</code>) and the slot check
+are in <code>nl2sql/registry.py</code> and <code>nl2sql/storage/__init__.py</code>. The
+built-ins, <code>nl2sql/storage/{chroma,sqlite,files,local}.py</code>, are thin
+wrappers that build today's <code>VectorStore</code>, <code>SqliteSchemaStore</code> and
+<code>ArtifactStore</code> and hold the traces folder; <code>Runtime.index</code>, <code>.state</code>,
+<code>.traces</code> and <code>.results</code> are built through the registry. Building it
+settled these details:</p>
+<ul>
+<li><code>IndexStore.query</code> returns <code>Hit</code> (<code>id</code>, <code>text</code>, <code>metadata</code>,
+  <code>distance</code>, and <code>vector</code> only when <code>with_vectors</code>), which the sketch
+  below used without defining.</li>
+<li>Until S2 to S4 move the engine onto each interface, the engine reads a
+  slot only through its built-in store, and a plugin store in that slot
+  is a <code>ConfigError</code> at <code>storage.&lt;slot&gt;</code> rather than silently unused.</li>
+<li><code>max_age_days</code> arrives with retention in S4; until then <code>files</code> and
+  <code>local</code> take no keys.</li>
+</ul>
+</div>
 <h3 id="the-config">The config</h3>
 <p>Every sub-block is optional. A config with only <code>path</code> stays valid and means
 the built-ins below.</p>

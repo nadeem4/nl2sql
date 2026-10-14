@@ -2353,6 +2353,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interfaces-the-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interfaces: the stores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#compliance-testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4890,6 +4901,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interfaces-the-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interfaces: the stores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#compliance-testing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5207,6 +5229,121 @@ config names one by <code>type</code> (see <a href="../../configuration/secrets/
 <p>A provider reads its settings from its entry only, never from the
 environment. The module that defines it must import without its client
 library, so the engine can validate the entry before building anything.</p>
+<hr />
+<h2 id="interfaces-the-stores">Interfaces: the stores</h2>
+<p>A store keeps one part of the engine's data: the vector <code>index</code>, the <code>state</code>
+(schema snapshots, plan cache, feedback), the run <code>traces</code> or the <code>results</code>.
+The storage config names one per slot by <code>type</code> (see
+<a href="../../configuration/storage/">Storage</a>). The four interfaces live in
+<code>nl2sql_sdk.stores</code>, which imports only pydantic and the standard library.</p>
+<p>Every store class has the same four members, whatever its slot:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Member</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>interface_version</code></td>
+<td style="text-align: left;"><code>1</code>. The engine accepts exactly the version it was built for.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>slot</code></td>
+<td style="text-align: left;"><code>"index"</code>, <code>"state"</code>, <code>"traces"</code> or <code>"results"</code>: the sub-block it fills. The engine refuses a store in another slot.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>config_model</code></td>
+<td style="text-align: left;">A pydantic model for the store's sub-block apart from <code>type</code>. Set <code>extra="forbid"</code>, so a misspelt key is an error, and hold credentials as <code>SecretStr</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>from_config(cfg, *, folder)</code></td>
+<td style="text-align: left;">Builds the store from a validated <code>config_model</code> instance, after the engine has resolved any <code>${provider:key}</code> in it. <code>folder</code> is <code>storage.path</code>. It should write nothing: <code>nl2sql config check</code> builds the stores too.</td>
+</tr>
+</tbody>
+</table>
+<p>The slots' methods:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Interface</th>
+<th style="text-align: left;">Methods</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>IndexStore</code></td>
+<td style="text-align: left;"><code>open(namespace, dimension)</code>, <code>add(namespace, entries)</code>, <code>query(namespace, vector, k, where=None, with_vectors=False)</code>, <code>get(namespace, where, with_vectors=False)</code>, <code>delete(namespace, where)</code>, <code>pointers(namespace)</code>, <code>set_pointers(namespace, updates)</code> (atomic), <code>namespaces()</code>, <code>drop(namespace)</code>, <code>close()</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>StateStore</code></td>
+<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>keep_snapshots(datasource_id, keep)</code>, <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>lock(name, ttl_s)</code>, <code>close()</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>TraceStore</code></td>
+<td style="text-align: left;"><code>write(trace_id, document)</code>, <code>get(trace_id)</code>, <code>purge(older_than)</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ResultStore</code></td>
+<td style="text-align: left;"><code>write(key, chunks)</code>, <code>open(key)</code>, <code>exists(key)</code>, <code>purge(older_than)</code>. Bytes only: the engine writes the Parquet.</td>
+</tr>
+</tbody>
+</table>
+<p>The models they exchange: <code>Entry</code> (<code>id</code>, <code>text</code>, <code>vector</code>, <code>metadata</code>), <code>Hit</code>
+(an entry with its <code>distance</code>, and its <code>vector</code> when asked for), <code>Filter</code>
+(<code>eq</code>, <code>ne</code> and <code>in</code>, all of which must hold) and <code>BuildPointer</code> (which build
+of a datasource is live, and the <code>schema_version</code> it was built from). The
+engine embeds; a store keeps the vectors it is handed.</p>
+<p>A results store, sketched:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Self</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">BucketConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">bucket</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="k">class</span><span class="w"> </span><span class="nc">BucketResults</span><span class="p">:</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">slot</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"results"</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]]</span> <span class="o">=</span> <span class="n">BucketConfig</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">,</span> <span class="n">bucket</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket</span> <span class="o">=</span> <span class="n">client</span><span class="p">,</span> <span class="n">bucket</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">BucketConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">folder</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>        <span class="kn">import</span><span class="w"> </span><span class="nn">acme_blob</span>  <span class="c1"># the client library, imported only here</span>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">acme_blob</span><span class="o">.</span><span class="n">Client</span><span class="p">(),</span> <span class="n">cfg</span><span class="o">.</span><span class="n">bucket</span><span class="p">)</span>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">chunks</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">bytes</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">chunks</span><span class="p">))</span>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BinaryIO</span><span class="p">:</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">purge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">older_than</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">delete_before</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">older_than</span><span class="p">)</span>
+</code></pre></div>
+<p>Declare it in the <code>nl2sql.stores</code> entry point group
+(<code>bucket = "acme_nl2sql.results:BucketResults"</code>), or register it in code with
+<code>registry.add_store("bucket", BucketResults)</code>. Then <code>results: {type: bucket,
+bucket: nl2sql-results}</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built-ins only, for now</p>
+<p>The engine moves onto these interfaces one slot at a time during 0.6
+(the index, then the state, then the traces and results). Until a slot's
+move lands, the engine refuses a plugin store in that slot.</p>
+</div>
 <hr />
 <h2 id="compliance-testing">Compliance Testing</h2>
 <p>All adapters should pass the compliance test suite (schema introspection, type mapping,

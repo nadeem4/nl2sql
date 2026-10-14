@@ -1862,6 +1862,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -1878,6 +1896,47 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-four-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four stores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sharing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -4469,6 +4528,36 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-four-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The four stores
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sharing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -4486,7 +4575,7 @@
 
 <h1 id="storage">Storage</h1>
 <p>The <code>storage</code> section of <a href="../system/"><code>nl2sql.yaml</code></a> says where the engine keeps
-its data. It has one key:</p>
+its data, and which store keeps each part of it. Only <code>path</code> is required:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># storage.yaml</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.nl2sql</span><span class="w">          </span><span class="c1"># or "${env:NL2SQL_DATA_DIR}" in a container</span>
 </code></pre></div>
@@ -4525,15 +4614,84 @@ and adds <code>.nl2sql/</code> to <code>.gitignore</code>.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="the-four-stores">The four stores</h2>
+<p>Each part of that data has a slot, and each slot a store, named by <code>type</code>.
+Every sub-block is optional; left out, a slot uses its built-in store, so the
+section above is the same as:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.nl2sql</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">index</span><span class="p">:</span><span class="w">   </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">chroma</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># &lt;path&gt;/index/</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">state</span><span class="p">:</span><span class="w">   </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">sqlite</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># &lt;path&gt;/state.db</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">traces</span><span class="p">:</span><span class="w">  </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">files</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">     </span><span class="c1"># &lt;path&gt;/traces/</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">results</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">local</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">     </span><span class="c1"># &lt;path&gt;/results/</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Slot</th>
+<th>Built-in</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td><code>chroma</code></td>
+<td>The vector index</td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>sqlite</code></td>
+<td>Schema snapshots, the plan cache, feedback</td>
+</tr>
+<tr>
+<td><code>traces</code></td>
+<td><code>files</code></td>
+<td>Run traces</td>
+</tr>
+<tr>
+<td><code>results</code></td>
+<td><code>local</code></td>
+<td>Result files</td>
+</tr>
+</tbody>
+</table>
+<p>A store's other keys are its own, checked by the store when the engine is
+built, so a misspelt key is an error. They may be <code>${provider:key}</code>
+references, resolved through the <a href="../secrets/">secret providers</a> when the store
+is built:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">index</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">qdrant</span><span class="p p-Indicator">,</span><span class="nt"> url</span><span class="p">:</span><span class="w"> </span><span class="s">"http://qdrant:6333"</span><span class="p p-Indicator">,</span><span class="nt"> api_key</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:QDRANT_KEY}"</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>Store names share one entry point group, <code>nl2sql.stores</code>, so a name is unique
+across the four slots. A store in the wrong slot is refused with the stores
+installed for that slot: "'chroma' is an index store; results needs a results
+store. Installed: local."</p>
+<p>In code, a slot takes a <code>StoreConfig</code> or a store object, used as given:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Storage</span><span class="p">,</span> <span class="n">StoreConfig</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">,</span> <span class="n">traces</span><span class="o">=</span><span class="n">StoreConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"files"</span><span class="p">))</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">my_index_store</span><span class="p">)</span>   <span class="c1"># any object whose slot is "index"</span>
+</code></pre></div>
+<p>The store interfaces are in <a href="../../adapters/sdk/#interfaces-the-stores"><code>nl2sql_sdk.stores</code></a>.
+A plugin registers a store in the <code>nl2sql.stores</code> entry point group, or in
+code with <code>registry.add_store(name, cls)</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built-ins only, for now</p>
+<p>0.6 moves the engine onto the four store interfaces one slot at a time.
+Until a slot's move lands, the engine reads that slot through its
+built-in store only, and refuses any other store there with a problem at
+<code>storage.&lt;slot&gt;</code>.</p>
+</div>
+<h2 id="sharing">Sharing</h2>
 <p>Two engines with different paths share nothing. The commands that only read
 these stores (<code>nl2sql cache clear</code>, <code>nl2sql feedback</code>, <code>nl2sql trace show</code>)
 find them from the same config, so run them with the same <code>--config</code>.</p>
 <p>Results are local files. The S3 and ADLS result backends of 0.4 were removed;
 remote stores come back with the results-store interface in a later release.</p>
 <p>In a container, mount a volume and point the path at it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_DATA_DIR</span><span class="o">=</span>/data<span class="w"> </span>-v<span class="w"> </span>nl2sql-data:/data<span class="w"> </span>...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_DATA_DIR</span><span class="o">=</span>/data<span class="w"> </span>-v<span class="w"> </span>nl2sql-data:/data<span class="w"> </span>...
 </code></pre></div>
 
 

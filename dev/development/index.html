@@ -2065,7 +2065,7 @@
 <li><code>extensions/add-execution-backend.md</code> for new executor services.</li>
 </ul>
 <h2 id="the-registry">The registry</h2>
-<p>Adapters, LLM providers, embeddings providers and secret providers are all
+<p>Adapters, LLM providers, embeddings providers, secret providers and stores are all
 found by name through <code>nl2sql.registry.Registry</code>
 (<a href="../architecture/configuration_v2/#5-the-registry">design</a>). Each kind has an
 entry point group, and the built-ins are declared in
@@ -2104,12 +2104,18 @@ entry point group, and the built-ins are declared in
 <td><code>nl2sql_sdk.SecretProvider</code></td>
 <td><code>env</code>, <code>aws</code>, <code>azure</code>, <code>hashicorp</code></td>
 </tr>
+<tr>
+<td><code>store</code></td>
+<td><code>nl2sql.stores</code></td>
+<td><code>nl2sql_sdk.stores</code> (four interfaces, one per slot)</td>
+<td><code>chroma</code>, <code>sqlite</code>, <code>files</code>, <code>local</code></td>
+</tr>
 </tbody>
 </table>
 <ul>
 <li><code>Registry.default()</code> lists the installed entry points by name and imports
   none of them. <code>Registry.empty()</code> holds nothing.</li>
-<li><code>add_adapter</code>, <code>add_llm</code>, <code>add_embeddings</code> and <code>add_secrets</code>, and the
+<li><code>add_adapter</code>, <code>add_llm</code>, <code>add_embeddings</code>, <code>add_secrets</code> and <code>add_store</code>, and the
   decorators <code>@registry.adapter(name)</code> and so on, register in code on that
   registry only. A name already present raises unless <code>replace=True</code>.</li>
 <li><code>names(kind)</code> lists the names; <code>load(kind, name)</code> imports one and checks its
