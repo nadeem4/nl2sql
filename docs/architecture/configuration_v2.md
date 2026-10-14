@@ -1011,6 +1011,29 @@ capabilities stay separate `runtime_checkable` protocols, as
 
 ## 6. Loading
 
+!!! note "Built: `nl2sql config check` (PR 8)"
+    `nl2sql.config.check.check_config(path, registry=, connect=)` runs steps
+    1, 2a and 2b, and with `connect` step 3, and returns every problem, every
+    secret as present or missing, and the datasource statuses;
+    `nl2sql config check [--connect]` prints them by file. Building it settled
+    these details:
+
+    - `Runtime.components(cfg, registry)` is step 2b without the stores and
+      without the process-global copy; `Runtime.from_config` is it plus the
+      stores. So the check writes nothing under `storage.path`.
+    - `Config.locate(path)` maps a path in the whole config
+      (`datasources[0].type`) to the file it was read from
+      (`datasources/sales.yaml → type`). The runtime's problems use it, so
+      `NL2SQL(...)`'s `ConfigError` names included files as well.
+    - Where `llm` names no `api_key`, the provider's standard variable is
+      listed with the secrets. A missing LLM key is reported, not a problem,
+      as in the constructor: `check()` reports it at startup.
+    - With `--connect`, any datasource that fails is a problem, `required` or
+      not. Exit codes: 0, 1 on a problem or a missing config, and 2 for a
+      usage error (Typer's).
+    - CI's integration job runs it with `--connect` on the `init --demo`
+      config before indexing.
+
 ```mermaid
 flowchart LR
   D["1. Discover<br/>Registry.default()<br/>entry point names only"] --> L["2. Load and validate<br/>load_config + NL2SQL(cfg)<br/>imports only what the config names"]
@@ -1329,6 +1352,9 @@ users, yanking it adds nothing.
 ## 10. CLI, demo, Docker and docs
 
 ### CLI
+
+!!! note "Built: `nl2sql config check` (PR 8)"
+    See the note in [Loading](#6-loading).
 
 !!! note "Built: the callers on the new config (PR 7b)"
     The CLI takes one global `--config`; `--env`, `--env-file`, every

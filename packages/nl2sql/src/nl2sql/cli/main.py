@@ -33,6 +33,7 @@ from nl2sql.cli.commands.policy import app as policy_app
 from nl2sql.cli.commands.curated import app as curated_app
 from nl2sql.cli.commands.trace import app as trace_app, replay_command
 from nl2sql.cli.commands.cache import app as cache_app
+from nl2sql.cli.commands.config_check import app as config_app
 from nl2sql.cli.commands.feedback import app as feedback_app
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import configure_output_encoding
@@ -45,6 +46,7 @@ app = typer.Typer(
     add_completion=False,
 )
 
+app.add_typer(config_app, name="config", help="Check the config without starting the engine (`nl2sql config check`).")
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
 app.add_typer(curated_app, name="curated", help="The curated answers file: `nl2sql curated validate`, `nl2sql curated test`, `nl2sql curated proposals export`.")
 app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")

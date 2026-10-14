@@ -126,7 +126,8 @@ reads a secret from the provider whose `id` is `vault` (see
 Every section forbids unknown keys and suggests the closest known one. Names
 resolved through the [registry](../development/index.md) (`type:`,
 `provider:`) suggest from the installed names. `load_config` and `NL2SQL(...)`
-collect every problem before raising one `ConfigError`:
+collect every problem before raising one `ConfigError`, each naming the file
+it is in (an included file, not `nl2sql.yaml`):
 
 ```text
 nl2sql.yaml has 2 problems:
@@ -191,6 +192,63 @@ There are no per-command path flags. Commands that query or index build the
 engine and call `engine.check()` first (see [Startup](#startup-check-and-required)).
 `nl2sql cache`, `nl2sql feedback` and `nl2sql trace show` only need the store
 paths under `storage.path`, and build no engine.
+
+## Checking a config: `nl2sql config check`
+
+`nl2sql config check` checks the whole config without starting the engine,
+so it fits a CI job or a pre-deploy step:
+
+```bash
+nl2sql --config prod/nl2sql.yaml config check            # files, names, drivers
+nl2sql --config prod/nl2sql.yaml config check --connect  # and connect to every datasource
+```
+
+It does what building the engine does, short of the stores:
+
+- reads `nl2sql.yaml` and every file it includes, and resolves `${env:...}`;
+- loads every name the config uses through the registry (`type:`,
+  `provider:`, the secret providers): the name is installed, implements the
+  interface version this engine needs, and its drivers are installed;
+- builds the components, which resolves each datasource's `connection`
+  references, without connecting or calling a model.
+
+With `--connect` it also connects to every datasource, as
+[`engine.check()`](#startup-check-and-required) does, and a datasource that
+fails is a problem (`required` or not).
+
+Problems are printed by the file they are in, then a line per secret:
+
+```text
+datasources/sales.yaml
+  type
+    Unknown adapter 'postgress'. Did you mean 'postgres'? Registered: duckdb, mssql, mysql, postgres, sqlite.
+
+llm.yaml
+  provider
+    Unknown LLM provider 'antropic'. Did you mean 'anthropic'? Registered: anthropic, ollama, openai, openrouter.
+
+Secrets:
+  ${env:SALES_DB_PASSWORD} missing (datasources/sales.yaml → connection.password)
+
+prod/nl2sql.yaml: 2 problems in 2 files.
+```
+
+A secret is reported as present or missing, never printed. Where the `llm`
+section names no `api_key`, the provider's standard variable is listed. A
+missing LLM key is reported but is not a problem, as for the engine: a CI job
+rarely holds the production key, and `engine.check()` reports it at startup.
+Any other secret that does not resolve stops the engine from building, so it
+is a problem.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | No problems. |
+| 1 | One or more problems, or the config was not found. |
+| 2 | A usage error: an unknown option. |
+
+The check creates no file under `storage.path`. From Python, the same check is
+`nl2sql.config.check.check_config(path, registry=..., connect=...)`, which
+returns the problems, the secrets and the datasource statuses.
 
 ## Startup: `check()` and `required`
 
@@ -313,3 +371,4 @@ start from.
 - `init_project`, `demo_config`: `packages/nl2sql/src/nl2sql/config/project.py`
 - The runtime built from a `Config`: `packages/nl2sql/src/nl2sql/runtime.py`
 - The CLI's `--config`: `packages/nl2sql/src/nl2sql/cli/common/engine.py`
+- `nl2sql config check`: `packages/nl2sql/src/nl2sql/config/check.py`, printed by `packages/nl2sql/src/nl2sql/cli/commands/config_check.py`

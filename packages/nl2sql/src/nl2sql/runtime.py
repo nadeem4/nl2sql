@@ -72,6 +72,26 @@ class Runtime:
                 provider without its key, or curated answers that do not
                 match the datasources.
         """
+        self = cls.components(config, registry)
+        _copy_into_global_settings(config, self.stores)
+        self._build_stores()
+        return self
+
+    @classmethod
+    def components(cls, config: Config, registry: Optional[Registry] = None) -> "Runtime":
+        """Step 2b of loading without the stores: what ``nl2sql config check`` builds.
+
+        Loads every name ``config`` uses through the registry and builds the
+        secret manager, the RBAC policies, the adapters (not connected), the
+        LLM clients (no model call) and the embedder. Nothing is written
+        under ``storage.path`` and no process global is touched. The result
+        can ``check_datasources()`` and ``close()``; it cannot answer.
+
+        Raises:
+            ConfigError: as ``from_config``. Each problem names the file it is
+                in (``config.locate``).
+        """
+        from nl2sql.auth import RBAC
         from nl2sql.datasources import DatasourceRegistry
         from nl2sql.llm import LLMRegistry
         from nl2sql.secrets import SecretManager
@@ -84,7 +104,8 @@ class Runtime:
         problems: List[Problem] = []
 
         def problem(path: str, message: str, fix: Optional[str] = None) -> None:
-            problems.append(Problem(file=source, path=path, message=message, fix=fix))
+            file, inner = config.locate(path) if config.folder is not None else (source, path)
+            problems.append(Problem(file=file, path=inner, message=message, fix=fix))
 
         # Secrets first: datasources, LLM keys and embeddings resolve through them.
         self.secret_manager = SecretManager(self.registry)
@@ -105,7 +126,8 @@ class Runtime:
 
         self.llm_registry = LLMRegistry(self.secret_manager, self.registry)
         llm_problems = _llm_provider_problems(config.llm, self.registry, source)
-        problems.extend(llm_problems)
+        for p in llm_problems:
+            problem(p.path, p.message)
         if not llm_problems:
             # Clients are built now (no model call); a key that does not
             # resolve is check()'s to report, not the constructor's.
@@ -130,9 +152,8 @@ class Runtime:
             raise ConfigError(problems, source=source)
 
         self._config = config
+        self.rbac = RBAC.from_policies(config.policies)
         self.stores = StorePaths.under(config.storage.path)
-        _copy_into_global_settings(config, self.stores)
-        self._build_stores()
         return self
 
     # ------------------------------------------------------------ building
@@ -148,14 +169,12 @@ class Runtime:
         return provider.create(embeddings)
 
     def _build_stores(self) -> None:
-        from nl2sql.auth import RBAC
         from nl2sql.execution import ExecutionStore
         from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
         from nl2sql.indexing.vector_store import VectorStore
         from nl2sql.schema.sqlite_store import SqliteSchemaStore
 
         config = self._config
-        self.rbac = RBAC.from_policies(config.policies)
         self.stores.index.mkdir(parents=True, exist_ok=True)
         self.stores.state.parent.mkdir(parents=True, exist_ok=True)
         self.vector_store = VectorStore(collection_name=INDEX_COLLECTION,
