@@ -86,6 +86,28 @@ Two rules from earlier decisions apply throughout:
 
 ## 2. The config files
 
+!!! note "Built: the models and `load_config` (PR 2)"
+    The models, `load_config`, `ConfigError`, `load_env_file` and the
+    `nl2sql.testing.config.make_config` test helper are in `nl2sql.config`.
+    Nothing reads them yet: the engine is moved onto them in PR 7a, and they
+    are exported from `nl2sql` from then on. Until PR 7b this section stays the
+    reference. Building them settled these details:
+
+    - In `Settings`, the `schema` group is the attribute `schema_` in Python,
+      because `schema` would shadow a pydantic method. The YAML key is
+      `schema`.
+    - `Policies.allow_all()` (the shorthand) and the `allow_all` field share a
+      name: the shorthand answers on the class, the field on an instance.
+      `default_role` must name one of the `roles`.
+    - A secret provider's own keys (everything but `id` and `type`) keep their
+      references, like a datasource's `connection`, until the provider's
+      `config_model` (PR 4) says which of them are secrets.
+    - Outside secret fields and `connection`, only `${env:...}` resolves at
+      load. Another provider's reference there is an error that names the
+      field.
+    - `datasources` is required in code as well as in the file; `[]` is
+      enough.
+
 ### The table of contents
 
 `nl2sql.yaml` is short. `nl2sql init` writes it with each section in its own
