@@ -417,18 +417,26 @@ default:
 Pick the provider whose credential behaviour matches the endpoint: `openai` or
 `openrouter` if the endpoint expects a key, `ollama` if it accepts any key.
 
-## Clients are built on first use
+## Clients are built when the LLM is set
 
-Registering an agent validates its configuration; the client itself is built the
-first time that agent's LLM is requested. Two consequences:
+The engine builds every agent's client when it is created, and again when the
+LLM is replaced, without calling a model. Each engine keeps its clients in its
+own cache (an LRU of 16), keyed on the agent's resolved settings: provider,
+model, `base_url`, temperature and the API key. The key enters the cache key
+only as a SHA-256 digest, so a cache key can be logged and never holds a
+secret. Agents with equal settings share one client: seven agents on one model
+build one client.
 
-- Building the engine's `Runtime` (which `nl2sql setup`, `nl2sql index` and the API
-  all do) no longer requires a chat provider key. A machine with no key can
-  still run key-free work such as indexing with `EMBEDDING_PROVIDER=local`. That
-  holds for indexing because the `indexing_enrichment` pass is genuinely
-  optional - it is skipped, not merely deferred to a later failure.
-- A missing or wrong key surfaces on the **first LLM call**, not at startup. The
-  error names the agent, the provider and the environment variable to set:
+A missing key does not stop the engine from starting:
+
+- Creating the engine (which `nl2sql setup`, `nl2sql index` and the API all do)
+  does not require a chat provider key. A machine with no key can still run
+  key-free work such as indexing with `EMBEDDING_PROVIDER=local`. That holds
+  for indexing because the `indexing_enrichment` pass is genuinely optional:
+  it is skipped, not merely deferred to a later failure.
+- `engine.check()` reports every agent whose key does not resolve, without
+  calling a model. Using that agent raises the same error, naming the agent,
+  the provider and the environment variable to set:
 
   ```text
   ValueError: LLM agent 'default' uses provider 'openai', which requires an API
@@ -436,8 +444,58 @@ first time that agent's LLM is requested. Two consequences:
   the agent an 'api_key' in configs/llm.yaml.
   ```
 
-Genuine misconfiguration still fails immediately at registration: an unknown
-provider, or an agent with no model.
+The key is read when the clients are built. A key set in the environment after
+the engine started is used only once the LLM is set again.
+
+Genuine misconfiguration fails immediately: an unknown provider, or an agent
+with no model.
+
+## Replacing the LLM at runtime
+
+`engine.llm.replace` swaps the whole `llm` section at once, while the engine
+runs:
+
+```python
+from nl2sql import LLM, AgentLLM
+
+change = engine.llm.replace(
+    LLM(provider="anthropic", model="claude-sonnet-5-5",
+        agents={"ast_planner": AgentLLM(model="claude-opus-5-5")}),
+    by=user,          # optional: the UserContext making the change
+)
+print(change.changes)  # {"default": {"old": "openai/gpt-5.4", "new": "anthropic/claude-sonnet-5-5"}, ...}
+```
+
+- **Validated like the file.** The new section is checked as the `llm`
+  section of `nl2sql.yaml` is: every provider must be registered and
+  installed, and every agent's API key must resolve. If anything is wrong it
+  raises `ConfigError` and nothing changes. No model is called.
+- **Atomic.** The new clients are built first, then the engine's LLM and
+  `engine.config.llm` are swapped together. A query reads the engine's LLM once,
+  when it starts: queries already running finish on the old LLM, and every
+  query that starts afterwards uses the new one. No query mixes the two.
+- **Logged and audited.** One INFO line on the `nl2sql.llm` logger and one
+  `llm.changed` audit record name who made the change (`by`'s user and roles
+  when given, otherwise the entry point, `python` by default) and, for each
+  agent whose provider or model changed, the old and the new one. They never
+  hold a key, a key reference or a header.
+
+  ```text
+  INFO nl2sql.llm: LLM replaced by user=u42 roles=[admin] via api: default: openai/gpt-5.4 -> anthropic/claude-sonnet-5-5; ast_planner: openai/gpt-5.4 -> anthropic/claude-opus-5-5
+  ```
+
+- **Not saved.** Nothing is written to disk, so a restart goes back to the
+  config file.
+- **Cached clients.** Swapping back to an earlier LLM reuses the clients built
+  for it. A client that falls out of the cache is closed (its `close()`, when
+  it has one) once no running query uses it.
+- **Plans follow the model.** The plan cache key includes the planner's
+  provider and model, so after a swap a plan written by another model is never
+  served. Swapping back hits the old plans again. See
+  [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+
+The REST API's `POST /llm` still registers one agent at a time until it is
+replaced by `PUT /api/v1/settings/llm`, which calls `engine.llm.replace`.
 
 ## Embeddings are a separate path
 

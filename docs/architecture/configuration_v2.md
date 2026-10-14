@@ -635,9 +635,8 @@ The variables read outside `Settings`:
       deleted; each engine builds its own `SecretManager(registry)`.
     - **Per engine.** The embedder is built once from `embeddings` through the
       registry, or is the `instance` given; `EmbeddingService` is deleted. The
-      LLM settings still go through `LLMRegistry` until PR 9: it takes the
-      `llm` section (`configure(llm)`), resolves providers through the
-      registry, and hands back a chat model object given as `LLM(model=...)`.
+      LLM is the engine's `LLMSet`, built from the `llm` section through its
+      `LLMClientCache` (PR 9, [Replacing the LLM at runtime](#replacing-the-llm-at-runtime)).
       `Policies.allow_all` and `default_role` are applied by `RBAC`.
     - **Stores.** The index is `<storage.path>/index/` (collection
       `nl2sql_store`, a constant), the schema store `<storage.path>/state.db`,
@@ -779,6 +778,39 @@ engine.llm.replace(LLM(provider="openai", model="gpt-5.4",
 ```
 
 ### Replacing the LLM at runtime
+
+!!! note "Built: the LLM client cache and `llm.replace` (PR 9)"
+    `engine.llm.replace(llm, *, by=None, via="python") -> LLMChange` is built
+    (`Runtime.replace_llm` in `nl2sql/runtime.py`), with `LLMSet` and
+    `LLMChange` in `nl2sql/llm/llm_set.py` and `LLMClientCache` in
+    `nl2sql/llm/client_cache.py`. `LLMRegistry` is now the per-engine holder of
+    the current set and the cache; the nodes still ask it for their client by
+    name. Building it settled these details:
+
+    - **The entry point.** `replace` takes `via` alongside `by`, so the entry
+      point (`python`, `api`, `playground`) is known when there is no user.
+      `PUT /api/v1/settings/llm` arrives in PR 10; until then `POST /llm`
+      keeps registering one agent through `configure_llm`, which builds a new
+      set and swaps it, but leaves `engine.config.llm` as it was.
+    - **Keys.** `replace` fails with `ConfigError` when an agent's API key
+      does not resolve (`llm.api_key`, `llm.agents.<agent>.api_key`). At
+      construction a key that does not resolve is still `check()`'s to
+      report, and using that agent raises the reason.
+    - **Clients are built up front**, at construction and on `replace`, so
+      the key is read then: a key set in the environment later is used only
+      once the LLM is set again.
+    - **Reading the set once.** `run_with_graph` pins the current set to the
+      run (`LLMRegistry.begin_run`, a context variable read while the graph is
+      built) and releases it when the graph finishes, which a timed-out run
+      has not yet done. The trace records the run's set.
+    - **Closing.** The built-in wires build `ChatOpenAI` and `ChatAnthropic`,
+      which share their library's process-wide connection pool, so there is
+      no HTTP client of their own to close: closing calls the client's
+      `close()` when it has one (a provider registered in code), and is
+      otherwise dropping the reference.
+    - **The plan cache key** carries the planner as `provider/model`, the
+      effective one for the run (a caller's per-request model included); a
+      model object is `Class/model`.
 
 Owner decision 6 keeps a runtime model switch. Changing the model by hand is
 something both the playground and an operator need.

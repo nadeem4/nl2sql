@@ -101,15 +101,16 @@ def test_empty_model_is_rejected_at_registration():
         registry.register_llm(AgentConfig(provider="openai", model="   "))
 
 
-def test_clients_are_built_lazily_and_cached():
+def test_clients_are_built_up_front_and_cached():
     registry = _registry()
     registry.register_llm(
         AgentConfig(provider="openai", model="gpt-4o", api_key="sk-test", name="default")
     )
 
-    assert registry.llms == {}
+    assert set(registry.llms) == {"default"}
 
     first = registry.get_llm("default")
+    assert first is registry.llms["default"]
     assert registry.get_llm("default") is first
 
 

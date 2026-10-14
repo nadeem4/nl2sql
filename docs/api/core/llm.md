@@ -4,12 +4,15 @@
 Configure LLM providers and expose LLM configurations by name.
 
 ## Responsibilities
+- Replace the engine's whole LLM at runtime (`replace`).
 - Register LLM configs programmatically or from file.
 - Provide config lookup and listing.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/llm_api.py`
 - `packages/nl2sql/src/nl2sql/llm/registry.py`
+- `packages/nl2sql/src/nl2sql/llm/llm_set.py`
+- `packages/nl2sql/src/nl2sql/llm/client_cache.py`
 - `packages/nl2sql/src/nl2sql/llm/models.py`
 - `packages/nl2sql/src/nl2sql/configs/llm.py`
 
@@ -50,6 +53,40 @@ Fields:
 | `default` | `AgentConfig` | yes | Default LLM configuration. |
 | `agents` | `Dict[str, AgentConfig]` | no | Per-agent overrides. |
 
+### LLM_API.replace
+
+Source:
+`packages/nl2sql/src/nl2sql/api/llm_api.py` (`Runtime.replace_llm` in
+`packages/nl2sql/src/nl2sql/runtime.py`)
+
+Signature:
+`replace(llm: LLM, *, by: Optional[UserContext] = None, via: str = "python") -> LLMChange`
+
+Parameters:
+| name | type | required | meaning |
+| --- | --- | --- | --- |
+| `llm` | `LLM` | yes | The whole `llm` section, as in `nl2sql.yaml`. |
+| `by` | `Optional[UserContext]` | no | Who is making the change; its `user_id` and `roles` are logged. |
+| `via` | `str` | no | The entry point making the change (`python`, `api`, `playground`). |
+
+Returns:
+`LLMChange`: `by` (`via`, and `user_id` and `roles` when `by` was given) and
+`changes`, each agent whose effective provider or model changed as
+`{"old": "provider/model", "new": "provider/model"}`. It holds no key.
+
+Raises:
+- `ConfigError` for a provider that is not registered or not installed, or an
+  agent whose API key does not resolve. Nothing changes.
+
+Side Effects:
+- Builds the new clients (no model call), then swaps the engine's `LLMSet`
+  and `engine.config.llm` together under the engine's lock. Runs already in
+  flight finish on the old set.
+- One INFO line on the `nl2sql.llm` logger and one `llm.changed` audit record.
+  Nothing is written to disk.
+
+See [LLM configuration → Replacing the LLM at runtime](../../configuration/llm.md#replacing-the-llm-at-runtime).
+
 ### LLM_API.configure_llm
 
 Source:
@@ -70,12 +107,13 @@ Raises:
 - `ValueError` for an unsupported provider or an empty model.
 
 Side Effects:
-- Registers the LLM config. The provider client is built lazily, on the first
-  `LLMRegistry.get_llm()` for that agent.
+- Sets that agent and keeps the others, as one swap of the engine's `LLMSet`.
+  The client is built now, through the engine's client cache. `engine.config.llm`
+  is not updated; `replace` is the way to change the whole section.
 
 Idempotency:
-- Re-registering same `name` overwrites the config and drops any client already
-  built from the previous one.
+- Re-registering same `name` overwrites the config; a client still used by
+  another agent or a run in flight is kept.
 
 ### LLM_API.configure_llm_from_config
 
@@ -130,16 +168,24 @@ Map of LLM name → config (API key excluded).
   with `max_tokens=16000`, and whose tool calls go through the adapter's
   `repair_tool_calls` (arguments Claude nested under a single key the schema
   does not declare -- `input`, `query`, ... -- are unwrapped). It needs the `nl2sql-engine[anthropic]` extra;
-  without it the first `get_llm()` raises a `ValueError` naming the extra. See
+  without it `get_llm()` raises a `ValueError` naming the extra. See
   [LLM configuration → Anthropic](../../configuration/llm.md#anthropic-claude).
 - `openai`, `anthropic` and `openrouter` require an API key (`OPENAI_API_KEY`,
   `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`); `ollama` does not, and its preset
   supplies the placeholder key `ChatOpenAI` insists on.
-- Clients are built lazily. `register_llm()` validates the provider and model and
-  stores the config; `get_llm()` builds the client on first use and caches it
-  under the registry lock, so a context can be constructed with no credentials.
-  A provider that needs a key and cannot resolve one raises a `ValueError` naming
-  the agent, the provider and the environment variable to set - not the raw
+- The engine's LLM is one immutable `LLMSet` (each agent's settings and
+  client), built when the engine is created and on every `replace`, without a
+  model call. A run reads it once, when it starts (`LLMRegistry.begin_run`), so
+  a run never mixes two sets.
+- Clients come from the engine's `LLMClientCache`, an LRU of 16 keyed on the
+  agent's resolved settings with the API key only as a SHA-256 digest. Agents
+  with equal settings share one client, and swapping back reuses cached
+  clients. A client that falls out of the cache is closed (its `close()`, when
+  it has one) once no set in use holds it; `engine.close()` closes them all.
+- A provider that needs a key and cannot resolve one does not stop the engine
+  being built: `check()` reports it (`missing_keys()`), and `get_llm()` for that
+  agent raises a `ValueError` naming the agent, the provider and the
+  environment variable to set - not the raw
   `openai.OpenAIError: Missing credentials`.
 - Ollama is supported at the transport level. The pipeline calls
   `with_structured_output` (including the recursive `PlanModel` in the AST

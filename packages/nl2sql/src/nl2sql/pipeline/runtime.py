@@ -122,6 +122,25 @@ def _install_signal_handlers(token: CancellationToken) -> Callable[[], None]:
     return _restore
 
 
+class _NoLLMs:
+    """The run handle for a context without an LLM registry (a test's stand-in runtime)."""
+
+    def unpin(self) -> None:
+        pass
+
+    def release(self) -> None:
+        pass
+
+    def end(self) -> None:
+        pass
+
+
+def _begin_run(ctx: Runtime):
+    """Pins the engine's current LLM set to this run (``LLMRegistry.begin_run``)."""
+    llms = getattr(ctx, "llm_registry", None)
+    return llms.begin_run() if llms is not None else _NoLLMs()
+
+
 def run_with_graph(
     ctx: Runtime,
     user_query: str,
@@ -148,10 +167,17 @@ def run_with_graph(
     restore_signals = _install_signal_handlers(token)
     _start_keyboard_cancel_listener(token, run_done)
 
-    graph = build_graph(
-        ctx,
-        execute=execute,
-    )
+    # The run reads the engine's LLM set once, here: every node is built from
+    # it, and a swap while the run is in flight leaves the run on this set.
+    run_llms = _begin_run(ctx)
+    try:
+        graph = build_graph(
+            ctx,
+            execute=execute,
+        )
+    except BaseException:
+        run_llms.end()
+        raise
 
     # No role is an empty UserContext, the state's own default: RBAC then sees
     # a caller with no roles, as it does for one whose roles list is empty.
@@ -232,8 +258,11 @@ def run_with_graph(
     # ``future.result`` would still have to wait for the whole graph to finish
     # before the timeout could surface. One worker per run; the run owns it.
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="nl2sql-run")
+    future = None
     try:
         future = pool.submit(_invoke)
+        # Released when the graph is done, which a timed-out run is not yet.
+        future.add_done_callback(lambda _: run_llms.release())
         try:
             result = future.result(timeout=timeout_sec)
         except concurrent.futures.TimeoutError:
@@ -295,5 +324,8 @@ def run_with_graph(
         }, "crashed", f"{type(e).__name__}: {e}")
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
+        run_llms.unpin()
+        if future is None:
+            run_llms.release()
         run_done.set()
         restore_signals()

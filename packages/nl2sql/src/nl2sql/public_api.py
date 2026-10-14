@@ -32,7 +32,7 @@ class NL2SQL:
 
         Resolves every name through ``registry`` (``Registry.default()`` when
         None), imports only the components the config uses, and builds the
-        secret manager, the adapters (not connected), the LLM settings (no
+        secret manager, the adapters (not connected), the LLM clients (no
         model call), the embedder and the stores under ``storage.path``.
 
         Raises:

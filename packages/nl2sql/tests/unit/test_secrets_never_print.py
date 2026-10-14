@@ -76,7 +76,7 @@ def test_llm_client_is_built_with_the_real_key(monkeypatch):
         registry.register_llm(AgentConfig(provider="openai", model="gpt-5.4", api_key=FAKE_KEY,
                                           base_url=server.base_url, temperature=None))
         client = registry.get_llm("default")
-        assert FAKE_KEY not in repr(registry._configs)
+        assert FAKE_KEY not in repr(registry.current.configs)
         client.invoke("ping")
     finally:
         server.stop()

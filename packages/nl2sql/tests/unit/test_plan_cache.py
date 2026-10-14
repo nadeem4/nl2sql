@@ -237,6 +237,7 @@ def _planner(store):
     llm.with_structured_output.return_value = llm
     ctx = fake_runtime(llm_registry=MagicMock(), schema_store=store)
     ctx.llm_registry.get_llm.return_value = llm
+    ctx.llm_registry.effective.return_value = None  # the plans below are cached without a planner model
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
     node.chain.invoke.return_value = _plan("from the model")

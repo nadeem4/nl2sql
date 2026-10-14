@@ -109,6 +109,9 @@ def wrap_subgraph(
     were superseded by a later attempt, so they reach the run's ``warnings``
     rather than its ``errors``.
     """
+    # Built with the graph, so it is keyed on the planner model this run uses.
+    plan_cache = plan_cache_for(ctx)
+
     def _wrapper(state_dict: dict, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
         trace_id = state_dict.get("trace_id")
         subgraph_id = state_dict.get("subgraph_id")
@@ -166,7 +169,7 @@ def wrap_subgraph(
             e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
         )
         if succeeded and execute and executed_cleanly and plan is not None and plan_source == "llm":
-            plan_cache_for(ctx).put(sub_query, plan)
+            plan_cache.put(sub_query, plan)
 
         row_cap = generator_response.row_cap if generator_response else None
         subgraph_output = SubgraphOutput(
