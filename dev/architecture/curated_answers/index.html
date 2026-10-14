@@ -2446,7 +2446,8 @@ person.</p>
 <h3 id="configscuratedyaml"><code>configs/curated.yaml</code></h3>
 <p>It follows the pattern of every other config file: a path setting with an
 environment alias (<code>CURATED_CONFIG</code>, default <code>configs/curated.yaml</code>), a
-pydantic file model in <code>nl2sql/configs/curated.py</code>, and a loader on
+pydantic file model in <code>nl2sql/configs/curated.py</code> (its models are in
+<code>nl2sql/config/curated.py</code>), and a loader on
 <code>ConfigManager</code> (<code>load_curated()</code>), next to <code>load_datasources()</code> and
 <code>load_policies()</code>.</p>
 <p>The file is optional. When the default path does not exist the feature is off

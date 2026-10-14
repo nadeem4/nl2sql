@@ -3102,6 +3102,30 @@ written into the section it affects:</p>
 </tbody>
 </table>
 <h2 id="2-the-config-files">2. The config files</h2>
+<div class="admonition note">
+<p class="admonition-title">Built: the models and <code>load_config</code> (PR 2)</p>
+<p>The models, <code>load_config</code>, <code>ConfigError</code>, <code>load_env_file</code> and the
+<code>nl2sql.testing.config.make_config</code> test helper are in <code>nl2sql.config</code>.
+Nothing reads them yet: the engine is moved onto them in PR 7a, and they
+are exported from <code>nl2sql</code> from then on. Until PR 7b this section stays the
+reference. Building them settled these details:</p>
+<ul>
+<li>In <code>Settings</code>, the <code>schema</code> group is the attribute <code>schema_</code> in Python,
+  because <code>schema</code> would shadow a pydantic method. The YAML key is
+  <code>schema</code>.</li>
+<li><code>Policies.allow_all()</code> (the shorthand) and the <code>allow_all</code> field share a
+  name: the shorthand answers on the class, the field on an instance.
+  <code>default_role</code> must name one of the <code>roles</code>.</li>
+<li>A secret provider's own keys (everything but <code>id</code> and <code>type</code>) keep their
+  references, like a datasource's <code>connection</code>, until the provider's
+  <code>config_model</code> (PR 4) says which of them are secrets.</li>
+<li>Outside secret fields and <code>connection</code>, only <code>${env:...}</code> resolves at
+  load. Another provider's reference there is an error that names the
+  field.</li>
+<li><code>datasources</code> is required in code as well as in the file; <code>[]</code> is
+  enough.</li>
+</ul>
+</div>
 <h3 id="the-table-of-contents">The table of contents</h3>
 <p><code>nl2sql.yaml</code> is short. <code>nl2sql init</code> writes it with each section in its own
 file:</p>
@@ -3260,9 +3284,10 @@ unknown keys, so writing one in 0.5 is an error.</p>
 <a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a><span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:SALES_DB_PASSWORD}"</span>
 <a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a><span class="nt">limits</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> row_limit</span><span class="p">:</span><span class="w"> </span><span class="nv">1000</span><span class="p p-Indicator">,</span><span class="nt"> timeout_ms</span><span class="p">:</span><span class="w"> </span><span class="nv">8000</span><span class="w"> </span><span class="p p-Indicator">}</span>
 <a href="#__codelineno-2-10" id="__codelineno-2-10" name="__codelineno-2-10"></a><span class="nt">preferred_tables</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">public.revenue_daily</span><span class="p p-Indicator">]</span>
-<a href="#__codelineno-2-11" id="__codelineno-2-11" name="__codelineno-2-11"></a><span class="nt">sample_questions</span><span class="p">:</span>
-<a href="#__codelineno-2-12" id="__codelineno-2-12" name="__codelineno-2-12"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What was revenue by region last quarter?</span>
-<a href="#__codelineno-2-13" id="__codelineno-2-13" name="__codelineno-2-13"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Which customers placed the most orders this year?</span>
+<a href="#__codelineno-2-11" id="__codelineno-2-11" name="__codelineno-2-11"></a><span class="nt">domains</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">revenue</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">customers</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">orders</span><span class="p p-Indicator">]</span>
+<a href="#__codelineno-2-12" id="__codelineno-2-12" name="__codelineno-2-12"></a><span class="nt">sample_questions</span><span class="p">:</span>
+<a href="#__codelineno-2-13" id="__codelineno-2-13" name="__codelineno-2-13"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What was revenue by region last quarter?</span>
+<a href="#__codelineno-2-14" id="__codelineno-2-14" name="__codelineno-2-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Which customers placed the most orders this year?</span>
 </code></pre></div>
 <h3 id="providerkey-interpolation"><code>${provider:key}</code> interpolation</h3>
 <p>The grammar is today's: <code>${env:SALES_DB_PASSWORD}</code>, <code>${vault:db/sales#password}</code>.
@@ -3379,6 +3404,12 @@ names are the YAML keys.</p>
 <td><code>list[str]</code></td>
 <td><code>[]</code></td>
 <td><code>sample_questions.yaml</code>, keyed by datasource</td>
+</tr>
+<tr>
+<td><code>domains</code></td>
+<td><code>list[str]</code></td>
+<td><code>[]</code></td>
+<td>new: a routing hint written by people. The domains generated at indexing are separate and stored with the index. Routing does not read it yet (a later phase).</td>
 </tr>
 <tr>
 <td><code>required</code></td>
