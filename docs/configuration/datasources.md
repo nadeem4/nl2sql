@@ -68,7 +68,7 @@ datasources[0].connection: connection.hostname: unknown key 'hostname'. Did you 
 | `duckdb` | `database` (the file, or `:memory:`) |
 | `postgres` | `host`, `port` (5432), `database`, `user`, `password`, `sslmode` (`disable`, `prefer` (default), `require`, `verify-full`) |
 | `mysql` | `host`, `port` (3306), `database`, `user`, `password` |
-| `mssql` | `host`, `port` (1433), `database`, `user`, `password`, `driver` (`ODBC Driver 17 for SQL Server`), `trusted_connection` (false), `trust_server_certificate` (false) |
+| `mssql` | `host`, `port` (1433), `database`, `user`, `password`, `driver` (the newest `ODBC Driver N for SQL Server` installed), `trusted_connection` (false), `trust_server_certificate` (false) |
 
 `postgres`, `mysql` and `mssql` also take `pool`, the connection pool:
 

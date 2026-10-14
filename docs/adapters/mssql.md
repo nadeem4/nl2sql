@@ -17,9 +17,9 @@ connection:
   user: sa
   password: "${env:DB_PASS}"
   database: my_db
-  driver: "ODBC Driver 17 for SQL Server" # Default
+  driver: "ODBC Driver 18 for SQL Server" # Optional: unset picks the newest one installed
   trusted_connection: false               # true: log in as the account the engine runs under
-  trust_server_certificate: false         # true: accept a self-signed certificate (ODBC Driver 18 encrypts by default)
+  trust_server_certificate: false         # true: accept a self-signed certificate
 ```
 
 The keys are `MssqlConnection`'s (`nl2sql.adapters.mssql.adapter`), and any
@@ -27,8 +27,16 @@ other key is an error; see [Connection](../configuration/datasources.md#connecti
 
 ### Connection Details
 
-* **Driver**: `pyodbc`. **Requires system ODBC headers installed.**
-* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}`, plus
+* **Driver**: `pyodbc`, with one of Microsoft's ODBC drivers (see [Requirements](#requirements)).
+* **ODBC driver**: the `driver` you set, else the newest `ODBC Driver N for SQL Server`
+  that `pyodbc.drivers()` lists, so a machine with only Driver 17 works without
+  configuration. With none installed, `nl2sql check` fails at the `driver` stage
+  and says where to download one.
+* **Encryption**: always on (`Encrypt=yes`). Driver 18 encrypts by default and
+  Driver 17 does not, so the adapter asks for it: the connection behaves the same
+  whichever driver is used. A server with a self-signed certificate (a local or
+  test server) needs `trust_server_certificate: true`.
+* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}&Encrypt=yes`, plus
   `Trusted_Connection=yes` and `TrustServerCertificate=yes` when set.
   Built with SQLAlchemy's `URL.create`, so the user name and password are
   percent-escaped: a password containing `@ : / # %` works as written.
@@ -39,7 +47,7 @@ other key is an error; see [Connection](../configuration/datasources.md#connecti
 | :--- | :--- | :--- |
 | **Read-only** | None | Does not declare `ENFORCES_READ_ONLY`; see [Read-only](#read-only). |
 | **Timeout** | pyodbc `Connection.timeout` | Client-side query timeout, in whole seconds. Declares `ENFORCES_TIMEOUT`. |
-| **Connection stages** | SQL Server's error number | 18456 is `auth`, 4060 `database`, 916 `permission`; ODBC's `08001`, `08S01` and `HYT00` are `network`. |
+| **Connection stages** | SQL Server's error number | 18456 is `auth`, 4060 `database`, 916 `permission`; ODBC's `08001`, `08S01` and `HYT00` are `network`; no ODBC Driver for SQL Server installed is `driver`. |
 | **Row counts** | `sys.partitions` | The row count SQL Server keeps for each table. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
@@ -79,7 +87,9 @@ limit passes, the driver cancels the query and the adapter reports it as a timeo
 
 ## Requirements
 
-You must have the MS ODBC Driver installed in your Docker image or local environment.
+`pip install "nl2sql-engine[mssql]"` installs `pyodbc`. You also need
+Microsoft's ODBC Driver for SQL Server (17 or 18) in your Docker image or local
+environment; the adapter uses the newest one installed.
 
 [Download ODBC Driver for SQL Server](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
 

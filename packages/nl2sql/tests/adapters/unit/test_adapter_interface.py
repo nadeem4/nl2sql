@@ -19,7 +19,7 @@ ENTRY_POINTS = sorted({ep.name: ep for ep in entry_points(group="nl2sql.adapters
 DRIVER_MODULES = {
     "duckdb": ("duckdb", "duckdb_engine"),
     "mssql": ("pyodbc",),
-    "mysql": ("pymysql",),
+    "mysql": ("pymysql", "cryptography"),
     "postgres": ("psycopg2",),
     "sqlite": ("sqlite3",),
 }

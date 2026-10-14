@@ -6,6 +6,9 @@ fragment (``#``), so the driver dials the wrong host or rejects the URL. Each
 adapter must escape them; parsing the URL back gives the original values.
 """
 
+import sys
+import types
+
 import pytest
 from sqlalchemy.engine import make_url
 
@@ -15,6 +18,13 @@ from nl2sql.adapters.postgres.adapter import PostgresAdapter, PostgresConnection
 
 PASSWORD = "p@ss:w/rd#%?&="
 USER = "an@lyst:1/x"
+
+
+@pytest.fixture(autouse=True)
+def odbc_driver_18(monkeypatch):
+    """pyodbc as a machine with ODBC Driver 18 sees it: the SQL Server URL names the driver it picks."""
+    fake = types.SimpleNamespace(drivers=lambda: ["SQL Server", "ODBC Driver 18 for SQL Server"])
+    monkeypatch.setitem(sys.modules, "pyodbc", fake)
 
 
 @pytest.mark.parametrize(
@@ -60,5 +70,5 @@ def test_mssql_keeps_driver_and_trusted_connection_without_credentials():
 
     # Assert
     assert url.username is None and url.password is None
-    assert url.query["driver"] == "ODBC Driver 17 for SQL Server"
+    assert url.query["driver"] == "ODBC Driver 18 for SQL Server"
     assert url.query["Trusted_Connection"] == "yes"
