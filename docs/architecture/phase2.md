@@ -309,7 +309,7 @@ cover `packages/*/src`, not the tests.
 
 ### The GCP VM
 
-One small VM in `nl2sql-testbed-261014` runs the same compose file
+One small VM, `nl2sql-testbed` in `nl2sql-testbed-261014` (zone `us-central1-a`), runs the same compose file
 (owner decision 3). It is started for a session and stopped after it.
 
 | Setting | Value |
@@ -318,7 +318,7 @@ One small VM in `nl2sql-testbed-261014` runs the same compose file
 | Image | Debian 12, with Docker and the compose plugin installed once by its startup script |
 | Disk | 30 GB standard persistent disk: the images and the data volumes, kept while stopped, so a later session skips the load |
 | External IP | Ephemeral only, for outbound traffic (image pulls, sample downloads). It is released, and free, while the VM is stopped. |
-| Inbound | No public database port. A firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range `35.235.240.0/20` only. |
+| Inbound | No public database port. The VM sits in its own VPC, `nl2sql-testbed`, so the default network's open SSH and RDP rules do not apply, and one firewall rule admits TCP 22, 15432, 13306 and 11433 from IAP's range `35.235.240.0/20` only. |
 | Access | `gcloud compute start-iap-tunnel`, which forwards `localhost:15432`, `13306` and `11433` on the caller's machine to the VM |
 | Passwords | Secret Manager: the existing `testbed-postgres-root-password`, `testbed-mysql-root-password` and `testbed-mssql-root-password`. Never in the repository. |
 | Bucket | `gs://nl2sql-testbed-261014-samples` is not needed: the VM downloads the samples itself, once |
@@ -332,7 +332,7 @@ Windows and CI runs Linux. It calls `gcloud` (found with `shutil.which`, so
 
 | Command | What it does |
 |---|---|
-| `up` | Starts the VM (`gcloud compute instances start`). Copies `testbed/` to it (`gcloud compute scp --tunnel-through-iap`). Runs `docker compose up -d --wait` on it over `gcloud compute ssh --tunnel-through-iap`, with `TESTBED_BIND=0.0.0.0` and the three passwords from Secret Manager passed on that command's environment only. Then opens the three IAP tunnels in the background and waits until each local port answers. |
+| `up` | Starts the VM (`gcloud compute instances start`). Copies `testbed/` to it (`gcloud compute scp --tunnel-through-iap`). Runs `docker compose up -d --wait` on it over `gcloud compute ssh --tunnel-through-iap`, with `TESTBED_BIND=0.0.0.0` and the three passwords from Secret Manager passed on that command's environment only (they travel on its stdin, never on a command line). Then opens the three IAP tunnels in the background and waits until each local port answers. |
 | `run -- <cmd>` | `up`, then runs `<cmd>` with `REALDB_POSTGRES`, `REALDB_MYSQL` and `REALDB_MSSQL` (pointing at the local tunnel ports) in the child's environment only, then closes the tunnels and stops the VM in a `finally`: also on Ctrl-C, a failing command or a failed `up`. It exits with the command's code. |
 | `down` | Closes any tunnels it opened and stops the VM. Safe to run again. |
 | `status` | The VM's state, how long it has been running, and whether the tunnels are open. Never a password. |
@@ -344,7 +344,7 @@ and are never written to a file or printed.
 started by hand, it would keep billing. One Cloud Scheduler job calls the
 Compute Engine API directly at 03:00 UTC, with an OAuth token for a service
 account that may only stop instances in this project:
-`POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/<zone>/instances/<vm>/stop`.
+`POST https://compute.googleapis.com/compute/v1/projects/nl2sql-testbed-261014/zones/us-central1-a/instances/nl2sql-testbed/stop`.
 Stopping a stopped VM does nothing, so the job needs no logic, and one job is
 inside Cloud Scheduler's free tier.
 

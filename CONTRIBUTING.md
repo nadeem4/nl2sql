@@ -110,8 +110,10 @@ docker compose -f testbed/docker-compose.yml down        # add -v to drop the da
 The first `up` downloads the sample databases and loads them, which takes
 several minutes; later ones reuse the data volumes. Without the test bed the
 `realdb` tests skip with that fix in the message. CI runs them in the
-`realdb` workflow when a pull request changes database-facing code. See
-`docs/testing/test-bed.md`.
+`realdb` workflow when a pull request changes database-facing code. The
+owner can also run them on the test bed's GCP VM with
+`python scripts/testbed.py run -- pytest -m realdb`, which always stops the
+VM afterwards. See `docs/testing/test-bed.md`.
 
 See `docs/testing/architecture.md` for what each marker means.
 
