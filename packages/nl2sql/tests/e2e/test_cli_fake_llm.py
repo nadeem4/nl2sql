@@ -148,12 +148,13 @@ def test_a_denied_query_stops_before_aggregation_and_synthesis(demo_project, fak
 def test_a_run_that_ends_with_pipeline_errors_exits_1(demo_project, fake_llm):
     """The graph finishing with a CRITICAL error is a failed run.
 
-    A decomposer answer that does not fit the schema ends in
-    ORCHESTRATOR_CRASH. The CLI printed the "Pipeline Errors" table and still
-    exited 0, so a script calling it saw success.
+    A decomposer answer that does not fit the schema, asked for again and
+    still wrong, ends in MODEL_OUTPUT_INVALID. The CLI printed the "Pipeline
+    Errors" table and still exited 0, so a script calling it saw success.
     """
     server, env = fake_llm([ANSWERABLE, Rule("DecomposerResponse", {"not": "a decomposition"})])
     r = run_cli(demo_project, env, "run", 
                 "How many customers are there?")
-    assert "ORCHESTRATOR_CRASH" in r.stdout, r.stdout + r.stderr
+    assert "MODEL_OUTPUT_INVALID" in r.stdout, r.stdout + r.stderr
+    assert [c["name"] for c in server.calls].count("DecomposerResponse") == 2  # the answer and one retry
     assert r.returncode == 1, r.stdout + r.stderr

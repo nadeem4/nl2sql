@@ -71,6 +71,27 @@ through what the exception was raised from:
 `run_with_graph()`'s fallback applies the same classification, so a provider
 failure that escapes its node is not `UNKNOWN_ERROR`.
 
+## Model output invalid
+
+Every structured call retries an answer that does not parse, up to the
+agent's `parse_retries` times (see
+[Parse-and-retry](../configuration/llm.md#parse-and-retry)). When the last
+answer still does not parse, `wires.structured()` raises
+`StructuredOutputError`, and `provider_error` reports it as
+`MODEL_OUTPUT_INVALID`:
+
+```text
+The ast_planner agent's answer did not match PlanModel after 2 attempts. Set another
+structured_output for it (tool_calling, json_schema or json_mode), or use a stronger model.
+```
+
+- The agent is the node that made the call (or, outside a run, the agent whose
+  client it was).
+- The last answer's validation errors are in `details`, which is not sent to
+  callers; the trace has every attempt in the node's `llm_calls`.
+- It is not fatal: like the node's own failure codes, the run's usual retry
+  path still applies.
+
 ## Circuit breaker
 
 `create_breaker()` configures `pybreaker.CircuitBreaker` instances with observability hooks. The system defines exactly one:

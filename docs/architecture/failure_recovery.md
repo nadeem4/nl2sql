@@ -1,7 +1,7 @@
 # Failure + Recovery Architecture
 
 ## Overview
-Failure in this system is represented as structured `PipelineError` objects accumulated in graph state, explicit exceptions that short-circuit a node/subgraph, or runtime timeouts/cancellations handled by the orchestrator. Most node failures are captured and returned in state rather than raising, so the graph can continue unless routing logic or wrappers explicitly stop or crash. Recovery is limited to a local retry loop inside the SQL agent subgraph; there is no graph-level replay or global retry.
+Failure in this system is represented as structured `PipelineError` objects accumulated in graph state, explicit exceptions that short-circuit a node/subgraph, or runtime timeouts/cancellations handled by the orchestrator. Most node failures are captured and returned in state rather than raising, so the graph can continue unless routing logic or wrappers explicitly stop or crash. Recovery is limited to a local retry loop inside the SQL agent subgraph, and to parse-and-retry inside each structured LLM call (an answer that does not parse is asked for again, up to the agent's `parse_retries`, then `MODEL_OUTPUT_INVALID`; see [Parse-and-retry](../configuration/llm.md#parse-and-retry)); there is no graph-level replay or global retry.
 
 ---
 
