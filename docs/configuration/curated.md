@@ -387,7 +387,8 @@ playground writes it either.
 
 ## Source references
 
-- Models and SQL checks: `packages/nl2sql/src/nl2sql/configs/curated.py`
+- Models: `packages/nl2sql/src/nl2sql/config/curated.py`
+- SQL checks and the file model: `packages/nl2sql/src/nl2sql/configs/curated.py`
 - Index entries and the change hash: `packages/nl2sql/src/nl2sql/indexing/curated.py`
 - Loader: `ConfigManager.load_curated()` in `packages/nl2sql/src/nl2sql/configs/manager.py`
 - Startup load: `packages/nl2sql/src/nl2sql/context.py`
