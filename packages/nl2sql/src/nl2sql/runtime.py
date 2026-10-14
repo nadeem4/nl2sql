@@ -27,6 +27,7 @@ from nl2sql.registry import Registry, RegistryError
 if TYPE_CHECKING:
     from nl2sql.auth import UserContext
     from nl2sql.config import LLM, Datasource
+    from nl2sql.embeddings import EmbeddingInfo
     from nl2sql.llm.llm_set import LLMChange
 
 logger = get_logger(__name__)
@@ -131,6 +132,8 @@ class Runtime:
             self.llm_registry.swap(self.llm_registry.build_from(config.llm))
 
         self.embedder = None
+        # Shared with derived runtimes, so the dimension is probed at most once per engine.
+        self._embedding: Dict[str, Any] = {}
         try:
             self.embedder = self._build_embedder(config)
         except (RegistryError, ValueError) as e:
@@ -156,14 +159,40 @@ class Runtime:
     # ------------------------------------------------------------ building
 
     def _build_embedder(self, config: Config):
+        """The embedder, and what it is (``EmbeddingInfo``, its dimension maybe unknown). No model call."""
+        from nl2sql.embeddings import EmbeddingInfo
+
         embeddings = config.embeddings
         if embeddings.instance is not None:
-            return embeddings.instance
+            instance = embeddings.instance
+            model = getattr(instance, "model", None)
+            self._embedding["info"] = EmbeddingInfo(
+                "instance", model if isinstance(model, str) and model else type(instance).__name__,
+                embeddings.dimension)
+            return instance
         provider = self.registry.load("embeddings", embeddings.provider)
         if embeddings.api_key:
             embeddings = embeddings.model_copy(
                 update={"api_key": self.secret_manager.resolve_object(embeddings.api_key)})
-        return provider.create(embeddings)
+        embedder = provider.create(embeddings)
+        self._embedding["info"] = provider.describe(embeddings)
+        return embedder
+
+    @property
+    def embedding_info(self) -> "EmbeddingInfo":
+        """The embedder's provider, model and dimension.
+
+        When neither the config nor the provider knows the dimension, the
+        first read embeds one short text to learn it; the answer is kept for
+        the engine's life.
+        """
+        from nl2sql.embeddings import probe
+
+        with self._lock:
+            info = self._embedding["info"]
+            if info.dimension is None:
+                info = self._embedding["info"] = probe(info, self.embedder)
+            return info
 
     def _build_stores(self) -> None:
         from nl2sql.execution import ExecutionStore

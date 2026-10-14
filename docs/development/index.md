@@ -21,7 +21,7 @@ entry point group, and the built-ins are declared in
 |---|---|---|---|
 | `adapter` | `nl2sql.adapters` | `nl2sql_sdk.DatasourceAdapterProtocol` | `sqlite`, `postgres`, `mysql`, `mssql`, `duckdb` |
 | `llm` | `nl2sql.llms` | `nl2sql.llm.providers.LLMProvider` | `openai`, `anthropic`, `openrouter`, `ollama`, made from `PROVIDER_PRESETS` |
-| `embeddings` | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` | `local`, `openai` |
+| `embeddings` | `nl2sql.embeddings` | `nl2sql.embeddings.EmbeddingsProvider` (version 2: `create` and `describe`) | `local`, `openai`, `openai_compatible` |
 | `secrets` | `nl2sql.secrets` | `nl2sql_sdk.SecretProvider` | `env`, `aws`, `azure`, `hashicorp` |
 
 - `Registry.default()` lists the installed entry points by name and imports

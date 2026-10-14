@@ -699,6 +699,13 @@ that fails to parse is retried without streaming.
 
 ### Embeddings
 
+!!! note "Built: embeddings providers v2 (PR E1)"
+    `openai_compatible`, `base_url` and `dimension` on the `embeddings`
+    section, `EmbeddingInfo` and `describe()` on interface version 2, and the
+    one-call probe as `Runtime.embedding_info`. The index does not read it
+    yet: namespaces per model come with S2. See
+    [Embeddings](../configuration/embeddings.md).
+
 ```yaml
 # embeddings.yaml
 provider: openai_compatible

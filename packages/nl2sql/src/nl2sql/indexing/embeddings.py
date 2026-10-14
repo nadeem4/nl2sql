@@ -11,18 +11,15 @@ from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
 from nl2sql.common.logger import get_logger
-from nl2sql.embeddings.local import LOCAL_EMBEDDING_MODEL
+from nl2sql.embeddings.local import LOCAL_EMBEDDING_DIMENSION, LOCAL_EMBEDDING_MODEL
+from nl2sql.embeddings.openai import OPENAI_EMBEDDING_DIMENSIONS
 
 logger = get_logger(__name__)
-
-LOCAL_EMBEDDING_DIMENSION = 384
 
 # Output dimensions of the embedding models this project knows about. Used only
 # to detect an index built with a different embedder; unknown models are skipped.
 KNOWN_EMBEDDING_DIMENSIONS: Dict[str, int] = {
-    "text-embedding-3-small": 1536,
-    "text-embedding-3-large": 3072,
-    "text-embedding-ada-002": 1536,
+    **OPENAI_EMBEDDING_DIMENSIONS,
     LOCAL_EMBEDDING_MODEL: LOCAL_EMBEDDING_DIMENSION,
 }
 
