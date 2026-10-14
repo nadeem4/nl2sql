@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.5.0](https://github.com/nadeem4/nl2sql/compare/v0.4.1...v0.5.0) (2026-10-14)
+
+
+### Features
+
+* **cli:** callers onto the new config (configuration v2, PR 7b) ([#272](https://github.com/nadeem4/nl2sql/issues/272)) ([712d849](https://github.com/nadeem4/nl2sql/commit/712d84912ede4d092a17985715a3070817dcd0a1))
+* **cli:** nl2sql config check (configuration v2, PR 8) ([#273](https://github.com/nadeem4/nl2sql/issues/273)) ([f710d52](https://github.com/nadeem4/nl2sql/commit/f710d52050321d057a897577d17f08a684e31900))
+* **cli:** nl2sql init writes the split config layout (configuration v2, PR 6) ([#267](https://github.com/nadeem4/nl2sql/issues/267)) ([4d00417](https://github.com/nadeem4/nl2sql/commit/4d004175e0d7a24df2034b6f39cf351772e44b4c))
+* **config:** config models and load_config (configuration v2, PR 2) ([#264](https://github.com/nadeem4/nl2sql/issues/264)) ([4a581eb](https://github.com/nadeem4/nl2sql/commit/4a581eb9838d045d98c8ff25a8f4f4bdc8ae9719))
+* **engine:** build the engine from a Config (configuration v2, PR 7a) ([#268](https://github.com/nadeem4/nl2sql/issues/268)) ([00b4d4b](https://github.com/nadeem4/nl2sql/commit/00b4d4b65aaaf1a4f294830f7da7de4e337cf6ac))
+* **facade:** engine.feedback, traces.get, about(), llm.providers() and the playground on the public API (configuration v2, PR 10b) ([#275](https://github.com/nadeem4/nl2sql/issues/275)) ([6ed0b8c](https://github.com/nadeem4/nl2sql/commit/6ed0b8cb08c7d733b998bc429f978215772b24fd))
+* **facade:** namespaces on NL2SQL, PUT /api/v1/settings/llm, and the CLI on the public API (configuration v2, PR 10a) ([#274](https://github.com/nadeem4/nl2sql/issues/274)) ([1459d5c](https://github.com/nadeem4/nl2sql/commit/1459d5c447094a872fb5b57b9015e25617982d45))
+* **llm:** per-engine LLM client cache and engine.llm.replace (configuration v2, PR 9) ([#270](https://github.com/nadeem4/nl2sql/issues/270)) ([884eeb6](https://github.com/nadeem4/nl2sql/commit/884eeb6ce3c8d7baac01954210d47b2fd25b74aa))
+* **registry:** the extension registry (configuration v2, PR 5) ([#266](https://github.com/nadeem4/nl2sql/issues/266)) ([8c9ff47](https://github.com/nadeem4/nl2sql/commit/8c9ff478227a8f24a1441257fc13f6881fcb79c3))
+* **sdk:** adapter and secret provider interfaces for the registry ([#265](https://github.com/nadeem4/nl2sql/issues/265)) ([38ef321](https://github.com/nadeem4/nl2sql/commit/38ef321e36590acc297cce22d30d7f2241856556))
+
+
+### Bug Fixes
+
+* **config:** mask secrets in the config, log level from .env, no environment writes in scripts ([#277](https://github.com/nadeem4/nl2sql/issues/277)) ([6e0a66a](https://github.com/nadeem4/nl2sql/commit/6e0a66aed81d8159ff9089e6756db2850224dd6c))
+
+
+### Performance Improvements
+
+* **engine:** make import nl2sql light ([#263](https://github.com/nadeem4/nl2sql/issues/263)) ([5f4e964](https://github.com/nadeem4/nl2sql/commit/5f4e964a74102a43eed2b1e7dd93aa77296ebea0))
+
+
+### Documentation
+
+* **architecture:** configuration v2 and the extension registry (phase 1 design) ([#260](https://github.com/nadeem4/nl2sql/issues/260)) ([277d957](https://github.com/nadeem4/nl2sql/commit/277d957db2570080a4f3884fce5dc9acec1f5aa8))
+* **release:** notes for 0.5.0 ([#278](https://github.com/nadeem4/nl2sql/issues/278)) ([4556b78](https://github.com/nadeem4/nl2sql/commit/4556b780afba84b52243791c6295347128e793f3))
+
+
+### Code Refactoring
+
+* **pipeline:** read settings from the runtime, not the global (configuration v2, PR 11) ([#269](https://github.com/nadeem4/nl2sql/issues/269)) ([65aaa23](https://github.com/nadeem4/nl2sql/commit/65aaa23fe725837d9a9e857eb13cc508b5b6c41b))
+* **runtime:** delete the settings global and every environment write (configuration v2, PR 13) ([#276](https://github.com/nadeem4/nl2sql/issues/276)) ([13ca8b7](https://github.com/nadeem4/nl2sql/commit/13ca8b7b41a8cafaf70f15b6eb892291e578184f))
+* **runtime:** indexing, tracing and evaluation read settings from the runtime (configuration v2, PR 12) ([#271](https://github.com/nadeem4/nl2sql/issues/271)) ([0713a3e](https://github.com/nadeem4/nl2sql/commit/0713a3e31b2e32e32a540ae66e8118d24a6da4cc))
+* **sdk:** rename nl2sql-adapter-sdk to nl2sql-sdk ([#262](https://github.com/nadeem4/nl2sql/issues/262)) ([94e0041](https://github.com/nadeem4/nl2sql/commit/94e0041257e42302d69d57df8f12d047df108f5e))
+
 ## [0.4.1](https://github.com/nadeem4/nl2sql/compare/v0.4.0...v0.4.1) (2026-10-13)
 
 
