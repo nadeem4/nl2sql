@@ -60,7 +60,7 @@ from nl2sql.llm.providers import (
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.cli.demo import DemoManager
-from nl2sql.cli.demo.datasets import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
+from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
 from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
 from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
 from nl2sql.cli.demo.stamp import outdated_warning
@@ -81,7 +81,7 @@ RECORDINGS = pathlib.Path(__file__).resolve().parent.parent / "demo" / "recordin
 INSTALL_HINT = 'Install the demo extra: pip install "nl2sql-engine[demo]"'
 
 # The demo's lead dataset. Three databases are registered (see
-# `nl2sql.cli.demo.datasets`); this one names the packaged recording file and
+# `nl2sql.datasets.demo`); this one names the packaged recording file and
 # the datasource the playground's schema panel opens on.
 DATASET = "chinook"
 

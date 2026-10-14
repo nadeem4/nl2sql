@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 pytest.importorskip("fastapi")
 
-from nl2sql.cli.demo.datasets import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
+from nl2sql.datasets.demo import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
 from nl2sql.cli.main import app  # noqa: E402
 from nl2sql.llm.providers import DEFAULT_OPENAI_MODEL  # noqa: E402
 from nl2sql.llm.replay import ReplayStore  # noqa: E402

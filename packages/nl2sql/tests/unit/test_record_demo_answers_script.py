@@ -110,7 +110,7 @@ def _recording_demo(answered):
 
 def test_failed_questions_are_listed_and_fail_the_script(tmp_path, monkeypatch, capsys):
     """A real run said "Recorded 20 of 20" with 10 failed runs."""
-    from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
     from nl2sql.llm.replay import ReplayStore
 
     _clear(monkeypatch)
@@ -130,7 +130,7 @@ def test_failed_questions_are_listed_and_fail_the_script(tmp_path, monkeypatch, 
 
 
 def test_recordings_left_from_an_earlier_run_are_not_taken_for_this_one(tmp_path, monkeypatch, capsys):
-    from nl2sql.cli.demo.datasets import DEMO_QUESTIONS
+    from nl2sql.datasets.demo import DEMO_QUESTIONS
     from nl2sql.llm.replay import Recording, ReplayStore
 
     _clear(monkeypatch)

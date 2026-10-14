@@ -43,7 +43,7 @@ The file is a YAML list. Each entry:
 | `alt_gold_sql` | Optional. [Reviewed alternative answers](#alternative-gold-answers) to the same question, each hand-written SQLite SQL |
 | `alt_gold_result` | The rows each `alt_gold_sql` returns, in the same order. Generated, never typed. Omitted with `alt_gold_sql` |
 
-`expected` follows the demo policy in `nl2sql/cli/demo/chinook.py`
+`expected` follows the demo policy in `nl2sql/datasets/chinook.py`
 (`CHINOOK_POLICIES`): a role gets `refused` when any of `needed_tables` is
 outside its `allowed_tables`, and `allowed` otherwise. Questions the database
 cannot answer are `unanswerable` for every role. The `rbac-denial` tag marks

@@ -1,7 +1,7 @@
 """A SQLite datasource opened read-only refuses a write at the driver.
 
 The demo's three sample databases are configured this way
-(``nl2sql.cli.demo.datasets``), so a hosted public demo cannot be talked into
+(``nl2sql.datasets.demo``), so a hosted public demo cannot be talked into
 changing the data it shows, whatever gets past the policy and the validator.
 """
 import sqlite3
@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import text
 
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter
-from nl2sql.cli.demo.datasets import DEMO_DATABASES
+from nl2sql.datasets.demo import DEMO_DATABASES
 
 
 @pytest.fixture

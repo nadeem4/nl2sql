@@ -12,7 +12,7 @@ import pytest
 import sqlglot
 from sqlglot import exp
 
-from nl2sql.cli.demo.chinook import CHINOOK_POLICIES, CHINOOK_QUESTIONS
+from nl2sql.datasets.chinook import CHINOOK_POLICIES, CHINOOK_QUESTIONS
 from nl2sql.evaluation.gold import (
     CHINOOK_DB_PATH,
     GOLD_DATASET_PATH,

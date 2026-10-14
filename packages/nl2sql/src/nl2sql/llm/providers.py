@@ -19,6 +19,7 @@ __all__ = [
     "ANTHROPIC_ENV",
     "KEY_SHAPE_MESSAGE",
     "DEFAULT_ANTHROPIC_MODEL",
+    "DEFAULT_MODELS",
     "DEFAULT_OPENAI_MODEL",
     "DEFAULT_OPENROUTER_MODEL",
     "KEYED_PROVIDERS",
@@ -143,8 +144,10 @@ VERIFIED_MODELS: Dict[str, Dict[str, Optional[float]]] = {
 # OpenRouter's ``sk-or-`` are both also ``sk-``, so they are checked before
 # falling back to OpenAI, the provider every other path already defaults to.
 _PREFIXES = (("sk-ant-", "anthropic"), ("sk-or-", "openrouter"))
-_DEFAULT_MODELS = {"openai": DEFAULT_OPENAI_MODEL, "openrouter": DEFAULT_OPENROUTER_MODEL,
-                   "anthropic": DEFAULT_ANTHROPIC_MODEL}
+# The model a newly written config starts with, per provider. A provider not
+# here (ollama) has no default: its models are whatever the local daemon pulled.
+DEFAULT_MODELS = {"openai": DEFAULT_OPENAI_MODEL, "openrouter": DEFAULT_OPENROUTER_MODEL,
+                  "anthropic": DEFAULT_ANTHROPIC_MODEL}
 
 
 def provider_for_key(key: str) -> str:
@@ -154,7 +157,7 @@ def provider_for_key(key: str) -> str:
 
 def default_model_for(provider: str) -> str:
     """Returns the model a newly written config uses for ``provider``."""
-    return _DEFAULT_MODELS.get(provider, DEFAULT_OPENAI_MODEL)
+    return DEFAULT_MODELS.get(provider, DEFAULT_OPENAI_MODEL)
 
 
 def default_temperature_for(provider: str) -> Optional[float]:

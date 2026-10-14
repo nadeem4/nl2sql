@@ -146,10 +146,10 @@ def test_the_ceiling_bounds_a_higher_datasource_row_limit(monkeypatch):
 
 
 def test_the_hosted_demo_datasources_are_capped_at_ten_thousand_rows():
-    from nl2sql.cli.demo.datasets import DEMO_DATASOURCES
+    from nl2sql.datasets.demo import DEMO_DATASOURCES
 
     assert DEMO_DATASOURCES
-    assert {ds["options"]["row_limit"] for ds in DEMO_DATASOURCES} == {10_000}
+    assert {ds["limits"]["row_limit"] for ds in DEMO_DATASOURCES} == {10_000}
 
 
 # --- the truncated flag ----------------------------------------------------

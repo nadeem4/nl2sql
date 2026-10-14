@@ -7,14 +7,14 @@ to the same people; anonymous sessions leave both null. The data is synthetic
 and owned by this repository; no third-party dataset is involved.
 """
 
-from nl2sql.cli.demo.chinook import DEMO_ROW_LIMIT
+from nl2sql.datasets.chinook import DEMO_ROW_LIMIT
 
 WEBANALYTICS_DATASOURCE = {
     "id": "webanalytics",
+    "type": "sqlite",
     # Read-only and row-limited, like the other two: see ``chinook.py``.
-    "connection": {"type": "sqlite", "database": "data/webanalytics.sqlite",
-                   "options": {"read_only": True}},
-    "options": {"row_limit": DEMO_ROW_LIMIT},
+    "connection": {"database": "webanalytics.sqlite", "options": {"read_only": True}},
+    "limits": {"row_limit": DEMO_ROW_LIMIT},
     "description": (
         "Website traffic analytics: visitor sessions with their duration and bounce flag, the "
         "pages viewed in each session and time on page, the referrer domain and marketing channel "

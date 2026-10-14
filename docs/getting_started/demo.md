@@ -80,6 +80,17 @@ This writes the following, relative to the directory you run the command in:
 
 Setup then runs schema indexing once, automatically, and exits `1` if it fails.
 
+!!! note "0.5: `nl2sql init --demo`"
+    `nl2sql init --demo DIR` writes the demo as a 0.5 config: `nl2sql.yaml`,
+    one file per datasource under `datasources/` (each with its description,
+    read-only connection, 10,000-row limit and sample questions),
+    `policies.yaml` with the admin, analyst and viewer roles below,
+    `curated.yaml` with the verified queries, and the three databases in
+    `data/`. It is the same config `nl2sql.config.demo_config()` builds in
+    code. In 0.5 it replaces `nl2sql setup --demo`; until then the engine
+    reads the files listed above. See
+    [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init-05).
+
 For the browser playground instead of the CLI, `nl2sql demo` does the same
 scaffolding in `./nl2sql-demo` and serves a page over it. See the
 [README](https://github.com/nadeem4/nl2sql#quickstart-run-it-locally) for its flags, and

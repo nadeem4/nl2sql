@@ -34,6 +34,7 @@ from nl2sql.cli.commands.info import list_available_adapters
 from nl2sql.cli.commands.demo import demo_command
 from nl2sql.cli.commands.doctor import doctor_command
 from nl2sql.cli.commands.setup import setup_command
+from nl2sql.cli.commands.init import init_command
 from nl2sql.cli.commands.install import install_command
 from nl2sql.cli.commands.policy import app as policy_app
 from nl2sql.cli.commands.curated import app as curated_app
@@ -195,6 +196,19 @@ def doctor():
     Diagnose environment issues (Python, Packages, Connectivity).
     """
     doctor_command()
+
+
+@app.command()
+def init(
+    directory: Annotated[pathlib.Path, typer.Argument(help="The folder to write the config into")] = pathlib.Path("."),
+    demo: Annotated[bool, typer.Option("--demo", help="Write the demo: three sample SQLite databases, their roles and verified queries")] = False,
+    provider: Annotated[str, typer.Option("--provider", help="The LLM provider llm.yaml names, with its default model")] = "openai",
+    force: Annotated[bool, typer.Option("--force", help="Overwrite files that already exist")] = False,
+):
+    """
+    Write a new config: nl2sql.yaml and one file per section. Never writes a key.
+    """
+    init_command(directory, demo=demo, provider=provider, force=force)
 
 
 @app.command()

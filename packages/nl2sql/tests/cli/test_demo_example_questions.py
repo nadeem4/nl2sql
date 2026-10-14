@@ -10,7 +10,7 @@ from __future__ import annotations
 from dotenv import load_dotenv
 from rich.console import Console
 
-from nl2sql.cli.demo.chinook import CHINOOK_QUESTIONS
+from nl2sql.datasets.chinook import CHINOOK_QUESTIONS
 from nl2sql.cli.demo.manager import DemoManager
 from nl2sql.cli.generators.env import EnvFileGenerator
 from nl2sql.common.settings import reload_settings
