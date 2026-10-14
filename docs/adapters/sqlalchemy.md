@@ -176,15 +176,47 @@ sqlglot cannot express for the database (SQLite rewrites date parts with
 #### `build_engine(**options) -> Engine`
 
 Creates the SQLAlchemy engine from `url(connection)` with the connection's
-`pool`, on first use. Override it to pass driver settings, handing them on as
+`pool`, on first use, and runs `session_setup` on every new pooled connection.
+Override it to pass driver settings, handing them on as
 `super().build_engine(connect_args=...)`.
+
+#### `session_setup(dbapi_connection)`
+
+The one place for session settings: it runs on every new pooled connection,
+before its first query, with the driver's own connection. The default does
+nothing. Make the session read-only and set the statement timeout here, and
+declare `ENFORCES_READ_ONLY` and `ENFORCES_TIMEOUT` in `capabilities()` only
+for what it really enforces.
 
 The base keeps `limits.timeout_ms` but does not enforce it: SQLAlchemy has no
 generic statement timeout and silently ignores an `execution_options["timeout"]`.
-Each built-in enforces it in `build_engine()` the way its driver allows:
-PostgreSQL with `statement_timeout`, MySQL with `MAX_EXECUTION_TIME`, SQL
-Server with pyodbc's query timeout, DuckDB by interrupting the connection. An
-adapter that does nothing here has no statement timeout.
+The built-ins:
+
+| Adapter | Read-only | Timeout |
+| :--- | :--- | :--- |
+| PostgreSQL | `SET default_transaction_read_only = on` | `SET statement_timeout` |
+| MySQL | `SET SESSION TRANSACTION READ ONLY` | `SET SESSION MAX_EXECUTION_TIME` |
+| SQL Server | none (it has no such setting) | pyodbc's query timeout |
+| DuckDB | `read_only=True` (a connect argument, in `build_engine`) | `interrupt()` on a timer, in `build_engine` |
+| SQLite | `mode=ro` in the URL | a progress handler per statement, in `build_engine` |
+
+A setting that is per statement rather than per session (DuckDB's timer,
+SQLite's deadline) goes in `build_engine` as a SQLAlchemy event. An adapter
+that does neither has no statement timeout.
+
+#### `classify(exc) -> str | None`
+
+The stage a failed `test_connection` failed at, or `None` when the error does
+not say. The default reads a missing driver module (`driver`) and the standard
+SQLSTATE: class `08` is `network`, `28` `auth`, `3D` `database`, and `42501`
+`permission`. Override it to add your driver's own codes and call `super()` for
+the rest; the built-ins add MySQL's error numbers, SQL Server's, and
+PostgreSQL's connection messages, which carry no SQLSTATE.
+
+`test_connection` connects, runs `SELECT 1` and lists the schemas. A failure
+to connect gets `classify`'s stage; a connection that cannot list the schemas
+is `permission`. Each stage has a fix: the `install_hint` for `driver`, "check
+the host, port and firewall" for `network`, and so on.
 
 #### `is_retryable_error(exc) -> bool`
 

@@ -18,7 +18,7 @@ from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, NamedTuple, Optional, Union
 
-from nl2sql_sdk import ConnectionCheck
+from nl2sql_sdk import ConnectionCheck, DatasourceCapability
 
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
@@ -408,11 +408,18 @@ class Runtime:
             check = ConnectionCheck(ok=False, message=str(e) or type(e).__name__)
         if check.ok:
             self.ds_registry.mark_available(datasource.id)
-            return DatasourceStatus(id=datasource.id, status="ready", required=datasource.required)
+            warnings = ()
+            if not self.ds_registry.supports(datasource.id, DatasourceCapability.ENFORCES_READ_ONLY):
+                # The typed plan and the validator still block every write; this is the missing third guard.
+                kind = datasource.type or getattr(adapter, "title", None) or type(adapter).__name__
+                warnings = (f"{datasource.id} ({kind}): this adapter cannot make the session read-only. "
+                            "Connect with a login that can only read.",)
+            return DatasourceStatus(id=datasource.id, status="ready", required=datasource.required,
+                                    warnings=warnings)
         reason = check.message or "The connection test failed."
         self.ds_registry.mark_unavailable(datasource.id, reason)
         return DatasourceStatus(
-            id=datasource.id, status="failed", required=datasource.required, stage=check.stage or "connect",
+            id=datasource.id, status="failed", required=datasource.required, stage=check.stage,
             reason=reason,
             fix=check.fix or f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
                              "is reachable from this machine. The log has the driver's error.")

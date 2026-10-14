@@ -38,23 +38,24 @@ def test_mssql_sets_the_pyodbc_query_timeout_on_each_new_connection(monkeypatch)
     dbapi_connection = types.SimpleNamespace(timeout=0)
 
     # Act
-    adapter._set_query_timeout(dbapi_connection, None)
+    adapter.session_setup(dbapi_connection)
 
-    # Assert: the hook runs on every new pooled connection, and pyodbc's
+    # Assert: session_setup runs on every new pooled connection, and pyodbc's
     # timeout is whole seconds, rounded up so 1500 ms is not 1 s.
-    assert event.contains(adapter.engine, "connect", adapter._set_query_timeout)
+    assert event.contains(adapter.engine, "connect", adapter._on_connect)
     assert dbapi_connection.timeout == 2
 
 
-def test_mssql_without_a_timeout_registers_no_hook(monkeypatch):
+def test_mssql_without_a_timeout_leaves_the_query_timeout_alone(monkeypatch):
     # Arrange
     _fake_pyodbc(monkeypatch)
+    dbapi_connection = types.SimpleNamespace(timeout=0)
 
     # Act
-    adapter = _mssql(None)
+    _mssql(None).session_setup(dbapi_connection)
 
     # Assert
-    assert not event.contains(adapter.engine, "connect", adapter._set_query_timeout)
+    assert dbapi_connection.timeout == 0
 
 
 def test_base_adapter_does_not_set_the_ignored_timeout_execution_option(monkeypatch):

@@ -25,7 +25,7 @@ For 95% of use cases, you are connecting to a SQL database that already has a Py
 
 ### Example
 
-A complete adapter: the built-in PostgreSQL one, less its statement timeout.
+A complete adapter: the built-in PostgreSQL one, less its `session_setup`, `classify` and `capabilities`.
 
 ```python
 from typing import Dict, Literal
@@ -75,8 +75,11 @@ class PostgresAdapter(SQLAlchemyAdapter):
         return {name: int(count) for name, count in rows}
 ```
 
-Enforce `limits.timeout_ms` in `build_engine()` too: the base class keeps it but
-does not apply it (see the [reference](sqlalchemy.md#build_engineoptions-engine)).
+Make the session read-only and enforce `limits.timeout_ms` in
+`session_setup()`: the base class keeps the limit but does not apply it. Then
+declare `ENFORCES_READ_ONLY` and `ENFORCES_TIMEOUT` for what it enforces, and
+override `classify()` to map your driver's connection errors to stages (see
+the [reference](sqlalchemy.md#session_setupdbapi_connection)).
 
 > See the **[SQLAlchemy Adapter Reference](sqlalchemy.md)** for full API details.
 

@@ -1,10 +1,10 @@
 import threading
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import Field
 from sqlalchemy import Connection, Engine, event, text
 
-from nl2sql_sdk import ConnectionModel
+from nl2sql_sdk import ConnectionModel, DatasourceCapability
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 
 # Connection.info key of the running statement's interrupt timer.
@@ -27,16 +27,27 @@ class DuckdbAdapter(SQLAlchemyAdapter):
     def url(self, connection: DuckdbConnection) -> str:
         return f"duckdb:///{self.local_path(connection.database)}"
 
-    def build_engine(self) -> Engine:
-        """The engine, enforcing ``limits.timeout_ms`` by interrupting.
+    def _in_memory(self) -> bool:
+        return self.connection.database == ":memory:"
 
-        DuckDB has no statement timeout setting, so each statement starts a
-        timer that calls the connection's ``interrupt()`` when the limit
-        passes; the statement then fails with DuckDB's ``InterruptException``,
-        reported as a refusal. The timer is cancelled when the statement
-        finishes or fails.
+    def capabilities(self) -> set[DatasourceCapability]:
+        """Read-only for a file; DuckDB cannot open an in-memory database read-only, nor has it anything to protect."""
+        enforced = {DatasourceCapability.ENFORCES_TIMEOUT}
+        if not self._in_memory():
+            enforced.add(DatasourceCapability.ENFORCES_READ_ONLY)
+        return super().capabilities() | enforced
+
+    def build_engine(self) -> Engine:
+        """The engine on a file opened read-only, enforcing ``limits.timeout_ms`` by interrupting.
+
+        ``read_only=True`` is how DuckDB opens a file that cannot be written,
+        so it is a connect argument rather than a session setting. DuckDB has
+        no statement timeout setting, so each statement starts a timer that
+        calls the connection's ``interrupt()`` when the limit passes; the
+        statement then fails with DuckDB's ``InterruptException``, reported as
+        a refusal. The timer is cancelled when the statement finishes or fails.
         """
-        engine = super().build_engine()
+        engine = super().build_engine(connect_args={} if self._in_memory() else {"read_only": True})
         if not self.limits.timeout_ms:
             return engine
         seconds = self.limits.timeout_ms / 1000
@@ -60,6 +71,12 @@ class DuckdbAdapter(SQLAlchemyAdapter):
         event.listen(engine, "after_cursor_execute", stop_timer)
         event.listen(engine, "handle_error", stop_timer_on_error)
         return engine
+
+    def classify(self, exc: BaseException) -> Optional[str]:
+        """A file that is not there is the ``database`` stage: read-only never creates one."""
+        if "does not exist" in str(getattr(exc, "orig", None) or exc):
+            return "database"
+        return super().classify(exc)
 
     def get_dialect(self) -> str:
         return "duckdb"

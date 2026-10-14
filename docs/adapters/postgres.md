@@ -33,7 +33,9 @@ The keys are `PostgresConnection`'s
 
 | Feature | Implementation | Note |
 | :--- | :--- | :--- |
-| **Timeout** | Native `-c statement_timeout={ms}` | Enforced server-side. |
+| **Read-only** | `SET default_transaction_read_only = on` | Set on every new pooled connection (`session_setup`): an `INSERT` or `CREATE TABLE` fails even for a login that could write. Declares `ENFORCES_READ_ONLY`. |
+| **Timeout** | `SET statement_timeout = {ms}` | Set with the read-only flag; enforced server-side. Declares `ENFORCES_TIMEOUT`. |
+| **Connection stages** | libpq's message | psycopg2 has no SQLSTATE for a failed connection, so `classify` reads the message: a refused password is `auth`, a missing database `database`, an unreachable host or port `network`. |
 | **Row counts** | `pg_class.reltuples` | The catalog's estimate; a table never analyzed has none, and is counted under `profile: stats`. |
 | **Stats** | One query per column | Null share, distinct count, `min/max` (no `min/max` for `boolean`, `uuid`; only the null share for `jsonb`, `bytea`, arrays). A column that fails is an index issue, rolled back so the transaction is not aborted; see [Reading a schema](sqlalchemy.md#reading-a-schema). |
 

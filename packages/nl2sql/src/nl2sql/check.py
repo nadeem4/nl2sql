@@ -6,12 +6,18 @@ See docs/architecture/configuration_v2.md, "Lifecycle". Plain dataclasses, so
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Tuple
 
 
 @dataclass(frozen=True)
 class DatasourceStatus:
-    """One datasource after ``check()``: ``ready``, or ``failed`` at a ``stage`` with a reason and a fix."""
+    """One datasource after ``check()``: ``ready``, or ``failed`` at a ``stage`` with a reason and a fix.
+
+    ``stage`` is the adapter's: ``config``, ``driver``, ``network``, ``auth``,
+    ``database`` or ``permission``, or None when the adapter cannot tell.
+    ``warnings`` are about a ready datasource, such as a session the adapter
+    cannot make read-only.
+    """
 
     id: str
     status: Literal["ready", "failed"]
@@ -19,14 +25,18 @@ class DatasourceStatus:
     stage: Optional[str] = None
     reason: Optional[str] = None
     fix: Optional[str] = None
+    warnings: Tuple[str, ...] = ()
 
     def __str__(self) -> str:
-        if self.status == "ready":
-            return f"{self.id}: ready"
         required = " (required)" if self.required else ""
-        lines = [f"{self.id}{required}: failed at {self.stage}: {self.reason}"]
+        if self.status == "ready":
+            lines = [f"{self.id}: ready"]
+        else:
+            stage = f" at {self.stage}" if self.stage else ""
+            lines = [f"{self.id}{required}: failed{stage}: {self.reason}"]
         if self.fix:
             lines.append(f"  Fix: {self.fix}")
+        lines += [f"  Warning: {warning}" for warning in self.warnings]
         return "\n".join(lines)
 
 

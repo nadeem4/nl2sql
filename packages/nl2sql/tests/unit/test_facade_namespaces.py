@@ -140,7 +140,7 @@ def test_datasources_test_connects_one_datasource(tmp_path):
         failed = engine.datasources.test("broken")
 
     assert isinstance(ready, DatasourceStatus) and ready.status == "ready"
-    assert failed.status == "failed" and failed.stage == "connect"
+    assert failed.status == "failed" and failed.stage == "database"
 
 
 # ---------------------------------------------------------------- index
