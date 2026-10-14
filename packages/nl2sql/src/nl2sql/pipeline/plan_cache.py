@@ -138,15 +138,23 @@ class PlanCache:
         return self._store.clear_plan_cache()
 
 
-def plan_cache_for(ctx: Any) -> PlanCache:
+def planner_of(ctx: Any) -> Optional[str]:
+    """``provider/model`` the planner runs on in this context (``LLMRegistry.effective``).
+
+    Read while a run's graph is built, so it is the model that run uses.
+    """
+    effective = getattr(getattr(ctx, "llm_registry", None), "effective", None)
+    return effective(PLANNER_AGENT) if callable(effective) else None
+
+
+def plan_cache_for(ctx: Any, planner: Optional[str] = None) -> PlanCache:
     """The plan cache of a runtime: its schema store, its ``settings.pipeline`` and its planner model.
 
-    Built while a run's graph is built, so the planner model is the one that
-    run uses (``LLMRegistry.effective``): the planner node reads and the
-    sub-query wrapper writes under one key.
+    ``planner`` is the run's ``planner_of(ctx)``, read now when not given.
+    The planner node and the sub-query wrapper both read it while the graph
+    is built, so they read and write under one key.
     """
     pipeline = ctx.settings.pipeline
-    effective = getattr(getattr(ctx, "llm_registry", None), "effective", None)
-    planner = effective(PLANNER_AGENT) if callable(effective) else None
+    planner = planner or planner_of(ctx)
     return PlanCache(getattr(ctx, "schema_store", None), enabled=pipeline.plan_cache, today=pipeline.today,
                      planner=planner)

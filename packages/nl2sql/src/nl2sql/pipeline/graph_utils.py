@@ -7,7 +7,7 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.runtime import Runtime
 from nl2sql.execution.dag import ExecutionDAG
-from nl2sql.pipeline.plan_cache import plan_cache_for
+from nl2sql.pipeline.plan_cache import plan_cache_for, planner_of
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs import SubgraphOutput
 from nl2sql_sdk.capabilities import DatasourceCapability
@@ -109,8 +109,8 @@ def wrap_subgraph(
     were superseded by a later attempt, so they reach the run's ``warnings``
     rather than its ``errors``.
     """
-    # Built with the graph, so it is keyed on the planner model this run uses.
-    plan_cache = plan_cache_for(ctx)
+    # Read with the graph, so the plan is keyed on the planner model this run uses.
+    planner = planner_of(ctx)
 
     def _wrapper(state_dict: dict, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
         trace_id = state_dict.get("trace_id")
@@ -169,7 +169,7 @@ def wrap_subgraph(
             e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
         )
         if succeeded and execute and executed_cleanly and plan is not None and plan_source == "llm":
-            plan_cache.put(sub_query, plan)
+            plan_cache_for(ctx, planner).put(sub_query, plan)
 
         row_cap = generator_response.row_cap if generator_response else None
         subgraph_output = SubgraphOutput(
