@@ -1211,6 +1211,24 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#retention">
+<span class="md-ellipsis">
+      
+        Retention
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-results-store-of-your-own">
+<span class="md-ellipsis">
+      
+        A results store of your own
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#artifactref-fields">
 <span class="md-ellipsis">
       
@@ -2136,6 +2154,24 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#retention">
+<span class="md-ellipsis">
+      
+        Retention
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-results-store-of-your-own">
+<span class="md-ellipsis">
+      
+        A results store of your own
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#artifactref-fields">
 <span class="md-ellipsis">
       
@@ -2192,8 +2228,8 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="artifact-store-architecture">Artifact Store Architecture</h1>
-<p>Execution results are persisted as <strong>artifacts</strong>. A single <code>ArtifactStore</code> writes Parquet files under the engine's results folder, <code>&lt;storage.path&gt;/results/</code>, and emits <code>ArtifactRef</code> metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.</p>
-<p>Results are local files only. The S3 and ADLS backends, and the <code>RESULT_ARTIFACT_BACKEND</code>, <code>RESULT_ARTIFACT_S3_*</code> and <code>RESULT_ARTIFACT_ADLS_*</code> settings, were removed in 0.5: they were untested and unreachable from the new config. The Phase 2 results-store interface brings remote stores back.</p>
+<p>Execution results are persisted as <strong>artifacts</strong>. The engine's <code>ArtifactStore</code> writes each result as Parquet, and the run's manifest as JSON, through the <strong>results store</strong> in <code>storage.results</code> (a <code>ResultStore</code>, see <a href="../../configuration/storage/">Storage</a>), and emits <code>ArtifactRef</code> metadata used by aggregation and downstream consumers. Each sub-query's result is one artifact, and the run's combined result is another, beside them.</p>
+<p>The engine makes the bytes; the store only keeps them under a key. The built-in <code>local</code> store keeps them as files in <code>&lt;storage.path&gt;/results/</code>. There is no built-in S3 or ADLS store: a remote store is four methods (see <a href="#a-results-store-of-your-own">A results store of your own</a>).</p>
 <h2 id="storage-lifecycle">Storage lifecycle</h2>
 <pre class="mermaid"><code>flowchart TD
     Adapter[Adapter: execute_batches or execute] --&gt; Batches[ResultFrame batches]
@@ -2229,19 +2265,83 @@
 <p><code>ResultReader</code> (<code>execution/artifacts/results.py</code>), behind <code>engine.results</code> (<code>manifest</code>, <code>page</code> and <code>csv</code>) (see <a href="../../api/core/query/#reading-a-runs-saved-results">Query API</a>), reads one tenant's results by request id:</p>
 <ol>
 <li>The request id and the result id must be plain tokens (letters, digits, <code>_</code>, <code>-</code>; up to 128 characters). Anything else is <code>ResultNotFound</code>, before any path is built.</li>
-<li>The manifest is read from the path rendered for the reader's tenant and that request id (<code>ArtifactStore.read_manifest</code>). No file there is <code>ResultNotFound</code>, so another tenant's run is not found, not refused.</li>
-<li>The result id must be a <code>node_id</code> the manifest lists. The parquet path is then rendered from the template, exactly as the aggregator wrote it (<code>ArtifactStore.scan_result</code>); the manifest never supplies a path.</li>
+<li>The manifest is read from the key rendered for the reader's tenant and that request id (<code>ArtifactStore.read_manifest</code>). No such key in the results store is <code>ResultNotFound</code>, so another tenant's run is not found, not refused.</li>
+<li>The result id must be a <code>node_id</code> the manifest lists. The parquet key is then rendered from the template, exactly as the aggregator wrote it (<code>ArtifactStore.scan_result</code>); the manifest never supplies a key.</li>
 <li>A page is <code>scan.slice(offset, limit).collect()</code> on a polars scan, so only that slice is read. A CSV export collects one <code>CSV_CHUNK_ROWS</code> (10,000) slice at a time and yields it as CSV text, header first.</li>
 </ol>
 <h2 id="where-the-files-go">Where the files go</h2>
-<p>An artifact's path is <code>&lt;results folder&gt;/&lt;rendered path&gt;</code>, and its parent folders are created as it is written. For an engine built from a <code>Config</code> the results folder is <code>&lt;storage.path&gt;/results/</code> (see <a href="../../api/core/public-facade/#creating-an-engine">Public Facade → Creating an engine</a>), so the default template gives:</p>
+<p>An artifact's key is the rendered path template, with <code>/</code> between its parts: <code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code> by default. That key is the <code>ArtifactRef</code>'s <code>uri</code>. Each Parquet file is written to a temporary folder first and handed to the results store in 1 MiB chunks (<code>ResultStore.write</code>); the manifest is handed over in one piece.</p>
+<p>The <code>local</code> store keeps a key as a file under its folder, <code>&lt;storage.path&gt;/results/</code>, so the default template gives:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a>&lt;storage.path&gt;/results/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
-<p>The store is exercised by real read/write round-trip tests (<code>packages/nl2sql/tests/unit/test_artifact_store.py</code>).</p>
+<p>It writes each file to a temporary name and renames it, and refuses a key that is absolute or contains <code>..</code>.</p>
+<p>Reading goes through <code>ResultStore.open</code>. When the store opens a local file, as <code>local</code> does, polars scans that file in place, so a page or a CSV slice reads only what it needs. Any other store's stream is read into memory first, because a scan outlives the call that opened it.</p>
+<p>The store is exercised by real read/write round-trip tests (<code>packages/nl2sql/tests/unit/test_artifact_store.py</code>, <code>test_trace_result_stores.py</code>).</p>
+<h2 id="retention">Retention</h2>
+<p>The <code>local</code> store takes <code>max_age_days</code> (default 7):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="c1"># storage.yaml</span>
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="nt">results</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">local</span><span class="p p-Indicator">,</span><span class="nt"> max_age_days</span><span class="p">:</span><span class="w"> </span><span class="nv">30</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p><code>engine.storage.purge()</code> deletes every result file last written more than <code>max_age_days</code> ago, then the run folders it emptied, and returns how many files went. <code>nl2sql storage purge</code> calls it, and <code>nl2sql-api</code> calls it at startup and once a day. A result past its age is gone: its page and CSV routes then answer <code>ResultNotFound</code>, as for an unknown run.</p>
+<h2 id="a-results-store-of-your-own">A results store of your own</h2>
+<p>There is no built-in S3 or ADLS store (owner decision 6 in <a href="../../architecture/phase2/#owner-decisions">the Phase 2 design</a>). A results store is the <code>ResultStore</code> protocol from <code>nl2sql_sdk.stores</code>: bytes in, bytes out, no Parquet knowledge. A sketch on S3 with <code>boto3</code>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a href="#__codelineno-5-3" id="__codelineno-5-3" name="__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Iterable</span>
+<a href="#__codelineno-5-4" id="__codelineno-5-4" name="__codelineno-5-4"></a>
+<a href="#__codelineno-5-5" id="__codelineno-5-5" name="__codelineno-5-5"></a><span class="kn">import</span><span class="w"> </span><span class="nn">boto3</span>
+<a href="#__codelineno-5-6" id="__codelineno-5-6" name="__codelineno-5-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span><span class="p">,</span> <span class="n">Field</span>
+<a href="#__codelineno-5-7" id="__codelineno-5-7" name="__codelineno-5-7"></a>
+<a href="#__codelineno-5-8" id="__codelineno-5-8" name="__codelineno-5-8"></a>
+<a href="#__codelineno-5-9" id="__codelineno-5-9" name="__codelineno-5-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">S3ResultsConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-5-10" id="__codelineno-5-10" name="__codelineno-5-10"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a href="#__codelineno-5-11" id="__codelineno-5-11" name="__codelineno-5-11"></a>    <span class="n">bucket</span><span class="p">:</span> <span class="nb">str</span>
+<a href="#__codelineno-5-12" id="__codelineno-5-12" name="__codelineno-5-12"></a>    <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"nl2sql/results/"</span>
+<a href="#__codelineno-5-13" id="__codelineno-5-13" name="__codelineno-5-13"></a>    <span class="n">max_age_days</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<a href="#__codelineno-5-14" id="__codelineno-5-14" name="__codelineno-5-14"></a>
+<a href="#__codelineno-5-15" id="__codelineno-5-15" name="__codelineno-5-15"></a>
+<a href="#__codelineno-5-16" id="__codelineno-5-16" name="__codelineno-5-16"></a><span class="k">class</span><span class="w"> </span><span class="nc">S3Results</span><span class="p">:</span>
+<a href="#__codelineno-5-17" id="__codelineno-5-17" name="__codelineno-5-17"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+<a href="#__codelineno-5-18" id="__codelineno-5-18" name="__codelineno-5-18"></a>    <span class="n">slot</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"results"</span>
+<a href="#__codelineno-5-19" id="__codelineno-5-19" name="__codelineno-5-19"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">]</span> <span class="o">=</span> <span class="n">S3ResultsConfig</span>
+<a href="#__codelineno-5-20" id="__codelineno-5-20" name="__codelineno-5-20"></a>
+<a href="#__codelineno-5-21" id="__codelineno-5-21" name="__codelineno-5-21"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">S3ResultsConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a href="#__codelineno-5-22" id="__codelineno-5-22" name="__codelineno-5-22"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_age_days</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">prefix</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">max_age_days</span>
+<a href="#__codelineno-5-23" id="__codelineno-5-23" name="__codelineno-5-23"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">s3</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s2">"s3"</span><span class="p">)</span>
+<a href="#__codelineno-5-24" id="__codelineno-5-24" name="__codelineno-5-24"></a>
+<a href="#__codelineno-5-25" id="__codelineno-5-25" name="__codelineno-5-25"></a>    <span class="nd">@classmethod</span>
+<a href="#__codelineno-5-26" id="__codelineno-5-26" name="__codelineno-5-26"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">S3ResultsConfig</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">folder</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"S3Results"</span><span class="p">:</span>
+<a href="#__codelineno-5-27" id="__codelineno-5-27" name="__codelineno-5-27"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+<a href="#__codelineno-5-28" id="__codelineno-5-28" name="__codelineno-5-28"></a>
+<a href="#__codelineno-5-29" id="__codelineno-5-29" name="__codelineno-5-29"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">chunks</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">bytes</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a href="#__codelineno-5-30" id="__codelineno-5-30" name="__codelineno-5-30"></a>        <span class="n">body</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>          <span class="c1"># or a multipart upload for large results</span>
+<a href="#__codelineno-5-31" id="__codelineno-5-31" name="__codelineno-5-31"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">put_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">key</span><span class="p">,</span> <span class="n">Body</span><span class="o">=</span><span class="n">body</span><span class="p">)</span>
+<a href="#__codelineno-5-32" id="__codelineno-5-32" name="__codelineno-5-32"></a>        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+<a href="#__codelineno-5-33" id="__codelineno-5-33" name="__codelineno-5-33"></a>
+<a href="#__codelineno-5-34" id="__codelineno-5-34" name="__codelineno-5-34"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BinaryIO</span><span class="p">:</span>
+<a href="#__codelineno-5-35" id="__codelineno-5-35" name="__codelineno-5-35"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">get_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">key</span><span class="p">)[</span><span class="s2">"Body"</span><span class="p">]</span>
+<a href="#__codelineno-5-36" id="__codelineno-5-36" name="__codelineno-5-36"></a>
+<a href="#__codelineno-5-37" id="__codelineno-5-37" name="__codelineno-5-37"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a href="#__codelineno-5-38" id="__codelineno-5-38" name="__codelineno-5-38"></a>        <span class="k">try</span><span class="p">:</span>
+<a href="#__codelineno-5-39" id="__codelineno-5-39" name="__codelineno-5-39"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">head_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">key</span><span class="p">)</span>
+<a href="#__codelineno-5-40" id="__codelineno-5-40" name="__codelineno-5-40"></a>            <span class="k">return</span> <span class="kc">True</span>
+<a href="#__codelineno-5-41" id="__codelineno-5-41" name="__codelineno-5-41"></a>        <span class="k">except</span> <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ClientError</span><span class="p">:</span>
+<a href="#__codelineno-5-42" id="__codelineno-5-42" name="__codelineno-5-42"></a>            <span class="k">return</span> <span class="kc">False</span>
+<a href="#__codelineno-5-43" id="__codelineno-5-43" name="__codelineno-5-43"></a>
+<a href="#__codelineno-5-44" id="__codelineno-5-44" name="__codelineno-5-44"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">purge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">older_than</span><span class="p">:</span> <span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a href="#__codelineno-5-45" id="__codelineno-5-45" name="__codelineno-5-45"></a>        <span class="n">deleted</span> <span class="o">=</span> <span class="mi">0</span>
+<a href="#__codelineno-5-46" id="__codelineno-5-46" name="__codelineno-5-46"></a>        <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">get_paginator</span><span class="p">(</span><span class="s2">"list_objects_v2"</span><span class="p">)</span><span class="o">.</span><span class="n">paginate</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Prefix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">):</span>
+<a href="#__codelineno-5-47" id="__codelineno-5-47" name="__codelineno-5-47"></a>            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"Contents"</span><span class="p">,</span> <span class="p">[]):</span>
+<a href="#__codelineno-5-48" id="__codelineno-5-48" name="__codelineno-5-48"></a>                <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s2">"LastModified"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">older_than</span><span class="p">:</span>
+<a href="#__codelineno-5-49" id="__codelineno-5-49" name="__codelineno-5-49"></a>                    <span class="bp">self</span><span class="o">.</span><span class="n">s3</span><span class="o">.</span><span class="n">delete_object</span><span class="p">(</span><span class="n">Bucket</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bucket</span><span class="p">,</span> <span class="n">Key</span><span class="o">=</span><span class="n">item</span><span class="p">[</span><span class="s2">"Key"</span><span class="p">])</span>
+<a href="#__codelineno-5-50" id="__codelineno-5-50" name="__codelineno-5-50"></a>                    <span class="n">deleted</span> <span class="o">+=</span> <span class="mi">1</span>
+<a href="#__codelineno-5-51" id="__codelineno-5-51" name="__codelineno-5-51"></a>        <span class="k">return</span> <span class="n">deleted</span>
+</code></pre></div>
+<p>Register it (<code>registry.add_store("s3", S3Results)</code>, or the <code>nl2sql.stores</code> entry point group) and name it: <code>results: { type: s3, bucket: my-results }</code>. Or pass an object: <code>Storage(path=".nl2sql", results=S3Results(...))</code>. <code>engine.storage.purge()</code> purges a store that has a <code>max_age_days</code> attribute; one without it is left alone, for a bucket with its own lifecycle rule. A sketch like this one is not tested here; test yours against your bucket.</p>
 <h2 id="artifactref-fields">ArtifactRef fields</h2>
 <p><code>ArtifactRef</code> contains:</p>
 <ul>
-<li><code>uri</code>, <code>backend</code> (always <code>local</code>), <code>format</code></li>
+<li><code>uri</code>, the result's key in the results store, and <code>format</code> (<code>parquet</code>)</li>
 <li><code>row_count</code>, <code>columns</code>, <code>bytes</code></li>
 <li><code>content_hash</code>, <code>created_at</code></li>
 <li>optional <code>schema_version</code></li>
@@ -2250,7 +2350,7 @@
 </ul>
 <h2 id="path-templating">Path templating</h2>
 <p>The path template defines the artifact path relative to the results folder. It defaults to:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <p>Each <code>&lt;key&gt;</code> placeholder is substituted from the metadata the executor passes to <code>write_batches</code>. The SQL executor supplies these keys:</p>
 <ul>
@@ -2267,11 +2367,13 @@
 <p>A template that names neither <code>&lt;sub_query_id&gt;</code> nor <code>&lt;dag_node_id&gt;</code> is therefore made unique rather than rejected: the store adds <code>-&lt;sub_query_id&gt;</code> to the end of the file name, before its extension, so <code>&lt;tenant_id&gt;/&lt;request_id&gt;.parquet</code> writes <code>&lt;tenant_id&gt;/&lt;request_id&gt;-&lt;sub_query_id&gt;.parquet</code>. The <code>ArtifactRef</code> records the template actually rendered in <code>path_template</code> and the sub-query in <code>sub_query_id</code>. A store used directly, with no <code>sub_query_id</code> in its metadata, renders the template as written.</p>
 <h2 id="tenant-aware-paths">Tenant-aware paths</h2>
 <p>Because the default template starts with <code>&lt;tenant_id&gt;</code>, artifacts are partitioned per tenant:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a>&lt;results folder&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a>&lt;results folder&gt;/&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet
 </code></pre></div>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Artifact store: <code>packages/nl2sql/src/nl2sql/execution/artifacts/store.py</code></li>
+<li>The <code>local</code> results store: <code>packages/nl2sql/src/nl2sql/storage/local.py</code></li>
+<li>The <code>ResultStore</code> protocol: <code>packages/sdk/src/nl2sql_sdk/stores.py</code></li>
 <li>Parquet helpers: <code>packages/nl2sql/src/nl2sql/execution/artifacts/parquet.py</code></li>
 <li>Manifest models and the result reader: <code>packages/nl2sql/src/nl2sql/execution/artifacts/results.py</code></li>
 <li>Artifact contracts: <code>packages/nl2sql/src/nl2sql/execution/contracts.py</code></li>

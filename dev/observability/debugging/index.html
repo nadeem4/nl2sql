@@ -4819,9 +4819,15 @@ one is still set from by the CLI and the playground is in brackets.</p>
 </tr>
 </tbody>
 </table>
-<p>Traces are written to <code>&lt;storage.path&gt;/traces/</code> (see
-<a href="../../configuration/storage/">Storage</a>); <code>nl2sql init</code> puts <code>storage.path</code> in
-<code>.gitignore</code>.</p>
+<p>Traces are written through the trace store in <code>storage.traces</code> (see
+<a href="../../configuration/storage/">Storage</a>). The built-in <code>files</code> store writes them
+to <code>&lt;storage.path&gt;/traces/</code>; <code>nl2sql init</code> puts <code>storage.path</code> in
+<code>.gitignore</code>. A trace store of your own (the <code>TraceStore</code> protocol in
+<code>nl2sql_sdk.stores</code>: <code>write</code>, <code>get</code>, <code>purge</code>) receives the whole document.</p>
+<p>Traces are kept for the store's <code>max_age_days</code>, 14 days by default
+(<code>traces: { type: files, max_age_days: 30 }</code>). <code>engine.storage.purge()</code> deletes
+the older ones; <code>nl2sql storage purge</code> calls it, and <code>nl2sql-api</code> calls it at
+startup and once a day.</p>
 <p><code>on_failure</code> writes a trace when the run returned errors, needed a retry in any
 sub-query, had a node fail, or did not complete (timeout, cancellation, crash).
 A run that recovered on retry therefore still leaves a trace.</p>
@@ -4833,8 +4839,9 @@ Writing a trace never fails a run; a write error is logged as a warning.</p>
 <p>Where the file went is reported back:</p>
 <ul>
 <li><code>QueryResult.trace_path</code> (Python API) and <code>trace_path</code> in the REST <code>/query</code>
-  response: the path, or <code>null</code> when no trace was written. <code>trace_id</code> is in the
-  file name.</li>
+  response: the path, or <code>null</code> when no trace was written or the trace store is
+  not the <code>files</code> store. <code>trace_id</code> is in the file name, and
+  <code>engine.traces.get(trace_id)</code> reads the trace from any store.</li>
 <li><code>nl2sql run</code> prints <code>Trace written to &lt;path&gt;</code>.</li>
 <li>The playground shows a <strong>Download trace</strong> link under Cost &amp; time when Debug is on.</li>
 </ul>
@@ -4999,7 +5006,7 @@ because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.</p>
 <h2 id="reading-a-trace-nl2sql-trace-show">Reading a trace: <code>nl2sql trace show</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in &lt;storage.path&gt;/traces</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in the trace store (engine.traces.get)</span>
 </code></pre></div>
 <p>It prints the question, then one row per node execution (nested SQL agent
 nodes indented) with sub-query, attempt, duration, tokens and status, then
@@ -5076,9 +5083,9 @@ naming the entries MMR passed over because they repeat an earlier pick. The <str
 runs the same search for any text (see the
 <a href="../../getting_started/demo/#the-retrieval-inspector">demo guide</a>). The page
 fetches the trace from <code>GET /api/trace/{trace_id}</code>, which reads it with
-<code>engine.traces.get</code>: only files directly inside the engine's traces folder, and
-any id that is not a plain token is rejected, so <code>../</code> or an absolute path never
-reaches the filesystem.</p>
+<code>engine.traces.get</code>: any id that is not a plain token is rejected before the
+trace store sees it, and the <code>files</code> store reads only files directly inside its
+folder, so <code>../</code> or an absolute path never reaches the filesystem.</p>
 <p>Below the run, <strong>Was this answer right?</strong> records a rating keyed by the same
 trace id; <code>nl2sql feedback stats</code> reads the ratings together with the traces in
 <code>&lt;storage.path&gt;/traces</code>. See <a href="../feedback/">Feedback and Signals</a>.</p>

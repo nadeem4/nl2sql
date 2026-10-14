@@ -3906,6 +3906,35 @@ Building it settled these details:</p>
   refreshes its stored metadata in place.</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: the trace and result stores, and retention (S4)</p>
+<p><code>nl2sql/storage/files.py</code> is the <code>files</code> <code>TraceStore</code> and
+<code>nl2sql/storage/local.py</code> the <code>local</code> <code>ResultStore</code>, each with
+<code>max_age_days</code> (14 and 7, at least 1) and <code>purge</code>. The run trace is
+written through <code>Runtime.traces</code>, <code>engine.traces.get</code> reads through it,
+and <code>ArtifactStore(results, path_template)</code> writes Parquet and the
+manifest through <code>Runtime.results</code>; <code>ArtifactStoreConfig</code> and
+<code>Runtime.traces_dir</code> are deleted, and the traces and results slots take
+any store. <code>engine.storage.info()</code> and <code>purge()</code>, <code>nl2sql storage purge</code>
+and the API's startup and daily purge are added. No S3 or ADLS store is
+built in; <code>storage/artifact-store.md</code> has an S3 example. Building it
+settled these details:</p>
+<ul>
+<li><code>ArtifactRef.uri</code> is the result's key in the results store
+  (<code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code>), not a file path,
+  and <code>ArtifactRef.backend</code> is deleted.</li>
+<li>Reading a result: when <code>ResultStore.open</code> returns a local file, as
+  <code>local</code> does, polars scans the file in place; any other stream is read
+  into memory first, since a scan outlives the call that opened it.</li>
+<li><code>purge()</code> purges a store that has a <code>max_age_days</code> attribute and leaves
+  one without it alone; it returns the counts per slot purged.</li>
+<li><code>QueryResult.trace_path</code> is the file the <code>files</code> store wrote, and None
+  with another trace store; <code>trace_id</code> always names the trace.</li>
+<li><code>nl2sql trace show &lt;id&gt;</code> reads through <code>engine.traces.get</code>.
+  <code>Runtime.stores</code> (<code>StorePaths</code>) stays for the state store's callers
+  until S3.</li>
+</ul>
+</div>
 <h3 id="the-config">The config</h3>
 <p>Every sub-block is optional. A config with only <code>path</code> stays valid and means
 the built-ins below.</p>

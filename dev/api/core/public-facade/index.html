@@ -3772,6 +3772,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#top-level-exports" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4763,6 +4774,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#top-level-exports" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4957,7 +4979,8 @@ datasource fails.</p>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">engine</span><span class="o">.</span><span class="n">results</span>       <span class="c1"># manifest, page, csv</span>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">engine</span><span class="o">.</span><span class="n">feedback</span>      <span class="c1"># record, list, stats, export, clear</span>
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">engine</span><span class="o">.</span><span class="n">traces</span>        <span class="c1"># get, replay</span>
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">engine</span><span class="o">.</span><span class="n">benchmark</span>     <span class="c1"># run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span>       <span class="c1"># info, purge</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">engine</span><span class="o">.</span><span class="n">benchmark</span>     <span class="c1"># run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2</span>
 </code></pre></div>
 <table>
 <thead>
@@ -5071,10 +5094,19 @@ thumbs up and down are built on it. See
 </code></pre></div>
 <h3 id="traces">Traces</h3>
 <p><code>engine.traces.get(trace_id)</code> returns one recorded run's trace document, or
-<code>None</code> when none was kept (which runs are kept is <code>settings.traces.mode</code>). It
-reads only <code>&lt;storage.path&gt;/traces</code>, and the id must be a plain token (letters,
-digits, <code>-</code> and <code>_</code>), so no id can name a file elsewhere: anything else raises
-<code>ValueError</code>, as does a file in another trace format.</p>
+<code>None</code> when none was kept (which runs are kept is <code>settings.traces.mode</code>, and
+for how long the trace store's <code>max_age_days</code>). It reads through the trace
+store, <code>storage.traces</code> (the <code>files</code> store reads only <code>&lt;storage.path&gt;/traces</code>),
+and the id must be a plain token (letters, digits, <code>-</code> and <code>_</code>), so no id can
+name a file elsewhere: anything else raises <code>ValueError</code>, as does a file in
+another trace format.</p>
+<h3 id="storage">Storage</h3>
+<p><code>engine.storage.info()</code> returns each store slot's <code>type</code> and <code>location</code> (and
+<code>max_age_days</code> for the traces and results stores that have it) and the current
+index <code>namespace</code>. <code>engine.storage.purge()</code> deletes the traces and results
+older than their store's <code>max_age_days</code> and returns the counts,
+<code>{"traces": 3, "results": 12}</code>. See
+<a href="../../../configuration/storage/#retention">Storage → Retention</a>.</p>
 <p><code>engine.traces.replay(trace)</code> re-runs a recorded question, answering every LLM
 call from the trace document (no model is called), on a runtime of its own so
 the engine's config and LLMs never change. It returns a <code>ReplayReport</code>: the

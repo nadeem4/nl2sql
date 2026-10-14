@@ -1924,6 +1924,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retention
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-where-enginestorageinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is where: engine.storage.info()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4585,6 +4607,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retention
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-where-enginestorageinfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is where: engine.storage.info()
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-index" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4654,12 +4698,12 @@ and adds <code>.nl2sql/</code> to <code>.gitignore</code>.</p>
 </tr>
 <tr>
 <td><code>traces/</code></td>
-<td>Run traces (<code>settings.traces.mode</code>).</td>
+<td>Run traces (<code>settings.traces.mode</code>), kept 14 days by default.</td>
 <td><code>TRACE_DIR</code></td>
 </tr>
 <tr>
 <td><code>results/</code></td>
-<td>Result files, <code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code>. See <a href="../../storage/artifact-store/">Artifact Store</a>.</td>
+<td>Result files, <code>&lt;tenant_id&gt;/&lt;request_id&gt;/&lt;sub_query_id&gt;.parquet</code>. Kept 7 days by default. See <a href="../../storage/artifact-store/">Artifact Store</a>.</td>
 <td><code>RESULT_ARTIFACT_BASE_URI</code></td>
 </tr>
 </tbody>
@@ -4671,8 +4715,8 @@ section above is the same as:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.nl2sql</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">index</span><span class="p">:</span><span class="w">   </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">chroma</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># &lt;path&gt;/index/</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">state</span><span class="p">:</span><span class="w">   </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">sqlite</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># &lt;path&gt;/state.db</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">traces</span><span class="p">:</span><span class="w">  </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">files</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">     </span><span class="c1"># &lt;path&gt;/traces/</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">results</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">local</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">     </span><span class="c1"># &lt;path&gt;/results/</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">traces</span><span class="p">:</span><span class="w">  </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">files</span><span class="p p-Indicator">,</span><span class="nt"> max_age_days</span><span class="p">:</span><span class="w"> </span><span class="nv">14</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># &lt;path&gt;/traces/</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">results</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">local</span><span class="p p-Indicator">,</span><span class="nt"> max_age_days</span><span class="p">:</span><span class="w"> </span><span class="nv">7</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">     </span><span class="c1"># &lt;path&gt;/results/</span>
 </code></pre></div>
 <table>
 <thead>
@@ -4719,20 +4763,52 @@ store. Installed: local."</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Storage</span><span class="p">,</span> <span class="n">StoreConfig</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">)</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">,</span> <span class="n">traces</span><span class="o">=</span><span class="n">StoreConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"files"</span><span class="p">))</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">,</span> <span class="n">traces</span><span class="o">=</span><span class="n">StoreConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"files"</span><span class="p">,</span> <span class="n">max_age_days</span><span class="o">=</span><span class="mi">30</span><span class="p">))</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">Storage</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">".nl2sql"</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">my_index_store</span><span class="p">)</span>   <span class="c1"># any object whose slot is "index"</span>
 </code></pre></div>
 <p>The store interfaces are in <a href="../../adapters/sdk/#interfaces-the-stores"><code>nl2sql_sdk.stores</code></a>.
 A plugin registers a store in the <code>nl2sql.stores</code> entry point group, or in
 code with <code>registry.add_store(name, cls)</code>.</p>
 <div class="admonition note">
-<p class="admonition-title">Built-ins only, for now, except the index</p>
+<p class="admonition-title">The state slot takes the built-in only, for now</p>
 <p>0.6 moves the engine onto the four store interfaces one slot at a time.
-The engine reads its index through <code>IndexStore</code>, so any index store
-works. Until the other slots' moves land, the engine reads <code>state</code>,
-<code>traces</code> and <code>results</code> through their built-in stores only, and refuses
-any other store there with a problem at <code>storage.&lt;slot&gt;</code>.</p>
+The engine reads its index, traces and results through <code>IndexStore</code>,
+<code>TraceStore</code> and <code>ResultStore</code>, so any store works in those slots. Until
+the state slot's move lands, the engine reads <code>state</code> through the
+built-in <code>sqlite</code> store only, and refuses any other store there with a
+problem at <code>storage.state</code>.</p>
 </div>
+<h2 id="retention">Retention</h2>
+<p>The <code>files</code> trace store and the <code>local</code> results store take <code>max_age_days</code>,
+14 and 7 by default (at least 1). It is a key of those two stores, not of
+every store.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">traces</span><span class="p">:</span><span class="w">  </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">files</span><span class="p p-Indicator">,</span><span class="nt"> max_age_days</span><span class="p">:</span><span class="w"> </span><span class="nv">30</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">results</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">local</span><span class="p p-Indicator">,</span><span class="nt"> max_age_days</span><span class="p">:</span><span class="w"> </span><span class="nv">2</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p><code>engine.storage.purge()</code> deletes the traces and result files last written
+before that age and returns the counts, <code>{"traces": 3, "results": 12}</code>. A
+plugin trace or results store is purged when it has a <code>max_age_days</code>
+attribute, and left alone when it does not (a bucket with its own lifecycle
+rule, say). Three things call it:</p>
+<ul>
+<li><code>nl2sql storage purge</code>, by hand or from cron;</li>
+<li><code>nl2sql-api</code>, at startup and then once a day while it serves (a failed
+  purge is logged and tried again the next day);</li>
+<li>your own code.</li>
+</ul>
+<p>Feedback and schema snapshots have no age limit: feedback is cleared by hand
+(<code>nl2sql feedback clear</code>), and old snapshots are evicted by
+<code>settings.schema.max_versions</code>.</p>
+<h2 id="what-is-where-enginestorageinfo">What is where: <code>engine.storage.info()</code></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span><span class="o">.</span><span class="n">info</span><span class="p">()</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># {"index":   {"type": "chroma", "location": ".../.nl2sql/index"},</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1">#  "state":   {"type": "sqlite", "location": ".../.nl2sql/state.db"},</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1">#  "traces":  {"type": "files",  "location": ".../.nl2sql/traces", "max_age_days": 14},</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1">#  "results": {"type": "local",  "location": ".../.nl2sql/results", "max_age_days": 7},</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1">#  "namespace": "nl2sql__local-all-minilm-l6-v2__384"}</span>
+</code></pre></div>
+<p><code>type</code> is the store's name, or the class name of a store object; <code>location</code>
+is its folder or file, or <code>None</code> for a store that does not have one.</p>
 <h2 id="the-index">The index</h2>
 <p>The engine embeds; the index store keeps entries and vectors in a
 <strong>namespace</strong> per embedding model, <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code> (for
@@ -4753,14 +4829,16 @@ run reads the pointers once when it starts. See
 </ul>
 <h2 id="sharing">Sharing</h2>
 <p>Two engines with different paths share nothing. The commands that only read
-these stores (<code>nl2sql cache clear</code>, <code>nl2sql feedback</code>, <code>nl2sql trace show</code>)
-find them from the same config, so run them with the same <code>--config</code>.</p>
-<p>Results are local files. The S3 and ADLS result backends of 0.4 were removed;
-remote stores come back with the results-store interface in a later release.</p>
+these stores (<code>nl2sql cache clear</code>, <code>nl2sql feedback</code>, <code>nl2sql trace show</code>,
+<code>nl2sql storage purge</code>) find them from the same config, so run them with the
+same <code>--config</code>.</p>
+<p>There is no built-in S3 or ADLS results store. The <code>ResultStore</code> interface is
+four methods; <a href="../../storage/artifact-store/#a-results-store-of-your-own">Artifact Store</a>
+has an S3 example.</p>
 <p>In a container, mount a volume and point the path at it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_DATA_DIR</span><span class="o">=</span>/data<span class="w"> </span>-v<span class="w"> </span>nl2sql-data:/data<span class="w"> </span>...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span><span class="nv">NL2SQL_DATA_DIR</span><span class="o">=</span>/data<span class="w"> </span>-v<span class="w"> </span>nl2sql-data:/data<span class="w"> </span>...
 </code></pre></div>
 
 

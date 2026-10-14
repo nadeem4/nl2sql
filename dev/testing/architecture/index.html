@@ -2253,7 +2253,8 @@ so a test sets them on the runtime it builds:</p>
 <ul>
 <li><strong>One node or service:</strong> <code>nl2sql.testing.runtime.fake_runtime(settings=...,
   policies=..., traces_dir=..., **attrs)</code> builds a stand-in runtime with a real
-  config. Settings are written as in YAML: <code>settings={"traces": {"mode":
+  config, a <code>local</code> results store and a <code>files</code> trace store on <code>traces_dir</code>
+  (pass <code>traces=</code> for another trace store). Settings are written as in YAML: <code>settings={"traces": {"mode":
   "always"}}</code>.</li>
 <li><strong>A whole engine:</strong> <code>Runtime.from_config(make_config(tmp_path, ...))</code>. An
   <code>Embeddings(instance=FakeEmbeddings(size=8))</code> keeps it free of any model.</li>
