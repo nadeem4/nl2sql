@@ -66,7 +66,7 @@ Validation performed:
 
 - Datasource override must exist in the registry.
 - RBAC must allow at least one candidate.
-- Version mismatch policy enforced via `settings.schema_version_mismatch_policy`.
+- Version mismatch policy enforced via `settings.schema.version_mismatch`.
 - At least one allowed candidate must be judged able to answer.
 
 ---
@@ -213,7 +213,7 @@ Exceptions are caught at the node boundary and logged with `logger.error`.
 
 ## Configuration
 
-- `settings.schema_version_mismatch_policy` (`warn` or `fail`)
+- `settings.schema.version_mismatch` (`warn`, `fail` or `ignore`)
 - LLM agent `datasourceresolver` in the LLM config (optional; see [LLM configuration](../../configuration/llm.md#per-node-models))
 
 ---

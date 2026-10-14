@@ -281,6 +281,7 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     from nl2sql.auth import UserContext
     from nl2sql.common.settings import settings
     from nl2sql.pipeline.runtime import run_with_graph
+    from nl2sql.runtime import pinned_config
 
     playback = TracePlayback(doc)
     _install_playback_clients(ctx, playback)
@@ -288,15 +289,15 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     user_context = UserContext(roles=list(request.get("roles") or []),
                                **({"tenant_id": request["tenant_id"]} if request.get("tenant_id") else {}))
 
-    # Retry back-off only waits; the recorded answers do not depend on it.
-    saved = {k: getattr(settings, k)
-             for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec", "plan_cache_enabled",
-                       "today")}
-    for k in ("sql_agent_retry_base_delay_sec", "sql_agent_retry_jitter_sec"):
-        setattr(settings, k, 0.0)
-    settings.plan_cache_enabled = saved["plan_cache_enabled"] and recorded_plan_cache_hit(doc)
-    # The prompts carry the date; replay them on the day they were recorded.
-    settings.today = recorded_run_date(doc) or saved["today"]
+    pipeline = ctx.config.settings.pipeline
+    pinned = {
+        # Retry back-off only waits; the recorded answers do not depend on it.
+        "settings.pipeline.retries.base_delay_s": 0.0,
+        "settings.pipeline.retries.jitter_s": 0.0,
+        "settings.pipeline.plan_cache": pipeline.plan_cache and recorded_plan_cache_hit(doc),
+        # The prompts carry the date; replay them on the day they were recorded.
+        "settings.pipeline.today": recorded_run_date(doc) or pipeline.today,
+    }
     # Once the run has diverged, the nodes log the refused call as a failure with
     # a stack trace. That is the replay stopping, not a fault: the report says so.
     quiet = _AfterDivergence(playback)
@@ -304,14 +305,13 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     for handler in handlers:
         handler.addFilter(quiet)
     try:
-        state = run_with_graph(
-            ctx, request.get("question") or "", datasource_id=request.get("datasource_id"),
-            execute=bool(request.get("execute", True)), callbacks=[playback.recorder],
-            user_context=user_context, cancellation_token=playback.token, trace_mode="off",
-        )
+        with pinned_config(ctx, pinned):
+            state = run_with_graph(
+                ctx, request.get("question") or "", datasource_id=request.get("datasource_id"),
+                execute=bool(request.get("execute", True)), callbacks=[playback.recorder],
+                user_context=user_context, cancellation_token=playback.token, trace_mode="off",
+            )
     finally:
-        for k, v in saved.items():
-            setattr(settings, k, v)
         for handler in handlers:
             handler.removeFilter(quiet)
 

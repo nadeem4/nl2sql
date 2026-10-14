@@ -18,6 +18,7 @@ from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.runtime import fake_runtime
 
 FAKE_KEY = "-".join(["fake", "key", "for", "tests"])
 QUESTION = "How many customers are there?"
@@ -55,7 +56,7 @@ def _ctx(server, ds_ids, allowed=("*",)):
     registry = LLMRegistry(SecretManager())
     registry.register_llm(AgentConfig(provider="openai", model="gpt-4o", api_key=FAKE_KEY,
                                       base_url=server.base_url, name="default"))
-    return SimpleNamespace(
+    return fake_runtime(
         vector_store=Store(ds_ids),
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: list(allowed)),
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),

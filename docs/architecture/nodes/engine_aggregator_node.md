@@ -77,14 +77,14 @@ Side effects:
 3. Save each terminal result with `ArtifactStore.write_lazy`, which streams the plan into a parquet artifact, and build `AggregatorResponse`:
    - `computed_artifacts[node_id]`: the saved result's `ArtifactRef`, with the whole result's `row_count` and `columns` (`sub_query_id` unset).
    - `results`: one `ResultSummary` per saved result (`node_id`, `columns`, `row_count`, and `truncated`: a sub-query upstream of the node in the DAG was cut at its row cap), also written as the run's `manifest.json`. `QueryResult.result_manifest` carries it, and the facade's paging and CSV export read the result by it.
-   - `terminal_results[node_id]`: the first `ANSWER_PREVIEW_ROWS` rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.
+   - `terminal_results[node_id]`: the first `settings.results.preview_rows` rows, read back from that artifact. This is what the answer model is shown; it is not the whole result.
 4. Return success reasoning.
 5. On exception, emit `AGGREGATOR_FAILED`, on the state's `errors` and on `AggregatorResponse.errors`. The graph's `aggregator_route` then ends the run: the answer synthesizer is not called on the empty result, so the aggregator's error is the run's outcome and no model call is spent explaining `{}`.
 
 ### Row cap before a combine
 
 The generator caps every sub-query at its datasource's `row_limit`, bounded by
-the `RESULT_ROW_LIMIT` ceiling (100,000, also the cap when none is set), unless the plan asks for fewer rows itself, and records that cap as
+the `settings.results.row_limit` ceiling (100,000, also the cap when none is set), unless the plan asks for fewer rows itself, and records that cap as
 `row_cap` on its response and on the sub-query's `SubgraphOutput`. The cap is
 applied in each sub-query's SQL, **before** the combine: a join input with
 2240 rows under a `row_limit` of 1000 reaches the aggregator as 1000, and every match the other 1240 held
@@ -210,8 +210,8 @@ Logs failures via `logger.error`.
 ## Configuration
 
 - Uses `PolarsDuckdbEngine`.
-- `ANSWER_PREVIEW_ROWS`: rows of each terminal result kept in `terminal_results`.
-- `RESULT_ARTIFACT_*`: where the combined result is written, as for the sub-query artifacts.
+- `settings.results.preview_rows`: rows of each terminal result kept in `terminal_results`.
+- The combined result is written to the runtime's results store (`ctx.artifact_store`, `<storage.path>/results/`), as the sub-query artifacts are.
 
 ---
 

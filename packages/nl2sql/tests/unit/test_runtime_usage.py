@@ -9,6 +9,7 @@ from langchain_core.outputs import ChatGeneration, LLMResult
 from nl2sql.auth import UserContext
 from nl2sql.pipeline import runtime
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
+from nl2sql.testing.runtime import fake_runtime
 
 
 class _FakeGraph:
@@ -33,7 +34,7 @@ def _one_planner_call(state, config):
 def test_every_run_reports_usage_without_the_caller_passing_a_callback(monkeypatch):
     monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _FakeGraph(_one_planner_call))
 
-    state = runtime.run_with_graph(None, "q", user_context=UserContext(roles=["user"]))
+    state = runtime.run_with_graph(fake_runtime(), "q", user_context=UserContext(roles=["user"]))
 
     usage = state["usage"]
     assert usage["total"]["calls"] == 1

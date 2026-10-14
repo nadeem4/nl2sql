@@ -18,6 +18,7 @@ from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, resolve_subgraph
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.testing import adapter_registry
+from nl2sql.testing.runtime import fake_runtime
 
 SQL = DatasourceCapability.SUPPORTS_SQL
 
@@ -100,5 +101,6 @@ def test_routing_and_the_sql_executor_ask_the_registry(monkeypatch, ds_id, allow
     assert (resolve_subgraph(ds_id, SimpleNamespace(ds_registry=registry)) == SQL_AGENT_SUBGRAPH) is allowed
     request = ExecutorRequest(node_id="n", trace_id="t", subgraph_name="sql_agent",
                               datasource_id=ds_id, sql="SELECT 1", tenant_id="t1")
-    errors = SqlExecutorService(registry).validate_request(request)
+    errors = SqlExecutorService(registry, fake_runtime().artifact_store,
+                                fetch_batch_size=10_000).validate_request(request)
     assert (not errors) is allowed

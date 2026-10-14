@@ -7,12 +7,13 @@ from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerRe
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.state import GraphState
 from nl2sql.common.errors import ErrorCode
+from nl2sql.testing.runtime import fake_runtime
 
 
 def test_answer_synthesizer_requires_aggregated_result():
     # Validates state requirements because synthesis must not run without inputs.
     # Arrange
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = MagicMock()
     node = AnswerSynthesizerNode(ctx)
     state = GraphState(user_query="q", aggregator_response=None)
@@ -29,7 +30,7 @@ def test_answer_synthesizer_returns_structured_answer():
     # Arrange
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = AnswerSynthesizerNode(ctx)
     node.chain = MagicMock()
@@ -53,7 +54,7 @@ def test_answer_synthesizer_uses_final_answer_fallback():
     # Validates fallback because previous synthesized answer can be reused.
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = AnswerSynthesizerNode(ctx)
     node.chain = MagicMock()
@@ -83,7 +84,7 @@ def _prompt_capturing_node(monkeypatch, prompts):
 
     monkeypatch.setattr("nl2sql.pipeline.nodes.answer_synthesizer.node.structured",
                         lambda llm, schema: RunnableLambda(answer))
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     return AnswerSynthesizerNode(ctx)
 
 
@@ -120,7 +121,7 @@ def test_answer_synthesizer_handles_llm_error():
     # Validates error handling because LLM failures must surface as errors.
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = AnswerSynthesizerNode(ctx)
     node.chain = MagicMock()

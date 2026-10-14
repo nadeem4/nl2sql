@@ -15,8 +15,8 @@
 ## Responsibilities
 
 - Limit the search to datasources that have verified queries and that `rbac.get_allowed_datasources()` allows (the pinned `datasource_id` only, when one is given).
-- Retrieve candidates with `VectorStore.retrieve_verified_query_candidates()` (top `CURATED_MATCH_TOP_K`), skipping a query that is in the index but no longer in the file.
-- Ask no model when the best similarity is below `CURATED_MATCH_FLOOR`.
+- Retrieve candidates with `VectorStore.retrieve_verified_query_candidates()` (top `settings.curated.match_top_k`), skipping a query that is in the index but no longer in the file.
+- Ask no model when the best similarity is below `settings.curated.match_floor`.
 - Make one structured-output call, `VerifiedQueryChoice`.
 - Check the chosen values (`params.resolve_params`): type, `min`/`max`, `choices`, required.
 - Check every table the SQL reads against the role's `allowed_tables` with `table_allowed()`, and that the SQL is still one read-only query.
@@ -90,12 +90,12 @@ Always, outside the state (the trace keeps the node's whole return):
 
 1. Searchable datasources: registered, allowed for the role (`*` allows all), the pinned one alone if pinned, and holding verified queries. None: `not_configured`, no search and no embedding call.
 2. Candidates. None (or none still in the file): `no_candidates`.
-3. Best similarity below `CURATED_MATCH_FLOOR`: `below_floor`, no model call.
+3. Best similarity below `settings.curated.match_floor`: `below_floor`, no model call.
 4. One `VerifiedQueryChoice` call. It raised (no recording in a replay, a provider error): `model_failed`. `none_of_these`: `none_of_these`. An id that is not a candidate: `unknown_query`.
 5. Values: an unknown name, a name twice, a value that does not parse or is out of bounds: `param_invalid`; a param with no default left out or empty: `param_missing`. A param left out takes its default.
 6. Tables: any table the SQL reads not allowed for the role: `policy_denied`. The normal pipeline then enforces RBAC as always; the user is not told a verified query exists.
 7. Capability: a query with params on an adapter without `SUPPORTS_BOUND_PARAMETERS`: `capability_missing`.
-8. Run with the values bound and `max_rows` set to `min(adapter.row_limit or RESULT_ROW_LIMIT, RESULT_ROW_LIMIT)`. Failed or no result: `execution_failed`, with a warning.
+8. Run with the values bound and `max_rows` set to `min(adapter.row_limit or row_limit, row_limit)` (`row_limit` is `settings.results.row_limit`). Failed or no result: `execution_failed`, with a warning.
 9. Fill the state and route to `layer_router`.
 
 ### The choice prompt

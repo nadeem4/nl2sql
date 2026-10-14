@@ -21,7 +21,6 @@ from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_EXAMPLES, PLANNER_SYSTEM_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
@@ -164,6 +163,7 @@ def test_the_decomposer_prompt_puts_order_and_limit_on_the_sub_query():
 def _plan_call(sub_query):
     node = ASTPlannerNode.__new__(ASTPlannerNode)
     node.node_name = "astplanner"
+    node.today = None
     node.plan_cache = PlanCache(None)
     node.chain = MagicMock()
     node.chain.invoke.return_value = PlanModel(tables=[])
@@ -190,10 +190,9 @@ def test_the_planner_prompt_asks_for_order_by_and_limit():
 # --- the plan cache ---------------------------------------------------------------
 
 
-def test_the_plan_cache_key_tells_top_1_from_top_5(monkeypatch):
-    monkeypatch.setattr(settings, "today", date(2013, 12, 31))
+def test_the_plan_cache_key_tells_top_1_from_top_5():
     base = dict(schema_version="v1")
-    key = PlanCache._key
+    key = PlanCache(None, today=date(2013, 12, 31))._key
 
     assert key(_sq(**base)) != key(_sq(limit=1, **base))
     assert key(_sq(limit=1, **base)) != key(_sq(limit=5, **base))

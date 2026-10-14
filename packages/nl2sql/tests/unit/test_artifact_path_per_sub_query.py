@@ -13,13 +13,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.common.settings import Settings, settings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
+from nl2sql.execution.artifacts.store import DEFAULT_PATH_TEMPLATE
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql_sdk.contracts import ResultFrame
 
-DEFAULT_TEMPLATE = Settings.model_fields["result_artifact_path_template"].default
+DEFAULT_TEMPLATE = DEFAULT_PATH_TEMPLATE
 
 
 def _frame(value):
@@ -100,12 +100,11 @@ class _Adapter:
 
 
 @pytest.mark.parametrize("template", [DEFAULT_TEMPLATE, "<tenant_id>/<request_id>.parquet"])
-def test_the_executor_writes_each_sub_query_of_a_run_to_its_own_artifact(tmp_path, monkeypatch, template):
-    monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
-    monkeypatch.setattr(settings, "result_artifact_path_template", template)
+def test_the_executor_writes_each_sub_query_of_a_run_to_its_own_artifact(tmp_path, template):
     adapters = {"chinook": _Adapter("music"), "support": _Adapter("tickets")}
     registry = SimpleNamespace(get_adapter=lambda ds: adapters[ds], supports=lambda ds, cap: True)
-    service = SqlExecutorService(registry)
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=template))
+    service = SqlExecutorService(registry, store, fetch_batch_size=10_000)
 
     def run(node_id, ds):
         return service.execute(ExecutorRequest(node_id=node_id, trace_id="trace-1", subgraph_name="sql_agent",

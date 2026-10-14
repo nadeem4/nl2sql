@@ -9,7 +9,6 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_demo_config
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
@@ -73,15 +72,6 @@ def demo_env() -> SimpleNamespace:
     collection_name = f"itest_aggregator_{uuid.uuid4().hex}"
     vector_store_path = tmp_dir / "chroma"
     schema_store_path = tmp_dir / "schema_store.db"
-    monkeypatch.setattr(settings, "result_artifact_base_uri", tmp_dir.as_posix())
-    monkeypatch.setattr(
-        settings,
-        "result_artifact_path_template",
-        "<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
-    )
-    monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
-    monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
     ctx = Runtime.from_config(make_demo_config(tmp_dir))
 
@@ -112,8 +102,8 @@ def test_aggregator_real_data(demo_env) -> None:
 
     store = ArtifactStore(
         ArtifactStoreConfig(
-            base_uri=settings.result_artifact_base_uri,
-            path_template=settings.result_artifact_path_template,
+            base_uri=demo_env.ctx.artifact_store.config.base_uri,
+            path_template="<tenant_id>/<request_id>/<subgraph_name>/<dag_node_id>/<schema_version>/part-00000.parquet",
         )
     )
     artifact = store.create_artifact_ref(

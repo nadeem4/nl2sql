@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from nl2sql.auth.rbac import default_schema, table_allowed
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
 from nl2sql.configs.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
@@ -72,10 +71,13 @@ class CuratedMatcherNode:
         self.ds_registry = ctx.ds_registry
         self.schema_store = ctx.schema_store
         self.tenant_id = ctx.tenant_id
+        self.row_limit = ctx.settings.results.row_limit
+        self.match = ctx.settings.curated
         # Registered as agent "curatedmatcher"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.chain = CURATED_MATCHER_PROMPT | structured(self.llm, VerifiedQueryChoice)
-        self.executor = SqlExecutorService(ctx.ds_registry)
+        self.executor = SqlExecutorService(ctx.ds_registry, ctx.artifact_store,
+                                          fetch_batch_size=ctx.settings.results.fetch_batch_size)
 
     # -- the steps --------------------------------------------------------
 
@@ -127,14 +129,14 @@ class CuratedMatcherNode:
                 raise _Fallback("policy_denied", f"'{ds_id}.{name}' is not allowed for this role")
 
     def _row_ceiling(self, ds_id: str) -> int:
-        ceiling = int(settings.result_row_limit)
+        ceiling = self.row_limit
         adapter = self.ds_registry.get_adapter(ds_id)
         return min(int(getattr(adapter, "row_limit", None) or ceiling), ceiling)
 
     # -- the node ---------------------------------------------------------
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
-        record: Dict[str, Any] = {"matched": False, "reason": None, "floor": settings.curated_match_floor,
+        record: Dict[str, Any] = {"matched": False, "reason": None, "floor": self.match.match_floor,
                                   "candidates": [], "choice": None, "params": None}
         searches: List[Dict[str, Any]] = []
         try:
@@ -164,7 +166,7 @@ class CuratedMatcherNode:
         if not datasource_ids:
             raise _Fallback("not_configured", "No readable datasource has verified queries.")
         found = self.vector_store.retrieve_verified_query_candidates(
-            state.user_query, datasource_ids, k=int(settings.curated_match_top_k), explain=searches)
+            state.user_query, datasource_ids, k=self.match.match_top_k, explain=searches)
         # The file, not the index, is the truth: a query that has since been
         # removed is skipped.
         candidates = [(c, self._queries(c.datasource_id)[c.query_id]) for c in found
@@ -176,8 +178,8 @@ class CuratedMatcherNode:
 
         # 2. The floor: below it, no model call.
         best = max(c.score for c, _ in candidates)
-        if best < settings.curated_match_floor:
-            raise _Fallback("below_floor", f"Best similarity {best:.3f} is below {settings.curated_match_floor}.")
+        if best < self.match.match_floor:
+            raise _Fallback("below_floor", f"Best similarity {best:.3f} is below {self.match.match_floor}.")
 
         # 3. One structured-output call.
         try:

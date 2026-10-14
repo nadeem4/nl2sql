@@ -12,7 +12,7 @@
 
 ## Responsibilities
 
-- Send the model a preview of each result, never the whole of it: the first `ANSWER_PREVIEW_ROWS` rows (20), the total row count, the column names and a `partial` flag.
+- Send the model a preview of each result, never the whole of it: the first `settings.results.preview_rows` rows (20), the total row count, the column names and a `partial` flag.
 - Say when a result was cut at the row limit, whatever the model wrote.
 - Include unmapped sub‑queries in the response context.
 - Invoke LLM with structured output schema.
@@ -73,7 +73,7 @@ Side effects:
 
 1. Resolve aggregated result from `aggregator_response`.
 2. If missing, emit `INVALID_STATE` error and stop.
-3. Build the result preview (`result_preview()`): for each terminal result, its first `ANSWER_PREVIEW_ROWS` rows, `row_count`, `columns` and `partial` (true when rows were left out). The rows are the aggregator's `terminal_results`, already cut to the preview; `row_count` and `columns` come from the saved combined result in `computed_artifacts`, so they describe the whole result. Serialize it to JSON.
+3. Build the result preview (`result_preview()`): for each terminal result, its first `settings.results.preview_rows` rows, `row_count`, `columns` and `partial` (true when rows were left out). The rows are the aggregator's `terminal_results`, already cut to the preview; `row_count` and `columns` come from the saved combined result in `computed_artifacts`, so they describe the whole result. Serialize it to JSON.
 4. Build the *Result Limit* note: one line per sub-query whose result reached its row limit ("The result was cut at 10,000 rows, the row limit, so it is incomplete. Narrow the question ..."), or `None`.
 5. Serialize unmapped sub‑queries to JSON.
 6. Invoke LLM chain with structured output. The prompt's *Data Notes* lists the missing values and asks the answer to say the value does not exist instead of reporting the empty result as a finding. When the run was started by `stream_query` (`configurable.stream_answer`), the chain is `streaming_structured`: the same request with the provider asked to stream, so the run's `RunEvents` callback turns each piece of the tool call into an `answer_delta` event. The answer it returns is the unstreamed chain's ([Streaming a run](../../api/core/query.md#streaming-a-run)).
@@ -90,7 +90,7 @@ not to copy it. So the prompt carries a preview, and its instructions say:
 - do not reproduce the result: say the full result is in the table, and use `format_type` `"table"` only for a few preview rows.
 
 The prompt's size no longer grows with the result, which is what let the row cap
-rise from 1,000 to a resource ceiling (`RESULT_ROW_LIMIT`, 100,000).
+rise from 1,000 to a resource ceiling (`settings.results.row_limit`, 100,000).
 
 ### A result cut at the row limit
 
@@ -147,7 +147,7 @@ Logs failures via `logger.error`.
 ## Performance Characteristics
 
 - LLM call dominates latency and cost.
-- The prompt holds at most `ANSWER_PREVIEW_ROWS` rows per terminal result, whatever the result's size. The whole result is still held in memory by the aggregator.
+- The prompt holds at most `settings.results.preview_rows` rows per terminal result, whatever the result's size. The whole result is still held in memory by the aggregator.
 
 ---
 
@@ -161,8 +161,9 @@ Logs failures via `logger.error`.
 ## Configuration
 
 - LLM configuration for agent name `answer_synthesizer` via `llm.yaml`.
-- `ANSWER_PREVIEW_ROWS` (default `20`): rows of each result the model sees.
-- `RESULT_ROW_LIMIT` (default `100000`): the row ceiling a result is cut at; see [the system settings](../../configuration/system.md).
+- `settings.results.preview_rows` (default `20`): rows of each result the model sees.
+- `settings.results.row_limit` (default `100000`): the row ceiling a result is cut at; see [the system settings](../../configuration/system.md).
+- Both are read from the engine's runtime (`ctx.settings`) when the node is built, so two engines in one process each use their own.
 
 ---
 

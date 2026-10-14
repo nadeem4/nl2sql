@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
 from .prompts import REFINER_PROMPT
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from nl2sql.common.settings import run_date
+from nl2sql.common.dates import run_date
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.retry_feedback import as_refiner_errors
@@ -37,6 +37,7 @@ class RefinerNode:
             llm: The language model to use for refinement.
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
+        self.today = ctx.settings.pipeline.today
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = REFINER_PROMPT
         self.chain = None
@@ -88,7 +89,7 @@ class RefinerNode:
                     "failed_plan": failed_plan_str,
                     "errors": errors_str,
                     "reasoning": reasoning_str,
-                    "today": run_date().isoformat(),
+                    "today": run_date(self.today).isoformat(),
                 })
                 
                 warning = PipelineError(

@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import streaming_structured, structured
@@ -79,6 +78,7 @@ class AnswerSynthesizerNode:
 
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
+        self.preview_rows = ctx.settings.results.preview_rows
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
         self.chain = self.prompt | structured(self.llm, AggregatedResponse)
@@ -106,7 +106,7 @@ class AnswerSynthesizerNode:
 
     def _serialize_result(self, result: Any, saved: Optional[Dict[str, Any]] = None) -> str:
         if isinstance(result, dict) and all(isinstance(v, list) for v in result.values()):
-            result = result_preview(result, int(settings.answer_preview_rows), saved)
+            result = result_preview(result, self.preview_rows, saved)
         try:
             return json.dumps(result, indent=2, ensure_ascii=True, default=str)
         except TypeError:

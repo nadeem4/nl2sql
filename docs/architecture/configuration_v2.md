@@ -1178,6 +1178,20 @@ Phase 1. OpenTelemetry moves in Phase 3.
     strict expected failure. The repository's root `conftest.py` puts the
     global back after every test, because building an engine changes it.
 
+!!! note "Built: step 2, the pipeline (PR 11)"
+    The pipeline nodes, the SQL agent subgraph, `pipeline/runtime.py`, the
+    plan cache, `execution` and `aggregation` read `ctx.settings`,
+    `ctx.config.policies` and `ctx.artifact_store`; `build_artifact_store()`
+    is gone. `run_date(today)` is in `nl2sql/common/dates.py`, and
+    `PlanCache(store, enabled=..., today=...)` takes its settings as
+    parameters. Evaluation (tiers 1 and 2, retrieval recall) and trace
+    replay pinned pipeline settings by editing the global, which the pipeline
+    no longer reads, so until PR 12 gives them derived configs they pin them
+    on the runtime with `pinned_config(ctx, {"settings.pipeline.plan_cache":
+    False})` in `nl2sql/runtime.py`. That swaps `ctx.config` for the run and
+    puts it back, with the same one-engine-at-a-time caveat the global had.
+    Node tests build their context with `nl2sql.testing.runtime.fake_runtime`.
+
 Each step is one green PR, and no release happens in between:
 
 1. **The switch PR (7a in the plan)** introduces `Runtime.from_config(cfg)`.

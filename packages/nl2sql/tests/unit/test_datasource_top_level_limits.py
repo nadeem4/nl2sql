@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.common.settings import settings
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.config import Datasource, Limits
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, Expr, PlanModel, SelectItem, TableRef
@@ -38,9 +38,9 @@ def registry(monkeypatch):
     return DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
 
 
-def _sql_for(registry, ds_yaml: dict) -> str:
+def _sql_for(registry, ds_yaml: dict, row_limit: int = 100_000) -> str:
     registry.register_datasource(Datasource(**ds_yaml))
-    node = GeneratorNode(SimpleNamespace(ds_registry=registry))
+    node = GeneratorNode(fake_runtime(ds_registry=registry, settings={"results": {"row_limit": row_limit}}))
     plan = PlanModel(tables=[TableRef(name="users", alias="u")],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],
                      joins=[])
@@ -49,9 +49,8 @@ def _sql_for(registry, ds_yaml: dict) -> str:
     return node(state)["generator_response"].sql_draft
 
 
-def test_a_datasource_row_limit_caps_the_generated_limit(registry, monkeypatch):
-    monkeypatch.setattr(settings, "result_row_limit", 100_000)
-    sql = _sql_for(registry, {"id": "ds1", "type": "stub", "limits": Limits(row_limit=100)})
+def test_a_datasource_row_limit_caps_the_generated_limit(registry):
+    sql = _sql_for(registry, {"id": "ds1", "type": "stub", "limits": Limits(row_limit=100)}, row_limit=100_000)
 
     assert "LIMIT 100" in sql and "LIMIT 100000" not in sql
 

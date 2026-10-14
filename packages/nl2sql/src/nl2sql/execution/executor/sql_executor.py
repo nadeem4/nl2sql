@@ -4,9 +4,8 @@ from typing import Any, Iterator, Optional
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
-from nl2sql.execution.artifacts import build_artifact_store
+from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
@@ -19,14 +18,14 @@ class _StreamFailed(Exception):
     """Raised into the artifact writer when the adapter reports a failure mid-result."""
 
 
-def _frames(adapter: Any, request: AdapterRequest) -> Iterator[ResultFrame]:
+def _frames(adapter: Any, request: AdapterRequest, batch_size: int) -> Iterator[ResultFrame]:
     """The adapter's result, a batch at a time when it streams, else in one frame.
 
     ``execute_batches`` is the SDK's optional ``StreamingAdapterProtocol``; an
     adapter without it (any written before it) is called through ``execute``.
     """
     if isinstance(adapter, StreamingAdapterProtocol):
-        yield from adapter.execute_batches(request, int(settings.result_fetch_batch_size))
+        yield from adapter.execute_batches(request, batch_size)
     else:
         yield adapter.execute(request)
 
@@ -67,9 +66,16 @@ class _Stream:
 
 
 class SqlExecutorService:
-    def __init__(self, ds_registry: DatasourceRegistry):
+    """Runs a query on its datasource and writes the result to ``artifact_store``.
+
+    ``fetch_batch_size`` is the runtime's ``settings.results.fetch_batch_size``:
+    the rows asked for at a time from an adapter that streams.
+    """
+
+    def __init__(self, ds_registry: DatasourceRegistry, artifact_store: ArtifactStore, *, fetch_batch_size: int):
         self.ds_registry = ds_registry
-        self.artifact_store = build_artifact_store()
+        self.artifact_store = artifact_store
+        self.fetch_batch_size = fetch_batch_size
 
     def validate_request(self, request: ExecutorRequest) -> list[PipelineError]:
         errors = []
@@ -139,7 +145,7 @@ class SqlExecutorService:
             "dag_node_id": request.node_id,
             "subgraph_name": request.subgraph_name,
         }
-        stream = _Stream(_frames(adapter, adapter_request), request.max_rows)
+        stream = _Stream(_frames(adapter, adapter_request, self.fetch_batch_size), request.max_rows)
         try:
             artifact_ref = self.artifact_store.write_batches(stream, metadata)
         except _StreamFailed:

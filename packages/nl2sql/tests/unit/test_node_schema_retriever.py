@@ -6,6 +6,7 @@ import pytest
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql_sdk.schema import (
     SchemaSnapshot,
     SchemaContract,
@@ -68,7 +69,7 @@ def test_schema_retriever_falls_back_to_schema_store():
         retrieve_planning_context=lambda *_a, **_k: [],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = SimpleNamespace(vector_store=vector_store, schema_store=_schema_store())
+    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store())
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -109,7 +110,7 @@ def test_schema_retriever_builds_tables_from_docs():
         retrieve_planning_context=lambda *_a, **_k: [doc_col, doc_rel],
         retrieve_column_candidates=lambda *_a, **_k: [],
     )
-    ctx = SimpleNamespace(vector_store=vector_store, schema_store=_schema_store())
+    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store())
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -141,7 +142,7 @@ def test_schema_retriever_uses_column_fallback():
         retrieve_planning_context=lambda *_a, **_k: [doc_col],
         retrieve_column_candidates=lambda *_a, **_k: [doc_col],
     )
-    ctx = SimpleNamespace(vector_store=vector_store, schema_store=_schema_store())
+    ctx = fake_runtime(vector_store=vector_store, schema_store=_schema_store())
     node = SchemaRetrieverNode(ctx)
 
     state = SubgraphExecutionState(
@@ -159,7 +160,7 @@ def test_schema_retriever_uses_column_fallback():
 def retriever_with_snapshot():
     """Build a retriever over a snapshot with ``table_count`` tables."""
 
-    def _factory(table_count: int):
+    def _factory(table_count: int, full_snapshot_max_tables: int = 15):
         refs = [TableRef(schema_name="public", table_name=f"t{i}") for i in range(table_count)]
         snapshot = SchemaSnapshot(
             contract=SchemaContract(
@@ -191,7 +192,8 @@ def retriever_with_snapshot():
             retrieve_column_candidates=MagicMock(return_value=[]),
         )
         schema_store = SimpleNamespace(get_latest_snapshot=lambda _id: snapshot)
-        ctx = SimpleNamespace(vector_store=vector_store, schema_store=schema_store)
+        ctx = fake_runtime(vector_store=vector_store, schema_store=schema_store,
+                           settings={"retrieval": {"full_snapshot_max_tables": full_snapshot_max_tables}})
         node = SchemaRetrieverNode(ctx)
         return node, vector_store, {ref.table_name for ref in refs}
 
@@ -199,11 +201,7 @@ def retriever_with_snapshot():
 
 
 def test_small_schema_bypasses_vector_retrieval(retriever_with_snapshot, monkeypatch):
-    node, vector_store, snapshot_tables = retriever_with_snapshot(table_count=3)
-    monkeypatch.setattr(
-        "nl2sql.pipeline.nodes.schema_retriever.node.settings.schema_retrieval_full_snapshot_max_tables",
-        15,
-    )
+    node, vector_store, snapshot_tables = retriever_with_snapshot(table_count=3, full_snapshot_max_tables=15)
     out = node(SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds", intent="q")))
     assert {t.name for t in out["relevant_tables"]} == snapshot_tables
     assert all(len(t.columns) > 0 for t in out["relevant_tables"])

@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 
 from nl2sql.auth import UserContext
 from nl2sql.pipeline.runtime import run_with_graph
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 
 
@@ -44,7 +43,7 @@ class PipelineRunner:
 
         user_context = UserContext(
             roles=[role],
-            tenant_id=settings.tenant_id,
+            tenant_id=self.ctx.tenant_id,
         )
 
         try:

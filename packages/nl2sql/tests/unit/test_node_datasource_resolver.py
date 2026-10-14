@@ -10,6 +10,7 @@ from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.runtime import fake_runtime
 
 FAKE_KEY = "-".join(["fake", "key", "for", "tests"])
 
@@ -42,8 +43,9 @@ def _schema_store(version="v1"):
     return SimpleNamespace(get_latest_version=lambda _id: version, get_latest_snapshot=lambda _id: None)
 
 
-def _ctx(llm_registry, vector_store, allowed, ds_ids=TWO, version="v1"):
-    return SimpleNamespace(
+def _ctx(llm_registry, vector_store, allowed, ds_ids=TWO, version="v1", version_mismatch="warn"):
+    return fake_runtime(
+        settings={"schema": {"version_mismatch": version_mismatch}},
         vector_store=vector_store,
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: allowed),
         ds_registry=SimpleNamespace(
@@ -60,12 +62,8 @@ def test_datasource_resolver_schema_version_mismatch_fail(monkeypatch, llm_regis
     # Arrange
     vector_store = SimpleNamespace()
     vector_store.retrieve_datasource_candidates = lambda *_a, **_k: [_doc()]
-    node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"], version="v2"))
+    node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"], version="v2", version_mismatch="fail"))
 
-    monkeypatch.setattr(
-        "nl2sql.pipeline.nodes.datasource_resolver.node.settings.schema_version_mismatch_policy",
-        "fail",
-    )
     state = GraphState(user_query="q", user_context=UserContext())
 
     # Act

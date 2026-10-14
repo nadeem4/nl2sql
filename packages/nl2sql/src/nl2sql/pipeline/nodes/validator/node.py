@@ -27,7 +27,6 @@ from nl2sql.pipeline.nodes.generator.node import (
 from nl2sql.runtime import Runtime
 from nl2sql.auth.rbac import FALLBACK_DEFAULT_SCHEMA, default_schema, table_allowed
 from nl2sql.common.logger import get_logger
-from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
 
 
@@ -97,7 +96,8 @@ class LogicalValidatorNode:
         """
         self.registry = ctx.ds_registry
         self.rbac = ctx.rbac
-        self.strict_columns = settings.logical_validator_strict_columns
+        self.strict_columns = ctx.settings.pipeline.strict_columns
+        self.refusal_names_tables = ctx.config.policies.refusal_names_tables
         # The validator does not render SQL, but it builds the generator's
         # query tree to find out whether the plan *can* be rendered. See
         # ``_validate_buildable``.
@@ -672,7 +672,7 @@ class LogicalValidatorNode:
             # the user gets them only when the deployment opts in, because
             # naming a table tells an unauthorised user that it exists.
             logger.warning("Policy denied role(s) %s access to '%s'.", roles, namespaced_name)
-            if settings.rbac_refusal_names_tables:
+            if self.refusal_names_tables:
                 message = (
                     f"Role '{role or '(none)'}' denied access to '{namespaced_name}'. "
                     "Policy requires an explicit 'datasource.schema.table' allow."

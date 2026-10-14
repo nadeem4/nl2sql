@@ -10,6 +10,7 @@ import pytest
 
 from nl2sql.evaluation import records, retrieval_recall as rr
 from nl2sql.evaluation.gold import GOLD_DATASET_PATH, load_gold_dataset
+from nl2sql.testing.runtime import fake_runtime
 
 WHEN = dt.datetime(2026, 9, 21, 14, 5, 6, tzinfo=dt.timezone.utc)
 
@@ -63,19 +64,29 @@ def test_the_top1_share_counts_the_questions_the_router_would_have_sent_elsewher
 def test_every_question_is_scored_against_the_datasource_its_gold_entry_names():
     """The retriever is asked about the gold datasource, whatever the vector search ranks first."""
     asked = []
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook", "support", "webanalytics"]),
-                          vector_store=SimpleNamespace(
-                              FETCH_MULTIPLIER=4, LAMBDA_MULT=0.7, embeddings=None,
-                              retrieve_datasource_candidates=lambda q, k: [
-                                  SimpleNamespace(metadata={"datasource_id": "support"})]))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook", "support", "webanalytics"]),
+                       vector_store=SimpleNamespace(
+                           FETCH_MULTIPLIER=4, LAMBDA_MULT=0.7, embeddings=None,
+                           retrieve_datasource_candidates=lambda q, k: [
+                               SimpleNamespace(metadata={"datasource_id": "support"})]))
+    snapshot_limits = []
+
+    def sent(_ctx, q, ds_id):
+        snapshot_limits.append(_ctx.settings.retrieval.full_snapshot_max_tables)
+        asked.append((q.id, ds_id))
+        return {}
+
     monkey = pytest.MonkeyPatch()
-    monkey.setattr(rr, "_sent", lambda _ctx, q, ds_id: asked.append((q.id, ds_id)) or {})
+    monkey.setattr(rr, "_sent", sent)
     try:
         report = rr.run_retrieval_recall(ctx, question_ids=["chinook_002"])
     finally:
         monkey.undo()
     [(qid, datasource_id)] = asked
     assert (qid, datasource_id) == ("chinook_002", "chinook")
+    # The vector search is forced for the run, and the runtime's setting is put back after.
+    assert snapshot_limits == [0]
+    assert ctx.settings.retrieval.full_snapshot_max_tables == 15
     [result] = report["results"]
     assert result["datasource_id"] == "chinook" and result["retrieved_datasource_id"] == "support"
     assert report["summary"]["datasource_top1_accuracy"] == 0.0

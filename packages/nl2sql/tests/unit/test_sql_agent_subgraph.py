@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
@@ -8,6 +6,7 @@ from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.execution.contracts import ExecutorResponse
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _executed():
@@ -48,7 +47,7 @@ def test_sql_agent_happy_path(monkeypatch):
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: executor)
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: (lambda _s: {}))
 
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     graph = build_sql_agent_graph(ctx)
 
     state = SubgraphExecutionState(
@@ -93,7 +92,7 @@ def test_sql_agent_planner_retry(monkeypatch):
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: executor)
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: refiner)
 
-    ctx = SimpleNamespace()
+    ctx = fake_runtime()
     graph = build_sql_agent_graph(ctx)
 
     state = SubgraphExecutionState(
@@ -118,10 +117,15 @@ def test_execute_false_skips_executor(monkeypatch):
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: executor)
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: (lambda _s: {}))
 
-    graph = build_sql_agent_graph(SimpleNamespace(), execute=False)
+    graph = build_sql_agent_graph(fake_runtime(), execute=False)
     result = graph.invoke(SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
     assert result["generator_response"].sql_draft == "SELECT 1"
     assert result.get("executor_response") is None
+
+
+def _two_quick_retries():
+    """A runtime allowing two retries, with no back-off between them."""
+    return fake_runtime(settings={"pipeline": {"retries": {"max": 2, "base_delay_s": 0, "jitter_s": 0}}})
 
 
 def _patch_nodes(monkeypatch, planner, logical, generator, executor=None, refiner=None):
@@ -131,9 +135,6 @@ def _patch_nodes(monkeypatch, planner, logical, generator, executor=None, refine
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.GeneratorNode", lambda _ctx: generator)
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: executor or (lambda s: {}))
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: refiner or (lambda s: {}))
-    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.settings.sql_agent_retry_base_delay_sec", 0)
-    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.settings.sql_agent_retry_jitter_sec", 0)
-    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.settings.sql_agent_max_retries", 2)
 
 
 def test_warning_only_validation_retries_then_proceeds_to_generation(monkeypatch):
@@ -158,7 +159,7 @@ def test_warning_only_validation_retries_then_proceeds_to_generation(monkeypatch
 
     _patch_nodes(monkeypatch, planner, logical, generator)
 
-    result = build_sql_agent_graph(SimpleNamespace(), execute=False).invoke(
+    result = build_sql_agent_graph(_two_quick_retries(), execute=False).invoke(
         SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
 
     assert calls["planner"] == 3  # the first attempt plus two retries
@@ -184,7 +185,7 @@ def test_blocking_validation_errors_still_end_without_sql_when_retries_run_out(m
 
     _patch_nodes(monkeypatch, planner, logical, generator)
 
-    result = build_sql_agent_graph(SimpleNamespace(), execute=False).invoke(
+    result = build_sql_agent_graph(_two_quick_retries(), execute=False).invoke(
         SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
 
     assert calls["planner"] == 3

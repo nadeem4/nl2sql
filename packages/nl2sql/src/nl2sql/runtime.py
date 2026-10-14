@@ -15,9 +15,10 @@ read this engine's values. The architecture ratchet test lists them.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, NamedTuple, Optional
 
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.logger import get_logger
@@ -174,6 +175,12 @@ class Runtime:
         with self._lock:
             return self._config
 
+    @config.setter
+    def config(self, config: Config) -> None:
+        """Only for ``pinned_config``: evaluation and trace replay pin settings for a run."""
+        with self._lock:
+            self._config = config
+
     @property
     def settings(self):
         """The ``settings`` section: the tuning knobs this engine runs with."""
@@ -254,6 +261,33 @@ def _llm_providers(config: Config):
         provider = override.provider if "provider" in override.model_fields_set else llm.provider
         if isinstance(model, str) and provider and provider != llm.provider:
             yield f"llm.agents.{agent}.provider", provider
+
+
+@contextmanager
+def pinned_config(ctx: Any, changes: Dict[str, Any]) -> Iterator[None]:
+    """Runs the block with ``ctx.config`` changed at dotted paths, then puts it back.
+
+    ``pinned_config(ctx, {"settings.pipeline.plan_cache": False})``. Evaluation
+    and trace replay use it to pin settings for one run, as they did on the
+    process-global ``settings``. Like that, it changes the runtime for every
+    thread using it; they move to derived configs (``cfg.model_copy``) in a
+    later pull request (docs/architecture/configuration_v2.md, section 8).
+    """
+    saved = ctx.config
+    config = saved
+    for path, value in changes.items():
+        config = _replaced(config, path.split("."), value)
+    ctx.config = config
+    try:
+        yield
+    finally:
+        ctx.config = saved
+
+
+def _replaced(model: Any, path: List[str], value: Any) -> Any:
+    head, *rest = path
+    new = _replaced(getattr(model, head), rest, value) if rest else value
+    return model.model_copy(update={head: new})
 
 
 def _copy_into_global_settings(config: Config, stores: StorePaths) -> None:

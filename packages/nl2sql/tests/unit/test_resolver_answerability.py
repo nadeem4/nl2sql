@@ -22,6 +22,7 @@ from nl2sql.pipeline.routes import resolver_route
 from nl2sql.pipeline.state import GraphState
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.runtime import fake_runtime
 
 FAKE_KEY = "-".join(["fake", "key", "for", "tests"])
 JUDGE = "AnswerabilityResponse"
@@ -71,7 +72,7 @@ class SpyStore:
 
 
 def _ctx(server, ds_ids, allowed=("*",), vector_store=None, **agents):
-    return SimpleNamespace(
+    return fake_runtime(
         vector_store=vector_store if vector_store is not None else SpyStore(ds_ids),
         rbac=SimpleNamespace(get_allowed_datasources=lambda _ctx: list(allowed)),
         ds_registry=SimpleNamespace(list_ids=lambda: list(ds_ids)),

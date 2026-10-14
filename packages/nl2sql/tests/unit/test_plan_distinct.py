@@ -15,7 +15,6 @@ from sqlglot import expressions as exp
 
 from nl2sql.auth import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
-from nl2sql.common.settings import settings
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
     ASTPlannerResponse,
@@ -29,6 +28,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _col(name: str) -> Expr:
@@ -61,13 +61,14 @@ def _plan(*exprs: Expr, distinct: bool = False) -> PlanModel:
 
 def _sql(plan: PlanModel, dialect: str = "sqlite") -> str:
     adapter = SimpleNamespace(row_limit=100, get_dialect=lambda: dialect)
-    node = GeneratorNode(SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
+    node = GeneratorNode(fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
     return node(_state(plan))["generator_response"].sql_draft
 
 
 def _validate(plan: PlanModel):
     rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: ["*"])
-    return LogicalValidatorNode(SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac))(_state(plan))
+    return LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac,
+                                             settings={"pipeline": {"strict_columns": True}}))(_state(plan))
 
 
 # --- the model -----------------------------------------------------------------
@@ -110,17 +111,13 @@ def test_a_plain_count_is_unchanged():
 # --- the validator -------------------------------------------------------------
 
 
-def test_the_validator_accepts_count_distinct(monkeypatch):
-    monkeypatch.setattr(settings, "logical_validator_strict_columns", True)
-
+def test_the_validator_accepts_count_distinct():
     result = _validate(_plan(_count_distinct(), distinct=True))
 
     assert result["errors"] == []
 
 
-def test_the_validator_still_resolves_the_column_inside_distinct(monkeypatch):
-    monkeypatch.setattr(settings, "logical_validator_strict_columns", True)
-
+def test_the_validator_still_resolves_the_column_inside_distinct():
     result = _validate(_plan(_count_distinct("NoSuchColumn")))
 
     assert [e.error_code for e in result["errors"]] == [ErrorCode.COLUMN_NOT_FOUND]

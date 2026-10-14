@@ -182,7 +182,7 @@ class CuratedAPI:
 
         request = AdapterRequest(plan_type="sql", payload={"sql": query.sql}, parameters=params, limits={})
         started = time.perf_counter()
-        frames = adapter_frames(registry.get_adapter(ds_id), request)
+        frames = adapter_frames(registry.get_adapter(ds_id), request, int(settings.result_fetch_batch_size))
         try:
             frame = next(frames, None)
         except Exception as e:  # a driver error the adapter did not wrap

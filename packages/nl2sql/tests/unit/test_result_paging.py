@@ -16,13 +16,11 @@ import io
 import json
 import types
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 from nl2sql import NL2SQL, QueryResult, ResultManifest, ResultNotFound, ResultPage, ResultSummary
 from nl2sql.api.query_api import QueryAPI, result_from_state
-from nl2sql.common.settings import settings
 from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.artifacts import results as results_module
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
@@ -30,6 +28,7 @@ from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql_sdk.contracts import ResultFrame
 
 TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
@@ -37,9 +36,7 @@ ROWS = [{"id": i, "name": f"n{i}"} for i in range(45)]
 
 
 @pytest.fixture()
-def store(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
-    monkeypatch.setattr(settings, "result_artifact_path_template", TEMPLATE)
+def store(tmp_path):
     return ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path), path_template=TEMPLATE))
 
 
@@ -58,15 +55,14 @@ def _run(store, tenant="t1", request="run-1", rows=ROWS, truncated=False, column
                                     {"tenant_id": tenant, "request_id": request, "sub_query_id": "sq1"})
     output = SubgraphOutput(subgraph_id="sg1", sub_query=SubQuery(id="sq1", datasource_id="d", intent="i"),
                             artifact=ref, truncated=truncated)
-    node = EngineAggregatorNode(SimpleNamespace(tenant_id=tenant))
-    node.service.engine.artifact_store = store
+    node = EngineAggregatorNode(fake_runtime(settings={"tenant_id": tenant}, artifact_store=store))
     state = GraphState(trace_id=request, user_query="q", execution_dag=_dag(),
                        artifact_refs={"sq1": ref}, subgraph_outputs={"sg1": output})
     return node(state)
 
 
 def _api(store, tenant="t1"):
-    return QueryAPI(SimpleNamespace(tenant_id=tenant, artifact_store=store))
+    return QueryAPI(fake_runtime(settings={"tenant_id": tenant}, artifact_store=store))
 
 
 # The manifest

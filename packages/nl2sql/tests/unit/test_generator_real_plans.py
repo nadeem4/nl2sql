@@ -40,6 +40,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import (
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.generator.node import GeneratorNode, SqlVisitor
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "gpt4o_genre_sales_plan.json"
 CHINOOK = Path(nl2sql.__file__).resolve().parent / "datasets" / "chinook.sqlite"
@@ -51,7 +52,7 @@ def _captured_plan() -> dict:
 
 def _generate(plan: PlanModel, dialect: str = "sqlite") -> dict:
     adapter = SimpleNamespace(row_limit=1000, get_dialect=lambda: dialect)
-    ctx = SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
+    ctx = fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter))
     state = SubgraphExecutionState(
         trace_id="t",
         sub_query=SubQuery(id="sq1", datasource_id="chinook", intent="q"),
@@ -300,7 +301,7 @@ def test_the_validator_builds_its_query_with_the_same_arithmetic():
     """
     from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 
-    validator = LogicalValidatorNode(SimpleNamespace(ds_registry=SimpleNamespace(), rbac=None))
+    validator = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), rbac=None))
     plan = PlanModel.model_validate(_captured_plan())
 
     query = validator._build_validation_query(plan, ["t1", "t2", "t3"])

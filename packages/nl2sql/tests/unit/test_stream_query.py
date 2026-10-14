@@ -16,6 +16,7 @@ from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerResponse
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 SUMMARY = ResultSummary(node_id="sq_1", columns=["genre"], row_count=25)
 ANSWER = {"summary": "Rock leads.", "format_type": "text", "content": "Rock leads.", "warnings": []}
@@ -63,7 +64,7 @@ def api(monkeypatch):
     holder = {"hold": None}
     monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph",
                         lambda ctx, execute=True: _graph(seen_config, holder["hold"]))
-    query = QueryAPI(SimpleNamespace(artifact_store=None))
+    query = QueryAPI(fake_runtime(artifact_store=None))
     query.seen_config = seen_config
     query.holder = holder
     return query
@@ -121,7 +122,7 @@ def test_a_run_that_cannot_start_ends_in_one_error_event(monkeypatch):
         raise RuntimeError("no graph today")
 
     monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", broken)
-    events = list(QueryAPI(SimpleNamespace(artifact_store=None)).stream_query("q"))
+    events = list(QueryAPI(fake_runtime(artifact_store=None)).stream_query("q"))
 
     assert [e.type for e in events] == ["error"]
     assert events[0].data == {"message": "The run failed: no graph today", "error_code": "UNKNOWN_ERROR"}
@@ -140,7 +141,7 @@ def test_the_callers_request_keys_go_with_the_run_to_its_thread(monkeypatch):
 
     monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", build)
     with use_api_key("sk-visitor-key"):
-        list(QueryAPI(SimpleNamespace(artifact_store=None)).stream_query("q"))
+        list(QueryAPI(fake_runtime(artifact_store=None)).stream_query("q"))
     assert seen == ["sk-visitor-key"]
 
 

@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.common.settings import settings
+from nl2sql.testing.runtime import fake_runtime
 
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
@@ -68,8 +68,9 @@ class _Rbac:
         return list(self._allowed)
 
 
-def _node(preferred, vector_store=None, allowed=("*",)):
-    ctx = SimpleNamespace(
+def _node(preferred, vector_store=None, allowed=("*",), settings=None):
+    ctx = fake_runtime(
+        settings=settings,
         vector_store=vector_store,
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
         rbac=_Rbac(allowed),
@@ -159,9 +160,9 @@ def test_an_unreadable_preferred_table_is_still_withheld():
 
 
 @pytest.fixture
-def retrieval(monkeypatch):
+def retrieval():
     """Force the retrieval path: the three-table schema is over the limit."""
-    monkeypatch.setattr(settings, "schema_retrieval_full_snapshot_max_tables", 0)
+    return {"retrieval": {"full_snapshot_max_tables": 0}}
 
 
 def test_retrieval_puts_a_found_preferred_table_first(retrieval):
@@ -170,7 +171,7 @@ def test_retrieval_puts_a_found_preferred_table_first(retrieval):
         pool=[(INVOICES.full_name, 0.8), (REVENUE.full_name, 0.7)],
     )
 
-    tables = _node(["v_customer_revenue"], vector_store=store)(_state())["relevant_tables"]
+    tables = _node(["v_customer_revenue"], vector_store=store, settings=retrieval)(_state())["relevant_tables"]
 
     assert [t.name for t in tables] == ["v_customer_revenue", "invoices"]
     assert tables[0].preferred is True
@@ -182,7 +183,7 @@ def test_retrieval_adds_a_missed_preferred_table_within_the_margin(retrieval):
         pool=[(INVOICES.full_name, 0.80), (REVENUE.full_name, 0.80 - SchemaRetrieverNode.PREFERRED_MARGIN / 2)],
     )
 
-    tables = _node(["v_customer_revenue"], vector_store=store)(_state())["relevant_tables"]
+    tables = _node(["v_customer_revenue"], vector_store=store, settings=retrieval)(_state())["relevant_tables"]
 
     assert [t.name for t in tables] == ["v_customer_revenue", "invoices"]
 
@@ -193,13 +194,13 @@ def test_retrieval_leaves_out_a_missed_preferred_table_beyond_the_margin(retriev
         pool=[(INVOICES.full_name, 0.80), (REVENUE.full_name, 0.80 - SchemaRetrieverNode.PREFERRED_MARGIN * 2)],
     )
 
-    tables = _node(["v_customer_revenue"], vector_store=store)(_state())["relevant_tables"]
+    tables = _node(["v_customer_revenue"], vector_store=store, settings=retrieval)(_state())["relevant_tables"]
 
     assert [t.name for t in tables] == ["invoices"]
 
 
 def test_a_context_without_a_registry_still_retrieves():
-    ctx = SimpleNamespace(
+    ctx = fake_runtime(
         vector_store=None,
         schema_store=SimpleNamespace(get_latest_snapshot=lambda _id: _snapshot()),
         rbac=None,

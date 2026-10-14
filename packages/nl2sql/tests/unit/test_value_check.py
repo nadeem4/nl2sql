@@ -20,7 +20,7 @@ import pytest
 
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
-from nl2sql.common.settings import settings
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.execution.contracts import ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
@@ -197,8 +197,8 @@ def _executor(adapter, monkeypatch, row_count, allowed=("*",)):
 
     monkeypatch.setattr(SqlExecutorService, "execute", execute)
     registry = SimpleNamespace(supports=lambda *_a: True, get_adapter=lambda _id: adapter)
-    ctx = SimpleNamespace(ds_registry=registry, tenant_id="t1",
-                          rbac=SimpleNamespace(get_allowed_tables=lambda _user: list(allowed)))
+    ctx = fake_runtime(settings={"tenant_id": "t1"}, ds_registry=registry,
+                       rbac=SimpleNamespace(get_allowed_tables=lambda _user: list(allowed)))
     return ExecutorNode(ctx)
 
 
@@ -253,8 +253,6 @@ def test_only_one_retry_is_spent_on_values(adapter, monkeypatch):
 
 
 def test_the_subgraph_retries_on_a_missing_value_and_ends_on_a_warning(monkeypatch):
-    monkeypatch.setattr(settings, "sql_agent_retry_base_delay_sec", 0)
-    monkeypatch.setattr(settings, "sql_agent_retry_jitter_sec", 0)
     calls = {"planner": 0, "executor": 0}
 
     def planner(state):
@@ -281,7 +279,8 @@ def test_the_subgraph_retries_on_a_missing_value_and_ends_on_a_warning(monkeypat
     for name, node in nodes.items():
         monkeypatch.setattr(f"nl2sql.pipeline.subgraphs.sql_agent.{name}", lambda _ctx, node=node: node)
 
-    result = build_sql_agent_graph(SimpleNamespace()).invoke(
+    result = build_sql_agent_graph(
+        fake_runtime(settings={"pipeline": {"retries": {"base_delay_s": 0, "jitter_s": 0}}})).invoke(
         SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q")))
 
     assert calls == {"planner": 2, "executor": 2}
@@ -291,7 +290,7 @@ def test_the_subgraph_retries_on_a_missing_value_and_ends_on_a_warning(monkeypat
 def test_the_answer_is_told_that_the_value_does_not_exist():
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = AnswerSynthesizerNode(ctx)
     node.chain = MagicMock()

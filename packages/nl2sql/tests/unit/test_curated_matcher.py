@@ -18,7 +18,7 @@ from nl2sql.adapters.sqlite.adapter import SqliteAdapter
 from nl2sql.auth import UserContext
 from nl2sql.auth.models import RolePolicy
 from nl2sql.auth.rbac import RBAC
-from nl2sql.common.settings import settings
+from nl2sql.config import Settings
 from nl2sql.configs.curated import CuratedFileConfig
 from nl2sql.indexing.models import VerifiedQueryCandidate
 from nl2sql.llm import LLMRegistry
@@ -27,6 +27,7 @@ from nl2sql.pipeline.nodes.curated_matcher import CuratedMatcherNode
 from nl2sql.pipeline.state import GraphState
 from nl2sql.secrets import SecretManager
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql_sdk.capabilities import DatasourceCapability
 
 FAKE_KEY = "-".join(["fake", "key", "for", "matcher"])
@@ -101,10 +102,8 @@ def db(tmp_path):
     return path
 
 
-@pytest.fixture(autouse=True)
-def _artifacts(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path / "artifacts"))
-    monkeypatch.setattr(settings, "result_artifact_path_template", "<tenant_id>/<request_id>/<sub_query_id>.parquet")
+# The runtime's settings when a test passes none.
+settings = Settings()
 
 
 class _Registry:
@@ -143,35 +142,36 @@ def _server(choice):
     return FakeLLMServer(rules).start()
 
 
-def _ctx(db, server, candidates, capabilities=None, curated=None):
+def _ctx(db, server, candidates, capabilities=None, curated=None, settings=None):
     registry = LLMRegistry(SecretManager())
     registry.register_llm(AgentConfig(provider="openai", model="gpt-4o", api_key=FAKE_KEY,
                                       base_url=server.base_url, name="default"))
     adapter = SqliteAdapter(datasource_id="shop", datasource_engine_type="sqlite",
                             connection_args={"type": "sqlite", "database": str(db)})
     vector_store = _VectorStore(candidates)
-    ctx = SimpleNamespace(
+    ctx = fake_runtime(
+        settings={"tenant_id": "t1", **(settings or {})},
+        results=db.parent / "artifacts",
         curated=CuratedFileConfig.model_validate(curated or CURATED),
         vector_store=vector_store,
         rbac=RBAC(POLICIES),
         ds_registry=_Registry(adapter, capabilities),
         schema_store=SimpleNamespace(get_latest_version=lambda _id: "v1"),
-        tenant_id="t1",
         llm_registry=registry,
     )
     return ctx
 
 
-def _matcher(db, server, candidates, capabilities=None, curated=None):
-    ctx = _ctx(db, server, candidates, capabilities, curated)
+def _matcher(db, server, candidates, capabilities=None, curated=None, settings=None):
+    ctx = _ctx(db, server, candidates, capabilities, curated, settings)
     return CuratedMatcherNode(ctx), ctx.vector_store
 
 
 def _run(db, choice, candidates=(TOP, COUNT), role="analyst", question=QUESTION, capabilities=None,
-         datasource_id=None, curated=None):
+         datasource_id=None, curated=None, settings=None):
     server = _server(choice)
     try:
-        node, vector_store = _matcher(db, server, list(candidates), capabilities, curated)
+        node, vector_store = _matcher(db, server, list(candidates), capabilities, curated, settings)
         state = GraphState(user_query=question, user_context=UserContext(roles=[role]),
                            datasource_id=datasource_id)
         out = node(state)
@@ -215,7 +215,7 @@ def test_a_match_runs_the_verified_sql_with_bound_params_and_fills_the_state(db)
     assert output.plan_source == "verified"
     assert output.status == "success"
     assert ":year" in output.sql_draft and "2012" not in output.sql_draft  # never interpolated
-    assert output.row_cap and output.row_cap <= int(settings.result_row_limit)
+    assert output.row_cap and output.row_cap <= settings.results.row_limit
     assert output.truncated is False
     assert {c.name for c in output.validation} == {"read_only", "params", "policy"}
     assert all(c.passed for c in output.validation)
@@ -230,19 +230,20 @@ def test_a_match_runs_the_verified_sql_with_bound_params_and_fills_the_state(db)
 
     record = out["curated_match"]
     assert record["matched"] is True and record["reason"] is None
-    assert record["floor"] == settings.curated_match_floor
+    assert record["floor"] == settings.curated.match_floor
     assert [c["query_id"] for c in record["candidates"]] == ["top_customers_by_revenue", "customer_count"]
     assert record["choice"]["query_id"] == "shop.top_customers_by_revenue"
     assert record["params"] == {"n": 2, "year": 2012}
 
 
-def test_the_rows_are_the_verified_querys_rows(db, tmp_path):
-    from nl2sql.execution.artifacts import build_artifact_store
+def test_the_rows_are_the_verified_querys_rows(db):
+    from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 
     out, _, _ = _run(db, CHOOSE_TOP)
 
     [artifact] = out["artifact_refs"].values()
-    frame = build_artifact_store().read_parquet(artifact)
+    assert artifact.uri.startswith(str((db.parent / "artifacts").resolve()))
+    frame = ArtifactStore(ArtifactStoreConfig(base_uri=str(db.parent / "artifacts"))).read_parquet(artifact)
     assert frame["customer"].to_list() == ["Bo", "Ana"]
     assert frame["revenue"].to_list() == [8.0, 3.0]
 
@@ -256,10 +257,8 @@ def test_a_query_without_params_matches_too(db):
     assert artifact.row_count == 1
 
 
-def test_the_row_ceiling_is_enforced_by_the_executor_not_the_sql(db, monkeypatch):
-    monkeypatch.setattr(settings, "result_row_limit", 1)
-
-    out, _, _ = _run(db, CHOOSE_TOP)
+def test_the_row_ceiling_is_enforced_by_the_executor_not_the_sql(db):
+    out, _, _ = _run(db, CHOOSE_TOP, settings={"results": {"row_limit": 1}})
 
     [output] = out["subgraph_outputs"].values()
     assert output.artifact.row_count == 1
@@ -271,7 +270,7 @@ def test_only_the_pinned_datasource_is_searched(db):
     _out, _, vector_store = _run(db, CHOOSE_TOP, datasource_id="shop")
 
     assert vector_store.calls[0]["datasource_ids"] == ["shop"]
-    assert vector_store.calls[0]["k"] == settings.curated_match_top_k
+    assert vector_store.calls[0]["k"] == settings.curated.match_top_k
 
 
 # -- each fallback --------------------------------------------------------------
@@ -300,7 +299,7 @@ def test_a_candidate_no_longer_in_the_file_is_skipped(db):
 
 
 def test_below_the_floor_no_model_call(db):
-    low = TOP.model_copy(update={"score": settings.curated_match_floor - 0.01})
+    low = TOP.model_copy(update={"score": settings.curated.match_floor - 0.01})
 
     out, server, _ = _run(db, CHOOSE_TOP, candidates=(low,))
 

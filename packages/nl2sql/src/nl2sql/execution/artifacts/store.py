@@ -12,7 +12,6 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import polars as pl
 
-from nl2sql.common.settings import settings
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql_sdk.contracts import ResultFrame
 
@@ -263,13 +262,3 @@ class ArtifactStore:
         path = Path(uri)
         return path.stat().st_size if path.exists() else estimated
 
-
-def build_artifact_store() -> ArtifactStore:
-    """The results store the settings name. The engine sets ``result_artifact_base_uri`` to
-    ``<storage.path>/results/`` (the copy step, until the settings global is deleted)."""
-    return ArtifactStore(
-        ArtifactStoreConfig(
-            base_uri=settings.result_artifact_base_uri,
-            path_template=settings.result_artifact_path_template,
-        )
-    )

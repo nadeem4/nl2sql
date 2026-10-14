@@ -23,7 +23,7 @@ flowchart TD
 
 ## Batched writes
 
-A result is written a batch at a time, so a large one is never held whole as Python rows. The executor reads it from the adapter's `execute_batches` when the adapter has one (the SDK's optional `StreamingAdapterProtocol`; every SQLAlchemy adapter does) in batches of `RESULT_FETCH_BATCH_SIZE` rows (default 10,000), and from `execute`, as one batch, when it does not.
+A result is written a batch at a time, so a large one is never held whole as Python rows. The executor reads it from the adapter's `execute_batches` when the adapter has one (the SDK's optional `StreamingAdapterProtocol`; every SQLAlchemy adapter does) in batches of `settings.results.fetch_batch_size` rows (default 10,000), and from `execute`, as one batch, when it does not.
 
 `ArtifactStore.write_batches` writes a single batch straight to the artifact, exactly as before. From the second batch on, each batch is written to its own part file in a temporary folder as it arrives, and polars then streams the parts into the artifact (`sink_parquet`), concatenated with `vertical_relaxed` so a column that is empty in one batch and text in the next is text. At most one batch is in memory at a time. If the adapter reports a failure between batches, nothing is written, the parts are removed, and the sub-query fails as it would have from `execute`. `create_artifact_ref(frame, metadata)` is `write_batches([frame], metadata)`.
 
@@ -35,7 +35,7 @@ The aggregator reads each sub-query's artifact as a polars scan (`ArtifactStore.
 <tenant_id>/<request_id>/result_<node_id>.parquet
 ```
 
-A combined result has no subgraph or schema version of its own: a template that names `<subgraph_name>` or `<schema_version>` gets `aggregator` and `result`. Its `ArtifactRef` (with `sub_query_id` unset) is recorded in `AggregatorResponse.computed_artifacts` under the terminal node's id, and its `row_count` is the whole result's. `AggregatorResponse.terminal_results` holds only the first `ANSWER_PREVIEW_ROWS` rows of it, read from the saved file, for the answer model.
+A combined result has no subgraph or schema version of its own: a template that names `<subgraph_name>` or `<schema_version>` gets `aggregator` and `result`. Its `ArtifactRef` (with `sub_query_id` unset) is recorded in `AggregatorResponse.computed_artifacts` under the terminal node's id, and its `row_count` is the whole result's. `AggregatorResponse.terminal_results` holds only the first `settings.results.preview_rows` rows of it, read from the saved file, for the answer model.
 
 ## The result manifest
 

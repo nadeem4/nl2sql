@@ -20,6 +20,7 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
 from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _col(alias: str, name: str) -> Expr:
@@ -28,7 +29,7 @@ def _col(alias: str, name: str) -> Expr:
 
 def _ctx(allowed_tables):
     rbac = SimpleNamespace(get_allowed_tables=lambda _ctx: list(allowed_tables))
-    return SimpleNamespace(ds_registry=SimpleNamespace(), rbac=rbac)
+    return fake_runtime(ds_registry=SimpleNamespace(), rbac=rbac)
 
 
 def _plan() -> PlanModel:

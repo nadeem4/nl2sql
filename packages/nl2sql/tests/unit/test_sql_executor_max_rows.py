@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from nl2sql.common.settings import settings
+from nl2sql.execution.artifacts import ArtifactStore, ArtifactStoreConfig
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql_sdk.contracts import ResultFrame
@@ -49,12 +49,11 @@ class _OneShotAdapter:
         return ResultFrame(columns=COLUMNS, rows=rows, row_count=len(rows))
 
 
-def _service(tmp_path, monkeypatch, adapter, batch_size=4):
-    monkeypatch.setattr(settings, "result_artifact_base_uri", str(tmp_path))
-    monkeypatch.setattr(settings, "result_artifact_path_template", "<tenant_id>/<request_id>/<sub_query_id>.parquet")
-    monkeypatch.setattr(settings, "result_fetch_batch_size", batch_size)
+def _service(tmp_path, adapter, batch_size=4):
+    store = ArtifactStore(ArtifactStoreConfig(base_uri=str(tmp_path),
+                                              path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet"))
     registry = SimpleNamespace(get_adapter=lambda ds: adapter, supports=lambda ds, cap: True)
-    return SqlExecutorService(registry)
+    return SqlExecutorService(registry, store, fetch_batch_size=batch_size)
 
 
 def _request(**extra):
@@ -63,9 +62,9 @@ def _request(**extra):
     return ExecutorRequest(**{**fields, **extra})
 
 
-def test_the_stream_stops_at_max_rows_and_the_rest_is_never_read(tmp_path, monkeypatch):
+def test_the_stream_stops_at_max_rows_and_the_rest_is_never_read(tmp_path):
     adapter = _StreamingAdapter(100)
-    service = _service(tmp_path, monkeypatch, adapter, batch_size=4)
+    service = _service(tmp_path, adapter, batch_size=4)
 
     response = service.execute(_request(max_rows=10))
 
@@ -80,36 +79,36 @@ def test_the_stream_stops_at_max_rows_and_the_rest_is_never_read(tmp_path, monke
     assert adapter.closed
 
 
-def test_a_result_under_max_rows_is_whole(tmp_path, monkeypatch):
+def test_a_result_under_max_rows_is_whole(tmp_path):
     adapter = _StreamingAdapter(7)
-    service = _service(tmp_path, monkeypatch, adapter)
+    service = _service(tmp_path, adapter)
 
     response = service.execute(_request(max_rows=10))
 
     assert response.artifact.row_count == 7
 
 
-def test_max_rows_applies_to_an_adapter_that_does_not_stream(tmp_path, monkeypatch):
+def test_max_rows_applies_to_an_adapter_that_does_not_stream(tmp_path):
     adapter = _OneShotAdapter(25)
-    service = _service(tmp_path, monkeypatch, adapter)
+    service = _service(tmp_path, adapter)
 
     response = service.execute(_request(max_rows=10))
 
     assert response.artifact.row_count == 10
 
 
-def test_without_max_rows_every_row_is_read(tmp_path, monkeypatch):
+def test_without_max_rows_every_row_is_read(tmp_path):
     adapter = _StreamingAdapter(30)
-    service = _service(tmp_path, monkeypatch, adapter)
+    service = _service(tmp_path, adapter)
 
     response = service.execute(_request())
 
     assert response.artifact.row_count == 30
 
 
-def test_parameters_reach_the_adapter_and_the_sql_text_is_untouched(tmp_path, monkeypatch):
+def test_parameters_reach_the_adapter_and_the_sql_text_is_untouched(tmp_path):
     adapter = _StreamingAdapter(3)
-    service = _service(tmp_path, monkeypatch, adapter)
+    service = _service(tmp_path, adapter)
 
     service.execute(_request(sql="SELECT id FROM t WHERE y = :year", parameters={"year": 2012}))
 
@@ -118,9 +117,9 @@ def test_parameters_reach_the_adapter_and_the_sql_text_is_untouched(tmp_path, mo
     assert sent.payload == {"sql": "SELECT id FROM t WHERE y = :year"}
 
 
-def test_generated_sql_sends_no_parameters(tmp_path, monkeypatch):
+def test_generated_sql_sends_no_parameters(tmp_path):
     adapter = _StreamingAdapter(3)
-    service = _service(tmp_path, monkeypatch, adapter)
+    service = _service(tmp_path, adapter)
 
     service.execute(_request())
 

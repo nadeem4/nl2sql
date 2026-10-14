@@ -10,13 +10,13 @@ schema_version)``:
 
 * the sub-query intent, because the cache sits at the AST planner, which plans
   one sub-query at a time from its intent (not from the user's question);
-* the run date (:func:`~nl2sql.common.settings.run_date`), because the planner
+* the run date (:func:`~nl2sql.common.dates.run_date`), because the planner
   is told today's date and writes "this year" or "the last 30 days" as literal
   dates: a plan from yesterday would answer for yesterday's window. Every
   entry is keyed on it, not just date-relative ones, because no test of the
   intent or the plan can tell reliably which answers depend on today. So a
   plan is reused for the rest of the day it was made, or for as long as
-  ``NL2SQL_TODAY`` pins the date;
+  ``settings.pipeline.today`` pins the date;
 * the datasource, because the same words mean different tables elsewhere;
 * the schema version, so a rebuilt index with a changed schema misses.
 
@@ -26,17 +26,18 @@ A cached plan is never trusted: the logical validator, generator and executor
 run on it every time, so a policy change or a less privileged role still
 refuses it. Only plans that validated and executed are stored (by the sub-query
 wrapper, which knows the outcome). Entries live in the schema store
-(``schema_store.db`` for the sqlite backend), and ``PLAN_CACHE_ENABLED=false``
+(``state.db`` under ``storage.path``), and ``settings.pipeline.plan_cache: false``
 turns reads and writes off.
 """
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any, Optional
 
 from nl2sql.common.logger import get_logger
 from nl2sql.common.metrics import plan_cache_counter
-from nl2sql.common.settings import run_date, settings
+from nl2sql.common.dates import run_date
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 
 logger = get_logger("plan_cache")
@@ -55,17 +56,20 @@ class PlanCache:
     """Reads and writes validated plans in the schema store.
 
     Every failure (no store, a store without a cache, an unreadable entry) is a
-    miss: the planner then runs as if there were no cache.
+    miss: the planner then runs as if there were no cache. ``enabled`` and
+    ``today`` are the run's ``settings.pipeline.plan_cache`` and
+    ``settings.pipeline.today``.
     """
 
-    def __init__(self, store: Any):
+    def __init__(self, store: Any, *, enabled: bool = True, today: Optional[date] = None):
         self._store = store
+        self._enabled = enabled
+        self._today = today
 
     def _usable(self) -> bool:
-        return bool(settings.plan_cache_enabled) and hasattr(self._store, "get_cached_plan")
+        return self._enabled and hasattr(self._store, "get_cached_plan")
 
-    @staticmethod
-    def _key(sub_query: Any) -> Optional[tuple]:
+    def _key(self, sub_query: Any) -> Optional[tuple]:
         if sub_query is None or not sub_query.schema_version:
             # Without a version nothing would invalidate the entry.
             return None
@@ -81,7 +85,7 @@ class PlanCache:
         if limit is not None:
             question += f" | limit={limit}"
         # The planner resolves relative dates against the run date.
-        question += f" | today={run_date().isoformat()}"
+        question += f" | today={run_date(self._today).isoformat()}"
         return question, sub_query.datasource_id, sub_query.schema_version
 
     def get(self, sub_query: Any) -> Optional[PlanModel]:
@@ -120,3 +124,9 @@ class PlanCache:
         if not hasattr(self._store, "clear_plan_cache"):
             return 0
         return self._store.clear_plan_cache()
+
+
+def plan_cache_for(ctx: Any) -> PlanCache:
+    """The plan cache of a runtime: its schema store, with its ``settings.pipeline``."""
+    pipeline = ctx.settings.pipeline
+    return PlanCache(getattr(ctx, "schema_store", None), enabled=pipeline.plan_cache, today=pipeline.today)

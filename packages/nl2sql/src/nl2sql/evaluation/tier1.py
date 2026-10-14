@@ -22,9 +22,8 @@ from typing import Any, Dict, Optional
 
 import yaml
 
-from nl2sql.common.settings import settings
 from nl2sql.configs.llm import AgentConfig
-from nl2sql.runtime import Runtime
+from nl2sql.runtime import Runtime, pinned_config
 from nl2sql.evaluation.benchmark_runner import BenchmarkResult, BenchmarkRunner
 from nl2sql.evaluation.gold import GoldQuestion, load_gold_dataset
 from nl2sql.evaluation.types import BenchmarkConfig
@@ -127,19 +126,16 @@ def run_tier1(ctx: Runtime, config: Optional[BenchmarkConfig] = None) -> Benchma
         raise ValueError(f"No gold plan for answerable question(s): {', '.join(missing)}")
 
     # Refusals are scored against the default, generic message. The demo opts
-    # into naming the forbidden table (RBAC_REFUSAL_NAMES_TABLES=true in
-    # .env.demo), so the default is pinned for the run and restored after.
-    names_tables = settings.rbac_refusal_names_tables
-    settings.rbac_refusal_names_tables = False
+    # into naming the forbidden table (policies.refusal_names_tables), so the
+    # default is pinned for the run and restored after.
     # Curated answers are off for the run: tier 1 scores plans, and a verified
     # answer has none. Without ``ctx.curated`` the graph has no curated matcher.
     curated = getattr(ctx, "curated", None)
     ctx.curated = None
     try:
-        with GoldPlanLLM(plans) as llm:
+        with pinned_config(ctx, {"policies.refusal_names_tables": False}), GoldPlanLLM(plans) as llm:
             ctx.llm_registry.replace_llms({"default": llm.agent_config()})
             runner = BenchmarkRunner(config, ctx, workers=1, before_case=llm.select)
             return runner.run_dataset()
     finally:
-        settings.rbac_refusal_names_tables = names_tables
         ctx.curated = curated

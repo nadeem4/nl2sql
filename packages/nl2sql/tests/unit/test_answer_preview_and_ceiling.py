@@ -15,7 +15,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from nl2sql.api.query_api import result_from_state
-from nl2sql.common.settings import Settings, settings
+from nl2sql.config import ResultSettings
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.pipeline.graph_utils import wrap_subgraph
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
@@ -28,6 +28,7 @@ from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _rows(n):
@@ -59,8 +60,8 @@ def test_an_empty_result_has_no_rows_and_is_not_partial():
     assert preview["sq1"] == {"rows": [], "row_count": 0, "columns": [], "partial": False}
 
 
-def _node():
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+def _node(preview_rows=20):
+    ctx = fake_runtime(llm_registry=MagicMock(), settings={"results": {"preview_rows": preview_rows}})
     node = AnswerSynthesizerNode(ctx)
     node.chain = MagicMock()
     node.chain.invoke.return_value = AggregatedResponse(summary="ok", format_type="text", content="ok")
@@ -71,9 +72,8 @@ def _sent(node):
     return node.chain.invoke.call_args.args[0]
 
 
-def test_the_answer_model_is_sent_only_the_preview(monkeypatch):
-    monkeypatch.setattr(settings, "answer_preview_rows", 20)
-    node = _node()
+def test_the_answer_model_is_sent_only_the_preview():
+    node = _node(preview_rows=20)
 
     node(GraphState(user_query="q", aggregator_response=AggregatorResponse(terminal_results={"sq1": _rows(500)})))
 
@@ -84,9 +84,8 @@ def test_the_answer_model_is_sent_only_the_preview(monkeypatch):
     assert "t20" not in _sent(node)["result_preview"]
 
 
-def test_the_preview_size_is_a_setting(monkeypatch):
-    monkeypatch.setattr(settings, "answer_preview_rows", 3)
-    node = _node()
+def test_the_preview_size_is_a_setting():
+    node = _node(preview_rows=3)
 
     node(GraphState(user_query="q", aggregator_response=AggregatorResponse(terminal_results={"sq1": _rows(10)})))
 
@@ -94,9 +93,8 @@ def test_the_preview_size_is_a_setting(monkeypatch):
 
 
 def test_the_settings_defaults():
-    fields = Settings.model_fields
-    assert fields["answer_preview_rows"].default == 20
-    assert fields["result_row_limit"].default == 100_000
+    assert ResultSettings().preview_rows == 20
+    assert ResultSettings().row_limit == 100_000
 
 
 def test_the_prompt_asks_for_no_copy_of_the_result():
@@ -116,9 +114,10 @@ def test_the_schema_no_longer_asks_for_a_markdown_table():
 
 # --- the ceiling -----------------------------------------------------------
 
-def _generate(adapter_row_limit, plan_limit=None):
+def _generate(adapter_row_limit, plan_limit=None, row_limit=100_000):
     adapter = SimpleNamespace(row_limit=adapter_row_limit, max_bytes=1000, get_dialect=lambda: "sqlite")
-    node = GeneratorNode(SimpleNamespace(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter)))
+    node = GeneratorNode(fake_runtime(ds_registry=SimpleNamespace(get_adapter=lambda _id: adapter),
+                                      settings={"results": {"row_limit": row_limit}}))
     plan = PlanModel(tables=[TableRef(name="users", alias="u")],
                      select_items=[SelectItem(expr=Expr(kind="column", alias="u", column_name="id"))],
                      joins=[], limit=plan_limit)
@@ -127,22 +126,19 @@ def _generate(adapter_row_limit, plan_limit=None):
     return node(state)["generator_response"]
 
 
-def test_a_datasource_with_no_row_limit_is_capped_at_the_ceiling(monkeypatch):
-    monkeypatch.setattr(settings, "result_row_limit", 100_000)
-    response = _generate(None)
+def test_a_datasource_with_no_row_limit_is_capped_at_the_ceiling():
+    response = _generate(None, row_limit=100_000)
 
     assert response.row_cap == 100_000
     assert "LIMIT 100000" in response.sql_draft
 
 
-def test_a_datasource_row_limit_below_the_ceiling_is_kept(monkeypatch):
-    monkeypatch.setattr(settings, "result_row_limit", 100_000)
-    assert _generate(10_000).row_cap == 10_000
+def test_a_datasource_row_limit_below_the_ceiling_is_kept():
+    assert _generate(10_000, row_limit=100_000).row_cap == 10_000
 
 
-def test_the_ceiling_bounds_a_higher_datasource_row_limit(monkeypatch):
-    monkeypatch.setattr(settings, "result_row_limit", 50)
-    assert _generate(10_000).row_cap == 50
+def test_the_ceiling_bounds_a_higher_datasource_row_limit():
+    assert _generate(10_000, row_limit=50).row_cap == 50
 
 
 def test_the_hosted_demo_datasources_are_capped_at_ten_thousand_rows():

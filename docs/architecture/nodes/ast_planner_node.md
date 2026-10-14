@@ -100,7 +100,7 @@ validation and executed is reused
 - **Written** by `wrap_subgraph` (`pipeline/graph_utils.py`) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
   and plan-only runs are not stored.
-- **Controls:** `PLAN_CACHE_ENABLED` (default `true`) and `nl2sql cache clear`.
+- **Controls:** `settings.pipeline.plan_cache` (default `true`) and `nl2sql cache clear`.
 
 See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinism-from-the-architecture).
 
@@ -129,8 +129,8 @@ caches a stable prefix of 1,024+ tokens automatically):
 | system (`PLANNER_SYSTEM_PROMPT`) | role, instructions, output contract, constraints, `PLANNER_EXAMPLES`, then `[RELEVANT_TABLES]` | only when the schema or the caller's role changes |
 | human (`PLANNER_HUMAN_PROMPT`) | `[TODAY]`, `[EXPECTED_SCHEMA]`, `[SEMANTIC_CONTEXT]`, `[FEEDBACK]`, `[USER_QUERY]` | every call |
 
-`[TODAY]` is the run date (`run_date()` in `common/settings.py`: `NL2SQL_TODAY`
-when set, else the UTC date), so "this year" or "the last 30 days" resolve to
+`[TODAY]` is the run date (`run_date(today)` in `common/dates.py`, given
+`settings.pipeline.today`: that date when it is set, else the UTC date), so "this year" or "the last 30 days" resolve to
 real dates rather than a year the model guessed. It is in the human message
 because it changes daily; in the system message it would invalidate the cached
 prefix every midnight. It comes before `[USER_QUERY]`, because demo replay keys

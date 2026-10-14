@@ -2,8 +2,8 @@
 
 Without it, "this year" or "the last 30 days" was resolved against whatever
 year the model guessed, and the answer came back confident and wrong.
-``NL2SQL_TODAY`` pins the date (tests, gold runs); unset, it is the real date
-in UTC. The date goes in the per-call human message, never the system
+``settings.pipeline.today`` pins the date (tests, gold runs); unset, it is the
+real date in UTC. The date goes in the per-call human message, never the system
 message, so the cached schema prefix stays byte-identical from day to day.
 """
 import datetime as dt
@@ -12,7 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from nl2sql.common.settings import Settings, run_date, settings
+from nl2sql.common.dates import run_date
+from nl2sql.config import Settings
 from nl2sql.llm.replay import extract_question
 
 SCRIPT = Path(__file__).resolve().parents[4] / "scripts" / "measure_prompt_tokens.py"
@@ -27,49 +28,32 @@ def measure():
     return module
 
 
-@pytest.fixture
-def pinned(monkeypatch):
-    def _pin(day):
-        monkeypatch.setattr(settings, "today", day)
-    return _pin
+def test_settings_pipeline_today_is_read_as_an_iso_date():
+    assert Settings.model_validate({"pipeline": {"today": "2013-12-31"}}).pipeline.today == dt.date(2013, 12, 31)
 
 
-def test_nl2sql_today_is_read_as_an_iso_date(monkeypatch):
-    monkeypatch.setenv("NL2SQL_TODAY", "2013-12-31")
-
-    assert Settings(_env_file=None).today == dt.date(2013, 12, 31)
+def test_unset_the_run_date_is_todays_date_in_utc():
+    assert run_date(None) == dt.datetime.now(dt.timezone.utc).date()
 
 
-def test_unset_the_run_date_is_todays_date_in_utc(pinned):
-    pinned(None)
-
-    assert run_date() == dt.datetime.now(dt.timezone.utc).date()
+def test_a_pinned_date_wins():
+    assert run_date(dt.date(2013, 12, 31)) == dt.date(2013, 12, 31)
 
 
-def test_a_pinned_date_wins(pinned):
-    pinned(dt.date(2013, 12, 31))
-
-    assert run_date() == dt.date(2013, 12, 31)
-
-
-def test_the_planner_gets_the_date_in_the_human_message_only(measure, pinned):
+def test_the_planner_gets_the_date_in_the_human_message_only(measure):
     tables = measure.chinook_tables()
-    pinned(dt.date(2013, 12, 31))
-    first, _ = measure.render_planner(Q, tables)
-    pinned(dt.date(2014, 1, 1))
-    second, _ = measure.render_planner(Q, tables)
+    first, _ = measure.render_planner(Q, tables, today=dt.date(2013, 12, 31))
+    second, _ = measure.render_planner(Q, tables, today=dt.date(2014, 1, 1))
 
     assert "2013-12-31" in first[1].content and "2013-12-31" not in first[0].content
     assert "2014-01-01" in second[1].content
     assert first[0].content == second[0].content  # the cached prefix does not move with the date
 
 
-def test_the_refiner_gets_the_date_in_the_human_message_only(measure, pinned):
+def test_the_refiner_gets_the_date_in_the_human_message_only(measure):
     tables = measure.chinook_tables()
-    pinned(dt.date(2013, 12, 31))
-    first, _ = measure.render_refiner(Q, tables)
-    pinned(dt.date(2014, 1, 1))
-    second, _ = measure.render_refiner(Q, tables)
+    first, _ = measure.render_refiner(Q, tables, today=dt.date(2013, 12, 31))
+    second, _ = measure.render_refiner(Q, tables, today=dt.date(2014, 1, 1))
 
     assert "2013-12-31" in first[1].content and "2013-12-31" not in first[0].content
     assert first[0].content == second[0].content
@@ -85,12 +69,11 @@ def test_a_trace_replay_is_told_the_date_the_run_was_told():
     assert recorded_run_date({}) is None
 
 
-def test_the_replay_key_is_still_the_question(measure, pinned):
+def test_the_replay_key_is_still_the_question(measure):
     """Demo recordings are keyed by the question the prompt carries."""
-    pinned(dt.date(2013, 12, 31))
     tables = measure.chinook_tables()
-    planner, _ = measure.render_planner(Q, tables)
-    refiner, _ = measure.render_refiner(Q, tables)
+    planner, _ = measure.render_planner(Q, tables, today=dt.date(2013, 12, 31))
+    refiner, _ = measure.render_refiner(Q, tables, today=dt.date(2013, 12, 31))
 
     assert extract_question("\n".join(m.content for m in planner)) == Q
     assert extract_question("\n".join(m.content for m in refiner)) == f'"{Q}"'
