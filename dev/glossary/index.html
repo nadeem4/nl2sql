@@ -4587,7 +4587,8 @@
 <li><strong>SubQuery</strong>: Decomposed, datasource-scoped query intent from the decomposer.</li>
 <li><strong>Subgraph</strong>: LangGraph subgraph that handles a specific execution capability (e.g., SQL agent).</li>
 <li><strong>ResultFrame</strong>: Adapter response containing rows/columns, row_count, and error metadata.</li>
-<li><strong>VectorStore</strong>: Chroma-backed vector index for schema chunks.</li>
+<li><strong>IndexStore</strong>: the store that keeps the index entries, in a namespace per embedding model, and each datasource's live build pointer (<code>chroma</code> by default).</li>
+<li><strong>Retriever</strong>: the engine's MMR searches over the index store's live builds, pinned per run.</li>
 <li><strong>RBAC</strong>: Role-based access control enforcing datasource/table permissions.</li>
 </ul>
 

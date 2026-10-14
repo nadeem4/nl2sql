@@ -5228,12 +5228,10 @@ can replay the guided questions from recorded runs. It refuses to start when
 <code>OPENAI_API_KEY</code>, <code>OPENROUTER_API_KEY</code> or <code>ANTHROPIC_API_KEY</code> is set. See
 <a href="../../deployment/hosted-demo/">Hosted demo</a>.</p>
 <p>Each project keeps its index under its own <code>storage.path</code> (the demo's is
-<code>nl2sql-demo/.nl2sql/index</code>), so projects that embed differently never share a
-collection. If you change the <code>embeddings</code> section of an existing project, run
-<code>nl2sql index --full</code>:
-every datasource in a collection must share one embedding model, so the store
-otherwise raises <code>EmbeddingDimensionMismatchError</code> (or
-<code>EmbeddingModelMismatchError</code> for a different model of the same size).</p>
+<code>nl2sql-demo/.nl2sql/index</code>), with one namespace per embedding model. If you
+change the <code>embeddings</code> section of an existing project, run <code>nl2sql index</code>:
+the new model's namespace starts empty, and the old one stays until
+<code>nl2sql index prune</code>.</p>
 <p>Column statistics are read when a datasource is indexed, so a change to what
 indexing records reaches an existing demo folder only when it is indexed again.
 After 0.2.2, a text column with at most 50 distinct values keeps all of them
@@ -5253,7 +5251,7 @@ so the page looked fine while every question failed with
 <ul>
 <li><strong>Startup repair.</strong> Every <code>nl2sql demo</code> start calls <code>engine.check()</code>, which
   reports what the index <em>contains</em>: the demo rebuilds it when it is missing or
-  empty, or was built from an older schema version than the latest snapshot. A failed rebuild is
+  empty, or a datasource has no live build. A failed rebuild is
   reported (the playground still starts, and offers Rebuild) rather than
   ignored.</li>
 <li><strong>Rebuilds never leave an empty index.</strong> A datasource's new entries are
@@ -5282,8 +5280,8 @@ demand.</p>
 <ul>
 <li>Rebuild re-reads one database's schema into a new snapshot and rebuilds its
   entries beside the current ones; questions keep using the current entries
-  until the new ones are complete, and questions in flight finish before the
-  switch. That database is the demo's own, named in the button's help;
+  until the new ones are complete, and a question in flight finishes on the
+  entries it started with. That database is the demo's own, named in the button's help;
   <code>nl2sql index</code> rebuilds all three.</li>
 <li>It shows each step as it runs. The first run downloads the 79 MB embedding
   model, so it can take a few minutes.</li>
@@ -5584,8 +5582,8 @@ folder (<code>cd nl2sql-demo</code>) no flag is needed; from anywhere else, add
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
 <a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># After changing the embedding model: rebuild every datasource, then switch</span>
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--full
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># After changing the embedding model: drop the old model's index</span>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>prune
 <a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
 <a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="c1"># Check the install, the keys, and the engine: each datasource, each key, the index</span>
 <a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>nl2sql<span class="w"> </span>doctor

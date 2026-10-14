@@ -1924,6 +1924,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#sharing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4574,6 +4585,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The index
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#sharing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4622,7 +4644,7 @@ and adds <code>.nl2sql/</code> to <code>.gitignore</code>.</p>
 <tbody>
 <tr>
 <td><code>index/</code></td>
-<td>The vector index (Chroma). The collection name is an internal constant.</td>
+<td>The vector index (Chroma), one collection per embedding model: <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code>.</td>
 <td><code>VECTOR_STORE</code>, <code>VECTOR_STORE_COLLECTION</code></td>
 </tr>
 <tr>
@@ -4664,7 +4686,7 @@ section above is the same as:</p>
 <tr>
 <td><code>index</code></td>
 <td><code>chroma</code></td>
-<td>The vector index</td>
+<td>The vector index, one namespace per embedding model, and each datasource's live build</td>
 </tr>
 <tr>
 <td><code>state</code></td>
@@ -4704,12 +4726,31 @@ store. Installed: local."</p>
 A plugin registers a store in the <code>nl2sql.stores</code> entry point group, or in
 code with <code>registry.add_store(name, cls)</code>.</p>
 <div class="admonition note">
-<p class="admonition-title">Built-ins only, for now</p>
+<p class="admonition-title">Built-ins only, for now, except the index</p>
 <p>0.6 moves the engine onto the four store interfaces one slot at a time.
-Until a slot's move lands, the engine reads that slot through its
-built-in store only, and refuses any other store there with a problem at
-<code>storage.&lt;slot&gt;</code>.</p>
+The engine reads its index through <code>IndexStore</code>, so any index store
+works. Until the other slots' moves land, the engine reads <code>state</code>,
+<code>traces</code> and <code>results</code> through their built-in stores only, and refuses
+any other store there with a problem at <code>storage.&lt;slot&gt;</code>.</p>
 </div>
+<h2 id="the-index">The index</h2>
+<p>The engine embeds; the index store keeps entries and vectors in a
+<strong>namespace</strong> per embedding model, <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code> (for
+example <code>nl2sql__local-all-minilm-l6-v2__384</code>), filters them, and records
+each datasource's live build as a <code>BuildPointer</code> (its <code>build_id</code> and the
+<code>schema_version</code> it was made from). Switching a pointer is the commit, and a
+run reads the pointers once when it starts. See
+<a href="../../architecture/indexing/#the-build-pointer-is-the-commit">Indexing</a>.</p>
+<ul>
+<li><strong>Changing the embedding model</strong> opens a new, empty namespace: <code>check()</code>
+  reports the index <code>missing</code>, and <code>nl2sql index</code> builds it. Switching back
+  finds the old namespace still built.</li>
+<li><strong><code>nl2sql index prune</code></strong> (<code>engine.index.prune()</code>) drops every namespace but
+  the current model's, including 0.5's <code>nl2sql_store</code> collection, which 0.6
+  never reads. Run it once after upgrading, and after settling on a new model.</li>
+<li>The <code>chroma</code> store opens <code>index/</code> on the first build; reading a missing
+  folder or namespace creates nothing.</li>
+</ul>
 <h2 id="sharing">Sharing</h2>
 <p>Two engines with different paths share nothing. The commands that only read
 these stores (<code>nl2sql cache clear</code>, <code>nl2sql feedback</code>, <code>nl2sql trace show</code>)

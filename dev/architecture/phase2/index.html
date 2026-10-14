@@ -3872,6 +3872,40 @@ settled these details:</p>
   <code>local</code> take no keys.</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: the index store and the pointer as the commit (S2)</p>
+<p><code>nl2sql/storage/chroma.py</code> is the <code>chroma</code> index store on Chroma's public
+client API, one collection per namespace, with each datasource's
+<code>BuildPointer</code> in the collection's metadata. The engine embeds and ranks:
+<code>nl2sql/indexing/retrieval.py</code> holds the <code>Retriever</code> (MMR in numpy over the
+vectors <code>query</code> returns) and <code>namespace_for</code>; <code>indexing/vector_store.py</code>,
+<code>retrieval_trace.py</code>, <code>indexing/embeddings.py</code> (the local embedder moved
+to <code>embeddings/local.py</code>), staging, <code>full</code>, <code>switch_guard</code>,
+<code>EmbeddingModelMismatchError</code>, <code>get_latest_snapshot</code>/<code>get_latest_version</code>
+and <code>settings.schema.version_mismatch</code> are deleted. <code>Runtime.vector_store</code>
+is a <code>Retriever</code> on the live pointers, <code>Runtime.pin_index()</code> pins them for
+a run (<code>run_with_graph</code> calls it), and the index slot takes any
+<code>IndexStore</code>. <code>engine.index.prune()</code> and <code>nl2sql index prune</code> are added.
+Building it settled these details:</p>
+<ul>
+<li><code>Entry.metadata</code> holds scalars only, so a relationship entry stores
+  <code>from_columns</code> and <code>to_columns</code> comma-joined and the retriever splits
+  them; empty values are left out.</li>
+<li>The local embedder uses chromadb's bundled ONNX model function, so
+  <code>embeddings/local.py</code> is the one exception to "only <code>nl2sql/storage/</code>
+  imports chromadb". <code>langchain-chroma</code> is no longer a dependency.</li>
+<li>Health keeps <code>index_version</code> per datasource (the pointer's schema
+  version, which the playground shows) and drops <code>snapshot_version</code>;
+  <code>stale</code> now means a datasource without a live build, or whose
+  snapshot is gone.</li>
+<li>The <code>chroma</code> store opens <code>index/</code> on the first write; reads of a missing
+  folder or namespace create nothing.</li>
+<li>Snapshot immutability and <code>keep_snapshots</code> (so eviction never removes a
+  pointed version) are S3's: until then <code>settings.schema.max_versions</code>
+  still evicts the oldest versions, and an unchanged structure still
+  refreshes its stored metadata in place.</li>
+</ul>
+</div>
 <h3 id="the-config">The config</h3>
 <p>Every sub-block is optional. A config with only <code>path</code> stays valid and means
 the built-ins below.</p>

@@ -2234,7 +2234,7 @@
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Limit the search to datasources that have verified queries and that the caller's <code>Scope</code> reaches (<code>reaches_datasource()</code>) (the pinned <code>datasource_id</code> only, when one is given).</li>
-<li>Retrieve candidates with <code>VectorStore.retrieve_verified_query_candidates()</code> (top <code>settings.curated.match_top_k</code>), skipping a query that is in the index but no longer in the file.</li>
+<li>Retrieve candidates with <code>Retriever.retrieve_verified_query_candidates()</code> (top <code>settings.curated.match_top_k</code>), skipping a query that is in the index but no longer in the file.</li>
 <li>Ask no model when the best similarity is below <code>settings.curated.match_floor</code>.</li>
 <li>Make one structured-output call, <code>VerifiedQueryChoice</code>.</li>
 <li>Check the chosen values (<code>params.resolve_params</code>): type, <code>min</code>/<code>max</code>, <code>choices</code>, required.</li>
@@ -2270,7 +2270,7 @@
 <li><code>vector_store</code>: <code>retrieve_verified_query_candidates()</code>.</li>
 <li><code>policy_engine</code>: <code>scope(user_context, datasource_id)</code>.</li>
 <li><code>ds_registry</code>: dialect, adapter row limit, <code>supports()</code>.</li>
-<li><code>schema_store</code>: the latest schema version, stamped on the sub-query.</li>
+<li><code>vector_store</code>: the run's pinned <code>Retriever</code>: the candidates, and the schema version of the datasource's live build, stamped on the sub-query.</li>
 <li><code>llm_registry</code>: the choice's model, agent name <code>curatedmatcher</code> (falls back to <code>default</code>).</li>
 </ul>
 <hr/>

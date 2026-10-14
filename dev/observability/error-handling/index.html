@@ -2221,7 +2221,7 @@ answer still does not parse, <code>wires.structured()</code> raises
 <ul>
 <li><code>VECTOR_BREAKER</code> (<code>fail_max=5</code>, <code>reset_timeout=30</code>)</li>
 </ul>
-<p>Retrieval calls in <code>VectorStore</code> are wrapped with <code>VECTOR_BREAKER</code>. It is the only breaker instance the system defines: LLM calls and SQL execution are <strong>not</strong> breaker-guarded, and their failures surface as <code>PipelineError</code> values in state.</p>
+<p>Retrieval calls in the <code>Retriever</code> are wrapped with <code>VECTOR_BREAKER</code>. It is the only breaker instance the system defines: LLM calls and SQL execution are <strong>not</strong> breaker-guarded, and their failures surface as <code>PipelineError</code> values in state.</p>
 <h2 id="failure-flow">Failure flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Node[Pipeline Node] --&gt; Error[PipelineError]

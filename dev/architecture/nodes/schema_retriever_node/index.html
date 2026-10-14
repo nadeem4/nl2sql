@@ -2304,7 +2304,7 @@
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Build a semantic query from sub‑query intent, filters, group_by, expected_schema, metrics.</li>
-<li>Retrieve candidate tables/columns/relationships from <code>VectorStore</code>.</li>
+<li>Retrieve candidate tables/columns/relationships from the run's pinned <code>Retriever</code>.</li>
 <li>Resolve authoritative tables from <code>SchemaStore</code>.</li>
 <li>Fall back to full schema snapshot when retrieval returns no candidates.</li>
 <li>Rank the datasource's <code>preferred_tables</code> first and set <code>preferred=True</code> on
@@ -2467,7 +2467,7 @@ matched against snapshot tables by bare name or <code>schema.table</code>, case 
 <h2 id="related-code">Related Code</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/indexing/vector_store.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/indexing/retrieval.py</code></li>
 </ul>
 </article>
 </div>

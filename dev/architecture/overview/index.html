@@ -2127,7 +2127,7 @@
     subgraph Context[Runtime]
         DS[DatasourceRegistry]
         LLM[LLMRegistry]
-        VS[VectorStore]
+        VS[IndexStore and Retriever]
         SS[SchemaStore]
         RBAC[RBAC]
         AS[ArtifactStore]
@@ -2157,7 +2157,7 @@
 <ul>
 <li><strong>Planner / Decomposer</strong>: <code>DecomposerNode</code> produces stable, semantically-scoped sub-queries and, from them, a deterministic <code>ExecutionDAG</code>.</li>
 <li><strong>Schema Store</strong>: <code>SchemaStore</code> persists versioned schema snapshots with fingerprints.</li>
-<li><strong>Chunking + Retrieval</strong>: <code>SchemaChunkBuilder</code> produces typed chunks; <code>VectorStore</code> provides staged retrieval for routing and planning context.</li>
+<li><strong>Chunking + Retrieval</strong>: <code>SchemaChunkBuilder</code> produces typed chunks; the <code>Retriever</code> provides staged retrieval for routing and planning context, over the index store's live builds.</li>
 <li><strong>Validation layer</strong>: <code>LogicalValidatorNode</code> enforces schema correctness and RBAC.</li>
 <li><strong>Execution layer</strong>: <code>ExecutorNode</code> routes to capability-driven executor services (e.g., SQL executor).</li>
 <li><strong>Adapter / Plugin backend</strong>: adapters implement <code>DatasourceAdapterProtocol</code> and are discovered via entry points.</li>

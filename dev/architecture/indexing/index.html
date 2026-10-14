@@ -450,26 +450,22 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#rebuilding-without-an-empty-index">
+<a class="md-nav__link" href="#one-namespace-per-embedding-model">
 <span class="md-ellipsis">
       
-        Rebuilding without an empty index
-      
-    </span>
-</a>
-<nav aria-label="Rebuilding without an empty index" class="md-nav">
-<ul class="md-nav__list">
-<li class="md-nav__item">
-<a class="md-nav__link" href="#one-embedding-model-per-collection">
-<span class="md-ellipsis">
-      
-        One embedding model per collection
+        One namespace per embedding model
       
     </span>
 </a>
 </li>
-</ul>
-</nav>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-build-pointer-is-the-commit">
+<span class="md-ellipsis">
+      
+        The build pointer is the commit
+      
+    </span>
+</a>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#index-health">
@@ -2204,26 +2200,22 @@
 </a>
 </li>
 <li class="md-nav__item">
-<a class="md-nav__link" href="#rebuilding-without-an-empty-index">
+<a class="md-nav__link" href="#one-namespace-per-embedding-model">
 <span class="md-ellipsis">
       
-        Rebuilding without an empty index
-      
-    </span>
-</a>
-<nav aria-label="Rebuilding without an empty index" class="md-nav">
-<ul class="md-nav__list">
-<li class="md-nav__item">
-<a class="md-nav__link" href="#one-embedding-model-per-collection">
-<span class="md-ellipsis">
-      
-        One embedding model per collection
+        One namespace per embedding model
       
     </span>
 </a>
 </li>
-</ul>
-</nav>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-build-pointer-is-the-commit">
+<span class="md-ellipsis">
+      
+        The build pointer is the commit
+      
+    </span>
+</a>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#index-health">
@@ -2354,7 +2346,7 @@
 <div class="md-content" data-md-component="content">
 <article class="md-content__inner md-typeset">
 <h1 id="indexing-chunking-and-retrieval-architecture">Indexing, Chunking, and Retrieval Architecture</h1>
-<p>This document describes <strong>current indexing behavior</strong> as implemented in code. Indexing transforms <strong>schema snapshots</strong> into <strong>typed chunks</strong> that are embedded and stored in a Chroma vector store. Retrieval uses these chunks as candidates and then resolves authoritative schema details from <code>SchemaStore</code> (see <code>../schema/store.md</code> for schema contracts and store behavior).</p>
+<p>This document describes <strong>current indexing behavior</strong> as implemented in code. Indexing transforms <strong>schema snapshots</strong> into <strong>typed chunks</strong> that the engine embeds and writes to the <strong>index store</strong> (<code>storage.index</code>, the built-in <code>chroma</code> store by default; see <a href="../../configuration/storage/">Storage</a>). Retrieval uses these entries as candidates and then resolves authoritative schema details from <code>SchemaStore</code> (see <code>../schema/store.md</code> for schema contracts and store behavior).</p>
 <h2 id="indexing-flow">Indexing flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Adapter[Datasource Adapter] --&gt; Snapshot[Schema Snapshot]
@@ -2362,9 +2354,10 @@
     Enrich --&gt; Register[SchemaStore.register_snapshot]
     Register --&gt; Chunker[SchemaChunkBuilder]
     Curated[curated.yaml] --&gt; CChunker[CuratedChunkBuilder]
-    Chunker --&gt; Refresh[VectorStore.refresh_schema_chunks]
-    CChunker --&gt; Refresh
-    Refresh --&gt; Store[Chroma Vector Store]</code></pre>
+    Chunker --&gt; Embed[The engine's embedder]
+    CChunker --&gt; Embed
+    Embed --&gt; Add[IndexStore.add: a new build]
+    Add --&gt; Switch[IndexStore.set_pointers: the commit]</code></pre>
 <p>The snapshot profiles each column on its own: a column, row count or table the
 database cannot profile is indexed without statistics and logged, rather than
 failing the datasource's index (see
@@ -2394,28 +2387,26 @@ catalog in the current implementation.</p>
 <h2 id="verified-queries">Verified queries</h2>
 <p>Verified query entries are written <strong>in the same build as the datasource's
 schema entries</strong>: <code>IndexingOrchestrator.index_datasource()</code> appends them to the
-schema chunks before <code>refresh_schema_chunks()</code>. A build replaces every entry of
-its datasource, so curated entries written on their own would be deleted by the
+schema chunks before it writes the build. A build replaces every entry of its
+datasource, so curated entries written on their own would be deleted by the
 next schema re-index.</p>
-<p>At the switch the collection metadata also records
-<code>curated_hash:&lt;datasource_id&gt;</code>, a SHA-256 of that datasource's verified queries
+<p>The build's pointer also records <code>curated_hash</code>, a SHA-256 of that datasource's verified queries
 as canonical JSON (metrics are left out; nothing indexes them yet). Index
 health compares it with the file as it is now (see <a href="#index-health">Index health</a>).</p>
 <p><strong>Changing <code>curated.yaml</code> does not re-read the schema.</strong>
 <code>nl2sql index --curated-only</code> (<code>engine.index.build(curated_only=True)</code>,
-<code>IndexingOrchestrator.refresh_curated()</code>,
-<code>VectorStore.refresh_curated_chunks()</code>) writes a new build for each datasource
-the usual way, except that the active build's schema entries are <strong>copied</strong>
-into it with their stored vectors: no schema read, no snapshot registered, no
-enrichment model call, and only the verified queries are embedded. The switch
-and the deletion of the old build are the ones described below, so the
-refresh is just as safe. It needs the datasource to have been indexed once;
-otherwise that datasource fails with a message saying to run <code>nl2sql index</code>.
-<code>--curated-only</code> cannot be combined with <code>--full</code> or <code>--enrich</code>.</p>
-<p><code>VectorStore.retrieve_verified_query_candidates(question, datasource_ids, k)</code>
+<code>IndexingOrchestrator.refresh_curated()</code>) writes a new build for each datasource
+the usual way, except that the live build's schema entries are <strong>copied</strong>
+into it with their stored vectors, and the pointer keeps its schema version:
+no schema read, no snapshot registered, no enrichment model call, and only the
+verified queries are embedded. The switch and the clean-up are the ones
+described below, so the refresh is just as safe. It needs the datasource to
+have been indexed once; otherwise that datasource fails with a message saying
+to run <code>nl2sql index</code>. <code>--curated-only</code> cannot be combined with <code>--enrich</code>.</p>
+<p><code>Retriever.retrieve_verified_query_candidates(question, datasource_ids, k)</code>
 returns the verified queries a question most resembles. It is a plain
 similarity search, not MMR, because several phrasings of one query are exactly
-what should match: it reads the active builds of the given datasources only,
+what should match: it reads the live builds of the given datasources only,
 fetches <code>k × 10</code> entries, keeps each query's best phrasing (by cosine
 similarity), and returns the best <code>k</code> (<code>CURATED_MATCH_TOP_K</code>, 5), each with its
 <code>score</code> and the phrasing that won. With no verified query entry among those
@@ -2424,74 +2415,87 @@ datasources it returns nothing without embedding the question. Given an
 the pipeline calls it yet; the matcher that will is described in
 <a href="../curated_answers/">Curated Answers (design)</a>.</p>
 <h2 id="chunk-index-mapping-actual">Chunk → index mapping (actual)</h2>
-<p>All chunk types are embedded as <code>langchain_core.documents.Document</code> and stored in Chroma:</p>
+<p>The engine embeds each chunk with its own embedder and hands the index store an
+<code>Entry</code> (<code>nl2sql_sdk.stores</code>):</p>
 <ul>
-<li><code>Document.page_content</code> = <code>chunk.get_page_content()</code></li>
-<li><code>Document.metadata</code> = <code>chunk.get_metadata()</code></li>
+<li><code>Entry.text</code> = <code>chunk.get_page_content()</code></li>
+<li><code>Entry.vector</code> = the embedder's vector for that text</li>
+<li><code>Entry.metadata</code> = <code>chunk.get_metadata()</code>, with empty values left out, plus
+  <code>build_id</code>. An entry holds scalars only, so a relationship's <code>from_columns</code>
+  and <code>to_columns</code> are stored comma-joined; the retriever splits them again.</li>
 </ul>
-<p>There is <strong>one index</strong> (Chroma collection) per <code>VectorStore</code> configuration, shared by
-every datasource. Each entry also carries a <code>build_id</code> (see below); it is stripped
-from retrieved documents, because the resolver prints a datasource entry's
+<p>The store never embeds and never depends on LangChain. <code>build_id</code> is stripped
+from retrieved entries, because the resolver prints a datasource entry's
 metadata into the decomposer prompt.</p>
-<h2 id="rebuilding-without-an-empty-index">Rebuilding without an empty index</h2>
-<p>Re-indexing never deletes the collection first. Each datasource is rebuilt on its
-own, inside the one collection (<code>VectorStore.refresh_schema_chunks</code>):</p>
-<pre class="mermaid"><code>flowchart TD
-    A[Read schema, register snapshot] --&gt; B[Write every entry under a new build_id]
-    B --&gt; C{All entries written?}
-    C --&gt;|no| D[Delete the partial new build; previous entries stay active]
-    C --&gt;|yes| E[Switch: collection metadata build:DS = new build_id]
-    E --&gt; F[Delete the datasource's other builds]</code></pre>
+<h2 id="one-namespace-per-embedding-model">One namespace per embedding model</h2>
+<p>Entries live in a <strong>namespace</strong> per embedding model:
+<code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code>, for example
+<code>nl2sql__local-all-minilm-l6-v2__384</code> (the slug is the provider and model,
+lower case; <code>Runtime.namespace</code>). Every datasource of one model shares its
+namespace; the <code>chroma</code> store keeps one collection per namespace.</p>
 <ul>
-<li>The collection's metadata names each datasource's <strong>active build</strong>
-  (<code>build:&lt;datasource_id&gt;</code>) and when it was switched in (<code>built_at:&lt;datasource_id&gt;</code>).
-  Every retrieval filters on the active builds, so while the old and new builds
-  coexist a reader sees exactly one of them, never both and never a mix of schema
-  versions. Entries written before builds existed have no <code>build_id</code> and are read
-  as they are until their datasource is next re-indexed.</li>
+<li><strong>Changing the embedding model opens a new, empty namespace.</strong> Health reports
+  <code>missing</code> with "run <code>nl2sql index</code>", and <code>nl2sql index</code> fills it. Nothing
+  refuses the change, and no special rebuild is needed.</li>
+<li><strong>Switching back finds the old namespace still built.</strong></li>
+<li><code>nl2sql index prune</code> (<code>engine.index.prune()</code>) drops every namespace but the
+  current one, including 0.5's <code>nl2sql_store</code> collection, which this version
+  never reads.</li>
+</ul>
+<h2 id="the-build-pointer-is-the-commit">The build pointer is the commit</h2>
+<p>Re-indexing never deletes anything first. Each datasource is built on its own
+(<code>IndexingOrchestrator</code>):</p>
+<pre class="mermaid"><code>flowchart TD
+    A[Read the schema; store the snapshot as version v2] --&gt; B[Embed and write every entry under a new build_id]
+    B --&gt; C{All entries written?}
+    C --&gt;|no| D[Raise: the pointer still names the previous build and v1]
+    C --&gt;|yes| E[set_pointers: datasource to the new build and v2]
+    E --&gt; F[Delete the datasource's builds older than the one replaced]</code></pre>
+<ul>
+<li>Each datasource's <code>BuildPointer</code> names its live <code>build_id</code> and the
+  <code>schema_version</code> the build was made from, with <code>built_at</code> and <code>curated_hash</code>.
+  <strong>Switching the pointer is the commit.</strong> A snapshot stored by a build that
+  then fails is referenced by no pointer, so no reader ever sees it: readers
+  resolve "live" through the pointer, never through the state store's newest
+  snapshot (bug B5). The failed build's entries are deleted by the next build
+  of that datasource.</li>
+<li><strong>A run pins the pointers.</strong> A run reads the pointers once, when it starts
+  (<code>Runtime.pin_index()</code>, called by <code>run_with_graph</code>), as it pins its LLM set.
+  The resolver, the schema retriever, the curated matcher and the decomposer's
+  context all use that build and that schema version. A build keeps the build
+  it replaces and deletes only older ones, so a run in flight never loses its
+  entries, and nothing has to hold questions back around the switch.</li>
 <li><strong>Other datasources are never read, deleted or rewritten</strong> by a datasource's
-  rebuild. <code>nl2sql index --datasource X</code> rebuilds only X; <code>nl2sql index</code> rebuilds
+  build. <code>nl2sql index --datasource X</code> rebuilds only X; <code>nl2sql index</code> rebuilds
   each configured datasource in turn, and a failure keeps that datasource's
-  previous entries active and exits <code>1</code>.</li>
-<li>Callers that serve questions can hold them back around the switch:
-  <code>engine.index.build(..., switch_guard=...)</code>. The playground passes its
-  <code>RunGate</code>, so questions in flight finish first.</li>
+  previous build live and exits <code>1</code>.</li>
 <li><code>nl2sql.indexing.rebuild.rebuild_index</code>, behind <code>engine.index.build</code>, is the
   one entry point for <code>nl2sql index</code>, the demo's startup repair, the
   playground's Rebuild and the REST index routes. Its <code>on_datasource</code> callback
   gets an <code>IndexProgress</code> per datasource (<code>started</code>, then <code>done</code> with the entry
   counts or <code>failed</code> with the reason): <code>nl2sql index</code> prints a line from it.</li>
+<li><code>engine.datasources.schema()</code>, <code>engine.curated.validate()</code> and the benchmark's
+  database identity read the snapshot the live pointer names too.</li>
 </ul>
-<h3 id="one-embedding-model-per-collection">One embedding model per collection</h3>
-<p>A query is embedded once, in one space, so every datasource in a collection
-must use the same embedding model. The collection records it
-(<code>embedding_model</code>, e.g. <code>local/all-MiniLM-L6-v2</code>) on its first write. If the
-configured model differs, retrieval and per-datasource re-indexing raise
-<code>EmbeddingModelMismatchError</code>, which also catches two different models of the
-same dimension that the dimension check cannot. A model change is the one case
-that needs every datasource rebuilt at once: <code>nl2sql index --full</code> builds all of
-them into a staging collection (<code>&lt;name&gt;__staging</code>) and swaps it in by renaming
-only when all succeed; a failure discards the staging collection and leaves the
-live one untouched. A collection written before models were recorded adopts the
-configured model on its next write (the dimension check still applies).</p>
 <h2 id="index-health">Index health</h2>
-<p><code>nl2sql.indexing.health</code> judges an index by its <strong>contents</strong>, never by whether
-its folder exists (the demo once had a <code>data/vector_store_demo</code> folder holding 0
-entries). Only active builds are counted. Status, worst first: <code>missing</code> (no
-folder or collection), <code>empty</code> (0 entries), <code>stale</code> (a configured datasource has
-no entries, its entries were built from an older schema version than the latest
-snapshot, or the configured embedding model differs), <code>ok</code>. It reports entry
-counts by type, the schema version per datasource, when each was built and the
-recorded embedding model. <code>warnings</code> never change the status: a datasource
-whose <code>curated.yaml</code> section has changed since it was indexed (its recorded
-<code>curated_hash</code> differs from the file's) gets "curated.yaml changed for
-'chinook' since it was indexed; run <code>nl2sql index --curated-only --datasource
-chinook</code>". Questions keep working meanwhile; the stale entries still name
-queries that exist. A <code>preferred_tables</code> entry missing from the datasource's
-latest snapshot is a warning too. <code>nl2sql doctor</code> prints it under <strong>Index</strong>,
-<code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the playground and
-<code>GET /api/v1/index/status</code> show it (through <code>engine.index.health()</code>), the playground
-with a Rebuild button.</p>
+<p><code>nl2sql.indexing.health</code> judges the index of the configured embedding model by
+its <strong>contents</strong>, never by whether a folder exists (the demo once had a
+<code>data/vector_store_demo</code> folder holding 0 entries). Only the builds the
+pointers name are counted. Status, worst first: <code>missing</code> (the model has no
+namespace yet: never indexed, or the model changed), <code>empty</code> (no live
+entries), <code>stale</code> (a configured datasource has no live build, or its build's
+snapshot is gone from the state store), <code>ok</code>. It reports entry counts by type,
+the schema version each live build was made from (<code>index_version</code>), when each
+was built, the embedding model and the namespace. <code>warnings</code> never change the
+status: a datasource whose <code>curated.yaml</code> section has changed since it was
+indexed (its pointer's <code>curated_hash</code> differs from the file's) gets
+"curated.yaml changed for 'chinook' since it was indexed; run <code>nl2sql index
+--curated-only --datasource chinook</code>". Questions keep working meanwhile; the
+stale entries still name queries that exist. A <code>preferred_tables</code> entry missing
+from the datasource's live snapshot is a warning too. <code>nl2sql doctor</code> prints it
+under <strong>Index</strong>, <code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the
+playground and <code>GET /api/v1/index/status</code> show it (through
+<code>engine.index.health()</code>), the playground with a Rebuild button.</p>
 <h2 id="chunking-strategy-as-implemented">Chunking strategy (as implemented)</h2>
 <p>Chunking is aligned to planning intent:</p>
 <ul>
@@ -2517,9 +2521,9 @@ with a Rebuild button.</p>
 </ol>
 <h2 id="authoritative-vs-semantic-sources">Authoritative vs semantic sources</h2>
 <ul>
-<li><strong>Semantic candidates</strong> come from Chroma (vector search over chunks).</li>
+<li><strong>Semantic candidates</strong> come from the index store (vector search over entries).</li>
 <li><strong>Authoritative schema</strong> is resolved from <code>SchemaStore</code> snapshots.</li>
-<li>Vector store content is <strong>never</strong> treated as authoritative.</li>
+<li>Index content is <strong>never</strong> treated as authoritative.</li>
 </ul>
 <h2 id="metadata-propagation">Metadata propagation</h2>
 <ul>
@@ -2533,30 +2537,30 @@ with a Rebuild button.</p>
 <ul>
 <li>Schema snapshots are fingerprinted and versioned (<code>YYYYMMDDhhmmss_&lt;fp8&gt;</code>).</li>
 <li>Chunk IDs embed <code>schema_version</code> for deterministic indexing.</li>
-<li>Retrieval uses the <code>SubQuery.schema_version</code> when available; otherwise latest snapshot.</li>
+<li>Retrieval uses the <code>SubQuery.schema_version</code> when available; otherwise the version the run's pinned pointer names.</li>
 <li>MMR ranking may introduce non-determinism in ordering for similar scores.</li>
 </ul>
 <h2 id="retrieval-mmr-not-a-re-ranking-model">Retrieval: MMR, not a re-ranking model</h2>
 <p>Every vector search in the engine is one maximal marginal relevance (MMR)
-search over the one Chroma collection, <code>nl2sql_store</code>, which holds every
+search over the current namespace's live builds, which hold every
 datasource (the demo's three databases: 3 datasource, 20 table, 121 column and
 18 relationship entries, 162 in all, of which Chinook is 87). There is <strong>no
 re-ranking model</strong>. What is sometimes called
 re-ranking is this:</p>
 <ol>
-<li>Embed the query text with the collection's embedder (the local
+<li>Embed the query text with the engine's embedder (the local
    <code>all-MiniLM-L6-v2</code> costs nothing per query).</li>
 <li>Fetch the pool: the <code>fetch_k = 4 * k</code> entries nearest to it, filtered by
-   entry type, datasource and active build.</li>
-<li>Pick <code>k</code> of them one at a time. The first pick is the entry most similar to
+   entry type, datasource and live build (<code>IndexStore.query</code> with a <code>Filter</code>).</li>
+<li>Pick <code>k</code> of them one at a time, in the engine, on the vectors the store
+   returned. The first pick is the entry most similar to
    the query (cosine similarity). Every later pick is the pool entry with the
    highest
    <code>0.7 * similarity(entry, query) - 0.3 * max similarity(entry, earlier picks)</code>,
    so an entry that nearly repeats an earlier pick loses to a less similar one
    that adds something. <code>lambda_mult = 0.7</code> is the weight on similarity.</li>
 </ol>
-<p>The documents come back in pool order (nearest first), not pick order, exactly
-as <code>Chroma.max_marginal_relevance_search</code> returns them.</p>
+<p>The documents come back in pool order (nearest first), not pick order.</p>
 <table>
 <thead>
 <tr>
@@ -2608,10 +2612,10 @@ datasources registered, the resolver searches on every question.</p>
 either path they come first, and on the retrieval path a preferred table the
 <code>tables</code> search scored within 0.05 of its least similar pick is added (see
 <a href="../nodes/schema_retriever_node/#preferred-tables">SchemaRetrieverNode</a>).</p>
-<p><code>nl2sql.indexing.retrieval_trace.mmr_search</code> is the one implementation: it
-makes the Chroma query and calls the same <code>maximal_marginal_relevance</code>
-function Chroma's method does, and returns the documents with a record of the
-search (the query, the pool with similarity, Chroma distance and type, the
+<p><code>Retriever.mmr</code> in <code>nl2sql.indexing.retrieval</code> is the one implementation: it
+asks the index store for the pool with its vectors, runs MMR in numpy, and
+returns the documents with a record of the search (the query, the pool with
+similarity, the store's distance and type, the
 picks in order with the score each won with, and what was dropped). The record
 comes from numbers MMR computes anyway, so it costs no second search. Nodes put
 it in their run trace (see <a href="../../observability/debugging/#retrieval">Debugging a run</a>),
@@ -2619,10 +2623,10 @@ and the playground's Retrieval inspector (<code>engine.index.inspect</code>) run
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the <strong>Copy as text</strong> output.</p>
-<p>The resolver's <code>datasources</code> search is exact: instead of Chroma's nearest-neighbour
-query it scores every active <code>schema.datasource</code> entry by cosine similarity and
+<p>The resolver's <code>datasources</code> search is exact: instead of the store's nearest-neighbour
+query it reads every live <code>schema.datasource</code> entry (<code>IndexStore.get</code>), scores it by cosine similarity and
 takes the nearest. There is one such entry per datasource among hundreds of
-others, and Chroma's approximate (HNSW) search under a filter that selective can
+others, and an approximate (HNSW) search under a filter that selective can
 return fewer entries than exist, which dropped a datasource from a question's
 candidates now and then. The other searches stay approximate.</p>
 <h2 id="tenant-isolation-current-state">Tenant isolation (current state)</h2>
@@ -2649,20 +2653,18 @@ candidates now and then. The other searches stay approximate.</p>
   degrade the same way. A missing/unusable LLM logs at <code>INFO</code>; any other
   failure (a 401, a timeout) logs one <code>WARNING</code> line with the reason and no
   stack trace (the trace is logged at <code>DEBUG</code>).</li>
-<li>Retrieving from a vector store whose persisted vectors do not match the
-  configured embedding provider raises <code>EmbeddingDimensionMismatchError</code>; a
-  recorded embedding model that differs from the configured one raises
-  <code>EmbeddingModelMismatchError</code>. Either is fixed with <code>nl2sql index --full</code>.</li>
+<li>A changed embedding model reads its own, empty namespace: health says
+  <code>missing</code> and <code>nl2sql index</code> builds it. Nothing is refused.</li>
 <li>When the resolver finds no datasource and the index is empty, its
   <code>SCHEMA_RETRIEVAL_FAILED</code> error says so and names <code>nl2sql index</code>, instead of
   "No datasource candidates resolved."</li>
-<li>A failed rebuild leaves the previous entries active (see above).</li>
+<li>A failed rebuild leaves the previous build and schema version live (see above).</li>
 </ul>
 <h2 id="performance-characteristics-current">Performance characteristics (current)</h2>
 <ul>
 <li>Embedding uses the engine's own embedder, built from its <code>embeddings</code>
-  section: OpenAI embeddings, or the local ONNX <code>all-MiniLM-L6-v2</code> model with
-  <code>provider: local</code>.</li>
+  section: OpenAI or OpenAI-compatible embeddings, or the local ONNX
+  <code>all-MiniLM-L6-v2</code> model with <code>provider: local</code>.</li>
 <li>Vector search is MMR (<code>lambda_mult=0.7</code>, <code>fetch_k = 4*k</code>); see
   <a href="#retrieval-mmr-not-a-re-ranking-model">Retrieval</a>.</li>
 <li>No caching or sharding layers are implemented.</li>
@@ -2680,10 +2682,13 @@ candidates now and then. The other searches stay approximate.</p>
 <li>Chunk models: <code>packages/nl2sql/src/nl2sql/indexing/models.py</code></li>
 <li>Chunk builder: <code>packages/nl2sql/src/nl2sql/indexing/chunk_builder.py</code></li>
 <li>Verified query entries and their hash: <code>packages/nl2sql/src/nl2sql/indexing/curated.py</code></li>
-<li>Vector store: <code>packages/nl2sql/src/nl2sql/indexing/vector_store.py</code></li>
+<li>Retrieval and MMR: <code>packages/nl2sql/src/nl2sql/indexing/retrieval.py</code></li>
+<li>The <code>chroma</code> index store: <code>packages/nl2sql/src/nl2sql/storage/chroma.py</code></li>
+<li>The store interfaces: <code>packages/sdk/src/nl2sql_sdk/stores.py</code></li>
 <li>Schema retriever: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
 <li>Indexing orchestrator: <code>packages/nl2sql/src/nl2sql/indexing/orchestrator.py</code></li>
-<li>Embeddings: <code>packages/nl2sql/src/nl2sql/indexing/embeddings.py</code></li>
+<li>Index health: <code>packages/nl2sql/src/nl2sql/indexing/health.py</code></li>
+<li>The local embedder: <code>packages/nl2sql/src/nl2sql/embeddings/local.py</code></li>
 </ul>
 </article>
 </div>

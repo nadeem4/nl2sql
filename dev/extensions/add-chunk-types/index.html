@@ -4685,7 +4685,7 @@
 <h2 id="3-update-retrieval-filters">3. Update retrieval filters</h2>
 <p>If your chunk type should be retrievable:</p>
 <ul>
-<li>Add it to the appropriate <code>VectorStore.retrieve_*</code> filters.</li>
+<li>Add it to the appropriate <code>Retriever.retrieve_*</code> filters. Its metadata must be scalars (an index entry holds nothing else).</li>
 <li>Update <code>SchemaRetrieverNode</code> logic if new chunk types influence planning.</li>
 </ul>
 <h2 id="4-update-plannervalidator-if-required">4. Update planner/validator (if required)</h2>
@@ -4698,7 +4698,7 @@
 <ul>
 <li>Chunk models: <code>packages/nl2sql/src/nl2sql/indexing/models.py</code></li>
 <li>Chunk builder: <code>packages/nl2sql/src/nl2sql/indexing/chunk_builder.py</code></li>
-<li>Vector store retrieval: <code>packages/nl2sql/src/nl2sql/indexing/vector_store.py</code></li>
+<li>Retrieval: <code>packages/nl2sql/src/nl2sql/indexing/retrieval.py</code></li>
 <li>Schema retriever: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
 </ul>
 

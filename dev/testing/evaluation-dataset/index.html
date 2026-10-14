@@ -6140,7 +6140,7 @@ against <code>needed_tables</code> and <code>needed_columns</code>, with no key,
   all-MiniLM-L6-v2. Its query is the question alone, since the decomposer
   that would add filters, groupings and expected columns is an LLM.</li>
 <li>What was sent is read from the retriever's retrieval record
-  (<code>indexing/retrieval_trace.py</code>), the one a run trace keeps: the tables and
+  (<code>indexing/retrieval.py</code>), the one a run trace keeps: the tables and
   columns the planner is given. A picked table with no picked column is sent
   with all its columns, as in the pipeline.</li>
 </ul>

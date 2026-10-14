@@ -4702,7 +4702,7 @@ added and removed at runtime, tested, and their indexed schema.</p>
 <tr>
 <td><code>schema(datasource_id)</code></td>
 <td><code>dict</code></td>
-<td>The indexed schema as the planner is given it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). Read from the latest schema snapshot, not the database; before the first index <code>tables</code> is empty.</td>
+<td>The indexed schema as the planner is given it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). Read from the snapshot the datasource's live index build was made from, not the database; before the first index <code>tables</code> is empty.</td>
 </tr>
 <tr>
 <td><code>test(datasource_id)</code></td>

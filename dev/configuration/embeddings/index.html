@@ -4764,8 +4764,8 @@ without <code>model</code> or <code>base_url</code>, or a <code>local</code> sec
 <code>ConfigError</code> when the engine is built, naming the problem.</p>
 <p>Notes on the <code>local</code> provider:</p>
 <ul>
-<li><strong>No extra dependency.</strong> The model ships with <code>chromadb</code>, which is already a
-  transitive dependency through <code>langchain-chroma</code>.</li>
+<li><strong>No extra dependency.</strong> The model ships with <code>chromadb</code>, which the engine
+  already depends on for its built-in <code>chroma</code> index store.</li>
 <li><strong>One-time download.</strong> The first indexing run downloads roughly 79 MB of ONNX
   model files into a local cache directory. Expect a pause of up to a few
   minutes; a log line is emitted before the download starts.</li>
@@ -4834,13 +4834,13 @@ with <code>registry.add_embeddings</code> (see <a href="../../development/#the-r
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>        <span class="k">return</span> <span class="n">EmbeddingInfo</span><span class="p">(</span><span class="s2">"mine"</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">model</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_model</span><span class="p">,</span> <span class="n">cfg</span><span class="o">.</span><span class="n">dimension</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="switching-providers">Switching providers</h2>
-<p><strong>Switching providers requires a re-index.</strong> Different embedding models
-produce different vectors, often of different dimensionality, so an existing
-index cannot be read with another provider. Retrieving from an index whose vectors disagree with the
-configured provider raises <code>EmbeddingDimensionMismatchError</code> naming both
-providers. The check runs on the read path only, so the fix is to re-run
-<code>nl2sql index --full</code>; alternatively, point <a href="../storage/"><code>storage.path</code></a> at a
-separate folder per provider.</p>
+<p><strong>Switching providers or models needs a re-index, and nothing more.</strong>
+Different embedding models produce different vectors, so each model has its
+own index namespace, <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code>. After a change the
+new model's namespace is empty: <code>check()</code> and <code>nl2sql doctor</code> report the index
+<code>missing</code>, and <code>nl2sql index</code> builds it. The old model's namespace is kept, so
+switching back finds it built; <code>nl2sql index prune</code> drops the ones you no
+longer need. See <a href="../storage/#the-index">Storage → The index</a>.</p>
 
 
 
