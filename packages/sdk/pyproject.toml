@@ -29,6 +29,8 @@ dependencies = [
 [project.optional-dependencies]
 # nl2sql_sdk.sqlalchemy: the base an adapter on SQLAlchemy builds on.
 sqlalchemy = ["SQLAlchemy>=2.0"]
+# nl2sql_sdk.testing: the conformance kit an adapter's tests subclass.
+testing = ["pytest>=8", "sqlglot"]
 
 [project.urls]
 Homepage = "https://github.com/nadeem4/nl2sql"

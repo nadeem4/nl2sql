@@ -1328,6 +1328,22 @@ What it checks:
 The kit proves itself on the five built-ins: SQLite and DuckDB in the unit
 job, PostgreSQL, MySQL and SQL Server in the `realdb` job.
 
+!!! note "Built: B4"
+    `nl2sql_sdk.testing.AdapterConformance`, with the `testing` extra and a
+    boundary test (pytest, sqlglot, pydantic, the SDK core and the standard
+    library only). Filled in on the way: the kit also takes a `connection`
+    fixture (the stage checks vary it) and an optional `limited_login`, a
+    second login whose password holds `@ : / # %` and that cannot read
+    `kit_b`, for the password and permission checks, since each needs a
+    login of its own; the test bed's `nl2sql_reader` cannot read the seed,
+    so the `realdb` tests make `nl2sql_kit`. `schemas` and `column_types`
+    adapt the seed to a database with one schema (SQLite) or without a type
+    (MySQL's uuid, SQL Server 2022's json). The "timeout error code" is a
+    new `QUERY_TIMEOUT` from the SQLAlchemy base. The kit found two
+    misclassified refusals, fixed in the base: MySQL's "command denied"
+    (SQLSTATE 42000) and DuckDB's write to a read-only file were both
+    `retryable`.
+
 ### `engine.datasources`: the methods behind Connect a database
 
 !!! note "Built: B5"

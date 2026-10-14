@@ -144,18 +144,19 @@ def _broke(rule: str, offenders: list[str]) -> str:
 # --------------------------------------------------------------------------
 
 SDK_SQLALCHEMY = SDK / "sqlalchemy"
+SDK_TESTING = SDK / "testing"
 
 
 def test_sdk_core_imports_only_pydantic_and_the_stdlib():
-    """An adapter author installs the SDK, not the engine. ``nl2sql_sdk.sqlalchemy`` is the one extra."""
+    """An adapter author installs the SDK, not the engine. ``sqlalchemy`` and ``testing`` are its extras."""
     allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
     offenders = [
         f"{_where(path)}:{lineno} {name}"
         for path in python_files(SDK)
-        if not path.is_relative_to(SDK_SQLALCHEMY)
+        if not path.is_relative_to(SDK_SQLALCHEMY) and not path.is_relative_to(SDK_TESTING)
         for lineno, name, _ in imports(path)
         if name.partition(".")[0] not in allowed
-        and not name.startswith("nl2sql_sdk.sqlalchemy")
+        and not name.startswith(("nl2sql_sdk.sqlalchemy", "nl2sql_sdk.testing"))
     ]
     assert not offenders, _broke(
         "The SDK imports only pydantic and the standard library: it is the "
@@ -177,6 +178,23 @@ def test_the_sdk_sqlalchemy_base_imports_only_sqlalchemy_sqlglot_pydantic_and_th
     assert not offenders, _broke(
         "nl2sql_sdk.sqlalchemy imports only SQLAlchemy, sqlglot, pydantic and the standard "
         "library: an adapter author installs nl2sql-sdk[sqlalchemy], not the engine.", offenders)
+
+
+def test_the_sdk_conformance_kit_imports_only_pytest_sqlglot_pydantic_and_the_stdlib():
+    """``nl2sql_sdk.testing`` is what an adapter's own tests subclass: no engine, no SQLAlchemy, no driver."""
+    allowed = {"pydantic", "pytest", "sqlglot"} | set(sys.stdlib_module_names)
+    assert SDK_TESTING.is_dir(), "nl2sql_sdk/testing/ holds the adapter conformance kit."
+    offenders = [
+        f"{_where(path)}:{lineno} {name}"
+        for path in python_files(SDK_TESTING)
+        for lineno, name, _ in imports(path)
+        if name.partition(".")[0] not in allowed
+        and not (name.startswith("nl2sql_sdk") and not name.startswith("nl2sql_sdk.sqlalchemy"))
+    ]
+    assert not offenders, _broke(
+        "nl2sql_sdk.testing imports only pytest, sqlglot, pydantic, the SDK core and the standard "
+        "library: the kit checks any adapter through DatasourceAdapter, so it needs no SQLAlchemy "
+        "and no engine.", offenders)
 
 
 def test_the_engine_has_no_sqlalchemy_base_of_its_own():

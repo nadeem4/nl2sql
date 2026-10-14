@@ -84,7 +84,7 @@ def test_duckdb_interrupts_a_query_that_outlives_the_timeout():
 
     # Assert
     assert result.success is False
-    assert result.error.error_code == "QUERY_REFUSED"
+    assert result.error.error_code == "QUERY_TIMEOUT"
     assert result.error.retryable is False
     assert elapsed < 10
 

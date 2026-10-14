@@ -10,6 +10,9 @@ extension implements. Its core depends on pydantic and the standard library only
   `SQLAlchemyConnection`, installed with `pip install "nl2sql-sdk[sqlalchemy]"`.
   The one part of the SDK that imports SQLAlchemy; see
   [SQLAlchemy adapters](sqlalchemy.md).
+- The conformance kit: `nl2sql_sdk.testing.AdapterConformance`, installed
+  with `pip install "nl2sql-sdk[testing]"`, a pytest test class every adapter
+  should pass; see [the conformance kit](#the-conformance-kit-nl2sql_sdktesting).
 - Secret providers: `nl2sql_sdk.secrets.SecretProvider`
 - Stores: the four protocols in `nl2sql_sdk.stores`
 - Policy checks: `nl2sql_sdk.policy.PolicyCheck`, with `UserContext` and
@@ -421,7 +424,13 @@ code with `registry.add_policy_check(name, cls)` or
 
 ---
 
-## Compliance Testing
+## The conformance kit: `nl2sql_sdk.testing`
 
-All adapters should pass the compliance test suite (schema introspection, type mapping,
-error handling, and result contract validation).
+`AdapterConformance`, installed with `pip install "nl2sql-sdk[testing]"`
+(adds pytest and sqlglot), is a pytest test class an adapter's own tests
+subclass. It checks what this page promises through `DatasourceAdapter`
+alone: the dialect, the connection model, `test_connection`'s stages, the
+index scope, profiling, bound parameters, every declared capability, error
+classification and streaming. Like the SQLAlchemy base, it is an extra: the
+SDK core never imports it. How to run it, with its fixtures and the full
+list of checks: [Running the conformance kit](development.md#running-the-conformance-kit).

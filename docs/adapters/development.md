@@ -141,10 +141,91 @@ class MyApiAdapter:
 
 > See the **[Adapter Interface Reference](sdk.md)** for the method signatures and compliance guide.
 
-## Compliance Testing
+## Running the conformance kit
 
-Regardless of which path you choose, your adapter **MUST** pass the compliance test suite to ensure it handles types and errors correctly.
+Whichever path you choose, run the conformance kit against a real database
+before you publish. It is a pytest test class, `AdapterConformance`, in
+`nl2sql_sdk.testing`:
+
+```bash
+pip install "nl2sql-sdk[testing]"   # adds pytest and sqlglot
+```
+
+Subclass it in a test module (the name must start with `Test`) and give it
+four fixtures:
+
+| Fixture | What it gives |
+| :--- | :--- |
+| `connection` | The `ConnectionModel` of a database the tests may write the kit's seed into |
+| `adapter_factory` | `adapter_factory(connection, limits)`: your adapter, built the way the engine builds it |
+| `seed` | `seed(statements)`: runs each SQL statement with a *writable* connection, outside your adapter |
+| `sleep_sql` | `sleep_sql(seconds)`: a query that runs at least that long |
 
 ```python
-# See Adapter Interface Reference for test setup
+import pytest
+from sqlalchemy import create_engine
+
+from nl2sql_sdk.testing import AdapterConformance
+
+from my_adapter import MyAdapter, MyConnection
+
+
+class TestMyAdapterConformance(AdapterConformance):
+
+    @pytest.fixture
+    def connection(self):
+        return MyConnection(host="127.0.0.1", database="kit", user="kit", password="...")
+
+    @pytest.fixture
+    def adapter_factory(self):
+        return lambda connection, limits: MyAdapter("kit", connection, limits)
+
+    @pytest.fixture
+    def seed(self):
+        admin = create_engine("mydb://admin:...@127.0.0.1/kit")
+
+        def run(statements):
+            with admin.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                for statement in statements:
+                    conn.exec_driver_sql(statement)
+        return run
+
+    @pytest.fixture
+    def sleep_sql(self):
+        return lambda seconds: f"SELECT pg_sleep({seconds})"
 ```
+
+Each test writes the kit's seed first and drops it after: two schemas
+(`kit_a`, `kit_b`), a view, a mixed-case table, and boolean, uuid and json
+columns. It is written once and transpiled to your `get_dialect()` with
+sqlglot. Two class attributes adapt it:
+
+- `schemas = ("main",)` for a database with one schema, such as SQLite: the
+  seed then creates no schema, and the check that needs two is skipped.
+- `column_types = {"uuid": "CHAR(36)"}` for a database without one of the
+  three types (MySQL has no uuid, SQL Server 2022 no json).
+
+A database with logins can also give `limited_login`: the `ConnectionModel`
+of a second login whose password holds `@ : / # %` and that can read
+`kit_a` but not `kit_b`. It may request the `seeded` fixture to grant on the
+seed. Without it, the two checks that need it are skipped.
+
+| Check | Passes when |
+| :--- | :--- |
+| Dialect | `get_dialect()` is a name `sqlglot.Dialect.get_or_raise` accepts |
+| Connection model | An unknown key fails; a password with `@ : / # %` connects; no secret appears in `repr`, `str`, a validation error or a failed check |
+| Stages | Good settings are `ok`; a wrong password is `auth`, a closed port `network`, a missing database `database` (skipped when the model has no such field) |
+| Scope | System schemas stay out even when named; include and exclude rules hold; views are included; mixed-case names keep their case |
+| Odd columns | Profiling the boolean, uuid and json columns gives statistics or an `IndexIssue`, never an exception |
+| Row estimates | Every table has a row count and says where it came from |
+| Bound parameters | `1; DROP TABLE kit_people` passed as a parameter is a value |
+| Read-only | If `ENFORCES_READ_ONLY` is declared, an `INSERT` and a `CREATE TABLE` through `execute` fail, are not retryable and change nothing |
+| Timeout | If `ENFORCES_TIMEOUT` is declared, `sleep_sql(5)` with a one-second limit fails within three seconds as `QUERY_TIMEOUT` |
+| Errors | A missing column is `retryable`; a permission error is not |
+| Streaming | If the adapter has `execute_batches`, its frames match `execute`'s result |
+
+A capability you do not declare is not checked: its test is reported as
+skipped, with the reason, so `pytest -rs` shows what your adapter does not
+promise. The five built-in adapters run the kit: SQLite and DuckDB in
+`packages/nl2sql/tests/adapters/unit/test_conformance.py`, PostgreSQL, MySQL
+and SQL Server in `packages/nl2sql/tests/realdb/test_conformance.py`.

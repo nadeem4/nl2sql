@@ -15,6 +15,9 @@ inherits nothing else.
 - `nl2sql_sdk.sqlalchemy` (`pip install "nl2sql-sdk[sqlalchemy]"`):
   `SQLAlchemyAdapter`, the base the built-in adapters are built on, and
   `SQLAlchemyConnection`. The one part of the SDK that imports SQLAlchemy.
+- `nl2sql_sdk.testing` (`pip install "nl2sql-sdk[testing]"`):
+  `AdapterConformance`, the conformance kit, a pytest test class an adapter's
+  tests subclass. It imports pytest and sqlglot.
 - `AdapterRequest`, `ResultFrame` and `ResultError`: what the engine sends an
   adapter and what it gets back.
 - `SchemaSnapshot` and the table, column and foreign-key contracts an adapter

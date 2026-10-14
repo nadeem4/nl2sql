@@ -97,9 +97,13 @@ def _wrapped(kind, message, sqlstate=None):
         (_wrapped(sa_exc.ProgrammingError, "The SELECT permission was denied on the object"), False),
         (_wrapped(sa_exc.ProgrammingError, "Invalid column name 'x'."), True),
         (_wrapped(sa_exc.DataError, "Conversion failed when converting"), True),
+        (_wrapped(sa_exc.OperationalError, "SELECT command denied to user 'u'@'h' for table 't'", "42000"), False),
+        (_wrapped(sa_exc.ProgrammingError, 'Cannot execute statement of type "INSERT" on database "d" '
+                                           "which is attached in read-only mode!"), False),
     ],
     ids=["unknown column", "syntax", "type mismatch", "permission (sqlstate)", "timeout",
-         "connection", "permission (message)", "unknown column (no sqlstate)", "conversion"],
+         "connection", "permission (message)", "unknown column (no sqlstate)", "conversion",
+         "mysql command denied (42000)", "read-only (no sqlstate)"],
 )
 def test_the_base_adapter_classifies_by_sqlstate_then_by_kind(error, retryable):
     adapter = SQLAlchemyAdapter.__new__(SQLAlchemyAdapter)
@@ -113,3 +117,32 @@ def test_the_base_adapter_classifies_by_sqlstate_then_by_kind(error, retryable):
     # Only the driver's first line, and only when the query was at fault.
     assert "LINE 1" not in frame.error.safe_message
     assert "SELECT secret" not in frame.error.safe_message
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        _wrapped(sa_exc.OperationalError, "canceling statement due to statement timeout", "57014"),
+        _wrapped(sa_exc.OperationalError, "[HYT00] [Microsoft][ODBC Driver 18 for SQL Server]Query timeout expired"),
+        _wrapped(sa_exc.OperationalError, "Query execution was interrupted, maximum statement execution time exceeded"),
+        _wrapped(sa_exc.OperationalError, "interrupted"),
+    ],
+    ids=["postgres", "sql server", "mysql", "sqlite and duckdb"],
+)
+def test_a_statement_stopped_at_the_timeout_is_query_timeout(error):
+    adapter = SQLAlchemyAdapter.__new__(SQLAlchemyAdapter)
+    adapter.datasource_id = "ds"
+
+    frame = adapter.query_failed(error)
+
+    assert (frame.error.error_code, frame.error.retryable) == ("QUERY_TIMEOUT", False)
+    _assert_safe(frame.error.safe_message)
+
+
+def test_a_lost_connection_is_refused_not_timed_out():
+    adapter = SQLAlchemyAdapter.__new__(SQLAlchemyAdapter)
+    adapter.datasource_id = "ds"
+
+    frame = adapter.query_failed(_wrapped(sa_exc.OperationalError, "server closed the connection unexpectedly"))
+
+    assert frame.error.error_code == "QUERY_REFUSED"

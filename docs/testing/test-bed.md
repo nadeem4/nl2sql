@@ -146,6 +146,13 @@ databases proves nothing.
 Test code may name dialects and use SQLAlchemy directly; the boundary tests
 cover `packages/*/src`, not the tests.
 
+`test_conformance.py` runs the adapter conformance kit
+(`nl2sql_sdk.testing`) on each server. Its seed goes into schemas `kit_a`
+and `kit_b` of the sample database (databases of those names on MySQL),
+written with the admin login and dropped after each test. Its
+`limited_login` is a login `nl2sql_kit` the test makes, whose password holds
+`@ : / # %` and which may read `kit_a` only.
+
 ## CI: the `realdb` workflow
 
 `.github/workflows/realdb.yml` runs the test bed on GitHub's runners. No

@@ -54,8 +54,8 @@ connection:
 
 When `limits.timeout_ms` is set, each statement starts a timer that calls the
 DuckDB connection's `interrupt()` once the limit passes. DuckDB stops the query and
-raises `InterruptException`, which the adapter reports as a refusal
-(`QUERY_REFUSED`) that the engine does not retry. The timer is cancelled as soon as
+raises `InterruptException`, which the adapter reports as a timeout
+(`QUERY_TIMEOUT`) that the engine does not retry. The timer is cancelled as soon as
 the statement finishes or fails, so it never touches a later query. The limit
 covers running the statement; DuckDB materialises the result while it runs, so
 fetching rows afterwards is not timed.

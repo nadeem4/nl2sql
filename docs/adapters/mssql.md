@@ -74,8 +74,8 @@ SQL Server has no session setting for a statement timeout, so the adapter's
 pooled connection.
 pyodbc counts whole seconds, so `limits.timeout_ms` is rounded **up**:
 `1500` becomes 2 seconds, and anything from 1 to 1000 becomes 1 second. When the
-limit passes, the driver cancels the query and the adapter reports it as a refusal
-(`QUERY_REFUSED`), which the engine does not retry.
+limit passes, the driver cancels the query and the adapter reports it as a timeout
+(`QUERY_TIMEOUT`), which the engine does not retry.
 
 ## Requirements
 
