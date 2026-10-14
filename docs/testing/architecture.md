@@ -128,11 +128,10 @@ so a test sets them on the runtime it builds:
   use it the same way; the runtime it came from never changes.
   `tests/unit/test_run_scoped_runtime.py` pins that down.
 
-Monkeypatching `nl2sql.common.settings.settings` changes nothing the
-pipeline, indexing, tracing or evaluation read. The global goes in a later
-pull request; until then `READS_THE_SETTINGS_GLOBAL` in
-`tests/architecture/test_boundaries.py` lists the modules still reading it,
-and it may only shrink.
+There is no process-global settings object to monkeypatch, and no module
+writes `os.environ`: a test sets what it needs in the config it builds. The
+architecture tests keep it that way
+([An Engine Owns Its Config](../architecture/invariants.md#an-engine-owns-its-config-no-process-globals)).
 
 ```mermaid
 flowchart TD

@@ -52,12 +52,8 @@ def _replay_environment(monkeypatch):
 
     The replay server's placeholder key is in ``llm.yaml``, not the environment.
     """
-    # Saving a key writes os.environ directly. delenv on an absent variable
-    # records nothing to restore, so set it first: the key a test saves is
-    # then removed afterwards instead of leaking into later tests.
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
-        monkeypatch.setenv(name, "")
-        monkeypatch.delenv(name)
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.delenv("OPENAI_API_BASE", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
@@ -314,7 +310,8 @@ def test_saving_a_key_switches_replay_to_live_without_a_restart(project):
     assert live_client is not replay_client
     assert live_client.openai_api_base in (None, "")
     assert live_client.openai_api_key.get_secret_value() == FAKE_KEY
-    assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
+    # The key reaches the engine as a value; the environment is never written.
+    assert "OPENAI_API_KEY" not in os.environ
     # Persisted through the same path `--api-key` uses, into `.env`.
     assert _key_from_env_file(project / ".env") == FAKE_KEY
     assert _llm_yaml(project).get("base_url") is None and _llm_yaml(project).get("api_key") is None
@@ -535,9 +532,9 @@ def test_a_second_key_keeps_the_first_and_the_nodes_on_its_provider(project, mon
                                                                   "decomposer": {"provider": "openai",
                                                                                  "model": "gpt-4.1"}}}).status_code == 200
 
-    # One key per provider, in the environment and in .env.
-    assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
-    assert os.environ["ANTHROPIC_API_KEY"] == FAKE_ANTHROPIC_KEY
+    # One key per provider, in .env and in the engine; never in the environment.
+    assert "OPENAI_API_KEY" not in os.environ and "ANTHROPIC_API_KEY" not in os.environ
+    assert engine._runtime.llm_registry.get_llm("astplanner").anthropic_api_key.get_secret_value()         == FAKE_ANTHROPIC_KEY
     env_demo = (project / ".env").read_text(encoding="utf-8")
     assert f"OPENAI_API_KEY={FAKE_KEY}" in env_demo and f"ANTHROPIC_API_KEY={FAKE_ANTHROPIC_KEY}" in env_demo
     cfg = _llm_yaml(project)
@@ -564,3 +561,53 @@ def test_the_settings_read_names_every_llm_node(project):
     assert all(n["label"] and n["model"] is None for n in read["nodes"])
     assert read["provider"] == "openai" and read["default_model"] == "gpt-5.4"
     assert read["key"]["masked"] is None
+
+
+# --- a key the demo is given travels in the LLM config, never the environment ----
+
+
+def test_with_api_keys_gives_each_entry_its_own_provider_s_key():
+    from nl2sql.cli.demo.llm_config import with_api_keys
+    from nl2sql.config import LLM
+    from nl2sql.llm.registry import agents_from_config
+
+    llm = LLM(provider="openai", model="gpt-5.4", agents={
+        "ast_planner": {"provider": "anthropic", "model": "claude-opus-5"},
+        "refiner": {"model": "gpt-4.1"},
+        "decomposer": {"provider": "openrouter", "model": "x"},
+        "answer_synthesizer": {"provider": "anthropic", "model": "claude-opus-5", "api_key": "${env:MINE}"},
+    })
+
+    agents = agents_from_config(with_api_keys(llm, {"openai": FAKE_KEY, "anthropic": FAKE_ANTHROPIC_KEY}))
+
+    assert agents["default"].api_key.get_secret_value() == FAKE_KEY
+    assert agents["refiner"].api_key.get_secret_value() == FAKE_KEY
+    assert agents["astplanner"].api_key.get_secret_value() == FAKE_ANTHROPIC_KEY
+    # No key given for OpenRouter: its own variable is read, never OpenAI's key.
+    assert agents["decomposer"].api_key is None
+    # A key the config names itself stays.
+    assert agents["answersynthesizer"].api_key.get_secret_value() == "${env:MINE}"
+
+
+def test_with_api_keys_keeps_a_key_the_config_names():
+    from nl2sql.cli.demo.llm_config import with_api_keys
+    from nl2sql.config import LLM
+
+    llm = LLM(provider="openai", model="gpt-5.4", api_key="replay", base_url=REPLAY_URL)
+
+    assert with_api_keys(llm, {"openai": FAKE_KEY}).api_key == "replay"
+    assert with_api_keys(llm, {}) is llm
+
+
+def test_a_key_the_demo_was_given_shows_masked_in_the_panel(project):
+    cfg = _llm_yaml(project)
+    cfg.pop("base_url")
+    cfg.pop("api_key")
+    (project / "llm.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    app = build_app(_Engine(project), questions=[], roles=["admin"], mode="live", dataset="chinook",
+                    project_dir=project, host="127.0.0.1", api_keys={"openai": FAKE_KEY})
+
+    read = TestClient(app, base_url="http://127.0.0.1:8765").get("/api/settings").json()
+
+    assert read["key"] == {"masked": mask_key(FAKE_KEY), "env_var": "OPENAI_API_KEY"}
+    assert "OPENAI_API_KEY" not in os.environ

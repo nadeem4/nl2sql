@@ -1,10 +1,10 @@
 # Configuration v2 and the extension registry (Phase 1 design)
 
-!!! note "Status: being built"
+!!! note "Status: built"
     This page is the design for Phase 1 of the redesign, which ships as
-    release 0.5. Each pull request in [the PR plan](#11-pr-plan) adds a
-    "Built" note to the sections it built, and updates the reference pages it
-    touches. Since PR 7b the [Configuration](../configuration/system.md)
+    release 0.5. Every pull request in [the PR plan](#11-pr-plan) is built,
+    and each added a "Built" note to the sections it built and updated the
+    reference pages it touched. PR 13 completes Phase 1. The [Configuration](../configuration/system.md)
     pages describe the 0.5 config.
 
 ## Principles
@@ -515,7 +515,27 @@ are not configuration: the trace redactor scans `os.environ` for values to
 mask, and `nl2sql benchmark` checks `CI`. Third-party libraries such as boto3
 and the OpenTelemetry SDK still read their own standard variables.
 
+!!! note "Built: the allow-list (PR 13)"
+    `test_environment_reads_only_from_the_allow_list` in
+    `tests/architecture/test_boundaries.py` names each module allowed to read
+    `os.environ` and why (`READS_THE_ENVIRONMENT`): `nl2sql/config/`
+    (`NL2SQL_CONFIG` and `${env:...}`), `nl2sql/llm/` (the provider keys),
+    the `env` secret provider, `common/logger.py` (`configure_logging` reads
+    `NL2SQL_LOG_LEVEL` when the caller passes no level, which the CLI and
+    `nl2sql-api` no longer do), the trace redactor and `nl2sql benchmark`
+    (`CI`). The CLI's demo command and the playground's settings panel ask
+    `nl2sql.llm.providers.api_key_from_env` for a provider's key.
+    `NL2SQL_TODAY`, `ENV`, `APP_ENV` and `ENV_FILE_PATH` went with
+    `common/settings.py`; the first is `settings.pipeline.today`.
+
 ### `.env` files
+
+!!! note "Built (PR 7b, PR 13)"
+    `test_only_entry_points_load_dotenv` allows `load_dotenv` only in
+    `nl2sql/config/loader.py` (`load_env_file`), and `load_env_file` only in
+    `cli/main.py`, `cli/commands/demo.py` and `nl2sql_api/main.py`.
+    `nl2sql-api` now loads the `.env` before `configure_logging()`, so a
+    `NL2SQL_LOG_LEVEL` there applies.
 
 Only the entry points load `.env` (owner decision 2):
 - The CLI, `nl2sql-api` and the demo load the `.env` next to `nl2sql.yaml`
@@ -1360,6 +1380,21 @@ Phase 1. OpenTelemetry moves in Phase 3.
     replay's playback clients) never changes the engine's. `nl2sql.runtime` stays on the ratchet list
     for the copy step, which PR 13 deletes.
 
+!!! note "Built: step 3, the apps, and the global deleted (PR 13)"
+    The playground reads `settings.feedback.enabled` from `engine.config`.
+    `common/settings.py`, `common/env_hint.py` and `_copy_into_global_settings`
+    are deleted, with the repository's root `conftest.py` (it restored the
+    global, and pointed its trace and artifact folders at a temporary
+    directory, which `storage.path` now does), the `READS_THE_SETTINGS_GLOBAL`
+    ratchet and the `nl2sql.common.settings` entry in
+    `STILL_IMPORTED_FROM_INSIDE`. `pydantic-settings` is no longer a
+    dependency. `test_no_module_writes_the_environment` and
+    `test_environment_reads_only_from_the_allow_list` are the two permanent
+    tests, and `test_only_entry_points_load_dotenv` a third.
+    `tests/e2e/test_two_engines_fake_llm.py` has passed as a normal test since
+    PR 11. Every `os.environ` write is gone; the demo's are described in
+    [Demo and playground](#demo-and-playground).
+
 Each step is one green PR, and no release happens in between:
 
 1. **The switch PR (7a in the plan)** introduces `Runtime.from_config(cfg)`.
@@ -1563,6 +1598,24 @@ data/                  # --demo only: the three bundled SQLite files, copied
 - A key the demo is given is written to `nl2sql-demo/.env` (it was
   `.env.demo`) and passed into the `LLM` it builds. Nothing goes into
   `os.environ`.
+
+!!! note "Built: keys without the environment (PR 13)"
+    `nl2sql demo --api-key` writes the key to the demo's `.env` and passes it
+    to `_build_engine` as `api_keys` (provider -> key), which puts it into the
+    engine's `llm` section in memory with
+    `nl2sql.cli.demo.llm_config.with_api_keys`: the top level gets its
+    provider's key unless it names one, and an agent on another provider gets
+    that provider's key, or explicitly none, so it never inherits a key for a
+    provider it does not run on. `llm.yaml` still never holds a key. A key in
+    `.env` from an earlier run reaches the engine through `load_env_file`, as
+    for every entry point; the flag wins over an exported variable because it
+    travels as a value, which the engine prefers to the environment. The
+    settings panel keeps the same `api_keys`, adds each key saved in it, and
+    passes them with every `engine.llm.replace`; it shows a key masked from
+    there or from the environment. Hosted mode used to remove the provider
+    key variables from its own environment; it now refuses to start when one
+    is set, since a public server must not hold a key and the demo no longer
+    writes the environment to drop it.
 - Replay mode keeps its local fake server. The demo points the config at it
   with `LLM(provider="openai", base_url="http://127.0.0.1:<port>/v1", api_key="replay")`
   instead of setting `OPENAI_API_KEY=replay`.
@@ -1639,7 +1692,7 @@ flowchart TD
 | 10 | **Facade namespaces** (built as 10a and 10b: see the note in section 7). The new shape in section 7; the duplicate methods, sub-API exports, `context`, `get_adapter` and `SettingsAPI` deleted; `POST /llm` becomes the admin-only `PUT /api/v1/settings/llm`; the playground's model switch calls `llm.replace`; the API, CLI and playground move onto the namespaces; the stricter boundary test. | 7b, 9 | One test per namespace method in the table; `test_nl2sql_exports_exactly_the_public_surface` (a fixed list, so semver has a test); `test_put_settings_llm_requires_admin`; `test_put_settings_llm_returns_422_with_the_config_error`; the boundary test for the playground and API imports. | `api/core/*`, `api/rest/*` (`llm.md` rewritten for `PUT /settings/llm`), `api/index.md` |
 | 11 | **Settings off the global: pipeline.** Nodes, `execution` and `aggregation` read `ctx.settings`; `run_date(today)`. | 7a | The ratchet list shrinks; node tests pass settings through the runtime and never monkeypatch the global. | node pages that name a setting |
 | 12 | **Settings off the global: indexing and the rest.** `indexing`, `secrets`, `services`, `tracing`, `evaluation` and `feedback`. Evaluation and replay build derived configs instead of editing the global. | 7a | The ratchet list shrinks; `test_tier2_runs_without_touching_another_engine`; `test_replay_pins_the_date_in_its_own_runtime`. | `testing/architecture.md`, `observability/debugging.md` |
-| 13 | **Settings off the global: apps, then delete it.** The CLI, playground and API move off it. `common/settings.py`, `env_hint.py` and the copy step are deleted, and every `os.environ` write goes. | 10, 11, 12 | The two-engines test flips from xfail to pass; `test_no_module_writes_the_environment`; `test_environment_reads_only_from_the_allow_list`; `test_only_entry_points_load_dotenv`. | invariants.md (no process globals, the env allow-list, `.env` loading) |
+| 13 | **Settings off the global: apps, then delete it** (built). The CLI, playground and API move off it. `common/settings.py`, `env_hint.py` and the copy step are deleted, and every `os.environ` write goes. | 10, 11, 12 | The two-engines test flips from xfail to pass (it already passed from PR 11); `test_no_module_writes_the_environment`; `test_environment_reads_only_from_the_allow_list`; `test_only_entry_points_load_dotenv`. | invariants.md (no process globals, the env allow-list, `.env` loading) |
 
 The waves, with at most four PRs at once:
 

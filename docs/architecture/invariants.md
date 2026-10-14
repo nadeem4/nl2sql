@@ -340,7 +340,7 @@ Concretely:
 - An adapter imports only the SDK, its driver, SQLAlchemy, sqlglot, pydantic and the standard library. SQLAlchemy and sqlglot are adapter-layer libraries: the shared connection layer, and the expression vocabulary the engine hands over to be rendered.
 - Nothing outside `nl2sql/adapters/` imports an adapter, SQLAlchemy or a database driver. The engine reaches an adapter through the `nl2sql.adapters` entry points and `DatasourceAdapterProtocol`.
 - Nothing outside `nl2sql/cli/` imports the CLI, and `nl2sql.cli.demo` never imports `nl2sql.cli.commands`.
-- `nl2sql_api` imports only the top-level `nl2sql` namespace, and so do the playground and `nl2sql demo`, apart from a named list of exceptions (`STILL_IMPORTED_FROM_INSIDE`: the settings global until it is deleted, the provider catalogue in `llm/providers.py`, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import `nl2sql.feedback`, `nl2sql.tracing`, `nl2sql.pipeline`, `nl2sql.indexing` or `PROVIDER_PRESETS`: `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.index.inspect_defaults()` and `engine.llm.providers()` serve them. The CLI, the playground and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`).
+- `nl2sql_api` imports only the top-level `nl2sql` namespace, and so do the playground and `nl2sql demo`, apart from a named list of exceptions (`STILL_IMPORTED_FROM_INSIDE`: the provider catalogue in `llm/providers.py`, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import `nl2sql.feedback`, `nl2sql.tracing`, `nl2sql.pipeline`, `nl2sql.indexing` or `PROVIDER_PRESETS`: `engine.feedback`, `engine.traces.get`, `engine.about()`, `engine.index.inspect_defaults()` and `engine.llm.providers()` serve them. The CLI, the playground and `nl2sql_api` reach the engine only through `NL2SQL`'s public methods and namespaces, never the runtime behind them (`engine._runtime`, a namespace's `_ctx`).
 - The runtime (`pipeline`, `execution`, `indexing`, `datasources`, `llm`, `auth`, `aggregation`, `schema`, `services`, `context`, `public_api`) never imports `nl2sql.evaluation` or `nl2sql.feedback` at module scope. A deferred import inside a function is fine.
 - A provider's API-key environment variable is read in `nl2sql/llm/` only. `PROVIDER_PRESETS` (`llm/registry.py`) is the one table; everything the CLI, the playground, evaluation and the REST API know about providers derives from it through `llm/providers.py`.
 
@@ -382,6 +382,31 @@ Code that only needs a name — a type hint, `nl2sql --help`, a config check in 
 
 ---
 
+## An Engine Owns Its Config: No Process Globals
+
+### Definition
+Everything an engine reads comes from its own `Config`, handed down through the runtime (`ctx.settings`, `ctx.config`) or passed as a parameter. Nothing is process-global, so two engines in one process share nothing.
+
+Concretely:
+
+- There is no `settings` singleton. A module with no runtime takes the value it needs as a parameter (`run_date(today)`, `PlanCache(store, enabled=..., today=...)`).
+- No module writes the process environment: no `os.environ` assignment, `pop` or `update`, no `os.putenv`. Keys and options travel in the `Config`. `nl2sql demo --api-key` and a key saved in the playground's settings panel are written to the demo's `.env` and given to the engine as a value in its LLM config, never put in `os.environ`; `nl2sql demo --hosted` refuses to start when a provider key variable is set rather than drop it.
+- The environment is read from an allow-list only: `NL2SQL_CONFIG` (`nl2sql/config/`), `NL2SQL_LOG_LEVEL` (`configure_logging`), the provider key variables (`nl2sql/llm/`, through `PROVIDER_PRESETS`), `${env:VAR}` references (`nl2sql/config/` and the `env` secret provider), the trace redactor, which masks every value the environment holds, and `CI` in `nl2sql benchmark`. Anything else is configuration and is written in `nl2sql.yaml`, as `${env:VAR}` where it should come from the environment.
+- Only the entry points load a `.env` file: the CLI, `nl2sql demo` and `nl2sql-api` call `nl2sql.config.load_env_file()`, which loads the `.env` next to `nl2sql.yaml` and never overrides a variable already set. It is the one place that calls `load_dotenv`. The library never reads a `.env`; a Python caller who wants one loads it before `NL2SQL.from_config()`.
+- Runs that need different settings (evaluation, trace replay) take a run-scoped runtime with a derived config (`ctx.derive(...)`) instead of editing shared state.
+
+### Enforcement Points
+- `test_no_module_writes_the_environment`, `test_environment_reads_only_from_the_allow_list` and `test_only_entry_points_load_dotenv` in `packages/nl2sql/tests/architecture/test_boundaries.py`, an AST scan of `packages/*/src` (`READS_THE_ENVIRONMENT` names each allowed reader and why)
+- `packages/nl2sql/tests/e2e/test_two_engines_fake_llm.py` — two engines in one process, each with its own row limit, plan cache, LLM, embedder and storage, and `os.environ` unchanged afterwards
+
+### Failure Behavior
+A failing test naming the file, line and the write or read that broke the rule.
+
+### Why It Exists
+0.4 kept its settings in a process-global object that every module imported, and carried keys and options through `os.environ`. Two engines in one process (a test, a server with two configs, an evaluation run beside live traffic) then read each other's values, an evaluation that pinned a setting raced every other query, and a key set for one engine leaked into every other engine and child process.
+
+---
+
 ## Dialect Knowledge Lives in the Adapter
 
 ### Definition
@@ -393,7 +418,7 @@ No engine module names a database dialect or writes one database's SQL. The plan
 - The plan's one function vocabulary: `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions` (see *Plan Functions Are Known Functions*)
 
 ### Failure Behavior
-A failing test naming the literal and where it was written. The documented exceptions are the engine's own SQLite metadata store (`schema/store.py`, `schema/sqlite_store.py`, `common/settings.py`), the in-process polars/DuckDB compute engine (`aggregation/engines/polars_duckdb.py`), and the plan's function allow-list.
+A failing test naming the literal and where it was written. The documented exceptions are the engine's own SQLite metadata store (`schema/store.py`, `schema/sqlite_store.py`), the in-process polars/DuckDB compute engine (`aggregation/engines/polars_duckdb.py`), and the plan's function allow-list.
 
 ### Why It Exists
 SQL that only one database understands, written in the engine, is wrong for every other database — and it is wrong silently, because it parses. A dialect name in engine code is worse: it is a switch statement that every future adapter has to be added to, in a repo whose point is that adapters are pluggable.
@@ -450,15 +475,15 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is RBAC-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
-- **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; Dialect Knowledge Lives in the Adapter
+- **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter
 - **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions
 
 ---
 
 ## Gaps
 
-- Column existence enforcement degrades to warnings when `logical_validator_strict_columns` is turned off (it is on by default), so missing columns then do not always block execution.
-- Schema version mismatch handling is policy-driven and may only emit warnings (e.g., `schema_version_mismatch_policy=warn`), so mismatch is not always enforced as a hard failure.
+- Column existence enforcement degrades to warnings when `settings.pipeline.strict_columns` is turned off (it is on by default), so missing columns then do not always block execution.
+- Schema version mismatch handling is policy-driven and may only emit warnings (e.g., `settings.schema.version_mismatch: warn`), so mismatch is not always enforced as a hard failure.
 - Semantic-only checks are pattern based: they block a field that opens with `SELECT ... FROM`, a statement terminator and comment markers, rather than parsing for every possible SQL construct. An intent that literally reads "select ... from ..." is rejected as SQL.
 - If the vector store is unavailable, datasource resolution can return a response without errors, relying on downstream stages to detect missing candidates.
 

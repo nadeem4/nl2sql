@@ -1,11 +1,11 @@
-"""Secrets held by settings and config models must never print.
+"""Secrets held by config models must never print.
 
-A failing test that printed the settings object once showed a live
+A failing test that printed 0.4's settings object once showed a live
 ``OPENAI_API_KEY`` in full: pytest had loaded the repo-root ``.env``. Any
-``repr``, ``str``, log line or traceback holding the settings object, or a
-config model holding a key, leaked every configured secret. The values are now
-``SecretStr`` and are read only where they are used, so these tests check both
-halves: nothing prints the value, and everything that needs it still gets it.
+``repr``, ``str``, log line or traceback holding a model with a key leaked
+every configured secret. The values are ``SecretStr`` and are read only where
+they are used, so these tests check both halves: nothing prints the value, and
+everything that needs it still gets it.
 
 Fake keys are assembled at run time so no key-shaped literal is committed.
 """
@@ -15,7 +15,6 @@ import pytest
 import yaml
 from pydantic import SecretStr
 
-from nl2sql.common.settings import Settings
 from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.datasources.models import ConnectionConfig
 
@@ -27,22 +26,6 @@ def _all_renderings(obj) -> str:
     parts = [repr(obj), str(obj), f"{obj}", str(obj.model_dump()), repr(obj.model_dump()),
              str(obj.model_dump(mode="json")), obj.model_dump_json()]
     return "\n".join(parts)
-
-
-@pytest.fixture()
-def hermetic_settings(monkeypatch):
-    """Settings built from the environment only, never from any ``.env`` file."""
-    monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
-    return Settings(_env_file=None)
-
-
-def test_settings_never_print_their_secrets(hermetic_settings):
-    text = _all_renderings(hermetic_settings)
-    assert FAKE_KEY not in text
-
-
-def test_settings_still_hold_the_real_values(hermetic_settings):
-    assert hermetic_settings.openai_api_key.get_secret_value() == FAKE_KEY
 
 
 def test_llm_config_models_never_print_the_key():

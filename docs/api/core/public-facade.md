@@ -66,13 +66,10 @@ built in code. `engine.config` is the current frozen `Config`, with secrets as
 references only; `datasources.add`, `datasources.remove` and `llm.replace` are
 the calls that change it.
 
-!!! note "Until the settings global is gone"
-    Modules not yet moved onto the runtime still read the process-global
-    `settings`, and building an engine copies its config into it. Two engines
-    in one process therefore share those values until the last migration pull
-    request (configuration v2, section 8). The CLI, `nl2sql-api` and the
-    playground build their engine from `nl2sql.yaml` and call `check()` at
-    startup.
+Each engine owns its config: nothing is process-global and nothing writes
+the environment, so two engines in one process share nothing. The CLI,
+`nl2sql-api` and the playground build their engine from `nl2sql.yaml` and call
+`check()` at startup.
 
 ## Lifecycle
 

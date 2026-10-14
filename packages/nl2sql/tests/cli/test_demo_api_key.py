@@ -25,9 +25,9 @@ FAKE_ANTHROPIC_KEY = "-".join(["sk", "ant", "api03", "test", "not", "a", "real",
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch, demo_engines):
     """No key anywhere, no Ollama, no server: the engine is a stub (``demo_engines``)."""
-    # The command writes provider keys into os.environ. delenv on an absent
-    # variable records nothing to restore, so set each first: whatever the
-    # command writes is then removed afterwards instead of leaking.
+    # The demo loads its .env into os.environ, as every entry point does.
+    # delenv on an absent variable records nothing to restore, so set each
+    # first: whatever the .env adds is then removed afterwards.
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
@@ -53,10 +53,13 @@ def _plain(text: str) -> str:
     return _ANSI.sub("", text)
 
 
-def test_api_key_selects_live_mode_with_nothing_in_the_environment(tmp_path):
+def test_api_key_selects_live_mode_with_nothing_in_the_environment(tmp_path, demo_engines):
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
 
     assert result.exit_code == 0, result.output
+    # The key reaches the engine as a value; the environment is never written.
+    assert demo_engines[-1].api_keys == {"openai": FAKE_KEY}
+    assert "OPENAI_API_KEY" not in os.environ
     assert "live mode" in _plain(result.output).lower(), result.output
     assert "using openai" in _plain(result.output).lower(), result.output
     llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text())
@@ -100,13 +103,14 @@ def test_an_openrouter_shaped_key_selects_openrouter(tmp_path):
     assert f"OPENROUTER_API_KEY={FAKE_OPENROUTER_KEY}" in env_demo
 
 
-def test_api_key_beats_a_key_already_in_the_environment(tmp_path, monkeypatch):
+def test_api_key_beats_a_key_already_in_the_environment(tmp_path, monkeypatch, demo_engines):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-from-the-environment")
 
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_KEY)
 
     assert result.exit_code == 0, result.output
-    assert os.environ["OPENAI_API_KEY"] == FAKE_KEY
+    assert demo_engines[-1].api_keys == {"openai": FAKE_KEY}
+    assert os.environ["OPENAI_API_KEY"] == "sk-test-from-the-environment"
     env_demo = (tmp_path / "d" / ".env").read_text(encoding="utf-8")
     assert FAKE_KEY in env_demo
     assert "sk-test-from-the-environment" not in env_demo
@@ -285,14 +289,15 @@ def _settings(app):
     return TestClient(app, base_url="http://127.0.0.1:8765").get("/api/settings").json()
 
 
-def test_an_openrouter_key_is_read_from_the_openrouter_variable(tmp_path):
-    """The config names no key, so OpenRouter reads its own variable, not OpenAI's."""
+def test_an_openrouter_key_is_passed_to_the_engine_as_openrouter_s_key(tmp_path, demo_engines):
+    """llm.yaml names no key; the engine is given it for OpenRouter, and the environment is untouched."""
     result = _run("--dir", str(tmp_path / "d"), "--api-key", FAKE_OPENROUTER_KEY)
 
     assert result.exit_code == 0, result.output
     llm = yaml.safe_load((tmp_path / "d" / "llm.yaml").read_text())
     assert llm["provider"] == "openrouter" and "api_key" not in llm
-    assert os.environ["OPENROUTER_API_KEY"] == FAKE_OPENROUTER_KEY
+    assert demo_engines[-1].api_keys == {"openrouter": FAKE_OPENROUTER_KEY}
+    assert "OPENROUTER_API_KEY" not in os.environ
 
 
 def test_the_api_key_flag_path_is_unchanged_by_the_settings_panel(tmp_path, monkeypatch):

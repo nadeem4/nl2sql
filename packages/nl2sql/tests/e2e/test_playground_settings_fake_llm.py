@@ -5,6 +5,7 @@ the way a real one would be: the saved key, no ``base_url`` in the config, and
 the OpenAI client's own endpoint variable pointing at the fake. No real key is
 used and nothing is spent.
 """
+import os
 import shutil
 
 import pytest
@@ -32,10 +33,8 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
     # Replay mode, as `nl2sql demo` leaves it: llm.yaml on the replay server with its placeholder key.
     point_llm_config_at(project, replay.base_url, api_key="replay")
 
-    # The panel writes the saved key into os.environ; set then delete, so it is restored afterwards.
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
-        monkeypatch.setenv(name, "")
-        monkeypatch.delenv(name)
+        monkeypatch.delenv(name, raising=False)
     # Where a client with no configured base_url goes: the stand-in provider.
     monkeypatch.setenv("OPENAI_API_BASE", live.base_url)
     monkeypatch.setenv("OPENAI_BASE_URL", live.base_url)
@@ -73,3 +72,5 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
         assert FAKE_KEY not in text
     assert saved.json()["key"]["masked"] == "sk-...7d3e"
     assert f"OPENAI_API_KEY={FAKE_KEY}" in (project / ".env").read_text(encoding="utf-8")
+    # The key reached the engine as a value: the environment was never written.
+    assert "OPENAI_API_KEY" not in os.environ

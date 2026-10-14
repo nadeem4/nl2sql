@@ -66,7 +66,7 @@ def build_engine(ctx: typer.Context, *, check: bool = True) -> "NL2SQL":
     except ConfigError as error:
         _fail(error)
     if engine.config.settings.observability.exporter == "otlp":
-        configure_logging(level="INFO", json_format=True)
+        configure_logging(json_format=True)
     if not check:
         return engine
     try:

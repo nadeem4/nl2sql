@@ -7,7 +7,7 @@ playground's settings panel, so it lives here rather than in a command module.
 from __future__ import annotations
 
 import pathlib
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Mapping, Optional
 
 import yaml
 
@@ -18,6 +18,9 @@ from nl2sql.llm.providers import (
     default_temperature_for,
     env_var_for_key,
 )
+
+if TYPE_CHECKING:
+    from nl2sql import LLM
 
 # The files in the demo folder: the llm section, and the key's dotenv file.
 LLM_FILE = pathlib.Path("llm.yaml")
@@ -53,6 +56,28 @@ def persist_api_key(path: pathlib.Path, key: str) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+
+
+def with_api_keys(llm: "LLM", api_keys: Mapping[str, str]) -> "LLM":
+    """``llm`` with each key in ``api_keys`` (provider -> key) given to the entries on that provider.
+
+    This is how a key the demo was given (``--api-key``, or one saved in the
+    settings panel) reaches the engine: as a value in its LLM config, never
+    through the environment, and never written into ``llm.yaml``. An entry
+    that names a key of its own keeps it. An agent on another provider than
+    the default is given that provider's key, or explicitly none, so it never
+    inherits the default's key for a provider it does not run on.
+    """
+    if not api_keys:
+        return llm
+    agents = {}
+    for name, agent in llm.agents.items():
+        provider = agent.provider or llm.provider
+        if "api_key" not in agent.model_fields_set and provider != llm.provider:
+            agent = agent.model_copy(update={"api_key": api_keys.get(provider)})
+        agents[name] = agent
+    api_key = llm.api_key if llm.api_key is not None else api_keys.get(llm.provider)
+    return llm.model_copy(update={"api_key": api_key, "agents": agents})
 
 
 def read_llm(directory: pathlib.Path) -> dict:

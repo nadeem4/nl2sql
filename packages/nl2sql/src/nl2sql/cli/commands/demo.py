@@ -28,8 +28,9 @@ Otherwise three modes, chosen at process start from the first key that turns up:
 
 The key is looked for in a fixed order, highest precedence first:
 
-1. ``--api-key`` on the command line, which is also written into the demo
-   project's ``.env`` so later runs from that directory stay live
+1. ``--api-key`` on the command line, which is passed to the engine in its
+   LLM config and also written into the demo project's ``.env`` so later runs
+   from that directory stay live
 2. ``OPENAI_API_KEY`` / ``OPENROUTER_API_KEY`` / ``ANTHROPIC_API_KEY`` in the
    process environment
 3. whichever of those is already recorded in the demo project's ``.env``
@@ -38,8 +39,12 @@ The key is looked for in a fixed order, highest precedence first:
 
 ``--api-key`` and the playground's settings panel are the only sources that
 write a key down, and both write only to ``.env``, through
-:func:`nl2sql.cli.demo.llm_config.persist_api_key`. A key saved in the panel takes effect at once, and on
-the next start it sits at step 3 of the order above. No path echoes a key: the
+:func:`nl2sql.cli.demo.llm_config.persist_api_key`. Neither writes the process
+environment: the key reaches the engine as a value in its LLM config
+(:func:`nl2sql.cli.demo.llm_config.with_api_keys`), and ``llm.yaml`` never
+holds it. A key saved in the panel takes effect at once, and on the next start
+it sits at step 3 of the order above, loaded from ``.env`` as every entry point
+loads it. No path echoes a key: the
 console and the playground show at most a masked form. The panel (and, by the
 same gate, Rebuild and the Retrieval inspector) is on only for a loopback
 ``--host`` unless ``--allow-settings`` is given; the playground never writes to
@@ -47,11 +52,10 @@ the demo database.
 """
 from __future__ import annotations
 
-import os
 import pathlib
 import urllib.request
 import webbrowser
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from nl2sql.llm.providers import (
     ANTHROPIC_UPSTREAM,
@@ -59,6 +63,7 @@ from nl2sql.llm.providers import (
     OLLAMA_BASE_URL,
     PROVIDER_KEYS,
     UPSTREAMS,
+    api_key_from_env,
     env_var_for_key,
     env_var_for_provider,
     mask_key,
@@ -67,7 +72,7 @@ from nl2sql.llm.providers import (
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.console import console, print_error, print_step, print_success
 from nl2sql.datasets.demo import DEMO_QUESTIONS, DEMO_QUESTIONS_BY_DATASOURCE
-from nl2sql.cli.demo.llm_config import ENV_FILE, read_llm
+from nl2sql.cli.demo.llm_config import ENV_FILE, read_llm, with_api_keys
 from nl2sql.cli.demo.llm_config import persist_api_key as _persist_api_key
 from nl2sql.cli.demo.llm_config import point_llm_config_at as _point_llm_config_at
 from nl2sql.cli.demo.defaults import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUESTIONS_PER_SESSION
@@ -114,8 +119,14 @@ def _ollama_reachable() -> bool:
         return False
 
 
-def detect_llm_mode() -> str:
-    if any(os.environ.get(name) for name in PROVIDER_KEYS) or _ollama_reachable():
+def keys_in_environment() -> List[str]:
+    """The provider key variables that are set, by name. Never the keys."""
+    return [env_var_for_provider(provider) for provider in KEYED_PROVIDERS if api_key_from_env(provider)]
+
+
+def detect_llm_mode(api_key: Optional[str] = None) -> str:
+    """``live`` with ``api_key``, a provider key in the environment or a reachable Ollama; else ``replay``."""
+    if api_key or keys_in_environment() or _ollama_reachable():
         return "live"
     return "replay"
 
@@ -131,7 +142,7 @@ def live_provider(key: Optional[str], source: str) -> str:
         return "ollama"
     if source == "environment":
         for provider in ("openai", "openrouter", "anthropic"):
-            if os.environ.get(env_var_for_provider(provider)) == key:
+            if api_key_from_env(provider) == key:
                 return provider
     return provider_for_key(key)
 
@@ -169,8 +180,8 @@ def resolve_api_key(api_key: Optional[str], env_file: pathlib.Path) -> Tuple[Opt
     """
     if api_key and api_key.strip():
         return api_key.strip(), "flag"
-    for name in PROVIDER_KEYS:
-        value = os.environ.get(name)
+    for provider in KEYED_PROVIDERS:
+        value = api_key_from_env(provider)
         if value:
             return value, "environment"
     from_file = _key_from_env_file(env_file)
@@ -251,15 +262,20 @@ def _serve(app, host: str, port: int) -> None:
     uvicorn.run(app, host=host, port=port, log_level="warning")
 
 
-def _build_engine(config_path: pathlib.Path, *, plan_cache: bool = True):
+def _build_engine(config_path: pathlib.Path, *, plan_cache: bool = True,
+                  api_keys: Optional[Dict[str, str]] = None):
     """Seam: the tests swap this so they never construct a real engine.
 
     ``plan_cache`` False turns the plan cache off for this run only
     (``settings.pipeline.plan_cache``), in the engine's own config.
+    ``api_keys`` (provider -> key) go into the engine's LLM config as values
+    (:func:`with_api_keys`); nothing is written to the environment.
     """
     from nl2sql import NL2SQL, load_config
 
     cfg = load_config(config_path)
+    if api_keys:
+        cfg = cfg.model_copy(update={"llm": with_api_keys(cfg.llm, api_keys)})
     if not plan_cache:
         settings = cfg.settings
         cfg = cfg.model_copy(update={"settings": settings.model_copy(
@@ -267,7 +283,8 @@ def _build_engine(config_path: pathlib.Path, *, plan_cache: bool = True):
     return NL2SQL(cfg)
 
 
-def start_engine(config_path: pathlib.Path, *, plan_cache: bool = True, require_index: bool = False):
+def start_engine(config_path: pathlib.Path, *, plan_cache: bool = True, require_index: bool = False,
+                 api_keys: Optional[Dict[str, str]] = None):
     """Builds the demo's engine, checks it, and builds the index when the check says it is not ready.
 
     A ``required`` datasource that fails, or none ready at all, exits 1; an
@@ -280,7 +297,7 @@ def start_engine(config_path: pathlib.Path, *, plan_cache: bool = True, require_
     from nl2sql.cli.common.indexing import run_indexing
 
     try:
-        engine = _build_engine(config_path, plan_cache=plan_cache)
+        engine = _build_engine(config_path, plan_cache=plan_cache, api_keys=api_keys)
     except ConfigError as error:
         print_error(str(error))
         raise SystemExit(1)
@@ -406,22 +423,28 @@ def demo_command(
     config_path = prepare_project(directory)
 
     env_file = directory / ENV_FILE
+    api_keys: Dict[str, str] = {}
     if hosted_mode.enabled:
         # No key is looked for and none is used: a key found here would be the
-        # owner's, and a public demo must never spend it.
+        # owner's, and a public demo must never spend it. The demo never
+        # writes the environment, so it cannot drop one; it refuses to start.
+        exported = keys_in_environment()
+        if exported:
+            print_error(f"Hosted mode holds no key of its own, but {' and '.join(exported)} is set: every "
+                        "visitor would spend it. Unset it and start again.")
+            raise SystemExit(1)
         resolved_key, key_source = None, "none"
     else:
         resolved_key, key_source = resolve_api_key(api_key, env_file)
-    if resolved_key and key_source != "environment":
-        # A key already exported by the user stays under the variable they
-        # chose; one from the flag or from the file is placed by its own shape.
-        os.environ[env_var_for_key(resolved_key)] = resolved_key
-    if not hosted_mode.enabled:
-        # Every other key saved in .env too: a node the settings panel put on
-        # another provider reads that provider's key. A key already set wins.
+        # The keys saved in .env: a node the settings panel put on another
+        # provider reads that provider's key. A key already set wins.
         load_env_file(config_path)
+    if key_source == "flag":
+        # The flag beats an exported key, so it travels in the engine's LLM
+        # config as a value rather than through the environment.
+        api_keys[provider_for_key(resolved_key)] = resolved_key
 
-    mode = "hosted" if hosted_mode.enabled else detect_llm_mode()
+    mode = "hosted" if hosted_mode.enabled else detect_llm_mode(resolved_key)
     # A reachable Ollama makes the mode "live" but gives recording nothing to
     # proxy through, so --record asks for a key directly rather than for a mode.
     if record and not resolved_key:
@@ -466,10 +489,6 @@ def demo_command(
         # visitor's key moves the client to their own provider per request
         # (``LLMRegistry._for_key``) and is stored nowhere.
         _point_llm_config_at(directory, None, provider="openai")
-        # Whatever the host exported, the server runs with no key of its own,
-        # so a bug cannot quietly fall back to the owner's.
-        for name in PROVIDER_KEYS:
-            os.environ.pop(name, None)
         # A visitor with no key is served the packaged recordings for the
         # guided questions they cover, from a replay server on loopback that
         # only this process can reach. Every other keyless question is a
@@ -504,8 +523,7 @@ def demo_command(
     else:
         provider = live_provider(resolved_key, key_source)
         configured = _default_provider(directory)
-        if key_source == "env-file" and configured in KEYED_PROVIDERS and os.environ.get(
-                env_var_for_provider(configured)):
+        if key_source == "env-file" and configured in KEYED_PROVIDERS and api_key_from_env(configured):
             # Several keys saved: the default stays on the provider it was set to.
             provider = configured
         _point_llm_config_at(directory, None, provider=provider)
@@ -520,7 +538,7 @@ def demo_command(
     # A plan served from the plan cache makes no planner call, so a recording
     # run turns it off: nothing would be recorded for replay to answer with.
     try:
-        engine = start_engine(config_path, plan_cache=not record, require_index=record)
+        engine = start_engine(config_path, plan_cache=not record, require_index=record, api_keys=api_keys)
     except SystemExit:
         for server in (proxy, replay_server):
             if server is not None:
@@ -549,6 +567,7 @@ def demo_command(
         recorded_questions=recorded_questions,
         questions_by_datasource=DEMO_QUESTIONS_BY_DATASOURCE,
         replay=local_replay,
+        api_keys=api_keys,
     )
     url = f"http://{host}:{port}/"
     print_success(f"Playground ready at {url}")

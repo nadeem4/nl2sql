@@ -39,7 +39,6 @@ dependencies = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-exporter-otlp>=1.20.0",
     "sqlglot>=23.0.0",
-    "pydantic-settings>=2.0.0",
     # For the parquet artifact store. The engine never imports it and polars
     # reads and writes local parquet without it; it stays until the remote
     # (s3/abfs) artifact store, which no test exercises, is shown not to need it.
@@ -51,7 +50,8 @@ dependencies = [
     "rich>=13.0.0",
     # typer no longer has an [all] extra; asking for it only warns.
     "typer>=0.9.0",
-    # cli/commands/demo.py and cli/demo/manager.py read .env files directly.
+    # nl2sql.config.load_env_file loads the .env next to nl2sql.yaml for the
+    # entry points, and cli/commands/demo.py reads the demo's .env directly.
     "python-dotenv>=1.0.0",
     "inquirerpy>=0.3.4",
     # cli/main.py and cli/commands/policy.py import it directly; it used to

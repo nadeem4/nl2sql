@@ -201,7 +201,9 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   is Anthropic and is stored as `ANTHROPIC_API_KEY` with `provider: anthropic`,
   model `claude-opus-5` and `temperature: null` (install
   `nl2sql-engine[anthropic]`); anything else is OpenAI. `llm.yaml` names no
-  key, so the provider's own variable is read. `.env` is covered by
+  key: the running engine is given it in memory, ahead of any key exported
+  for the same provider, and later runs read it from `.env`. The process
+  environment is never written. `.env` is covered by
   `.gitignore`, but a key passed on the command line is visible in shell
   history and to `ps`, so the environment variable remains the more private
   route.
@@ -217,7 +219,8 @@ This covers the embedding step only. The demo is **not** key-free end to end:
 Sharing the demo with other people is the one case where none of this applies:
 `nl2sql demo --hosted` serves the playground with **no key on the server at
 all**, and each visitor pastes their own into the page; a visitor without one
-can replay the guided questions from recorded runs. See
+can replay the guided questions from recorded runs. It refuses to start when
+`OPENAI_API_KEY`, `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY` is set. See
 [Hosted demo](../deployment/hosted-demo.md).
 
 Each project keeps its index under its own `storage.path` (the demo's is
@@ -440,7 +443,8 @@ second settings store, and the browser keeps nothing but UI conveniences.
   running demo switches from replay to live **without a restart**: questions
   already running finish on the model client they started with, then the
   engine's LLM clients are rebuilt from the project's `nl2sql.yaml` (its
-  `llm.yaml`). Keys are
+  `llm.yaml`), with the saved key given to them in memory rather than through
+  the environment. Keys are
   write-only: no response, log line, trace or error carries one, only a masked
   form such as `sk-...4f2a` per provider. On a later start the precedence above
   still holds, so `--api-key` or a key exported in your shell wins over a saved

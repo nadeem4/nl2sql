@@ -288,7 +288,6 @@ DIALECT_ONLY_SQL = re.compile(
 DIALECT_NAME_EXCEPTIONS = {
     "nl2sql/src/nl2sql/schema/store.py",
     "nl2sql/src/nl2sql/schema/sqlite_store.py",
-    "nl2sql/src/nl2sql/common/settings.py",
     "nl2sql/src/nl2sql/aggregation/engines/polars_duckdb.py",
 }
 
@@ -442,7 +441,6 @@ def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
 # and why. Everything else comes from the top-level ``nl2sql``. The list only
 # shrinks: nl2sql-api gets none of it.
 STILL_IMPORTED_FROM_INSIDE = {
-    "nl2sql.common.settings": "the playground reads the settings global until PR 13 deletes it",
     "nl2sql.llm.providers": "provider knowledge the CLI reads from the engine: labels, verified models, "
                             "the key shape (CLAUDE.md)",
     "nl2sql.llm.request_key": "the hosted demo's per-request keys, until Phase 4 moves the web app onto "
@@ -603,17 +601,6 @@ def test_aggregation_never_imports_the_pipeline():
 
 PROVIDER_KEY_VARIABLE = re.compile(r"^[A-Z0-9]+_API_KEY$")
 
-KEY_READER_EXCEPTIONS = {
-    # The embedding provider is a separate axis from the chat LLM:
-    # EMBEDDING_PROVIDER picks it, and openai is one of its two values.
-    "nl2sql/src/nl2sql/indexing/embeddings.py",
-    # `demo --record` puts a recording proxy in front of the real provider and
-    # points the config at it as `provider="openai"`, so the key the client
-    # library looks for is OPENAI_API_KEY whatever the upstream was.
-    "nl2sql/src/nl2sql/cli/commands/demo.py",
-}
-
-
 def _environment_reads(path: pathlib.Path):
     """Yield ``(lineno, name)`` for every read of ``os.environ``/``os.getenv``."""
     for node in ast.walk(_tree(path)):
@@ -630,14 +617,13 @@ def _environment_reads(path: pathlib.Path):
 def test_every_provider_key_variable_is_read_through_the_llm_presets():
     """One table maps a provider to its key variable: PROVIDER_PRESETS in llm/registry.py.
 
-    ``common.settings.openai_api_key`` binds ``OPENAI_API_KEY`` as a pydantic
-    validation alias rather than reading it, and is the declared settings
-    surface; everything else that needs a key reads the preset.
+    Everything that needs a key -- the embeddings providers, the demo, the
+    settings panel -- asks ``nl2sql.llm.providers`` for it.
     """
     offenders = [
         f"{_where(path)}:{lineno} {name}"
         for path in python_files(*SOURCES)
-        if not path.is_relative_to(ENGINE / "llm") and _where(path) not in KEY_READER_EXCEPTIONS
+        if not path.is_relative_to(ENGINE / "llm")
         for lineno, name in _environment_reads(path)
         if PROVIDER_KEY_VARIABLE.match(name)
     ]
@@ -649,33 +635,117 @@ def test_every_provider_key_variable_is_read_through_the_llm_presets():
 
 
 # --------------------------------------------------------------------------
-# 12. The settings global is going away: the ratchet
+# 12. No process globals: the environment is read from an allow-list and
+#     never written (docs/architecture/configuration_v2.md, sections 3 and 8)
 # --------------------------------------------------------------------------
 
-# Every module that still imports the process-global ``nl2sql.common.settings``.
-# The engine copies its config into the global until these move onto the
-# runtime's ``ctx.settings`` (docs/architecture/configuration_v2.md, section 8,
-# "Staging it"). This list may only shrink: take a module off it when it stops
-# importing the global, and never add one. PR 13 deletes the global and this test.
-READS_THE_SETTINGS_GLOBAL = {
-    "nl2sql.cli.demo.playground.app",
-    "nl2sql.runtime",
+# Where ``os.environ``/``os.getenv`` may be read, and why. A folder entry ends
+# in "/". Anything else is configuration, and is written in nl2sql.yaml, as
+# ``${env:VAR}`` where it should come from the environment.
+READS_THE_ENVIRONMENT = {
+    "nl2sql/src/nl2sql/config/": "NL2SQL_CONFIG, and ${env:...} references",
+    "nl2sql/src/nl2sql/llm/": "the provider key variables, through PROVIDER_PRESETS",
+    "nl2sql/src/nl2sql/secrets/providers/env.py": "the env secret provider: ${env:...}",
+    "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL",
+    "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
+    "nl2sql/src/nl2sql/cli/commands/benchmark.py": "CI detection, not configuration",
 }
 
+# The one function that loads a .env file, and the entry points that call it.
+LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
+ENTRY_POINTS_LOADING_DOTENV = {
+    "nl2sql/src/nl2sql/cli/main.py",
+    "nl2sql/src/nl2sql/cli/commands/demo.py",
+    "api/src/nl2sql_api/main.py",
+}
 
-def _reads_the_settings_global(path: pathlib.Path) -> bool:
-    return any(imported == "nl2sql.common.settings" or imported.startswith("nl2sql.common.settings.")
-               for _, imported, _ in imports(path))
+_ENVIRON_WRITERS = {"pop", "popitem", "setdefault", "update", "clear", "__setitem__", "__delitem__"}
 
 
-def test_the_modules_reading_the_settings_global_only_shrink():
-    readers = {_module_name(path, _root_of(path)) for path in python_files(*SOURCES)
-               if _reads_the_settings_global(path)}
-    added = sorted(readers - READS_THE_SETTINGS_GLOBAL)
-    assert not added, _broke(
-        "No new module may import the process-global nl2sql.common.settings. Read the value "
-        "from the runtime (ctx.settings, the Settings section of the engine's Config) or take "
-        "it as a parameter.", added)
-    gone = sorted(READS_THE_SETTINGS_GLOBAL - readers)
-    assert not gone, (f"These modules no longer import the settings global; take them off "
-                      f"READS_THE_SETTINGS_GLOBAL so the list keeps shrinking: {gone}")
+def _is_environ(node: ast.AST) -> bool:
+    return ast.unparse(node) in {"os.environ", "environ"}
+
+
+def _environment_writes(path: pathlib.Path):
+    """Yield ``(lineno, what)`` for every write to the process environment."""
+    for node in ast.walk(_tree(path)):
+        targets = []
+        if isinstance(node, (ast.Assign, ast.Delete)):
+            targets = node.targets
+        elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+            targets = [node.target]
+        for target in targets:
+            if isinstance(target, ast.Subscript) and _is_environ(target.value):
+                yield node.lineno, ast.unparse(target)
+            elif _is_environ(target):
+                yield node.lineno, "os.environ = ..."
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr in _ENVIRON_WRITERS and _is_environ(func.value):
+                yield node.lineno, ast.unparse(func)
+            elif ast.unparse(func) in {"os.putenv", "os.unsetenv", "putenv", "unsetenv"}:
+                yield node.lineno, ast.unparse(func)
+            elif ast.unparse(func).endswith("load_dotenv") and _where(path) != LOADS_DOTENV:
+                yield node.lineno, ast.unparse(func)
+
+
+def _environment_access(path: pathlib.Path):
+    """Yield ``(lineno, what)`` for every use of ``os.environ`` or ``os.getenv``."""
+    for node in ast.walk(_tree(path)):
+        if isinstance(node, ast.Attribute) and ast.unparse(node) in {"os.environ", "os.getenv", "os.environb",
+                                                                       "os.getenvb"}:
+            yield node.lineno, ast.unparse(node)
+        elif isinstance(node, ast.ImportFrom) and node.module == "os":
+            for alias in node.names:
+                if alias.name in {"environ", "getenv", "environb", "getenvb", "putenv", "unsetenv"}:
+                    yield node.lineno, f"from os import {alias.name}"
+
+
+def _may_read_the_environment(path: pathlib.Path) -> bool:
+    where = _where(path)
+    return any(where.startswith(allowed) if allowed.endswith("/") else where == allowed
+               for allowed in READS_THE_ENVIRONMENT)
+
+
+def test_no_module_writes_the_environment():
+    offenders = [f"{_where(path)}:{lineno} {what}"
+                 for path in python_files(*SOURCES)
+                 for lineno, what in _environment_writes(path)]
+    assert not offenders, _broke(
+        "No module writes the process environment: no os.environ assignment, pop or update, no "
+        "os.putenv, no load_dotenv outside nl2sql.config.load_env_file. Keys and options travel in "
+        "the engine's Config, so two engines in one process share nothing.", offenders)
+
+
+def test_environment_reads_only_from_the_allow_list():
+    offenders = [f"{_where(path)}:{lineno} {what}"
+                 for path in python_files(*SOURCES) if not _may_read_the_environment(path)
+                 for lineno, what in _environment_access(path)]
+    assert not offenders, _broke(
+        "The environment is read only for NL2SQL_CONFIG (nl2sql/config/), NL2SQL_LOG_LEVEL "
+        "(configure_logging), the provider key variables (nl2sql/llm/), ${env:...} references, "
+        "the trace redactor and CI detection. Anything else is configuration: put it in "
+        "nl2sql.yaml, as ${env:VAR} if it should come from the environment.", offenders)
+
+
+def test_only_entry_points_load_dotenv():
+    loaders, callers = [], []
+    for path in python_files(*SOURCES):
+        for node in ast.walk(_tree(path)):
+            if not isinstance(node, ast.Call):
+                continue
+            name = ast.unparse(node.func).rpartition(".")[2]
+            if name == "load_dotenv" and _where(path) != LOADS_DOTENV:
+                loaders.append(f"{_where(path)}:{node.lineno} load_dotenv")
+            elif name == "load_env_file" and _where(path) not in ENTRY_POINTS_LOADING_DOTENV:
+                callers.append(f"{_where(path)}:{node.lineno} load_env_file")
+    assert not loaders + callers, _broke(
+        "Only the entry points -- the CLI, nl2sql demo and nl2sql-api -- load a .env file, through "
+        "nl2sql.config.load_env_file, the one place that calls load_dotenv. The library never "
+        "reads a .env file; a Python caller who wants one loads it before NL2SQL.from_config().",
+        loaders + callers)
+
+
+def test_the_settings_global_is_gone():
+    assert not (ENGINE / "common" / "settings.py").exists()
+    assert not (ENGINE / "common" / "env_hint.py").exists()

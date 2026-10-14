@@ -147,7 +147,7 @@ None are required. The image's command and the demo's config set them all:
 
 **Never add an API key as a Space secret.** The whole point of hosted mode is
 that the server has none; a key here would be spent by every visitor, and
-`nl2sql demo --hosted` clears any provider key in its environment at start-up
+`nl2sql demo --hosted` refuses to start when a provider key variable is set
 rather than use it.
 
 ## Testing the same image locally

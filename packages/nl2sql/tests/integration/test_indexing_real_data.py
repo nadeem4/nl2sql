@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 import yaml
 
-from nl2sql.common.settings import settings
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_demo_config
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
@@ -31,11 +30,6 @@ def test_indexing_real_embeddings_and_versions(tmp_path, monkeypatch) -> None:
     root = _project_root()
 
     collection_name = f"itest_indexing_{uuid.uuid4().hex}"
-    vector_store_path = tmp_path / "chroma"
-    schema_store_path = tmp_path / "schema_store.db"
-    monkeypatch.setattr(settings, "vector_store_path", str(vector_store_path))
-    monkeypatch.setattr(settings, "schema_store_path", str(schema_store_path))
-    monkeypatch.setattr(settings, "schema_store_max_versions", 3)
 
     ctx = Runtime.from_config(make_demo_config(tmp_path))
     orchestrator = IndexingOrchestrator(ctx)

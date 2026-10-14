@@ -62,12 +62,12 @@ executed is therefore **pinned** and reused
   `engine.llm.replace` a plan written by the old model is never served. Its
   entries stay, and swapping back hits them again
   ([LLM configuration → Replacing the LLM at runtime](../configuration/llm.md#replacing-the-llm-at-runtime)).
-- **The run date.** The planner is told today's date (`NL2SQL_TODAY`, else the
+- **The run date.** The planner is told today's date (`settings.pipeline.today`, else the
   UTC date) and writes "this year" or "the last 30 days" as literal dates, so a
   plan made yesterday would answer for yesterday's window. Every entry is keyed
   on the run date, date-relative or not, because nothing in the intent or the
   plan says reliably which answers depend on today. A plan is therefore reused
-  for the rest of the day it was made, or for as long as `NL2SQL_TODAY` pins
+  for the rest of the day it was made, or for as long as `settings.pipeline.today` pins
   the date.
 - **Invalidation.** Automatic through the schema version: a re-index with a
   changed schema registers a new version, which misses. A new day misses too. Plans for a version the

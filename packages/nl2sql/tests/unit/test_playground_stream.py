@@ -43,6 +43,12 @@ class _Engine(NL2SQL):
     def datasources(self):
         return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
+    @property
+    def config(self):
+        from nl2sql.config import demo_config
+
+        return demo_config()
+
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                   cancellation_token=None):
         self.seen.append(("run", current_api_key(), user_context.roles))
