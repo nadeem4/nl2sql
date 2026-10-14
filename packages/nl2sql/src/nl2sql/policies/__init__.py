@@ -2,7 +2,7 @@
 
 Nothing outside this package matches a policy pattern.
 """
-from .models import UserContext
+from nl2sql_sdk.policy import UserContext
 from .patterns import matching_datasources
 from .scope import PolicyEngine, Scope
 

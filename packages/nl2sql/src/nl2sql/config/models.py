@@ -268,13 +268,32 @@ class Role(_Model):
 
 
 class Policies(_Model):
-    """Who may read what. ``{allow_all: true}`` is a complete section."""
+    """Who may read what. ``{allow_all: true}`` is a complete section.
+
+    ``check`` is an optional policy check: a ``PolicyCheckConfig``
+    (``{type: ..., <its keys>}``) naming a registered one, or a check object,
+    used as given. What it grants is intersected with the roles; with
+    ``allow_all`` the check alone decides.
+    """
 
     allow_all: bool = False
     default_role: Optional[str] = None
     admin_roles: List[str] = Field(default_factory=lambda: ["admin"])
     refusal_names_tables: bool = False
     roles: Dict[str, Role] = Field(default_factory=dict)
+    check: Any = None  # a PolicyCheckConfig or a check object
+
+    @field_validator("check", mode="before")
+    @classmethod
+    def _check(cls, value: Any) -> Any:
+        if value is None or isinstance(value, PolicyCheckConfig):
+            return value
+        if isinstance(value, dict):
+            return PolicyCheckConfig(**value)
+        if isinstance(value, (str, list)) or not callable(getattr(value, "grant", None)):
+            raise ValueError("check takes a mapping with a 'type' key, such as {type: corp_iam}, "
+                             "or a policy check object (one with a grant method)")
+        return value
 
     @model_validator(mode="after")
     def _allow_all_stands_alone(self) -> "Policies":
@@ -315,6 +334,10 @@ class _PluginBlock(BaseModel):
         # prints; a reference, and every other setting, does.
         for key, value in super().__repr_args__():
             yield key, masked(value) if is_secret_key(key) else value
+
+
+class PolicyCheckConfig(_PluginBlock):
+    """A policy check, by name: ``PolicyCheckConfig(type="corp_iam", url=...)``. The check's ``config_model`` checks the other keys."""
 
 
 class StoreConfig(_PluginBlock):

@@ -39,7 +39,8 @@ known one is ignored, and the known role's permissions still apply.
 ## Hidden tables and strict refusal
 
 Every access decision asks one `Scope`: what the caller may read in one
-datasource, from the roles' allow and deny patterns (see
+datasource, from the roles' allow and deny patterns and, when one is
+configured, a policy check's grant (see
 [Policies](../configuration/policies.md)). A run builds each datasource's
 scope once, so every step decides the same way.
 
@@ -85,6 +86,12 @@ user who produced it is left to a multi-user deployment.
   `PolicyEngine` into a `Scope`. A role allows and denies tables with
   patterns over `datasource.schema.table` (each part a glob, case ignored) —
   nothing finer. There is no column masking and no row-level security.
+- **Policy check** (optional): a plugin that asks an outside service (IAM,
+  OPA, Cedar) what the caller may read, once per caller and datasource per
+  run. Its grant is intersected with the roles, so neither can widen the
+  other, and it **fails closed**: an exception denies the datasource for the
+  run and is logged with the check's name. See
+  [A policy check](../configuration/policies.md#a-policy-check).
 - **Logical validation** enforces schema constraints and policy-based table access.
 - **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
   (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
@@ -108,6 +115,7 @@ the engine a read-only database user.**
 ```mermaid
 flowchart TD
     User[UserContext] --> Scope[PolicyEngine.scope]
+    Check[PolicyCheck.grant, optional] --> Scope
     Scope --> Retriever[SchemaRetrieverNode: hides denied tables]
     Scope --> Validator[LogicalValidatorNode: refuses denied tables]
     Validator --> Executor[ExecutorNode]
@@ -127,6 +135,8 @@ flowchart TD
 - Deny beats allow within a role; across roles a table is readable when some
   role allows it and that same role does not deny it.
 - If no datasource ID is present, validation fails closed.
+- With a policy check, a table must also be allowed, and not denied, by the
+  check's grant; a check that failed allows nothing in that datasource.
 - An unknown role, or no role, allows nothing and is refused like any denial.
 - One `SECURITY_VIOLATION` per forbidden table, with the generic message unless
   `policies.refusal_names_tables` is set, and `details` naming the table, the
@@ -138,7 +148,8 @@ Validation rules are enforced by `LogicalValidatorNode` and documented in `../ar
 
 ## Source references
 
-- Policies: `packages/nl2sql/src/nl2sql/policies/` (`scope.py`, `patterns.py`)
+- Policies: `packages/nl2sql/src/nl2sql/policies/` (`scope.py`, `patterns.py`, `check.py`)
+- The policy check contract: `packages/sdk/src/nl2sql_sdk/policy.py`
 - Validator node: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
 - Hiding denied tables: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
 - Audit logger: `packages/nl2sql/src/nl2sql/common/event_logger.py`
