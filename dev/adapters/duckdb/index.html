@@ -4742,15 +4742,19 @@
 <p>This adapter extends <code>SQLAlchemyAdapter</code>. It overrides <code>build_engine()</code> to
 open a file with <code>read_only=True</code> and to enforce <code>limits.timeout_ms</code>: DuckDB
 runs in-process and has no statement timeout setting, so the adapter
-interrupts a statement that runs too long.</p>
+interrupts a statement that runs too long. It overrides <code>schema_names()</code>
+and <code>reflect()</code> to read DuckDB's own catalog (see below).</p>
 </div>
 <h2 id="installation">Installation</h2>
 <p>The SQLAlchemy dialect lives in <code>duckdb-engine</code>, which ships in its own extra:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[duckdb]"</span>
 </code></pre></div>
-<p>The extra keeps SQLAlchemy below 2.1: <code>duckdb-engine</code> reads a schema with
-SQLAlchemy's PostgreSQL reflection, which from 2.1 queries
-<code>pg_catalog.pg_collation</code>, a table DuckDB does not have.</p>
+<p>The adapter reads a schema from DuckDB's own catalog (<code>duckdb_schemas()</code>,
+<code>duckdb_tables()</code>, <code>duckdb_views()</code>, <code>duckdb_columns()</code> and
+<code>duckdb_constraints()</code>) rather than through <code>duckdb-engine</code>'s reflection,
+which reuses SQLAlchemy's PostgreSQL reflection and queries <code>pg_catalog</code>
+tables DuckDB does not have. A column's type is DuckDB's own name:
+<code>DECIMAL(10,2)</code>, <code>VARCHAR[]</code>, <code>JSON</code>.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>duckdb</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># datasources/warehouse.yaml</span>

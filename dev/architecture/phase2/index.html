@@ -5282,7 +5282,9 @@ misclassified refusals, fixed in the base: MySQL's "command denied"
 (SQLSTATE 42000) and DuckDB's write to a read-only file were both
 <code>retryable</code>. It also found that SQLAlchemy 2.1 breaks every DuckDB
 snapshot (<code>duckdb-engine</code> inherits PostgreSQL reflection, which now
-queries <code>pg_collation</code>), so the <code>duckdb</code> extra keeps SQLAlchemy below 2.1.</p>
+queries <code>pg_collation</code>). The DuckDB adapter now reads DuckDB's own
+catalog through the base's <code>schema_names</code> and <code>reflect</code> hooks, so it
+runs on SQLAlchemy 2.1.</p>
 </div>
 <h3 id="enginedatasources-the-methods-behind-connect-a-database"><code>engine.datasources</code>: the methods behind Connect a database</h3>
 <div class="admonition note">

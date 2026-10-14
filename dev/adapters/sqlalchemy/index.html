@@ -2322,6 +2322,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#schema_namesconn-liststr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema_names(conn) -&gt; list[str]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reflectconn-schema-wants_table-issues-dictstr-reflectedtable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reflect(conn, schema, wants_table, issues) -&gt; dict[str, ReflectedTable]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#row_estimatesconn-schema-dictstr-int-none" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4926,6 +4948,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#schema_namesconn-liststr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema_names(conn) -&gt; list[str]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reflectconn-schema-wants_table-issues-dictstr-reflectedtable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reflect(conn, schema, wants_table, issues) -&gt; dict[str, ReflectedTable]
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#row_estimatesconn-schema-dictstr-int-none" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5166,12 +5210,12 @@ has no server to protect: the SQLite and DuckDB connections are plain
 <h3 id="reading-a-schema">Reading a schema</h3>
 <p><code>fetch_schema_snapshot(scope, on_table=None)</code>:</p>
 <ol>
-<li><strong>The scope first.</strong> The database's schemas are listed, and a schema in
+<li><strong>The scope first.</strong> The database's schemas are listed (<code>schema_names</code>), and a schema in
    <code>system_schemas()</code> or one the scope does not want (<code>scope.wants_schema</code>) is
    dropped before any query names it. So is a table the scope does not want.
    An excluded schema costs nothing.</li>
-<li><strong>Reflect once.</strong> Each remaining schema is reflected with
-   <code>inspector.get_multi_columns</code>, <code>get_multi_pk_constraint</code>,
+<li><strong>Reflect once.</strong> Each remaining schema is read by <code>reflect</code>, by default
+   with <code>inspector.get_multi_columns</code>, <code>get_multi_pk_constraint</code>,
    <code>get_multi_foreign_keys</code> and <code>get_multi_table_comment</code>, for the wanted
    tables and views together. A dialect whose multi-table reflection fails is
    read one table at a time; a table that still cannot be read is an issue
@@ -5250,6 +5294,22 @@ ignoring case. The default is none. The built-ins: PostgreSQL <code>pg_catalog</
 and <code>information_schema</code>; MySQL <code>mysql</code>, <code>information_schema</code>,
 <code>performance_schema</code> and <code>sys</code>; SQL Server <code>sys</code> and <code>INFORMATION_SCHEMA</code>;
 DuckDB its <code>system</code> and <code>temp</code> catalogs.</p>
+<h4 id="schema_namesconn-liststr"><code>schema_names(conn) -&gt; list[str]</code></h4>
+<p>The database's schemas, as <code>fetch_schema_snapshot</code> lists them and
+<code>test_connection</code> checks it can. The default asks SQLAlchemy's inspector
+(<code>get_schema_names()</code>).</p>
+<h4 id="reflectconn-schema-wants_table-issues-dictstr-reflectedtable"><code>reflect(conn, schema, wants_table, issues) -&gt; dict[str, ReflectedTable]</code></h4>
+<p>Each table and view of <code>schema</code> that <code>wants_table(name)</code> accepts, keyed by
+name. A <code>ReflectedTable</code> (from <code>nl2sql_sdk.sqlalchemy</code>) holds <code>columns</code>
+(dicts with <code>name</code>, <code>type</code>, and optionally <code>nullable</code> and <code>comment</code>; <code>type</code>
+is a SQLAlchemy type or the database's own type name), <code>primary_key</code> (the
+column names), <code>foreign_keys</code> (<code>ForeignKeyContract</code>s) and <code>comment</code>. A table
+that cannot be read is an <code>IndexIssue</code> appended to <code>issues</code>. The default
+reflects with SQLAlchemy's inspector, as described above. Override it, with
+<code>schema_names</code>, when the dialect's reflection does not work on the database:
+DuckDB reads <code>duckdb_tables()</code>, <code>duckdb_views()</code>, <code>duckdb_columns()</code> and
+<code>duckdb_constraints()</code>, because <code>duckdb-engine</code> reuses PostgreSQL reflection,
+which queries <code>pg_catalog</code> tables DuckDB lacks.</p>
 <h4 id="row_estimatesconn-schema-dictstr-int-none"><code>row_estimates(conn, schema) -&gt; dict[str, int] | None</code></h4>
 <p>The catalog's row count of each table in <code>schema</code>, read from the database's
 statistics and never by counting. The default is <code>None</code>: the database keeps
@@ -5285,7 +5345,7 @@ none. A table left out of the dictionary has no estimate.</p>
 </tbody>
 </table>
 <h4 id="column_profilesa_type-columnprofile"><code>column_profile(sa_type) -&gt; ColumnProfile</code></h4>
-<p>What a column of the reflected SQLAlchemy type gets under <code>profile: stats</code>:
+<p>What a column of the reflected type gets under <code>profile: stats</code>:
 <code>ColumnProfile(min_max, distinct, values)</code>. Its null share is always read, and
 <code>values</code> is only a permission: the scope's <code>sample_values</code> must be on too. The
 default, <code>nl2sql_sdk.sqlalchemy.column_profile</code>:</p>
