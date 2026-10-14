@@ -76,7 +76,7 @@ jobs:
           pip install -e packages/sdk -e "packages/nl2sql[postgres,mysql,mssql,duckdb]" pytest pytest-randomly
 
       - name: Run the realdb tests
-        run: pytest -m realdb
+        run: pytest -m realdb packages/nl2sql/tests/realdb
 
       - name: Show the test bed's logs
         if: failure()
