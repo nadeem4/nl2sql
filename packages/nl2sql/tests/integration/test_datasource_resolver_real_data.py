@@ -191,7 +191,11 @@ def _build_schema_mismatch_context(indexed_env, tmp_path: Path) -> tuple[Runtime
 
     # The indexed environment's index, with this datasource's own schema store.
     stores = indexed_env.ctx.stores._replace(state=tmp_path / "schema_store.db")
-    ctx = _use_fake_judge(Runtime.from_config(make_demo_config(tmp_path, datasources=[base_ds]), stores=stores))
+    # A second datasource, so the resolver runs its vector search: the schema
+    # version mismatch is between an index entry and the store, and with one
+    # datasource no index entry is read.
+    datasources = [base_ds, {**base_ds, "id": "chinook_copy"}]
+    ctx = _use_fake_judge(Runtime.from_config(make_demo_config(tmp_path, datasources=datasources), stores=stores))
 
     adapter = ctx.ds_registry.get_adapter("chinook")
     snapshot = adapter.fetch_schema_snapshot()

@@ -88,7 +88,7 @@ def test_the_playground_pages_and_exports_the_whole_result(demo_project, fake_ll
     server, env = fake_llm(RULES)
     _env(monkeypatch, demo_project, env)
     try:
-        app = build_app(NL2SQL(), questions=[], roles=["admin"], mode="live", dataset="chinook")
+        app = build_app(NL2SQL._legacy(), questions=[], roles=["admin"], mode="live", dataset="chinook")
         client = TestClient(app)
         body = client.post("/api/ask", json={"question": QUESTION, "role": "admin"}).json()
         assert body["status"] == "success", body["errors"]

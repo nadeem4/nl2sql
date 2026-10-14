@@ -41,7 +41,7 @@ def _client(demo_project, fake_llm, monkeypatch, rules):
     server, env = fake_llm(rules)
     env["CURATED_ENABLED"] = "true"  # the demo's own file, from .env.demo
     _env(monkeypatch, demo_project, env)
-    app = build_app(NL2SQL(), questions=[], roles=["admin"], mode="live", dataset="chinook")
+    app = build_app(NL2SQL._legacy(), questions=[], roles=["admin"], mode="live", dataset="chinook")
     return server, TestClient(app)
 
 

@@ -58,7 +58,7 @@ def test_after_cache_clear_the_playground_reports_a_planner_call(demo_project, t
     monkeypatch.setattr(settings, "plan_cache_enabled", True)
 
     try:
-        engine = NL2SQL()
+        engine = NL2SQL._legacy()
         app = build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook",
                         project_dir=project, host="127.0.0.1")
         client = TestClient(app, base_url="http://127.0.0.1:8765")

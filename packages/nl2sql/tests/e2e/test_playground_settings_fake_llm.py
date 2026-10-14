@@ -46,7 +46,7 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
     reload_settings()
 
     try:
-        engine = NL2SQL()
+        engine = NL2SQL._legacy()
         app = build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook",
                         project_dir=project, host="127.0.0.1")
         client = TestClient(app, base_url="http://127.0.0.1:8765")

@@ -59,7 +59,7 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
     reload_settings()
 
     try:
-        engine = NL2SQL()
+        engine = NL2SQL._legacy()
         app = build_app(engine, questions=[QUESTION], roles=["admin"], mode="hosted",
                         dataset="chinook", trace_dir=project / "traces", project_dir=project,
                         host="0.0.0.0", hosted=Hosted(enabled=True))
@@ -143,7 +143,7 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
     reload_settings()
 
     try:
-        engine = NL2SQL()
+        engine = NL2SQL._legacy()
         app = build_app(engine, questions=[QUESTION], roles=["admin"], mode="hosted",
                         dataset="chinook", trace_dir=project / "traces", project_dir=project,
                         host="0.0.0.0", hosted=Hosted(enabled=True))
