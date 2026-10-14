@@ -13,9 +13,14 @@ from nl2sql import NL2SQL
 from nl2sql.datasources.models import ConnectionConfig, DatasourceConfig
 from nl2sql.datasources.registry import DatasourceRegistry
 from nl2sql.secrets import SecretManager
+from nl2sql.testing import adapter_registry
 
 
 class _StubAdapter:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
         self.datasource_id = datasource_id
         self.datasource_engine_type = datasource_engine_type
@@ -30,8 +35,7 @@ class _StubAdapter:
 
 @pytest.fixture
 def registry(monkeypatch):
-    monkeypatch.setattr("nl2sql.datasources.registry.discover_adapters", lambda: {"stub": _StubAdapter})
-    return DatasourceRegistry(SecretManager())
+    return DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
 
 
 def _good(ds_id="good"):

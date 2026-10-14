@@ -8,9 +8,14 @@ from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
 from nl2sql.secrets.manager import SecretManager
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql.testing import adapter_registry
 
 
 class FakeAdapter:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     def __init__(self, capabilities):
         self._capabilities = capabilities
 
@@ -26,8 +31,7 @@ class FakeAdapter:
 
 def _ctx(adapters, monkeypatch):
     # A real registry, so the node goes through its one capability check.
-    monkeypatch.setattr("nl2sql.datasources.registry.discover_adapters", lambda: dict(adapters))
-    registry = DatasourceRegistry(SecretManager())
+    registry = DatasourceRegistry(SecretManager(), adapter_registry(dict(adapters)))
     for ds_id in adapters:
         registry.register_datasource(DatasourceConfig(id=ds_id, connection=ConnectionConfig(type=ds_id)))
     return SimpleNamespace(ds_registry=registry, tenant_id="t1")

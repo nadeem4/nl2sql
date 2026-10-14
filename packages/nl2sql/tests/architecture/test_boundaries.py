@@ -457,11 +457,12 @@ FORBIDDEN_AT_IMPORT = ("chromadb", "onnxruntime", "sqlalchemy", "psycopg2", "psy
 IMPORT_BUDGET_US = 500_000
 
 
-def test_importing_nl2sql_loads_no_heavy_library():
-    loaded = _run("import sys, nl2sql; "
+@pytest.mark.parametrize("statement", ["import nl2sql", "from nl2sql import Registry; Registry.default()"])
+def test_importing_nl2sql_loads_no_heavy_library(statement):
+    loaded = _run(f"import sys; {statement}; "
                   f"print(sorted({{m.split('.')[0] for m in sys.modules}} & set({FORBIDDEN_AT_IMPORT!r})))")
     assert loaded == "[]", (
-        f"import nl2sql loaded {loaded}. Import heavy libraries where they are used, "
+        f"{statement} loaded {loaded}. Import heavy libraries where they are used, "
         f"not at module scope on the import path of nl2sql. The rule is in {RULES}.")
 
 

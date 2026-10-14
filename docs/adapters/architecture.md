@@ -1,14 +1,14 @@
 # Plugin / Adapter Architecture
 
-Adapters integrate NL2SQL with external datasources. Each adapter implements a **protocol contract**, is discovered via **Python entry points**, and is registered in the `DatasourceRegistry`.
+Adapters integrate NL2SQL with external datasources. Each adapter implements a **protocol contract**, is found by name in the **registry** (`nl2sql.registry`, built from Python entry points), and is registered in the `DatasourceRegistry`.
 
 ## Discovery and registration
 
 ```mermaid
 flowchart TD
     Config[configs/datasources.yaml] --> Registry[DatasourceRegistry]
-    Registry --> Discovery[discover_adapters()]
-    Discovery --> EntryPoints[entry_points('nl2sql.adapters')]
+    Registry --> Lookup["Registry.load('adapter', type)"]
+    Lookup --> EntryPoints["nl2sql.adapters entry points, or a class registered in code"]
     EntryPoints --> AdapterClass[Adapter Class]
     AdapterClass --> AdapterInstance[DatasourceAdapterProtocol instance]
 ```
@@ -66,12 +66,12 @@ The control graph can resolve multiple datasources for a single user query. `Dec
 To add a new adapter:
 
 1. Implement `DatasourceAdapterProtocol` (or extend a base adapter).
-2. Publish the adapter class as an `nl2sql.adapters` entry point.
+2. Publish the adapter class as an `nl2sql.adapters` entry point, or register it in code (see [Adding a New Adapter](../extensions/add-adapter.md)).
 3. Configure the datasource in `configs/datasources.yaml`.
 
 ## Source references
 
 - Adapter protocol: `packages/sdk/src/nl2sql_sdk/protocols.py`
-- Adapter discovery: `packages/nl2sql/src/nl2sql/datasources/discovery.py`
+- Registry: `packages/nl2sql/src/nl2sql/registry.py`
 - Datasource registry: `packages/nl2sql/src/nl2sql/datasources/registry.py`
 - Example adapter: `packages/nl2sql/src/nl2sql/adapters/sqlalchemy_base/adapter.py`

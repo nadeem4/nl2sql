@@ -108,6 +108,24 @@ mysql = "nl2sql.adapters.mysql.adapter:MysqlAdapter"
 postgres = "nl2sql.adapters.postgres.adapter:PostgresAdapter"
 sqlite = "nl2sql.adapters.sqlite.adapter:SqliteAdapter"
 
+# The registry (nl2sql/registry.py) lists these by name and imports one only
+# when a config uses it. A plugin package declares its own in the same groups.
+[project.entry-points."nl2sql.llms"]
+openai = "nl2sql.llm.providers:OPENAI"
+anthropic = "nl2sql.llm.providers:ANTHROPIC"
+openrouter = "nl2sql.llm.providers:OPENROUTER"
+ollama = "nl2sql.llm.providers:OLLAMA"
+
+[project.entry-points."nl2sql.embeddings"]
+local = "nl2sql.embeddings.local:LOCAL"
+openai = "nl2sql.embeddings.openai:OPENAI"
+
+[project.entry-points."nl2sql.secrets"]
+env = "nl2sql.secrets.providers.env:EnvSecretProvider"
+aws = "nl2sql.secrets.providers.aws:AwsSecretProvider"
+azure = "nl2sql.secrets.providers.azure:AzureSecretProvider"
+hashicorp = "nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["nl2sql*"]

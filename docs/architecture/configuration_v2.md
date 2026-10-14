@@ -800,6 +800,21 @@ hits them again.
 
 ## 5. The registry
 
+!!! note "Built: the registry (PR 5)"
+    `nl2sql/registry.py` holds `Registry` with `default()`, `empty()`, the
+    `add_*` methods and decorators for the four Phase 1 kinds, `names()`, and
+    `load(kind, name)`, which imports a name and runs the load-time checks
+    (interface version with the package name, `find_spec` with the install
+    hint, duplicate entry points naming both packages, "did you mean"). It
+    raises `RegistryError`; collecting those into a `ConfigError` is
+    `NL2SQL(cfg, registry)`'s job, in PR 7a. The built-ins are declared in
+    the four entry point groups. `LLMProvider` and `ResolvedAgent` live in
+    `nl2sql.llm.providers`, `EmbeddingsProvider` in `nl2sql.embeddings`.
+    `discover_adapters()` and `nl2sql/secrets/factory.py` are deleted: the
+    `DatasourceRegistry`, the secret manager and `nl2sql list-adapters` use the
+    registry. The runtime still builds its LLM clients and embedder from the
+    0.4 settings until PR 7a passes a registry in.
+
 ### What it is
 
 A YAML file holds only text. When it says `type: postgres` or
@@ -892,8 +907,8 @@ hashicorp = "nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"
     `DatasourceAdapterProtocol` and the five built-in adapters, and
     `nl2sql_sdk.secrets.SecretProvider` with the four built-in providers.
     A provider's `config_model` covers its block apart from `id` and `type`.
-    Until the registry (PR 5), `nl2sql/secrets/factory.py` maps the four
-    built-in `type` names to their classes.
+    PR 5 replaced the temporary `nl2sql/secrets/factory.py` table with the
+    `nl2sql.secrets` entry point group.
 
 Each Phase 1 interface carries `interface_version: ClassVar[int]`. The engine
 accepts exactly the version it was built for, and anything else is a load

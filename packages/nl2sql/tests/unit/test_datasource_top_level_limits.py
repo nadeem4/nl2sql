@@ -20,9 +20,14 @@ from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.generator.node import GeneratorNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.secrets.manager import SecretManager
+from nl2sql.testing import adapter_registry
 
 
 class _StubAdapter:
+    interface_version = 1
+    driver_modules = ()
+    install_hint = ""
+
     def __init__(self, datasource_id, datasource_engine_type, connection_args, **kwargs):
         self.kwargs = kwargs
         self.row_limit = kwargs.get("row_limit")
@@ -37,8 +42,7 @@ class _StubAdapter:
 
 @pytest.fixture
 def registry(monkeypatch):
-    monkeypatch.setattr("nl2sql.datasources.registry.discover_adapters", lambda: {"stub": _StubAdapter})
-    return DatasourceRegistry(SecretManager())
+    return DatasourceRegistry(SecretManager(), adapter_registry({"stub": _StubAdapter}))
 
 
 def _sql_for(registry, ds_yaml: dict) -> str:

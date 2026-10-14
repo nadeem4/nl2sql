@@ -1,6 +1,5 @@
-"""Datasource management, configuration, and adapter discovery."""
+"""Datasource management and configuration. Adapters are found through ``nl2sql.registry``."""
 from nl2sql.datasources.registry import DatasourceRegistry
-from nl2sql.datasources.discovery import discover_adapters
 from nl2sql.datasources.models import (
     DatasourceConfig,
     ConnectionConfig,
@@ -11,7 +10,6 @@ from nl2sql_sdk.capabilities import DatasourceCapability
 
 __all__ = [
     "DatasourceRegistry", 
-    "discover_adapters", 
     "DatasourceConfig",
     "ConnectionConfig",
     "DatasourceAdapterProtocol",
