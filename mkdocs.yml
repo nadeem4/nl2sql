@@ -139,6 +139,7 @@ nav:
     - Add Execution Backend: extensions/add-execution-backend.md
   - Testing:
     - Testing Architecture: testing/architecture.md
+    - Real-Database Test Bed: testing/test-bed.md
     - Evaluation Dataset: testing/evaluation-dataset.md
     - Benchmark Results: benchmarks.md
   - API:
