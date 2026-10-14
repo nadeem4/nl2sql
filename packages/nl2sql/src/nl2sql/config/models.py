@@ -195,6 +195,7 @@ class AgentLLM(_Model):
     api_key: Optional[Secret] = None
     base_url: Optional[str] = None
     structured_output: Optional[StructuredOutput] = None  # None: the provider's
+    parse_retries: NonNegativeInt = 1  # retries of a malformed structured answer
     max_tokens: Optional[PositiveInt] = None  # None: the provider's
     timeout_s: Optional[PositiveFloat] = None  # per request; None: the client library's
     max_retries: Optional[NonNegativeInt] = None  # network and rate-limit retries; None: the client library's
@@ -210,6 +211,7 @@ class LLM(_Model):
     api_key: Optional[Secret] = None  # None: the provider's standard variable
     base_url: Optional[str] = None
     structured_output: Optional[StructuredOutput] = None
+    parse_retries: NonNegativeInt = 1
     max_tokens: Optional[PositiveInt] = None
     timeout_s: Optional[PositiveFloat] = None
     max_retries: Optional[NonNegativeInt] = None

@@ -93,8 +93,8 @@ PROVIDER_PRESETS: Dict[str, ProviderPreset] = {
 
 
 # The fields an agent takes from the top of the ``llm`` section unless it sets its own.
-AGENT_FIELDS = ("provider", "model", "temperature", "api_key", "base_url", "structured_output", "max_tokens",
-                "timeout_s", "max_retries", "headers")
+AGENT_FIELDS = ("provider", "model", "temperature", "api_key", "base_url", "structured_output", "parse_retries",
+                "max_tokens", "timeout_s", "max_retries", "headers")
 
 
 def wire_for_provider(provider: str) -> Wire:
@@ -471,8 +471,8 @@ class LLMRegistry:
             ValueError: If the wire's optional dependency (the anthropic
                 extra) is missing.
         """
-        from .providers import ResolvedAgent
-        from .wires import STRUCTURED_OUTPUT_KEY
+        from .providers import LLM_AGENTS, ResolvedAgent
+        from .wires import AGENT_KEY, PARSE_RETRIES_KEY, STRUCTURED_OUTPUT_KEY
 
         if not api_key:
             api_key = self._api_key_for(agent)
@@ -485,8 +485,10 @@ class LLMRegistry:
             max_tokens=agent.max_tokens, timeout_s=agent.timeout_s, max_retries=agent.max_retries,
             headers=headers,
         ))
-        # ``structured()`` reads the method off the client, whichever provider built it.
-        client.metadata = {**(client.metadata or {}), STRUCTURED_OUTPUT_KEY: structured_output}
+        # ``structured()`` reads these off the client, whichever provider built it.
+        agent_name = next((name for name, key in LLM_AGENTS.items() if key == agent.name), agent.name)
+        client.metadata = {**(client.metadata or {}), STRUCTURED_OUTPUT_KEY: structured_output,
+                           PARSE_RETRIES_KEY: agent.parse_retries, AGENT_KEY: agent_name}
         return client
 
     def _resolve_secret(self, value: Any) -> str:

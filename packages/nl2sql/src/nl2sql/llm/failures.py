@@ -171,7 +171,22 @@ def provider_error(node: str, exc: BaseException) -> Optional[PipelineError]:
     """The ``PipelineError`` for a provider failure, or None when ``exc`` is something else.
 
     The message is the provider's sentence alone: no node label, no repr, no key.
+    A structured answer that still did not parse after the agent's
+    ``parse_retries`` (``StructuredOutputError``) is ``MODEL_OUTPUT_INVALID``.
     """
+    from .wires import StructuredOutputError
+
+    if isinstance(exc, StructuredOutputError):
+        tries = "attempt" if exc.attempts == 1 else "attempts"
+        return PipelineError(
+            node=node,
+            message=(f"The {exc.agent} agent's answer did not match {exc.schema} after {exc.attempts} {tries}. "
+                     f"Set another structured_output for it (tool_calling, json_schema or json_mode), "
+                     f"or use a stronger model."),
+            severity=ErrorSeverity.ERROR,
+            error_code=ErrorCode.MODEL_OUTPUT_INVALID,
+            details={"errors": exc.errors},
+        )
     failure = classify_provider_error(exc)
     if failure is None:
         return None

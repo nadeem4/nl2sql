@@ -624,8 +624,13 @@ A new boundary test: only `nl2sql/storage/` imports `chromadb` or `sqlite3`.
     `openai_compatible`, with `openrouter` and `ollama` as its presets;
     `structured_output`, `max_tokens`, `timeout_s`, `max_retries` and
     `headers` on `LLM` and `AgentLLM`; `LLMProvider` on interface version 2.
-    `parse_retries` and parse-and-retry come with L2. See
-    [LLM configuration](../configuration/llm.md).
+    See [LLM configuration](../configuration/llm.md).
+
+!!! note "Built: parse-and-retry (PR L2)"
+    `parse_retries` on `LLM` and `AgentLLM`; `structured()` and
+    `streaming_structured()` retry an answer that does not parse;
+    `StructuredOutputError` and `MODEL_OUTPUT_INVALID`. See
+    [Parse-and-retry](../configuration/llm.md#parse-and-retry).
 
 ### The LLM config
 
