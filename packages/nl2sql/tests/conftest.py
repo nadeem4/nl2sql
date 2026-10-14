@@ -4,6 +4,7 @@ _INTEGRATION_DIRS = (
     "packages/nl2sql/tests/integration/",
     "packages/nl2sql/tests/e2e/",
 )
+_REALDB_DIR = "packages/nl2sql/tests/realdb/"
 
 
 def pytest_collection_modifyitems(config, items):
@@ -21,8 +22,13 @@ def pytest_collection_modifyitems(config, items):
     Deliberately matched on the exact engine paths -- the sqlite-backed
     integration tests under ``tests/adapters/`` and ``tests/sqlalchemy_base/``
     need none of that and stay selected.
+
+    Everything under ``tests/realdb/`` needs the real-database test bed
+    (``testbed/docker-compose.yml``) and is marked ``realdb``.
     """
     for item in items:
         path = str(item.fspath).replace("\\", "/")
         if any(directory in path for directory in _INTEGRATION_DIRS):
             item.add_marker(pytest.mark.integration)
+        if _REALDB_DIR in path:
+            item.add_marker(pytest.mark.realdb)

@@ -12,6 +12,7 @@ packages/nl2sql/tests/
   cli/              # CLI command tests
   adapters/         # Cross-dialect adapter contract tests
   sqlalchemy_base/  # SQLAlchemy base adapter tests
+  realdb/           # Against real PostgreSQL, MySQL and SQL Server (the test bed)
 packages/api/tests/ # FastAPI route and service tests (stubbed engine)
 ```
 
@@ -23,16 +24,18 @@ so such a table is silently ignored. Dev/test tooling lives in the root
 
 ## Markers and what CI runs
 
-Two independent things can make a test unrunnable in CI, so they are two
-markers. A test may carry both.
+Three independent things can make a test unrunnable in the fast job, so they
+are three markers. A test may carry more than one.
 
 | Marker | Means | Provided by |
 | --- | --- | --- |
 | `integration` | Needs external resources: the demo's SQLite databases - vendored Chinook and the generated `support` and `webanalytics`, read from the installed package (`nl2sql.testing.config.make_demo_config`) - or the downloaded ONNX embedding model. | The package; `tests/e2e` writes its own project with `nl2sql init --demo` |
 | `llm` | Needs a real `OPENAI_API_KEY`. Costs money per run. | Nothing in CI - never selected. |
+| `realdb` | Needs a real PostgreSQL, MySQL or SQL Server: the [test bed](test-bed.md). | `testbed/docker-compose.yml`, in the `realdb` workflow |
 
 Everything under `packages/nl2sql/tests/integration/` is marked `integration`
-automatically by `packages/nl2sql/tests/conftest.py`. The `llm` marker is
+automatically by `packages/nl2sql/tests/conftest.py`, and everything under
+`packages/nl2sql/tests/realdb/` is marked `realdb` the same way. The `llm` marker is
 declared per module, next to a comment saying which call needs the key. Only
 four modules carry it - `test_ast_planner_real_data.py`,
 `test_decomposer_real_data.py`, `test_logical_validator_real_data.py` and
@@ -43,7 +46,7 @@ data run key-free.
 
 `.github/workflows/test.yml` has two test jobs over the source tree:
 
-- **`test`** runs `pytest -m "not integration"` across Python 3.12 and 3.13.
+- **`test`** runs `pytest -m "not integration and not realdb"` across Python 3.12 and 3.13.
   This is the fast job and must stay fast.
 - **`integration`** runs `pytest -m "integration and not llm"` on one Python
   version, after writing and indexing a demo project (`nl2sql init --demo
@@ -52,6 +55,11 @@ data run key-free.
   subset covers schema indexing, datasource resolution, schema retrieval,
   aggregation and the local embedder against the real Chinook database; run
   it with `--collect-only -q` for the current list.
+
+A separate workflow, `.github/workflows/realdb.yml`, runs `pytest -m realdb`
+against the [test bed](test-bed.md) on GitHub's runners: on pull requests that
+change database-facing code, nightly on `main`, and on demand before a
+release. Its `realdb-gate` job always runs and is the required check.
 
 Three more jobs test the package rather than the source tree:
 
