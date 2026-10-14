@@ -4911,6 +4911,18 @@ from a clone with <code>pip install -e packages/sdk -e "packages/nl2sql[demo]"</
   folder (see <a href="#old-demo-folders">Old demo folders</a>)</li>
 </ul>
 <p>Setup then runs schema indexing once, automatically, and exits <code>1</code> if it fails.</p>
+<div class="admonition note">
+<p class="admonition-title">0.5: <code>nl2sql init --demo</code></p>
+<p><code>nl2sql init --demo DIR</code> writes the demo as a 0.5 config: <code>nl2sql.yaml</code>,
+one file per datasource under <code>datasources/</code> (each with its description,
+read-only connection, 10,000-row limit and sample questions),
+<code>policies.yaml</code> with the admin, analyst and viewer roles below,
+<code>curated.yaml</code> with the verified queries, and the three databases in
+<code>data/</code>. It is the same config <code>nl2sql.config.demo_config()</code> builds in
+code. In 0.5 it replaces <code>nl2sql setup --demo</code>; until then the engine
+reads the files listed above. See
+<a href="../#start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code></a>.</p>
+</div>
 <p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does the same
 scaffolding in <code>./nl2sql-demo</code> and serves a page over it. See the
 <a href="https://github.com/nadeem4/nl2sql#quickstart-run-it-locally">README</a> for its flags, and

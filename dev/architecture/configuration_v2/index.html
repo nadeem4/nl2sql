@@ -5033,6 +5033,33 @@ checklist item. <code>nl2sql-adapter-sdk</code> is simply not published again. W
 users, yanking it adds nothing.</p>
 <h2 id="10-cli-demo-docker-and-docs">10. CLI, demo, Docker and docs</h2>
 <h3 id="cli">CLI</h3>
+<div class="admonition note">
+<p class="admonition-title">Built: <code>nl2sql init</code> (PR 6)</p>
+<p><code>nl2sql init</code> is in the CLI, and <code>setup</code> stays until PR 7b. The engine
+writes the files: <code>nl2sql.config.init_project(folder, demo=, provider=,
+force=)</code> returns the paths it wrote, after loading them with
+<code>load_config</code>. <code>nl2sql.config.demo_config(llm=, path=, data_dir=)</code> builds
+the demo <code>Config</code> that <code>NL2SQL.demo()</code> (PR 7a) uses, and <code>init --demo</code>
+writes that same config out, so the two cannot drift. Building it settled
+these details:</p>
+<ul>
+<li>The demo's datasources, roles, sample questions and verified queries
+  moved from <code>nl2sql.cli.demo</code> to <code>nl2sql.datasets</code> (<code>chinook</code>,
+  <code>support</code>, <code>webanalytics</code>, <code>demo</code>), in the <code>nl2sql.yaml</code> shape, so the
+  engine can build the demo without importing the CLI.</li>
+<li><code>--provider</code> accepts the providers with a default model (<code>openai</code>,
+  <code>anthropic</code>, <code>openrouter</code>). <code>llm.yaml</code> gets that model and the
+  provider's default temperature (none for Anthropic).</li>
+<li>If any file <code>init</code> would write exists, it names them all and writes
+  nothing. <code>.gitignore</code> is never overwritten: the missing lines are
+  appended.</li>
+<li>A demo datasource's <code>database</code> is written as <code>data/&lt;name&gt;.sqlite</code>,
+  relative to <code>nl2sql.yaml</code>. <code>load_config</code> keeps <code>connection</code> as
+  written, so the runtime (PR 7a) has to resolve a relative SQLite path
+  against the config's folder, as it does <code>storage.path</code>.
+  <code>demo_config()</code> points at the packaged files instead.</li>
+</ul>
+</div>
 <table>
 <thead>
 <tr>

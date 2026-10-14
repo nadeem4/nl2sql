@@ -4725,6 +4725,13 @@ Detailed schemas for each file:</p>
 <li><a href="../../configuration/policies/">Policies</a></li>
 <li><a href="../../configuration/secrets/">Secrets</a></li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">0.5: <code>nl2sql init</code></p>
+<p>From 0.5 the engine reads one <code>nl2sql.yaml</code> instead of these files.
+<code>nl2sql init</code> writes it, and in Python
+<code>nl2sql.config.init_project("my-project")</code> writes the same files. See
+<a href="../#start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code></a>.</p>
+</div>
 <h3 id="configuration-paths-at-startup">Configuration paths at startup</h3>
 <p>You can pass config paths directly when creating the engine:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>

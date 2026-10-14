@@ -4484,6 +4484,12 @@ library. <code>pip install --group dev</code> (pip 25.1 or newer) installs the P
 <li><code>configs/secrets.yaml</code> (optional)</li>
 </ul>
 <p>Start from <code>configs/datasources.example.yaml</code> and <code>configs/policies.example.json</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">0.5: <code>nl2sql init</code></p>
+<p>From 0.5 the engine reads one <code>nl2sql.yaml</code> instead. <code>nl2sql init</code> writes
+it, with each section in its own file, and <code>nl2sql init --demo</code> writes the
+demo's. See <a href="../#start-a-config-with-nl2sql-init-05">Start a config with <code>nl2sql init</code></a>.</p>
+</div>
 <h2 id="run-locally">Run locally</h2>
 <p>Python API:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"from nl2sql import NL2SQL, UserContext; print(NL2SQL().run_query('hello', user_context=UserContext(roles=['admin'])))"</span>

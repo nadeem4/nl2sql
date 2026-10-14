@@ -2907,7 +2907,7 @@ the generated <code>.env.demo</code> gains <code>CURATED_CONFIG=configs/curated.
 (<code>cli/generators/env/templates.py</code>). Only the demo's env file sets it: for any
 other environment the file is optional, and a <code>CURATED_CONFIG</code> naming a file
 that does not exist fails startup. The queries are data in
-<code>cli/demo/chinook.py</code> (<code>CHINOOK_VERIFIED_QUERIES</code>), written by
+<code>datasets/chinook.py</code> (<code>CHINOOK_VERIFIED_QUERIES</code>), written by
 <code>DemoManager._write_common_artifacts()</code>, and <code>nl2sql setup --demo</code> indexes
 their questions with the schema, so the hosted Space's image has them too. No
 guided question was added: two of the existing ones ("What is the total
