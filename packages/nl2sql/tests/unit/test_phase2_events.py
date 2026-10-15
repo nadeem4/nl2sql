@@ -312,9 +312,9 @@ def test_resolver_refusal_publishes_policy_decision():
         out = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext(roles=["r"])))
 
     assert [e.error_code.value for e in out["errors"]] == ["SECURITY_VIOLATION"], out["errors"]
-    assert len(seen) == 1, (seen, scope.events)
-    [event] = seen
-    assert event.data["datasource_id"] == "ds1" and event.data["table"] is None
+    assert [e.data["datasource_id"] for e in seen] == ["ds1", "ds2"]  # every registered one was refused
+    event = seen[0]
+    assert event.data["table"] is None
     assert event.data["schema"] is None and event.data["step"] == "datasource_resolver"
     assert event.data["rule"] == "no allow pattern of role(s) 'r' reaches 'ds1'"
 

@@ -454,8 +454,10 @@ names in the same PR.
     (`step: logical_validator`, `schema` the table's or the scope's default),
     `CuratedMatcherNode._check_access` on the refused table (`step:
     curated_matcher`; it now asks `scope.rule_for`, which `allows` wraps),
-    and the resolver when the role check refuses every candidate
-    (`_publish_refusals`, one per candidate, `schema` and `table` None,
+    and the resolver when the role check refuses every datasource it was
+    asked about: every registered one before the routing search (R1's
+    scope filter), or the explicit or only one (`_publish_refusals`, one
+    per datasource, `schema` and `table` None,
     `step: datasource_resolver`, `rule` naming the roles or the policy
     check). The resolver's re-check after `datasources.after` hooks publishes
     nothing; the hook's own `hook.decision` covers it. Test fakes that build

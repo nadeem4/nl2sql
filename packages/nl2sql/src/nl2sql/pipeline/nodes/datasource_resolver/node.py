@@ -304,6 +304,7 @@ class DatasourceResolverNode:
                 # caller may not read is never searched, so it never ranks.
                 reachable = self._get_allowed_datasource_ids(state.user_context, registered_ids)
                 if not reachable:
+                    _publish_refusals(self.policy_engine, state.user_context, registered_ids)
                     return self._error_response(
                         resolved_datasources=[],
                         allowed_ids=[],
@@ -417,7 +418,12 @@ class DatasourceResolverNode:
 
 
 def _publish_refusals(policy_engine, user_context: UserContext, datasource_ids: list[str]) -> None:
-    """``policy.decision`` for each datasource the role check refused, when it refused them all (D16)."""
+    """``policy.decision`` for each datasource the role check refused, when it refused them all (D16).
+
+    Before a search that means every registered datasource; otherwise the
+    explicit or only one. Routing that skips some while others go on is
+    filtering and publishes nothing.
+    """
     for ds_id in datasource_ids:
         scope = policy_engine.scope(user_context, ds_id)
         roles = ", ".join(g.name for g in scope.grants) or "(none)"

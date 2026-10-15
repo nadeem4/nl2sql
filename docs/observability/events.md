@@ -81,8 +81,9 @@ on the engine's bus directly.
 `policy.decision` is published for denials only, and only where a refusal is
 enforced (the logical validator refusing a table of the plan, the curated
 matcher refusing a verified query, the datasource resolver refusing every
-candidate datasource). A scope asked only to filter (the schema retriever,
-the value check) publishes nothing, so the bus is not flooded with tables
+datasource it was asked about). A scope asked only to filter (routing that
+skips some datasources, the schema retriever, the value check) publishes
+nothing, so the bus is not flooded with tables
 nobody asked for. Every catalogued event is published today except
 `run.limit_reached`, `sanity.flagged` and `schema.drifted`, whose Wave A
 PRs are named in their descriptions. While a
