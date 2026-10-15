@@ -53,6 +53,19 @@ are all among those it keeps. CI's integration job gates on the newest run of ea
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-15 17:44:47 | a33c8ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38778183715 | chinook @dc1e8456 | @ceed80fe | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 96 | 97.9% | 76.5% | 100.0% / 100.0% | tables +0.0 pp, columns +0.0 pp | 8.0 / 22.2 |
 | 2026-10-15 16:27:15 | 1099c15 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38767715412 | chinook @dc1e8456 | @ceed80fe | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 96 | 97.9% | 76.5% | - | new series (suite changed) | 8.0 / 22.2 |
 | 2026-10-15 13:05:04 | 653fa73 | 0.6 baseline before Phase R (R1) | chinook_gold.yaml @8be35a10 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 43 | 97.7% | 71.9% | - | new series (suite changed) | 8.2 / 24.1 |
 | 2026-09-22 03:39:36 | 571cd16 | first retrieval baseline | chinook_gold.yaml @7d104084 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 39 | 98.5% | 72.6% | - | first run | 8.3 / 24.2 |
+
+## Retrieval recall: chinook+support+webanalytics (sqlite, 20 tables / 121 columns)
+
+`nl2sql eval run --mode retrieval`: the share of each answerable case's needed tables and
+columns that schema retrieval sends the planner, with the vector search forced on and no
+LLM. Mean over cases; tables and columns sent are means too. Routing top-1 is the share of
+cases routing ranks one of their datasources first, shortlist the share whose datasources
+are all among those it keeps. CI's integration job gates on the newest run of each suite here.
+
+| Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-15 17:45:34 | a33c8ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38778183715 | routing @c87d2a8e | @bffaf096 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 0 | - | - | 97.4% / 98.7% | first run | - |

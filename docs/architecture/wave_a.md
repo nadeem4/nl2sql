@@ -1757,6 +1757,13 @@ Phase R's change rather than asserting a number.
       tickets and made a purchase on the website?" drops webanalytics at the
       floor. The Chinook suite's retrieval gate is unchanged by the stricter
       scorer (all 43 Chinook cases rank chinook first).
+    - **Baselines, recorded on CI** (run 38778183715, ubuntu-latest, Python
+      3.12, the same numbers as on Windows):
+      `benchmarks/retrieval/chinook-support-webanalytics/2026-10-15_a33c8ce_retrieval.json`
+      (routing top-1 97.4%, shortlist 98.7%) and a new Chinook retrieval record,
+      `benchmarks/retrieval/chinook/2026-10-15_a33c8ce_retrieval.json`, which
+      carries the routing metrics (100% / 100%) with no flip against the last.
+      The realdb wide-schema test passed on that run too.
 
 ## 10. Schema drift: measure first
 
