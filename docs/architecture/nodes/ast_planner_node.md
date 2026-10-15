@@ -101,8 +101,9 @@ validation and executed is reused
 - **Written** by `wrap_subgraph` (`pipeline/graph_utils.py`) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
   and plan-only runs are not stored. What is stored is `planner_plan`, the
-  plan before any `plan.after` hook changed it; the hooks run again on every
-  hit.
+  plan before any `plan.after` hook changed it. When a hook changed it, that
+  plan was not itself validated in the run that stored it; a hit is safe
+  anyway, because it passes `plan.after` and the validator again every time.
 - **Controls:** `settings.pipeline.plan_cache` (default `true`) and `nl2sql cache clear`.
 
 See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinism-from-the-architecture).

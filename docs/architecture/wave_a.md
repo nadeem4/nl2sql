@@ -754,10 +754,16 @@ not declare is a `ConfigError` at build.
       built-in hook (Wave B's `policy.cost`) goes first with its own
       `approver_roles`. `ctx.hooks` is the engine's runner; `hooks_of(ctx)`
       gives `NO_HOOKS` for a stand-in runtime.
-    - `HookRunner.call(point, **fields)` builds the context and returns a
-      `HookVerdict`: `ctx` after every `Modify`, and the `decision` and
-      `hook` that stopped the point (`allowed`, `scope`, `error(node)`, the
-      `PipelineError`). With no hook at a point, nothing is validated.
+    - `HookRunner.call(point, **fields)` builds the context from deep copies
+      of `fields` (a hook changing the plan or the caller in place changes
+      nothing) and returns a `HookVerdict`: `ctx` after every `Modify`,
+      `modified`, and the `decision` and `hook` that stopped the point
+      (`allowed`, `scope`, `error(node)`, the `PipelineError`; a hook error's
+      message names only the hook and the point). With no hook at a point,
+      nothing is validated. `HookRunner.attached(point)` says whether any
+      hook runs there: while one runs at `answer.after` the answer is not
+      streamed, and `result_from_state` drops the rows, `artifact_refs` and
+      `result_manifest` of a run a hook ended.
     - `HookContext` adds `conversation_id: str | None` (Wave C's A3),
       `execute` (`run.before`) and `results` (the run's `ResultSummary`s at
       `answer.after`, the "sub-query summaries" of the table).
@@ -775,9 +781,9 @@ not declare is a `ConfigError` at build.
     `ASTPlannerNode.check_plan(state, plan)` is one plan's verdict, for Wave
     B's alternatives. `ASTPlannerResponse.planner_plan` is the plan before
     the hooks, and `wrap_subgraph` caches it. `execute.before` and
-    `execute.after` in `ExecutorNode._hook` and `CuratedMatcherNode._hook`
-    (a deny on the verified path ends the run, as `_ended`, never a
-    fallback); `answer.after` in `AnswerSynthesizerNode`. A sub-query a hook
+    `execute.after` in `ExecutorNode` and `CuratedMatcherNode` (each a
+    `self.hooks.call("<point>", **self._hook_fields(...))`; a deny on the
+    verified path ends the run, as `_ended`, never a fallback); `answer.after` in `AnswerSynthesizerNode`. A sub-query a hook
     dropped has `SubgraphOutput.status == "dropped"` and a `HOOK_DENIED`
     warning; `build_scan_layer_router` (in `pipeline/routes.py`, a small
     addition the file list missed) ends the run on a hook's error and still
@@ -786,7 +792,8 @@ not declare is a `ConfigError` at build.
     warnings name what was dropped. `SubgraphExecutionState.user_query` (in
     `pipeline/state.py`, also not in the file list) carries the question to
     the sub-query's hooks. The architecture test is
-    `tests/architecture/test_hooks_boundary.py`; its graph check asks that
+    `tests/architecture/test_hooks_boundary.py`: every runner call names its
+    point as a literal; its graph check asks that
     every path from `ast_planner` to `generator` pass `logical_validator`, so
     Wave B's clarifier may sit between the validator and the generator.
 

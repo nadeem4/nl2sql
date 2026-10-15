@@ -40,7 +40,9 @@ flowchart TD
 | `answer.after` | The answer is written, before it is returned | `final_answer`, `results` (summaries) | `Allow`, `Deny` |
 
 `tables` are `datasource.schema.table`. A field a point does not have is
-`None`. The context is frozen: a hook changes the run only through `Modify`.
+`None`. The context is frozen and holds copies of the run's plan, caller and
+values: a hook that changes one in place changes nothing. A hook changes the
+run only through `Modify`.
 `ctx.conversation_id` is set when the run is a conversation's turn.
 
 **Modify before the validator, deny only after.** A plan a hook changed is
@@ -60,7 +62,11 @@ the run; it does not fall back to the generated path. **A plan-only run**
   the fields it sets and the next hook sees the result. The first `Deny` (or
   `NeedsApproval`) ends the point; later hooks are not asked.
 - **A deny** ends the run with the error `HOOK_DENIED` (never retried), whose
-  message is the hook's `reason`. At a per-sub-query point (`plan.after`,
+  message is the hook's `reason`. A run a hook ended carries none of its
+  data: no answer, no rows, no artifact references, no result manifest.
+  While any hook is attached at `answer.after`, `stream_query` does not
+  stream the answer as it is written; it arrives whole, once the hooks
+  allowed it. At a per-sub-query point (`plan.after`,
   `execute.before`, `execute.after`), `Deny(reason, scope="sub_query")` drops
   only that sub-query: the run goes on without it and the answer's warnings
   say what went unanswered. A sub-query that feeds a `join` or `compare`
@@ -69,7 +75,9 @@ the run; it does not fall back to the generated path. **A plan-only run**
 - **Hooks fail closed.** An exception, a return value that is not a
   decision, or a decision the point does not allow (a `Modify` at
   `execute.before`, a `NeedsApproval` at `plan.after`) is a hook error: the
-  run ends with `HOOK_FAILED`, naming the hook. With `on_error: open`, an
+  run ends with `HOOK_FAILED`, whose message names only the hook and the
+  point; the exception's text goes to the log and to `hook.decision`, never
+  to the caller. With `on_error: open`, an
   exception is logged and counts as `Allow`; a disallowed decision still
   fails, because it is a bug in the hook, not an outage.
 - **Approval.** `NeedsApproval` at `execute.before` stops the SQL with the

@@ -5,8 +5,9 @@ The invariant *Hooks Modify Before the Validator, Deny After*
 
 1. ``HOOK_POINTS`` allows ``Modify`` at ``run.before``, ``datasources.after``
    and ``plan.after`` only.
-2. Every call naming a point (``hooks.call("<point>", ...)``, or a node's
-   own helper such as ``self._hook("<point>", ...)``) is found by an AST scan: a
+2. An AST scan finds every call of the runner (``<...>hooks.call(...)``). Each
+   names its point as a literal, so the scan sees which point is called where,
+   and no other call passes a point name along (no helper hides a point). A
    point that allows ``Modify`` is called only from the run's worker, the
    resolver and the planner, and every point is called somewhere.
 3. In the SQL agent graph, built with fakes, every path from the planner to
@@ -31,27 +32,39 @@ MODIFY_CALLERS = {
     "pipeline/nodes/datasource_resolver/node.py",
     "pipeline/nodes/ast_planner/node.py",
 }
-# After the validator: these may call only points that cannot modify.
-AFTER_THE_VALIDATOR = {
-    "pipeline/nodes/generator/node.py",
-    "pipeline/nodes/executor/node.py",
-    "pipeline/nodes/curated_matcher/node.py",
-    "pipeline/nodes/aggregator/node.py",
-    "aggregation/aggregator.py",
-    "pipeline/nodes/answer_synthesizer/node.py",
-}
+
+
+def _runner_method(node: ast.Call):
+    """``"call"`` for ``hooks.call(...)`` or ``self.hooks.call(...)``, ``"attached"`` likewise; else None."""
+    func = node.func
+    if not (isinstance(func, ast.Attribute) and func.attr in ("call", "attached")):
+        return None
+    target = func.value
+    name = target.attr if isinstance(target, ast.Attribute) else getattr(target, "id", None)
+    return func.attr if name == "hooks" else None
 
 
 def _call_sites():
-    """``{point: {file, ...}}`` for every call in the engine whose first argument names a point."""
-    sites = defaultdict(set)
+    """``{point: {file, ...}}`` for every runner call in the engine, and the problems the scan found."""
+    sites, problems = defaultdict(set), []
     for path in SRC.rglob("*.py"):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant)
-                    and node.args[0].value in HOOK_POINTS):
-                sites[node.args[0].value].add(path.relative_to(SRC).as_posix())
-    return sites
+        file = path.relative_to(SRC).as_posix()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            first = node.args[0] if node.args else None
+            literal = first.value if isinstance(first, ast.Constant) and first.value in HOOK_POINTS else None
+            method = _runner_method(node)
+            if method == "attached":
+                continue
+            if method == "call":
+                if literal is None:
+                    problems.append(f"{file}:{node.lineno}: the runner is called without a literal point")
+                else:
+                    sites[literal].add(file)
+            elif literal is not None:
+                problems.append(f"{file}:{node.lineno}: {literal!r} is passed to something other than the runner")
+    return sites, problems
 
 
 def _sql_agent_graph(monkeypatch):
@@ -80,13 +93,11 @@ def test_hooks_modify_only_before_the_validator(monkeypatch):
     assert {point for point, rule in HOOK_POINTS.items() if Modify in rule.decisions} == MAY_MODIFY
 
     # 2. The call sites.
-    sites = _call_sites()
+    sites, problems = _call_sites()
+    assert not problems, problems
     assert set(sites) == set(HOOK_POINTS), f"points never called: {set(HOOK_POINTS) - set(sites)}"
     for point in MAY_MODIFY:
         assert sites[point] <= MODIFY_CALLERS, (point, sites[point] - MODIFY_CALLERS)
-    for point, files in sites.items():
-        if point in MAY_MODIFY:
-            assert not files & AFTER_THE_VALIDATOR, (point, files & AFTER_THE_VALIDATOR)
 
     # 3. The graph: the planner reaches the generator only through the validator.
     graph = _sql_agent_graph(monkeypatch)

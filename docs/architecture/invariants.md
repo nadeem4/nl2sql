@@ -493,16 +493,17 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 ## Hooks Modify Before the Validator, Deny After
 
 ### Definition
-A hook may change what a run carries only at the three points before the logical validator: the question at `run.before`, the datasources at `datasources.after` (a subset only, checked against the caller's scope again) and the plan at `plan.after`. A plan a hook changed is validated like any other. At `execute.before`, `execute.after` and `answer.after` a hook may only allow or stop the run (or, at `execute.before`, ask for approval). Hooks fail closed: an exception, a value that is not a decision, or a decision the point does not allow denies with `HOOK_FAILED`; `on_error: open` lets an exception through as an allow, never a disallowed decision. The plan cache stores the planner's plan, never a hook's change of it.
+A hook may change what a run carries only through a `Modify`, and only at the three points before the logical validator: the question at `run.before`, the datasources at `datasources.after` (a subset only, checked against the caller's scope again) and the plan at `plan.after`. A plan a hook changed is validated like any other. At `execute.before`, `execute.after` and `answer.after` a hook may only allow or stop the run (or, at `execute.before`, ask for approval). Hooks fail closed: an exception, a value that is not a decision, or a decision the point does not allow denies with `HOOK_FAILED`; `on_error: open` lets an exception through as an allow, never a disallowed decision. The plan cache stores the planner's plan, never a hook's change of it.
 
 ### Enforcement Points
 - `HOOK_POINTS` in `nl2sql.hooks.points` (what each point allows) and `HookRunner.call()` in `nl2sql.hooks.runner`
 - `ASTPlannerNode.after_plan()` in `nl2sql.pipeline.nodes.ast_planner.node`: every plan the validator gets (the planner's, a cached one, a supplied one) passes `plan.after` there
 - `wrap_subgraph()` in `nl2sql.pipeline.graph_utils` caches `ASTPlannerResponse.planner_plan`
-- `test_hooks_modify_only_before_the_validator` in `packages/nl2sql/tests/architecture/test_hooks_boundary.py`: the point table, an AST scan of every call site, and the SQL agent graph, in which every path from the planner to the generator passes the validator
+- `HookRunner.call()` hands hooks deep copies of the plan, the caller, the sub-query and the values, so a hook that changes one in place changes nothing: `test_a_hook_changing_the_callers_roles_in_place_changes_nothing`, `test_a_hook_changing_the_plan_in_place_changes_nothing`, `test_a_shallow_copy_modify_leaves_the_planners_plan_alone` and `test_a_hook_changing_the_params_in_place_changes_nothing` in `packages/nl2sql/tests/unit/test_hook_points.py`
+- `test_hooks_modify_only_before_the_validator` in `packages/nl2sql/tests/architecture/test_hooks_boundary.py`: the point table, an AST scan of every runner call (each names its point as a literal, and no other call passes a point name along), and the SQL agent graph, in which every path from the planner to the generator passes the validator
 
 ### Failure Behavior
-A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED`, an approval request `NEEDS_APPROVAL`; none is retried. A run-scoped one ends the run once the step in flight is done. A deny scoped to a sub-query drops it (and a `join` or `compare` group it feeds), and the answer says what went unanswered.
+A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook and the point only; the exception goes to the log and `hook.decision`), an approval request `NEEDS_APPROVAL`; none is retried. A run-scoped one ends the run once the step in flight is done, and its result carries no rows, artifact references or result manifest. A deny scoped to a sub-query drops it (and a `join` or `compare` group it feeds), and the answer says what went unanswered.
 
 ### Why It Exists
 *The validator rejects everything the generator can* would mean nothing if code could change the plan or the SQL after the validator: a hook could otherwise route around the policies, including a table the role may not read.

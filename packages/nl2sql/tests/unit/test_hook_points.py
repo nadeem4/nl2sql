@@ -166,16 +166,21 @@ def test_a_supplied_plan_passes_plan_after(store):
     node.chain.invoke.assert_not_called()
 
 
-def test_modified_plan_is_validated(monkeypatch):
+ORDERS = PlanModel.model_validate({"tables": [{"name": "orders", "alias": "o"}],
+                                   "select_items": [{"expr": {"kind": "column", "alias": "o", "column_name": "id"}}]})
+SALARIES = PlanModel.model_validate({"tables": [{"name": "salaries", "alias": "s"}],
+                                     "select_items": [{"expr": {"kind": "column", "alias": "s",
+                                                                "column_name": "id"}}]})
+
+
+def _sql_agent(monkeypatch, hook, planned):
+    """The real planner and validator in the SQL agent graph, for a role that may read orders only.
+
+    Returns ``(generated, result)``: what reached the generator, and the subgraph's state.
+    """
     from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
     from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 
-    allowed = PlanModel.model_validate({"tables": [{"name": "orders", "alias": "o"}],
-                                        "select_items": [{"expr": {"kind": "column", "alias": "o",
-                                                                   "column_name": "id"}}]})
-    secret = PlanModel.model_validate({"tables": [{"name": "salaries", "alias": "s"}],
-                                       "select_items": [{"expr": {"kind": "column", "alias": "s",
-                                                                  "column_name": "id"}}]})
     generated = []
     tables = [Table(name="orders", columns=[Column(name="id", type="int")]),
               Table(name="salaries", columns=[Column(name="id", type="int")])]
@@ -186,21 +191,75 @@ def test_modified_plan_is_validated(monkeypatch):
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: (lambda s: {}))
     llm = MagicMock()
     llm.with_structured_output.return_value = llm
-    ctx = fake_runtime(llm_registry=MagicMock(), ds_registry=SimpleNamespace(),
-                       hooks=_hooks(lambda c: Modify(plan=secret)),
-                       policies={"roles": {"user": {"description": "d", "allow": ["ds1.main.orders"]}}},
+    ctx = fake_runtime(llm_registry=MagicMock(), ds_registry=SimpleNamespace(), hooks=_hooks(hook),
+                       policies={"roles": {"user": {"description": "d", "allow": ["ds1.main.orders"]},
+                                           "admin": {"description": "a", "allow": ["*"]}}},
                        settings={"pipeline": {"retries": {"max": 0}}})
     ctx.llm_registry.get_llm.return_value = llm
     ctx.llm_registry.effective.return_value = None
     monkeypatch.setattr("nl2sql.pipeline.nodes.ast_planner.node.structured",
-                        lambda _llm, _model: RunnableLambda(lambda _inputs: allowed))
+                        lambda _llm, _model: RunnableLambda(lambda _inputs: planned))
 
     result = build_sql_agent_graph(ctx, execute=False).invoke(SubgraphExecutionState(
         trace_id="t", user_query="q", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
         user_context=UserContext(roles=["user"])))
+    return generated, result
+
+
+def test_modified_plan_is_validated(monkeypatch):
+    generated, result = _sql_agent(monkeypatch, lambda c: Modify(plan=SALARIES), ORDERS)
 
     assert generated == []
     assert any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in result["errors"])
+
+
+# ---------------------------------------------------------------- a hook changes nothing in place
+
+
+def test_a_hook_changing_the_callers_roles_in_place_changes_nothing(monkeypatch):
+    def widen(ctx):
+        ctx.user.roles.append("admin")
+        return Allow()
+
+    generated, result = _sql_agent(monkeypatch, widen, SALARIES)
+
+    assert generated == []
+    assert any(e.error_code == ErrorCode.SECURITY_VIOLATION for e in result["errors"])
+
+
+def test_a_hook_changing_the_plan_in_place_changes_nothing(store):
+    def scribble(ctx):
+        ctx.plan.reasoning = "scribbled by a hook"
+        ctx.plan.tables.append(ctx.plan.tables[0].model_copy(update={"alias": "t2"}))
+        return Allow()
+
+    response = _planner(store, _hooks(scribble))(
+        SubgraphExecutionState(trace_id="t", sub_query=_sq()))["ast_planner_response"]
+
+    assert response.plan.reasoning == "from the model" and len(response.plan.tables) == 1
+    assert response.planner_plan.reasoning == "from the model"
+
+
+def test_a_shallow_copy_modify_leaves_the_planners_plan_alone(store):
+    def add_table(ctx):
+        plan = ctx.plan.model_copy()
+        plan.tables.append(plan.tables[0].model_copy(update={"alias": "t2"}))
+        return Modify(plan=plan)
+
+    response = _planner(store, _hooks(add_table))(
+        SubgraphExecutionState(trace_id="t", sub_query=_sq()))["ast_planner_response"]
+
+    assert len(response.plan.tables) == 2
+    assert len(response.planner_plan.tables) == 1
+
+
+def test_the_verdict_says_whether_a_modify_applied():
+    def call(decide):
+        return _hooks(decide).call("run.before", trace_id="t", question="q", user=UserContext())
+
+    assert call(lambda ctx: Modify(question="other")).modified
+    assert not call(lambda ctx: Allow()).modified
+    assert not _hooks().call("run.before", trace_id="t", question="q", user=UserContext()).modified
 
 
 # ---------------------------------------------------------------- datasources.after
@@ -372,6 +431,18 @@ def test_verified_query_passes_execute_before(db):
     assert sorted(before.tables) == ["shop.main.Customer", "shop.main.Invoice", "shop.main.InvoiceLine"]
     assert "SUM(il.UnitPrice * il.Quantity)" in before.sql
     assert hooks.seen[1][1].result.row_count == 2
+
+
+def test_a_hook_changing_the_params_in_place_changes_nothing(db):
+    def narrow(ctx):
+        if ctx.point == "execute.before":
+            ctx.params["n"] = 1
+        return Allow()
+
+    out = _verified(db, _hooks(narrow))
+
+    assert out["verified_match"].params == {"n": 2, "year": 2012}
+    assert next(iter(out["artifact_refs"].values())).row_count == 2
 
 
 def test_deny_on_verified_path_does_not_fall_back(db):

@@ -115,10 +115,11 @@ class ASTPlannerNode:
                 "reasoning": [{"node": self.node_name, "content": notes + [
                     f"The plan.after hook '{verdict.hook}' stopped the plan."]}],
             }
-        if verdict.ctx.plan is not plan:
+        if verdict.modified:
             notes.append("A plan.after hook changed the plan; the changed plan is validated.")
         return {
-            "ast_planner_response": ASTPlannerResponse(plan=verdict.ctx.plan, planner_plan=plan,
+            "ast_planner_response": ASTPlannerResponse(plan=verdict.ctx.plan if verdict.modified else plan,
+                                                       planner_plan=plan,
                                                        plan_source=plan_source),
             "reasoning": [{"node": self.node_name, "content": notes}],
         }

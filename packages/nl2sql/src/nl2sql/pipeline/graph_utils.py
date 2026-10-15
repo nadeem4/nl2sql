@@ -165,10 +165,13 @@ def wrap_subgraph(
             )
         plan = planner_response.plan if planner_response else None
         plan_source = planner_response.plan_source if planner_response else "llm"
-        # Only a plan that passed validation and executed is cached; a refused,
-        # failed or plan-only one never is. A cache hit is already stored. The
-        # planner's plan is cached, never a plan.after hook's change of it,
-        # which is applied afresh on every run.
+        # Only a sub-query that passed validation and executed caches a plan;
+        # a refused, failed or plan-only one never does, and a cache hit is
+        # already stored. What is cached is the planner's plan, never a
+        # plan.after hook's change of it. When a hook changed it, the planner's
+        # plan was not itself validated in this run; that is safe, because a
+        # cached plan goes through plan.after and the validator again on every
+        # hit.
         executed_cleanly = executor_response is not None and not any(
             e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
         )

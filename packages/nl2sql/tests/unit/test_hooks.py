@@ -92,7 +92,8 @@ def test_hook_exception_denies():
     assert not verdict.allowed and not after
     error = verdict.error("orchestrator")
     assert error.error_code == ErrorCode.HOOK_FAILED
-    assert "review" in error.message and "review service down" in error.message
+    # The caller learns which hook failed and where; the exception text is operator data only.
+    assert error.message == "The hook 'review' failed at run.before."
     assert error.details == {"hook": "review", "point": "run.before"}
 
 
@@ -211,6 +212,22 @@ def test_every_call_publishes_hook_decision():
     decisions = [(e.data["hook"], e.data["decision"], e.data["reason"]) for e in seen if e.name == "hook.decision"]
     assert decisions == [("ok", "allow", None), ("rewrite", "modify", None), ("gate", "deny", "No")]
     assert all(e.trace_id == scope.trace_id for e in seen)
+
+
+def test_a_hook_failure_keeps_its_reason_in_the_event_not_the_error():
+    bus = EventBus()
+    seen = []
+    bus.subscribe(seen.append)
+
+    def broken(ctx):
+        raise RuntimeError("https://review.internal/?token=abc")
+
+    with RunScope(bus, question="q").entered():
+        verdict = _run_before(HookRunner([_bind("review", broken)]))
+
+    [event] = [e for e in seen if e.name == "hook.decision"]
+    assert "token=abc" in event.data["reason"]
+    assert "token=abc" not in verdict.error("orchestrator").message
 
 
 def test_an_exception_let_through_is_published_as_an_error():

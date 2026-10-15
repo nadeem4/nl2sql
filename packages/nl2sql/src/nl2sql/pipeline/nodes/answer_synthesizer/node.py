@@ -100,7 +100,10 @@ class AnswerSynthesizerNode:
         query's answer adds one section to the prompt, its description, so a
         generated answer's prompt is exactly what it was.
         """
-        stream = bool(((config or {}).get("configurable") or {}).get("stream_answer"))
+        # Not while a hook is attached at answer.after: a streamed answer is
+        # already the caller's, and a deny there must be able to withhold it.
+        stream = (bool(((config or {}).get("configurable") or {}).get("stream_answer"))
+                  and not self.hooks.attached("answer.after"))
         if not stream and not verified:
             return self.chain
         key = (stream, verified)

@@ -252,6 +252,10 @@ def _overall_status(
     return "success" if produced_rows else "plan_only"
 
 
+# What a hook ends a run with; such a run's result carries none of its data.
+_HOOK_ENDINGS = {ErrorCode.HOOK_DENIED.value, ErrorCode.HOOK_FAILED.value, ErrorCode.NEEDS_APPROVAL.value}
+
+
 def result_from_state(
     state: Dict[str, Any],
     artifact_store: Any = None,
@@ -269,7 +273,10 @@ def result_from_state(
         else:
             errors.append(summary)
 
-    sub_queries = _sub_query_results(state, artifact_store, sample_rows, warnings)
+    # A hook that ended the run withholds its data as well as its answer:
+    # no rows, no artifact references, no result manifest.
+    withheld = any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
+    sub_queries = _sub_query_results(state, None if withheld else artifact_store, sample_rows, warnings)
     usage = QuestionUsage.model_validate(state.get("usage") or {})
     usage.plan_cache_hits = sum(1 for sq in sub_queries if sq.plan_source == "cache")
 
@@ -280,13 +287,13 @@ def result_from_state(
         trace_id=state.get("trace_id") or "",
         reasoning=list(state.get("reasoning") or []),
         warnings=warnings,
-        artifact_refs=state.get("artifact_refs") or {},
+        artifact_refs={} if withheld else state.get("artifact_refs") or {},
         status=_overall_status(sub_queries, errors, state),
         timings=dict(state.get("timings") or {}),
         usage=usage,
         trace_path=state.get("trace_path"),
         truncated=any(sq.truncated for sq in sub_queries),
-        result_manifest=list(_field(state.get("aggregator_response"), "results", None) or []),
+        result_manifest=[] if withheld else list(_field(state.get("aggregator_response"), "results", None) or []),
         source=_source(state.get("verified_match")),
         stop=state.get("stop"),
         approvals_needed=list(state.get("approvals_needed") or []),

@@ -229,12 +229,17 @@ class CuratedMatcherNode:
         # 6. Run it, under the row ceiling, with the values bound.
         return self._run(state, ds_id, query, params, tables)
 
-    def _hook(self, point: str, state: GraphState, sub_query: SubQuery, query: VerifiedQuery,
-              params: Dict[str, Any], tables: List[str], **fields: Any) -> None:
-        """``execute.before`` or ``execute.after`` on the verified query; raises ``_Denied`` when stopped."""
-        verdict = self.hooks.call(point, trace_id=state.trace_id, question=state.user_query,
-                                  user=state.user_context or UserContext(), datasource_id=sub_query.datasource_id,
-                                  sub_query=sub_query, sql=query.sql.strip(), params=params, tables=tables, **fields)
+    @staticmethod
+    def _hook_fields(state: GraphState, sub_query: SubQuery, query: VerifiedQuery, params: Dict[str, Any],
+                     tables: List[str]) -> Dict[str, Any]:
+        """What ``execute.before`` and ``execute.after`` see of the verified query."""
+        return dict(trace_id=state.trace_id, question=state.user_query, user=state.user_context or UserContext(),
+                    datasource_id=sub_query.datasource_id, sub_query=sub_query, sql=query.sql.strip(),
+                    params=params, tables=tables)
+
+    def _stop_if_denied(self, verdict, state: GraphState, sub_query: SubQuery, query: VerifiedQuery,
+                        params: Dict[str, Any]) -> None:
+        """Raises ``_Denied`` when a hook stopped the verified query."""
         if not verdict.allowed:
             error = verdict.error(self.node_name)
             raise _Denied(error, self._ended(state, sub_query, query, params, error))
@@ -273,7 +278,8 @@ class CuratedMatcherNode:
         )
         row_cap = self._row_ceiling(ds_id)
         # The verified path has no plan: only the execute points apply to it.
-        self._hook("execute.before", state, sub_query, query, params, tables)
+        fields = self._hook_fields(state, sub_query, query, params, tables)
+        self._stop_if_denied(self.hooks.call("execute.before", **fields), state, sub_query, query, params)
         response = self.executor.execute(ExecutorRequest(
             node_id=sub_query.id,
             trace_id=state.trace_id,
@@ -290,9 +296,10 @@ class CuratedMatcherNode:
         if response.errors or artifact is None:
             reasons = "; ".join(e.message for e in response.errors) or "no result"
             raise _Fallback("execution_failed", f"Verified query '{ds_id}.{query.id}' failed: {reasons}")
-        self._hook("execute.after", state, sub_query, query, params, tables,
-                   result=ResultSummary(node_id=sub_query.id, columns=list(artifact.columns),
-                                        row_count=artifact.row_count, truncated=artifact.row_count >= row_cap))
+        summary = ResultSummary(node_id=sub_query.id, columns=list(artifact.columns),
+                                row_count=artifact.row_count, truncated=artifact.row_count >= row_cap)
+        self._stop_if_denied(self.hooks.call("execute.after", **fields, result=summary),
+                             state, sub_query, query, params)
 
         decomposition = DecomposerResponse(
             sub_queries=[sub_query],

@@ -16,6 +16,7 @@ runner reads no config. The rules (docs/architecture/wave_a.md, section 6):
 """
 from __future__ import annotations
 
+import copy
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, FrozenSet, Literal, Optional, Sequence, Tuple
@@ -60,13 +61,15 @@ class HookVerdict:
 
     ``decision`` is None when the run may go on. Otherwise it is the ``Deny``
     or ``NeedsApproval`` that ended the point, from hook ``hook``; ``failed``
-    marks a hook error (always a run-scoped ``Deny``).
+    marks a hook error (always a run-scoped ``Deny``). ``modified`` is True
+    when a ``Modify`` changed a field: then read the changed value from ``ctx``.
     """
 
     ctx: HookContext
     decision: Optional[Any] = None
     hook: Optional[str] = None
     failed: bool = False
+    modified: bool = False
 
     @property
     def allowed(self) -> bool:
@@ -83,12 +86,13 @@ class HookVerdict:
         """The run's error for a stopped point: ``HOOK_DENIED``, ``HOOK_FAILED`` or ``NEEDS_APPROVAL``.
 
         Never retried (``CRITICAL``). ``details`` name the hook and the point,
-        and a deny's scope.
+        and a deny's scope. A hook error names only the hook and the point: the
+        exception text may hold an internal URL or a token, so it goes to the
+        log and the ``hook.decision`` event, which are operator data.
         """
         details = {"hook": self.hook, "point": self.ctx.point}
         if self.failed:
-            code, message = ErrorCode.HOOK_FAILED, (f"The hook '{self.hook}' failed at {self.ctx.point}: "
-                                                    f"{self.decision.reason}")
+            code, message = ErrorCode.HOOK_FAILED, f"The hook '{self.hook}' failed at {self.ctx.point}."
         elif isinstance(self.decision, NeedsApproval):
             code, message = ErrorCode.NEEDS_APPROVAL, (f"This question needs approval before it runs: "
                                                        f"{self.decision.reason}")
@@ -105,14 +109,25 @@ class HookRunner:
     def __init__(self, bindings: Sequence[HookBinding]) -> None:
         self.bindings: Tuple[HookBinding, ...] = tuple(bindings)
 
+    def attached(self, point: HookPoint) -> bool:
+        """Whether any hook runs at ``point``."""
+        return any(point in binding.points for binding in self.bindings)
+
     def call(self, point: HookPoint, **fields: Any) -> HookVerdict:
-        """Ask every hook attached at ``point``; ``fields`` are the ``HookContext``'s, ``point`` aside."""
+        """Ask every hook attached at ``point``; ``fields`` are the ``HookContext``'s, ``point`` aside.
+
+        The hooks see deep copies of ``fields``: the plan, the caller and the
+        values are the run's own objects, and a hook that changed one in place
+        would change the run without a ``Modify`` (past the validator, or into
+        the plan cache). ``Modify`` is the only way a hook changes anything.
+        """
         rule = HOOK_POINTS[point]
         attached = [binding for binding in self.bindings if point in binding.points]
         if not attached:
             # Nothing to ask: the values go on as given, unchecked.
             return HookVerdict(HookContext.model_construct(point=point, **fields))
-        ctx = HookContext(point=point, **fields)
+        ctx = HookContext(point=point, **copy.deepcopy(fields))
+        modified = False
         for binding in attached:
             started = time.perf_counter()
             try:
@@ -133,10 +148,12 @@ class HookRunner:
             if isinstance(decision, Modify):
                 changes = {name: getattr(decision, name) for name in rule.modifies
                            if getattr(decision, name) is not None}
-                ctx = ctx.model_copy(update=changes)
+                # Copied too: the hook keeps no handle on what the run goes on with.
+                ctx = ctx.model_copy(update=copy.deepcopy(changes))
+                modified = modified or bool(changes)
             elif isinstance(decision, (Deny, NeedsApproval)):
-                return HookVerdict(ctx, decision, binding.name)
-        return HookVerdict(ctx)
+                return HookVerdict(ctx, decision, binding.name, modified=modified)
+        return HookVerdict(ctx, modified=modified)
 
 
 NO_HOOKS = HookRunner(())
