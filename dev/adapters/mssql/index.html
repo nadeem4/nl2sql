@@ -4756,7 +4756,8 @@
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">database</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_db</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="s">"ODBC</span><span class="nv"> </span><span class="s">Driver</span><span class="nv"> </span><span class="s">18</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">SQL</span><span class="nv"> </span><span class="s">Server"</span><span class="w"> </span><span class="c1"># Optional: unset picks the newest one installed</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">trusted_connection</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">               </span><span class="c1"># true: log in as the account the engine runs under</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">trust_server_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">         </span><span class="c1"># true: accept a self-signed certificate</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">encrypt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                           </span><span class="c1"># false: a local or test server without TLS</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">trust_server_certificate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">         </span><span class="c1"># true: accept a self-signed certificate</span>
 </code></pre></div>
 <p>The keys are <code>MssqlConnection</code>'s (<code>nl2sql.adapters.mssql.adapter</code>), and any
 other key is an error; see <a href="../../configuration/datasources/#connection">Connection</a>.</p>
@@ -4767,11 +4768,12 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
   that <code>pyodbc.drivers()</code> lists, so a machine with only Driver 17 works without
   configuration. With none installed, <code>nl2sql check</code> fails at the <code>driver</code> stage
   and says where to download one.</li>
-<li><strong>Encryption</strong>: always on (<code>Encrypt=yes</code>). Driver 18 encrypts by default and
-  Driver 17 does not, so the adapter asks for it: the connection behaves the same
-  whichever driver is used. A server with a self-signed certificate (a local or
-  test server) needs <code>trust_server_certificate: true</code>.</li>
-<li><strong>URI Constructed</strong>: <code>mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}&amp;Encrypt=yes</code>, plus
+<li><strong>Encryption</strong>: on by default (<code>Encrypt=yes</code>). Driver 18 encrypts by default and
+  Driver 17 does not, so the adapter always says which it wants: the connection
+  behaves the same whichever driver is used. A server with a self-signed
+  certificate (a local or test server) needs <code>trust_server_certificate: true</code>;
+  one without TLS at all needs <code>encrypt: false</code>, which sends <code>Encrypt=no</code>.</li>
+<li><strong>URI Constructed</strong>: <code>mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}&amp;Encrypt=yes</code> (<code>no</code> with <code>encrypt: false</code>), plus
   <code>Trusted_Connection=yes</code> and <code>TrustServerCertificate=yes</code> when set.
   Built with SQLAlchemy's <code>URL.create</code>, so the user name and password are
   percent-escaped: a password containing <code>@ : / # %</code> works as written.</li>
