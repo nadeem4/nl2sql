@@ -71,10 +71,14 @@ WAIT_FOR_DOCKER = (f"for i in $(seq {DOCKER_WAIT // 5}); do"
                    " sleep 5; done; echo 'Docker is not installed on the VM yet.' >&2; exit 1")
 
 # Runs on the VM. The passwords arrive on stdin, one per line, and live only in
-# this command's environment.
-COMPOSE = ("IFS= read -r TESTBED_POSTGRES_PASSWORD && IFS= read -r TESTBED_MYSQL_PASSWORD"
-           " && IFS= read -r TESTBED_MSSQL_PASSWORD"
-           " && export TESTBED_POSTGRES_PASSWORD TESTBED_MYSQL_PASSWORD TESTBED_MSSQL_PASSWORD TESTBED_BIND=0.0.0.0"
+# this command's environment. Each loses a trailing carriage return, in case
+# anything on the way writes Windows line endings. No double quotes: on Windows
+# the command passes through gcloud.cmd, where one would unquote the `&&`.
+READ_PASSWORDS = " && ".join(f"IFS= read -r {name} && {name}=${{{name}%$(printf '\\r')}}"
+                             for name in ("TESTBED_POSTGRES_PASSWORD", "TESTBED_MYSQL_PASSWORD",
+                                          "TESTBED_MSSQL_PASSWORD"))
+COMPOSE = (READ_PASSWORDS
+           + " && export TESTBED_POSTGRES_PASSWORD TESTBED_MYSQL_PASSWORD TESTBED_MSSQL_PASSWORD TESTBED_BIND=0.0.0.0"
            " && sudo -E docker compose -f testbed/docker-compose.yml up -d --wait")
 
 # Runs on the VM before it stops: stopping the VM kills SQL Server instead of
@@ -113,16 +117,19 @@ def gcloud() -> str:
     return found
 
 
-def call(args: Sequence[str], *, input: Optional[str] = None, capture: bool = False,
+def call(args: Sequence[str], *, input: Optional[bytes] = None, capture: bool = False,
          env: Optional[Dict[str, str]] = None) -> str:
-    """Run ``gcloud args``; raise ``TestbedError`` naming the step when it fails."""
-    result = subprocess.run([gcloud(), *args], input=input, text=True,
+    """Run ``gcloud args``; raise ``TestbedError`` naming the step when it fails.
+
+    ``input`` is bytes: in text mode Windows would send every newline as CR LF.
+    """
+    result = subprocess.run([gcloud(), *args], input=input,
                             stdin=None if input is not None else subprocess.DEVNULL,
                             stdout=subprocess.PIPE if capture else None,
                             env=None if env is None else {**os.environ, **env})
     if result.returncode != 0:
         raise TestbedError(f"`gcloud {' '.join(args[:3])}` failed with exit code {result.returncode}.")
-    return result.stdout or ""
+    return (result.stdout or b"").decode("utf-8")
 
 
 def connect(args: Sequence[str]) -> None:
@@ -167,7 +174,8 @@ def up(target: Target) -> Dict[str, str]:
     connect(["compute", "ssh", target.instance, *ssh, f"--command={WAIT_FOR_DOCKER}"])
     print("Starting the servers (the first time loads the samples, a few minutes) ...", file=sys.stderr)
     call(["compute", "ssh", target.instance, *ssh, f"--command={COMPOSE}"],
-         input="".join(secrets[name] + "\n" for name in ("postgres", "mysql", "mssql")), env=STDIN_THROUGH)
+         input="".join(secrets[name] + "\n" for name in ("postgres", "mysql", "mssql")).encode("utf-8"),
+         env=STDIN_THROUGH)
     open_tunnels(target)
     return secrets
 

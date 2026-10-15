@@ -255,6 +255,20 @@ stores the VM's host key in PuTTY's cache; the `docker compose` step sets
 `CLOUDSDK_SSH_PUTTY_FORCE_CONNECT=false` in `gcloud`'s environment only, so
 the passwords on its stdin reach the VM. OpenSSH ignores the setting.
 
+The script writes that stdin as bytes, one password per line ending in a bare
+newline: in text mode Windows would end each line with a carriage return, and
+the servers would be initialised with every password plus `\r` while the tests
+use the password alone (MySQL then answers 1045 and SQL Server 18456). The
+command on the VM also drops a trailing carriage return from each password it
+reads. A server keeps the password its data volume was created with, so if
+one was ever initialised with a wrong password, drop the volumes once while
+the VM is up, then `down` and `up` again, which loads the samples afresh:
+
+```bash
+gcloud compute ssh nl2sql-testbed --project=nl2sql-testbed-261014 --zone=us-central1-a --tunnel-through-iap \
+  --command="sudo TESTBED_POSTGRES_PASSWORD=unused TESTBED_MYSQL_PASSWORD=unused TESTBED_MSSQL_PASSWORD=unused docker compose -f testbed/docker-compose.yml down -v"
+```
+
 After `up` on its own, remember `down`: a running VM bills by the hour. If
 the script is killed hard or the VM is started by hand, the nightly stop job
 below stops it at 03:00 UTC. That stop does not stop the servers first, so
