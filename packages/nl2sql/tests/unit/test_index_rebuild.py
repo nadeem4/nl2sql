@@ -133,7 +133,7 @@ def _routing_pools(reader) -> dict:
     """How many entries each routing search of ds_a saw, for the searches that saw any."""
     explain: list = []
     reader.route("q", ["ds_a"], explain=explain)
-    return {r["search"]: len(r["pool"]) for r in explain if r.get("pool")}
+    return {r["search"]: len(r["pool"]) for r in explain if r.get("pool") and r["search"] != "routing"}
 
 
 def test_a_build_keeps_the_one_it_replaced_and_deletes_older_ones(tmp_path):

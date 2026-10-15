@@ -2,7 +2,7 @@
   "schema": 2,
   "kind": "retrieval",
   "recorded_at": "2026-10-15T13:05:04Z",
-  "engine_version": "0.5.0",
+  "engine_version": "0.6.0",
   "git_commit": "653fa73c76eb2bc764795d19e9ee6e3c78e4617e",
   "git_dirty": false,
   "note": "0.6 baseline before Phase R (R1)",

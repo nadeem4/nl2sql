@@ -25,7 +25,7 @@ See docs/architecture/phase2.md, section 4.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 from langchain_core.documents import Document
@@ -53,36 +53,58 @@ ROUTE_SIGNALS: Dict[str, str] = {
 }
 
 
-def fuse(rankings: Mapping[str, Sequence[str]], rrf_k: int) -> List[RouteCandidate]:
-    """Reciprocal rank fusion: ``score(ds) = sum over signals of 1 / (rrf_k + rank)``, best first.
+def fuse(rankings: Mapping[str, Sequence[str]], rrf_k: int, datasource_ids: Sequence[str],
+         similarity: Optional[Mapping[str, float]] = None) -> List[RouteCandidate]:
+    """Reciprocal rank fusion over ``datasource_ids``: ``score(ds) = sum over signals of 1 / (rrf_k + rank)``.
 
-    ``rankings`` maps a signal to its datasource ids, best first. A datasource
-    a signal did not rank adds nothing from it. Ties go to the smaller id.
+    ``rankings`` maps a signal to the datasources it ranked, best first. A
+    datasource a signal did not rank (it has no entry of that type) gets the
+    rank after the last one ranked, so having entries of a type is not a vote:
+    only ranking well in a signal is. A signal that ranked nothing is skipped.
+    ``ranks`` records the real ranks only. ``similarity`` is each datasource's
+    best entry similarity, carried for :func:`shortlist`'s floor. Best first;
+    ties go to the smaller id.
     """
-    scores: Dict[str, float] = {}
-    ranks: Dict[str, Dict[str, int]] = {}
+    ids = list(dict.fromkeys(datasource_ids))
+    scores: Dict[str, float] = {ds: 0.0 for ds in ids}
+    ranks: Dict[str, Dict[str, int]] = {ds: {} for ds in ids}
     for signal, ranked in rankings.items():
+        ranked = [ds for ds in ranked if ds in scores]
+        if not ranked:
+            continue
         for rank, datasource_id in enumerate(ranked, start=1):
-            scores[datasource_id] = scores.get(datasource_id, 0.0) + 1.0 / (rrf_k + rank)
-            ranks.setdefault(datasource_id, {})[signal] = rank
-    order = sorted(scores, key=lambda ds: (-scores[ds], ds))
-    return [RouteCandidate(datasource_id=ds, score=scores[ds], ranks=ranks[ds]) for ds in order]
+            scores[datasource_id] += 1.0 / (rrf_k + rank)
+            ranks[datasource_id][signal] = rank
+        absent = 1.0 / (rrf_k + len(ranked) + 1)
+        for datasource_id in ids:
+            if signal not in ranks[datasource_id]:
+                scores[datasource_id] += absent
+    similarity = similarity or {}
+    order = sorted(ids, key=lambda ds: (-scores[ds], ds))
+    return [RouteCandidate(datasource_id=ds, score=scores[ds], ranks=ranks[ds],
+                           similarity=float(similarity.get(ds, 0.0))) for ds in order]
 
 
 def shortlist(fused: Sequence[RouteCandidate], limit: int,
               floor_ratio: float) -> Tuple[List[RouteCandidate], List[Dict[str, str]]]:
-    """The top ``limit`` of ``fused``, without any scoring under ``floor_ratio`` times the best.
+    """The top ``limit`` of ``fused``, less any datasource far less similar than the best.
 
-    Returns the kept candidates and, for the trace, each dropped datasource
-    with why: ``floor`` or ``limit``.
+    The floor is on similarity, not on the fused score: with a handful of
+    datasources every RRF score is within a few percent of the best, so a
+    floor on it would never drop anything. A datasource whose best entry
+    similarity is under ``floor_ratio`` times the most similar datasource's is
+    dropped (no floor when that similarity is not positive). Returns the kept
+    candidates and, for the trace, each dropped datasource with why:
+    ``floor`` or ``limit``.
     """
     if not fused:
         return [], []
-    floor = floor_ratio * fused[0].score
+    top = max(c.similarity for c in fused)
+    floor = floor_ratio * top if top > 0 else float("-inf")
     kept: List[RouteCandidate] = []
     dropped: List[Dict[str, str]] = []
     for candidate in fused:
-        if candidate.score < floor:
+        if candidate.similarity < floor:
             dropped.append({"datasource_id": candidate.datasource_id, "reason": "floor"})
         elif len(kept) >= limit:
             dropped.append({"datasource_id": candidate.datasource_id, "reason": "limit"})
@@ -314,22 +336,29 @@ class Retriever:
 
     def route(self, question: str, datasource_ids: Sequence[str],
               explain: Optional[List[Dict[str, Any]]] = None, *,
-              limit: int = 5, floor_ratio: float = 0.5) -> List[RouteCandidate]:
+              limit: int = 3, floor_ratio: float = 0.5,
+              allows: Optional[Callable[[Mapping[str, Any]], bool]] = None) -> List[RouteCandidate]:
         """The datasources ``question`` most likely needs, best first (docs/architecture/wave_a.md, section 9).
 
         Five searches (:data:`ROUTE_SIGNALS`) run over the live builds of
         ``datasource_ids`` only, so a datasource the caller's scope does not
-        reach is never searched, let alone ranked. Each ranks datasources by
-        their best entry: the description over every datasource entry,
-        exactly; the example questions, verified queries, tables and columns
-        over their ``VOTE_K`` nearest entries. The ranks are fused with
-        reciprocal rank fusion (``RRF_K``), and the top ``limit`` are kept,
-        less any scoring under ``floor_ratio`` times the best.
+        reach is never searched, let alone ranked. ``allows`` is the caller's
+        entry check (the resolver's: a table or column of a table the scope
+        hides, or a verified query that reads one, is not allowed): an entry
+        it refuses is dropped before anything is ranked or recorded, and the
+        searches fetch more until ``VOTE_K`` allowed entries are found or the
+        index runs out. Each search ranks datasources by their best entry: the
+        description over every datasource entry, exactly; the example
+        questions, verified queries, tables and columns over their ``VOTE_K``
+        nearest entries. The ranks are fused with reciprocal rank fusion
+        (:func:`fuse`, ``RRF_K``), and :func:`shortlist` keeps the top
+        ``limit``, less any datasource whose best similarity is under
+        ``floor_ratio`` times the most similar one's.
 
         ``explain`` gets one record per signal (``route.<signal>``: the pool
         by similarity, each datasource's best entry picked) and a ``routing``
-        record: each signal's ranking, the fused scores, the picks and what
-        was dropped and why.
+        record: each signal's ranking, the fused scores, a pool of the fused
+        datasources, the picks and what was dropped and why.
         """
         from nl2sql.common.resilience import VECTOR_BREAKER
 
@@ -337,6 +366,16 @@ class Retriever:
         if not ids:
             return []
         live = self._live(ids)
+        allowed = allows or (lambda _md: True)
+
+        def votes(embedding: List[float], where: Filter) -> List[Any]:
+            fetch = self.VOTE_K if allows is None else self.VOTE_K * self.FETCH_MULTIPLIER
+            while True:
+                hits = self.index.query(self.namespace, embedding, k=fetch, where=where, with_vectors=True)
+                visible = [h for h in hits if allowed(h.metadata)]
+                if len(visible) >= self.VOTE_K or len(hits) < fetch:
+                    return visible
+                fetch *= 2
 
         @VECTOR_BREAKER
         def _execute():
@@ -347,18 +386,20 @@ class Retriever:
                 # The description search is exact: one entry per datasource, a
                 # handful among hundreds, and approximate search under a filter
                 # that selective can miss one.
-                found[signal] = (self.index.get(self.namespace, where, with_vectors=True)
-                                 if signal == "description" else
-                                 self.index.query(self.namespace, embedding, k=self.VOTE_K, where=where,
-                                                  with_vectors=True))
+                found[signal] = ([e for e in self.index.get(self.namespace, where, with_vectors=True)
+                                  if allowed(e.metadata)]
+                                 if signal == "description" else votes(embedding, where))
             return embedding, found
 
         embedding, found = _execute()
         rankings: Dict[str, List[str]] = {}
+        best_similarity: Dict[str, float] = {}
         records: List[Dict[str, Any]] = []
         for signal, entries in found.items():
             scores = cosine_similarity([embedding], [e.vector for e in entries])[0] if entries else []
             order = sorted(range(len(entries)), key=lambda i: (-float(scores[i]), entries[i].id))
+            if signal != "description":
+                order = order[:self.VOTE_K]
             ranked: List[str] = []
             picks: List[str] = []
             pool: List[Dict[str, Any]] = []
@@ -369,6 +410,8 @@ class Retriever:
                 if best:
                     ranked.append(datasource_id)
                     picks.append(md.get("id") or entries[i].id)
+                    best_similarity[datasource_id] = max(best_similarity.get(datasource_id, float("-inf")),
+                                                         float(scores[i]))
                 pool.append({"rank": rank, "id": md.get("id") or entries[i].id, "label": entry_label(md),
                              "type": md.get("type"), "datasource_id": datasource_id, "table": md.get("table"),
                              "column": md.get("column"), "similarity": round(float(scores[i]), _ROUND),
@@ -382,16 +425,23 @@ class Retriever:
                 "pool": pool, "picks": picks, "dropped": [p["id"] for p in pool if not p["picked"]],
             })
 
-        fused = fuse(rankings, self.RRF_K)
+        fused = fuse(rankings, self.RRF_K, ids, best_similarity)
         kept, dropped = shortlist(fused, limit, floor_ratio)
         if explain is not None:
+            picked = {c.datasource_id for c in kept}
             explain.extend(records)
             explain.append({
                 "search": "routing", "query": question, "rrf_k": self.RRF_K, "vote_k": self.VOTE_K,
                 "candidates": limit, "floor_ratio": floor_ratio,
                 "signals": rankings,
-                "fused": [{"datasource_id": c.datasource_id, "score": round(c.score, 6), "ranks": c.ranks}
-                          for c in fused],
+                "fused": [{"datasource_id": c.datasource_id, "score": round(c.score, 6), "ranks": c.ranks,
+                           "similarity": round(c.similarity, _ROUND)} for c in fused],
+                # The fused ranking as a pool, so a search view can draw it.
+                "k": limit, "fetch_k": len(fused), "lambda_mult": 1.0,
+                "pool": [{"rank": rank, "id": c.datasource_id, "label": c.datasource_id, "type": "schema.datasource",
+                          "datasource_id": c.datasource_id, "similarity": round(c.similarity, _ROUND),
+                          "score": round(c.score, 6), "picked": c.datasource_id in picked}
+                         for rank, c in enumerate(fused, start=1)],
                 "picks": [c.datasource_id for c in kept],
                 "dropped": dropped,
             })

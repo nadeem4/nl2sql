@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, Any, TYPE_CHECKING
+from typing import Any, Callable, Dict, Mapping, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.config.curated import inspect_verified_sql
+from nl2sql.indexing.retrieval import CURATED_TYPE
+from nl2sql_sdk.schema import TableRef
 from nl2sql.policies import UserContext
 from nl2sql.common.logger import get_logger
 from nl2sql.hooks import hooks_of
@@ -29,7 +32,8 @@ class DatasourceResolverNode:
        one datasource registered, that one is used without a vector search.
        Otherwise routing (``Retriever.route``) ranks the datasources the
        caller's scope reaches, and only those: a datasource the role may not
-       read is never searched. ``settings.routing.candidates`` and
+       read is never searched, and a table it may not read (or a verified
+       query that reads one) never votes or reaches the trace. ``settings.routing.candidates`` and
        ``floor_ratio`` bound what it returns.
     2. The role check: candidates the caller's role may not read are dropped;
        none left is a ``SECURITY_VIOLATION``, before any model call.
@@ -53,6 +57,7 @@ class DatasourceResolverNode:
         self.ds_registry = ctx.ds_registry
         self.hooks = hooks_of(ctx)
         self.routing = ctx.settings.routing
+        self.curated = getattr(ctx, "curated", None)
         self.decomposer_tables = ctx.settings.retrieval.decomposer_tables
         # Registered as agent "datasourceresolver"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
@@ -111,6 +116,45 @@ class DatasourceResolverNode:
             metadata={},
             schema_version=self.vector_store.schema_version(datasource_id),
         )
+
+    def _route_filter(self, user_context: UserContext,
+                      datasource_ids: list[str]) -> Callable[[Mapping[str, Any]], bool]:
+        """Which index entries may vote in routing: none that names a table the caller's scope hides.
+
+        A table or column entry votes only when its table is one of the
+        datasource's visible tables in the live snapshot (none without a
+        snapshot); a verified query only when every table its SQL reads is
+        visible (not when the SQL does not parse). Description and example
+        entries name no table. The check is on the (datasource, table) pair:
+        two datasources can hold a table of the same name.
+        """
+        visible: Dict[str, set] = {}
+        denied_queries: Dict[str, set] = {}
+        for ds_id in datasource_ids:
+            scope = self.policy_engine.scope(user_context, ds_id)
+            snapshot = self.vector_store.snapshot(ds_id)
+            visible[ds_id] = ({TableRef(schema_name=t.table.schema_name, table_name=t.table.table_name).full_name
+                               for t in snapshot.contract.tables.values()
+                               if scope.allows(t.table.schema_name, t.table.table_name)} if snapshot else set())
+            section = self.curated.datasources.get(ds_id) if self.curated else None
+            denied_queries[ds_id] = {q.id for q in (section.verified_queries if section else [])
+                                     if not self._query_allowed(scope, ds_id, q.sql)}
+
+        def allows(metadata: Mapping[str, Any]) -> bool:
+            ds_id = metadata.get("datasource_id")
+            if metadata.get("type") == CURATED_TYPE:
+                return metadata.get("query_id") not in denied_queries.get(ds_id, set())
+            table = metadata.get("table")
+            return table is None or table in visible.get(ds_id, set())
+
+        return allows
+
+    def _query_allowed(self, scope, datasource_id: str, sql: str) -> bool:
+        try:
+            parsed = inspect_verified_sql(sql, self.ds_registry.get_dialect(datasource_id))
+        except Exception:
+            return False
+        return all(scope.allows(schema, table) for schema, table in parsed.tables)
 
     def _summary(self, user_context: UserContext, datasource_id: str) -> tuple[str, list[str]]:
         """The datasource's description and the sorted, bare names of the tables the caller may read.
@@ -270,6 +314,7 @@ class DatasourceResolverNode:
                 routed = self.vector_store.route(
                     state.user_query, reachable, explain=searches,
                     limit=self.routing.candidates, floor_ratio=self.routing.floor_ratio,
+                    allows=self._route_filter(state.user_context, reachable),
                 )
                 candidates = [self._direct_candidate(c.datasource_id) for c in routed]
                 if not candidates:

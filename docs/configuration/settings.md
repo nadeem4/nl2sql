@@ -23,7 +23,7 @@ retrieval:
   planning_k: 12
   decomposer_tables: 30
 routing:
-  candidates: 5
+  candidates: 3
   max_datasources: 3
   max_sub_queries: 6
   floor_ratio: 0.5
@@ -105,10 +105,10 @@ may spread. The resolver reads `candidates`, `max_datasources` and
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `candidates` | `5` | Datasources routing keeps for the answerability check, best by fused score first. |
+| `candidates` | `3` | Datasources routing keeps for the answerability check, best by fused score first. |
 | `max_datasources` | `3` | Datasources one question may use: of those the answerability check accepts, the resolver forwards at most this many, best first. |
 | `max_sub_queries` | `6` | Sub-queries one question may have. A decomposition over it ends the run with `QUESTION_TOO_BROAD`. |
-| `floor_ratio` | `0.5` | A candidate whose fused routing score is under this share of the best is dropped, between 0 and 1. `0` keeps every candidate up to `candidates`. |
+| `floor_ratio` | `0.5` | A candidate whose best index-entry similarity to the question is under this share of the most similar candidate's is dropped, between 0 and 1. It is on similarity, not on the fused score: with a handful of datasources every reciprocal-rank score is within a few percent of the best. `0` keeps every candidate up to `candidates`. |
 
 ## `results`
 

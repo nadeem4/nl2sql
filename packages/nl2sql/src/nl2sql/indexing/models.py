@@ -76,16 +76,19 @@ class DatasourceExampleChunk(BaseChunk):
 
 
 class RouteCandidate(BaseModel):
-    """A datasource routing ranked: its fused score and its rank in each signal that ranked it.
+    """A datasource routing ranked: its fused score, its rank in each signal that ranked it, its best similarity.
 
     ``ranks`` maps a signal (``description``, ``examples``, ``curated``,
     ``tables``, ``columns``) to the datasource's 1-based rank in it; a signal
-    in which the datasource had no entry is absent.
+    in which the datasource had no entry is absent. ``similarity`` is the
+    cosine similarity of its best entry across the signals, which the floor
+    compares.
     """
 
     datasource_id: str
     score: float
     ranks: Dict[str, int] = Field(default_factory=dict)
+    similarity: float = 0.0
 
 
 class TableChunk(BaseChunk):
