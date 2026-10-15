@@ -108,3 +108,26 @@ class ConnectionCheck(BaseModel):
     message: Optional[str] = None
     fix: Optional[str] = None
     server_version: Optional[str] = None
+
+
+class Estimate(BaseModel):
+    """The database's estimate of a query, without running it (``EstimatingAdapterProtocol.estimate``).
+
+    ``rows`` is the rows the database expects to *read*, added up over the
+    plan's scan operators (a full scan counts its table, not its filtered
+    output), so a ``LIMIT`` on the result does not hide a billion-row scan.
+    ``cost`` is the planner's own cost units, for display: comparable within
+    one database only, never with a limit. ``source`` says what was read, for
+    people. See docs/architecture/wave_b.md, section 9.
+    """
+
+    rows: Optional[int] = None
+    cost: Optional[float] = None
+    source: str
+
+
+class Overlap(BaseModel):
+    """Of ``sampled`` distinct non-null values of one column, how many (``matched``) exist in another."""
+
+    sampled: int
+    matched: int

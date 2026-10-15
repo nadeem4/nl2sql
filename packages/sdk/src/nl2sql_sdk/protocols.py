@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Any, Callable, ClassVar, Iterator, Optional, Protocol, Set, Tuple, Type, runtime_checkable
+from typing import Any, Callable, ClassVar, Dict, Iterator, Optional, Protocol, Set, Tuple, Type, runtime_checkable
 
 from .capabilities import DatasourceCapability
 from .contracts import AdapterRequest, ResultFrame
-from .models import ConnectionCheck, ConnectionModel, IndexScope, Limits
-from .schema import SchemaSnapshot
+from .models import ConnectionCheck, ConnectionModel, Estimate, IndexScope, Limits, Overlap
+from .schema import ColumnRef, SchemaSnapshot
 
 
 @runtime_checkable
@@ -122,4 +122,38 @@ class SqlRenderingAdapterProtocol(Protocol):
 
     def render_sql(self, expression: Any) -> str:
         """Return the SQL text for ``expression`` (a ``sqlglot.exp.Expression``)."""
+        ...
+
+
+@runtime_checkable
+class EstimatingAdapterProtocol(Protocol):
+    """Optional hook: the database's estimate of a query, without running it.
+
+    An adapter that has it declares ``DatasourceCapability.ESTIMATES_COST``;
+    the engine's cost rule (``policies.cost``) asks for one estimate per
+    sub-query before it runs. ``Estimate.rows`` is the rows the query *reads*
+    (see ``Estimate``). It runs under the datasource's ``timeout_ms`` and
+    never runs the statement. Raise on failure: the rule treats a failed
+    estimate as unknown.
+    """
+
+    def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+        """The database's estimate of the rows ``sql`` reads, without executing it. Raises on failure."""
+        ...
+
+
+@runtime_checkable
+class ProfilingAdapterProtocol(Protocol):
+    """Optional hook: how well one column's values match another's, for the schema profiler's join candidates.
+
+    The SDK's SQLAlchemy base implements it with SQLAlchemy Core, so an
+    adapter on it has it. Without it, the profiler proposes joins by name and
+    type alone, with no overlap.
+    """
+
+    def probe_overlap(self, left: ColumnRef, right: ColumnRef, sample_rows: int) -> Overlap:
+        """Of up to ``sample_rows`` distinct non-null values of ``left``, how many exist in ``right``.
+
+        Read-only, within the adapter's limits.
+        """
         ...

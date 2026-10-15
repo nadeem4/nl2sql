@@ -286,7 +286,7 @@ command has `--help`.
 | `nl2sql demo` | Write (`init --demo`), check, index and serve the three-database playground | `--dir` (default `nl2sql-demo`), `--host` (default `127.0.0.1`), `--port` (default 8765), `--no-browser`, `--api-key`, `--record`, `--allow-settings`, `--hosted`, `--questions-per-minute` (default 6), `--questions-per-session` (default 30) |
 | `nl2sql init [DIR]` | Write a new config into `DIR` (default `.`): `nl2sql.yaml` plus one file per section, checked with `load_config`. Never writes a key and never overwrites a file without `--force` | `--demo` (the three sample databases, their roles, verified queries, sample questions and settings), `--provider` (`openai`, `anthropic` or `openrouter`; default `openai`), `--force` |
 | `nl2sql run "QUESTION"` | Ask a question and print the plan, checks, SQL, rows and answer | `--role` (default `admin`), `--no-exec` (plan and validate only), `--ds-id`, `--verbose`/`-v`, `--show-perf` |
-| `nl2sql index` | Index datasource schemas into the index of the configured embedding model, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--curated-only` (re-index only the verified queries of the `curated` section, keeping the schema entries; no model call), `--enrich` (ask the `indexing_enrichment` LLM for descriptions the database lacks; spends tokens, off by default), `--check` (re-index nothing: compare each live database with the schema its index was built from; exits 0 unchanged, 1 drifted, 2 a check failed or nothing was checked; with `--role` (default `admin`) and `--json`) |
+| `nl2sql index` | Index datasource schemas into the index of the configured embedding model, one datasource at a time | `--datasource`/`-d ID` (repeatable), `--curated-only` (re-index only the verified queries of the `curated` section, keeping the schema entries; no model call), `--enrich` (ask the `profiler` LLM for descriptions the database lacks; spends tokens, off by default), `--check` (re-index nothing: compare each live database with the schema its index was built from; exits 0 unchanged, 1 drifted, 2 a check failed or nothing was checked; with `--role` (default `admin`) and `--json`) |
 | `nl2sql mcp` | Serve the engine to an MCP client over stdio: `ask`, `list_datasources`, `describe_table`, as the role given; needs `pip install "nl2sql-engine[mcp]"`. Refuses to start with no role and no `policies.default_role` | `--role` (repeatable), `--user` |
 | `nl2sql index prune` | Drop the index of every other embedding model (and 0.5's collection); the current one is kept | |
 | `nl2sql config check` | Check the whole config without starting the engine: every file, include and `${env:...}`, and every component it names (installed, right interface version, drivers present). Problems are printed by file; each secret is reported present or missing, never printed. Exits 0, or 1 on any problem. Writes nothing under `storage.path` | `--connect` (also connect to every datasource; one that fails is a problem) |
@@ -297,6 +297,9 @@ command has `--help`.
 | `nl2sql curated validate` | Check the `curated` section (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | |
 | `nl2sql curated test` | Run every verified query once against its database, read-only, with each param's default or example bound; reports pass/fail per query and exits 1 on any failure | |
 | `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in the `curated` section's shape, for review; never writes a file of the config | `--out PATH` (default: print to stdout) |
+| `nl2sql knowledge` | The glossary as the engine uses it. Its commands (`show`, `export`, `sources`) arrive in 0.8 | |
+| `nl2sql review` | The review queue of proposed knowledge and verified queries. Its commands (`list`, `show`, `accept`, `reject`, `export`, `apply`) arrive in 0.8 | |
+| `nl2sql profile` | Profile the indexed schema and file what it finds for review; arrives in 0.8 | |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |
 | `nl2sql cache clear` | Empty the plan cache in `<storage.path>/state.db`; schema snapshots are kept | |
@@ -489,7 +492,7 @@ nl2sql run "How many customers are there?"
 fill the recursive plan schema). Those defaults are what `nl2sql init` and
 `nl2sql demo` write. Each of the six model-using steps can have its own
 provider and model under `agents`: `curated_matcher`, `datasource_resolver`, `decomposer`,
-`ast_planner`, `refiner` and `answer_synthesizer`, plus `indexing_enrichment`
+`ast_planner`, `refiner` and `answer_synthesizer`, plus `profiler`
 for optional schema descriptions during indexing (off unless you run
 `nl2sql index --enrich`).
 

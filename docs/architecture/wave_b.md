@@ -1276,6 +1276,71 @@ flowchart TD
 | L2 | **Re-ask, settled phrases, save and surfaces.** `choice` on `run_query` and `stream_query` with its checks; H2's pinned entry taking a choice (`plan_source: "chosen"`, never cached; no resolver, decomposer or `datasources.after`); a choice that then needs approval; the settled-phrase rule in the clarifier; `engine.knowledge.save_choice`; `nl2sql run`'s prompt and exit 4; the MCP `ask` tool's `choice`; the clarify eval suite and the `clarify` outcome. Files: `api/query_api.py`, `public_api.py`, `pipeline/graph.py`, `pipeline/state.py`, `pipeline/routes.py` (the pinned entry), `ast_planner/node.py` (the chosen plan), `pipeline/nodes/clarifier/node.py` (settled phrases), `api/knowledge_api.py` (`save_choice`), `cli/commands/run.py`, `nl2sql/mcp/server.py`, `evaluation/suites/clarify.yaml`, `evaluation/scorers/outcome.py`. | L1, K2, Q1 | `test_choice_runs_the_chosen_plan_through_the_validator`, `test_choice_skips_resolver_decomposer_and_datasources_after`, `test_question_is_compared_before_run_before`, `test_inconsistent_request_is_invalid`, `test_changed_schema_or_glossary_is_stale`, `test_chosen_plan_is_not_cached`, `test_denied_datasource_in_a_choice_is_refused`, `test_chosen_plan_needing_cost_approval_round_trips`, `test_choice_and_approvals_together_are_refused`, `test_phrase_that_is_a_term_name_is_settled`, `test_synonym_shared_by_two_terms_is_asked`, `test_save_choice_creates_a_term_proposal`, `test_accepting_an_existing_term_replaces_it`, `test_run_command_asks_on_a_terminal_and_exits_4_otherwise`, `test_mcp_ask_round_trips_a_choice`, `test_clarify_outcome_scores` | `getting_started/` (clarification), `api/core/query.md` (`choice`), `getting_started/mcp.md`, `evals/cases.md` (`clarify`) |
 | P2 | **Drafted descriptions.** `profile(draft=True)` under the budget (`max_cost_usd`, unpriced model refused, `stopped_by: "cost_cap"`); the `profiler` agent's prompt from enrichment's; drafts as `table` and `column` proposals; `nl2sql profile --draft --max-cost`. Files: `nl2sql/profiler/drafts.py` (wiring the functions K3 moved), `nl2sql/profiler/prompts.py`, `nl2sql/profiler/run.py`, `cli/commands/profile.py`. | P1, K3 | `test_draft_never_overwrites_glossary_or_database_text`, `test_draft_reaches_no_prompt_until_accepted`, `test_accepted_draft_moves_to_the_glossary`, `test_draft_stops_at_its_cost_cap`, `test_draft_refuses_an_unpriced_model`, `test_draft_without_an_llm_reports_and_drafts_nothing` (fake LLM throughout) | `schema/profiler.md` (drafts), `configuration/llm.md` (the `profiler` agent) |
 
+!!! note "Built: the foundation (B0)"
+    Every shape the four tracks share is in place; nothing reads or publishes
+    it yet. Where the code on `main` differed from this page, the code won:
+
+    - **SDK.** `nl2sql_sdk/knowledge.py`: `Glossary`, `DatasourceKnowledge`,
+      `TableKnowledge`, `ColumnKnowledge`, `JoinKnowledge` (`from_`, alias
+      `from`), `Term`, `Rule` and the `KnowledgeSource` protocol. The text cap
+      is the validation context: `Glossary.model_validate(data,
+      context={"item_max_chars": n})`, 500 (`ITEM_MAX_CHARS`) without one.
+      `values` is allowed on `role: enum` only; rule ids are unique slugs.
+      `nl2sql_sdk/stores.py`: `Proposal` (with `Proposal.build(...)`, which
+      computes `id` through `proposal_id(kind, datasource_id, target,
+      change)`), its `ProposalKind`, `ProposalOrigin` and `ProposalStatus`,
+      `BuildPointer.knowledge_hash`, and `StateStore.put_proposal` (an upsert
+      by id; superseding is Q1's queue), `get_proposal`, `list_proposals`
+      (newest first), `decide_proposal(id, status, *, by, reason, wrote, at)`
+      and `purge_proposals(older_than)` (decided rows only). `Estimate` and
+      `Overlap` in `models.py`, `ESTIMATES_COST`, and
+      `EstimatingAdapterProtocol` and `ProfilingAdapterProtocol` in
+      `protocols.py`, all exported from `nl2sql_sdk`.
+    - **Stores.** Interface version 3 and migration `0005_proposals`, after
+      Wave A's D1 (version 2, migration `0004_schema_diffs`). Every built-in
+      store declares 3; a version-2 store is refused.
+    - **Config.** `knowledge` is a list section (`KnowledgeSourceConfig`, or
+      an object with `load`), `[]` when absent. `CostRule` on `Policies.cost`
+      and `Role.cost` (a role's `model_fields_set` says what it replaces).
+      `settings.knowledge`, `clarify`, `profiler`, `review`. The agent
+      `indexing_enrichment` is `profiler`, read by `ENRICHMENT_LLM_NAME` until
+      K3 moves it.
+    - **Errors.** `NEEDS_CLARIFICATION`, `CLARIFICATION_INVALID`,
+      `CLARIFICATION_STALE` and `COST_LIMIT_EXCEEDED`, never retried, each in
+      `DECLARED_AHEAD` with the PR that raises it. `ReviewError` and
+      `ReviewErrorCode` (`NOT_AUTHORIZED`, `NOT_WRITABLE`, `FILE_CHANGED`,
+      `NOT_FOUND`) are in `nl2sql/review/models.py`, beside `AcceptReport`.
+    - **Results.** `nl2sql/explain/models.py`, `nl2sql/clarify/models.py`
+      (`ClarificationRequest.build(...)` and `expected_id()`: SHA-256 of the
+      canonical JSON without `id`, 32 hex), `nl2sql/profiler/models.py`, and
+      `nl2sql/knowledge/models.py`: `KnowledgeUsed` (`terms` as `TermMatch`,
+      `rules` as `RuleUse`, `dropped`, `digest`), `KnowledgeSourceInfo` and
+      `DatasourceKnowledgeView`, which K1 may refine. `QueryResult.clarification`
+      and `explanation`, `SubQueryResult.knowledge_used` and `estimate`.
+      `needs_clarification` and `plan_source="chosen"` were already there (A0,
+      H2).
+    - **State.** `SubgraphExecutionState` lives in `pipeline/state.py`, not
+      `subgraphs/schemas.py`: it gains `knowledge_used`, and the planner's
+      readings are `ASTPlannerResponse.alternatives` and `ambiguous_phrase`
+      (with `PlanAlternative` and `PlannerAnswer` in `ast_planner/schemas.py`).
+      `SubgraphOutput` carries `knowledge_used`, `ambiguous_phrase`,
+      `alternatives` and `estimate` to the result: `graph_utils` copies the
+      first three from the sub-query's state, so K2 and L1 fill only the state
+      and X1 reads only the output; C2 sets `estimate`.
+    - **Events.** The seven are catalogued, none on the stream; the audit
+      observer writes `proposal.decided` and `cost.estimated` with
+      `decision` `confirm` or `refuse`. `cost.estimated` names its count
+      `estimated_rows`, not `rows`: no event has a field called `rows`
+      (`test_no_catalogued_event_has_a_rows_field`, D15).
+    - **Registry, facade, CLI.** The `knowledge_source` kind
+      (`nl2sql.knowledge_sources`, version 1); no entry point is declared
+      until K1 adds `yaml`. `engine.knowledge` and `engine.proposals`
+      (`api/knowledge_api.py`, `api/proposals_api.py`) with their final
+      signatures, each raising `NotImplementedError` naming its PR;
+      `test_wave_b_read_methods_require_a_caller` holds D60. The CLI groups
+      `knowledge`, `review` and `profile` are registered empty; P1 gives
+      `profile` its callback. `DIALECT_SCAN` covers the five new packages.
+
 **The demo recording.** K2 changes the planner's structured output from
 `PlanModel` to `PlannerAnswer`, and the replay provider keys on the
 structured output's name. K2 converts `cli/demo/recordings/chinook.json`

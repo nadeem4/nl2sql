@@ -19,8 +19,10 @@ if TYPE_CHECKING:
     from nl2sql.api.events_api import EventsAPI
     from nl2sql.api.feedback_api import FeedbackAPI
     from nl2sql.api.indexing_api import IndexAPI
+    from nl2sql.api.knowledge_api import KnowledgeAPI
     from nl2sql.api.llm_api import LLMAPI
     from nl2sql.api.policy_api import PoliciesAPI
+    from nl2sql.api.proposals_api import ProposalsAPI
     from nl2sql.api.query_api import QueryAPI, QueryResult
     from nl2sql.api.results_api import ResultsAPI
     from nl2sql.api.storage_api import StorageAPI
@@ -171,6 +173,21 @@ class NL2SQL:
         from nl2sql.api.evals_api import EvalsAPI
 
         return EvalsAPI(self._runtime)
+
+    @cached_property
+    def knowledge(self) -> "KnowledgeAPI":
+        """The glossary as the engine uses it: ``sources``, ``show``, ``export``, ``reload``, ``profile``,
+        ``save_choice``. Every read takes the caller."""
+        from nl2sql.api.knowledge_api import KnowledgeAPI
+
+        return KnowledgeAPI(self._runtime)
+
+    @cached_property
+    def proposals(self) -> "ProposalsAPI":
+        """The review queue: ``list``, ``get``, ``accept``, ``reject``, ``export``, ``apply``."""
+        from nl2sql.api.proposals_api import ProposalsAPI
+
+        return ProposalsAPI(self._runtime)
 
     @cached_property
     def _queries(self) -> "QueryAPI":

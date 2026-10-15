@@ -17,3 +17,6 @@ class DatasourceCapability(str, Enum):
     ENFORCES_READ_ONLY = "enforces_read_only"
     # A statement running past ``limits.timeout_ms`` is stopped by the server or the driver.
     ENFORCES_TIMEOUT = "enforces_timeout"
+    # ``estimate`` returns the database's estimate of the rows a query reads, without running it
+    # (EstimatingAdapterProtocol). The conformance kit checks it.
+    ESTIMATES_COST = "estimates_cost"

@@ -93,10 +93,15 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
     assert not set(DECLARED_AHEAD) & raised, sorted(set(DECLARED_AHEAD) & raised)
 
 
-# Wave A's codes, added by its foundation PR before their producers so the
-# parallel PRs never edit errors.py (docs/architecture/wave_a.md, D35), each
-# with the PR that raises it. All of them are raised now (S1, E3).
-DECLARED_AHEAD: dict = {}
+# Codes added by a wave's foundation PR before their producers, so the parallel
+# PRs never edit errors.py (docs/architecture/wave_a.md, D35; wave_b.md, D59),
+# each with the PR that raises it. Wave A's are all raised now (S1, E3).
+DECLARED_AHEAD: dict = {
+    "NEEDS_CLARIFICATION": "L1",
+    "CLARIFICATION_INVALID": "L2",
+    "CLARIFICATION_STALE": "L2",
+    "COST_LIMIT_EXCEEDED": "C2",
+}
 
 
 def test_cancelled_is_a_string_not_a_one_tuple():
@@ -122,7 +127,8 @@ def test_every_capability_flag_is_one_something_queries():
     source = "\n".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
     queried = set(re.findall(r"DatasourceCapability\.([A-Z_]+)", source))
 
-    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_TIMEOUT"}
+    # ESTIMATES_COST is declared ahead by Wave B's B0; C1's adapters and C2's cost rule query it.
+    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_TIMEOUT", "ESTIMATES_COST"}
 
 
 def test_the_public_facade_exposes_nothing_without_methods():

@@ -227,6 +227,31 @@ class PlanModel(BaseModel):
     reasoning: Optional[str] = None
 
 
+class PlanAlternative(BaseModel):
+    """Another reading of the question the planner flagged, with its own plan (docs/architecture/wave_b.md, D48)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=60)  # "Invoiced total (tax included)"
+    plan: PlanModel
+
+
+class PlannerAnswer(BaseModel):
+    """The planner's structured output (from K2, replacing a bare ``PlanModel``).
+
+    ``plan`` is the most likely reading. When the question can reasonably be
+    read more than one way that changes the result, ``ambiguous_phrase`` names
+    the phrase and ``alternatives`` holds up to two other readings. An answer
+    with alternatives is never cached (D47).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    plan: PlanModel
+    ambiguous_phrase: Optional[str] = None
+    alternatives: List[PlanAlternative] = Field(default_factory=list, max_length=2)
+
+
 class ASTPlannerResponse(BaseModel):
     """The planner's answer: the plan to validate, and the plan the planner (or the cache) produced.
 
@@ -241,6 +266,10 @@ class ASTPlannerResponse(BaseModel):
     # "cache" when the plan came from the plan cache and no LLM call was made.
     # "supplied", "approved" or "chosen" for a pinned plan (nl2sql.pipeline.pinned).
     plan_source: Literal["llm", "cache", "supplied", "approved", "chosen"] = "llm"
+    # The planner's other readings of an ambiguous phrase, each through plan.after (K2); the
+    # clarifier validates them and offers them (L1). Empty for a clear question or a pinned plan.
+    ambiguous_phrase: Optional[str] = None
+    alternatives: List["PlanAlternative"] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _planner_plan_defaults_to_plan(self) -> "ASTPlannerResponse":

@@ -236,6 +236,9 @@ def wrap_subgraph(
             ),
             reasoning=sub_reasoning,
             status=status,
+            knowledge_used=returned_state.knowledge_used,
+            ambiguous_phrase=planner_response.ambiguous_phrase if planner_response else None,
+            alternatives=list(planner_response.alternatives) if planner_response else [],
         )
 
         if status == "dropped":

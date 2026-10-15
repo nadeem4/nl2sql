@@ -215,6 +215,19 @@ def test_the_sdk_stores_module_imports_only_pydantic():
         "plugin compiles against it without the engine.", offenders)
 
 
+def test_the_sdk_knowledge_module_imports_only_pydantic():
+    """A knowledge-source plugin (a wiki, a catalog) installs the SDK for ``nl2sql_sdk.knowledge``, not the
+    engine (docs/architecture/wave_b.md, D36)."""
+    path = SDK / "knowledge.py"
+    allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
+    assert path.is_file(), "nl2sql_sdk/knowledge.py holds the glossary's models and KnowledgeSource."
+    offenders = [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                 if name.partition(".")[0] not in allowed]
+    assert not offenders, _broke(
+        "nl2sql_sdk.knowledge imports only pydantic and the standard library: a knowledge-source "
+        "plugin compiles against it without the engine.", offenders)
+
+
 def test_no_file_imports_the_sdk_by_its_old_name():
     """The SDK is ``nl2sql_sdk``; ``nl2sql_adapter_sdk`` is never published again."""
     roots = [PACKAGES, PACKAGES.parent / "scripts"]
@@ -376,7 +389,10 @@ def test_only_storage_imports_sqlite3():
 # knowledge, not SQL. Neither is datasets/, whose literals are file names.
 DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm", "aggregation",
                 "schema", "services", "datasources", "policies", "tracing", "storage", "runtime.py",
-                "public_api.py"]
+                "public_api.py",
+                # Wave B (docs/architecture/wave_b.md, section 14): the profiler's probe and the cost
+                # estimate are adapter methods, so none of these names a dialect either.
+                "knowledge", "review", "profiler", "clarify", "explain"]
 
 DIALECT_NAMES = re.compile(r"(?i)\b(sqlite|postgres|postgresql|mysql|mssql|tsql|duckdb|snowflake|bigquery)\b")
 
@@ -813,6 +829,35 @@ def test_every_access_decision_goes_through_scope():
         "(PolicyEngine.scope), and nothing outside nl2sql/policies/ matches policy patterns. "
         "One decision, made one way, is what keeps the planner, the validator and the "
         "executor from disagreeing about a table.", offenders)
+
+
+# Wave B's methods that show knowledge, proposals or schema (docs/architecture/wave_b.md, D60), by file and
+# class. Each takes the caller as a required keyword: no admin default, as Wave A's D33 made
+# ``datasources.schema()`` do.
+WAVE_B_READ_METHODS = {
+    ("api/knowledge_api.py", "KnowledgeAPI"): ("sources", "show", "export", "reload", "profile", "save_choice"),
+    ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "export"),
+}
+
+
+def test_wave_b_read_methods_require_a_caller():
+    offenders = []
+    for (relative, class_name), methods in WAVE_B_READ_METHODS.items():
+        cls = next(n for n in _tree(ENGINE / relative).body if isinstance(n, ast.ClassDef) and n.name == class_name)
+        found = {n.name: n for n in cls.body if isinstance(n, ast.FunctionDef)}
+        for method in methods:
+            node = found.get(method)
+            if node is None:
+                offenders.append(f"{relative}: {class_name}.{method} is missing")
+                continue
+            names = [a.arg for a in node.args.kwonlyargs]
+            if "user_context" not in names:
+                offenders.append(f"{relative}: {class_name}.{method} has no keyword-only user_context")
+            elif node.args.kw_defaults[names.index("user_context")] is not None:
+                offenders.append(f"{relative}: {class_name}.{method} gives user_context a default")
+    assert not offenders, _broke(
+        "Every Wave B method that shows knowledge, proposals or schema takes the caller as a required "
+        "keyword (D60): an app that forgot the caller fails rather than seeing everything.", offenders)
 
 
 # --------------------------------------------------------------------------

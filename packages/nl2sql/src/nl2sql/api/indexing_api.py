@@ -41,7 +41,7 @@ class IndexAPI:
         only when all are written, so a failure keeps its previous build and
         schema version answering. Runs in flight keep the build they started
         with. ``curated_only`` re-indexes the verified queries only.
-        ``enrich`` asks the ``indexing_enrichment`` LLM for descriptions and
+        ``enrich`` asks the ``profiler`` LLM for descriptions and
         spends tokens. ``on_progress`` gets a sentence before each step;
         ``on_datasource`` gets an :class:`IndexProgress` as each datasource
         starts, is done (with its entry counts) or fails (with the reason).

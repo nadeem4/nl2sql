@@ -29,6 +29,10 @@ from nl2sql.pipeline.events import RunEvents
 from nl2sql.pipeline.pinned import PinnedRun, SuppliedPlan, check_pinned
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
+from nl2sql.clarify.models import ClarificationRequest
+from nl2sql.explain.models import Explanation
+from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql_sdk.models import Estimate
 
 DEFAULT_SAMPLE_ROWS = 50
 # A run's stream ends with exactly one of these.
@@ -65,6 +69,10 @@ class SubQueryResult(BaseModel):
     # rows may be missing.
     row_cap: Optional[int] = None
     truncated: bool = False
+    # The knowledge this sub-query's prompts carried (glossary terms and rules), and the database's
+    # estimate of the rows it reads, when the cost rule asked for one.
+    knowledge_used: Optional[KnowledgeUsed] = None
+    estimate: Optional[Estimate] = None
 
 
 class AnswerSource(BaseModel):
@@ -122,6 +130,10 @@ class QueryResult(BaseModel):
     # What a person must approve before the question runs, one per pending sub-query, when status is
     # "needs_approval". Re-run the question with an Approval for each.
     approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
+    # The readings to choose from, when status is "needs_clarification" (from L1).
+    clarification: Optional[ClarificationRequest] = None
+    # The run's plan in plain English, rendered from the typed plan with no model call (from X1).
+    explanation: Optional[Explanation] = None
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -226,6 +238,8 @@ def _sub_query_results(
                 plan_source=_field(output, "plan_source", "llm") or "llm",
                 row_cap=_field(output, "row_cap"),
                 truncated=bool(_field(output, "truncated", False)),
+                knowledge_used=_field(output, "knowledge_used"),
+                estimate=_field(output, "estimate"),
             )
         )
     return results
