@@ -69,7 +69,7 @@ the first draft (PR #308) changed several of them; those are marked
 | D30 | **Join keys are coerced, not just checked.** The engine's aggregator casts both sides of a join key to the declared `dtype` (in polars, so no dialect is involved), and a value that does not convert is a warning. The validator rejects only categories that cannot be coerced (temporal against number or boolean); an unknown type is not checked. The plan has no `CAST`, so the validator never asks the model for one. | decided overnight, amended after review, owner to confirm | [The join-key type check](#the-join-key-type-check) |
 | D31 | **Structural diffs are stored with the new version** in the state store (store interface version 2). A rename is reported as a drop and an add. `index.check()` never re-indexes. | decided overnight, owner to confirm | [Schema drift](#10-schema-drift-measure-first) |
 | D32 | **Sanity checks:** a missing filter value with a close match, and a confirmed fan-out under `COUNT` (repairable as `COUNT(DISTINCT ...)`), are retried once. A fan-out under `SUM` or `AVG` (the plan has no derived tables to repair it), an all-null column, a missing value with no close match, and any check with no retry left are warnings. Many-to-many sums are one case of `JOIN_FAN_OUT`, not a code of their own. | decided overnight, amended after review, owner to confirm | [Answer sanity checks](#11-answer-sanity-checks) |
-| D33 | **MCP is stdio only in 0.7,** behind the `mcp` extra; the caller's role comes from `nl2sql mcp --role`, by default `policies.default_role`, and with neither the server refuses to start. `engine.datasources.schema()` requires a `user_context` and hides denied tables (bug B29); there is no default admin view. | decided overnight, amended after review, owner to confirm | [MCP server](#12-mcp-server-stdio) |
+| D33 | **MCP is stdio only in 0.7,** behind the `mcp` extra; the caller's role comes from `nl2sql mcp --role`, by default `policies.default_role`, and with neither the server refuses to start, except under `policies.allow_all`, where it starts and logs a warning that every table is readable; an unknown `--role` is refused, `allow_all` included. Over MCP a refusal is always the generic one, whatever `refusal_names_tables` says. `engine.datasources.schema()` requires a `user_context` and hides denied tables (bug B29); there is no default admin view, and the playground's `/api/schema` requires its `role`. | decided overnight, amended after review (twice: the second after the attack review of PR #325), owner to confirm | [MCP server](#12-mcp-server-stdio) |
 | D34 | **`QueryResult.warnings` is typed** (`RunWarning`: `code`, `node`, `message`, `sub_query_id`, `detail`), replacing the list of dicts. It lands with the sanity checks (S1), the PR that adds warnings, not in the foundation. | decided overnight, amended after review, owner to confirm | [Answer sanity checks](#11-answer-sanity-checks) |
 | D35 | **The first PR adds the shared shapes, and only those:** the SDK's `Event` and `Observer`, the bus, the catalog, `RunScope` with its publish slots, the registry kinds, the config shapes, the error codes, the new `status`, `stop` and `approvals_needed` result fields, and stub `engine.events` and `engine.evals` namespaces. The parallel PRs then never edit `config/models.py`, `common/errors.py`, `events/run.py` or `public_api.py`'s namespace list; the overlaps that remain are listed in the PR plan. | decided overnight, amended after review, owner to confirm | [PR plan](#16-pr-plan) |
 
@@ -1893,13 +1893,17 @@ schema panel passes the selected role.
     a missing one and a table in an unreachable datasource alike) with the
     `tables` the caller may read, or `ambiguous` when a bare name matches
     tables in two schemas. `nl2sql mcp` also starts without a role under
-    `allow_all`, where every caller reads everything, and refuses a role the
-    policies do not define. `datasources.schema(datasource_id, *,
+    `allow_all` (with a warning), and refuses a role the policies do not
+    define, under `allow_all` too. After the attack review of PR #325: the
+    identity is resolved inside each tool's guard (a resolver that raises
+    gives `INTERNAL_ERROR`); `SECURITY_VIOLATION` always carries the generic
+    refusal (`GENERIC_REFUSAL`); FastMCP is built with explicit settings; and
+    `/api/schema` without `?role=` is a 400. `datasources.schema(datasource_id, *,
     user_context)` filters through `policy_engine.scope(...).allows`
     (`schema_view(..., allows=)`), drops a foreign key to a denied table, and
     is in the boundary test's `ACCESS_DECISIONS`. The playground's
-    `/api/schema` takes `?role=` (default `admin`, as `/api/ask` does) and
-    the page sends its **Ask as** role. `mcp` is in `FORBIDDEN_AT_IMPORT`
+    `/api/schema` requires `?role=` (400 without it) and the page sends its
+    **Ask as** role. `mcp` is in `FORBIDDEN_AT_IMPORT`
     (which is what `test_import_nl2sql_does_not_load_mcp` was to check), and
     `test_mcp_uses_only_the_public_api` holds `nl2sql/mcp/` to the
     top-level `nl2sql` and `mcp` to `nl2sql/mcp/`.

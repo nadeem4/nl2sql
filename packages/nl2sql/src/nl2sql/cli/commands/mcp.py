@@ -29,17 +29,21 @@ def _fail(message: str) -> None:
 def caller(policies: "Policies", roles: List[str], user: Optional[str]) -> "UserContext":
     """The ``UserContext`` the server answers for: ``roles``, else the default role.
 
+    Under ``allow_all`` no role is needed (every caller reads everything), and
+    none is defined, so any ``--role`` is unknown. A ``default_role`` that
+    names no role never gets here: the config does not load.
+
     Raises:
-        ValueError: no role and no default role (and not ``allow_all``), or a
-            role the policies do not define.
+        ValueError: a role the policies do not define, or no role and no
+            default role (and not ``allow_all``).
     """
     from nl2sql import UserContext
 
+    unknown = [role for role in roles if role not in policies.roles]
+    if unknown:
+        defined = ", ".join(policies.roles) or "none (policies.allow_all is set)"
+        raise ValueError(f"Unknown role(s) {', '.join(unknown)}. The roles are: {defined}.")
     if not policies.allow_all:
-        unknown = [role for role in roles if role not in policies.roles]
-        if unknown:
-            raise ValueError(f"Unknown role(s) {', '.join(unknown)}. The roles are: "
-                             f"{', '.join(policies.roles) or '(none)'}.")
         roles = roles or ([policies.default_role] if policies.default_role else [])
         if not roles:
             raise ValueError("nl2sql mcp needs a role: pass --role <role> (repeatable), or set "
@@ -71,6 +75,8 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str]) -> No
         for status in report.datasources:
             if status.status == "failed":
                 logger.warning("Running degraded: %s", status)
+        if config.policies.allow_all:
+            logger.warning("policies.allow_all is set: the MCP client can read every table of every datasource.")
         logger.info("Serving %d datasource(s) over stdio as role(s) %s", len(config.datasources),
                     ", ".join(identity.roles) or "(allow_all)")
         server.build_server(engine, identity).run("stdio")

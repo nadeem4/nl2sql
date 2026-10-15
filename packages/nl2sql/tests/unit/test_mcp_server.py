@@ -202,7 +202,6 @@ def test_ask_never_returns_exception_text():
     out = _call(raised, ADMIN, "ask", question="q")
 
     assert [e["code"] for e in run["errors"]] == ["EXECUTOR_CRASH", "SECURITY_VIOLATION"]
-    assert run["errors"][1]["message"] == "You do not have permission to see the data."
     assert "t-3" in run["errors"][0]["message"]
     assert run["warnings"] == [
         {"code": "EXECUTION_FAILED", "message": "EXECUTION_FAILED: the trace t-3 has the details."},
@@ -242,3 +241,47 @@ def test_every_caller_facing_code_is_an_error_code():
     from nl2sql.mcp.server import _CALLER_FACING
 
     assert _CALLER_FACING <= {code.value for code in ErrorCode}
+
+
+def test_ask_never_names_a_denied_table():
+    """A refusal is always the generic one over MCP, whatever ``refusal_names_tables`` says."""
+    engine = _Engine(QueryResult(status="error", trace_id="t-4", errors=[
+        {"node": "logical_validator", "message": "Role 'viewer' denied access to 'chinook.Customer'",
+         "error_code": "SECURITY_VIOLATION", "severity": "ERROR"}]))
+
+    body = _call(engine, VIEWER, "ask", question="Who are the top customers?")
+
+    assert body["errors"] == [{"code": "SECURITY_VIOLATION", "node": "logical_validator",
+                               "message": "You do not have permission to see the data this question requires."}]
+    assert "Customer" not in json.dumps(body)
+
+
+@pytest.mark.parametrize("tool, arguments", [
+    ("ask", {"question": "q"}),
+    ("list_datasources", {}),
+    ("describe_table", {"datasource_id": "chinook", "table": "Album"}),
+])
+def test_an_identity_that_raises_returns_no_exception_text(tool, arguments):
+    """Wave C resolves a caller per request; a resolver's failure (a rejected token, say) is never echoed."""
+    def rejected():
+        raise RuntimeError("token=SECRET123 rejected")
+
+    engine = _Engine()
+    body = _call(engine, rejected, tool, **arguments)
+
+    assert body == {"status": "error", "errors": [
+        {"code": "INTERNAL_ERROR", "node": None, "message": "The server could not answer. Its log has the details."}]}
+    assert engine.calls == []
+
+
+def test_the_server_s_settings_come_from_code_not_the_environment(tmp_path, monkeypatch):
+    """FastMCP's settings read FASTMCP_* variables and ./.env; every one is passed explicitly, so neither applies."""
+    (tmp_path / ".env").write_text("FASTMCP_DEBUG=true" + chr(10) + "FASTMCP_LOG_LEVEL=DEBUG" + chr(10) + "FASTMCP_PORT=9" + chr(10),
+                                        encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FASTMCP_WARN_ON_DUPLICATE_TOOLS", "false")
+
+    settings = build_server(_Engine(), ADMIN).settings
+
+    assert settings.debug is False and settings.log_level == "INFO" and settings.port == 8000
+    assert settings.warn_on_duplicate_tools is True

@@ -31,8 +31,11 @@ Error: nl2sql mcp needs a role: pass --role <role> (repeatable), or set policies
 ```
 
 A role the policies do not define is refused the same way, naming the roles
-there are. With `policies: {allow_all: true}` (what `nl2sql init` writes) every
-caller reads everything, so no role is needed.
+there are, and a `policies.default_role` that names no role stops the config
+from loading. With `policies: {allow_all: true}` (what `nl2sql init` writes)
+every caller reads everything, so no role is needed: the server starts and logs
+a warning that the client can read every table of every datasource. Under
+`allow_all` no role is defined, so any `--role` is refused as unknown.
 
 ## Connect a client
 
@@ -76,7 +79,7 @@ run's trace.
 | `source` | Whether a verified query or a generated one answered. |
 | `warnings` | Each one's `code` and `message`, under the same rule as `errors`. |
 | `trace_id` | The run's trace. The full results are read by it with `engine.results`. |
-| `errors` | When the run failed: each one's `code`, `node` and `message`. A refusal, a hook's denial, a limit, a provider failure or an answer check keeps the engine's message; any other message names only its code and the trace, since it may carry an exception's text. |
+| `errors` | When the run failed: each one's `code`, `node` and `message`. A refusal (`SECURITY_VIOLATION`) always carries the generic "You do not have permission to see the data this question requires.", whatever `refusal_names_tables` says. A hook's denial, a limit, a provider failure or an answer check keeps the engine's message; any other message names only its code and the trace, since it may carry an exception's text. |
 | `approvals_needed` | When `status` is `needs_approval`: what a person must approve, as `run_query` returns it ([Approval](../architecture/wave_a.md#7-approval)). |
 | `stop` | When `status` is `stopped`: which limit stopped the run. |
 
@@ -95,14 +98,35 @@ The caller sees only what its roles may read:
 - `ask` with a `datasource_id` the caller cannot reach answers
   `DATASOURCE_NOT_FOUND`, as for one that does not exist, without running.
   Without one, the run is refused by the engine's policy checks as any run is.
+- `ask` never names a denied table. The client is a third party, and a
+  refusal that named the table would confirm it exists, so `refusal_names_tables`
+  does not apply here: every refusal carries the generic message.
+
+Two things can still give a table away, and are the operator's to manage:
+
+- **The refusal's code.** The message is generic, but the code is not. A plan
+  that names a table the role may not read can end in `SECURITY_VIOLATION`,
+  while a plan that names a table that does not exist fails a different check.
+  The review of this server saw it with a role written as a deny list (the
+  demo's `analyst`): a client that guesses table names can tell a denied table
+  from a missing one by the code. This is how the engine's validator reports,
+  not something the server adds.
+- **The datasource's description.** `list_datasources` returns each
+  datasource's `description` from the config, verbatim, to every caller that
+  reaches it. Do not name tables there that some role may not read.
 
 ## In Python
 
 `nl2sql.mcp.server.build_server(engine, identity)` returns the server (a
 `FastMCP`); `nl2sql mcp` builds the engine and calls
 `build_server(engine, identity).run("stdio")`. `identity` is a `UserContext`,
-or a function returning one that is called on every tool call. The engine
-stays yours to close.
+or a function returning one that is called on every tool call, inside the
+tool's guard: a function that raises gives `INTERNAL_ERROR`, never its
+exception's text. The engine stays yours to close.
+
+The SDK's `FastMCP` settings read `FASTMCP_*` environment variables and the
+working directory's `.env`; every setting is passed explicitly when the server
+is built, so neither can change it.
 
 ```python
 from nl2sql import NL2SQL, UserContext

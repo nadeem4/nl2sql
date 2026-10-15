@@ -22,10 +22,10 @@ ROLES = {"analyst": {"description": "Reads everything", "allow": ["*"]}}
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
-    """A project with one role and no default role, named by NL2SQL_CONFIG."""
+    """A project with one role and no default role (or ``policies`` as given), named by NL2SQL_CONFIG."""
     def write(**policies):
-        make_config(tmp_path, policies={"roles": ROLES, **policies})
         monkeypatch.setenv("NL2SQL_CONFIG", str(tmp_path / "nl2sql.yaml"))
+        make_config(tmp_path, policies=policies if "allow_all" in policies else {"roles": ROLES, **policies})
         return tmp_path / "nl2sql.yaml"
 
     return write
@@ -88,6 +88,36 @@ def test_mcp_without_a_role_serves_as_the_default_role(project, served):
 
     assert result.exit_code == 0, result.output
     assert served[0].roles == ["analyst"]
+
+
+def test_mcp_under_allow_all_starts_without_a_role_and_warns(project, served):
+    project(allow_all=True)
+
+    result = runner.invoke(app, ["mcp"])
+
+    assert result.exit_code == 0, result.output
+    assert served[0].roles == []
+    assert "WARNING" in result.stderr and "allow_all" in result.stderr
+    assert result.stdout == ""
+
+
+def test_mcp_under_allow_all_refuses_an_unknown_role(project, served):
+    project(allow_all=True)
+
+    result = runner.invoke(app, ["mcp", "--role", "analyst"])
+
+    assert result.exit_code == 1
+    assert "analyst" in result.stderr and served == []
+
+
+def test_mcp_refuses_a_default_role_that_names_no_role(project, served):
+    with pytest.raises(Exception, match="(?i)default_role 'ghost' is not one of the roles"):
+        project(default_role="ghost")
+
+    result = runner.invoke(app, ["mcp"])  # the file was written; loading it is what fails
+
+    assert result.exit_code == 1
+    assert "ghost" in result.stderr and served == []
 
 
 def test_logs_go_to_stderr(project):

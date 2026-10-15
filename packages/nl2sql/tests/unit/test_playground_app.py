@@ -225,7 +225,7 @@ def test_the_shipped_clips_are_small_and_come_in_pairs():
 def test_schema_route_reads_the_engine_snapshot():
     engine = _Engine(snapshot=_snapshot())
     client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook"))
-    body = client.get("/api/schema").json()
+    body = client.get("/api/schema", params={"role": "admin"}).json()
 
     assert body["datasource_id"] == "chinook"
     names = [t["name"] for t in body["tables"]]
@@ -261,6 +261,17 @@ def test_schema_route_shows_only_what_the_selected_role_may_read():
     assert [t["name"] for t in admin["tables"]] == ["Album", "Artist"]
 
 
+def test_schema_route_without_a_role_is_refused():
+    """No default view (D33): a request that names no role gets no schema."""
+    client = TestClient(build_app(_Engine(snapshot=_snapshot()), questions=[], roles=["admin"], mode="replay",
+                                  dataset="chinook"))
+
+    response = client.get("/api/schema")
+
+    assert response.status_code == 400
+    assert "role" in response.json()["detail"]
+
+
 def test_meta_lists_every_registered_datasource_with_the_demo_s_own_first():
     """The rail's switcher is built from this list, so all three have to be in it."""
     engine = _Engine(datasources=("support", "chinook", "webanalytics"))
@@ -283,14 +294,15 @@ def test_schema_route_follows_the_datasource_the_panel_asks_for():
     engine = _Engine(snapshot=None, datasources=("chinook", "support"))
     client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay",
                                   dataset="chinook"))
-    assert client.get("/api/schema").json()["datasource_id"] == "chinook"
-    assert client.get("/api/schema", params={"datasource": "support"}).json()["datasource_id"] == "support"
+    assert client.get("/api/schema", params={"role": "admin"}).json()["datasource_id"] == "chinook"
+    assert client.get("/api/schema", params={"datasource": "support", "role": "admin"}).json()[
+        "datasource_id"] == "support"
 
 
 def test_schema_route_is_empty_when_nothing_is_indexed():
     client = TestClient(build_app(_Engine(snapshot=None), questions=[], roles=["admin"],
                                   mode="replay", dataset="chinook"))
-    body = client.get("/api/schema").json()
+    body = client.get("/api/schema", params={"role": "admin"}).json()
     assert body["tables"] == []
     assert body["datasource_id"] == "chinook"
 

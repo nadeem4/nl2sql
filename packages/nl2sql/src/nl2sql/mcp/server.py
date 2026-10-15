@@ -37,13 +37,18 @@ INSTRUCTIONS = (
     "returns the answer, the SQL and the first rows. You see only what your role may read."
 )
 
-# The codes whose message the engine writes for the person asking: refusals,
+# A refusal over MCP never names a table, whatever ``refusal_names_tables``
+# says: the assistant asking is a third party, and a named denial confirms the
+# table exists. This is the engine's own generic refusal.
+GENERIC_REFUSAL = "You do not have permission to see the data this question requires."
+
+# The codes whose message the engine writes for the person asking: hooks,
 # limits, provider failures and the answer checks' warnings. Any other error
 # or warning (a crash, or an earlier attempt a retry recovered from) may carry
 # an exception's text, so its message is replaced. ``ErrorCode`` values, named
 # as text: the engine's own tests read ``ErrorCode.X`` as the place X is raised.
 _CALLER_FACING = frozenset({
-    "SECURITY_VIOLATION", "QUESTION_NOT_ANSWERABLE", "QUESTION_TOO_BROAD", "HOOK_DENIED", "NEEDS_APPROVAL",
+    "QUESTION_NOT_ANSWERABLE", "QUESTION_TOO_BROAD", "HOOK_DENIED", "NEEDS_APPROVAL",
     "RUN_LIMIT_REACHED", "CANCELLED", "PIPELINE_TIMEOUT", "PROVIDER_AUTH_FAILED", "PROVIDER_RATE_LIMITED",
     "PROVIDER_QUOTA_EXCEEDED", "PROVIDER_TIMEOUT", "PROVIDER_UNAVAILABLE", "PROVIDER_MODEL_UNAVAILABLE",
     "VALUE_NOT_FOUND", "RESULT_TRUNCATED", "JOIN_KEY_UNCONVERTED", "JOIN_FAN_OUT", "ALL_NULL_COLUMN",
@@ -57,7 +62,10 @@ def build_server(engine: NL2SQL, identity: Identity) -> FastMCP:
     called once per tool call. The engine stays the caller's to close.
     """
     caller = (lambda: identity) if isinstance(identity, UserContext) else identity
-    server = FastMCP("nl2sql", instructions=INSTRUCTIONS)
+    # FastMCP's settings are pydantic-settings that would read FASTMCP_*
+    # variables and the working directory's .env; FastMCP passes every one of
+    # them explicitly, so neither can change the server. Pinned here as well.
+    server = FastMCP("nl2sql", instructions=INSTRUCTIONS, debug=False, log_level="INFO")
 
     # The builtin ``dict`` return type makes the result the tool's structured
     # content as it is; ``typing.Dict`` would wrap it in ``{"result": ...}``.
@@ -72,26 +80,33 @@ def build_server(engine: NL2SQL, identity: Identity) -> FastMCP:
         approvals_needed; a run stopped at a limit carries stop. Pass
         datasource_id to skip routing.
         """
-        return await _off_the_loop(_ask, engine, caller(), question, datasource_id)
+        return await _off_the_loop(caller, _ask, engine, question, datasource_id)
 
     @server.tool()
     async def list_datasources() -> dict[str, Any]:
         """The datasources you may query: each one's id, type, description and status."""
-        return await _off_the_loop(_list_datasources, engine, caller())
+        return await _off_the_loop(caller, _list_datasources, engine)
 
     @server.tool()
     async def describe_table(datasource_id: str, table: str) -> dict[str, Any]:
         """One table's columns (name, type, nullable, primary key, description), foreign keys, row count
         and description. ``table`` is its name, or schema.name. A table you may not read is not found."""
-        return await _off_the_loop(_describe_table, engine, caller(), datasource_id, table)
+        return await _off_the_loop(caller, _describe_table, engine, datasource_id, table)
 
     return server
 
 
-async def _off_the_loop(tool: Callable[..., dict[str, Any]], *args: Any) -> dict[str, Any]:
-    """Run a tool in a worker thread (the engine blocks); an exception is logged, never returned."""
+async def _off_the_loop(caller: Callable[[], UserContext], tool: Callable[..., dict[str, Any]],
+                        engine: NL2SQL, *args: Any) -> dict[str, Any]:
+    """Name the caller, then run the tool in a worker thread (the engine blocks).
+
+    The caller is resolved here, on the event loop (where a per-request
+    identity lives), and inside the guard: an exception from the resolver or
+    the tool is logged, never returned.
+    """
     try:
-        return await anyio.to_thread.run_sync(lambda: tool(*args))
+        user = caller()
+        return await anyio.to_thread.run_sync(lambda: tool(engine, user, *args))
     except Exception:
         logger.exception("The MCP tool %s failed", tool.__name__.lstrip("_"))
         return _error("INTERNAL_ERROR", "The server could not answer. Its log has the details.")
@@ -182,7 +197,9 @@ def _sub_query(sq: dict[str, Any]) -> dict[str, Any]:
 def _problem(problem: dict[str, Any], trace_id: str, node: bool = True) -> dict[str, Any]:
     """A run error (or, without ``node``, a warning) as its code and a message safe to show."""
     code = problem.get("error_code") or problem.get("code")
-    if code in _CALLER_FACING:
+    if code == "SECURITY_VIOLATION":
+        message = GENERIC_REFUSAL
+    elif code in _CALLER_FACING:
         message = problem.get("message") or ""
     else:
         message = f"{code}: the trace {trace_id} has the details."
