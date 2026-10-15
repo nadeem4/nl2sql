@@ -22,7 +22,7 @@ from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
 from nl2sql_sdk.events import Event
 from nl2sql.hooks import hooks_of
 from nl2sql.hooks.approval import Approval, ApprovalRequest
-from nl2sql.limits import RunStop
+from nl2sql.limits import Budget, RunStop
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import RunEvents
@@ -446,7 +446,10 @@ class QueryAPI:
 
         The scope carries a :class:`~nl2sql.pipeline.events.RunEvents`, so the
         graph publishes the run's steps (``node.*``, ``result.manifest``,
-        ``answer.delta``) through it.
+        ``answer.delta``) through it, and the question's
+        :class:`~nl2sql.limits.Budget` (``settings.pipeline.max_llm_calls`` and
+        ``max_cost_usd``), so every model call of the run, in the graph or
+        not, is checked against the caps first.
         """
         scope = RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
                          execute=execute, tenant_id=self._ctx.tenant_id,
@@ -454,6 +457,9 @@ class QueryAPI:
         # While a hook may withhold the answer at answer.after, the manifest waits for it.
         hooks = hooks_of(self._ctx)
         scope.attach(RunEvents(scope.publish, hold_manifest=hooks.attached("answer.after")))
+        budget = Budget.for_question(self._ctx.settings.pipeline, scope.usage)
+        if budget is not None:
+            scope.attach(budget)
         scope.start()
         return scope
 

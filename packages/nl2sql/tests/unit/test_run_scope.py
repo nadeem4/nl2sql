@@ -322,19 +322,21 @@ def test_scope_callbacks_hold_the_usage_collector_and_the_attached_handlers():
 
     from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 
-    class Budget(BaseCallbackHandler):
+    class Extra(BaseCallbackHandler):
         pass
 
-    budget = Budget()
+    extra = Extra()
     scope = QueryAPI(_ctx()).open_scope("q", user_context=_USER)
-    scope.attach(budget)
+    scope.attach(extra)
 
+    from nl2sql.limits import Budget
     from nl2sql.pipeline.events import RunEvents
 
     handlers = scope.callbacks()
-    # The usage collector, the run's step events (E1), then what was attached.
+    # The usage collector, the run's step events (E1), the question's budget (E3), then what was attached.
     assert isinstance(handlers[0], TokenUsageCallback) and isinstance(handlers[1], RunEvents)
-    assert handlers[2:] == [budget]
+    assert isinstance(handlers[2], Budget) and handlers[2].usage is handlers[0]
+    assert handlers[3:] == [extra]
 
 
 def test_close_scope_with_a_result_built_without_a_graph_run():

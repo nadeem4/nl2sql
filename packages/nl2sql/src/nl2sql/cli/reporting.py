@@ -357,10 +357,16 @@ class ConsolePresenter:
     def print_usage_summary(self, total_duration: float, usage: Dict[str, Any]) -> None:
         """One line totalling the question's LLM usage, from ``QueryResult.usage``."""
         total = (usage or {}).get("total") or {}
+
+        def count(name: str) -> str:
+            # A count no call reported is unknown, not zero.
+            value = total.get(name)
+            return "-" if value is None else str(value)
+
         line = (
             f"LLM usage: {total.get('calls', 0)} calls | "
-            f"tokens in {total.get('input_tokens', 0)} (cached {total.get('cached_input_tokens', 0)}) "
-            f"out {total.get('output_tokens', 0)} (reasoning {total.get('reasoning_tokens', 0)}) | "
+            f"tokens in {count('input_tokens')} (cached {count('cached_input_tokens')}) "
+            f"out {count('output_tokens')} (reasoning {count('reasoning_tokens')}) | "
             f"{total_duration:.2f}s"
         )
         if total.get("cost") is not None:

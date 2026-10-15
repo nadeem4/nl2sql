@@ -28,7 +28,8 @@ def test_count_customers_end_to_end(demo_project, fake_llm):
     # One line totalling the question: the fake reports 1 prompt + 1 completion token per call.
     [line] = [ln for ln in r.stdout.splitlines() if ln.startswith("LLM usage:")]
     assert "4 calls" in line and "in 4" in line and "out 4" in line
-    assert "cached 0" in line and "reasoning 0" in line
+    # The fake reports no cache or reasoning detail: unknown, shown as "-", never 0.
+    assert "cached -" in line and "reasoning -" in line
 
 
 @pytest.mark.e2e

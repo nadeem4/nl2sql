@@ -7,7 +7,7 @@ import openai
 from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI
 
-from .base import as_int, temperature_error, usage, usage_metadata_of
+from .base import opt_int, sum_known, temperature_error, usage, usage_metadata_of
 
 SEED = 42
 
@@ -69,13 +69,18 @@ def build_chat_client(model: str, temperature: Optional[float], **kwargs: Any) -
     return client
 
 
-def _detail(details: Mapping[str, Any], key: str) -> int:
+def _detail(details: Mapping[str, Any], key: str) -> Optional[int]:
     """Read a usage detail, including its service-tier-prefixed variants.
 
     langchain-openai writes ``priority_cache_read`` rather than ``cache_read``
-    for priority/flex tier calls.
+    for priority/flex tier calls. None when no variant was reported.
     """
-    return sum(as_int(v) for k, v in (details or {}).items() if k == key or k.endswith(f"_{key}"))
+    return sum_known(*(opt_int(v) for k, v in (details or {}).items() if k == key or k.endswith(f"_{key}")))
+
+
+def _first(mapping: Mapping[str, Any], *keys: str) -> Any:
+    """The first of ``keys`` that ``mapping`` holds a value for."""
+    return next((mapping[k] for k in keys if mapping.get(k) is not None), None)
 
 
 class OpenAIWire:
@@ -102,15 +107,13 @@ class OpenAIWire:
     def read_usage(self, response: LLMResult) -> Optional[Dict[str, int]]:
         metadata = usage_metadata_of(response)
         if metadata:
-            inp = as_int(metadata.get("input_tokens"))
-            out = as_int(metadata.get("output_tokens"))
             return usage(
-                inp,
+                opt_int(metadata.get("input_tokens")),
                 _detail(metadata.get("input_token_details") or {}, "cache_read"),
                 _detail(metadata.get("input_token_details") or {}, "cache_creation"),
-                out,
+                opt_int(metadata.get("output_tokens")),
                 _detail(metadata.get("output_token_details") or {}, "reasoning"),
-                as_int(metadata.get("total_tokens")),
+                opt_int(metadata.get("total_tokens")),
             )
 
         # A plain (non-chat) LLM only reports the provider's raw usage object.
@@ -118,11 +121,11 @@ class OpenAIWire:
         legacy = output.get("token_usage") or output.get("usage")
         if legacy:
             return usage(
-                as_int(legacy.get("prompt_tokens") or legacy.get("input_tokens")),
-                as_int((legacy.get("prompt_tokens_details") or {}).get("cached_tokens")),
-                0,
-                as_int(legacy.get("completion_tokens") or legacy.get("output_tokens")),
-                as_int((legacy.get("completion_tokens_details") or {}).get("reasoning_tokens")),
-                as_int(legacy.get("total_tokens")),
+                opt_int(_first(legacy, "prompt_tokens", "input_tokens")),
+                opt_int((legacy.get("prompt_tokens_details") or {}).get("cached_tokens")),
+                None,
+                opt_int(_first(legacy, "completion_tokens", "output_tokens")),
+                opt_int((legacy.get("completion_tokens_details") or {}).get("reasoning_tokens")),
+                opt_int(legacy.get("total_tokens")),
             )
         return None

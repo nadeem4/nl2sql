@@ -25,7 +25,7 @@ class Wire(Protocol):
             node uses on this wire.
         cache_write_multiplier: What writing a token to this wire's prompt
             cache costs, as a multiple of the input rate. It prices a cache
-            write when ``LLM_PRICES`` gives the model no ``cache_write`` rate.
+            write when an ``llm.prices`` row gives the model no ``cache_write`` rate.
     """
 
     name: str
@@ -43,8 +43,12 @@ class Wire(Protocol):
     def mark_cache(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """The request payload with any prompt-cache breakpoints this wire needs."""
 
-    def read_usage(self, response: LLMResult) -> Optional[Dict[str, int]]:
-        """Token counts in the engine's fields, or None if the response reports none."""
+    def read_usage(self, response: LLMResult) -> Optional[Dict[str, Optional[int]]]:
+        """Token counts in the engine's fields, or None if the response reports none.
+
+        A count the response does not report (a cache read, a reasoning
+        count) is None, never 0.
+        """
 
 
 def temperature_error(model: str, tags: Optional[list], reason: str) -> ValueError:
@@ -57,13 +61,6 @@ def temperature_error(model: str, tags: Optional[list], reason: str) -> ValueErr
     )
 
 
-def as_int(value: Any) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-
-
 def usage_metadata_of(response: LLMResult) -> Optional[Mapping[str, Any]]:
     """The first ``AIMessage.usage_metadata`` in a chat result, if any."""
     for generations in response.generations or []:
@@ -74,14 +71,35 @@ def usage_metadata_of(response: LLMResult) -> Optional[Mapping[str, Any]]:
     return None
 
 
-def usage(input_tokens: int, cached: int, cache_write: int, output: int, reasoning: int,
-          total: int = 0) -> Dict[str, int]:
-    """The engine's usage fields. Cached and cache-write are subsets of input."""
+def opt_int(value: Any) -> Optional[int]:
+    """A count the provider reported, or None when it reported none: an unknown count is never 0."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def sum_known(*values: Optional[int]) -> Optional[int]:
+    """The sum of the counts that were reported; None when none was."""
+    known = [value for value in values if value is not None]
+    return sum(known) if known else None
+
+
+def usage(input_tokens: Optional[int], cached: Optional[int], cache_write: Optional[int], output: Optional[int],
+          reasoning: Optional[int], total: Optional[int] = None) -> Dict[str, Optional[int]]:
+    """The engine's usage fields. Cached and cache-write are subsets of input, reasoning of output.
+
+    A count the provider did not report is None, never 0.
+    """
+    if not total and input_tokens is not None and output is not None:
+        total = input_tokens + output
     return {
         "input_tokens": input_tokens,
         "cached_input_tokens": cached,
         "cache_write_input_tokens": cache_write,
         "output_tokens": output,
         "reasoning_tokens": reasoning,
-        "total_tokens": total or input_tokens + output,
+        "total_tokens": total,
     }

@@ -60,6 +60,21 @@ class LLMAPI:
 
         return describe_providers(self._ctx.registry)
 
+    def prices(self) -> Dict[str, Any]:
+        """The prices every model call is costed with: the dated table with ``llm.prices`` applied.
+
+        ``checked_on`` is the date the table was last checked against the
+        providers' pages; ``models`` maps each model name to its ``input``,
+        ``cached_input``, ``cache_write`` and ``output`` rates (USD per million
+        tokens; a config row's cache rates may be None, see
+        :mod:`nl2sql.llm.prices`), ``verified``, ``source`` (``table`` or
+        ``config``) and ``citation`` (where a table row's numbers came from).
+        A model not listed is not priced: its calls' cost is null.
+        """
+        from nl2sql.llm.prices import effective_prices
+
+        return effective_prices(self._ctx.config.llm.prices)
+
     def replace(self, llm: Union["LLM", Mapping[str, Any]], *, by: Optional["UserContext"] = None,
                 via: str = "python") -> "LLMChange":
         """Replace the whole ``llm`` section at once: validated, atomic, logged. Never calls a model.

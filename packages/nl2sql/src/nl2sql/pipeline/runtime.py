@@ -20,6 +20,7 @@ from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.common.dates import run_date
 from nl2sql.runtime import Runtime
 from nl2sql.hooks import hooks_of
+from nl2sql.limits import Budget, RunStop, describe, stop_answer
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.pinned import PinnedRun, check_pinned, pinned_from_approvals
@@ -156,8 +157,8 @@ def _pin_index(ctx: Runtime):
 
 
 def usage_prices(ctx: Runtime) -> Dict:
-    """The price table a run's ``TokenUsageCallback`` costs its calls with."""
-    return {model: price.model_dump(exclude_none=True) for model, price in ctx.config.llm.prices.items()}
+    """``llm.prices``: the overrides a run's ``TokenUsageCallback`` prices its calls with, before the dated table."""
+    return dict(ctx.config.llm.prices)
 
 
 def run_with_graph(
@@ -279,7 +280,29 @@ def run_with_graph(
             out["trace_path"] = path
         return out
 
+    def _stopped(stop: RunStop) -> Dict:
+        """A run a ``Budget`` stopped at a limit: ``stopped``, with the limit and the setting named."""
+        message = f"The question reached its {describe(stop)}."
+        answer = stop_answer(stop)
+        return _done({
+            "errors": [
+                PipelineError(
+                    node="orchestrator",
+                    message=message,
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.RUN_LIMIT_REACHED,
+                )
+            ],
+            "stop": stop,
+            # Where the answer synthesizer would have written it, as the timeout's answer is.
+            "answer_synthesizer_response": {"final_answer": {
+                "summary": answer, "format_type": "text", "content": answer, "warnings": []}},
+            **_telemetry(),
+        }, "stopped", message)
+
     def _cancelled() -> Dict:
+        if isinstance(token.reason, RunStop):
+            return _stopped(token.reason)
         return _done({
             "errors": [
                 PipelineError(
@@ -293,6 +316,10 @@ def run_with_graph(
         }, "cancelled")
 
     attached = [cb for cb in scope.callbacks() if cb is not usage] if scope is not None else []
+    # The run's budget stops it through this run's token (wave_a.md, section 5).
+    for piece in attached:
+        if isinstance(piece, Budget):
+            piece.bind(token)
     hooks = hooks_of(ctx)
 
     def _invoke():
@@ -340,6 +367,9 @@ def run_with_graph(
         try:
             result = future.result(timeout=timeout_sec)
         except concurrent.futures.TimeoutError:
+            # A budget stop the worker was still unwinding from is the run's ending, not the timeout.
+            if isinstance(token.reason, RunStop):
+                return _stopped(token.reason)
             # The worker keeps running the graph until its nodes observe the
             # cancelled token. That is a background wind-down, not a hang: the
             # caller is answered now.

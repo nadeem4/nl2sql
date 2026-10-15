@@ -42,6 +42,8 @@ class EvalReport(BaseModel):
     clarify: bool = False
     max_cost_usd: Optional[float] = None
     spent: float = 0.0
+    # Mode full: calls whose cost is unknown (no token counts reported); not counted in spent.
+    unknown_cost_calls: int = 0
     stopped: Optional[str] = None  # "max_cost" when the cap stopped the run
     skipped: int = 0  # role runs left out: a clarify case, with clarify off
     prices_checked_on: Optional[str] = None
@@ -287,7 +289,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
         for node, counts in (r.get("tokens_by_node") or {}).items():
             totals = tokens.setdefault(node, {f: 0 for f in _TOKEN_FIELDS})
             for f in _TOKEN_FIELDS:
-                totals[f] += counts.get(f, 0)
+                totals[f] += counts.get(f) or 0  # a count no call reported adds nothing
 
     node_times: Dict[str, List[float]] = {}
     for r in records:

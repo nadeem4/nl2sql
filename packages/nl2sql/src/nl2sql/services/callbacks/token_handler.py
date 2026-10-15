@@ -11,16 +11,18 @@ client stamps on the message. Every adapter fills the same fields:
 ``input_tokens``, ``cached_input_tokens``, ``cache_write_input_tokens``,
 ``output_tokens``, ``reasoning_tokens`` and ``total_tokens``.
 
-A detail the provider did not report is recorded as ``0``. A call whose result
-carries no usage at all is recorded with zero tokens and ``usage_reported=False``
-so a zero is never mistaken for a measurement. Cached and cache-write tokens are
-a subset of ``input_tokens``; reasoning tokens are a subset of ``output_tokens``.
+A count the provider did not report is None, never ``0``: a call whose
+result carries no usage at all (a failed call) has every count None and
+``usage_reported=False``. Cached and cache-write tokens are a subset of
+``input_tokens``; reasoning tokens are a subset of ``output_tokens``.
 
-With a price for the model (``LLM_PRICES``), each part of the prompt is billed
-at its own rate: cache reads at ``cached_input``, cache writes at
-``cache_write`` (by default the input rate times the wire's
-``cache_write_multiplier``: 1.25 for Anthropic's 5-minute cache, 1 for OpenAI),
-and the rest at ``input``.
+Every call is priced from ``nl2sql.llm.prices`` (``llm.prices``, then the
+dated table; :func:`~nl2sql.llm.prices.price_for`), each part of the prompt at
+its own rate: cache reads at ``cached_input``, cache writes at
+``cache_write`` (for a config row without one, the input rate times the
+wire's ``cache_write_multiplier``: 1.25 for Anthropic's 5-minute cache, 1 for
+OpenAI), the rest at ``input``, and the output (reasoning included) at
+``output``. A model with no price, or a call with no counts, has a null cost.
 """
 from __future__ import annotations
 
@@ -35,11 +37,11 @@ from pydantic import BaseModel, Field
 
 from nl2sql.events import publish
 from nl2sql.llm.failures import redact_keys
+from nl2sql.llm.prices import call_cost, price_for_call
 from nl2sql.llm.wires import AGENT_KEY, wire_named
 
-# Per-model prices, per million tokens:
-# {"input": .., "output": .., "cached_input": .., "cache_write": ..}.
-Prices = Mapping[str, Mapping[str, float]]
+# ``llm.prices``: per model, a ``Price`` (or the same keys as a mapping), per million tokens.
+Prices = Mapping[str, Any]
 
 _TOKEN_FIELDS = (
     "input_tokens",
@@ -57,31 +59,32 @@ class UsageTotals(BaseModel):
     ``latency_s`` is time spent waiting on the model, summed over calls; a
     node's wall-clock time (which also covers its non-LLM work) is in
     ``QueryResult.timings``. ``cost`` is null unless every call counted here
-    ran on a model with a configured price.
+    has a cost. A token count is the sum of what the calls reported, and
+    null when no call reported it.
     """
 
     calls: int = 0
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
-    cache_write_input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
-    total_tokens: int = 0
+    input_tokens: Optional[int] = None
+    cached_input_tokens: Optional[int] = None
+    cache_write_input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    reasoning_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
     latency_s: float = 0.0
     cost: Optional[float] = None
 
 
 class LLMCallUsage(BaseModel):
-    """One model call: which node made it, on which model, and what it used."""
+    """One model call: which node made it, on which model, and what it used (None: not reported)."""
 
     node: str
     model: str = ""
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
-    cache_write_input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
-    total_tokens: int = 0
+    input_tokens: Optional[int] = None
+    cached_input_tokens: Optional[int] = None
+    cache_write_input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    reasoning_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
     latency_s: float = 0.0
     cost: Optional[float] = None
     usage_reported: bool = True
@@ -132,35 +135,22 @@ def _model_name(response: LLMResult) -> str:
 
 def _cost(call: LLMCallUsage, requested_model: str, prices: Optional[Prices],
           cache_write_multiplier: float = 1.0) -> Optional[float]:
-    """Price a call by its served model name, else by the configured one.
-
-    Cache reads cost ``cached_input`` (default ``input``); cache writes cost
-    ``cache_write``, by default the input rate times the wire's
-    ``cache_write_multiplier`` (1.25 on Anthropic). The rest of the prompt is
-    billed at ``input``. No prefix matching: ``gpt-4o`` must not price
-    ``gpt-4o-mini``.
-    """
-    if not prices:
+    """Price a call: ``llm.prices`` by its served name, then its configured one, then the table (``price_for_call``)."""
+    price = price_for_call(call.model, requested_model, prices)
+    if price is None:
         return None
-    price = prices.get(call.model) or prices.get(requested_model)
-    if not price or "input" not in price or "output" not in price:
-        return None
-    cached_price = price.get("cached_input", price["input"])
-    write_price = price.get("cache_write", price["input"] * cache_write_multiplier)
-    uncached = max(call.input_tokens - call.cached_input_tokens - call.cache_write_input_tokens, 0)
-    return round(
-        (uncached * price["input"] + call.cached_input_tokens * cached_price
-         + call.cache_write_input_tokens * write_price + call.output_tokens * price["output"])
-        / 1_000_000,
-        8,
-    )
+    return call_cost(price, input_tokens=call.input_tokens, output_tokens=call.output_tokens,
+                     cached_input_tokens=call.cached_input_tokens,
+                     cache_write_input_tokens=call.cache_write_input_tokens,
+                     cache_write_multiplier=cache_write_multiplier)
 
 
 def _roll_up(calls: List[LLMCallUsage]) -> UsageTotals:
     totals = UsageTotals(calls=len(calls))
+    for name in _TOKEN_FIELDS:
+        known = [getattr(call, name) for call in calls if getattr(call, name) is not None]
+        setattr(totals, name, sum(known) if known else None)
     for call in calls:
-        for name in _TOKEN_FIELDS:
-            setattr(totals, name, getattr(totals, name) + getattr(call, name))
         totals.latency_s += call.latency_s
     totals.latency_s = round(totals.latency_s, 4)
     if calls and all(call.cost is not None for call in calls):
@@ -181,7 +171,8 @@ class TokenUsageCallback(BaseCallbackHandler):
     """
 
     def __init__(self, prices: Optional[Prices] = None) -> None:
-        self._prices = prices
+        # ``llm.prices``; the dated table prices every model it does not name.
+        self._prices = prices or {}
         self._lock = threading.Lock()
         self._open: Dict[UUID, tuple] = {}
         self._calls: List[LLMCallUsage] = []
@@ -228,6 +219,11 @@ class TokenUsageCallback(BaseCallbackHandler):
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
         self._finish(run_id, None, error)
+
+    def spent(self) -> float:
+        """Dollars spent so far: the sum of the calls with a known cost (what a cost cap compares)."""
+        with self._lock:
+            return round(sum(call.cost for call in self._calls if call.cost is not None), 8)
 
     def call_for(self, run_id: UUID) -> Optional[LLMCallUsage]:
         """The record for one finished LLM run, e.g. for a run trace to attach."""

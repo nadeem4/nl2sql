@@ -18,7 +18,7 @@ import pytest
 from nl2sql.api.evals_api import EvalsAPI
 from nl2sql.config import LLM
 from nl2sql.evaluation.gold_llm import GoldPlanLLM, gold_plans
-from nl2sql.evaluation.prices import PRICES, call_cost
+from nl2sql.llm.prices import PRICES, call_cost
 from nl2sql.evaluation.run import UnknownPriceError
 from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 

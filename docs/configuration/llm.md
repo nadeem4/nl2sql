@@ -199,10 +199,10 @@ How the engine uses it:
   refuses a non-streaming call whose `max_tokens` could outlast its timeout.
 - **Usage.** Cache reads and writes are reported as `cached_input_tokens` and
   `cache_write_input_tokens`, with each input token counted once (see
-  [Query API → usage](../api/core/query.md)). With a price in `llm.prices`, a cache
-  write costs 1.25x the model's `input` rate (Anthropic's price for a 5-minute
-  write, the only kind the engine asks for) unless the price gives its own
-  `cache_write`.
+  [Query API → usage](../api/core/query.md)). A cache write costs 1.25x the
+  model's `input` rate (Anthropic's price for a 5-minute write, the only kind
+  the engine asks for): the price table's Claude rows say so, and an
+  `llm.prices` row without its own `cache_write` gets it from the wire.
 
 `nl2sql demo --record` records Claude too: with an Anthropic key the recording
 proxy speaks Anthropic's Messages API to `https://api.anthropic.com`, and stores
@@ -568,20 +568,55 @@ Switching embedding providers requires a re-index.
 
 ## Prices
 
-`prices` gives per-model prices per million tokens, so `QueryResult.usage`
-reports a `cost`:
+Every model call is priced, so `QueryResult.usage` reports a `cost`, from a
+dated price table the engine ships (`nl2sql/llm/prices.py`, USD per million
+tokens, each row with its source), with `prices` in the config adding a model
+or replacing a row (a negotiated rate, a fine-tune):
 
 ```yaml
 prices:
   gpt-4o: { input: 2.5, cached_input: 1.25, output: 10 }
 ```
 
-Optional `cached_input` (cache reads) defaults to `input`; optional
-`cache_write` (cache writes) defaults to `input` times the wire's write
-premium: 1.25 for Claude (`provider: anthropic`, whose 5-minute cache write
-Anthropic bills at 1.25x input) and 1 for the OpenAI wire. The rest of the
-prompt is billed at `input`. With no price for a model, `QueryResult.usage`
-reports tokens only and `cost` is `null`. No prices are built in.
+| Model | Input | Cached input | Cache write | Output |
+| --- | --- | --- | --- | --- |
+| gpt-5.4 | 2.50 | 0.25 | 2.50 | 15.00 |
+| gpt-5.4-mini | 0.75 | 0.075 | 0.75 | 4.50 |
+| claude-opus-5 | 5.00 | 0.50 | 6.25 | 25.00 |
+| claude-sonnet-5 | 2.00 | 0.20 | 2.50 | 10.00 |
+| claude-haiku-4-5 | 1.00 | 0.10 | 1.25 | 5.00 |
+
+The Claude rows match Anthropic's first-party prices, with the 5-minute
+cache write (1.25x input; the engine never asks for the 1-hour cache, which
+costs 2x). The OpenAI rows still need verifying against OpenAI's published
+prices (owner to confirm); put a row in `llm.prices` if yours differ.
+
+The table was checked on 2026-09-21; `engine.llm.prices()` returns it as the
+engine uses it, `llm.prices` applied: `checked_on`, and per model the four
+rates, `verified`, `source` (`table` or `config`) and `citation`.
+
+- **Exact names, overrides first.** A call is priced from `llm.prices` by the
+  model name the provider reports, then by the name configured, and only then
+  from the table, by either name. So a negotiated rate for a deployment alias
+  (`acme-gpt`) holds even when the provider reports a table model
+  (`gpt-5.4`), and a dated snapshot the provider reports
+  (`gpt-5.4-2026-03-05`) is priced by its configured name. Matches are exact:
+  `gpt-5.4` never prices `gpt-5.4-mini`. A rate is never negative.
+- **Unknown is null, never zero.** A model neither lists has a `null` cost,
+  and so does any total that includes one of its calls. A token count the
+  provider did not report (a cache read, reasoning tokens) is `null` too.
+- **Each part at its own rate.** Cache reads at `cached_input`, cache writes
+  at `cache_write`, the rest of the prompt at `input`, and the output,
+  reasoning tokens included, at `output`. In a `prices` row, `cached_input`
+  defaults to `input`, and `cache_write` to `input` times the wire's write
+  premium: 1.25 for Claude (`provider: anthropic`, whose 5-minute cache write
+  Anthropic bills at 1.25x input) and 1 for the OpenAI wire.
+- **A cost cap needs prices.** With
+  [`settings.pipeline.max_cost_usd`](settings.md#per-question-caps) set, every
+  model the `llm` section names must have a price, or the engine does not
+  build (a `ConfigError` naming each model, with the fix
+  `add llm.prices.<model>`); `engine.llm.replace` refuses such a model the
+  same way.
 
 ## Notes
 
