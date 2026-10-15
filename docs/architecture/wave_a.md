@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2 and V2 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2 and E4 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -424,6 +424,44 @@ names in the same PR.
     rebuilt) and `nl2sql-api`'s stream route read the new names; each SSE
     `data` line is the whole event. The invariant *Events Carry No Rows, and
     the Stream Carries No Operator Data* is in `invariants.md`.
+
+!!! note "Built: the Phase 2 events, published (E4)"
+    Engine events go through `ctx.bus` explicitly, never a context variable,
+    because an index build and a purge run outside any `RunScope`; each
+    carries the engine's `tenant_id`. `rebuild_index` wraps its
+    `on_datasource` callback, so every `IndexProgress` it reports `started`
+    publishes `index.started` (with `ctx.namespace`) and every `failed` one
+    `index.failed` (a datasource that is unavailable, unknown, locked out by
+    another build, or whose build raised). `IndexingOrchestrator` keeps
+    `ctx.bus` and `ctx.tenant_id`: `index_datasource` publishes one
+    `index.column_failed` per `IndexIssue` before the commit (`table`,
+    `column`, `stage`, `message`: the issue, never the column's statistics or
+    sample values, D15), and `_commit` publishes `index.swapped` after the
+    pointer switch, with `counts` by entry type and the replaced pointer's
+    `build_id` and `schema_version` (None on a first build), so a curated-only
+    refresh publishes it too. `Runtime._published(status)` publishes
+    `datasource.failed` for a failed `DatasourceStatus`; `check_datasource`
+    returns through it, and `try_datasource` is now `_published` around
+    `_try_datasource` (the old body), which is the whole `runtime.py` change.
+    `StorageAPI.purge` publishes `retention.purged` with the counts it
+    returns (audited, so the audit observer writes it to the current day's
+    file after deleting the old ones). Run events use the module `publish`:
+    `structured()`'s retry loop publishes `llm.parse_retry` before each retry
+    (`attempt` 1 is the first retry; `errors` are pydantic's `path: message`
+    lines, or the exception's type name, never the model's answer).
+    `policy.decision` is published at the three enforcement points only
+    (D16 amended): `LogicalValidatorNode._validate_policy` per refused table
+    (`step: logical_validator`, `schema` the table's or the scope's default),
+    `CuratedMatcherNode._check_access` on the refused table (`step:
+    curated_matcher`; it now asks `scope.rule_for`, which `allows` wraps),
+    and the resolver when the role check refuses every candidate
+    (`_publish_refusals`, one per candidate, `schema` and `table` None,
+    `step: datasource_resolver`, `rule` naming the roles or the policy
+    check). The resolver's re-check after `datasources.after` hooks publishes
+    nothing; the hook's own `hook.decision` covers it. Test fakes that build
+    an orchestrator or call `rebuild_index` need `bus` and `tenant_id`
+    (`tests/unit/index_helpers.py`'s `TestIndex` has them). Tests:
+    `tests/unit/test_phase2_events.py`.
 
 ## 4. Observers
 

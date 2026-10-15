@@ -127,16 +127,25 @@ def _location(loc: Any) -> str:
     return out or "(root)"
 
 
-def _errors_of(exc: BaseException) -> str:
-    """The validation errors behind a parse failure, one ``path: message`` each."""
+def _validation_messages(exc: BaseException) -> Optional[List[str]]:
+    """The validation errors behind a parse failure, one ``path: message`` each, or None when there are none.
+
+    Only pydantic's messages, never the input: ``llm.parse_retry`` carries them (D15).
+    """
     from pydantic import ValidationError
 
     seen: Optional[BaseException] = exc
     while seen is not None:
         if isinstance(seen, ValidationError):
-            return "; ".join(f"`{_location(e['loc'])}`: {e['msg']}" for e in seen.errors())
+            return [f"`{_location(e['loc'])}`: {e['msg']}" for e in seen.errors()]
         seen = seen.__cause__ or seen.__context__
-    return str(exc)
+    return None
+
+
+def _errors_of(exc: BaseException) -> str:
+    """The validation errors behind a parse failure, one ``path: message`` each."""
+    messages = _validation_messages(exc)
+    return "; ".join(messages) if messages is not None else str(exc)
 
 
 def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
@@ -148,8 +157,9 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
     answer and the errors to the messages. The model and the parser run under
     the caller's config, directly under this step, so every call reaches the
     usage and trace callbacks and the trace records this step's parsed answer
-    against the call.
+    against the call. Each retry publishes ``llm.parse_retry`` in the run.
     """
+    from nl2sql.events import publish
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.runnables import RunnableLambda
 
@@ -161,6 +171,7 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
         if json_mode:
             messages = _with_schema(messages, schema)
         errors = ""
+        agent = (config.get("metadata") or {}).get("langgraph_node") or _metadata(llm).get(AGENT_KEY) or "default"
         for attempt in range(retries + 1):
             if attempt == 0 and streamed is not None:
                 answer = streamed[1](streamed[0].invoke(messages, config))
@@ -170,14 +181,18 @@ def _retrying(llm: Any, schema: Any, model: Any, parser: Any, json_mode: bool,
                 parsed = parser.invoke(answer, config)
             except ValueError as exc:  # OutputParserException, ValidationError and JSONDecodeError all are
                 parsed, errors = None, _errors_of(exc)
+                reported = _validation_messages(exc) or [type(exc).__name__]
             else:
                 errors = "" if parsed is not None else "no structured answer was given"
+                reported = [errors]
             if not errors:
                 return parsed
+            if attempt < retries:
+                publish("llm.parse_retry", {"agent": agent, "schema": name, "attempt": attempt + 1,
+                                            "errors": reported})
             messages = [*messages, AIMessage(content=_answer_text(answer)),
                         HumanMessage(content=f"Your answer did not match the schema: {errors}. "
                                              f"Answer again with only {name}.")]
-        agent = (config.get("metadata") or {}).get("langgraph_node") or _metadata(llm).get(AGENT_KEY) or "default"
         raise StructuredOutputError(agent, name, retries + 1, errors)
 
     return RunnableLambda(ask, name=f"structured_{name}")

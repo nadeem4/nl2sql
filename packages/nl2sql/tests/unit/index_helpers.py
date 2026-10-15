@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 from nl2sql.embeddings import EmbeddingInfo
+from nl2sql.events import EventBus
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.indexing.retrieval import Retriever, namespace_for
 from nl2sql.storage.chroma import ChromaIndex
@@ -53,7 +54,7 @@ class TestIndex:
         self.ctx = SimpleNamespace(
             index=self.index, namespace=self.namespace, embedding_info=EmbeddingInfo("test", model, dimension),
             embedder=embeddings, state=state, ds_registry=None, llm_registry=None, curated=None,
-            settings=SimpleNamespace(schema_=SimpleNamespace(max_versions=3)))
+            settings=SimpleNamespace(schema_=SimpleNamespace(max_versions=3)), bus=EventBus(), tenant_id="default")
 
     def write(self, datasource_id: str, chunks: List[Any], schema_version: str = "v1",
               curated_hash: Optional[str] = None) -> str:

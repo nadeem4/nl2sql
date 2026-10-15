@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from nl2sql.common.errors import ErrorCode, PipelineError
 from nl2sql.common.logger import get_logger
+from nl2sql.events import publish
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.hooks import hooks_of
 from nl2sql.hooks.approval import ApprovalRequest, VerifiedRef
@@ -146,7 +147,10 @@ class CuratedMatcherNode:
         scope = self.policy_engine.scope(state.user_context, ds_id)
         for schema, table in tables:
             name = f"{schema}.{table}" if schema else table
-            if not scope.allows(schema, table):
+            rule = scope.rule_for(schema, table)
+            if rule is not None:
+                publish("policy.decision", {"datasource_id": ds_id, "schema": schema or scope.default_schema,
+                                            "table": table, "rule": rule, "step": "curated_matcher"})
                 raise _Fallback("policy_denied", f"'{ds_id}.{name}' is not allowed for this role")
 
     def _row_ceiling(self, ds_id: str) -> int:

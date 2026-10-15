@@ -26,6 +26,7 @@ from nl2sql.pipeline.nodes.generator.node import (
 )
 from nl2sql.runtime import Runtime
 from nl2sql.common.logger import get_logger
+from nl2sql.events import publish
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
 from nl2sql.pipeline.nodes.validator.join_keys import join_key_type_errors
 
@@ -672,6 +673,8 @@ class LogicalValidatorNode:
             # and trace); the user gets the table only when the deployment opts
             # in, because naming a table tells an unauthorised user that it exists.
             logger.warning("Policy denied role(s) %s access to '%s': %s.", roles, namespaced_name, rule)
+            publish("policy.decision", {"datasource_id": ds_id, "schema": t.schema_name or scope.default_schema,
+                                        "table": t.name, "rule": rule, "step": "logical_validator"})
             if self.refusal_names_tables:
                 message = f"Role '{role or '(none)'}' denied access to '{namespaced_name}'."
             else:

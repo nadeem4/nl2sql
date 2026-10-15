@@ -58,17 +58,34 @@ Run events (they carry the run's `trace_id`):
 | `run.finished` | a summary, never rows: `status`, `duration_s`, `usage`, `error_codes`, `source`, `datasources`, `tables` (`datasource.schema.table`), `result_manifest`, `user_id`, `roles` | yes, with `result` added |
 | `run.failed` | `message` (a key in it redacted), `error_code`, `user_id`, `roles` | yes |
 | `llm.call` | `node`, `agent`, `model`, the six token counts, `latency_s`, `cost`, `usage_reported`, `error` (redacted) | no |
-| `llm.parse_retry` | `agent`, `schema`, `attempt`, `errors` | no |
+| `llm.parse_retry` | `agent`, `schema`, `attempt` (1 for the first retry), `errors` (the validation messages only, never the model's answer) | no |
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
-| `policy.decision` | a denial: `datasource_id`, `schema`, `table`, `rule`, `step` | no |
+| `policy.decision` | a denial: `datasource_id`, `schema`, `table` (both None for a datasource), `rule`, `step` (`logical_validator`, `curated_matcher` or `datasource_resolver`) | no |
 | `hook.decision` | `hook`, `point`, `decision`, `reason`, ... | no |
 
-Engine events (`datasource.failed`, `index.started`, `index.column_failed`,
-`index.swapped`, `index.failed`, `schema.drifted`, `retention.purged`,
-`llm.changed`, `eval.case`, `eval.finished`) carry no `trace_id`. Which PR
-of Wave A starts publishing each one is in its description; `node.*`,
-`answer.delta`, `result.manifest`, the three `run.*` events, `llm.call`,
-`plan_cache.lookup` and `llm.changed` are published today. While a
+Engine events carry no `trace_id`: they happen outside any question and go
+on the engine's bus directly.
+
+| Name | Data | Published when |
+| --- | --- | --- |
+| `datasource.failed` | `datasource_id`, `stage`, `message`, `fix` | a connection check fails: the engine's start, `engine.check()` and `engine.datasources.test()` (by id, or with a `Datasource` it builds and tests) |
+| `index.started` | `datasource_id`, `namespace` | `engine.index.build` starts one datasource |
+| `index.column_failed` | `datasource_id`, `table`, `column`, `stage`, `message` | one per issue the adapter reported (a column it could not profile, a table it could not reflect): the issue only, never the column's statistics or sample values |
+| `index.swapped` | `datasource_id`, `namespace`, `build_id`, `schema_version`, `replaced_build_id`, `replaced_schema_version`, `counts` (entries by type) | a datasource's new build goes live (audited) |
+| `index.failed` | `datasource_id`, `reason` | one datasource's build fails; its previous build stays live |
+| `schema.drifted` | `datasource_id`, `from_version`, `to_version`, `detected_by`, the diff's `counts` | not yet published (D1) |
+| `retention.purged` | `counts`: what `engine.storage.purge()` returned (`traces`, `results`, `audit`) | `engine.storage.purge()` ran (audited) |
+| `llm.changed` | `by`, `changes` (never a key) | `engine.llm.replace` (audited) |
+| `eval.case`, `eval.finished` | see [Evals](../evals/index.md) | `engine.evals.run` |
+
+`policy.decision` is published for denials only, and only where a refusal is
+enforced (the logical validator refusing a table of the plan, the curated
+matcher refusing a verified query, the datasource resolver refusing every
+candidate datasource). A scope asked only to filter (the schema retriever,
+the value check) publishes nothing, so the bus is not flooded with tables
+nobody asked for. Every catalogued event is published today except
+`run.limit_reached`, `sanity.flagged` and `schema.drifted`, whose Wave A
+PRs are named in their descriptions. While a
 [hook](../configuration/hooks.md) is attached at `answer.after`, a run
 publishes no `answer.delta` and sends `result.manifest` only after the hooks
 allowed the answer (never, on a deny).

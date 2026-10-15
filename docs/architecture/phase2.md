@@ -1415,6 +1415,22 @@ only has to publish it.
 | The pointer switch, in the log | `IndexStore.set_pointers` | `index.swapped` |
 | Purge counts | `storage.purge()` | `retention.purged` |
 
+!!! note "Built: the events published (Wave A, E4)"
+    Wave A publishes each of these ([wave_a.md](wave_a.md), row E4).
+    Engine events go on the runtime's bus (`ctx.bus`), since an index build,
+    a datasource check and a purge run outside any question:
+    `rebuild_index` publishes `index.started` and `index.failed`,
+    `IndexingOrchestrator` publishes one `index.column_failed` per
+    `IndexIssue` (the issue only, never a sample value) and `index.swapped`
+    from `_commit`, `Runtime.check_datasource` and `try_datasource` publish
+    `datasource.failed`, and `engine.storage.purge()` publishes
+    `retention.purged` with the counts it returns. Run events go through the
+    run's scope: `structured()` publishes `llm.parse_retry` before each
+    retry, with the validation messages only, and `policy.decision` is
+    published for a denial at the logical validator, the curated matcher
+    and the datasource resolver (when it refuses every candidate), never by
+    `Scope` itself. The data Phase 2 returns is unchanged.
+
 ## 10. Bugs Phase 2 fixes
 
 | # | Bug | Evidence | Fixed by |

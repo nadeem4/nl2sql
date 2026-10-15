@@ -12,6 +12,7 @@ from nl2sql.indexing.retrieval import CURATED_TYPE
 from nl2sql_sdk.schema import TableRef
 from nl2sql.policies import UserContext
 from nl2sql.common.logger import get_logger
+from nl2sql.events import publish
 from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
@@ -346,6 +347,7 @@ class DatasourceResolverNode:
             # role may not read.
             allowed_ids = self._get_allowed_datasource_ids(state.user_context, candidate_ids)
             if not allowed_ids:
+                _publish_refusals(self.policy_engine, state.user_context, candidate_ids)
                 return self._error_response(
                     resolved_datasources=candidates,
                     allowed_ids=[],
@@ -412,3 +414,13 @@ class DatasourceResolverNode:
                     )
                 ],
             }
+
+
+def _publish_refusals(policy_engine, user_context: UserContext, datasource_ids: list[str]) -> None:
+    """``policy.decision`` for each datasource the role check refused, when it refused them all (D16)."""
+    for ds_id in datasource_ids:
+        scope = policy_engine.scope(user_context, ds_id)
+        roles = ", ".join(g.name for g in scope.grants) or "(none)"
+        rule = (f"no allow pattern of role(s) '{roles}' reaches '{ds_id}'"
+                if not any(g.reaches(ds_id) for g in scope.grants) else f"the policy check does not allow '{ds_id}'")
+        publish("policy.decision", {"datasource_id": ds_id, "rule": rule, "step": "datasource_resolver"})
