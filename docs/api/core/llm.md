@@ -45,7 +45,7 @@ Fields:
 
 ### LLMFileConfig
 
-A set of agents the benchmark compares, one config at a time:
+A set of agents an eval in mode full compares, one config at a time:
 `LLMFileConfig.from_llm(llm)` turns an `llm` section into it.
 
 Source:
@@ -144,7 +144,7 @@ See [LLM configuration → Replacing the LLM at runtime](../../configuration/llm
 `api_key` (masked in `repr`, `str` and JSON dumps; `None` reads the provider's
 standard variable), `base_url`, `structured_output`, `parse_retries`, `max_tokens`, `timeout_s`,
 `max_retries`, `headers` (values masked like the key) and `name`. `LLMFileConfig` is a set of agents
-the benchmark compares, one config at a time (`LLMFileConfig.from_llm(llm)`).
+an eval in mode full compares, one config at a time (`LLMFileConfig.from_llm(llm)`).
 Neither is part of the public API.
 
 ## Behavioral Contracts

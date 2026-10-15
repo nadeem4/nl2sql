@@ -136,7 +136,7 @@ DEFAULT_ANTHROPIC_MODEL = "claude-opus-5"
 # answer temperature=0 with HTTP 400 and work only without it, so they run at
 # the model's default temperature (None: nothing is sent) and vary more.
 # "Verified" means the parameters are accepted, not that the model plans well;
-# that is eval tier 2's question. OpenRouter and Ollama have no list yet: add
+# that is an eval in mode full's question. OpenRouter and Ollama have no list yet: add
 # one here under the provider's name.
 VERIFIED_OPENAI_MODELS: Dict[str, Optional[float]] = {
     "gpt-5.4": 0.0,

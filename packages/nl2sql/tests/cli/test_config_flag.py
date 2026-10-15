@@ -37,8 +37,6 @@ COMMANDS = [
     ["cache", "clear"],
     ["feedback", "list"],
     ["feedback", "stats"],
-    ["benchmark", "--tier", "1"],
-    ["benchmark", "retrieval"],
 ]
 
 

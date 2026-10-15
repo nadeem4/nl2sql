@@ -34,9 +34,11 @@ _EXPORTS = {
                       "Embeddings", "Policies", "Role", "Storage", "StoreConfig", "Secrets", "Curated", "Settings",
                       "ObserverConfig", "HookConfig", "EvalsConfig"),
     "nl2sql.check": ("CheckReport", "DatasourceStatus", "EngineNotReady"),
-    # The benchmark lives in nl2sql.evaluation, which the runtime never needs.
-    "nl2sql.api.benchmark_api": ("BenchmarkAPI",),
-    "nl2sql.evaluation.types": ("BenchmarkConfig",),
+    # Evals live in nl2sql.evaluation, which the runtime never needs.
+    "nl2sql.evaluation.suite": ("EvalSuite", "EvalCase"),
+    "nl2sql.evaluation.report": ("EvalReport",),
+    "nl2sql.evaluation.regenerate": ("RegenerateReport",),
+    "nl2sql.evaluation.scorers": ("Scorer", "Score", "CaseRun"),
 }
 _LAZY = {name: module for module, names in _EXPORTS.items() for name in names}
 
@@ -56,7 +58,6 @@ def __dir__():
 __all__ = [
     "NL2SQL",
     "QueryResult",
-    "BenchmarkAPI",
     "ErrorSeverity",
     "ErrorCode",
     "PipelineError",
@@ -82,7 +83,13 @@ __all__ = [
     "ObserverConfig",
     "HookConfig",
     "EvalsConfig",
-    "BenchmarkConfig",
+    "EvalSuite",
+    "EvalCase",
+    "EvalReport",
+    "RegenerateReport",
+    "Scorer",
+    "Score",
+    "CaseRun",
     "Registry",
     "Config",
     "load_config",

@@ -1,6 +1,6 @@
 """Does the written answer say what the result rows say? A deterministic check, no model.
 
-Tier 1 and tier 2 score the rows a question returns. The answer synthesizer
+The ``result_match`` scorer reads the rows a question returns. The answer synthesizer
 then writes a sentence about them, and that sentence can state a number the
 rows do not hold while the rows are right. :func:`check_answer` reads the
 numbers and the quoted or bold names out of the answer and checks each one:

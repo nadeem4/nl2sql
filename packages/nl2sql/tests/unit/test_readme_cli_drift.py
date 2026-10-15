@@ -25,6 +25,6 @@ def _command_paths(group, prefix="nl2sql"):
 def test_every_cli_command_and_subcommand_is_in_the_readme_cli_reference():
     section = _section((REPO / "README.md").read_text(encoding="utf-8"), "CLI reference")
     paths = list(_command_paths(typer.main.get_command(app)))
-    assert "nl2sql benchmark retrieval" in paths and "nl2sql feedback export" in paths
+    assert "nl2sql curated proposals export" in paths and "nl2sql feedback export" in paths
     missing = [p for p in paths if f"`{p}" not in section]
     assert not missing, f"add these to the README's CLI reference: {missing}"

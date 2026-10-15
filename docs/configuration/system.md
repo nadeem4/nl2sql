@@ -152,7 +152,7 @@ the other two from the Wave A change named below.
   approver_roles: [dba]           # who may approve its needs_approval; default policies.admin_roles
   url: "${env:REVIEW_URL}"        # the hook's own keys
 
-# evals.yaml (read from V1)
+# evals.yaml: the suites engine.evals.run runs, and how they are scored
 suites: [evals/chinook.yaml]      # relative to nl2sql.yaml
 scorers: [result_match, outcome, faithfulness, retrieval_recall, routing]   # the default: all five
 curated: true
@@ -167,7 +167,7 @@ gate:
 | --- | --- | --- |
 | `observers` | `{type: <name>, ...}` (`ObserverConfig`) or an observer object in code | `type` names a registered observer (`nl2sql.observers`); its `config_model` checks the other keys, and keeps their `${...}` references until it is built. Without the section the engine runs `log` and `audit`; `observers: []` runs none. |
 | `hooks` | `{type: <name>, points, on_error, approver_roles, ...}` (`HookConfig`) or a hook object in code | `points` takes `run.before`, `datasources.after`, `plan.after`, `execute.before`, `execute.after` and `answer.after`; any other is an error. `on_error` is `closed` or `open`. The hook's `config_model` checks its own keys. A point the hook does not declare is an error. See [Hooks](hooks.md). |
-| `evals` | `EvalsConfig` | Strict keys. `suites` are files of cases, read when a run asks for them, not when the engine starts. `gate.alpha` is between 0 and 1. |
+| `evals` | `EvalsConfig` | Strict keys. `suites` are files of cases, read when a run asks for them, not when the engine starts. `gate.alpha` is between 0 and 1. See [Evals](../evals/index.md). |
 
 ```python
 from nl2sql import Config, HookConfig, ObserverConfig
@@ -211,8 +211,7 @@ Only these are read directly:
 Anything else from the environment is written in the YAML as `${env:VAR}`.
 There are no generic overrides such as `NL2SQL__SECTION__KEY`. Third-party
 libraries (the OpenTelemetry SDK) still read their own standard variables, the
-trace redactor scans the environment for values to mask, and `nl2sql
-benchmark` checks `CI`. Nothing in nl2sql writes the environment: a key the
+trace redactor scans the environment for values to mask. Nothing in nl2sql writes the environment: a key the
 demo is given travels in the engine's LLM config, and only the `.env` loading
 below adds variables. The architecture tests enforce both
 ([invariants](../architecture/invariants.md#an-engine-owns-its-config-no-process-globals)).
@@ -415,7 +414,6 @@ start from.
 | `VAULT_ADDR`, `VAULT_TOKEN` | `secrets.providers[].url` / `.token` (write `${env:VAULT_TOKEN}` to keep reading the variable) |
 | `AZURE_KEYVAULT_URL` | `secrets.providers[].vault_url` |
 | `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | unchanged: the fallback key variables |
-| `CI` | unchanged: `nl2sql benchmark` refuses tier 2 in CI |
 
 ### CLI
 

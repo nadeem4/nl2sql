@@ -143,11 +143,15 @@ nav:
     - Add Chunk Types: extensions/add-chunk-types.md
     - Extend Planner: extensions/extend-planner.md
     - Add Execution Backend: extensions/add-execution-backend.md
+  - Evals:
+    - Overview: evals/index.md
+    - Cases and Suites: evals/cases.md
+    - Scorers: evals/scorers.md
+    - The Chinook Suite: testing/evaluation-dataset.md
+    - Benchmark Results: benchmarks.md
   - Testing:
     - Testing Architecture: testing/architecture.md
     - Real-Database Test Bed: testing/test-bed.md
-    - Evaluation Dataset: testing/evaluation-dataset.md
-    - Benchmark Results: benchmarks.md
   - API:
     - Overview: api/index.md
     - Core API (Python):

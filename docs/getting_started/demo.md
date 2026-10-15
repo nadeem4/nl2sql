@@ -610,14 +610,14 @@ kept trace:
 ```bash
 nl2sql feedback list               # the ratings, newest first
 nl2sql feedback stats              # thumbs up/down, refusals, retries, errors, plan cache
-nl2sql feedback export --good      # thumbs-up runs as draft gold entries, for review
+nl2sql feedback export --good      # thumbs-up runs as draft eval cases, for review
 nl2sql feedback clear              # delete every rating
 ```
 
-`export --good` writes `feedback_gold_drafts.yaml`, never the gold set itself. A
-person must review each draft and run `python -m nl2sql.evaluation.gold` before
-adding it; see
-[Feedback and Signals](../observability/feedback.md#growing-the-gold-set-nl2sql-feedback-export-good).
+`export --good` writes `feedback_gold_drafts.yaml`, a suite of draft cases. A
+person must review each draft, approve it and run `engine.evals.regenerate`
+before it runs; see
+[Feedback and Signals](../observability/feedback.md#growing-an-eval-suite-nl2sql-feedback-export-good).
 
 `nl2sql demo --record` turns the cache off while recording
 (`settings.pipeline.plan_cache` is off in the engine it builds; the files are
@@ -638,7 +638,7 @@ The `.env` next to `nl2sql.yaml` is loaded by the CLI, `nl2sql-api` and
 variable already exported in your shell wins over the file. There is no
 `--env` flag and no `.env.<name>` lookup: one config folder, one `.env`.
 
-`run`, `index` and `benchmark` call `engine.check()` first. A datasource marked
+`run` and `index` call `engine.check()` first. A datasource marked
 `required: true` that cannot connect stops them with the report (exit `1`); any
 other one that fails is printed and left out of routing.
 

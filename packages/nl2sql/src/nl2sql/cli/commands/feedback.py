@@ -1,8 +1,8 @@
-"""``nl2sql feedback``: the playground's answer ratings, the guardrail rates, and draft gold entries.
+"""``nl2sql feedback``: the playground's answer ratings, the guardrail rates, and draft eval cases.
 
 * ``list``   -- the ratings, newest first.
 * ``stats``  -- rates over the ratings plus any run traces in ``<storage.path>/traces``.
-* ``export --good`` -- thumbs-up runs as draft gold entries in their own YAML file.
+* ``export --good`` -- thumbs-up runs as draft eval cases in a suite file of their own.
 * ``clear``  -- empty the feedback table; schema snapshots and the plan cache stay.
 
 Every command builds the engine from ``--config`` and calls ``engine.feedback``,
@@ -107,7 +107,7 @@ def export_command(
     good: Annotated[bool, typer.Option("--good", help="Export the thumbs-up runs.")] = False,
     out: Annotated[pathlib.Path, typer.Option("--out", help="Where to write the drafts.")] = DEFAULT_DRAFTS,
 ) -> None:
-    """Write thumbs-up runs as draft gold entries to a separate file, for a person to review."""
+    """Write thumbs-up runs as draft eval cases to a separate file, for a person to review."""
     if not good:
         console.print("[red][ERROR][/red] Say which runs to export: --good (the thumbs-up runs).")
         raise typer.Exit(2)
@@ -120,7 +120,8 @@ def export_command(
     written = report["written"]
     console.print(f"[green]Wrote {written} draft{'s' if written != 1 else ''}[/green] to "
                   f"{escape(str(out.resolve()))}; skipped {report['skipped']} (no SQL, or more than one statement).")
-    console.print("Review each entry, then add it to the gold set and run `python -m nl2sql.evaluation.gold`.")
+    console.print("Review each case, set status: approved, then run engine.evals.regenerate on the file "
+                  "to write its rows.")
 
 
 @app.command("clear")

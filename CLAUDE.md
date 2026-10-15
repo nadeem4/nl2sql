@@ -39,7 +39,7 @@ name the rule.
 
 - **Where the reader picks the theme, force no colours at all** — the README and anything else GitHub renders, and the docs site, which has a dark palette. That line paints black lines and black label text onto a near-black canvas; the default theme follows the reader instead. Carry emphasis in shape and layout.
 
-- **Never change gold data to make a benchmark run pass.** Add a reviewed `alt_gold_sql` alternative instead: [`docs/testing/evaluation-dataset.md`](docs/testing/evaluation-dataset.md).
+- **Never change gold data to make an eval run pass.** Add a reviewed `alt_sql` alternative instead: [`docs/testing/evaluation-dataset.md`](docs/testing/evaluation-dataset.md).
 
 ## Checks
 

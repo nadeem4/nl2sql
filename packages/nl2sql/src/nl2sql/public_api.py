@@ -89,7 +89,6 @@ class NL2SQL:
 
     def _attach(self, runtime: "Runtime") -> None:
         self._runtime = runtime
-        self._benchmark = None
 
     # ------------------------------------------------------------ namespaces
     # Each is built on first use from the runtime; the classes are internal.
@@ -166,7 +165,7 @@ class NL2SQL:
 
     @cached_property
     def evals(self) -> "EvalsAPI":
-        """Evaluation: suites, scorers, the regression gate (filled from Wave A's V1)."""
+        """Evals: load and run suites, regenerate their rows, list the scorers. Builds no evaluation code until used."""
         from nl2sql.api.evals_api import EvalsAPI
 
         return EvalsAPI(self._runtime)
@@ -249,15 +248,6 @@ class NL2SQL:
         runtime = getattr(self, "_runtime", None)
         if getattr(runtime, "closed", False):
             raise RuntimeError("This engine is closed. Build a new one.")
-
-    @property
-    def benchmark(self):
-        """The benchmark API, built on first use so ``import nl2sql`` never loads ``nl2sql.evaluation``."""
-        if self._benchmark is None:
-            from nl2sql.api.benchmark_api import BenchmarkAPI
-
-            self._benchmark = BenchmarkAPI(self._runtime)
-        return self._benchmark
 
     # ------------------------------------------------------------ questions
 

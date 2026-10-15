@@ -1,0 +1,187 @@
+# Evals
+
+`engine.evals` measures how well the engine answers your questions. You
+write **cases** (a question, what each role should get, and the SQL a person
+reviewed) in **suite** files. A run asks every case once per role and scores it
+with registered **scorers**, and the result is an `EvalReport`.
+
+The package ships one suite, Chinook's 47 gold cases, and
+`nl2sql init --demo` copies it next to the demo's `nl2sql.yaml`. The format
+is in [Cases and suites](cases.md), and what makes a case pass is in
+[Scorers](scorers.md).
+
+## Configuring it
+
+`evals.yaml` is a config section, like `curated.yaml`. Its keys are strict and
+it is loaded with the config:
+
+```yaml
+# nl2sql.yaml
+evals: { file: evals.yaml }
+
+# evals.yaml
+suites: [evals/chinook.yaml]       # relative to nl2sql.yaml
+scorers: [result_match, outcome, faithfulness, retrieval_recall, routing]   # the default: all five
+curated: true                      # mode full: curated answers on (the default)
+max_cost_usd: 5.00                 # mode full's dollar cap over a whole run; it needs one
+gate: { max_regressions: 2, alpha: 0.05, max_cost_increase: 0.20 }
+```
+
+A suite file is data. It is read when a run asks for it, never when the
+engine starts, so a large suite does not slow down engine start. `gate`
+configures the regression gate, which compares a run with a baseline.
+
+## The facade
+
+```python
+from nl2sql import NL2SQL, load_config
+
+engine = NL2SQL(load_config("nl2sql.yaml"))
+report = engine.evals.run(mode="plans")          # no key, no cost
+print(report.accuracy, report.accuracy_generated)
+```
+
+| Method | What it does |
+| --- | --- |
+| `engine.evals.load(path=None)` | The suites `evals.yaml` names, or the one file at `path`, as `EvalSuite`s |
+| `engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)` | Runs every approved case once per role in its `outcome` map, `passes` times, and returns an `EvalReport` |
+| `engine.evals.regenerate(path)` | Runs each approved case's `sql` and `alt_sql` through its datasource's adapter and writes `rows` and `alt_rows` ([Regenerating rows](cases.md#regenerating-rows)) |
+| `engine.evals.scorers()` | The registered scorer names: the five built-ins and any plugin's |
+
+The `run` arguments:
+
+- `cases` narrows the run by case id or tag. A selector that matches nothing is
+  an error.
+- `roles` narrows it by role.
+- An argument left as `None` takes its value from `evals.yaml`.
+
+`on_case(config, record, spent)` is called after each case. It gets the
+config's name, the case's record and the dollars spent so far.
+
+## The modes
+
+| Mode | What runs | Model calls | Curated answers | Plan cache |
+| --- | --- | --- | --- | --- |
+| `full` | The whole pipeline, on the configured LLM or on each named config | yes; needs `max_cost_usd` | as `curated` says (on by default) | **off** |
+| `plans` | Each case's hand-written `plan` through the validator, generator and executor, on the gold-plan fake LLM | none | **off** | as configured |
+| `retrieval` | Datasource routing and schema retrieval only | none (the configured embedder) | **off** | not used |
+
+Every mode runs on a runtime derived from the engine's (`ctx.derive`), so the
+engine serving traffic never changes. In each mode:
+
+- **Refusals are generic.** A refusal message never names a table
+  (`policies.refusal_names_tables` is off for the run). The `outcome` scorer
+  checks for the generic message.
+- **Mode `full` turns the plan cache off.** A second pass asks the planner
+  again instead of replaying the first pass's plans.
+- **Modes `plans` and `retrieval` turn curated answers off.** The curated
+  matcher makes a model call the gold-plan fake cannot answer, and a verified
+  hit would skip the plan or the retrieval being measured.
+- **Mode `retrieval` always runs the vector search.** Its runtime sets
+  `settings.retrieval.full_snapshot_max_tables` to 0, because Chinook's 11
+  tables are under the limit that would otherwise skip the search.
+
+### Mode full: the configured model, priced and capped
+
+`llm` takes one of three values:
+
+- `None`: the engine's own `llm` section, reported as `default`.
+- One `LLM`.
+- A mapping of names to `LLM` sections. Each one runs on its own derived
+  runtime over the same cases, and the report compares them.
+
+The named configs in `nl2sql/evaluation/presets/` are `llm` sections too:
+`load_llm_file(path)` and `model_config("gpt-5.4")` in
+`nl2sql.evaluation.presets` build one.
+
+Every call costs money, so mode full checks prices before it starts and
+checks the cap before every case:
+
+- **Every model must have a price.** Before any call, every model that any
+  node of any config would use must be in `nl2sql/evaluation/prices.py`. A
+  missing price is an `UnknownPriceError` naming the config, the node and the
+  model.
+- **The run stops before it could pass the cap.** Before each case, the run
+  adds the most expensive case so far to its running total. If that could
+  pass `max_cost_usd`, the run stops and the report says
+  `stopped: "max_cost"`.
+- **The first case always runs.** So a run can pass the cap by at most one
+  case's cost.
+
+Each call is priced by the model its node is configured with, and the dollars
+are in `report.spent` and each record's `cost`.
+
+### Curated answers in mode full
+
+`curated: true` is the default. Each case record says where its answer came
+from in `source` (`verified` or `generated`).
+
+A case that a verified query answered is run a **second time with curated
+answers off**, and that second run is scored as the case's generated answer
+(in the record's `generated`). Only the cases a verified query answered pay
+for the second run.
+
+The report gives two accuracies:
+
+| Accuracy | What it measures |
+| --- | --- |
+| `accuracy` | What users see |
+| `accuracy_generated` | Every case on the generated path: the model's own skill, comparable across configs |
+
+Both are also split by source.
+
+### Clarification
+
+A case may expect the engine to ask the caller to narrow the question
+(outcome `clarify`). Wave B adds that result. Until then, evals run with
+`clarify=False`, the default: those role runs are left out and counted in
+`report.skipped`. With `clarify=True` they run, and the `outcome` scorer
+passes them when the run's status is `needs_clarification`.
+
+## The report
+
+`EvalReport` has:
+
+- `mode` and `suites` (each suite's name, path and SHA-256 digest).
+- `roles`, `passes`, `curated`, `clarify`, `max_cost_usd`, `spent`, `stopped`,
+  `skipped` and `settings` (mode retrieval's retrieval settings).
+- `database`: the datasource, engine and schema fingerprint of the
+  datasources the suites name.
+- `configs`: one **board** per LLM config. Mode `plans` reports one board
+  named `plans`, and mode `retrieval` one named `retrieval`.
+- `comparison`, when there are several configs.
+
+`report.accuracy` and `report.accuracy_generated` read the first config's
+board.
+
+A board holds:
+
+| Field | What it is |
+| --- | --- |
+| `accuracy` | `overall` (what users see), `lenient`, `generated`, each with a 95% Wilson interval; `pass_k` over several passes; and the rates `by_tag`, `by_difficulty`, `by_source` and `generated_by_source` |
+| `summary` | `pass`, `fail`, `error` and `skip` counts per role and in total |
+| `scores` | Per scorer: how many cases it applied to, passed, failed and errored on, and its mean value |
+| `retrieval` | The mean table and column recall over the cases `retrieval_recall` scored, how many were perfect, and how much was sent |
+| `answerability`, `faithfulness`, `tokens_by_node`, `cost`, `latency`, `retries`, `errors_by_code`, `determinism` | As for a single run, summed or averaged over the cases |
+| `models`, `planned_cases`, `completed_cases` | The config's model per node, and the cases the run would make and made |
+| `results` | One record per case run: its `status` and `reason`, every scorer's `score`, the SQL, the answer, the plans, `source` and `generated` |
+
+Accuracy over 47 cases has an interval about 14 points wide, so two runs are
+compared case by case, not headline to headline. The statistics are in
+[the Chinook suite](../testing/evaluation-dataset.md#reading-a-run-intervals-flips-and-passk).
+
+## Events
+
+Each case runs under its own run scope (`QueryAPI.open_scope` and
+`close_scope`), so it publishes `run.started` and `run.finished` like any
+question. Every finished case also publishes `eval.case` on the engine's bus,
+with the suite, case, role, whether it passed, the answer's source, each
+scorer's verdict and its cost. The end of the run publishes `eval.finished`,
+with the suites, the number of cases, both accuracies and the dollars spent.
+
+## In CI
+
+The key-free integration job runs `engine.evals.run(mode="plans")` on the
+Chinook suite, and every case must pass for every role
+(`tests/e2e/test_evals_plans.py`). Mode `full` spends a key and never runs in
+CI.

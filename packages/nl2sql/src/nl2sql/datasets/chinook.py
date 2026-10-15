@@ -39,7 +39,7 @@ CHINOOK_ROLES = {
     "viewer": {"allow": [f"chinook.main.{t}" for t in _CATALOG]},
 }
 
-# Chinook on its own, as the tier 1 gold evaluation reads it. The demo project
+# Chinook on its own, as the Chinook eval suite reads it. The demo project
 # gets ``nl2sql.datasets.demo.DEMO_POLICIES``, which covers all three
 # databases and grants the same Chinook tables to each role.
 CHINOOK_POLICIES = {

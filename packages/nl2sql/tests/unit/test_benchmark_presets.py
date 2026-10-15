@@ -4,7 +4,7 @@ import pathlib
 import pytest
 
 from nl2sql.evaluation import presets
-from nl2sql.evaluation.tier2 import node_agents
+from nl2sql.evaluation.run import node_agents
 from nl2sql.llm.providers import LLM_AGENTS
 
 
@@ -61,7 +61,7 @@ def test_every_preset_is_an_llm_section_on_priced_models():
     import yaml
 
     from nl2sql.config import LLM
-    from nl2sql.evaluation.tier2 import check_prices
+    from nl2sql.evaluation.run import check_prices
 
     listed = presets.list_presets()
     assert [name for name, _ in listed] == ["claude-planner", "gpt-5.4", "gpt-5.4-mini-helpers"]

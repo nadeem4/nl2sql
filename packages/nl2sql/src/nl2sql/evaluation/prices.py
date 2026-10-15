@@ -1,6 +1,6 @@
-"""USD per million tokens for the models tier 2 may run, dated and sourced.
+"""USD per million tokens for the models an eval in mode full may run, dated and sourced.
 
-Tier 2 prices every LLM call from this table and refuses to start if a model
+Mode full prices every LLM call from this table and refuses to start if a model
 it would call is missing, so a run can never spend money it cannot count.
 Update a row (and its ``source``) when a provider changes its prices.
 

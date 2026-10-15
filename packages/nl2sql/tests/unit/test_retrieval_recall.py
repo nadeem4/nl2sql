@@ -1,28 +1,28 @@
-"""Retrieval recall's pure parts: per-question recall, the means, the comparison and the records.
+"""Retrieval recall's parts: per-case recall, routing's ranking, mode retrieval's runtime and the records.
 
 The run against the indexed demo with the local embedder is
-``tests/e2e/test_benchmark_retrieval.py``.
+``tests/e2e/test_evals_retrieval.py``.
 """
 import datetime as dt
 from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.evaluation import records, retrieval_recall as rr
-from nl2sql.evaluation.gold import GOLD_DATASET_PATH, load_gold_dataset
+from nl2sql.evaluation import records
+from nl2sql.evaluation.scorers import retrieval_recall as rr
+from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 from nl2sql.testing.runtime import fake_runtime
 
 WHEN = dt.datetime(2026, 9, 21, 14, 5, 6, tzinfo=dt.timezone.utc)
 
 
-def _question(qid="chinook_002"):
-    return next(q for q in load_gold_dataset() if q.id == qid)
+CHINOOK_002 = next(c for c in load_suite(CHINOOK_SUITE_PATH).cases if c.id == "chinook_002")
 
 
 def test_recall_is_the_share_of_needed_tables_and_columns_sent_to_the_planner():
-    q = _question()  # Customer and Invoice; five columns
-    assert q.needed_tables == ["Customer", "Invoice"]
-    scored = rr.score_question(q, {"Customer": ["CustomerId", "FirstName", "Country"], "Track": ["Name"]})
+    case = CHINOOK_002  # Customer and Invoice; five columns
+    assert case.tables == ["Customer", "Invoice"]
+    scored = rr.recall(case, {"Customer": ["CustomerId", "FirstName", "Country"], "Track": ["Name"]})
     assert scored["table_recall"] == 0.5 and scored["missed_tables"] == ["Invoice"]
     assert scored["column_recall"] == pytest.approx(2 / 5)
     assert scored["missed_columns"] == ["Customer.LastName", "Invoice.CustomerId", "Invoice.Total"]
@@ -30,83 +30,48 @@ def test_recall_is_the_share_of_needed_tables_and_columns_sent_to_the_planner():
 
 
 def test_names_match_whatever_their_case():
-    q = _question()
-    scored = rr.score_question(q, {"customer": ["customerid", "firstname", "lastname"],
-                                   "INVOICE": ["CustomerId", "Total"]})
+    scored = rr.recall(CHINOOK_002, {"customer": ["customerid", "firstname", "lastname"],
+                                     "INVOICE": ["CustomerId", "Total"]})
     assert scored["table_recall"] == 1.0 and scored["column_recall"] == 1.0 and scored["missed_columns"] == []
 
 
-def test_the_summary_is_the_mean_over_questions_and_lists_the_worst_first():
-    results = [{"id": "a", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10},
-               {"id": "b", "table_recall": 0.5, "column_recall": 0.25, "tables_sent": 4, "columns_sent": 6},
-               {"id": "c", "table_recall": 1.0, "column_recall": 0.5, "tables_sent": 3, "columns_sent": 8}]
-    summary = rr.summarize(results)
-    assert summary == {"questions": 3, "table_recall": 0.8333, "column_recall": 0.5833,
-                       "perfect_tables": 2, "perfect_columns": 1, "tables_sent": 3.0, "columns_sent": 8.0,
-                       "datasource_top1_accuracy": None}
-    assert [r["id"] for r in rr.worst(results, 2)] == ["b", "c"]
+def test_routing_ranks_datasources_best_first_without_repeats_up_to_the_limit():
+    ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook", "support", "webanalytics"]),
+                          vector_store=SimpleNamespace(retrieve_datasource_candidates=lambda q, k: [
+                              SimpleNamespace(metadata={"datasource_id": d})
+                              for d in ("support", "support", "chinook", "webanalytics")]))
+    assert rr.routed(ctx, "q", 2) == ["support", "chinook"]
+    one = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook"]))
+    assert rr.routed(one, "q", 3) == ["chinook"]
 
 
-def test_the_top1_share_counts_the_questions_the_router_would_have_sent_elsewhere():
-    """Recall is scored on the gold entry's datasource; where the router disagrees is its own metric."""
-    results = [{"id": "a", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10,
-                "datasource_id": "chinook", "retrieved_datasource_id": "chinook"},
-               {"id": "b", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10,
-                "datasource_id": "chinook", "retrieved_datasource_id": "support"},
-               {"id": "c", "table_recall": 1.0, "column_recall": 1.0, "tables_sent": 2, "columns_sent": 10,
-                "datasource_id": "chinook", "retrieved_datasource_id": None}]
-    summary = rr.summarize(results)
-    # Every question was scored on Chinook all the same: recall is untouched.
-    assert summary["table_recall"] == 1.0 and summary["column_recall"] == 1.0
-    assert summary["datasource_top1_accuracy"] == 0.3333
+def test_mode_retrieval_asks_the_retriever_about_the_cases_datasource_with_the_search_forced(monkeypatch):
+    """The retriever is asked about the case's datasource, whatever routing ranks first."""
+    from nl2sql.evaluation import run as run_module
+    from nl2sql.evaluation.suite import EvalSuite
+    from nl2sql.registry import Registry
 
-
-def test_every_question_is_scored_against_the_datasource_its_gold_entry_names():
-    """The retriever is asked about the gold datasource, whatever the vector search ranks first."""
     asked = []
-    ctx = fake_runtime(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook", "support", "webanalytics"]),
-                       vector_store=SimpleNamespace(
-                           FETCH_MULTIPLIER=4, LAMBDA_MULT=0.7, embeddings=None,
-                           retrieve_datasource_candidates=lambda q, k: [
-                               SimpleNamespace(metadata={"datasource_id": "support"})]))
-    snapshot_limits = []
 
-    def sent(_ctx, q, ds_id):
-        snapshot_limits.append(_ctx.settings.retrieval.full_snapshot_max_tables)
-        asked.append((q.id, ds_id))
-        return {}
+    def sent(run, case, role):
+        asked.append((case.id, case.datasources[0], role, run.settings.retrieval.full_snapshot_max_tables))
+        return {"Customer": ["CustomerId", "FirstName", "LastName"], "Invoice": ["CustomerId", "Total"]}
 
-    monkey = pytest.MonkeyPatch()
-    monkey.setattr(rr, "_sent", sent)
-    try:
-        report = rr.run_retrieval_recall(ctx, question_ids=["chinook_002"])
-    finally:
-        monkey.undo()
-    [(qid, datasource_id)] = asked
-    assert (qid, datasource_id) == ("chinook_002", "chinook")
-    # The vector search is forced for the run, and the runtime's setting is put back after.
-    assert snapshot_limits == [0]
+    monkeypatch.setattr(rr, "sent", sent)
+    monkeypatch.setattr(rr, "routed", lambda run, question, limit: ["support", "chinook"][:limit])
+    ctx = fake_runtime(registry=Registry.default())
+    suite = EvalSuite(cases=[CHINOOK_002.model_copy(update={"outcome": {"admin": "allowed"}})])
+    report = run_module.run_evals(ctx, [suite], mode="retrieval", scorers=["retrieval_recall", "routing"],
+                                  curated=True)
+
+    assert asked == [("chinook_002", "chinook", "admin", 0)]
     assert ctx.settings.retrieval.full_snapshot_max_tables == 15
-    [result] = report["results"]
-    assert result["datasource_id"] == "chinook" and result["retrieved_datasource_id"] == "support"
-    assert report["summary"]["datasource_top1_accuracy"] == 0.0
-
-
-def test_comparing_two_reports_gives_the_deltas_and_each_question_that_moved():
-    old = {"summary": {"table_recall": 0.8, "column_recall": 0.5, "tables_sent": 3.0, "columns_sent": 8.0},
-           "results": [{"id": "a", "table_recall": 1.0, "column_recall": 0.5},
-                       {"id": "b", "table_recall": 0.5, "column_recall": 0.5}]}
-    new = {"summary": {"table_recall": 0.9, "column_recall": 0.5, "tables_sent": 3.0, "columns_sent": 9.0},
-           "results": [{"id": "a", "table_recall": 1.0, "column_recall": 1.0},
-                       {"id": "b", "table_recall": 0.5, "column_recall": 0.5}]}
-    diff = rr.compare_reports(new, old)
-    assert diff["summary"]["table_recall"] == pytest.approx(0.1)
-    assert diff["summary"]["column_recall"] == 0.0 and diff["summary"]["columns_sent"] == 1.0
-    assert diff["moved"] == [{"id": "a", "table_recall": [1.0, 1.0], "column_recall": [0.5, 1.0]}]
+    board = report.configs["retrieval"]
+    assert board["retrieval"]["column_recall"] == 1.0 and board["scores"]["routing"]["passed"] == 1
 
 
 def _report(table=0.9, column=0.6):
-    return {"kind": "retrieval", "dataset": str(GOLD_DATASET_PATH),
+    return {"kind": "retrieval", "dataset": str(CHINOOK_SUITE_PATH),
             "settings": {"table_k": 8, "planning_k": 12, "fetch_multiplier": 4, "lambda_mult": 0.7,
                          "full_snapshot_max_tables": 0, "embedding": "all-MiniLM-L6-v2"},
             "summary": {"questions": 39, "table_recall": table, "column_recall": column, "perfect_tables": 30,
@@ -120,7 +85,7 @@ def test_a_retrieval_record_holds_the_run_the_settings_and_the_means(tmp_path):
     assert path.relative_to(tmp_path).as_posix() == "retrieval/unknown/2026-09-21_abc1234_retrieval.json"
     [rec] = records.load_records(tmp_path)
     assert rec["kind"] == "retrieval" and rec["metrics"]["table_recall"] == 0.9
-    assert rec["settings"]["table_k"] == 8 and rec["dataset"]["name"] == "chinook_gold.yaml"
+    assert rec["settings"]["table_k"] == 8 and rec["dataset"]["name"] == "chinook.yaml"
 
 
 def test_publish_adds_a_retrieval_section_newest_first(tmp_path):

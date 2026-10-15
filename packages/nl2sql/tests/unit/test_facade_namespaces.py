@@ -389,26 +389,27 @@ def test_feedback_stats_counts_the_ratings_and_the_traces(engine):
     assert engine.feedback.stats(traces=Path(engine.config.storage.path) / "elsewhere")["runs"] == 1
 
 
-def test_feedback_export_writes_the_thumbs_up_runs_as_draft_gold_entries(engine, tmp_path):
-    import yaml
+def test_feedback_export_writes_draft_cases(engine, tmp_path):
+    from nl2sql.evaluation.suite import load_suite
 
     engine.feedback.record(_answered("one"), question="How many customers?", role="admin", rating="up")
     engine.feedback.record(_answered("two"), question="Bad", role="admin", rating="down")
 
     report = engine.feedback.export(tmp_path / "drafts.yaml")
 
-    drafts = yaml.safe_load((tmp_path / "drafts.yaml").read_text(encoding="utf-8"))
+    [case] = load_suite(tmp_path / "drafts.yaml").cases
     assert report == {"written": 1, "skipped": 0}
-    assert [d["question"] for d in drafts] == ["How many customers?"]
+    assert case.question == "How many customers?"
+    assert (case.status, case.origin, case.outcome) == ("draft", "feedback", {"admin": "allowed"})
 
 
-def test_feedback_export_never_writes_the_gold_set(engine):
-    from nl2sql.evaluation.gold import GOLD_DATASET_PATH
+def test_feedback_export_never_writes_a_packaged_suite(engine):
+    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH
 
-    before = GOLD_DATASET_PATH.read_bytes()
-    with pytest.raises(ValueError, match="gold set"):
-        engine.feedback.export(GOLD_DATASET_PATH)
-    assert GOLD_DATASET_PATH.read_bytes() == before
+    before = CHINOOK_SUITE_PATH.read_bytes()
+    with pytest.raises(ValueError, match="suite"):
+        engine.feedback.export(CHINOOK_SUITE_PATH)
+    assert CHINOOK_SUITE_PATH.read_bytes() == before
 
 
 def test_feedback_clear_empties_the_table(engine):

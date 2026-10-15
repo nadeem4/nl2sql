@@ -2,7 +2,7 @@
 
 * :mod:`record` -- what one run contributes (signals, question, SQL, models), and its rated row.
 * :mod:`stats` -- rates over feedback rows plus kept run traces.
-* :mod:`drafts` -- thumbs-up runs as draft gold entries for review.
+* :mod:`drafts` -- thumbs-up runs as draft eval cases for review.
 * :mod:`proposals` -- thumbs-up generated answers as proposed verified queries for review.
 
 The rows are kept by the engine's state store (``storage.state``).

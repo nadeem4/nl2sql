@@ -1,6 +1,6 @@
 """Evaluation and trace replay run on a runtime of their own, never on the engine's.
 
-They need different settings for one run: tier 2 turns the plan cache off,
+They need different settings for one run: an eval in mode full turns the plan cache off,
 replay tells the prompts the date the recording was told. They build a
 run-scoped runtime from a derived config (``Runtime.derive``) and leave the
 engine's config, LLM set and curated answers alone, so a query running on
@@ -18,7 +18,6 @@ from langchain_core.embeddings import FakeEmbeddings
 from nl2sql.api.query_api import QueryResult
 from nl2sql.config import LLM, Embeddings
 from nl2sql.llm.models import AgentConfig, LLMFileConfig
-from nl2sql.evaluation import tier2
 from nl2sql.runtime import Runtime
 from nl2sql.testing.config import make_config
 
@@ -72,33 +71,28 @@ def test_a_replaced_engine_llm_is_what_a_later_run_starts_from(tmp_path):
     assert run.llm_registry.get_llm("default") is engine.llm_registry.get_llm("default")
 
 
-def test_tier2_runs_without_touching_another_engine(tmp_path, monkeypatch):
+def test_an_eval_runs_without_touching_another_engine(tmp_path, monkeypatch):
+    from nl2sql.evaluation import run as run_module
+    from nl2sql.evaluation.suite import EvalSuite
+
     a, b = _engine(tmp_path / "a"), _engine(tmp_path / "b")
     a_config, b_config = a.config, b.config
-    a_default = a.llm_registry.get_llm_config("default")
     seen = []
 
-    class _Runner:
-        def __init__(self, config, ctx, workers, before_case):
-            self.ctx = ctx
+    def ask(run, case, role):
+        # What another query on either engine would read while the eval runs.
+        seen.append((run.settings.pipeline.plan_cache, run.config.policies.refusal_names_tables,
+                     a.config is a_config, b.config is b_config))
+        return QueryResult(status="success"), None
 
-        def cases(self):
-            return [(SimpleNamespace(id="q0", question="?", tags=[], difficulty="easy"), "admin")]
-
-        def run_case(self, question, role):
-            # What another query on either engine would read while tier 2 runs.
-            seen.append((self.ctx.settings.pipeline.plan_cache, self.ctx.config.policies.refusal_names_tables,
-                         a.config is a_config, b.config is b_config))
-            return ({"id": question.id, "question": "?", "role": role, "expected": "allowed", "status": "pass",
-                     "reason": "", "sql": "SELECT 1", "rows": 1, "gold_rows": 1}, QueryResult())
-
-    monkeypatch.setattr(tier2, "BenchmarkRunner", _Runner)
-    cfg = LLMFileConfig(default=AgentConfig(provider="openai", model="gpt-5.4"))
-    tier2.run_tier2(a, SimpleNamespace(dataset_path="gold.yaml", roles=["admin"]), {"x": cfg}, max_cost=1.0)
+    monkeypatch.setattr(run_module, "_ask", ask)
+    cfg = LLMFileConfig(default=AgentConfig(provider="openai", model="gpt-5.4", **KEY))
+    suite = EvalSuite(cases=[{"id": "q0", "question": "?", "status": "approved", "outcome": {"admin": "allowed"}}])
+    run_module.run_evals(a, [suite], mode="full", llm={"x": cfg}, scorers=["outcome"], curated=False,
+                         max_cost_usd=1.0)
 
     assert seen == [(False, False, True, True)]
     assert a.config is a_config and b.config is b_config
-    assert a.llm_registry.get_llm_config("default") == a_default  # the run's LLMs were its own
 
 
 def test_replay_pins_the_date_in_its_own_runtime(tmp_path, monkeypatch):

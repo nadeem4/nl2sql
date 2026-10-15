@@ -93,9 +93,6 @@ nl2sql run --no-exec "Which artist has the most albums?"                 # plan 
 nl2sql index                       # re-index the schema
 nl2sql config check --connect      # the whole config, by file; exit 1 on a problem
 nl2sql doctor                      # drivers, provider keys, and the engine's check
-nl2sql benchmark --tier 1          # gold plans, no key
-nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5
-nl2sql benchmark retrieval         # retrieval recall, no key
 nl2sql feedback stats              # ratings and guardrail rates
 ```
 

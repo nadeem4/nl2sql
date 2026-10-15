@@ -17,11 +17,9 @@ def _pyproject() -> dict:
 # F13: the vendored Chinook database is a dataset, not part of the CLI.
 def test_chinook_lives_in_the_neutral_datasets_package():
     from nl2sql.datasets import CHINOOK_DB_PATH
-    from nl2sql.evaluation.gold import CHINOOK_DB_PATH as gold_path
 
     assert CHINOOK_DB_PATH.is_file()
     assert "cli" not in CHINOOK_DB_PATH.relative_to(SRC).parts
-    assert gold_path == CHINOOK_DB_PATH
 
 
 def test_the_wheel_carries_the_chinook_database():

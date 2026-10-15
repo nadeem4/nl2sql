@@ -1,125 +1,114 @@
-# Chinook Gold Evaluation Dataset
+# The Chinook Suite
 
-A set of about forty questions about the vendored Chinook database
-(`nl2sql/datasets/chinook.sqlite`), each with hand-written SQL and the rows
-that SQL returns. It is the reference an evaluation compares the engine's
-answers against.
+The Chinook suite holds 47 cases about the vendored Chinook database
+(`nl2sql/datasets/chinook.sqlite`). Each case has hand-written SQL, the rows
+that SQL returns, and a hand-written plan. Evaluations compare the engine's
+answers against it. It is a suite in the [eval case format](../evals/cases.md)
+and runs through [`engine.evals`](../evals/index.md).
 
 | File | What it holds |
 | --- | --- |
-| `packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold.yaml` | The dataset |
-| `packages/nl2sql/src/nl2sql/evaluation/gold.py` | `GoldQuestion` model (with `alt_gold_sql`), `load_gold_dataset()`, `execute_gold_sql()`, `regenerate()` |
-| `packages/nl2sql/src/nl2sql/evaluation/datasets/chinook_gold_plans.yaml` | A hand-written `PlanModel` per answerable question, for [tier 1](#tier-1-gold-plans-through-the-code-nodes) |
-| `packages/nl2sql/src/nl2sql/evaluation/tier1.py` | `load_gold_plans()`, the gold-plan fake LLM, `run_tier1()` |
-| `packages/nl2sql/src/nl2sql/evaluation/tier2.py` | [Tier 2](#tier-2-the-real-model-end-to-end): the cost cap, the scoreboard, the comparison and the baseline check |
+| `packages/nl2sql/src/nl2sql/evaluation/suites/chinook.yaml` | The suite: the cases, their rows and their plans |
+| `packages/nl2sql/src/nl2sql/evaluation/suite.py` | `EvalCase`, `EvalSuite`, the loader and the writer |
+| `packages/nl2sql/src/nl2sql/evaluation/regenerate.py` | `regenerate`: the rows, through the datasource's adapter |
+| `packages/nl2sql/src/nl2sql/evaluation/run.py` | The three modes, prices and the cost cap |
+| `packages/nl2sql/src/nl2sql/evaluation/gold_llm.py` | The gold-plan fake LLM that [mode plans](#mode-plans-gold-plans-through-the-code-nodes) runs on |
+| `packages/nl2sql/src/nl2sql/evaluation/scorers/` | The scorer interface and the five built-ins |
+| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `compare_results_lenient`), which `result_match` reads |
 | `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
-| `packages/nl2sql/src/nl2sql/evaluation/retrieval_recall.py` | [Retrieval recall](#retrieval-recall): table and column recall of schema retrieval, no key |
-| `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table tier 2 bills every call from |
-| `packages/nl2sql/src/nl2sql/evaluation/records.py` | Result records, comparable runs, `nl2sql benchmark publish` and `--from` |
-| `packages/nl2sql/src/nl2sql/evaluation/presets/` | `--model` configs and the built-in `--llm` presets (`*.yaml`, shipped in the wheel) |
-| `packages/nl2sql/src/nl2sql/evaluation/baselines/` | Where a committed tier 2 baseline scoreboard goes (none yet) |
-| `benchmarks/<kind>/<database>/` | Committed result records: `tier2/` one per run and config, `retrieval/` one per run ([layout](#results-over-time)) |
-| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `compare_results_lenient`) and per-role scoring (`score_case`, `score_case_lenient`) |
-| `packages/nl2sql/tests/unit/test_chinook_gold_dataset.py` | Key-free checks, part of the normal unit suite |
+| `packages/nl2sql/src/nl2sql/evaluation/report.py` | The report's boards: accuracy, intervals, pass^k, cost, latency |
+| `packages/nl2sql/src/nl2sql/evaluation/gate.py` | The regression gate's statistics: flips, McNemar's test, the checks |
+| `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table mode full bills every call from |
+| `packages/nl2sql/src/nl2sql/evaluation/records.py` | Result records, comparable runs and the published pages |
+| `packages/nl2sql/src/nl2sql/evaluation/presets/` | Named LLM configs to compare (`*.yaml`, shipped in the wheel) |
+| `benchmarks/<kind>/<database>/` | Committed result records ([layout](#results-over-time)) |
+| `packages/nl2sql/tests/unit/test_chinook_suite.py` | Key-free checks, part of the normal unit suite |
 
-## Format
+## The cases
 
-The file is a YAML list. Each entry:
+The fields are described in [Cases and suites](../evals/cases.md). For this
+suite:
 
-| Field | Meaning |
-| --- | --- |
-| `id` | Unique id, `chinook_NNN` |
-| `question` | The natural-language question |
-| `difficulty` | `easy`, `medium` or `hard` |
-| `tags` | Categories: `single-table`, `filter`, `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `offset`, `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`, `data-range` (needs to know where the data ends: "the most recent month in the data"), `value-matching` (names a stored value in other words: "heavy metal" for `'Heavy Metal'`), `rbac-denial`, `unanswerable` |
-| `paraphrase_group` | Optional. Questions with the same intent share this id and the same `gold_result`, for determinism checks |
-| `datasource` | The database the question is asked against. Defaults to `chinook` and is written out only where a question differs, so the file - and its sha256 - are unchanged. It is what the run is scored and identified by, so the demo's other databases do not widen it |
-| `needed_tables` | Exactly the tables `gold_sql` reads, for retrieval recall |
-| `needed_columns` | `Table.Column` names the answer needs, for retrieval recall |
-| `expected` | Per demo role (`admin`, `analyst`, `viewer`): `allowed`, `refused` or `unanswerable` |
-| `order_matters` | Whether a comparison should respect row order |
-| `gold_sql` | Hand-written SQLite SQL, or `null` for an unanswerable question |
-| `gold_result` | Rows `gold_sql` returns, as a list of `{column: value}` maps. Generated, never typed. `null` when `gold_sql` is `null` |
-| `alt_gold_sql` | Optional. [Reviewed alternative answers](#alternative-gold-answers) to the same question, each hand-written SQLite SQL |
-| `alt_gold_result` | The rows each `alt_gold_sql` returns, in the same order. Generated, never typed. Omitted with `alt_gold_sql` |
+- **The tags.** `tags` come from a fixed list: `single-table`, `filter`,
+  `join`, `multi-join`, `aggregation`, `having`, `order-limit`, `offset`,
+  `ties`, `date`, `paraphrase`, `keyword-in-question`, `keyword-in-value`,
+  `data-range` and `value-matching`. `data-range` marks a case that needs to
+  know where the data ends ("the most recent month in the data"), and
+  `value-matching` one that names a stored value in other words ("heavy
+  metal" for `'Heavy Metal'`).
+- **`rbac-denial` and `unanswerable`.** `rbac-denial` marks exactly the cases
+  some role is refused, and `unanswerable` the four the database cannot
+  answer.
+- **Every case is approved and hand written, about `chinook`.** So the run is
+  scored, and identified, by Chinook, whatever else the demo registers.
+- **The outcomes follow the demo policy.** `outcome` follows
+  `CHINOOK_POLICIES` in `nl2sql/datasets/chinook.py`: a role gets `refused`
+  when its scope does not allow one of `tables`, and `allowed` otherwise. An
+  unanswerable case is `unanswerable` for every role.
+- **Ties are broken on a key.** Where `ORDER BY` has ties, `sql` breaks them
+  on a key (`CustomerId`, `Country` and so on) so the result is
+  deterministic, and the case carries the `ties` tag. When the tie is only
+  about order, `order_matters` is `false`.
 
-`expected` follows the demo policy in `nl2sql/datasets/chinook.py`
-(`CHINOOK_POLICIES`): a role gets `refused` when its scope does not allow
-any of `needed_tables`, and `allowed` otherwise. Questions the database
-cannot answer are `unanswerable` for every role. The `rbac-denial` tag marks
-exactly the questions some role is refused.
-
-Where `ORDER BY` has ties, `gold_sql` breaks them on a key (`CustomerId`,
-`Country` and so on) so the result is deterministic, and the question carries
-the `ties` tag. When the tie is only about order, `order_matters` is `false`.
-
-## Regenerating the results
-
-`gold_result` and `alt_gold_result` are always produced by running `gold_sql`
-and each `alt_gold_sql` against the database. After adding or editing a
-question, an alternative or any SQL, set its `gold_result` to `null` (or leave
-it stale) and run:
-
-```bash
-python -m nl2sql.evaluation.gold
-```
-
-It re-executes every `gold_sql` and every `alt_gold_sql`, rewrites the file in
-its canonical layout and prints how many results it wrote. A question with no
-alternatives carries neither field. Commit the rewritten file.
+**The data never changes.** The suite was moved from 0.6's
+`chinook_gold.yaml` and `chinook_gold_plans.yaml` with only its keys renamed.
+`test_chinook_suite_holds_the_gold_data_unchanged` pins a SHA-256 of every
+case's question, SQL, rows, alternatives, outcomes, tables, columns and plan.
+A new accepted answer is a reviewed [alternative](#alternative-answers),
+followed by [`regenerate`](../evals/cases.md#regenerating-rows); never an edit
+to the gold data.
 
 ## What the tests check
 
-`pytest packages/nl2sql/tests/unit/test_chinook_gold_dataset.py` runs without
-an API key and checks that:
+`pytest packages/nl2sql/tests/unit/test_chinook_suite.py` runs without an API
+key and checks that:
 
-- every entry validates against `GoldQuestion` and ids are unique;
-- every `gold_sql` reproduces its committed `gold_result`, and the committed
-  file is byte-for-byte what the generator writes;
-- every `alt_gold_sql` reproduces its committed `alt_gold_result` the same
-  way, reads no table outside `needed_tables`, returns between one and
-  twenty-five rows, and is not the gold answer written again;
-- paraphrase groups share one result;
-- every needed table and column exists, and `needed_tables` equals the tables
-  in `gold_sql`;
-- every role in `expected` exists in the demo policy and each outcome follows
+- the data hashes to the pinned digest;
+- every case is `approved` and `hand`, on `chinook`;
+- ids are unique, and paraphrase groups share one result;
+- every table and column exists, and `tables` equals the tables in `sql`;
+- every role in `outcome` exists in the demo policy, and each outcome follows
   from it;
+- every answerable case has a plan, and no other case does. Each plan is a
+  `PlanModel` that reads exactly `tables` and selects as many columns as
+  `rows` has;
+- every `alt_sql` reads no table outside `tables`, returns between one and
+  twenty-five rows, and is not the gold answer written again;
 - Chinook's twelve guided questions (`CHINOOK_QUESTIONS`) are included
-  verbatim. The demo offers twenty in all (`DEMO_QUESTIONS`); the other eight
-  ask about `support` and `webanalytics`, which this Chinook-only gold set does
-  not cover.
+  verbatim. The demo offers twenty in all; the other eight ask about
+  `support` and `webanalytics`, which this suite does not cover.
 
-## Running the benchmark
+`tests/unit/test_eval_regenerate.py` runs `regenerate` through the sqlite
+adapter and checks that the committed file is byte for byte what it writes.
 
-```bash
-nl2sql benchmark --tier 1        # gold plans, no API key
-nl2sql benchmark --tier 2 --max-cost 5   # the real model, scored and priced
-nl2sql benchmark                 # full pipeline, the configured LLM
-nl2sql benchmark retrieval       # schema retrieval recall, no API key
-```
+## How a run is scored
 
-Each question runs once per role in its `expected` map (narrow with
-`--include-ids` and `--role`; tier 2 runs as `admin` unless `--role` says
-otherwise), and each run is scored:
+Each case runs once per role in its `outcome` map, and each run is scored by
+the [scorers](../evals/scorers.md). For `result_match` and `outcome`:
 
-| Expected | Passes when |
+| Outcome | Passes when |
 | --- | --- |
-| `allowed` | Status `success`, one result set, and its rows equal `gold_result` or any [alternative](#alternative-gold-answers) |
+| `allowed` | Status `success`, one result set, and its rows equal `rows` or any [alternative](#alternative-answers) |
 | `refused` | Status `error`, a `SECURITY_VIOLATION` whose message is the generic refusal (it names no table), and no rows |
 | `unanswerable` | Status `error`, a `QUESTION_NOT_ANSWERABLE` from the datasource resolver's answerability check, and no rows |
 
-Rows are compared by value, in selected column order: column names and
-aliases are ignored, so `SELECT Country AS c` matches a gold `Country`
-column but a swapped column order does not. Numbers match within 0.005,
-because gold values are rounded to two decimals. A number also matches a
-string that spells one, within the same tolerance, so `'2009'` is `2009`:
-databases differ in which of the two they return for the same value. Other
-strings must be equal, and two strings compare as strings (`'2009'` is not
-`'2009.0'`). Row order counts only when `order_matters` is true.
+Rows are compared by value, in selected column order:
+
+- **Names don't count, order does.** Column names and aliases are ignored, so
+  `SELECT Country AS c` matches a gold `Country` column, but a swapped column
+  order does not.
+- **Numbers match within 0.005**, because gold values are rounded to two
+  decimals.
+- **A number matches a string that spells it**, within the same tolerance, so
+  `'2009'` is `2009`: databases differ in which of the two they return for the
+  same value.
+- **Other strings must be equal.** Two strings compare as strings, so
+  `'2009'` is not `'2009.0'`.
+- **Row order counts only when `order_matters` is true.**
 
 ### Strict and lenient accuracy
 
-Tier 2 scores every run twice and reports both, strict first.
+Every run is scored twice, and the report gives both, strict first.
 
 | Score | What it is |
 | --- | --- |
@@ -127,14 +116,17 @@ Tier 2 scores every run twice and reports both, strict first.
 | **Lenient** | Every gold column is answered by *some* column of the result, wherever it sits |
 
 Strict is the honest headline. Lenient exists because most of what it
-forgives is shape a person would accept: the same two names as
-`FirstName, LastName` or the other way round, one extra key column, a year
-labelled `2009-01-01` where the gold set writes `2009`. Academic and vendor
-practice has moved the same way -- Spider 2.0 counts a prediction correct
-when every gold column vector appears in the result
-([paper](https://arxiv.org/html/2411.07763v2)) and Defog's `sql-eval` falls
-back to `subset_df`, matching each gold column's values against some
-generated column with names, types and order ignored
+forgives is shape a person would accept:
+
+- the same two names as `FirstName, LastName` or the other way round;
+- one extra key column;
+- a year labelled `2009-01-01` where the gold set writes `2009`.
+
+Academic and vendor practice has moved the same way. Spider 2.0 counts a
+prediction correct when every gold column vector appears in the result
+([paper](https://arxiv.org/html/2411.07763v2)). Defog's `sql-eval` falls back
+to `subset_df`, matching each gold column's values against some generated
+column with names, types and order ignored
 ([post](https://defog.ai/blog/open-sourcing-sqleval/)).
 
 A run passes leniently when:
@@ -164,46 +156,50 @@ Two guardrails keep it from passing wrong answers:
 One value normalisation is added, and only one: **date and period labels**.
 When a gold value is a `YYYY`, `YYYY-MM` or `YYYY-MM-DD` string and the
 predicted value is a date starting with it at a component boundary, the two
-are equal -- `'2009'` matches `'2009-01-01'`, `'2013-02'` matches
-`'2013-02-01'`. Only the gold side may be the shorter label, only strings are
-read this way (a number is a number, never a year), and nothing else is
-normalised. Anything broader belongs in an alternative gold answer, which is
-reviewed per question and cannot silently widen.
+are equal: `'2009'` matches `'2009-01-01'`, and `'2013-02'` matches
+`'2013-02-01'`.
+
+- Only the gold side may be the shorter label.
+- Only strings are read this way: a number is a number, never a year.
+- Nothing else is normalised. Anything broader belongs in an alternative
+  answer, which is reviewed per case and cannot silently widen.
 
 Lenient is a superset of strict by construction: everything strict accepts is
-accepted. It is not partial credit -- a question passes a score or it does
+accepted. It is not partial credit -- a case passes a score or it does
 not -- and there is no model in either score, so both stay reproducible.
+Every record carries `status` and `lenient_status`, so a case that passes one
+score and not the other is visible per case.
 
-Every result row carries `status` and `lenient_status`, so a question that
-passes one score and not the other is visible per question; the printed
-table shows a **Strict** and a **Lenient** column beside each other, and the
-scoreboard, the records, the README block and
-[docs/benchmarks.md](../benchmarks.md) all report both.
+### Alternative answers
 
-### Alternative gold answers
+A question can have more than one right answer:
 
-A question can have more than one right answer. "Who are the top 5 customers
-by total spend?" is answered just as well with the name in one column as with
-`FirstName` and `LastName` side by side; "What is the total revenue per year?"
-is answered with the year written `2009` or `2009-01-01`. `alt_gold_sql` holds
-those other answers, one SQL each, executed and committed exactly as
-`gold_sql` is. A run passes -- strictly or leniently -- when its rows match the
-gold answer **or any alternative**.
+- "Who are the top 5 customers by total spend?" is answered just as well
+  with the name in one column as with `FirstName` and `LastName` side by
+  side.
+- "What is the total revenue per year?" is answered with the year written
+  `2009` or `2009-01-01`.
 
-This is how the field handles multiple right answers. Snowflake has humans
-pick every correct answer out of several models' SQL
-([post](https://www.snowflake.com/en/blog/engineering/cortex-analyst-text-to-sql-accuracy-bi/));
-LinkedIn reports that about 60% of its benchmark questions now have several
-answers and that without them it *"underreported recall by 10-15%"*
-([post](https://www.linkedin.com/blog/engineering/ai/practical-text-to-sql-for-data-analytics));
-Spider 2.0 supports multiple gold files per task
-([paper](https://arxiv.org/html/2411.07763v2)).
+`alt_sql` holds those other answers, one SQL each, and `regenerate` runs each
+one exactly as it runs `sql`. A run passes, strictly or leniently, when its
+rows match `rows` **or any alternative**.
+
+This is how the field handles multiple right answers:
+
+- Snowflake has humans pick every correct answer out of several models' SQL
+  ([post](https://www.snowflake.com/en/blog/engineering/cortex-analyst-text-to-sql-accuracy-bi/)).
+- LinkedIn reports that about 60% of its benchmark questions now have
+  several answers, and that without them it *"underreported recall by
+  10-15%"*
+  ([post](https://www.linkedin.com/blog/engineering/ai/practical-text-to-sql-for-data-analytics)).
+- Spider 2.0 supports multiple gold files per task
+  ([paper](https://arxiv.org/html/2411.07763v2)).
 
 #### When to add one, and when not to
 
 Prefer an alternative to loosening the comparator. An alternative is written
-down, reviewed once, and only ever affects the question it sits on; a looser
-rule applies to all forty-seven at once and can quietly start passing wrong
+down, reviewed once, and only ever affects the case it sits on. A looser rule
+applies to all forty-seven at once and can quietly start passing wrong
 answers. The [lenient score](#strict-and-lenient-accuracy) is deliberately
 narrow for the same reason.
 
@@ -214,8 +210,8 @@ Add one when **all** of these hold:
 2. A person has **read the rows** and would accept them as an answer to the
    question as written.
 3. It is the same question, from the same tables: an alternative may not read
-   a table outside `needed_tables`, and the test enforces that.
-4. It is deterministic -- ties broken on a key, as `gold_sql` does.
+   a table outside `tables`, and the test enforces that.
+4. It is deterministic -- ties broken on a key, as `sql` does.
 
 Do not add one when the answer is a *different* question, however reasonable
 it looks. Two from the run this was built on, both refused:
@@ -230,164 +226,100 @@ it looks. Two from the run this was built on, both refused:
   support the **most** customers"* carries a superlative, and the one employee
   who holds the maximum is a fair reading of it, so that one is kept.
 
-Write the SQL into `alt_gold_sql`, run `python -m nl2sql.evaluation.gold` to
-generate `alt_gold_result`, read the rows it wrote, and commit both. Never
-type an alternative's rows by hand.
+To add one:
 
-The command prints one row per question and role, then a pass/fail/skip/xfail
-count per role, writes the whole report as JSON (`--export-path`, default
-`benchmark_report.json`) and exits 1 if any case failed. Without `--tier`,
-`--bench-config-path` names a YAML map of LLM configs to run in turn; without
-it the context's own LLM config runs once.
+1. Write the SQL into `alt_sql`.
+2. Run `engine.evals.regenerate("evals/chinook.yaml")` to write its
+   `alt_rows`.
+3. Read the rows it wrote.
+4. Commit both.
 
-## Tier 1: gold plans through the code nodes
+Never type an alternative's rows by hand.
 
-Tier 1 checks the nodes that are plain code -- the logical validator
-(including RBAC), the SQL generator and the executor -- with no model
-involved. `chinook_gold_plans.yaml` holds, for every answerable question, a
-hand-written `PlanModel` (the typed AST the planner emits) that answers it. A
-local `FakeLLMServer` answers every LLM call: the datasource resolver's
-answerability check gets `["chinook"]` for a question with `gold_sql` and an
-empty list for an unanswerable one (so the resolver's refusal is what is
-scored), the decomposer gets one
-sub-query on `chinook` whose expected columns are the plan's select aliases,
-the planner gets the gold plan, the refiner "Keep the same plan." and the
-answer synthesizer a fixed sentence. The rest is the real pipeline on the
-indexed demo, so a failing case is a bug in a code node or in the plan, never
-in a model. Refusals are scored against the default, generic message: the
-demo's config sets `policies.refusal_names_tables: true` so the playground
-can show which table was refused, and tier 1 turns that off for its run.
-Tier 1 also runs with [curated answers](../configuration/curated.md) off
-(`run_tier1()` clears the context's curated file for the run): it scores
-plans, and a verified answer has none.
+## Mode plans: gold plans through the code nodes
 
-Each plan reads exactly the question's `needed_tables` (the RBAC outcome is
-derived from them) and selects the gold result's columns in order. PlanModel
-has no subqueries or window functions, so a few plans express the answer
-differently from `gold_sql`: anti-joins for "longest track per genre"
-(`chinook_008`) and "never purchased" (`chinook_039`), and conditional sums
-in HAVING for "jazz but never rock" (`chinook_009`). The header of the plans
-file lists these. `chinook_011` and `chinook_034` use `COUNT(DISTINCT x)`
-through the aggregate's `distinct: true` flag.
+`engine.evals.run(mode="plans")` checks the nodes that are plain code -- the
+logical validator (including RBAC), the SQL generator and the executor --
+with no model involved. Every answerable case has a hand-written `plan` (the
+typed AST the planner emits) that answers it.
 
-Tier 1 runs on every PR as `packages/nl2sql/tests/e2e/test_benchmark_tier1.py`,
-in the key-free integration job: it generates the demo, runs
-`nl2sql benchmark --tier 1` with no API key in the environment, and requires
-every case -- allowed, refused and unanswerable, for every role -- to pass,
-with none skipped. `packages/nl2sql/tests/unit/test_tier1_gold_plans.py`
-checks in the unit job that every answerable question has a plan, that it
-reads exactly the needed tables and selects as many columns as the gold
-result, and that the answerability verdict served follows the gold dataset.
+A local `FakeLLMServer` (`nl2sql/evaluation/gold_llm.py`) answers every LLM
+call:
+
+| Node | The fake answers |
+| --- | --- |
+| Datasource resolver | The case's datasources for a case with `sql`, and an empty list for an unanswerable one, so the resolver's refusal is what is scored |
+| Decomposer | One sub-query whose expected columns are the plan's select aliases |
+| Planner | The gold plan |
+| Refiner | "Keep the same plan." |
+| Answer synthesizer | A fixed sentence |
+
+Every answer comes from one table keyed by the structured output's schema
+name, so a new structured output is one more entry.
+
+The rest is the real pipeline on the indexed demo, so a failing case is a bug
+in a code node or in the plan, never in a model. The run turns curated
+answers off, because a verified answer has no plan. It also scores refusals
+against the generic message: the demo's config names the refused table so the
+playground can show it, and the run turns that off.
+
+Each plan reads exactly the case's `tables` (the RBAC outcome is derived from
+them) and selects the rows' columns in order. PlanModel has no subqueries or
+window functions, so a few plans express the answer differently from `sql`:
+
+- anti-joins for "longest track per genre" (`chinook_008`) and "never
+  purchased" (`chinook_039`);
+- conditional sums in HAVING for "jazz but never rock" (`chinook_009`);
+- `COUNT(DISTINCT x)` through the aggregate's `distinct: true` flag
+  (`chinook_011` and `chinook_034`).
+
+The suite file's header lists these.
+
+Mode plans runs on every PR as `packages/nl2sql/tests/e2e/test_evals_plans.py`,
+in the key-free integration job. It builds an engine on the generated demo
+with no API key in the environment, runs `engine.evals.run(mode="plans")`, and
+requires every case to pass -- allowed, refused and unanswerable, for every
+role -- with none skipped.
 
 When a gold plan fails, the fault is in the engine or in the plan. Fix an
-engine bug with a regression test; do not change the gold data to make a plan
-pass unless the gold data is itself wrong.
+engine bug with a regression test. Never change the gold data to make a plan
+pass.
 
-## Tier 2: the real model, end to end
+## Mode full: the real model, end to end
 
-Tier 2 runs the whole product -- every LLM node on a real model -- on the gold
-questions and scores it with the same runner and scoring as tier 1. It costs
-money, so it never runs in CI (it refuses when `CI` is set) and never runs
-without a dollar cap. The key comes from the environment or the LLM config
-(`${env:...}`), never from the command line; traces follow `TRACE_MODE` as for
-any run.
+`engine.evals.run(mode="full")` runs the whole product -- every LLM node on a
+real model -- on the cases, and scores it with the same scorers. It costs
+money, so it never runs in CI and never runs without a dollar cap
+(`max_cost_usd`). The key comes from the LLM config (`${env:...}`).
 
-The commands the owner runs, from the demo folder:
+```python
+from nl2sql.evaluation.presets import PRESETS_DIR, load_llm_file, model_config
 
-```bash
-nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5                        # a run
-nl2sql benchmark --tier 2 --model gpt-5.4 --llm mini-helpers --max-cost 10    # a comparison
+report = engine.evals.run(max_cost_usd=5)                                # the engine's own llm section
+report = engine.evals.run(llm={"gpt-5.4": model_config("gpt-5.4"),       # a comparison
+                               "mini": load_llm_file(PRESETS_DIR / "gpt-5.4-mini-helpers.yaml")},
+                          max_cost_usd=10)
 ```
 
-and then, from the repo, `nl2sql benchmark publish --from <demo folder>`
-([results over time](#results-over-time)).
+`model_config(MODEL)` puts `MODEL` on all six LLM nodes:
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `--max-cost USD` | required | Stop before a question that could take the run's total spend past this |
-| `--model MODEL` | none | A model to put on every LLM node, named in the scoreboard by itself (repeatable; below) |
-| `--llm SPEC` | none | An LLM config to compare (repeatable): a preset name, `PATH.yaml` (named by the file stem) or `NAME=PATH`. With no `--model` or `--llm`, the project's LLM config runs as `default` |
-| `--note TEXT` | none | A short label for what changed, e.g. `"slim prompts"`, kept in each record and shown in the history |
-| `--role ROLE` | `admin` | Run as this role (repeatable) |
-| `--passes N` | `1` | Run every question N times per config and report determinism and pass^N. Use `--passes 3` for a baseline |
-| `--questions ID_OR_TAG` | every question | Only these question ids or tags (repeatable or comma-separated), e.g. `--questions unanswerable,chinook_001` |
-| `--export-path PATH` | `<project>/benchmark_tier2.json` | Where to write the full scoreboard |
-| `--results-dir DIR` | `<project>/benchmarks` | The benchmarks folder; one record per config goes in `DIR/tier2/<database>/` |
-| `--baseline PATH` | none | A committed scoreboard to check against (below) |
-| `--max-regressions N` | `2` | Baseline: how many questions may flip from pass to fail before the run fails; a smaller but significant drop fails too |
-| `--max-accuracy-drop F` | none | Deprecated: a flat accuracy drop gate. Smaller than one question at n = 47, so it fired on noise. Only applied when passed |
-| `--max-cost-increase F` | `0.2` | Baseline: largest allowed rise in cost per question (0.2 is 20%) |
-| `--use-curated` | off | Keep [curated answers](../configuration/curated.md) on, so a verified query may answer a gold question (below) |
+- **A model in `VERIFIED_MODELS`** (`nl2sql/llm/providers.py`) names its own
+  provider and temperature: `gpt-5.4`, `gpt-5.4-mini`, `gpt-4.1`, `gpt-4o`,
+  `gpt-5.5`, `gpt-5-mini`, `claude-opus-5`, `claude-sonnet-5`,
+  `claude-haiku-4-5`, and others. None is sent where the model rejects one
+  (`gpt-5.5`, `gpt-5-mini`, `claude-opus-5`, `claude-sonnet-5`).
+- **Any other model is written `provider/model`**
+  (`openrouter/meta-llama/llama-3.3-70b-instruct`, `ollama/llama3`) and runs
+  at temperature 0 (none for `anthropic`).
 
-`<project>` is the folder of the `nl2sql.yaml` the run is configured from
-(`--config`, else `NL2SQL_CONFIG`, else `./nl2sql.yaml`): run from the demo
-folder, that is the current folder.
+The presets in `nl2sql/evaluation/presets/` are `llm` sections, shipped in the
+package:
 
-The option is `--llm`, not `--config`: `nl2sql --config PATH` is the global
-flag naming the whole `nl2sql.yaml`. A `--llm` file holds an `llm` section, in
-the shape of `llm.yaml`.
-
-Before anything is spent, the run prints its plan and carries on without a
-prompt (the cap is the safety):
-
-```
-Plan: 47 questions x role admin x 1 pass, cap $10.00, curated answers off
-  gpt-5.4: gpt-5.4 (every node)
-  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
-  Records: C:\demo\benchmarks\tier2  Scoreboard: C:\demo\benchmark_tier2.json
-```
-
-Exit codes: 0 when every config ran, 1 on a baseline regression or a failed
-run, 2 on a usage error (no `--max-cost`, an unknown `--model` or `--llm`, two
-configs with one name, `CI` set), 3 when the cap stopped the run early.
-
-### `--model` and the presets
-
-`--model MODEL` puts `MODEL` on all six LLM nodes. A model in
-`VERIFIED_MODELS` (`nl2sql/llm/providers.py`: `gpt-5.4`, `gpt-5.4-mini`,
-`gpt-4.1`, `gpt-4o`, `gpt-5.5`, `gpt-5-mini`, `claude-opus-5`,
-`claude-sonnet-5`, `claude-haiku-4-5`, ...) names its provider and its
-temperature: none is sent where the model rejects one (`gpt-5.5`,
-`gpt-5-mini`, `claude-opus-5`, `claude-sonnet-5`). Any other model is written
-`provider/model` (`openrouter/meta-llama/llama-3.3-70b-instruct`,
-`ollama/llama3`) and runs at temperature 0 (none for `anthropic`); a bare
-unknown model is a usage error. The key is the provider's `${env:...}`
-variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`), which
-the `.env` next to `nl2sql.yaml` may set. No `base_url` is written, so the
-provider preset's endpoint is used.
-
-`--llm NAME` picks a preset, a config file shipped inside the package.
-`nl2sql benchmark presets` lists them:
-
-```
-Tier 2 presets (--llm NAME):
-  claude-planner: claude-opus-5 (astplanner, refiner); gpt-5.4 (answersynthesizer, datasourceresolver, decomposer)
-  gpt-5.4: gpt-5.4 (every node)
-  gpt-5.4-mini-helpers: gpt-5.4 (astplanner, refiner); gpt-5.4-mini (answersynthesizer, datasourceresolver, decomposer)
-```
-
-A preset matches by its full name or a `-`-separated suffix, so `--llm
-mini-helpers` is `gpt-5.4-mini-helpers`, and the scoreboard names it by its
-full name. `claude-planner` needs the `anthropic` extra and
-`ANTHROPIC_API_KEY`. `--llm PATH.yaml` runs your own file under its stem, and
-`--llm NAME=PATH` under `NAME`. `--model` and `--llm` combine: every one
-becomes a config in one comparison, `--model`s first.
-
-### Comparing configs
-
-Each config runs on the same questions, one after another, and the
-scoreboard puts them side by side and lists every question one config passed
-and another failed (with `--passes` > 1 a question can also be `flaky`). Since
-[per-node providers](../configuration/llm.md), a config can put each LLM node
-(`datasourceresolver`, `decomposer`, `astplanner`, `refiner`,
-`answersynthesizer`) on its own provider and model, as the presets do:
-
-```bash
-nl2sql benchmark --tier 2 --max-cost 10 --model gpt-5.4 --llm mini-helpers --llm claude-planner
-```
-
-A model that is not in `VERIFIED_MODELS` (`nl2sql/llm/providers.py`) gets
-a warning: the engine's parameters have not been checked against it.
+| Preset | Models |
+| --- | --- |
+| `gpt-5.4` | `gpt-5.4` on every node |
+| `gpt-5.4-mini-helpers` | `gpt-5.4` on the planner and refiner; `gpt-5.4-mini` elsewhere |
+| `claude-planner` | `claude-opus-5` on the planner and refiner; `gpt-5.4` elsewhere |
 
 ### Cost and the cap
 
@@ -404,88 +336,42 @@ of USD per 1M tokens, dated with the day it was checked:
 
 A call costs `(input - cached - cache_write) x input + cached x cached_input +
 cache_write x cache_write_rate + output x output`, from the token counts each
-wire adapter records in `QueryResult.usage`. Reasoning tokens are part of
-output and billed as output. OpenAI charges nothing extra to write its
-automatic cache; Anthropic bills a cache write at 1.25x input and a read at
-0.1x. Each call is priced by the model its node is configured with, so a dated
-snapshot name in the response still prices correctly.
+wire adapter records in `QueryResult.usage`:
 
-Before any call, every model any LLM node of any config would use must have a
-price; a missing one is an error naming the config, node and model. Before
-each question the run adds the dearest question seen so far to the running
-total and stops if that could pass `--max-cost`. The cap covers the whole run
-(every config and pass), and the first question always runs, so the total can
-exceed the cap only by what one question costs more than the dearest before
-it. The running spend prints after every question. A stopped run still writes
-its scoreboard, marked `"stopped": "max_cost"`, with `completed_cases` short
-of `planned_cases`.
+- **Reasoning tokens** are part of output and billed as output.
+- **Prompt caching:** OpenAI charges nothing extra to write its automatic
+  cache. Anthropic bills a cache write at 1.25x input and a read at 0.1x.
+- **Pricing by node:** each call is priced by the model its node is
+  configured with, so a dated snapshot name in the response still prices
+  correctly.
 
-Tier 2 turns the plan cache off for its run (`PLAN_CACHE_ENABLED`), so a
-second pass asks the planner again instead of replaying the first, and scores
-refusals against the generic message, as tier 1 does.
+How the cap holds:
 
-Tier 2 also runs with [curated answers](../configuration/curated.md) off, as
-tier 1 does (`run_tier2()` clears the context's curated file for the run and
-restores it after). A verified query answers without a plan, so with them on
-a hit would be scored as if the model had planned it, and the run would not be
-comparable with the published ones. `--use-curated` keeps them on, to measure
-the product as a user with a curated file meets it. Either way every result
-row records its answer's `source` (`verified` or `generated`) and, for a
-verified one, the `verified_query` id, and `accuracy.by_source` splits the
-score by it. The scoreboard and each record say `"curated": true` for such a
-run, and it starts its own series in the history.
+- **Before any call:** every model that any node of any config would use
+  must have a price. A missing one is an `UnknownPriceError` naming the
+  config, node and model.
+- **Before each case:** the run adds the most expensive case so far to the
+  running total, and stops if that could pass `max_cost_usd`. The cap covers
+  the whole run, every config and pass.
+- **The first case always runs.** So the total can pass the cap only by what
+  one case costs more than the most expensive case before it.
+- **A stopped run is still reported.** It returns its report with
+  `stopped: "max_cost"`, and each board's `completed_cases` is short of
+  `planned_cases`.
 
-### The scoreboard
-
-`benchmark_tier2.json` holds the run (`passes`, `roles`, `curated`, `questions`,
-`max_cost`, `spent`, `stopped`, `prices_checked_on`), one entry per config
-under `configs`, and a `comparison`. Each config has:
-
-| Field | What it is |
-| --- | --- |
-| `models` | `provider:model` per LLM node |
-| `planned_cases`, `completed_cases` | Cases the run would make, and made |
-| `summary` | pass/fail counts per role, as tier 1 reports |
-| `accuracy` | `overall` (strict) and `lenient`, each with a 95% Wilson `interval`; `pass_k` when `--passes` > 1; then `by_tag`, `by_difficulty` and `by_source` (`verified`, `generated`; `unknown` for a run that raised), each with both counts and both rates |
-| `answerability` | `precision` and `recall` of refusing as unanswerable: true refusals of the four unanswerable questions, false refusals of answerable ones, and missed unanswerables |
-| `tokens_by_node` | calls, input, cached input, cache write, output and reasoning tokens per node |
-| `cost` | dollars `total` and `per_question` (each result row has its own `cost`) |
-| `latency` | p50 and p95 seconds per question, and per node |
-| `retries` | refiner retries in total, and questions that needed one |
-| `errors_by_code` | error codes the runs ended with (`EXCEPTION` for a run that raised) |
-| `determinism` | with `--passes` > 1: the share of questions whose SQL and rows were identical in every pass, and which ones differed |
-| `faithfulness` | [answer faithfulness](#answer-faithfulness): `faithful` of `answers` written, the `rate`, and each `unfaithful` run with what it stated that the rows do not hold |
-| `results` | one row per run: `status` and `reason` (strict), `lenient_status` and `lenient_reason`, SQL, cost, latency, tokens, retries, `faithfulness` (`null` when no answer was written), and `plans`: each sub-query's `id`, `intent` and `plan` (the `PlanModel` JSON the SQL was generated from, `null` if planning failed), so a wrong answer can be traced to the plan; and `answer`, the text the answer synthesizer wrote (summary, then content), which the faithfulness check read; `source` (`verified` or `generated`, `null` for a run that raised) and `verified_query`, the verified query's id when one answered |
-
-`comparison.configs` is one row per config (strict and lenient accuracy, answerability, cost,
-latency, retries, determinism, faithfulness); `comparison.differences` lists
-the questions the configs disagree on. The command prints the same as tables:
-
-```
-              Tier 2 scoreboard (accuracy with its 95% interval)
-Config        Cases  Strict             Lenient            Ans. P  Ans. R  Cost     $/question  p50    p95    Retries  Determinism  Faithful
-gpt-5.4       8/8    100.0% [67.6-100]  100.0% [67.6-100]  100.0%  100.0%  $0.0806  $0.0101     0.08s  0.25s  0        100.0%       100.0%
-mini-helpers  8/8    75.0% [40.9-92.9]  87.5% [52.9-97.8]  100.0%  100.0%  $0.0372  $0.0046     0.09s  0.09s  0        100.0%       85.7%
-
-                  Questions the configs disagree on
-ID           Role   gpt-5.4  mini-helpers
-chinook_018  admin  pass     fail
-
-              Answers stating what the rows do not hold
-Config        ID           Role   Pass  Unsupported
-mini-helpers  chinook_018  admin  1     MPEG audio file
-```
-
-(a run against the fake LLM, with one plan deliberately wrong on the second
-server.)
+The run turns the plan cache off, so a second pass asks the planner again
+instead of replaying the first. Curated answers are on unless `curated` says
+otherwise: a case a verified query answered also runs with them off, and the
+report's `accuracy_generated` scores every case on the generated path
+([Curated answers in mode full](../evals/index.md#curated-answers-in-mode-full)).
 
 ### Answer faithfulness
 
 Accuracy scores the rows. The answer synthesizer then writes a sentence about
 them, and that sentence can state a number the rows do not hold while the
-rows are right. Tier 2 checks every written answer (its `summary` and
-`content`) against the rows the run returned, deterministically, with no
-model (`nl2sql/evaluation/faithfulness.py`). It never changes pass or fail.
+rows are right. The `faithfulness` scorer checks every written answer (its
+`summary` and `content`) against the rows the run returned, deterministically,
+with no model (`nl2sql/evaluation/faithfulness.py`).
 
 | What the answer writes | Supported when |
 | --- | --- |
@@ -494,266 +380,180 @@ model (`nl2sql/evaluation/faithfulness.py`). It never changes pass or fail.
 | A number inside a text cell or the question | Always: the year of `2009-01-01`, `Symphony No. 5`, `top 5`, `in 2013` |
 | A quoted (`"Jazz"`) or bold (`**Rock**`) name | A text cell, a column name or the question contains it, or it contains a text cell |
 
-Not read as numbers: ordinals (`2nd`), list markers (`1.` at the start of a
-line), numbers glued to a word or identifier (`chinook_001`, `MPEG-4`, `#7`),
-and the month and day of a date. Names are only checked when quoted or bold,
-and bold spans with a digit, ending in `:` (`**Note:**`) or longer than six
-words are skipped, so the name check flags little it should not. `1,300` for
-`1297`, `2013` when neither the rows nor the question hold it, and a bold
-genre the rows do not list are unsupported.
+Some numbers and names are never checked:
 
-Each result row carries `faithfulness`: `faithful`, `unsupported_numbers` and
-`unsupported_entities` (as written) and `checked` (how many numbers and names
-were checked). A refusal or error writes no answer and is `null`. Read the
-rate with the list: an unfaithful answer is a synthesizer problem to look at,
-not a failed question. Tier 1 does not report it: its fake synthesizer writes
-the same fixed sentence for every question, with nothing to check.
+- **Not numbers:** ordinals (`2nd`), list markers (`1.` at the start of a
+  line), numbers glued to a word or identifier (`chinook_001`, `MPEG-4`,
+  `#7`), and the month and day of a date.
+- **Names only when quoted or bold.** Bold spans with a digit, ending in `:`
+  (`**Note:**`), or longer than six words are skipped, so the name check
+  flags little it should not.
+
+`1,300` for `1297`, a `2013` that neither the rows nor the question hold, and
+a bold genre the rows do not list are all unsupported.
+
+Each record carries `faithfulness`: `faithful`, `unsupported_numbers` and
+`unsupported_entities` (as written), and `checked` (how many numbers and
+names were checked). A refusal or error writes no answer, and the scorer does
+not apply to it. The board's `faithfulness` gives the rate over the answers
+written and lists each unfaithful one. Mode plans does not run it: its fake
+synthesizer writes the same fixed sentence for every case.
 
 ### Reading a run: intervals, flips and pass^k
 
-Forty-seven questions cannot settle much on their own. 27 of 47 is 57.4%, and
-its 95% Wilson interval is **43.3%-70.5%** -- about fourteen points either
-way. Every run therefore prints and records that interval next to both
-scores, written `57.4% [43.3-70.5]`, and the gate below is built on the
-questions that moved rather than on the headline
+Forty-seven cases cannot settle much on their own. 27 of 47 is 57.4%, and its
+95% Wilson interval is **43.3%-70.5%** -- about fourteen points either way.
+Every board therefore reports that interval next to each accuracy, and the
+gate below is built on the cases that moved rather than on the headline
 ([Anthropic, *A statistical approach to model
 evals*](https://www.anthropic.com/research/statistical-approach-to-model-evals)).
-The interval is taken over the runs a config scored, so with `--passes` above
-one the runs of a single question are not independent and it reads narrower
-than it really is; pass^k below counts questions and does not.
+The interval is taken over the runs a config scored. With more than one pass,
+the runs of a single case are not independent, so it reads narrower than it
+really is; pass^k below counts cases and does not.
 
-**Compare two runs question by question, not headline to headline.** The same
-47 questions are run both times, so the runs are paired and most of the
-variance cancels. `--baseline PATH` prints, per config:
+**Compare two runs case by case, not headline to headline.** The same cases
+run both times, so the runs are paired and most of the variance cancels.
+`nl2sql/evaluation/gate.py` lists, per config:
 
-- the strict and lenient accuracy of each run, side by side;
-- how many questions went **pass -> fail** and how many **fail -> pass**, and
+- how many cases went **pass -> fail** and how many **fail -> pass**, and
   which ones;
-- **McNemar's exact two-sided p-value** on those flips. Questions both runs
-  got right, and both got wrong, say nothing about a change; only the
-  discordant pairs do, and under "the two runs are equally good" each flip is
-  a fair coin. Ten lost and none gained is p = 0.002; five each way is p = 1.0.
+- **McNemar's exact two-sided p-value** on those flips.
 
-A question counts as passed only when **every** pass passed, so with
-`--passes 3` a question that has become flaky reads as a regression.
+Cases both runs got right, or both got wrong, say nothing about a change.
+Only the discordant pairs do, and under "the two runs are equally good" each
+flip is a fair coin. Ten lost and none gained is p = 0.002; five each way is
+p = 1.0.
 
-`docs/benchmarks.md` carries the same thing in its "Δ vs previous" column:
-the headline deltas, then `3 flipped to fail, 1 to pass (McNemar p=0.625)`.
-The README block keeps the deltas only.
+A case counts as passed only when **every** pass passed, so over three passes
+a case that has become flaky reads as a regression.
 
-#### The regression gate
+The regression gate fails a run when, for any config both reports name:
 
-`--baseline` exits 1 when, for any config both scoreboards name:
-
-| Check | Default | Why |
+| Check | Default (`evals.yaml` `gate`) | Why |
 | --- | --- | --- |
-| More than `--max-regressions` questions flipped from pass to fail | 2 | A handful of named questions is something a person can go and read |
-| The flips are one-sided enough that McNemar's exact p < 0.05 | - | A small but real drop should not pass because it is under the count |
-| Cost per question rose by more than `--max-cost-increase` | 0.2 | Unchanged |
+| More than `max_regressions` cases flipped from pass to fail | 2 | A handful of named cases is something a person can go and read |
+| The flips are one-sided enough that McNemar's exact p < `alpha` | 0.05 | A small but real drop should not pass because it is under the count |
+| Cost per case rose by more than `max_cost_increase` | 0.2 | Unchanged |
 
-`--max-accuracy-drop` is **deprecated**. It failed a run when accuracy fell by
-more than a flat fraction, two points by default -- and at n = 47 one question
-is 2.1 points, so the gate was tighter than the resolution of the benchmark
-and fired on run-to-run noise. It still works when it is passed explicitly,
-with a warning, and is no longer applied unless it is.
-
-#### `--passes` and pass^k
-
-`--passes` is 1 for an ordinary run: one pass is enough to see where the
-engine stands, and every call costs money. Run a **baseline** with
-`--passes 3`, so the run it is compared against is not a single sample:
-
-```bash
-nl2sql benchmark --tier 2 --model gpt-5.4 --passes 3 --max-cost 15 \
-  --export-path <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
-```
-
-With more than one pass the run also reports **pass^k**: the share of
-questions that passed in *every* pass, for both scores, beside mean accuracy.
-Mean accuracy counts runs, so a question that passes two times of three still
-lifts it; pass^k counts questions, and a flaky one never counts. It is the
-number to read when asking whether the engine can be relied on rather than
-how often it happens to be right ([tau-bench](https://arxiv.org/abs/2406.12045)).
-`determinism` stays what it was: whether the SQL and rows were identical
-across passes, which is a stricter thing than passing every time.
-
-#### Where baselines live
-
-`packages/nl2sql/src/nl2sql/evaluation/baselines/`; none is committed yet. A
-run is compared config by config, by name, and a config the baseline lacks is
-skipped:
-
-```bash
-nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5 \
-  --baseline <repo>/packages/nl2sql/src/nl2sql/evaluation/baselines/gpt-5.4.json
-```
+With `passes` above one the board also reports **pass^k**: the share of
+cases that passed in *every* pass, for both scores, beside mean accuracy.
+Mean accuracy counts runs, so a case that passes two times of three still
+lifts it. pass^k counts cases, and a flaky one never counts. It is the number
+to read when asking whether the engine can be relied on, rather than how
+often it happens to be right ([tau-bench](https://arxiv.org/abs/2406.12045)).
+`determinism` is stricter than pass^k: it says whether the SQL and rows were
+identical across passes.
 
 ### Results over time
 
-Every tier 2 run writes one record per config, and `benchmark retrieval
---record` one record, under the project's `benchmarks/` folder:
+A recorded run is a JSON file under the repo's `benchmarks/` folder:
 
 ```
 benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 ```
 
-`kind` is `tier2` or `retrieval`, `database` the datasource id (`chinook`),
-`shortsha` the first seven characters of the engine commit and `config` the
-config name (`retrieval` for a retrieval run). `-2`, `-3`... are added when the
-name is taken. Every record holds:
+| Part | What it is |
+| --- | --- |
+| `kind` | `tier2` (mode full) or `retrieval` |
+| `database` | The datasource id (`chinook`) |
+| `shortsha` | The first seven characters of the engine commit |
+| `config` | The config name (`retrieval` for a retrieval run) |
+
+`-2`, `-3`... are added when the name is taken.
+
+Every record holds:
 
 | Field | What it is |
 | --- | --- |
-| `schema`, `kind` | The record format (2) and the benchmark |
+| `schema`, `kind` | The record format (2) and the kind |
 | `recorded_at` | UTC date and time |
 | `engine_version` | The installed `nl2sql-engine` version (the same for every run until a release) |
-| `git_commit`, `git_dirty` | The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed `nl2sql` package to its `.git`, so a run from the demo folder of an editable install still names the repo commit; `"unknown"` for a wheel install or without git, never null |
-| `note` | `--note`: what changed, e.g. `"slim prompts"` (null without one) |
-| `dataset` | `chinook_gold.yaml`'s name and sha256, taken with LF line endings so a Windows checkout hashes the same |
-| `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` (a hash of the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it) and the `tables` and `columns` counts. Built from the datasources the gold dataset's questions name, not from every datasource the project registered: the demo registers three and this set asks about Chinook, so a run there is still `chinook` with Chinook's fingerprint, and stays in the series recorded before the other two existed. Several datasources (a dataset that spans them) are joined with `+` |
-| `config` | The config name, and for tier 2 `provider:model` per node |
-| `metrics` | Tier 2: accuracy (strict) and lenient_accuracy with their 95% intervals, `pass_k`, answerability precision and recall, dollars total and per question, input / cached / output tokens per question, p50 and p95 latency, determinism, answer faithfulness. Retrieval: the report's `summary` |
-| tier 2 only | `roles`, `passes`, `curated` (whether curated answers were on; a record without it ran with them off), `stopped`, `partial` and the config's full `scoreboard` |
-| retrieval only | `settings` and the full `report` |
+| `git_commit`, `git_dirty` | The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed `nl2sql` package to its `.git`, so a run from the demo folder of an editable install still names the repo commit. `"unknown"` for a wheel install or without git, never null |
+| `note` | What changed, e.g. `"slim prompts"` (null without one) |
+| `dataset` | The suite file's name and sha256, taken with LF line endings so a Windows checkout hashes the same |
+| `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` and the `tables` and `columns` counts. The fingerprint hashes the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it. Built from the datasources the suite's cases name, not every datasource the project registered: the demo registers three and this suite asks about Chinook, so a run there is still `chinook` with Chinook's fingerprint |
+| `config` | The config name, and `provider:model` per node |
+| `metrics` | The headline numbers: accuracy (strict and lenient) with their intervals, `pass_k`, answerability, dollars, tokens, latency, determinism and faithfulness; or, for retrieval, the recall summary |
 
-Records are never edited after writing: a run writes a new file, and
-`publish` and `publish --from` refuse to overwrite one. The first retrieval
-baseline was written before this layout and was moved into it with its
-database, the commit that added it and the note "first retrieval baseline"
-filled in (listed in its `backfilled` field).
+Records are never edited after writing: a run writes a new file. Two runs are
+comparable when they share the kind, the dataset sha and the schema
+fingerprint, and for mode full the roles and whether curated answers were on.
+`nl2sql.evaluation.records.publish()`, run from the repo root, reads every
+record and rewrites [docs/benchmarks.md](../benchmarks.md) and the README's
+results block. It reads no clock, so the same records always give
+byte-identical pages. `packages/nl2sql/tests/unit/test_benchmark_records.py`
+checks in CI, with no key, that the committed pages are exactly what
+`publish` makes from the committed records.
 
-#### Comparable runs
+### How mode full is tested
 
-Two runs are comparable when they share the benchmark kind, the dataset sha
-and the schema fingerprint, and for tier 2 the roles and whether curated
-answers were on. `docs/benchmarks.md`
-groups the history by benchmark, then database, and lists each group's runs
-newest first. "Δ vs previous" compares a run with the previous run of the same
-config on the same database: the change in strict accuracy, lenient accuracy
-and faithfulness (in percentage points) and dollars per question for tier 2,
-in table and column recall for retrieval. For tier 2 it then says how many
-questions flipped each way and McNemar's exact p-value on them, read from the
-two records' committed per-question results -- `3 flipped to fail, 1 to pass
-(McNemar p=0.625)`. When the dataset, the schema, the roles or curated answers changed, the
-run starts a new series and the cell says so, e.g. `new series (schema
-changed)`; a config's first run says `first run`. The README block has two
-headed tables, tier 2 accuracy (latest run per config and database) and then
-retrieval recall (latest run per database), with the headline deltas only; a
-benchmark with no recorded run says so under its heading. Accuracy in the
-history page carries its 95% interval, and the Passes column carries pass^k
-when a run made more than one pass.
+`packages/nl2sql/tests/e2e/test_evals_full_fake_llm.py` runs mode full with no
+key and no spending. It points two `llm` sections at two `FakeLLMServer`s
+that serve the gold plans with canned usage (cached and reasoning tokens
+included). One server has a plan deliberately wrong. The fakes learn which
+case is being asked from each run's `run.started` event, and the fake
+synthesizer writes each answer from the case's rows, so the good server's
+answers are faithful and the bad server's answer on its wrong rows is not.
 
-#### Publishing
+The test checks:
 
-`nl2sql benchmark publish` (no key, no network), run from the repo root,
-reads every record in `benchmarks/<kind>/<database>/` and rewrites
-`docs/benchmarks.md` and the block between `<!-- BENCHMARKS:START -->` and
-`<!-- BENCHMARKS:END -->` in `README.md`. It reads no clock, so the same
-records always give byte-identical pages. `--from DIR` (repeatable) first
-copies the records of another project folder (its `benchmarks/`) that the
-repo lacks: one already here with the same content is skipped, one with the
-same name and other content is reported as a conflict, left as it is, and
-makes the command exit 1 after publishing. Records in the old layout are
-skipped with a warning. The workflow:
+- the scoring, the comparison and its differences;
+- the dollars against the price table;
+- the cap stopping mid-run, with a partial report;
+- an unpriced model failing before any call;
+- two passes with the plan cache off;
+- the database identity the report records.
 
-1. From the demo folder: `nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5`.
-2. From the repo: `nl2sql benchmark publish --from <demo folder>`.
-3. Commit the new records in `benchmarks/` with the `README.md` and
-   `docs/benchmarks.md` changes.
+The unit tests cover the rest:
 
-`benchmarks/README.md` repeats the layout and workflow next to the records.
-`packages/nl2sql/tests/unit/test_benchmark_records.py` checks in CI, with no
-key, that the committed README block and `docs/benchmarks.md` are exactly what
-`publish` makes from the committed records, and that every committed record
-sits where its fields say.
-
-### How tier 2 is tested
-
-With no key and no spending: `packages/nl2sql/tests/e2e/test_benchmark_tier2_fake_llm.py`
-points ordinary LLM config files at two `FakeLLMServer`s serving the gold
-plans with canned usage (cached and reasoning tokens included), one with a
-plan deliberately wrong. It checks the scoring, the comparison and its
-differences, the dollars against the price table, the cap stopping mid-run
-with a partial scoreboard, an unpriced model failing before any call, and two
-passes with the plan cache off. A `--model gpt-5.4` config writes no
-`base_url`, so its test points the OpenAI client at the fake server with the
-client's own `OPENAI_BASE_URL` variable, and checks the database identity
-the board records. Its fake synthesizer writes each answer from
-the gold rows, so the good server's answers are faithful and the bad server's
-answer on its wrong rows is not. `tests/unit/test_answer_faithfulness.py`
-covers the faithfulness rules with good and bad answers. `tests/unit/test_tier2_scoreboard.py` and
-`tests/cli/test_benchmark_tier2_command.py` cover the scoreboard, the lenient
-score, the Wilson interval on known counts, McNemar's exact test on a
-constructed table, pass^k, the gate firing and not firing, the deprecated
-`--max-accuracy-drop`, the refusal to start without `--max-cost`, the exit codes,
-`--model` and `--llm` resolution, the plan, the project-relative outputs,
-`benchmark presets` and `publish --from`. `tests/unit/test_benchmark_presets.py`
-covers the per-node `--model` config and preset lookup, and
-`tests/unit/test_benchmark_records.py` the records, the git commit lookup,
-comparability, the Δ and series breaks. `tests/unit/test_tier2_curated.py`
-covers curated answers off by default and restored after, `--use-curated`
-keeping them on, each row's `source` and the `by_source` split, and an old
-record without a `source` still scoring.
+| Test | What it covers |
+| --- | --- |
+| `tests/unit/test_eval_run.py` | The runner: approved cases only, roles and selectors, the derived runtime of each mode, configs compared, curated hits run twice, clarify, the events |
+| `tests/unit/test_eval_report.py` | Prices, the boards, the Wilson interval on known counts, McNemar's exact test on a constructed table, pass^k and the gate |
+| `tests/unit/test_eval_scorers.py` | Each scorer |
+| `tests/unit/test_answer_faithfulness.py` | The faithfulness rules |
+| `tests/unit/test_benchmark_records.py` | The records |
 
 ## Retrieval recall
 
 Before the planner sees a schema, the schema retriever picks the tables and
 columns it is given. A column it never sends is one the planner cannot use.
-`nl2sql benchmark retrieval` measures that, per answerable gold question,
-against `needed_tables` and `needed_columns`, with no key, no LLM and no cost:
+`engine.evals.run(mode="retrieval")` measures that, per answerable case and
+role, against `tables` and `columns`, with no key, no LLM and no cost.
 
-```bash
-nl2sql benchmark retrieval                       # writes <project>/benchmark_retrieval.json
-nl2sql benchmark retrieval --record --note "k 10"  # also writes a record to <project>/benchmarks/retrieval/<database>/
-nl2sql benchmark retrieval --baseline old.json   # the change against an earlier report or record
-nl2sql benchmark retrieval --questions join,chinook_014
-```
+How it runs (`nl2sql/evaluation/scorers/retrieval_recall.py`):
 
-How it runs (`nl2sql/evaluation/retrieval_recall.py`):
-
-- Chinook's 11 tables are under `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES`
-  (15), which would send the whole schema without a search, so the limit is
-  set to 0 for the run and the vector search always runs.
-- Each question is scored against the datasource its gold entry names, which
-  for this set is always `chinook`, whatever else the project has registered.
-  Which datasource the resolver's own vector search would have ranked first
-  is reported separately as `datasource_top1_accuracy`; its answerability
-  check is an LLM call and is skipped.
-- The schema retriever runs as the pipeline runs it (MMR, k 8 table entries,
+- **The search always runs.** Chinook's 11 tables are under
+  `settings.retrieval.full_snapshot_max_tables` (15), which would send the
+  whole schema without a search, so the run sets the limit to 0.
+- **Each case is scored against the datasource it names**, which for this
+  suite is always `chinook`, whatever else the project has registered.
+  Routing's ranking is scored separately by the `routing` scorer; the
+  resolver's answerability check is an LLM call and is skipped.
+- **The retriever runs as the pipeline runs it** (MMR, k 8 table entries,
   then k 12 column and relationship entries of those tables), on the index
-  and embedder the project has: the demo's is the local ONNX
+  and embedder the project has. The demo's embedder is the local ONNX
   all-MiniLM-L6-v2. Its query is the question alone, since the decomposer
   that would add filters, groupings and expected columns is an LLM.
-- What was sent is read from the retriever's retrieval record
-  (`indexing/retrieval.py`), the one a run trace keeps: the tables and
-  columns the planner is given. A picked table with no picked column is sent
-  with all its columns, as in the pipeline.
 
-Per question the report has `table_recall` (needed tables sent / needed
-tables), `column_recall` (needed `Table.Column`s sent / needed), the
-`missed_tables` and `missed_columns`, `tables_sent` and `columns_sent`, and
-`sent` (every table and column sent), plus the `datasource_id` it was scored
-against and the `retrieved_datasource_id` the vector search ranked first.
-`summary` holds the means over questions, how many had every needed table
-(`perfect_tables`) or column (`perfect_columns`), the mean tables and columns
-sent, and `datasource_top1_accuracy`, the share of questions whose top
-candidate was the datasource the gold entry names. With one datasource
-registered there is nothing to choose and it is 1.0; the demo registers
-three, so it measures the router. `settings` holds
-the k, the MMR settings and the embedder, so two reports are only compared
-like for like. The command prints a row per question and the summary, and
-always exits 0 when it ran: it reports, it does not gate.
+What was sent is read from the retriever's retrieval record, the one a run
+trace keeps.
 
-### Reading the numbers
+The `retrieval_recall` score's `detail` has:
+
+- `table_recall` (needed tables sent / needed tables) and `column_recall`
+  (needed `Table.Column`s sent / needed);
+- the `missed_tables` and `missed_columns`;
+- `tables_sent` and `columns_sent`.
+
+The board's `retrieval` has the means, and how many cases had every needed
+table (`perfect_tables`) or column (`perfect_columns`). The report's
+`settings` has the k values and the MMR settings, so two reports are only
+compared like for like.
 
 Read recall with the amount sent: sending all 11 tables would score 100%, so
 a change that raises recall by sending more is not an improvement by itself.
-A missed column is one the planner cannot select, filter or join on. Compare
-runs with `--baseline`, which prints the change in each mean and every
-question whose recall moved, or with the committed records: each `--record`
-run is a JSON file in `benchmarks/retrieval/<database>/`, and `nl2sql
-benchmark publish` lists them newest first in `docs/benchmarks.md`, with the
-change in each recall against the previous comparable run.
+A missed column is one the planner cannot select, filter or join on.
 
 The committed baseline (2026-09-22, engine 0.1.2, 39 questions):
 
@@ -763,14 +563,13 @@ The committed baseline (2026-09-22, engine 0.1.2, 39 questions):
 
 Most misses are columns of a table that was sent. Once one column entry of
 a table is picked, or a relationship entry adds its key columns, only those
-columns are sent rather than all of them, so `Invoice` often reaches the
+columns are sent rather than all of them. So `Invoice` often reaches the
 planner as `BillingCountry` or a key without `Total` or `InvoiceDate`
 (`chinook_014`, "How much did we earn in each year?", gets `Invoice` with
-`BillingCountry` only). The two table misses
-are `chinook_009` (`Customer`, `Invoice`) and `chinook_034` (`Artist`).
+`BillingCountry` only). The two table misses are `chinook_009` (`Customer`,
+`Invoice`) and `chinook_034` (`Artist`).
 
-`packages/nl2sql/tests/e2e/test_benchmark_retrieval.py` runs the command on
-the generated demo in the key-free integration job and checks that it covers
-every answerable question and writes its report and record, not what the
-recall is. `tests/unit/test_retrieval_recall.py` covers the scoring, the
-means, the comparison and the records.
+`packages/nl2sql/tests/e2e/test_evals_retrieval.py` runs mode retrieval on the
+generated demo in the key-free integration job. It checks that the run covers
+every answerable case and reports recall and routing, not what the recall
+is.

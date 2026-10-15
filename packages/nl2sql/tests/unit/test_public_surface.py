@@ -24,8 +24,8 @@ PUBLIC_SURFACE = {
     "CheckReport", "DatasourceStatus", "EngineNotReady",
     # Entry-point hooks
     "configure_logging", "TraceContextFilter",
-    # The benchmark
-    "BenchmarkAPI", "BenchmarkConfig",
+    # Evals: suites, reports and the scorer interface
+    "EvalSuite", "EvalCase", "EvalReport", "RegenerateReport", "Scorer", "Score", "CaseRun",
 }
 
 

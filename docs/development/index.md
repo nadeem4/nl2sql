@@ -27,7 +27,7 @@ entry point group, and the built-ins are declared in
 | `policy_check` | `nl2sql.policy_checks` | `nl2sql_sdk.policy.PolicyCheck` | none |
 | `observer` | `nl2sql.observers` | `nl2sql_sdk.events.Observer` (version 1) | none yet; `log`, `audit` and `otel` arrive with release 0.7 |
 | `hook` | `nl2sql.hooks` | `nl2sql.hooks.Hook` (version 1, from release 0.7) | none |
-| `scorer` | `nl2sql.scorers` | `nl2sql.evaluation.scorers.Scorer` (version 1, from release 0.7) | none yet; five arrive with release 0.7 |
+| `scorer` | `nl2sql.scorers` | `nl2sql.evaluation.scorers.Scorer` (version 1, from release 0.7; see [Scorers](../evals/scorers.md)) | `result_match`, `outcome`, `retrieval_recall`, `faithfulness`, `routing` |
 
 - `Registry.default()` lists the installed entry points by name and imports
   none of them. `Registry.empty()` holds nothing.

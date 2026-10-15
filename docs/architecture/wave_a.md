@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0, the foundation, and E1 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0, the foundation, E1 and V1 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -1069,6 +1069,45 @@ order the SQL returns them, keeping the file's formatting rules from
 the same adapter questions run on. Gold data is never edited by hand: a new
 accepted answer is a reviewed `alt_sql`, then `regenerate`.
 
+!!! note "Built: evals core (V1)"
+    `nl2sql/evaluation/` is reorganised as the section says:
+
+    - **The case format.** `suite.py` holds `EvalCase`, `EvalSuite`,
+      `load_suite`, `select_cases` and `write_suite`. `outcome` also takes
+      `clarify`, which runs only with `engine.evals.run(clarify=True)`;
+      Wave B's clarification produces it.
+    - **The Chinook suite moved.** `suites/chinook.yaml` holds the gold data
+      unchanged, pinned by `test_chinook_suite_holds_the_gold_data_unchanged`.
+      Rows stay `{column: value}` maps, as the old file wrote them.
+    - **The run and the report.** `run.py` (`run_evals`) runs the three modes.
+      `report.py` holds `EvalReport` and the boards, from tier 2's scoreboard.
+    - **The scorers.** `scorers/` holds `Score`, `CaseRun`, `Scorer` and the
+      five built-ins, declared as `nl2sql.scorers` entry points.
+    - **Rows through the adapter.** `regenerate.py` returns a
+      `RegenerateReport`.
+    - **The gold-plan fake.** `gold_llm.py` answers from one table,
+      `RESPONSES`, keyed by structured-output schema name. Wave B's
+      `PlannerAnswer` is one more entry there.
+    - **The gate's statistics.** `gate.py` holds tier 2's
+      `question_flips`, `mcnemar_exact`, `compare_with_baseline` and
+      `check_baseline`, unchanged except that the deprecated
+      `max_accuracy_drop` is gone. V2 builds `engine.evals.gate` on them.
+
+    `engine.evals` has `load`, `run`, `regenerate` and `scorers`. `run` takes
+    `clarify: bool = False`. With `curated` on in mode full, a curated hit's
+    record carries `generated`, and each board carries `accuracy.generated`.
+    `CaseRun` also carries `mode`, `columns`, `retrieval` (what the
+    retriever sent) and `routed` (mode retrieval's ranking). In mode full,
+    `retrieval` is read from the run's schema retriever node.
+
+    Deleted: `engine.benchmark`, `BenchmarkAPI`, `BenchmarkConfig`,
+    `benchmark_runner.py`, `tier1.py`, `tier2.py`, `types.py`, `gold.py`,
+    `retrieval_recall.py` (now `scorers/retrieval_recall.py`, with
+    `sent`, `routed` and `retrieval_settings`), `datasets/` and
+    `nl2sql benchmark`. `records.py` keeps its page texts, which still name
+    `nl2sql benchmark`, so the committed pages stay byte-identical until V2
+    rewires publishing.
+
 ### The regression gate
 
 `nl2sql/evaluation/gate.py` takes tier 2's gate as it is
@@ -1458,6 +1497,11 @@ decorators. Knowledge sources stay for Wave B.
     `observer`, `hook` and `scorer` are in `nl2sql/registry.py` (`GROUPS`,
     `INTERFACE_VERSIONS` at 1, `add_*` and the decorators). No built-in is
     declared yet: E2 adds the observers and V1 the scorers.
+
+!!! note "Built: the five scorers (V1)"
+    `result_match`, `outcome`, `faithfulness`, `retrieval_recall` and
+    `routing` are declared in `packages/nl2sql/pyproject.toml` under
+    `nl2sql.scorers`.
 
 ## 14. Bugs Wave A fixes
 
