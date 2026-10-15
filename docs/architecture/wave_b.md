@@ -693,6 +693,21 @@ of 1.0 and of 0.0, and a timeout honoured where `ENFORCES_TIMEOUT` is
 declared). An adapter without the method gets name-and-type proposals with
 `overlap: null`.
 
+!!! note "Built: `probe_overlap` (C1)"
+    `SQLAlchemyAdapter.probe_overlap(left, right, sample_rows)` in
+    `nl2sql_sdk/sqlalchemy/adapter.py`: one SQLAlchemy Core statement, a
+    `DISTINCT` subquery of `left` with `.limit(sample_rows)` and a
+    `COUNT(CASE WHEN EXISTS (...) THEN 1 END)` on `right`, on the adapter's
+    own connections (read-only and under `timeout_ms` where the adapter
+    enforces them). The adapter raises `RuntimeError` on failure, naming
+    the two columns and the driver's error class, never the driver's message
+    (a conversion error quotes the value); P1 turns that into the report's
+    issue. A `ColumnRef`'s `schema_name` is the schema as the snapshot names
+    it (DuckDB's `catalog.schema`). The kit's
+    `test_kit_overlap_on_the_seed` checks 1.0 (`kit_orders.person_id` to
+    `kit_people.id`: 2 sampled, 2 matched) and 0.0; no kit check proves the
+    timeout on an overlap, since no seed makes the probe slow portably.
+
 ### Column roles
 
 Two kinds of role (D61). **Derived** roles are facts the snapshot proves;
@@ -1049,6 +1064,35 @@ filtered full scan of the kit's largest seeded table (a `WHERE` on an
 unindexed column that matches no row) reports at least half the table's
 row count, not the filter's output; and an estimate of SQL naming a
 missing table raises.
+
+!!! note "Built: `estimate` (C1)"
+    `estimate(sql, parameters)` on the PostgreSQL, MySQL, SQL Server and
+    DuckDB adapters, which declare `ESTIMATES_COST`; SQLite does not. Each
+    asks for the plan on the adapter's own connections (read-only and under
+    `timeout_ms`), with `parameters` bound as `execute` binds them, and
+    raises `RuntimeError("<datasource> could not estimate the query: <the
+    driver's first line>")` on failure. The table above holds, with these
+    details:
+
+    - **postgres** asks `EXPLAIN (FORMAT JSON, VERBOSE)`, for each scan's
+      `Schema`. A relation never analyzed (`reltuples` -1, as the kit's
+      fresh seed is) counts the `Plan Rows` of `EXPLAIN SELECT * FROM` it,
+      which the planner estimates from its size on disk.
+    - **mysql** skips derived tables (`<derived2>`, `<union1,2>`), whose rows
+      were counted where they were read.
+    - **mssql** reads the plan on a pooled connection that it then
+      invalidates, so none goes back to the pool with SHOWPLAN on. The test
+      bed's reader login lacks `SHOWPLAN`; its estimate raises.
+    - **duckdb** reads the scan's `Table` (`catalog.schema.table`) and counts
+      a table function's (`range`) own `Estimated Cardinality`. DuckDB rules
+      a scan out from its min/max statistics when a filter falls outside
+      them, so the kit's no-match filter (`amount = 50.5` on `kit_orders`,
+      now 100 rows) falls inside them.
+
+    The kit's checks are `test_kit_estimate_does_not_execute` (two seconds,
+    not one: SQL Server opens a fresh connection per estimate),
+    `test_kit_filtered_full_scan_reports_the_table_size` and
+    `test_kit_estimate_of_a_missing_table_raises`. `cost` is `None` on DuckDB.
 
 ### The policy rule
 

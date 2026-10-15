@@ -1,11 +1,13 @@
-from typing import Any, Dict, Optional
+import json
+from typing import Any, Dict, Iterator, Optional
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, text
 from sqlalchemy.dialects import mysql
+from sqlalchemy.exc import SQLAlchemyError
 
-from nl2sql_sdk import DatasourceCapability
-from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
+from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # MySQL's error numbers for a failed connection: the first argument of the driver's error.
 _STAGE_BY_ERROR = {
@@ -50,7 +52,25 @@ class MysqlAdapter(SQLAlchemyAdapter):
 
     def capabilities(self) -> set[DatasourceCapability]:
         return super().capabilities() | {DatasourceCapability.ENFORCES_READ_ONLY,
-                                         DatasourceCapability.ENFORCES_TIMEOUT}
+                                         DatasourceCapability.ENFORCES_TIMEOUT,
+                                         DatasourceCapability.ESTIMATES_COST}
+
+    def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+        """The rows ``sql`` reads, from ``EXPLAIN FORMAT=JSON``, without running it.
+
+        Each table access counts ``rows_examined_per_scan``, MySQL's estimate
+        of the rows it reads (a full scan, ``access_type: ALL``, counts the
+        table). ``cost`` is the query block's ``query_cost``. Runs read-only,
+        under ``MAX_EXECUTION_TIME``.
+        """
+        try:
+            with self.engine.connect() as conn:
+                plan = json.loads(self._run(conn, f"EXPLAIN FORMAT=JSON {sql}", parameters).scalar())
+        except SQLAlchemyError as exc:
+            raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
+        cost = (plan.get("query_block", {}).get("cost_info") or {}).get("query_cost")
+        return Estimate(rows=rows_examined(plan), cost=float(cost) if cost is not None else None,
+                        source="EXPLAIN FORMAT=JSON")
 
     def session_setup(self, dbapi_connection: Any) -> None:
         """Every transaction read-only, and ``limits.timeout_ms`` as the session's ``MAX_EXECUTION_TIME``.
@@ -92,3 +112,22 @@ class MysqlAdapter(SQLAlchemyAdapter):
             "WHERE table_schema = :schema AND table_type = 'BASE TABLE' AND table_rows IS NOT NULL"
         ), {"schema": schema})
         return {name: int(count) for name, count in rows}
+
+
+def _examined(node: Any) -> Iterator[int]:
+    if isinstance(node, dict):
+        accessed = node.get("table")
+        # A derived table (<derived2>, <union1,2>) is rows already counted where they were read.
+        if (isinstance(accessed, dict) and "rows_examined_per_scan" in accessed
+                and not str(accessed.get("table_name", "")).startswith("<")):
+            yield int(accessed["rows_examined_per_scan"])
+        for value in node.values():
+            yield from _examined(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _examined(value)
+
+
+def rows_examined(plan: Dict[str, Any]) -> int:
+    """``rows_examined_per_scan`` of every table access in an ``EXPLAIN FORMAT=JSON`` plan, added up."""
+    return sum(_examined(plan))

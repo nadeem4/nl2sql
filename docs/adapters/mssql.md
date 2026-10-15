@@ -50,6 +50,7 @@ other key is an error; see [Connection](../configuration/datasources.md#connecti
 | **Read-only** | None | Does not declare `ENFORCES_READ_ONLY`; see [Read-only](#read-only). |
 | **Timeout** | pyodbc `Connection.timeout` | Client-side query timeout, in whole seconds. Declares `ENFORCES_TIMEOUT`. |
 | **Connection stages** | SQL Server's error number | 18456 is `auth`, 4060 `database`, 916 `permission`; ODBC's `08001`, `08S01` and `HYT00` are `network`; no ODBC Driver for SQL Server installed is `driver`. |
+| **Estimates** | `SET SHOWPLAN_XML ON`, then `sys.partitions` | `estimate` never runs the query. Each `Table Scan`, `Clustered Index Scan`, `Index Scan`, `Index Seek` or `Clustered Index Seek` counts `EstimatedRowsRead` where the server reports it; else a scan counts its table's catalog row count and a seek its `EstimateRows`. `cost` is `StatementSubtreeCost`. The plan is read on a connection that is discarded after. Needs the `SHOWPLAN` permission: see [Estimates](#estimates). Declares `ESTIMATES_COST`. |
 | **Row counts** | `sys.partitions` | The row count SQL Server keeps for each table. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
@@ -75,6 +76,17 @@ is `db_datareader`.**
 CREATE LOGIN nl2sql WITH PASSWORD = '...';
 CREATE USER nl2sql FOR LOGIN nl2sql;
 ALTER ROLE db_datareader ADD MEMBER nl2sql;
+```
+
+### Estimates
+
+`estimate` reads SQL Server's estimated plan, which needs the `SHOWPLAN`
+permission. A `db_datareader` login does not have it, and its estimate
+raises, which a cost rule treats as `unknown`. To give the cost rule real
+numbers, grant it; it lets the login see plans, not data:
+
+```sql
+GRANT SHOWPLAN TO nl2sql;
 ```
 
 ### Statement Timeout

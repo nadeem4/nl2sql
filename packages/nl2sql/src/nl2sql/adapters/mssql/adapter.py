@@ -1,12 +1,14 @@
 import math
 import re
-from typing import Any, Dict, Optional
+import xml.etree.ElementTree as ElementTree
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, text
+from sqlalchemy.exc import SQLAlchemyError
 
-from nl2sql_sdk import DatasourceCapability
-from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
+from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # SQL Server's error numbers for a failed connection, as the ODBC message
 # carries them: "... (4060)". Checked in this order.
@@ -19,6 +21,10 @@ _STAGE_BY_ERROR = (
 _NETWORK_SQLSTATES = {"08001", "08S01", "HYT00"}
 # Microsoft's ODBC drivers for SQL Server, as pyodbc.drivers() names them: "ODBC Driver 18 for SQL Server".
 _SQL_SERVER_DRIVER = re.compile(r"ODBC Driver (\d+) for SQL Server")
+_SHOWPLAN = "{http://schemas.microsoft.com/sqlserver/2004/07/showplan}"
+# Plan operators that read a whole table or index, and those that seek into one.
+_SCANS = {"Table Scan", "Clustered Index Scan", "Index Scan"}
+_SEEKS = {"Index Seek", "Clustered Index Seek"}
 
 
 class OdbcDriverMissing(ImportError):
@@ -99,7 +105,36 @@ class MssqlAdapter(SQLAlchemyAdapter):
         the guard is a login with only ``db_datareader``, and ``check()``
         warns about every SQL Server datasource.
         """
-        return super().capabilities() | {DatasourceCapability.ENFORCES_TIMEOUT}
+        return super().capabilities() | {DatasourceCapability.ENFORCES_TIMEOUT, DatasourceCapability.ESTIMATES_COST}
+
+    def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+        """The rows ``sql`` reads, from the estimated plan (``SET SHOWPLAN_XML ON``), without running it.
+
+        Each scan or seek counts ``EstimatedRowsRead`` where the server
+        reports it; else a scan counts its table's catalog row count
+        (``sys.partitions``) and a seek its ``EstimateRows``. ``cost`` is
+        ``StatementSubtreeCost``. The plan is read on a connection of its
+        own, which is discarded after, so no pooled connection is left with
+        SHOWPLAN on. The login needs the ``SHOWPLAN`` permission; without
+        it, this raises.
+        """
+        try:
+            with self.engine.connect() as conn:
+                try:
+                    conn.exec_driver_sql("SET SHOWPLAN_XML ON")
+                    result = self._run(conn, sql, parameters)
+                    plan = result.scalar() if result.returns_rows else None
+                finally:
+                    conn.invalidate()
+            rows, cost, uncounted = read_showplan(plan) if plan else (0, None, [])
+            if uncounted:
+                with self.engine.connect() as conn:
+                    for schema in {schema for schema, _ in uncounted}:
+                        counts = self.row_estimates(conn, schema)
+                        rows += sum(counts.get(name, 0) for s, name in uncounted if s == schema)
+        except SQLAlchemyError as exc:
+            raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
+        return Estimate(rows=rows, cost=cost, source="SHOWPLAN_XML and sys.partitions")
 
     def session_setup(self, dbapi_connection: Any) -> None:
         """``limits.timeout_ms`` as pyodbc's query timeout: the client cancels.
@@ -143,3 +178,22 @@ class MssqlAdapter(SQLAlchemyAdapter):
             "WHERE s.name = :schema AND o.type = 'U' GROUP BY o.name"
         ), {"schema": schema})
         return {name: int(count) for name, count in rows}
+
+
+def read_showplan(plan: str) -> Tuple[int, Optional[float], List[Tuple[str, str]]]:
+    """``(rows read, cost, the (schema, table) of each scan whose rows the plan does not give)`` of a showplan."""
+    root = ElementTree.fromstring(plan)
+    cost = sum(float(statement.get("StatementSubtreeCost") or 0) for statement in root.iter(f"{_SHOWPLAN}StmtSimple"))
+    rows, uncounted = 0.0, []
+    for operator in root.iter(f"{_SHOWPLAN}RelOp"):
+        kind = operator.get("PhysicalOp")
+        if kind not in _SCANS and kind not in _SEEKS:
+            continue
+        if operator.get("EstimatedRowsRead") is not None:
+            rows += float(operator.get("EstimatedRowsRead"))
+        elif kind in _SEEKS:
+            rows += float(operator.get("EstimateRows") or 0)
+        else:
+            source = operator.find(f".//{_SHOWPLAN}Object")
+            uncounted.append((source.get("Schema", "").strip("[]"), source.get("Table", "").strip("[]")))
+    return math.ceil(rows), cost, uncounted

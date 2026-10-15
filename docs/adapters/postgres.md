@@ -36,6 +36,7 @@ The keys are `PostgresConnection`'s
 | **Read-only** | `SET default_transaction_read_only = on` | Set on every new pooled connection (`session_setup`): an `INSERT` or `CREATE TABLE` fails even for a login that could write. Declares `ENFORCES_READ_ONLY`. |
 | **Timeout** | `SET statement_timeout = {ms}` | Set with the read-only flag; enforced server-side. Declares `ENFORCES_TIMEOUT`. |
 | **Connection stages** | libpq's message | psycopg2 has no SQLSTATE for a failed connection, so `classify` reads the message: a refused password is `auth`, a missing database `database`, an unreachable host or port `network`. |
+| **Estimates** | `EXPLAIN (FORMAT JSON, VERBOSE)`, then `pg_class.reltuples` | `estimate` never runs the query. A `Seq Scan` counts its relation's `reltuples`, not its `Plan Rows` (the rows left after the filter); `Index Scan`, `Index Only Scan` and `Bitmap Index Scan` count their `Plan Rows`. A relation never analyzed counts the planner's estimate of a whole scan of it. `cost` is the plan's `Total Cost`. Runs read-only, under `statement_timeout`. Declares `ESTIMATES_COST`. |
 | **Row counts** | `pg_class.reltuples` | The catalog's estimate; a table never analyzed has none, and is counted under `profile: stats`. |
 | **Stats** | One query per column | Null share, distinct count, `min/max` (no `min/max` for `boolean`, `uuid`; only the null share for `jsonb`, `bytea`, arrays). A column that fails is an index issue, rolled back so the transaction is not aborted; see [Reading a schema](sqlalchemy.md#reading-a-schema). |
 

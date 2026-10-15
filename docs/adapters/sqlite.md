@@ -41,6 +41,7 @@ does the same.
 | **Read-only** | `mode=ro` | Always; declares `ENFORCES_READ_ONLY`. |
 | **Timeout** | A progress handler per statement | See [Statement Timeout](#statement-timeout). Declares `ENFORCES_TIMEOUT`. |
 | **Connection stages** | The message | A file that cannot be opened is `database`. |
+| **Estimates** | None | Does not declare `ESTIMATES_COST`: `EXPLAIN QUERY PLAN` has no row estimates. A cost rule treats every SQLite query as `unknown`. |
 | **Row counts** | `COUNT(*)` | SQLite keeps no estimate, so rows are counted under `profile: stats`, and there is no row count under `catalog`. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 

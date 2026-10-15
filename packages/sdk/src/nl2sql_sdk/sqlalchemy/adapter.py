@@ -15,9 +15,10 @@ from sqlalchemy.exc import DataError, ProgrammingError, SQLAlchemyError
 
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql_sdk.contracts import AdapterRequest, ResultError, ResultFrame
-from nl2sql_sdk.models import ConnectionCheck, ConnectionModel, IndexScope, Limits
+from nl2sql_sdk.models import ConnectionCheck, ConnectionModel, IndexScope, Limits, Overlap
 from nl2sql_sdk.schema import (
     ColumnContract,
+    ColumnRef,
     ColumnMetadata,
     ColumnStatistics,
     ForeignKeyContract,
@@ -153,6 +154,10 @@ class SQLAlchemyAdapter:
     ``session_setup``, ``classify``, ``system_schemas``, ``schema_names``,
     ``reflect``, ``row_estimates``, ``column_profile`` and ``render_sql``. Building one never connects: the SQLAlchemy engine is
     created on first use, so the driver is imported then.
+
+    It has ``probe_overlap`` (``ProfilingAdapterProtocol``). It has no
+    ``estimate``: reading a plan is the database's own, so an adapter that
+    can adds ``estimate`` and declares ``ESTIMATES_COST``.
     """
 
     interface_version = 2
@@ -521,6 +526,38 @@ class SQLAlchemyAdapter:
             return state != "42501" and state[:2] in ("42", "22")
         return isinstance(exc, (ProgrammingError, DataError))
 
+    # --- Overlap ---------------------------------------------------------------
+
+    def probe_overlap(self, left: ColumnRef, right: ColumnRef, sample_rows: int) -> Overlap:
+        """Of up to ``sample_rows`` distinct non-null values of ``left``, how many exist in ``right``.
+
+        One statement in SQLAlchemy Core: a ``DISTINCT`` sample of ``left``
+        with a limit, and an ``EXISTS`` on ``right`` for each value. It runs on
+        the adapter's own connections, so under the session's read-only
+        setting and ``limits.timeout_ms`` where the adapter enforces them.
+        Distinct values, so one popular key does not fill the sample. A
+        failure raises ``RuntimeError`` naming the two columns and the
+        driver's error class, never its message: a conversion error quotes
+        the value it could not convert.
+        """
+        left_column = table(left.table.table_name, column(left.column_name), schema=left.table.schema_name
+                            ).c[left.column_name]
+        right_table = table(right.table.table_name, column(right.column_name), schema=right.table.schema_name)
+        sample = (select(left_column.label("value")).where(left_column.is_not(None)).distinct()
+                  .limit(max(1, int(sample_rows))).subquery("sample"))
+        found = select(literal_column("1")).select_from(right_table).where(
+            right_table.c[right.column_name] == sample.c.value).exists()
+        stmt = select(func.count(), func.count(case((found, 1)))).select_from(sample)
+        try:
+            with self.engine.connect() as conn:
+                sampled, matched = conn.execute(stmt).one()
+        except SQLAlchemyError as exc:
+            logger.warning("Overlap of %s with %s failed on %s: %s", _column_name(left), _column_name(right), self,
+                           _error_type(exc))
+            raise RuntimeError(f"Could not compare {_column_name(left)} with {_column_name(right)} on {self}: "
+                               f"the database raised {_error_type(exc)}") from None
+        return Overlap(sampled=int(sampled), matched=int(matched or 0))
+
     # --- Reading the schema ----------------------------------------------------
 
     def fetch_schema_snapshot(self, scope: IndexScope,
@@ -710,3 +747,7 @@ class SQLAlchemyAdapter:
 
 def _name(ref: TableRef) -> str:
     return f"{ref.schema_name}.{ref.table_name}"
+
+
+def _column_name(ref: ColumnRef) -> str:
+    return f"{_name(ref.table)}.{ref.column_name}"

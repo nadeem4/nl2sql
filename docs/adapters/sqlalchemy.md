@@ -283,6 +283,19 @@ before the first row or between batches, is yielded as `query_failed(exc)`,
 the same failed frame `execute` returns. `execute` itself still reads the whole
 result with `fetchall`.
 
+#### `probe_overlap(left, right, sample_rows) -> Overlap`
+
+Implements the SDK's optional `ProfilingAdapterProtocol` (see [the SDK](sdk.md#optional-hooks-estimate-and-probe_overlap)):
+of up to `sample_rows` distinct non-null values of `left`, how many exist in
+`right`. One statement in SQLAlchemy Core, a `DISTINCT` sample with a limit
+and an `EXISTS` on `right`, on the adapter's own connections, so it runs
+read-only and under `limits.timeout_ms` wherever `session_setup` enforces
+them. A failure raises `RuntimeError` naming the columns and the driver's
+error class, never the driver's message, which can quote a sampled value.
+
+The base has no `estimate`: reading a plan is the database's own. See
+[Adding `estimate`](development.md#adding-estimate).
+
 #### `close()`
 
 Disposes the connection pool, if one was made. The engine calls an adapter's

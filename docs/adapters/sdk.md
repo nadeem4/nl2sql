@@ -271,7 +271,22 @@ as the two hooks above are. The adapter interface stays at version 2.
 to read, added up over the plan's scan operators: a full scan counts its
 table, not its filtered output), `cost` (the planner's own units, for
 display only) and `source` (what was read, for people). `Overlap` has
-`sampled` and `matched`. Wave B's C1 implements both on the built-ins.
+`sampled` and `matched`.
+
+On the built-ins:
+
+- **`probe_overlap`** is on the SDK's `SQLAlchemyAdapter`, so all five
+  built-ins and every adapter on the base have it. It is one statement in
+  SQLAlchemy Core (a `DISTINCT` sample of `left` with a limit, and an
+  `EXISTS` on `right`), run on the adapter's own connections, so read-only
+  and under `timeout_ms` wherever the adapter enforces them. A failure
+  raises `RuntimeError` naming the two columns and the driver's error
+  class, never the driver's message, which can quote a value.
+- **`estimate`** is on PostgreSQL, MySQL, SQL Server and DuckDB, which
+  declare `ESTIMATES_COST`. SQLite does not: `EXPLAIN QUERY PLAN` has no row
+  estimates. Each reads the database's plan without running the query and
+  adds up what its scan operators read; the four adapter pages say how. A
+  failure raises `RuntimeError` with the driver's first line.
 
 ### Result types every adapter returns
 

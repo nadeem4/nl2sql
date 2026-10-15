@@ -127,8 +127,7 @@ def test_every_capability_flag_is_one_something_queries():
     source = "\n".join(path.read_text(encoding="utf-8") for path in SRC.rglob("*.py"))
     queried = set(re.findall(r"DatasourceCapability\.([A-Z_]+)", source))
 
-    # ESTIMATES_COST is declared ahead by Wave B's B0; C1's adapters and C2's cost rule query it.
-    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_TIMEOUT", "ESTIMATES_COST"}
+    assert {member.name for member in DatasourceCapability} - queried <= {"ENFORCES_TIMEOUT"}
 
 
 def test_the_public_facade_exposes_nothing_without_methods():

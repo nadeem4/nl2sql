@@ -1,10 +1,12 @@
-from typing import Any, Dict, Literal, Optional
+import json
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, text
+from sqlalchemy.exc import SQLAlchemyError
 
-from nl2sql_sdk import DatasourceCapability
-from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
+from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # libpq reports a failed connection before the server gives any SQLSTATE, so
 # psycopg2 has none: the message is all there is. Checked in this order.
@@ -20,6 +22,8 @@ _STAGE_BY_MESSAGE = (
     ("no route to host", "network"),
     ("could not connect", "network"),
 )
+# Plan nodes that read through an index: each counts its own Plan Rows.
+_INDEX_SCANS = {"Index Scan", "Index Only Scan", "Bitmap Index Scan"}
 
 
 class PostgresConnection(SQLAlchemyConnection):
@@ -57,7 +61,38 @@ class PostgresAdapter(SQLAlchemyAdapter):
 
     def capabilities(self) -> set[DatasourceCapability]:
         return super().capabilities() | {DatasourceCapability.ENFORCES_READ_ONLY,
-                                         DatasourceCapability.ENFORCES_TIMEOUT}
+                                         DatasourceCapability.ENFORCES_TIMEOUT,
+                                         DatasourceCapability.ESTIMATES_COST}
+
+    def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+        """The rows ``sql`` reads, from ``EXPLAIN (FORMAT JSON, VERBOSE)``, without running it.
+
+        A ``Seq Scan`` counts its relation's ``pg_class.reltuples``, not its
+        ``Plan Rows``, which is what is left after the filter; an index scan
+        counts its ``Plan Rows``. A relation never analyzed (no
+        ``reltuples``) counts the planner's estimate of a scan of the whole
+        relation, which it makes from the relation's size on disk. ``cost``
+        is the plan's ``Total Cost``. Runs read-only, under ``statement_timeout``.
+        """
+        try:
+            with self.engine.connect() as conn:
+                plan = _plan(self._run(conn, f"EXPLAIN (FORMAT JSON, VERBOSE) {sql}", parameters).scalar())
+                seq_scans, rows = scans(plan)
+                sizes: Dict[Tuple[str, str], int] = {}
+                for schema in {schema for schema, _ in seq_scans}:
+                    sizes.update({(schema, name): n for name, n in self.row_estimates(conn, schema).items()})
+                for relation in seq_scans:
+                    rows += sizes[relation] if relation in sizes else self._planned_size(conn, relation)
+        except SQLAlchemyError as exc:
+            raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
+        return Estimate(rows=rows, cost=float(plan.get("Total Cost") or 0),
+                        source="EXPLAIN (FORMAT JSON) and pg_class.reltuples")
+
+    def _planned_size(self, conn: Connection, relation: Tuple[str, str]) -> int:
+        """The planner's estimate of a relation's rows: ``Plan Rows`` of an unfiltered scan of it."""
+        quote = conn.dialect.identifier_preparer.quote
+        name = f"{quote(relation[0])}.{quote(relation[1])}"
+        return int(_plan(conn.execute(text(f"EXPLAIN (FORMAT JSON) SELECT * FROM {name}")).scalar())["Plan Rows"])
 
     def session_setup(self, dbapi_connection: Any) -> None:
         """Every transaction read-only, and ``limits.timeout_ms`` as the server's ``statement_timeout``.
@@ -97,3 +132,25 @@ class PostgresAdapter(SQLAlchemyAdapter):
             "WHERE n.nspname = :schema AND c.relkind IN ('r', 'p', 'm', 'f') AND c.reltuples >= 0"
         ), {"schema": schema})
         return {name: int(count) for name, count in rows}
+
+
+def _plan(explained: Any) -> Dict[str, Any]:
+    """The top node of ``EXPLAIN (FORMAT JSON)``'s output, which psycopg2 returns parsed or as text."""
+    return (json.loads(explained) if isinstance(explained, str) else explained)[0]["Plan"]
+
+
+def _nodes(plan: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
+    yield plan
+    for child in plan.get("Plans") or []:
+        yield from _nodes(child)
+
+
+def scans(plan: Dict[str, Any]) -> Tuple[List[Tuple[str, str]], int]:
+    """``(the (schema, relation) of each Seq Scan, the Plan Rows of the index scans added up)``."""
+    seq_scans, rows = [], 0
+    for node in _nodes(plan):
+        if node.get("Node Type") == "Seq Scan":
+            seq_scans.append((node["Schema"], node["Relation Name"]))
+        elif node.get("Node Type") in _INDEX_SCANS:
+            rows += int(node.get("Plan Rows") or 0)
+    return seq_scans, rows
