@@ -34,12 +34,15 @@ RULES:
    - union
 6) For join or compare:
    - include join_keys as left/right semantic attribute pairs.
+   - each join key is an expected_schema name of its side's sub-query, and that column declares its dtype.
+   - join columns that hold the same kind of value: a number or a boolean never joins a date.
 7) post_combine_ops are only for operations across two or more combined sub-queries. A question answered
    by one sub-query puts all of its filters, order_by and limit on that sub-query and emits no post_combine_ops.
 8) expected_schema must be derived strictly from semantic intent (metrics + group_by) and be minimal.
    It defines the semantic output contract for downstream aggregation, not physical columns.
 9) Do not invent attributes not implied by the user query or datasource metadata.
-10) No commentary.
+10) Use at most {max_sub_queries} sub_queries. A question that needs more cannot be answered.
+11) No commentary.
 
 OUTPUT FORMAT:
 Call the DecomposerResponse tool. Its arguments are the decomposition itself, with

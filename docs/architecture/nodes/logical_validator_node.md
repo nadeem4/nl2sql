@@ -175,6 +175,19 @@ Side effects:
      wrapped in `exp.Ordered` first (`generator.node.ordered()`): sqlglot only
      wraps an argument it has to *parse*, and a bare function node in
      `Order.expressions` makes `qualify()` raise.
+   - `join_key_type_errors()` (`validator/join_keys.py`) checks each select
+     item that is a join key (its alias names an `expected_schema` column the
+     decomposer marked `join_key`) and a plain column reference: the column's
+     type from the schema snapshot is parsed by `sqlglot.exp.DataType.build`
+     in the datasource's dialect (the adapter's `get_dialect()`) and put in a
+     category (number, text, temporal, boolean or other). A temporal column
+     declared a number or a boolean, or a number or boolean column declared a
+     date, is a retryable `JOIN_KEY_TYPE_MISMATCH` that asks for another
+     column, never a cast (the plan has none): "The join key order_key is
+     declared a date, but Orders.OrderKey is a number. Select a column that
+     holds a date for this key." Every other pair is coerced by the
+     aggregator; a type sqlglot cannot place, a column with no type and a
+     computed select item are not checked ([Wave A, D30](../wave_a.md#the-join-key-type-check)).
    - `_validate_buildable()` runs last and is the **buildability** check: it
      calls the generator's own `_build_query()` and throws the tree away. See
      below.
@@ -234,6 +247,7 @@ Emits `PipelineError` with:
 - `SECURITY_VIOLATION`
 - `TABLE_NOT_FOUND`, `COLUMN_NOT_FOUND`
 - `JOIN_TABLE_NOT_IN_PLAN`
+- `JOIN_KEY_TYPE_MISMATCH`, retried
 - `VALIDATOR_CRASH`
 
 ---

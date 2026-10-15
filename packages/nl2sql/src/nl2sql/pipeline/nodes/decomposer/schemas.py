@@ -3,6 +3,10 @@ from typing import List, Optional, Literal, Dict, Any
 import re
 
 from pydantic import BaseModel, Field, model_validator
+from pydantic.json_schema import SkipJsonSchema
+
+from nl2sql.aggregation.columns import input_order, resolve_key
+from nl2sql.aggregation.join_keys import DTYPE_CATEGORY, coercible
 
 # The decomposer emits semantic intent only; the model never writes SQL. Words
 # such as "from", "where" or "select" are ordinary English ("customers from
@@ -40,9 +44,16 @@ class OrderBySpec(BaseModel):
     direction: Literal["asc", "desc"] = "asc"
 
 
+Dtype = Literal["string", "int", "float", "bool", "date", "datetime"]
+
+
 class ExpectedColumn(BaseModel):
     name: str
-    dtype: Optional[Literal["string", "int", "float", "bool", "date", "datetime"]] = None
+    dtype: Optional[Dtype] = None
+    # Set by the decomposer node on its own copy of each sub-query, never by
+    # the model: kept out of the tool schema. The logical validator checks the
+    # type of a join-key column against `dtype` (wave_a.md, D30).
+    join_key: SkipJsonSchema[bool] = False
 
 
 class SubQuery(BaseModel):
@@ -82,6 +93,11 @@ class CombineInput(BaseModel):
 class JoinKeyPair(BaseModel):
     left: str
     right: str
+    # Each side's declared dtype, copied from its sub-query's expected_schema
+    # by the decomposer node, never by the model (kept out of the tool
+    # schema). The aggregator casts both sides to one type with them.
+    left_dtype: SkipJsonSchema[Optional[Dtype]] = None
+    right_dtype: SkipJsonSchema[Optional[Dtype]] = None
 
 
 class CombineGroup(BaseModel):
@@ -97,6 +113,16 @@ class CombineGroup(BaseModel):
                 raise ValueError("Compare/join combine groups require roles.")
             if not self.join_keys:
                 raise ValueError("Compare/join combine groups require join_keys.")
+            # The engine joins the left-hand input to the right-hand one; with
+            # two of a side, which is which would turn on sub-query ids, and a
+            # third input would be ignored. One input is the node's to refuse
+            # (a side RBAC dropped is reported as such).
+            sides = sorted(input_order(i.role, "")[0] for i in self.inputs)
+            if sides not in ([0], [1], [0, 1]):
+                raise ValueError(
+                    f"Combine group '{self.group_id}' is a {self.operation}: it needs exactly one left-hand input "
+                    f"(role left, base or primary) and one right-hand input (role right, compare or secondary)."
+                )
         return self
 
 
@@ -170,3 +196,53 @@ class DecomposerResponse(BaseModel):
             if op.target_group_id not in group_ids:
                 raise ValueError(f"PostCombineOp references unknown combine group: {op.target_group_id}")
         return self
+
+    @model_validator(mode="after")
+    def validate_join_key_types(self):
+        """Each join key names a typed column of its side, and the two types can meet (D30).
+
+        The aggregator casts both sides of a key to one type before the join,
+        so each side must declare one, in its sub-query's ``expected_schema``,
+        and the two must be coercible: a number or a boolean is never a date.
+        A violation is a ``ValueError``, which parse-and-retry sends back to
+        the model. A group with one input left (the node refuses it) is not
+        checked.
+        """
+        sub_queries = {sq.id: sq for sq in self.sub_queries}
+        for group in self.combine_groups:
+            if group.operation not in {"join", "compare"} or len(group.inputs) < 2:
+                continue
+            left, right = (sub_queries[i.subquery_id] for i in
+                           sorted(group.inputs, key=lambda i: input_order(i.role, i.subquery_id))[:2])
+            for pair in group.join_keys:
+                left_dtype = _key_dtype(group.group_id, "left", pair.left, left)
+                right_dtype = _key_dtype(group.group_id, "right", pair.right, right)
+                if not coercible(DTYPE_CATEGORY[left_dtype], DTYPE_CATEGORY[right_dtype]):
+                    raise ValueError(
+                        f"Combine group '{group.group_id}': join key '{pair.left}' is declared {left_dtype} and "
+                        f"'{pair.right}' {right_dtype}; a {left_dtype} and a {right_dtype} cannot be joined. "
+                        f"Join on columns that hold the same kind of value."
+                    )
+        return self
+
+
+def key_column(key: str, sub_query: SubQuery) -> Optional[ExpectedColumn]:
+    """The ``expected_schema`` column a join key names, side-qualified or not."""
+    names = [c.name for c in sub_query.expected_schema]
+    name = resolve_key(names, key)
+    return next((c for c in sub_query.expected_schema if c.name == name), None)
+
+
+def _key_dtype(group_id: str, side: str, key: str, sub_query: SubQuery) -> str:
+    column = key_column(key, sub_query)
+    if column is None:
+        raise ValueError(
+            f"Combine group '{group_id}': the {side} join key '{key}' is not in the expected_schema of "
+            f"sub-query '{sub_query.id}'. Each join key must be one of its side's expected_schema names."
+        )
+    if column.dtype is None:
+        raise ValueError(
+            f"Combine group '{group_id}': the {side} join key '{key}' has no dtype in the expected_schema of "
+            f"sub-query '{sub_query.id}'. Declare the dtype of every join key column."
+        )
+    return column.dtype

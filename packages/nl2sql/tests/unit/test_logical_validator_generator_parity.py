@@ -313,3 +313,32 @@ def test_a_registry_without_an_adapter_does_not_break_validation():
 
     # Assert
     assert any(e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE for e in errors)
+
+
+def test_a_join_key_that_cannot_be_coerced_is_stopped_at_the_validator():
+    # D30: the generator builds this plan, and the aggregator could not join a
+    # date to a number. The validator is the last gate with a retry edge, so
+    # the join-key type check lives there, with a retryable code.
+    # Arrange
+    from nl2sql.pipeline.nodes.decomposer.schemas import ExpectedColumn
+
+    plan = PlanModel(tables=[TableRef(name="Invoice", alias="t1")],
+                     select_items=[SelectItem(alias="customer_id", expr=_col("t1", "InvoiceDate"))])
+    state = SubgraphExecutionState(
+        trace_id="t",
+        sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q",
+                           expected_schema=[ExpectedColumn(name="customer_id", dtype="int", join_key=True)]),
+        relevant_tables=[Table(name="Invoice", columns=[Column(name="InvoiceDate", type="datetime")])],
+        ast_planner_response=ASTPlannerResponse(plan=plan),
+        user_context=UserContext(roles=["admin"]),
+    )
+
+    # Act
+    generated = GeneratorNode(_ctx())(state)
+    errors = LogicalValidatorNode(_ctx())(state)["errors"]
+
+    # Assert
+    assert not generated.get("errors"), generated.get("errors")
+    [error] = errors
+    assert error.error_code == ErrorCode.JOIN_KEY_TYPE_MISMATCH
+    assert error.severity == ErrorSeverity.ERROR and error.is_retryable

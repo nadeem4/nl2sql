@@ -25,7 +25,9 @@ from nl2sql.pipeline.graph_utils import wrap_subgraph
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel
 from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
-from nl2sql.pipeline.nodes.decomposer.schemas import CombineGroup, CombineInput, DecomposerResponse, SubQuery
+from nl2sql.pipeline.nodes.decomposer.schemas import (
+    CombineGroup, CombineInput, DecomposerResponse, ExpectedColumn, SubQuery,
+)
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.plan_cache import PlanCache
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
@@ -518,7 +520,10 @@ def _aggregate(groups, dropped, rows):
 
     ctx = fake_runtime(settings={"tenant_id": "t1"})
     ids = sorted({i.subquery_id for g in groups for i in g.inputs})
-    decomposition = DecomposerResponse(sub_queries=[SubQuery(id=i, datasource_id="shop", intent=i) for i in ids],
+    # Every join here is on `id`, which each sub-query declares (D30).
+    decomposition = DecomposerResponse(sub_queries=[SubQuery(id=i, datasource_id="shop", intent=i,
+                                                             expected_schema=[ExpectedColumn(name="id", dtype="int")])
+                                                    for i in ids],
                                        combine_groups=groups)
     refs = {i: _write(ctx.artifact_store, "t1", "t", i, rows[i]) for i in ids if i not in dropped}
     outputs = {f"sql_agent:{i}:t": _output(i, status="dropped" if i in dropped else "success",

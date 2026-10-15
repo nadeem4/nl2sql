@@ -13,12 +13,12 @@ The model is ``FakeLLMServer`` on the openai wire: no key, no network.
 """
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
 
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.aggregation.columns import combined_columns, input_order
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
 from nl2sql.llm.wires import WIRES
@@ -60,7 +60,7 @@ def _run(payload):
     try:
         llm = WIRES["openai"].build_client("gpt-5.4", 0.0, api_key="-".join(["fake", "decomposer", "key"]),
                                            base_url=server.base_url, tags=["decomposer"])
-        ctx = SimpleNamespace(llm_registry=MagicMock())
+        ctx = fake_runtime(llm_registry=MagicMock())
         ctx.llm_registry.get_llm.return_value = llm
         state = GraphState(
             user_query=QUESTION,
@@ -105,7 +105,10 @@ def test_a_good_answer_is_asked_for_once():
 
 
 def test_without_an_expected_schema_the_columns_are_unknown_and_nothing_is_rejected():
-    result, prompts = _run(_decomposition("bought_rock", expected_schema=()))
+    # A union: a join's keys must be in each side's expected_schema (D30).
+    payload = _decomposition("bought_rock", expected_schema=())
+    payload["combine_groups"][0].update(operation="union", join_keys=[])
+    result, prompts = _run(payload)
 
     assert len(prompts) == 1
     assert not result.get("errors")

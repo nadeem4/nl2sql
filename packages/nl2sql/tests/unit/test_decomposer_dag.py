@@ -5,6 +5,7 @@ of ``DecomposerResponse``; these are that node's tests, against the function.
 """
 import pytest
 
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
 from nl2sql.pipeline.nodes.decomposer.schemas import (
     DecomposerResponse,
@@ -348,7 +349,7 @@ def _decompose_with_fake_llm(payload):
         registry = LLMRegistry(SecretManager())
         registry.register_llm(AgentConfig(provider="openai", model="gpt-4o", api_key="sk-fake",
                                           base_url=server.base_url, name="default"))
-        node = DecomposerNode(SimpleNamespace(llm_registry=registry))
+        node = DecomposerNode(fake_runtime(llm_registry=registry))
         return node(GraphState(
             user_query="customers per country, twice",
             datasource_resolver_response=DatasourceResolverResponse(
@@ -425,7 +426,7 @@ def test_a_dag_that_cannot_be_built_ends_the_run_with_its_error():
         )],
     )
 
-    node = DecomposerNode(SimpleNamespace(llm_registry=MagicMock()))
+    node = DecomposerNode(fake_runtime(llm_registry=MagicMock()))
     node.chain = MagicMock()
     node.chain.invoke.return_value = response
 

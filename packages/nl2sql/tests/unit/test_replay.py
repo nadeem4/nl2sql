@@ -27,10 +27,10 @@ def _render(template: str, **values) -> str:
 def rendered_prompts():
     """The three real prompt templates, rendered with the same question."""
     return [
-        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[], feedback=""),
+        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[], feedback="", max_sub_queries=6),
         # A decomposer retry carries the reason after the question; a recording
         # of it must key on the same question, so it replaces the first answer.
-        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[],
+        _render(DECOMPOSER_PROMPT, user_query=QUESTION, resolved_datasources=[], max_sub_queries=6,
                 feedback=DECOMPOSER_RETRY_FEEDBACK.format(problems="Post-combine operation references 'x'.")),
         _render(
             PLANNER_PROMPT,
