@@ -2122,6 +2122,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/observers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/api/" class="md-nav__link">
         
   
@@ -5082,8 +5110,10 @@ data.</p>
 <h2 id="the-catalog">The catalog</h2>
 <p><code>engine.events.catalog()</code> lists every event: its <code>name</code>, <code>description</code>,
 whether a run has it (<code>run</code>), whether the caller's stream carries it
-(<code>stream</code>), whether the audit observer writes it (<code>audit</code>) and its data's JSON
-Schema (<code>data_schema</code>). The catalog lives in <code>nl2sql/events/catalog.py</code>; a name
+(<code>stream</code>), whether the <a href="../../configuration/observers/#audit">audit observer</a>
+writes it (<code>audit</code>, narrowed by <code>audit_only</code> to some values of a field: of
+<code>hook.decision</code>, only <code>deny</code>, <code>needs_approval</code>, <code>approved</code> and <code>error</code>) and its
+data's JSON Schema (<code>data_schema</code>). The catalog lives in <code>nl2sql/events/catalog.py</code>; a name
 that is not in it cannot be published.</p>
 <p>Run events (they carry the run's <code>trace_id</code>):</p>
 <table>
@@ -5137,12 +5167,12 @@ that is not in it cannot be published.</p>
 </tr>
 <tr>
 <td><code>run.failed</code></td>
-<td><code>message</code>, <code>error_code</code></td>
+<td><code>message</code> (a key in it redacted), <code>error_code</code>, <code>user_id</code>, <code>roles</code></td>
 <td>yes</td>
 </tr>
 <tr>
 <td><code>llm.call</code></td>
-<td>the model, its tokens, latency and cost</td>
+<td><code>node</code>, <code>agent</code>, <code>model</code>, the six token counts, <code>latency_s</code>, <code>cost</code>, <code>usage_reported</code>, <code>error</code> (redacted)</td>
 <td>no</td>
 </tr>
 <tr>
@@ -5171,10 +5201,11 @@ that is not in it cannot be published.</p>
 <code>index.swapped</code>, <code>index.failed</code>, <code>schema.drifted</code>, <code>retention.purged</code>,
 <code>llm.changed</code>, <code>eval.case</code>, <code>eval.finished</code>) carry no <code>trace_id</code>. Which PR
 of Wave A starts publishing each one is in its description; <code>node.*</code>,
-<code>answer.delta</code>, <code>result.manifest</code> and the three <code>run.*</code> events are published
-today. While a <a href="../../configuration/hooks/">hook</a> is attached at
-<code>answer.after</code>, a run publishes no <code>answer.delta</code> and sends <code>result.manifest</code>
-only after the hooks allowed the answer (never, on a deny).</p>
+<code>answer.delta</code>, <code>result.manifest</code>, the three <code>run.*</code> events, <code>llm.call</code>,
+<code>plan_cache.lookup</code> and <code>llm.changed</code> are published today. While a
+<a href="../../configuration/hooks/">hook</a> is attached at <code>answer.after</code>, a run
+publishes no <code>answer.delta</code> and sends <code>result.manifest</code> only after the hooks
+allowed the answer (never, on a deny).</p>
 <h2 id="the-runs-stream">The run's stream</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
@@ -5244,6 +5275,8 @@ detaches it.</p>
   never fails a run.</li>
 <li><strong>One bus per engine.</strong> Two engines in one process share no subscriber.</li>
 </ul>
+<p>The engine's own observers (<code>log</code>, <code>audit</code>, <code>otel</code> and plugins) subscribe the
+same way, from the <code>observers</code> section: see <a href="../../configuration/observers/">Observers</a>.</p>
 <h2 id="logs-carry-the-runs-trace_id">Logs carry the run's <code>trace_id</code></h2>
 <p>Every log line written while a question runs carries its <code>trace_id</code> and
 <code>tenant_id</code>, on the caller's thread and on every graph worker thread, so a

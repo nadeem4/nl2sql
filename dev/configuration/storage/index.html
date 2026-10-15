@@ -2238,6 +2238,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../observers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../api/" class="md-nav__link">
         
   
@@ -5161,7 +5189,10 @@ every store.</p>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">results</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> type</span><span class="p">:</span><span class="w"> </span><span class="nv">local</span><span class="p p-Indicator">,</span><span class="nt"> max_age_days</span><span class="p">:</span><span class="w"> </span><span class="nv">2</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p><code>engine.storage.purge()</code> deletes the traces and result files last written
-before that age and returns the counts, <code>{"traces": 3, "results": 12}</code>. A
+before that age, and the <a href="../observers/#audit">audit observer's</a> day files older
+than its <code>max_age_days</code> (90 by default), and returns the counts,
+<code>{"traces": 3, "results": 12, "audit": 1}</code> (no <code>audit</code> when the engine runs no
+audit observer). A
 plugin trace or results store is purged when it has a <code>max_age_days</code>
 attribute, and left alone when it does not (a bucket with its own lifecycle
 rule, say). Three things call it:</p>

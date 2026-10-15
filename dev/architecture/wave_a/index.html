@@ -1480,6 +1480,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/observers/">
+<span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/api/">
 <span class="md-ellipsis">
     
@@ -3192,7 +3204,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0, the foundation, E1 and V1 are built. Phase 1 is
+as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1 and E2 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -4145,6 +4157,55 @@ dependencies to the <code>otel</code> extra. Only <code>nl2sql/observers/otel.py
 them, and only when the observer is built. <code>common/metrics.py</code> is deleted:
 <code>plan_cache.py</code> and <code>token_handler.py</code> publish events instead of adding to
 counters.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the observers (E2)</p>
+<p><code>nl2sql/observers/</code> holds <code>build_observers</code> (<code>__init__.py</code>, with
+<code>DEFAULT_OBSERVERS</code>, <code>log</code> then <code>audit</code>), <code>log.py</code> (<code>LogObserver</code>,
+<code>LogConfig</code>), <code>audit.py</code> (<code>AuditObserver</code>, <code>AuditConfig</code>) and <code>otel.py</code>
+(<code>OtelObserver</code>, <code>OtelConfig</code>), declared in the <code>nl2sql.observers</code> entry
+point group. <code>Runtime.components</code> builds them after every other
+component (a problem is one more line of the one <code>ConfigError</code>, and a
+built observer is closed again), keeps them as <code>Runtime.observers</code> and
+subscribes them to <code>Runtime.bus</code> in config order; <code>engine.close()</code> closes
+them through the bus. The registry checks an observer's <code>requires</code> like
+an LLM provider's, so <code>otel</code> without the extra is a <code>ConfigError</code> ending
+in <code>pip install "nl2sql-engine[otel]"</code>. <strong>What is audited is the
+catalog's:</strong> <code>EventSpec.audit</code>, and a new <code>EventSpec.audit_only</code> (a field
+name to the values written; <code>hook.decision</code>'s is <code>decision</code>: <code>deny</code>,
+<code>needs_approval</code>, <code>approved</code>, <code>error</code>), applied by <code>EventSpec.audited(data)</code>
+and reported in <code>EventInfo.audit_only</code>. The observer reads the audited
+names from the catalog when it is built, so Wave C's
+<code>datasource.saved</code>, <code>api_key.created</code>, <code>api_key.revoked</code> and <code>mcp.denied</code>
+join the log with <code>audit=True</code> on their own entries. <code>run.failed</code> gained
+<code>user_id</code> and <code>roles</code> (two lines in <code>RunScope.fail</code>), so a failed run's
+line names its user too. The audit observer queues each line and writes
+on its own daemon thread, started by the first audited event, opening
+and closing the day file per batch. Its queue is bounded (<code>MAX_QUEUE</code>,
+10,000): a line that does not fit is dropped, counted in <code>dropped</code> and
+warned about once. <code>close</code> writes what is queued, and what arrived while
+it closed; an <code>atexit</code> hook (through a weak reference, unregistered by
+<code>close</code>) does the same for a process that never closes its engine.
+<code>RunScope.fail</code> passes <code>message</code> through <code>redact_keys</code> (D15).
+<code>engine.storage.purge()</code> adds <code>audit</code> (day files older than
+<code>max_age_days</code>) when the engine runs an audit observer. <code>otel</code> records in
+memory on its own <code>MeterProvider</code> and <code>TracerProvider</code> (a
+<code>BatchSpanProcessor</code>, a <code>PeriodicExportingMetricReader</code>) and never sets
+the global ones, and <code>close</code> bounds the providers' flush at 5 seconds;
+<code>nl2sql.token.usage</code> lost its <code>datasource_id</code> attribute,
+which <code>llm.call</code> does not carry. <code>TokenUsageCallback</code> publishes <code>llm.call</code>
+per finished call through <code>nl2sql.events.publish</code> (with the client's
+<code>nl2sql_agent</code> metadata as <code>agent</code>), <code>PlanCache.get</code> publishes
+<code>plan_cache.lookup</code>, and <code>Runtime.replace_llm</code> publishes <code>llm.changed</code> on
+<code>ctx.bus</code> with the engine's <code>tenant_id</code>; <code>common/metrics.py</code> and
+<code>common/event_logger.py</code> are deleted, and opentelemetry is the <code>otel</code>
+extra (CI's unit and integration jobs install it). One test differs
+from the plan: <code>test_building_an_engine_loads_no_opentelemetry</code> cannot
+hold, because chromadb (a core dependency) installs the OpenTelemetry
+SDK and langsmith, under langchain, imports it whenever it is installed;
+<code>test_building_an_engine_loads_no_otel_observer</code> checks what the engine
+controls, beside the two AST tests on <code>nl2sql/observers/otel.py</code>. The
+page is <a href="../../configuration/observers/">Observers</a>.</p>
+</div>
 <h3 id="the-run-collectors">The run collectors</h3>
 <p>Three things the engine already builds for every run become run-scoped bus
 subscribers attached by <code>RunScope</code>, not configurable observers, since the
@@ -5611,7 +5672,9 @@ decorators. Knowledge sources stay for Wave B.</p>
 <p class="admonition-title">Built: the three kinds (A0)</p>
 <p><code>observer</code>, <code>hook</code> and <code>scorer</code> are in <code>nl2sql/registry.py</code> (<code>GROUPS</code>,
 <code>INTERFACE_VERSIONS</code> at 1, <code>add_*</code> and the decorators). No built-in is
-declared yet: E2 adds the observers and V1 the scorers.</p>
+declared yet: E2 adds the observers and V1 the scorers. E2 declared
+<code>log</code>, <code>audit</code> and <code>otel</code> and made the registry check an observer's
+<code>requires</code>.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Built: the five scorers (V1)</p>

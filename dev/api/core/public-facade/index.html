@@ -2122,6 +2122,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/observers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/api/" class="md-nav__link">
         
   
@@ -5474,8 +5502,9 @@ another trace format.</p>
 <p><code>engine.storage.info()</code> returns each store slot's <code>type</code> and <code>location</code> (and
 <code>max_age_days</code> for the traces and results stores that have it) and the current
 index <code>namespace</code>. <code>engine.storage.purge()</code> deletes the traces and results
-older than their store's <code>max_age_days</code> and returns the counts,
-<code>{"traces": 3, "results": 12}</code>. See
+older than their store's <code>max_age_days</code>, and the audit observer's day files
+older than its own, and returns the counts,
+<code>{"traces": 3, "results": 12, "audit": 1}</code>. See
 <a href="../../../configuration/storage/#retention">Storage → Retention</a>.</p>
 <p><code>engine.traces.replay(trace)</code> re-runs a recorded question, answering every LLM
 call from the trace document (no model is called), on a runtime of its own so

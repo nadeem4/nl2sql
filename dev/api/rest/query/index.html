@@ -2122,6 +2122,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/observers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/api/" class="md-nav__link">
         
   
@@ -5657,7 +5685,7 @@ routes), <code>tenant_id</code> and <code>data</code>. The table lists each even
 </tr>
 <tr>
 <td><code>run.failed</code></td>
-<td><code>message</code>, <code>error_code</code></td>
+<td><code>message</code> (a key in it is redacted), <code>error_code</code>; and <code>user_id</code>, <code>roles</code> when the engine ended the run</td>
 <td>The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server).</td>
 </tr>
 </tbody>
