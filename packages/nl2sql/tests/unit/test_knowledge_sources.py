@@ -230,7 +230,7 @@ def test_write_goes_through_a_symlink(tmp_path):
 
     write_glossary(link, Glossary(version=1), file_sha256(link))
     assert link.is_symlink(), "the link is kept"
-    assert yaml.safe_load(real.read_text(encoding="utf-8")) == {"version": 1}
+    assert yaml.safe_load(real.read_text(encoding="utf-8")) == {"version": 1, "datasources": {}}
 
 
 # ---------------------------------------------------------------- merging
