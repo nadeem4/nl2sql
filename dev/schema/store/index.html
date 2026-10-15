@@ -16,7 +16,7 @@
         <link rel="prev" href="../../adapters/sqlite/">
       
       
-        <link rel="next" href="../../execution/isolation/">
+        <link rel="next" href="../drift/">
       
       
         
@@ -2705,6 +2705,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#schema-diffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema diffs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#which-snapshots-are-kept" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2790,6 +2801,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -5108,6 +5147,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#schema-diffs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schema diffs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#which-snapshots-are-kept" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5211,7 +5261,7 @@
 <ul>
 <li><strong>Schema contracts</strong>: structural schema (tables, columns, foreign keys).</li>
 <li><strong>Schema metadata</strong>: descriptive enrichment and statistics.</li>
-<li><strong>The state store</strong>: immutable, versioned snapshots, kept by <code>storage.state</code>.</li>
+<li><strong>The state store</strong>: immutable, versioned snapshots, and the diffs between them, kept by <code>storage.state</code>.</li>
 <li><strong>Schema retrieval</strong>: staged lookup via schema chunks.</li>
 </ul>
 <h2 id="schema-contracts-and-metadata">Schema contracts and metadata</h2>
@@ -5255,10 +5305,19 @@ of its contract and metadata). A stored snapshot is never changed: in the
 <p>The structural fingerprint (<code>nl2sql.schema.generate_schema_fingerprint</code>:
 datasource ID, engine type, sorted tables, columns and foreign keys) is still
 stored beside each row, and eval reports and records use it to identify a database.</p>
+<h3 id="schema-diffs">Schema diffs</h3>
+<p>When a build stores a snapshot whose structure differs from the version it
+replaces, the orchestrator stores the diff between them beside the new
+version (<code>put_schema_diff(diff)</code>, keyed by datasource and <code>diff.to_version</code>;
+<code>get_schema_diff(datasource_id, schema_version)</code> reads it back) and publishes
+<code>schema.drifted</code>. A version whose statistics alone changed gets no diff. The
+diff (<code>nl2sql_sdk.schema.SchemaDiff</code>) and how to read it are in
+<a href="../drift/">Schema Drift</a>. These two methods are why the store interface is
+version 2.</p>
 <h3 id="which-snapshots-are-kept">Which snapshots are kept</h3>
 <p>After each build of a datasource, indexing calls
 <code>keep_snapshots(datasource_id, keep)</code>, which deletes every other snapshot of
-the datasource and the plans cached on them. <code>keep</code> is:</p>
+the datasource, the plans cached on them and their diffs. <code>keep</code> is:</p>
 <ul>
 <li>every version a build pointer names, in <strong>every</strong> index namespace, so
   switching back to an earlier embedding model still finds its snapshot;</li>
@@ -5282,7 +5341,8 @@ table, and the engine applies the pending ones when it starts
 (<code>StateStore.migrate()</code>). Migration 1 creates 0.5's three tables
 (<code>schema_snapshots</code>, <code>plan_cache</code>, <code>feedback</code>) if they are missing, so a 0.5
 <code>state.db</code> is adopted as it is; migration 2 adds the feedback columns that
-came later; migration 3 adds the immutability trigger and the <code>locks</code> table.</p>
+came later; migration 3 adds the immutability trigger and the <code>locks</code> table;
+migration 4 adds the <code>schema_diffs</code> table.</p>
 <h3 id="the-lock">The lock</h3>
 <p><code>lock(name, ttl_s)</code> is a lease held for a <code>with</code> block: in the <code>sqlite</code> store,
 a <code>locks</code> row taken in a <code>BEGIN IMMEDIATE</code> transaction, with an expiry. Every
@@ -5310,6 +5370,7 @@ it. See <a href="../../architecture/indexing/#the-build-pointer-is-the-commit">I
 <ul>
 <li>Contracts and metadata: <code>packages/sdk/src/nl2sql_sdk/schema.py</code></li>
 <li>Fingerprinting: <code>packages/nl2sql/src/nl2sql/schema/fingerprint.py</code></li>
+<li>Diffs and drift: <code>packages/nl2sql/src/nl2sql/schema/diff.py</code>, <code>drift.py</code>, <code>impact.py</code></li>
 <li>The <code>StateStore</code> interface: <code>packages/sdk/src/nl2sql_sdk/stores.py</code></li>
 <li>The <code>sqlite</code> state store: <code>packages/nl2sql/src/nl2sql/storage/sqlite.py</code></li>
 <li>Which snapshots are kept: <code>packages/nl2sql/src/nl2sql/indexing/orchestrator.py</code></li>

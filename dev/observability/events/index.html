@@ -2629,6 +2629,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5263,8 +5291,8 @@ on the engine's bus directly.</p>
 </tr>
 <tr>
 <td><code>schema.drifted</code></td>
-<td><code>datasource_id</code>, <code>from_version</code>, <code>to_version</code>, <code>detected_by</code>, the diff's <code>counts</code></td>
-<td>not yet published (D1)</td>
+<td><code>datasource_id</code>, <code>from_version</code>, <code>to_version</code> (<code>None</code> for the live database), <code>detected_by</code> (<code>check</code> or <code>build</code>), the whole diff's <code>counts</code>; never a table name</td>
+<td><code>engine.index.check()</code> finds the live database differs from its build (once per drift per engine, not on every check), or a build stores a structural diff (audited). See <a href="../../schema/drift/">Schema Drift</a></td>
 </tr>
 <tr>
 <td><code>retention.purged</code></td>
@@ -5296,8 +5324,8 @@ once per check, even when the plan names it twice. A scope asked only to filter 
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
 nobody asked for. Every catalogued event is published today except
-<code>run.limit_reached</code>, <code>sanity.flagged</code> and <code>schema.drifted</code>, whose Wave A
-PRs are named in their descriptions. While a
+<code>run.limit_reached</code>, whose Wave A
+PR is named in its description. While a
 <a href="../../configuration/hooks/">hook</a> is attached at <code>answer.after</code>, a run
 publishes no <code>answer.delta</code> and sends <code>result.manifest</code> only after the hooks
 allowed the answer (never, on a deny).</p>

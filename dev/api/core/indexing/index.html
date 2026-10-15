@@ -2629,6 +2629,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../schema/drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -4245,6 +4273,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#indexcheck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexversions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexdiff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.diff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#indexinspect_defaults" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5191,6 +5252,39 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#indexcheck" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexversions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexdiff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.diff
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#indexinspect_defaults" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5237,14 +5331,17 @@
 <h1 id="indexing-api">Indexing API</h1>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.index</code>: build the vector index that retrieval and grounding read,
-report its health, clear it, prune other embedding models' indexes, and
-inspect one search of it.</p>
+report its health, clear it, prune other embedding models' indexes,
+inspect one search of it, and measure schema drift.</p>
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Build the index for some or every datasource, beside the live entries.</li>
 <li>Report each datasource's progress as it goes, for a console or a job.</li>
 <li>Report the index's health, clear it, and run one inspected search (and say
   what that search uses by default).</li>
+<li>Compare each live database with the schema its build was made from, and
+  read the stored versions and the diffs between them, as the caller may see
+  them.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
@@ -5257,6 +5354,7 @@ inspect one search of it.</p>
 <li><code>packages/nl2sql/src/nl2sql/storage/chroma.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/indexing/enrichment_service.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/storage/sqlite.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/schema/drift.py</code>, <code>diff.py</code>, <code>impact.py</code> (schema drift)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <h3 id="indexbuild">index.build</h3>
@@ -5372,6 +5470,34 @@ names. The current model's namespace is kept. <code>nl2sql index prune</code> ca
 with scores, the picks in order and what was dropped. <code>types</code> limits the
 entry types (<code>schema.table</code>, ...). It reads index metadata only and needs no
 LLM.</p>
+<h3 id="indexcheck">index.check</h3>
+<p>Signature:
+<code>check(datasource_ids=None, *, user_context) -&gt; list[DriftReport]</code></p>
+<p>Compares each datasource's live database (reflected with its <code>index</code> scope,
+catalog only, no profiling) with the snapshot its live build was made from.
+Each <code>DriftReport</code> has <code>datasource_id</code>, <code>status</code> (<code>unchanged</code>, <code>drifted</code>,
+<code>not_indexed</code>, <code>failed</code>), <code>live_version</code>, <code>checked_at</code>, and for <code>drifted</code> the
+<code>diff</code> (a <code>SchemaDiff</code>, <code>to_version</code> <code>None</code>) and its <code>impact</code> (a
+<code>DriftImpact</code>: verified queries, policy rules and preferred tables it
+breaks); <code>error</code> (redacted) for <code>failed</code>. Drift publishes <code>schema.drifted</code>,
+once per drift and engine.
+Nothing is stored and nothing is rebuilt. <code>user_context</code> is required: the
+caller sees drift only in tables its scope may read, a datasource it cannot
+reach is left out (or, named, is a <code>ValueError</code> like an unknown one). See
+<a href="../../../schema/drift/">Schema Drift</a>.</p>
+<h3 id="indexversions">index.versions</h3>
+<p>Signature:
+<code>versions(datasource_id, *, user_context) -&gt; list[SchemaVersionInfo]</code></p>
+<p>The datasource's stored schema versions, newest first: <code>schema_version</code>,
+<code>fingerprint</code> (of the schema without the tables the caller may not read), <code>live</code> (the live build pointer names it) and <code>has_diff</code> (a
+build stored the diff that introduced it, with something the caller may
+read).</p>
+<h3 id="indexdiff">index.diff</h3>
+<p>Signature:
+<code>diff(datasource_id, schema_version=None, *, user_context) -&gt; SchemaDiff | None</code></p>
+<p>The stored diff that introduced <code>schema_version</code> (the live one by default),
+as the caller may see it; <code>None</code> for a first build, a version whose
+structure did not change, or drift only in tables the caller may not read.</p>
 <h3 id="indexinspect_defaults">index.inspect_defaults</h3>
 <p>Signature:
 <code>inspect_defaults() -&gt; dict</code></p>

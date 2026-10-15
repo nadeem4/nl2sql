@@ -1365,6 +1365,18 @@
   </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/drift/">
+<span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -2664,7 +2676,8 @@ namespace; the <code>chroma</code> store keeps one collection per namespace.</p>
     C --&gt;|no| D[Raise: the pointer still names the previous build and v1]
     C --&gt;|yes| E[set_pointers: datasource to the new build and v2]
     E --&gt; F[Delete the datasource's builds older than the one replaced]
-    F --&gt; G[keep_snapshots: delete the snapshots nothing can read any more]</code></pre>
+    F --&gt; H[If v2's structure differs from v1's: store the diff, publish schema.drifted]
+    H --&gt; G[keep_snapshots: delete the snapshots nothing can read any more]</code></pre>
 <ul>
 <li>Each datasource's <code>BuildPointer</code> names its live <code>build_id</code> and the
   <code>schema_version</code> the build was made from, with <code>built_at</code> and <code>curated_hash</code>.
@@ -2696,6 +2709,10 @@ namespace; the <code>chroma</code> store keeps one collection per namespace.</p>
   names (in any namespace), the one just replaced and the newest
   <code>settings.schema.max_versions</code> are kept. See
   <a href="../../schema/store/#which-snapshots-are-kept">The state store</a>.</li>
+<li><strong>A structural change is recorded.</strong> When the new version's structure
+  differs from the one it replaced, the diff between them is stored beside it
+  and <code>schema.drifted</code> is published; nothing else happens. See
+  <a href="../../schema/drift/">Schema Drift</a>, which also covers <code>nl2sql index --check</code>.</li>
 <li><code>engine.datasources.schema()</code>, <code>engine.curated.validate()</code> and an eval report's
   database identity read the snapshot the live pointer names too.</li>
 </ul>

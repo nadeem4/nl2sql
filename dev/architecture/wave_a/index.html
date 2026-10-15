@@ -1712,6 +1712,18 @@
   </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/drift/">
+<span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -3242,7 +3254,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2, E4 and S1 are built. Phase 1 is
+as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2, E4, S1 and D1 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -5926,6 +5938,73 @@ build at any check.</p>
 </table>
 <p>The plan cache needs no impact entry: it is keyed on <code>schema_version</code>, so a
 rebuild already makes its plans unreachable.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: schema drift (D1)</p>
+<p><code>nl2sql_sdk.schema</code> holds <code>SchemaDiff</code> (with <code>counts()</code> and
+<code>is_empty()</code>), <code>ColumnChange</code> and <code>ForeignKeyRef</code>, exported from
+<code>nl2sql_sdk</code> and <code>SchemaDiff</code> from <code>nl2sql</code> too. Three shapes differ from
+the sketch above, so a caller's scope can filter them without parsing
+names: tables are <code>TableRef</code>s (not <code>str</code>), <code>ColumnChange.table</code> is a
+<code>TableRef</code>, and a foreign key is a <code>ForeignKeyRef</code> (<code>table</code>, <code>columns</code>,
+<code>referred_table</code>, <code>referred_columns</code>) rather than a string. A table added
+or dropped is listed once, without its columns or foreign keys.
+<code>nl2sql/schema/diff.py</code> has <code>diff_contracts(old, new, *, from_version,
+to_version)</code> and <code>visible_diff(diff, allows)</code>; a seeded random property
+test holds that the diff is empty exactly when the fingerprints match.
+The <code>store</code> kind is at interface version 2 (<code>INTERFACE_VERSIONS</code>), all
+four built-in stores declare it, and <code>SqliteState</code> adds migration
+<code>0004_schema_diffs</code> (<code>schema_diffs</code>, keyed by datasource and
+<code>to_version</code>; <code>put_schema_diff</code> replaces and refuses a diff with no
+<code>to_version</code>; <code>keep_snapshots</code> deletes a pruned version's diff).
+Wave B takes version 3 and migration 5, Wave C version 4 and migration 6.
+<code>IndexingOrchestrator._record_drift</code> runs after the commit (a failure is
+logged, never fails the live build) and publishes through
+<code>nl2sql/schema/drift.py</code>'s <code>publish_drift(ctx, diff, detected_by)</code> on
+<code>ctx.bus</code> with the engine's <code>tenant_id</code>. <strong>The caller's scope (binding
+extra):</strong> <code>engine.index.check(datasource_ids=None, *, user_context)</code>,
+<code>versions(datasource_id, *, user_context)</code> and <code>diff(datasource_id,
+schema_version=None, *, user_context)</code> all require <code>user_context</code>, as
+<code>datasources.schema</code> does (M1). A caller sees only the tables its
+<code>Scope.allows</code>: drift only in denied tables is <code>unchanged</code> (and a stored
+diff reads <code>None</code>, <code>has_diff</code> false); a datasource it cannot reach is
+left out of <code>check()</code> and, named, is the same <code>ValueError</code> as an unknown
+id. <code>schema.drifted</code> carries the whole diff's counts and no table name;
+it is audited and off the stream (<code>STREAM_EVENTS</code>). <code>DriftReport</code> and
+<code>SchemaVersionInfo</code> live in <code>nl2sql/schema/drift.py</code>;
+<code>SchemaVersionInfo</code> has <code>schema_version</code>, <code>fingerprint</code>, <code>live</code>,
+<code>has_diff</code> and no <code>created_at</code>, since the store interface records no
+creation time (the <code>sqlite</code> version string starts with one).
+The check reflects with the datasource's <code>IndexScope</code> copied to
+<code>profile: catalog, sample_values: false</code>; a failure's error is
+<code>redact_for(ctx, ...)</code>. <strong>Impact:</strong> <code>nl2sql/schema/impact.py</code>'s
+<code>drift_impact(ctx, diff, tables)</code> runs every finder in <code>FINDERS</code> over
+the (caller-visible) diff, each filling its own field of <code>DriftImpact</code>
+(<code>verified_queries</code>: <code>ImpactedQuery(datasource_id, query_id, reasons)</code>;
+<code>policy_rules</code>: <code>ImpactedRule(role, kind, pattern)</code>;
+<code>preferred_tables</code>). Wave B adds <code>glossary_terms</code> as one more field and
+one more finder appended to <code>FINDERS</code>; no caller changes. Verified
+queries are matched from <code>inspect_verified_sql</code>, which now also returns
+<code>columns</code>.
+After review: <code>SchemaVersionInfo.fingerprint</code> is of
+<code>visible_contract(contract, scope.allows)</code> (the denied tables and the
+foreign keys to them removed), so a denied-only change looks like a
+statistics-only one; the policy-rule impact compares against the live
+tables the caller may read; a check publishes <code>schema.drifted</code> once per
+drift (<code>_publish_check_drift</code> remembers <code>(from_version, the diff's
+sha256)</code> per datasource in a <code>WeakKeyDictionary</code> keyed by the runtime, so
+per engine and in memory only); <code>inspect_verified_sql</code>'s <code>columns</code> are
+<code>(schema, table, column)</code> with the table its qualifier's alias names (or
+the only table read, or <code>""</code>), and an unqualified column in a
+multi-table query is a "may read" reason. <code>nl2sql index --check</code> exits 2
+when nothing was checked.
+<code>nl2sql.policies.patterns_matching(roles, datasource_id, tables)</code> takes
+<code>policies.roles</code> too and returns <code>(role, kind, pattern)</code> triples; the
+boundary test now flags imports of the <code>nl2sql.policies.patterns</code>
+module only (its prefix also caught <code>patterns_matching</code>), and
+<code>api/indexing_api.py</code> joined its access-decision list. <code>nl2sql index
+--check</code> also takes <code>--role</code> (repeatable, default <code>admin</code> as <code>nl2sql
+run</code>) and <code>--json</code>; a config that fails to load exits 2.</p>
+</div>
 <h2 id="11-answer-sanity-checks">11. Answer sanity checks</h2>
 <p>Cheap checks after a sub-query runs, before the aggregator. They live in
 <code>pipeline/nodes/executor/sanity/</code>, which takes in today's

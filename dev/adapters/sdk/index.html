@@ -2900,6 +2900,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5875,7 +5903,7 @@ The storage config names one per slot by <code>type</code> (see
 <tbody>
 <tr>
 <td style="text-align: left;"><code>interface_version</code></td>
-<td style="text-align: left;"><code>1</code>. The engine accepts exactly the version it was built for.</td>
+<td style="text-align: left;"><code>2</code>. The engine accepts exactly the version it was built for. Version 2 added <code>StateStore.put_schema_diff</code> and <code>get_schema_diff</code> (schema drift); the version is one per kind, so a store of any slot declares <code>2</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>slot</code></td>
@@ -5906,7 +5934,7 @@ The storage config names one per slot by <code>type</code> (see
 </tr>
 <tr>
 <td style="text-align: left;"><code>StateStore</code></td>
-<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code>, <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>lock(name, ttl_s)</code>, <code>close()</code></td>
+<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code> (also deletes the diffs of the snapshots it deletes), <code>put_schema_diff(diff)</code> (keyed by <code>diff.datasource_id</code> and <code>diff.to_version</code>, which it requires; replaces one stored before), <code>get_schema_diff(datasource_id, schema_version)</code> (or <code>None</code>), <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>lock(name, ttl_s)</code>, <code>close()</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>TraceStore</code></td>
@@ -5938,7 +5966,7 @@ engine embeds; a store keeps the vectors it is handed.</p>
 <a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
 <a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
 <a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="k">class</span><span class="w"> </span><span class="nc">BucketResults</span><span class="p">:</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
 <a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">slot</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"results"</span>
 <a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]]</span> <span class="o">=</span> <span class="n">BucketConfig</span>
 <a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
