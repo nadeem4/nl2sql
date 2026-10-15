@@ -44,7 +44,7 @@ cases:
 | `outcome` | Per role: `allowed`, `refused`, `unanswerable` or `clarify`. The case runs once per role named here |
 | `tables`, `columns` | The tables the SQL reads, and the `Table.Column` names the answer needs. `retrieval_recall` scores against them |
 | `order_matters` | Whether row order counts when rows are compared |
-| `sql` | The reviewed SQL, in the datasource's dialect; `null` for an unanswerable case |
+| `sql` | The reviewed SQL, in the datasource's dialect; `null` for an unanswerable case, and for a routing case that says only where the question goes |
 | `rows` | The rows `sql` returns, as `{column: value}` maps. Written by `regenerate`, never typed by hand |
 | `alt_sql`, `alt_rows` | [Reviewed alternative answers](../testing/evaluation-dataset.md#alternative-answers) and their rows |
 | `plan` | Optional. A `PlanModel` written as data, which mode `plans` serves through its fake LLM. Mode plans needs one for every answerable case |
@@ -84,6 +84,39 @@ nothing else changed:
 case's question, SQL, rows, alternatives, outcomes, tables, columns and plan,
 taken from the old files with the old loader. [The Chinook
 suite](../testing/evaluation-dataset.md) describes it.
+
+## The routing suite
+
+`suites/routing.yaml` asks which of the demo's three databases (`chinook`,
+`support`, `webanalytics`) a question belongs to. Every case is `approved`,
+`origin: hand`, asked as `admin`, and names the datasources a right answer
+needs. None names `tables`, so in mode retrieval the `routing` scorer alone
+decides it. Its tags say where each case came from:
+
+| Tag | Cases |
+| --- | --- |
+| `gold` | The Chinook suite's 43 answerable questions. Their answers are checked in `chinook.yaml`; here a recall miss cannot hide a routing one |
+| `sample` | Each demo datasource's sample questions, as `nl2sql init --demo` writes them |
+| `paraphrase`, `hand` | Questions written for routing and read against each datasource's schema, most about `support` and `webanalytics`. Ten carry reviewed SQL, with rows written by `regenerate`, so mode full checks those answers too |
+| `cross-database` | Three questions that need two databases |
+
+Every case also carries its datasource's name as a tag, so
+`--cases support` runs only those. Mode plans cannot run the suite, since its
+cases have no plans. So the demo's `evals.yaml` names only `chinook.yaml`, and
+the routing suite is run by name:
+
+```bash
+nl2sql eval run --mode retrieval --suite evals/routing.yaml --out eval_routing.json   # no key: CI's gate
+nl2sql eval run --mode full --suite evals/routing.yaml --max-cost 5                   # the release check
+```
+
+In mode retrieval a case passes when routing ranks one of its datasources
+first and shortlists all of them (`settings.routing.candidates`, cut at
+`max_datasources`). A few cases fail today; the baseline records where
+routing misses, and the gate allows no other case to start failing. The test
+bed's 1,200-table wide schema has routing cases of its own in the `realdb`
+job (`tests/realdb/test_routing_wide.py`), since they need the test bed's
+databases.
 
 ## Regenerating rows
 

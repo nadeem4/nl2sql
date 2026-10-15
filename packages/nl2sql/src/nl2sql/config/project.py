@@ -231,7 +231,9 @@ CURATED_HEADER = """\
 
 EVALS_HEADER = """\
 # The eval suites engine.evals.run runs, relative to nl2sql.yaml, and how they are
-# scored. evals/chinook.yaml is the Chinook gold suite. See the Evals docs.
+# scored. evals/chinook.yaml is the Chinook gold suite. evals/routing.yaml asks
+# which database a question belongs to; run it by name, in mode retrieval or full:
+# nl2sql eval run --mode retrieval --suite evals/routing.yaml. See the Evals docs.
 """
 
 DEMO_SETTINGS_HEADER = """\

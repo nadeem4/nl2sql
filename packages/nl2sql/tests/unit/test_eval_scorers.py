@@ -112,6 +112,12 @@ def test_result_match_does_not_apply_to_a_refusal_or_an_unanswerable_case():
     assert result_match.score(_run(_case({"a": "unanswerable"}, rows=None), "a", NOT_ANSWERABLE)).passed is None
 
 
+def test_result_match_does_not_apply_to_an_allowed_case_with_no_reviewed_answer():
+    # A routing case: it says where the question goes, not what it returns.
+    case = _case({"admin": "allowed"}, rows=None)
+    assert result_match.score(_run(case, "admin", _rows_result([["USA", 13]]))).passed is None
+
+
 def test_result_match_fails_an_allowed_case_that_returned_no_rows():
     score = result_match.score(_run(_case({"a": "allowed"}), "a", QueryResult(status="error")))
     assert score.passed is False and "no rows" in score.detail["reason"]
@@ -216,6 +222,21 @@ def test_routing_in_retrieval_mode_needs_every_datasource_among_the_ranked():
     assert Routing().score(run).passed
     missed = _run(case, "admin", QueryResult(), mode="retrieval", routed=["support", "web"])
     assert Routing().score(missed).passed is False
+
+
+def test_routing_in_retrieval_mode_needs_the_top_ranked_datasource_to_be_one_of_the_cases():
+    case = _case({"admin": "allowed"})
+    second = Routing().score(_run(case, "admin", QueryResult(), mode="retrieval", routed=["support", "chinook"]))
+    assert second.passed is False and second.value == 0.0
+    assert second.detail["top1"] is False and second.detail["shortlist"] is True
+    assert "ranked support first" in second.detail["reason"]
+    first = Routing().score(_run(case, "admin", QueryResult(), mode="retrieval", routed=["chinook", "support"]))
+    assert first.passed and first.detail["top1"] is True and first.detail["shortlist"] is True
+
+
+def test_routing_in_retrieval_mode_with_nothing_ranked_misses_both():
+    score = Routing().score(_run(_case({"admin": "allowed"}), "admin", QueryResult(), mode="retrieval", routed=[]))
+    assert score.passed is False and score.detail["top1"] is False and score.detail["shortlist"] is False
 
 
 def test_routing_does_not_apply_to_a_refused_role():

@@ -111,11 +111,11 @@ The real model end to end on the Chinook suite. Accuracy is execution accuracy, 
 
 ### Retrieval recall
 
-The share of each answerable case's needed tables and columns that schema retrieval sends the planner, with no LLM involved.
+The share of each answerable case's needed tables and columns that schema retrieval sends the planner, and the share of cases routing ranks the right datasource first and shortlists every one the case needs, with no LLM involved.
 
-| Database | Date (UTC) | Commit | Table recall | Column recall | Δ vs previous |
-| --- | --- | --- | --- | --- | --- |
-| chinook | 2026-10-15 | 1099c15 | 97.9% | 76.5% | new series (suite changed) |
+| Database | Date (UTC) | Commit | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous |
+| --- | --- | --- | --- | --- | --- | --- |
+| chinook | 2026-10-15 | 1099c15 | 97.9% | 76.5% | - | new series (suite changed) |
 
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->

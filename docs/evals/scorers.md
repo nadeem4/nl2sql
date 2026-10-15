@@ -12,11 +12,18 @@ built-ins and any plugin's are listed the same way and named in
 
 | Scorer | Passes when | Applies to | Modes |
 | --- | --- | --- | --- |
-| `result_match` | The rows match the case's `rows` or any `alt_rows` | an `allowed` role | full, plans |
+| `result_match` | The rows match the case's `rows` or any `alt_rows` | an `allowed` role on a case with `sql` | full, plans |
 | `outcome` | The role got what the case says: an answer (`allowed`), the generic refusal (`refused`), `QUESTION_NOT_ANSWERABLE` (`unanswerable`) or status `needs_clarification` (`clarify`) | every role | full, plans |
 | `retrieval_recall` | The schema retriever sent every one of the case's `tables` and `columns`; the value is the column recall | an `allowed` role with `tables` | full, retrieval |
 | `faithfulness` | Every number and quoted name the answer states is in the result or its counts | a run that wrote an answer | full |
-| `routing` | Mode full: the run used exactly the case's `datasources`. Mode retrieval: all of them are among the datasources routing ranked, up to `settings.routing.max_datasources` | an `allowed` role | full, retrieval |
+| `routing` | Mode full: the run used exactly the case's `datasources`. Mode retrieval: routing ranked one of them first (`top1`), and all of them are among the datasources it ranked, up to `settings.routing.max_datasources` (`shortlist`) | an `allowed` role | full, retrieval |
+
+In mode retrieval, `routing` passes a case only on both `top1` and
+`shortlist`. Its `detail` keeps each, with the ranking (`routed`) and the
+datasources it `missed`, and the board's `routing` gives the share of cases
+for each. The gate allows no flip in mode retrieval, so it fails when either
+drops. A case with no `sql` (a routing case, which says where a question goes
+and not what it returns) gets no `result_match` verdict.
 
 A scorer that does not apply to a case returns no verdict. A scorer that
 cannot score the run's mode is left out of that run.

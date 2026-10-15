@@ -127,6 +127,13 @@ one SQL file. The same seed always gives the same schema:
 The rows are made on the server (`generate_series` on PostgreSQL, a cross
 join of digit tables on MySQL and SQL Server), so the file stays small.
 
+Routing is measured on it too: `tests/realdb/test_routing_wide.py` indexes
+Pagila and the whole wide schema side by side on PostgreSQL, and checks that
+questions about films go to Pagila and questions about payroll runs or ledger
+entries go to the wide schema, however many tables there are to vote
+([the routing suite](../evals/cases.md#the-routing-suite)). Indexing the
+wide schema takes minutes, so the test runs on PostgreSQL only.
+
 ## The `realdb` marker and fixtures
 
 Every test under `packages/nl2sql/tests/realdb/` is marked `realdb`. Its

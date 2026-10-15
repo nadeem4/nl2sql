@@ -266,6 +266,16 @@ def _retrieval(records: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             "columns_sent": _mean([d["columns_sent"] for d in details])}
 
 
+def _routing(records: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Mode retrieval: the share of cases routing ranked right first (``top1``) and fully shortlisted."""
+    details = [s["detail"] for r in records for n, s in (r.get("scores") or {}).items()
+               if n == "routing" and s.get("passed") is not None and "top1" in (s.get("detail") or {})]
+    if not details:
+        return None
+    return {"cases": len(details), "top1": _share(sum(d["top1"] for d in details), len(details)),
+            "shortlist": _share(sum(d["shortlist"] for d in details), len(details))}
+
+
 def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     """The board for one config's runs (every pass, every case and role)."""
     by_tag: Dict[str, List] = {}
@@ -357,6 +367,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
         },
         "scores": _scorer_counts(records),
         "retrieval": _retrieval(records),
+        "routing": _routing(records),
         "tokens_by_node": tokens,
         "cost": {"total": round(total_cost, 6),
                  "per_question": round(total_cost / len(records), 6) if records else None},

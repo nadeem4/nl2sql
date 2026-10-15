@@ -1,0 +1,1137 @@
+# The routing suite: which demo datasource (chinook, support, webanalytics) a
+# question belongs to. Each case names the datasources a right answer needs;
+# the routing scorer checks them (docs/evals/cases.md, "The routing suite").
+#
+# - gold: the Chinook suite's answerable questions, routing only (their answers
+#   are checked in chinook.yaml).
+# - sample: each demo datasource's sample questions, as nl2sql init --demo
+#   writes them.
+# - paraphrase, hand: questions written for routing, each read against the
+#   datasource's schema. A few carry reviewed SQL, whose rows only
+#   `nl2sql eval regenerate` writes.
+# - cross-database: questions that need two datasources.
+#
+# CI runs it in mode retrieval (no key, no model) and gates every case:
+# routing must rank one of the case's datasources first and shortlist all of
+# them. Never edit rows by hand.
+version: 1
+cases:
+
+- id: routing_chinook_gold_001
+  question: How many customers do we have, by country?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_002
+  question: Who are the top 5 customers by total spend?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_003
+  question: Which artist has the most albums?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_004
+  question: What is the total revenue per year?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_005
+  question: Which genre sells the most tracks?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_006
+  question: What is the average invoice total by billing country?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_007
+  question: Which employees support the most customers?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_008
+  question: What is the longest track in each genre?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_009
+  question: Which customers bought jazz tracks but never rock?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_010
+  question: What was the monthly revenue in 2013 for customers in the USA?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_011
+  question: Which playlists contain tracks from more than three genres?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_012
+  question: Who are the top customers by total spend?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_013
+  question: Show me the five customers who have spent the most money.
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_014
+  question: How much did we earn in each year?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_015
+  question: Give me the yearly sales totals.
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_016
+  question: Name the artist with the largest number of albums.
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_017
+  question: Which musician released more albums than anyone else in the catalog?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_018
+  question: List all the media types.
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_019
+  question: How many tracks are longer than ten minutes?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_020
+  question: Which tracks are from the album Let There Be Rock?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_021
+  question: Where do our customers from Germany live?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_022
+  question: List the customers where the country is Canada, with their email addresses.
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_023
+  question: How many tracks are on the album From The Muddy Banks Of The Wishkah [Live]?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_024
+  question: Which artist recorded the album Somewhere in Time?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_025
+  question: Which artists have more than ten albums?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_026
+  question: Which customers have spent more than 45 dollars in total?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_027
+  question: How many invoices were issued in March 2010?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_028
+  question: What was the total revenue in the fourth quarter of 2012?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_029
+  question: Which month of 2011 had the highest revenue?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_030
+  question: What are the top 3 countries by number of customers?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_031
+  question: What is the total revenue per genre?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_032
+  question: Which artist has earned the most revenue?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_033
+  question: How many tracks of each media type are in the Grunge playlist?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_034
+  question: How many different customers bought at least one track by AC/DC?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_035
+  question: How many employees does the company have?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_036
+  question: Who does Jane Peacock report to?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_037
+  question: Which sales support agent brought in the most revenue from their customers?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_038
+  question: What are the five longest tracks and how long are they in minutes?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_039
+  question: How many tracks have never been purchased?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_044
+  question: Which 5 customers bought the most jazz tracks?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_045
+  question: Which customers rank 11th to 20th by total spend?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_046
+  question: How many invoices were issued in the most recent month in the data?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_gold_047
+  question: How many tracks are in the heavy metal genre?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, gold]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_paraphrase_01
+  question: Which artists have the most albums?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_paraphrase_02
+  question: What were total invoice sales by country?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_paraphrase_03
+  question: Which employee supports the most customers?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_chinook_paraphrase_04
+  question: What is the most popular music genre by tracks sold?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [routing, chinook, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_sample_01
+  question: How many support tickets are still open, by priority?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_sample_02
+  question: Which support agents resolved the most tickets?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_sample_03
+  question: What is the average time to close a ticket, by category?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_sample_04
+  question: Which customers raised the most support tickets?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_paraphrase_01
+  question: Which agent handles the most escalated tickets?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_paraphrase_02
+  question: How long do urgent tickets take to resolve on average?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_paraphrase_03
+  question: List tickets opened this month that are still unassigned.
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_paraphrase_04
+  question: What share of tickets are about billing?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_paraphrase_05
+  question: Which customers complained most about refunds?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_paraphrase_06
+  question: How many tickets did each agent close last quarter?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_support_hand_01
+  question: What is the average satisfaction score by ticket category?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT category, AVG(satisfaction) AS avg_satisfaction
+    FROM tickets
+    GROUP BY category
+    ORDER BY category
+  rows:
+  - {category: Account access, avg_satisfaction: 4.461538461538462}
+  - {category: Billing, avg_satisfaction: 4.3125}
+  - {category: Download, avg_satisfaction: 4.363636363636363}
+  - {category: Feature request, avg_satisfaction: 4.357142857142857}
+  - {category: Mobile app, avg_satisfaction: 4.354838709677419}
+  - {category: Other, avg_satisfaction: 4.2631578947368425}
+  - {category: Payment method, avg_satisfaction: 4.733333333333333}
+  - {category: Playback, avg_satisfaction: 4.526315789473684}
+  - {category: Refund request, avg_satisfaction: 3.875}
+  - {category: Subscription, avg_satisfaction: 4.619047619047619}
+
+- id: routing_support_hand_02
+  question: How many messages were sent by agents and how many by customers?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT sender_role, COUNT(*) AS messages
+    FROM ticket_messages
+    GROUP BY sender_role
+    ORDER BY sender_role
+  rows:
+  - {sender_role: agent, messages: 593}
+  - {sender_role: customer, messages: 532}
+
+- id: routing_support_hand_03
+  question: How many agents are in each team?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT team, COUNT(*) AS agents
+    FROM agents
+    GROUP BY team
+    ORDER BY team
+  rows:
+  - {team: Accounts, agents: 3}
+  - {team: Billing, agents: 3}
+  - {team: Technical, agents: 4}
+
+- id: routing_support_hand_04
+  question: How many tickets are there at each priority level?
+  datasources: [support]
+  status: approved
+  origin: hand
+  tags: [routing, support, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT priority, COUNT(*) AS tickets
+    FROM tickets
+    GROUP BY priority
+    ORDER BY priority
+  rows:
+  - {priority: high, tickets: 51}
+  - {priority: low, tickets: 88}
+  - {priority: medium, tickets: 127}
+  - {priority: urgent, tickets: 18}
+
+- id: routing_webanalytics_sample_01
+  question: Which pages were viewed the most last year?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_sample_02
+  question: How many sessions came from each marketing channel?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT r.channel, COUNT(*) AS sessions
+    FROM sessions s
+    JOIN referrers r ON r.referrer_id = s.referrer_id
+    GROUP BY r.channel
+    ORDER BY r.channel
+  rows:
+  - {channel: direct, sessions: 83}
+  - {channel: email, sessions: 67}
+  - {channel: organic, sessions: 199}
+  - {channel: paid, sessions: 83}
+  - {channel: referral, sessions: 147}
+  - {channel: social, sessions: 189}
+
+- id: routing_webanalytics_sample_03
+  question: What is the bounce rate by device type?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_sample_04
+  question: How many purchases were there per month in 2013?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, sample]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT strftime('%Y-%m', occurred_at) AS month, COUNT(*) AS purchases
+    FROM conversions
+    WHERE event_type = 'purchase' AND strftime('%Y', occurred_at) = '2013'
+    GROUP BY month
+    ORDER BY month
+  rows:
+  - {month: 2013-02, purchases: 1}
+  - {month: 2013-05, purchases: 1}
+  - {month: 2013-07, purchases: 1}
+  - {month: 2013-08, purchases: 1}
+  - {month: 2013-10, purchases: 1}
+
+- id: routing_webanalytics_paraphrase_01
+  question: Which landing pages have the highest bounce rate?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_paraphrase_02
+  question: How many visitors used mobile browsers?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_paraphrase_03
+  question: Which referrer domains bring the most signups?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_paraphrase_04
+  question: What is the average session duration by operating system?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_paraphrase_05
+  question: How many newsletter signups came from social media?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_paraphrase_06
+  question: Which marketing channel converts best to purchases?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, paraphrase]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_webanalytics_hand_01
+  question: What is the average session duration in seconds by visitor country?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT country, AVG(duration_seconds) AS avg_duration_seconds
+    FROM sessions
+    GROUP BY country
+    ORDER BY country
+  rows:
+  - {country: Australia, avg_duration_seconds: 1034.8}
+  - {country: Austria, avg_duration_seconds: 406.5}
+  - {country: Belgium, avg_duration_seconds: 1001.6666666666666}
+  - {country: Brazil, avg_duration_seconds: 643.6444444444444}
+  - {country: Canada, avg_duration_seconds: 832.7058823529412}
+  - {country: Chile, avg_duration_seconds: 1046.5454545454545}
+  - {country: Czech Republic, avg_duration_seconds: 975.5}
+  - {country: Finland, avg_duration_seconds: 899.8}
+  - {country: France, avg_duration_seconds: 631.5963302752293}
+  - {country: Germany, avg_duration_seconds: 593.9203539823009}
+  - {country: Hungary, avg_duration_seconds: 856.8888888888889}
+  - {country: India, avg_duration_seconds: 538.6702127659574}
+  - {country: Ireland, avg_duration_seconds: 700.125}
+  - {country: Italy, avg_duration_seconds: 647.5}
+  - {country: Netherlands, avg_duration_seconds: 723.5}
+  - {country: Poland, avg_duration_seconds: 1055.142857142857}
+  - {country: Portugal, avg_duration_seconds: 1047.1818181818182}
+  - {country: Spain, avg_duration_seconds: 516.3333333333334}
+  - {country: Sweden, avg_duration_seconds: 792.1818181818181}
+  - {country: USA, avg_duration_seconds: 742.1319444444445}
+  - {country: United Kingdom, avg_duration_seconds: 978.0714285714286}
+
+- id: routing_webanalytics_hand_02
+  question: How many page views did the pricing page get?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT COUNT(*) AS page_views
+    FROM page_views
+    WHERE page_path = '/pricing'
+  rows:
+  - {page_views: 200}
+
+- id: routing_webanalytics_hand_03
+  question: How many sessions used each browser?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT d.browser, COUNT(*) AS sessions
+    FROM sessions s
+    JOIN devices d ON d.device_id = s.device_id
+    GROUP BY d.browser
+    ORDER BY d.browser
+  rows:
+  - {browser: Chrome, sessions: 261}
+  - {browser: Edge, sessions: 58}
+  - {browser: Firefox, sessions: 199}
+  - {browser: Safari, sessions: 198}
+  - {browser: Samsung Internet, sessions: 52}
+
+- id: routing_webanalytics_hand_04
+  question: What is the total value of purchase conversions by year?
+  datasources: [webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, webanalytics, hand]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: |
+    SELECT CAST(strftime('%Y', occurred_at) AS INTEGER) AS year, SUM(value_usd) AS purchase_value_usd
+    FROM conversions
+    WHERE event_type = 'purchase'
+    GROUP BY year
+    ORDER BY year
+  rows:
+  - {year: 2009, purchase_value_usd: 101.68}
+  - {year: 2010, purchase_value_usd: 91.41}
+  - {year: 2011, purchase_value_usd: 80.34}
+  - {year: 2012, purchase_value_usd: 118.62}
+  - {year: 2013, purchase_value_usd: 68.94}
+
+- id: routing_cross_01
+  question: For customers who opened support tickets, how much have they spent on music invoices?
+  datasources: [chinook, support]
+  status: approved
+  origin: hand
+  tags: [routing, cross-database]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_cross_02
+  question: Do the customers with the most website sessions also have the highest invoice totals?
+  datasources: [chinook, webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, cross-database]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: routing_cross_03
+  question: Which customers both raised support tickets and made a purchase on the website?
+  datasources: [support, webanalytics]
+  status: approved
+  origin: hand
+  tags: [routing, cross-database]
+  outcome: {admin: allowed}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
