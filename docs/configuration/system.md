@@ -50,6 +50,9 @@ curated:     { file: curated.yaml }      # optional
 secrets:     { file: secrets.yaml }      # optional
 settings:    { file: settings.yaml }     # optional
 api:         { file: api.yaml }          # optional, read by nl2sql-api only
+observers:   { file: observers.yaml }    # optional: where events, logs and metrics go
+hooks:       { file: hooks.yaml }        # optional
+evals:       { file: evals.yaml }        # optional
 ```
 
 A small project can write every section inline instead. This file builds the
@@ -79,6 +82,9 @@ storage:    { path: .nl2sql }
 | `secrets` | no | [Secrets](secrets.md) | The `env` provider is always there without it. |
 | `settings` | no | [Settings](settings.md) | Tuning knobs; every field has a default. |
 | `api` | no | [REST API](api.md) | `nl2sql-api`'s own settings; the engine ignores them. |
+| `observers` | no | [below](#observers-hooks-and-evals) | A list. Absent means the default observers, `log` and `audit`; `[]` means none. |
+| `hooks` | no | [below](#observers-hooks-and-evals) | A list, run in its order. |
+| `evals` | no | [below](#observers-hooks-and-evals) | The eval suites, scorers and regression gate. |
 
 From Python:
 
@@ -102,6 +108,7 @@ See [Public Facade → Creating an engine](../api/core/public-facade.md#creating
 | No `version` | Only `nl2sql.yaml` has `version:`. |
 | Datasource folder | `datasources: {file: datasources/}` names a folder. Every `*.yaml` in it, sorted by name and not recursive, holds one datasource. `id` may be left out and defaults to the file name; if it is given, it must equal the file name. |
 | Datasource file | `datasources: {file: datasources.yaml}` names a file whose body is the list. |
+| List sections | `observers` and `hooks` are lists too: their file's body is the list. |
 | Literal paths | `file:` values are never interpolated. |
 | Each file once | Including the same file twice is an error. |
 
@@ -120,6 +127,54 @@ reads a secret from the provider whose `id` is `vault` (see
 | Secrets resolve late | Every `api_key`, the secret providers' credentials and every value under a datasource's `connection` keep the reference. It is resolved when the component is built, so `engine.config`, logs and errors never hold a plaintext secret. |
 | Everything else resolves at load | Any other field, for example `storage.path: "${env:NL2SQL_DATA_DIR}"`, is resolved by `load_config`. A variable that is not set is an error naming the field. |
 | Inside `secrets:` | Only `${env:...}`: one provider cannot depend on another. |
+
+### Observers, hooks and evals
+
+Three sections added in release 0.7 ([Wave A](../architecture/wave_a.md)).
+They are accepted and validated now; the engine reads each from the Wave A
+change named below.
+
+```yaml
+# observers.yaml: where the engine's events go (read from E2)
+- type: log
+  level: INFO
+- type: audit
+  max_age_days: 90
+- type: otel                      # needs nl2sql-engine[otel]
+  endpoint: http://collector:4317
+- type: corp_siem                 # a plugin; its config_model checks the rest
+  url: "${env:SIEM_URL}"
+
+# hooks.yaml: code that sees every run at fixed points, in this order (read from H1)
+- type: corp_sql_review
+  points: [execute.before]        # a subset of the hook's own points; all of them by default
+  on_error: closed                # closed (the default) | open
+  approver_roles: [dba]           # who may approve its needs_approval; default policies.admin_roles
+  url: "${env:REVIEW_URL}"        # the hook's own keys
+
+# evals.yaml (read from V1)
+suites: [evals/chinook.yaml]      # relative to nl2sql.yaml
+scorers: [result_match, outcome, faithfulness, retrieval_recall, routing]   # the default: all five
+curated: true
+max_cost_usd: 5.00                # across a run in mode full; required for it
+gate:
+  max_regressions: 2
+  alpha: 0.05
+  max_cost_increase: 0.20
+```
+
+| Section | Item | Rule |
+| --- | --- | --- |
+| `observers` | `{type: <name>, ...}` (`ObserverConfig`) or an observer object in code | `type` names a registered observer (`nl2sql.observers`); its `config_model` checks the other keys, and keeps their `${...}` references until it is built. Without the section the engine runs `log` and `audit`; `observers: []` runs none. |
+| `hooks` | `{type: <name>, points, on_error, approver_roles, ...}` (`HookConfig`) or a hook object in code | `points` takes `run.before`, `datasources.after`, `plan.after`, `execute.before`, `execute.after` and `answer.after`; any other is an error. `on_error` is `closed` or `open`. The hook's `config_model` checks its own keys. |
+| `evals` | `EvalsConfig` | Strict keys. `suites` are files of cases, read when a run asks for them, not when the engine starts. `gate.alpha` is between 0 and 1. |
+
+```python
+from nl2sql import Config, HookConfig, ObserverConfig
+
+Config(..., observers=[ObserverConfig(type="log"), MyObserver()],
+       hooks=[HookConfig(type="corp_sql_review", points=["execute.before"]), MyHook()])
+```
 
 ### Strict keys and errors
 
@@ -150,6 +205,7 @@ Only these are read directly:
 | --- | --- | --- |
 | `NL2SQL_CONFIG` | `load_config()` with no path, the CLI, `nl2sql-api` | Path to `nl2sql.yaml`. Without it, `./nl2sql.yaml`. |
 | `NL2SQL_LOG_LEVEL` | `configure_logging()` | The log level when the caller passes none (`DEBUG`, `INFO`, ...). Without it, `INFO`. |
+| `NL2SQL_LOG_FORMAT` | `configure_logging()` | `text` or `json` (one JSON object per line, with its `trace_id`) when the caller chooses neither; the CLI's `--log-format` chooses for any command. Without it, `text`. |
 | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY` | `nl2sql/llm/` | The fallback key when `llm.api_key` (or an agent's, or `embeddings.api_key`) is not set. |
 
 Anything else from the environment is written in the YAML as `${env:VAR}`.
@@ -193,6 +249,7 @@ nl2sql --config prod/nl2sql.yaml index
 nl2sql --config prod/nl2sql.yaml run "Top 5 customers by revenue"
 NL2SQL_CONFIG=prod/nl2sql.yaml nl2sql curated validate
 nl2sql run "..."                       # ./nl2sql.yaml
+nl2sql --log-format json run "..."     # JSON log lines, for any command
 ```
 
 There are no per-command path flags. Commands that query or index build the
@@ -341,8 +398,8 @@ start from.
 | `TRACE_SAMPLE_ROWS` | `settings.traces.sample_rows` |
 | `TRACE_MAX_FIELD_CHARS` | `settings.traces.max_field_chars` |
 | `NL2SQL_TODAY` | `settings.pipeline.today` |
-| `OBSERVABILITY_EXPORTER` | `settings.observability.exporter` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `settings.observability.otlp_endpoint` |
+| `OBSERVABILITY_EXPORTER` | an `otel` observer in the `observers` section (0.7) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | the `otel` observer's `endpoint` (0.7) |
 
 ### Other variables
 

@@ -12,6 +12,7 @@ from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, PlanModel, SelectItem, TableRef
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
+from nl2sql.testing.runtime import fake_runtime
 
 
 def _dict_state():
@@ -123,7 +124,7 @@ def test_empty_state_yields_empty_result():
 def test_run_query_returns_query_result(monkeypatch):
     monkeypatch.setattr(query_api, "run_with_graph", lambda *args, **kwargs: _dict_state())
 
-    result = QueryAPI(ctx=None).run_query("count the rows")
+    result = QueryAPI(ctx=fake_runtime(artifact_store=None)).run_query("count the rows")
 
     assert isinstance(result, QueryResult)
     _assert_mapped(result)

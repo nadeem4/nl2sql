@@ -801,7 +801,7 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/config/": "NL2SQL_CONFIG, and ${env:...} references",
     "nl2sql/src/nl2sql/llm/": "the provider key variables, through PROVIDER_PRESETS",
     "nl2sql/src/nl2sql/secrets/providers/env.py": "the env secret provider: ${env:...}",
-    "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL",
+    "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
     "nl2sql/src/nl2sql/cli/commands/benchmark.py": "CI detection, not configuration",
 }
@@ -878,7 +878,7 @@ def test_environment_reads_only_from_the_allow_list():
                  for path in python_files(*SOURCES) if not _may_read_the_environment(path)
                  for lineno, what in _environment_access(path)]
     assert not offenders, _broke(
-        "The environment is read only for NL2SQL_CONFIG (nl2sql/config/), NL2SQL_LOG_LEVEL "
+        "The environment is read only for NL2SQL_CONFIG (nl2sql/config/), NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT "
         "(configure_logging), the provider key variables (nl2sql/llm/), ${env:...} references, "
         "the trace redactor and CI detection. Anything else is configuration: put it in "
         "nl2sql.yaml, as ${env:VAR} if it should come from the environment.", offenders)

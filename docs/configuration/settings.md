@@ -14,8 +14,19 @@ pipeline:
   strict_columns: true
   today: null                 # pin the run date: 2013-12-31
   retries: { max: 3, base_delay_s: 1.0, max_delay_s: 10.0, jitter_s: 0.5 }
+  max_llm_calls: 60           # model calls per question; null: no cap
+  max_cost_usd: null          # dollars per question; null: no cap
+  sanity_checks: true
 retrieval:
   full_snapshot_max_tables: 15
+  table_k: 8
+  planning_k: 12
+  decomposer_tables: 30
+routing:
+  candidates: 5
+  max_datasources: 3
+  max_sub_queries: 6
+  floor_ratio: 0.5
 results:
   row_limit: 100000
   fetch_batch_size: 10000
@@ -31,9 +42,6 @@ curated:
   match_floor: 0.6
 feedback:
   enabled: true
-observability:
-  exporter: none              # none | console | otlp
-  otlp_endpoint: null
 ```
 
 Unknown keys are errors, as everywhere in the config. The demo
@@ -43,9 +51,14 @@ Unknown keys are errors, as everywhere in the config. The demo
 trace).
 
 In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
-`RetrievalSettings`, `ResultSettings`, `TraceSettings`, `SchemaSettings`,
-`CuratedSettings`, `FeedbackSettings` and `ObservabilitySettings` in
-`nl2sql.config`. The `schema` group is the attribute `schema_`
+`RetrievalSettings`, `RoutingSettings`, `ResultSettings`, `TraceSettings`,
+`SchemaSettings`, `CuratedSettings` and `FeedbackSettings` in
+`nl2sql.config`.
+
+Where the engine's events, logs and metrics go is not a setting: it is the
+[`observers` section](system.md#observers-hooks-and-evals) of
+`nl2sql.yaml`. The 0.6 `observability` group (`exporter`, `otlp_endpoint`)
+is gone; an `otel` observer takes its place. The `schema` group is the attribute `schema_`
 (`cfg.settings.schema_.max_versions`), because `schema` would shadow a
 pydantic method; the YAML key is `schema`.
 
@@ -65,12 +78,35 @@ The tenant id for requests that name none. Result files are kept per tenant.
 | `retries.base_delay_s` | `1.0` | Base delay between retries, in seconds. |
 | `retries.max_delay_s` | `10.0` | Longest delay between retries. |
 | `retries.jitter_s` | `0.5` | Most jitter added to a delay. |
+| `max_llm_calls` | `60` | The most model calls one question may make, parse retries included; `null` turns the cap off. 60 covers the largest legitimate run. A run that reaches it ends with `status: "stopped"` and `QueryResult.stop`. Enforced from release 0.7's cost and caps work ([Wave A](../architecture/wave_a.md#5-cost-the-price-table-and-per-question-caps)). |
+| `max_cost_usd` | none | The most one question may spend, in dollars; `null` (the default) is no cap. With a cap set, every model the config names must have a price. Enforced as `max_llm_calls` is. |
+| `sanity_checks` | `true` | The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). `false` turns them all off. Read from release 0.7's sanity checks ([Wave A](../architecture/wave_a.md#11-answer-sanity-checks)). |
 
 ## `retrieval`
 
 | Key | Default | Description |
 | --- | --- | --- |
 | `full_snapshot_max_tables` | `15` | When a datasource's schema has at most this many tables, the schema retriever skips vector retrieval and passes the full schema snapshot (every table, every column) to the planner. `0` always uses vector retrieval. |
+| `table_k` | `8` | Tables the schema retriever keeps for a sub-query. |
+| `planning_k` | `12` | Schema entries the planner is shown for a sub-query. |
+| `decomposer_tables` | `30` | Tables the decomposer is shown per datasource. |
+
+`table_k`, `planning_k` and `decomposer_tables` replace constants in the
+schema retriever and the resolver; the nodes read them from release 0.7's
+routing work ([Wave A](../architecture/wave_a.md#limits)).
+
+## `routing`
+
+Cross-database routing: which datasources a question goes to, and how far it
+may spread. Read from release 0.7's routing work
+([Wave A](../architecture/wave_a.md#9-phase-r-cross-database-routing)).
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `candidates` | `5` | Datasources shown to the answerability check. |
+| `max_datasources` | `3` | Datasources one question may use. |
+| `max_sub_queries` | `6` | Sub-queries one question may have. A decomposition over it ends the run with `QUESTION_TOO_BROAD`. |
+| `floor_ratio` | `0.5` | A candidate scoring under this share of the best is dropped, between 0 and 1. |
 
 ## `results`
 
@@ -110,9 +146,3 @@ Whether curated answers are on is not a setting: the
 | --- | --- | --- |
 | `enabled` | `true` | Let the playground record a thumbs up or down, with an optional note, for a run. Stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
 
-## `observability`
-
-| Key | Default | Description |
-| --- | --- | --- |
-| `exporter` | `none` | `none`, `console` or `otlp`. With `otlp`, the CLI and `nl2sql-api` also switch to JSON logs. |
-| `otlp_endpoint` | none | The OTLP endpoint. |

@@ -17,7 +17,7 @@ import importlib.util
 from importlib.metadata import EntryPoint, entry_points
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
-Kind = Literal["adapter", "llm", "embeddings", "secrets", "store", "policy_check"]
+Kind = Literal["adapter", "llm", "embeddings", "secrets", "store", "policy_check", "observer", "hook", "scorer"]
 
 # The entry point group each kind is installed under.
 GROUPS: Dict[str, str] = {
@@ -27,12 +27,15 @@ GROUPS: Dict[str, str] = {
     "secrets": "nl2sql.secrets",
     "store": "nl2sql.stores",
     "policy_check": "nl2sql.policy_checks",
+    "observer": "nl2sql.observers",
+    "hook": "nl2sql.hooks",
+    "scorer": "nl2sql.scorers",
 }
 
 # The interface version this engine was built for, per kind. Anything else is
 # a load error: there are no minor versions and no window for old ones.
 INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 1,
-                                   "policy_check": 1}
+                                   "policy_check": 1, "observer": 1, "hook": 1, "scorer": 1}
 
 # How a kind reads in a message.
 _LABELS: Dict[str, str] = {
@@ -42,6 +45,9 @@ _LABELS: Dict[str, str] = {
     "secrets": "secret provider",
     "store": "store",
     "policy_check": "policy check",
+    "observer": "observer",
+    "hook": "hook",
+    "scorer": "scorer",
 }
 
 # The attribute naming the modules a kind needs before it can be built.
@@ -86,7 +92,8 @@ def missing_modules(kind: str, target: Any) -> List[str]:
 
 
 class Registry:
-    """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores, policy checks."""
+    """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores, policy
+    checks, observers, hooks and scorers."""
 
     def __init__(self) -> None:
         self._installed: Dict[str, Dict[str, List[_Entry]]] = {kind: {} for kind in GROUPS}
@@ -131,6 +138,15 @@ class Registry:
     def add_policy_check(self, name: str, cls: type, *, replace: bool = False) -> None:
         self._add("policy_check", name, cls, replace)
 
+    def add_observer(self, name: str, cls: type, *, replace: bool = False) -> None:
+        self._add("observer", name, cls, replace)
+
+    def add_hook(self, name: str, cls: type, *, replace: bool = False) -> None:
+        self._add("hook", name, cls, replace)
+
+    def add_scorer(self, name: str, cls: type, *, replace: bool = False) -> None:
+        self._add("scorer", name, cls, replace)
+
     def adapter(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("adapter", name)
 
@@ -148,6 +164,15 @@ class Registry:
 
     def policy_check(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("policy_check", name)
+
+    def observer(self, name: str) -> Callable[[Any], Any]:
+        return self._decorator("observer", name)
+
+    def hook(self, name: str) -> Callable[[Any], Any]:
+        return self._decorator("hook", name)
+
+    def scorer(self, name: str) -> Callable[[Any], Any]:
+        return self._decorator("scorer", name)
 
     def _decorator(self, kind: str, name: str) -> Callable[[Any], Any]:
         def register(target: Any) -> Any:

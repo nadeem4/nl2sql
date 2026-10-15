@@ -285,7 +285,7 @@ def test_settings_defaults():
     assert s.schema_.max_versions == 3
     assert (s.curated.match_top_k, s.curated.match_floor) == (5, 0.6)
     assert s.feedback.enabled is True
-    assert (s.observability.exporter, s.observability.otlp_endpoint) == ("none", None)
+    assert "observability" not in s.model_dump()
 
 
 def test_settings_schema_key_is_schema():

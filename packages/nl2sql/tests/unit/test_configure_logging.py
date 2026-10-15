@@ -31,3 +31,47 @@ def test_a_level_the_caller_passes_wins(monkeypatch):
     monkeypatch.setenv("NL2SQL_LOG_LEVEL", "DEBUG")
     configure_logging(level="WARNING")
     assert logging.getLogger().level == logging.WARNING
+
+
+# ---------------------------------------------------------------- the format: --log-format, NL2SQL_LOG_FORMAT
+
+def _formatter():
+    from nl2sql.common.logger import JsonFormatter
+
+    return isinstance(logging.getLogger().handlers[-1].formatter, JsonFormatter)
+
+
+def test_the_format_defaults_to_text(monkeypatch):
+    monkeypatch.delenv("NL2SQL_LOG_FORMAT", raising=False)
+    configure_logging()
+    assert not _formatter()
+
+
+def test_nl2sql_log_format_json_chooses_json(monkeypatch):
+    monkeypatch.setenv("NL2SQL_LOG_FORMAT", "json")
+    configure_logging()
+    assert _formatter()
+
+
+def test_a_format_the_caller_passes_wins(monkeypatch):
+    monkeypatch.setenv("NL2SQL_LOG_FORMAT", "json")
+    configure_logging(json_format=False)
+    assert not _formatter()
+
+
+def test_an_unknown_format_is_refused(monkeypatch):
+    monkeypatch.setenv("NL2SQL_LOG_FORMAT", "xml")
+    with pytest.raises(ValueError, match="text or json"):
+        configure_logging()
+
+
+def test_the_cli_takes_log_format_for_any_command(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from nl2sql.cli.main import app
+
+    monkeypatch.delenv("NL2SQL_LOG_FORMAT", raising=False)
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(app, ["--log-format", "json", "list-adapters"])
+    assert result.exit_code == 0, result.output
+    assert _formatter()

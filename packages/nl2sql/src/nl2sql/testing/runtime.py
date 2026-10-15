@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, Optional, Union
 
 from nl2sql.config import LLM, Config, Embeddings, Limits, Policies, Settings, Storage
+from nl2sql.events import EventBus
 from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql.policies import PolicyEngine
 from nl2sql.storage.files import FilesTraces
@@ -55,7 +56,7 @@ def fake_runtime(*, settings: Union[Settings, dict, None] = None, policies: Unio
     temporary folder by default. Every other keyword becomes an attribute:
     ``ds_registry``, ``llm_registry``, ``vector_store`` and so on. ``policy_engine`` is
     built from ``policies`` (which read nothing by default; ``{"allow_all": True}``
-    reads everything).
+    reads everything). ``bus`` is a new ``EventBus`` of its own.
     """
     settings = settings if isinstance(settings, Settings) else Settings.model_validate(settings or {})
     policies = policies if isinstance(policies, Policies) else Policies.model_validate(policies or {})
@@ -64,6 +65,7 @@ def fake_runtime(*, settings: Union[Settings, dict, None] = None, policies: Unio
                     embeddings=Embeddings(provider="local"), policies=policies,
                     storage=Storage(path=folder.parent), settings=settings)
     attrs.setdefault("artifact_store", ArtifactStore(LocalResults(folder)))
+    attrs.setdefault("bus", EventBus())
     if "traces" not in attrs:
         traces_dir = attrs.pop("traces_dir", None) or Path(tempfile.mkdtemp(prefix="nl2sql-traces-"))
         attrs["traces"] = FilesTraces(Path(traces_dir))

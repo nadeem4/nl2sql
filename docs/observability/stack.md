@@ -48,7 +48,8 @@ sequenceDiagram
 
 `configure_metrics()` installs an OpenTelemetry meter provider. Exported metrics include:
 
-- `nl2sql.node.duration` (histogram), attribute `node`. CLI only.
+- `nl2sql.node.duration` (histogram), attribute `node`. Not recorded until
+  the `otel` observer arrives (see below).
 - `nl2sql.token.usage` (counter), attributes `node`, `model`, `datasource_id`
   and `type`: one point per LLM call for each of `input`, `cached_input`,
   `cache_write_input`, `output`, `reasoning` and `total`. Every run.
@@ -58,10 +59,13 @@ sequenceDiagram
   `QueryResult.usage.plan_cache_hits` and `sub_queries[].plan_source`; see
   [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
 
-`configure_metrics()` is called by `nl2sql run`, with the exporter the
-config's `settings.observability` names, so outside the CLI no meter provider
-is installed unless the embedding application installs one; the counter is
-then recorded against OpenTelemetry's no-op provider and discarded. Token usage
+No meter provider is installed unless the embedding application installs
+one; the counters are then recorded against OpenTelemetry's no-op provider
+and discarded. The 0.6 `settings.observability` section, and `nl2sql run`'s
+call to `configure_metrics()` that read it, are gone: release 0.7 replaces
+them with an `otel` observer in the `observers` section
+([Wave A](../architecture/wave_a.md#4-observers)), and until it lands nothing
+exports to OpenTelemetry. Token usage
 is not kept in a process-wide list; read it from `QueryResult.usage`.
 
 ## Audit logging
@@ -81,7 +85,7 @@ compliance audit trail.
 
 ## Structured logging
 
-The library does not configure logging on import; the application entry point calls `nl2sql.configure_logging` after loading the `.env` next to `nl2sql.yaml`, so a `NL2SQL_LOG_LEVEL` there applies (the REST API does it in its lifespan, the CLI before every command, `nl2sql demo` again once the demo project's `.env` is loaded). JSON formatting is enabled when `Settings.observability_exporter == "otlp"`. Trace and tenant context helpers exist (`trace_context`, `tenant_context`), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.
+The library does not configure logging on import; the application entry point calls `nl2sql.configure_logging` after loading the `.env` next to `nl2sql.yaml`, so a `NL2SQL_LOG_LEVEL` there applies (the REST API does it in its lifespan, the CLI before every command, `nl2sql demo` again once the demo project's `.env` is loaded). JSON lines are chosen with `nl2sql --log-format json` (any command) or `NL2SQL_LOG_FORMAT=json` (any entry point); text is the default. Every question's `RunScope` sets the run's `trace_id` and `tenant_id` in the context `TraceContextFilter` reads, inside the run's worker, so a log line written during a run carries them, on LangGraph's worker threads too.
 
 ## Source references
 

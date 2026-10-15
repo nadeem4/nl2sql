@@ -14,8 +14,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import (BaseModel, ConfigDict, Field, NonNegativeInt, PositiveFloat, PositiveInt, PrivateAttr,
-                      field_validator, model_validator)
+from pydantic import (BaseModel, BeforeValidator, ConfigDict, Field, NonNegativeInt, PositiveFloat, PositiveInt,
+                      PrivateAttr, field_validator, model_validator)
 from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
@@ -97,6 +97,7 @@ AgentName = Literal[
     "refiner",
     "answer_synthesizer",
     "indexing_enrichment",
+    "eval_seeder",  # seeding a draft eval suite (V3)
 ]
 
 
@@ -437,10 +438,30 @@ class PipelineSettings(_Model):
     strict_columns: bool = True
     today: Optional[date] = None  # pin the run date
     retries: RetrySettings = Field(default_factory=RetrySettings)
+    # Per-question caps (enforced from E3): model calls, parse retries
+    # included, and dollars. None turns a cap off.
+    max_llm_calls: Optional[PositiveInt] = 60
+    max_cost_usd: Optional[PositiveFloat] = None
+    # The answer sanity checks (read from S1).
+    sanity_checks: bool = True
 
 
 class RetrievalSettings(_Model):
     full_snapshot_max_tables: int = Field(15, ge=0)
+    # Read by the schema retriever and the resolver from R1: they were
+    # TABLE_K, PLANNING_K and MAX_DECOMPOSER_TABLES.
+    table_k: PositiveInt = 8
+    planning_k: PositiveInt = 12
+    decomposer_tables: PositiveInt = 30
+
+
+class RoutingSettings(_Model):
+    """Cross-database routing (read from R1 and R2)."""
+
+    candidates: PositiveInt = 5  # datasources shown to the answerability check
+    max_datasources: PositiveInt = 3  # datasources one question may use
+    max_sub_queries: PositiveInt = 6  # sub-queries one question may have
+    floor_ratio: float = Field(0.5, ge=0.0, le=1.0)  # drop a candidate scoring under this share of the best
 
 
 class ResultSettings(_Model):
@@ -468,11 +489,6 @@ class FeedbackSettings(_Model):
     enabled: bool = True
 
 
-class ObservabilitySettings(_Model):
-    exporter: Literal["none", "console", "otlp"] = "none"
-    otlp_endpoint: Optional[str] = None
-
-
 class Settings(_Model):
     """Tuning knobs. Every field has a default, so the section is optional."""
 
@@ -481,13 +497,91 @@ class Settings(_Model):
     tenant_id: str = "default_tenant"
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
     retrieval: RetrievalSettings = Field(default_factory=RetrievalSettings)
+    routing: RoutingSettings = Field(default_factory=RoutingSettings)
     results: ResultSettings = Field(default_factory=ResultSettings)
     traces: TraceSettings = Field(default_factory=TraceSettings)
     # ``schema`` would shadow a BaseModel method, so the attribute is ``schema_``.
     schema_: SchemaSettings = Field(default_factory=SchemaSettings, alias="schema")
     curated: CuratedSettings = Field(default_factory=CuratedSettings)
     feedback: FeedbackSettings = Field(default_factory=FeedbackSettings)
-    observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
+
+
+# ---------------------------------------------------------------- observers, hooks, evals
+
+class ObserverConfig(_PluginBlock):
+    """One observer, by name: ``ObserverConfig(type="log")``. The observer's ``config_model`` checks the other keys.
+
+    The engine builds its observers from the ``observers`` section from E2.
+    """
+
+
+HookPoint = Literal["run.before", "datasources.after", "plan.after", "execute.before", "execute.after",
+                    "answer.after"]
+
+
+class HookConfig(_PluginBlock):
+    """One hook, by name: ``HookConfig(type="corp_sql_review", points=["execute.before"])``.
+
+    ``points`` is a subset of the hook's own points (all of them when None);
+    ``on_error: open`` lets the run go on when the hook raises (hooks fail
+    closed by default); ``approver_roles`` may approve its
+    ``needs_approval`` (``policies.admin_roles`` when None). The hook's
+    ``config_model`` checks the other keys. The engine builds and runs its
+    hooks from H1.
+    """
+
+    points: Optional[List[HookPoint]] = None
+    on_error: Literal["closed", "open"] = "closed"
+    approver_roles: Optional[List[str]] = None
+
+
+_EXAMPLE = {"an observer": "log", "a hook": "corp_sql_review"}
+
+
+def _entry(block: type, kind: str, method: str):
+    """A list item that is a ``{type: ...}`` block or an object (one with ``method``), used as given."""
+
+    def check(value: Any) -> Any:
+        if isinstance(value, dict):
+            return block(**value)
+        if isinstance(value, block) or (value is not None and not isinstance(value, (str, list, int, float, bool))
+                                        and hasattr(value, method)):
+            return value
+        raise ValueError(f"each item is {kind}: a mapping with a 'type' key, such as "
+                         f"{{type: {_EXAMPLE[kind]}}}, or an object with {method}")
+
+    return check
+
+
+ObserverEntry = Annotated[Union[ObserverConfig, Any],
+                          BeforeValidator(_entry(ObserverConfig, "an observer", "on_event"))]
+HookEntry = Annotated[Union[HookConfig, Any], BeforeValidator(_entry(HookConfig, "a hook", "__call__"))]
+
+# The built-in scorers (from V1): the default list.
+DEFAULT_SCORERS = ("result_match", "outcome", "faithfulness", "retrieval_recall", "routing")
+
+
+class EvalGate(_Model):
+    """The regression gate (from V2): regressions, accuracy and cost against a baseline."""
+
+    max_regressions: NonNegativeInt = 2  # cases that passed in the baseline and fail now
+    alpha: float = Field(0.05, gt=0.0, lt=1.0)  # the one-sided test on the accuracy difference
+    max_cost_increase: float = Field(0.20, ge=0.0)  # more cost per case, as a share
+
+
+class EvalsConfig(_Model):
+    """The ``evals`` section: the suites, the scorers and the gate. ``engine.evals`` reads it from V1.
+
+    A relative suite path is relative to the folder of ``nl2sql.yaml``. A
+    suite file is data, read when a run asks for it, not when the engine
+    starts.
+    """
+
+    suites: List[Path] = Field(default_factory=list)
+    scorers: List[str] = Field(default_factory=lambda: list(DEFAULT_SCORERS))
+    curated: bool = True  # D12: curated answers on in mode full
+    max_cost_usd: Optional[PositiveFloat] = None  # across a run in mode full; required for it
+    gate: EvalGate = Field(default_factory=EvalGate)
 
 
 # ---------------------------------------------------------------- api
@@ -516,6 +610,10 @@ class Config(_Model):
     secrets: Secrets = Field(default_factory=Secrets)
     settings: Settings = Field(default_factory=Settings)
     api: Api = Field(default_factory=Api)
+    # None (no section) means the default observers, log and audit; [] means none.
+    observers: Optional[List[ObserverEntry]] = None
+    hooks: List[HookEntry] = Field(default_factory=list)  # run in this order
+    evals: EvalsConfig = Field(default_factory=EvalsConfig)
 
     # The folder of the nl2sql.yaml this config was loaded from, set by
     # load_config and kept by every copy; None when it was built in code.

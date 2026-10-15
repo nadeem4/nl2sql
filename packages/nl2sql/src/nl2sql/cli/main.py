@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Unified CLI for the NL2SQL Ecosystem."""
+import click
 import typer
 import importlib.metadata
 import pathlib
@@ -75,6 +76,12 @@ def global_callback(
         help="The nl2sql.yaml to read. Without it, NL2SQL_CONFIG, then ./nl2sql.yaml. "
              "The .env next to it is loaded, never overriding a variable already set.",
     )] = None,
+    log_format: Annotated[Optional[str], typer.Option(
+        "--log-format",
+        help="Log lines as text or json (one JSON object per line, with its trace_id). "
+             "Without it, NL2SQL_LOG_FORMAT, then text.",
+        click_type=click.Choice(["text", "json"]),
+    )] = None,
     version: Annotated[bool, typer.Option("--version", help="Show the installed nl2sql-engine version and exit", callback=_version_callback, is_eager=True)] = False,
 ):
     """
@@ -82,11 +89,10 @@ def global_callback(
     """
     ctx.obj = {"config": config}
     load_env_file(config)
-    # After the .env, so a NL2SQL_LOG_LEVEL written there applies. The library
-    # never configures logging on import: the entry point owns it. A command
-    # that builds the engine switches to JSON logs when its config's
-    # settings.observability.exporter is otlp (cli/common/engine.py).
-    configure_logging()
+    # After the .env, so a NL2SQL_LOG_LEVEL or NL2SQL_LOG_FORMAT written there
+    # applies. The library never configures logging on import: the entry
+    # point owns it.
+    configure_logging(json_format=None if log_format is None else log_format == "json")
 
 
 @app.command()

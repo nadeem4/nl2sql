@@ -15,8 +15,8 @@ Source: `packages/api/src/nl2sql_api/main.py`
   and calls `engine.check()` before it serves. A `required` datasource that
   fails, or no datasource ready at all, raises `EngineNotReady` and the server
   does not start; an optional one that fails leaves it serving the others. The
-  engine is stored in `app.state.engine` and closed at shutdown. When
-  `settings.observability.exporter` is `otlp`, logs switch to JSON.
+  engine is stored in `app.state.engine` and closed at shutdown. Logs are
+  text, or JSON lines with `NL2SQL_LOG_FORMAT=json`.
 - Retention: the lifespan calls `engine.storage.purge()` once before it
   serves and then once a day (`purge_daily`, every `PURGE_INTERVAL_S`
   seconds), so traces and results older than their store's `max_age_days`

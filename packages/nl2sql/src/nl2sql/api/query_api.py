@@ -16,7 +16,10 @@ from nl2sql.runtime import Runtime
 from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
-from nl2sql.common.errors import ErrorSeverity
+from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql.events import RunScope, RunStatus
+from nl2sql.hooks.approval import ApprovalRequest
+from nl2sql.limits import RunStop
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import QueryEvent, RunEvents
@@ -90,7 +93,11 @@ class QueryResult(BaseModel):
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
     warnings: List[Dict[str, Any]] = Field(default_factory=list)
     artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
-    status: str = Field(default="")
+    # How the run ended: success, plan_only, error, needs_approval (see
+    # approvals_needed), stopped (see stop), or needs_clarification (reserved
+    # for Wave B's clarification result; nothing produces it yet). None when
+    # nothing ran and nothing failed.
+    status: Optional[RunStatus] = None
     timings: Dict[str, float] = Field(default_factory=dict)
     usage: QuestionUsage = Field(default_factory=QuestionUsage)
     trace_path: Optional[str] = None
@@ -100,6 +107,11 @@ class QueryResult(BaseModel):
     result_manifest: List[ResultSummary] = Field(default_factory=list)
     # A verified query's answer, or a generated one.
     source: AnswerSource = Field(default_factory=AnswerSource)
+    # Why the run stopped at a limit (settings.pipeline.max_llm_calls or max_cost_usd), when status is "stopped".
+    stop: Optional[RunStop] = None
+    # What a person must approve before the question runs, one per pending sub-query, when status is
+    # "needs_approval". Re-run the question with an Approval for each.
+    approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -213,13 +225,22 @@ def _overall_status(
     sub_queries: List[SubQueryResult],
     blocking_errors: List[Dict[str, Any]],
     state: Dict[str, Any],
-) -> str:
-    """Summarise the run for a caller that renders one badge."""
+) -> Optional[str]:
+    """Summarise the run for a caller that renders one badge.
+
+    A run that asked for approval, or stopped at a limit, says so before its
+    error does: the state's ``approvals_needed`` and ``stop`` are how the
+    pipeline reports them.
+    """
+    if state.get("approvals_needed"):
+        return "needs_approval"
+    if state.get("stop"):
+        return "stopped"
     if blocking_errors:
         return "error"
     if not sub_queries:
         # Nothing ran, so neither "plan_only" nor "success" would be true.
-        return ""
+        return None
     outputs = list((state.get("subgraph_outputs") or {}).values())
     produced_rows = any(sub_query.rows is not None for sub_query in sub_queries) or any(
         _field(output, "artifact") is not None for output in outputs
@@ -263,7 +284,39 @@ def result_from_state(
         truncated=any(sq.truncated for sq in sub_queries),
         result_manifest=list(_field(state.get("aggregator_response"), "results", None) or []),
         source=_source(state.get("verified_match")),
+        stop=state.get("stop"),
+        approvals_needed=list(state.get("approvals_needed") or []),
     )
+
+
+def tables_read(result: QueryResult, ds_registry: Any = None) -> List[str]:
+    """The tables ``result``'s sub-queries read, as ``datasource.schema.table``, for the run's summary.
+
+    From each sub-query's plan or, on the verified path, from its SQL parsed
+    in the adapter's dialect. A table with no schema is in the adapter's
+    default schema. A sub-query whose tables cannot be read is left out: a
+    summary never fails a run over a table name.
+    """
+    from nl2sql.config.curated import inspect_verified_sql
+    from nl2sql.policies.scope import default_schema
+
+    tables = set()
+    for sq in result.sub_queries:
+        ds_id = sq.datasource_id
+        if not ds_id:
+            continue
+        pairs: List[Any] = []
+        if sq.plan:
+            pairs = [(t.get("schema_name"), t.get("name")) for t in sq.plan.get("tables") or []]
+        elif sq.sql and ds_registry is not None:
+            try:
+                pairs = list(inspect_verified_sql(sq.sql, ds_registry.get_dialect(ds_id)).tables)
+            except Exception:
+                pairs = []
+        for schema, table in pairs:
+            if table:
+                tables.add(f"{ds_id}.{schema or default_schema(ds_registry, ds_id)}.{table}")
+    return sorted(tables)
 
 
 def _source(match: Any) -> AnswerSource:
@@ -305,18 +358,41 @@ class QueryAPI:
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
         """
-        state = run_with_graph(
-            self._ctx,
-            question,
-            datasource_id=datasource_id,
-            execute=execute,
-            user_context=user_context,
-            cancellation_token=cancellation_token,
-        )
-        return result_from_state(
-            state,
-            artifact_store=getattr(self._ctx, "artifact_store", None),
-        )
+        scope = self._scope(question, datasource_id, execute, user_context)
+        scope.start()
+        try:
+            state = run_with_graph(
+                self._ctx,
+                question,
+                datasource_id=datasource_id,
+                execute=execute,
+                user_context=user_context,
+                cancellation_token=cancellation_token,
+                scope=scope,
+            )
+            result = result_from_state(
+                state,
+                artifact_store=getattr(self._ctx, "artifact_store", None),
+            )
+        except Exception as exc:
+            scope.fail(f"The run failed: {exc}", ErrorCode.UNKNOWN_ERROR)
+            raise
+        self._finish(scope, result)
+        return result
+
+    def _scope(self, question: str, datasource_id: Optional[str], execute: bool,
+               user_context: Optional[UserContext]) -> RunScope:
+        """The run's scope on the engine's bus (docs/architecture/wave_a.md, section 3)."""
+        return RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
+                        execute=execute, tenant_id=self._ctx.tenant_id)
+
+    def _finish(self, scope: RunScope, result: QueryResult) -> None:
+        """Close ``scope`` with the result's summary; ``run.failed`` if the summary cannot be built."""
+        try:
+            scope.finish(result, tables=tables_read(result, getattr(self._ctx, "ds_registry", None)))
+        except Exception as exc:
+            scope.fail(f"The run's summary could not be built: {exc}", ErrorCode.UNKNOWN_ERROR)
+            raise
 
     def stream_query(
         self,
@@ -348,7 +424,10 @@ class QueryAPI:
         events: "queue.Queue[Optional[QueryEvent]]" = queue.Queue()
 
         def run() -> None:
+            scope: Optional[RunScope] = None
             try:
+                scope = self._scope(question, datasource_id, execute, user_context)
+                scope.start()
                 state = run_with_graph(
                     self._ctx,
                     question,
@@ -358,10 +437,14 @@ class QueryAPI:
                     user_context=user_context,
                     cancellation_token=token,
                     stream_answer=True,
+                    scope=scope,
                 )
                 result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
+                self._finish(scope, result)
                 events.put(QueryEvent(type="final", data=result.model_dump(mode="json")))
             except Exception as exc:
+                if scope is not None:
+                    scope.fail(f"The run failed: {exc}", ErrorCode.UNKNOWN_ERROR)
                 events.put(QueryEvent(type="error", data={"message": f"The run failed: {exc}",
                                                           "error_code": "UNKNOWN_ERROR"}))
             finally:

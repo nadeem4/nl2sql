@@ -38,8 +38,9 @@ files (`results/`). Mount one persistent volume and point `storage.path` at it
   admin roles (`policies.admin_roles`, default `[admin]`): pod traffic is not
   loopback, so without them the admin routes answer HTTP 403. See
   [Admin routes](../api/rest/index.md#admin-routes).
-- Configure observability exporters in `settings.observability` (`exporter`,
-  `otlp_endpoint`).
+- Configure observability exporters as observers in the `observers` section
+  (from release 0.7, an `otel` observer with its `endpoint`), and set
+  `NL2SQL_LOG_FORMAT=json` for JSON log lines.
 
 ## Reference configuration
 

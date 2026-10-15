@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Union
 if TYPE_CHECKING:
     from nl2sql.api.curated_api import CuratedAPI
     from nl2sql.api.datasource_api import DatasourcesAPI
+    from nl2sql.api.evals_api import EvalsAPI
+    from nl2sql.api.events_api import EventsAPI
     from nl2sql.api.feedback_api import FeedbackAPI
     from nl2sql.api.indexing_api import IndexAPI
     from nl2sql.api.llm_api import LLMAPI
@@ -154,6 +156,20 @@ class NL2SQL:
         from nl2sql.api.feedback_api import FeedbackAPI
 
         return FeedbackAPI(self._runtime)
+
+    @cached_property
+    def events(self) -> "EventsAPI":
+        """The engine's events: every run's and the engine's own (filled from Wave A's E1)."""
+        from nl2sql.api.events_api import EventsAPI
+
+        return EventsAPI(self._runtime)
+
+    @cached_property
+    def evals(self) -> "EvalsAPI":
+        """Evaluation: suites, scorers, the regression gate (filled from Wave A's V1)."""
+        from nl2sql.api.evals_api import EvalsAPI
+
+        return EvalsAPI(self._runtime)
 
     @cached_property
     def _queries(self) -> "QueryAPI":
