@@ -341,7 +341,7 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved for Wave B), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
-| `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Not filled yet (release 0.8). |
+| `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Not filled yet (release 0.8). |
 | `estimate` | `Optional[Estimate]` | no | The database's estimate of the rows this sub-query reads, when the cost rule asked for one. Not filled yet (release 0.8). |
 
 ### RowSample

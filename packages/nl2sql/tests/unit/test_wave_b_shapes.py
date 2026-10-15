@@ -163,6 +163,27 @@ def store():
     state.close()
 
 
+def test_a_0_7_state_file_upgrades_to_migration_5_keeping_its_rows(tmp_path):
+    """A state.db that ran migrations 1 to 4 (release 0.7) gains only the proposals table."""
+    from nl2sql.storage.sqlite import MIGRATIONS
+
+    path = tmp_path / "state.db"
+    with sqlite3.connect(path) as connection:
+        connection.execute("CREATE TABLE nl2sql_meta (migration TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);")
+        for name, migration in MIGRATIONS[:4]:
+            migration(connection)
+            connection.execute("INSERT INTO nl2sql_meta VALUES (?, 0);", (name,))
+        assert [name for name, _ in MIGRATIONS[:4]][-1] == "0004_schema_diffs"
+        connection.execute("INSERT INTO plan_cache VALUES ('q', 'ds', 'v1', '{}', 0);")
+
+    state = SqliteState(path)
+    assert state.migrate() == ["0005_proposals"]
+    assert state.get_plan("q", "ds", "v1") == "{}", "0.7's rows are kept"
+    state.put_proposal(_proposal())
+    assert state.get_proposal(_proposal().id) is not None
+    state.close()
+
+
 def test_migration_5_adds_the_proposals_table(tmp_path):
     state = SqliteState(tmp_path / "state.db")
     assert "0005_proposals" in state.migrate()
@@ -356,6 +377,15 @@ def test_indexing_enrichment_agent_is_gone():
     assert ENRICHMENT_LLM_NAME == "profiler"
 
 
+def test_the_old_agent_name_is_an_error_that_names_the_new_one(tmp_path):
+    """No alias (no active users): the 0.7 key fails, and the message says what it became."""
+    with pytest.raises(ConfigError) as caught:
+        load_config(_project(tmp_path, llm={"provider": "openai", "model": "gpt-4o",
+                                            "agents": {"indexing_enrichment": {"model": "gpt-4o-mini"}}}))
+    text = str(caught.value)
+    assert "llm.agents.indexing_enrichment" in text and "renamed to 'profiler'" in text
+
+
 # ---------------------------------------------------------------- the registry
 
 def test_registry_lists_knowledge_sources():
@@ -429,6 +459,9 @@ def test_query_result_has_clarification_and_explanation():
     assert SubQueryResult().knowledge_used is None and SubQueryResult().estimate is None
 
     step = ExplainedStep(sub_query_id="sq1", datasource_id="chinook", source="generated", text="Counts invoices.")
+    # Every plan_source a sub-query can have is a source an explanation names ("llm" is "generated").
+    for source in ("cache", "supplied", "approved", "chosen", "verified"):
+        ExplainedStep(datasource_id="chinook", source=source, text="t")
     option = ClarificationOption(id="a", label="Revenue", plan={"tables": []}, explanation=step)
     request = ClarificationRequest.build(question="sales last year", asker_user_id="ada", asker_tenant_id=None,
                                          phrase="sales", datasource_id="chinook", schema_version="v1",
