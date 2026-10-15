@@ -37,7 +37,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 from pydantic import BaseModel, Field
 
-from nl2sql.evaluation.report import EvalReport, execution_passed, reliable, suite_identity
+from nl2sql.evaluation.report import EvalReport, execution_passed, execution_records, reliable, suite_identity
 
 # Defaults: at most two cases may flip to failing, a drop must be significant at
 # p < 0.05, and cost per case may rise 20% (EvalGate in config/models.py).
@@ -243,8 +243,12 @@ def gate(report: Union[EvalReport, Dict[str, Any]], baseline: Baseline, *,
             measures["generated"] = _generated
         compared[now.name] = {}
         for measure, passed in measures.items():
-            diff = compare_with_baseline({"configs": {now.name: now.board}},
-                                         {"configs": {now.name: base.board}}, passed)[now.name]
+            now_board, base_board = now.board, base.board
+            if now.mode != "retrieval":  # execution accuracy: a routing case has none
+                now_board = {**now_board, "results": execution_records(now_board.get("results") or [])}
+                base_board = {**base_board, "results": execution_records(base_board.get("results") or [])}
+            diff = compare_with_baseline({"configs": {now.name: now_board}},
+                                         {"configs": {now.name: base_board}}, passed)[now.name]
             compared[now.name][measure] = diff
             label = now.name if measure == "accuracy" else f"{now.name} (generated)"
             problems += _flip_problems(label, diff, allowed, alpha)

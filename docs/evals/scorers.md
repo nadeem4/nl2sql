@@ -22,8 +22,8 @@ In mode retrieval, `routing` passes a case only on both `top1` and
 `shortlist`. Its `detail` keeps each, with the ranking (`routed`) and the
 datasources it `missed`, and the board's `routing` gives the share of cases
 for each. The gate allows no flip in mode retrieval, so it fails when either
-drops. A case with no `sql` (a routing case, which says where a question goes
-and not what it returns) gets no `result_match` verdict.
+drops. A `kind: routing` case (which says where a question goes, not what it
+returns) gets no `result_match` verdict and is left out of execution accuracy.
 
 A scorer that does not apply to a case returns no verdict. A scorer that
 cannot score the run's mode is left out of that run.

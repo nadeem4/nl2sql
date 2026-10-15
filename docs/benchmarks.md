@@ -68,4 +68,4 @@ are all among those it keeps. CI's integration job gates on the newest run of ea
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-10-15 17:45:34 | a33c8ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38778183715 | routing @c87d2a8e | @bffaf096 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 0 | - | - | 97.4% / 98.7% | first run | - |
+| 2026-10-15 17:45:34 | a33c8ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38778183715 | routing @c87d2a8e | @bffaf096 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 78 | - | - | 97.4% / 98.7% | first run | - |

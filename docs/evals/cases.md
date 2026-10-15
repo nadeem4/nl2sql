@@ -37,6 +37,7 @@ cases:
 | `question` | The natural-language question |
 | `datasources` | The datasources the question is about. The `routing` scorer checks a run used exactly these. A case with `sql` names one |
 | `status` | `draft`, `approved` or `retired`. Only `approved` cases run |
+| `kind` | `answer` (the default, left out of the file) or `routing`: a case that says only where a question goes. A routing case has no `sql`, gets no `result_match` verdict and is left out of execution accuracy in every mode. An approved `answer` case that a role may answer must have `sql`; the loader rejects it otherwise |
 | `origin` | `hand` (written by a person), `seeded` (drafted from a datasource's schema) or `feedback` (exported from a thumbs-up run) |
 | `difficulty` | Optional: `easy`, `medium` or `hard` |
 | `tags` | Free categories. A run can be narrowed to them, and the report gives accuracy per tag |
@@ -44,7 +45,7 @@ cases:
 | `outcome` | Per role: `allowed`, `refused`, `unanswerable` or `clarify`. The case runs once per role named here |
 | `tables`, `columns` | The tables the SQL reads, and the `Table.Column` names the answer needs. `retrieval_recall` scores against them |
 | `order_matters` | Whether row order counts when rows are compared |
-| `sql` | The reviewed SQL, in the datasource's dialect; `null` for an unanswerable case, and for a routing case that says only where the question goes |
+| `sql` | The reviewed SQL, in the datasource's dialect; `null` for an unanswerable case and for a `kind: routing` case |
 | `rows` | The rows `sql` returns, as `{column: value}` maps. Written by `regenerate`, never typed by hand |
 | `alt_sql`, `alt_rows` | [Reviewed alternative answers](../testing/evaluation-dataset.md#alternative-answers) and their rows |
 | `plan` | Optional. A `PlanModel` written as data, which mode `plans` serves through its fake LLM. Mode plans needs one for every answerable case |
@@ -98,10 +99,15 @@ decides it. Its tags say where each case came from:
 | `gold` | The Chinook suite's 43 answerable questions. Their answers are checked in `chinook.yaml`; here a recall miss cannot hide a routing one |
 | `sample` | Each demo datasource's sample questions, as `nl2sql init --demo` writes them |
 | `paraphrase`, `hand` | Questions written for routing and read against each datasource's schema, most about `support` and `webanalytics`. Ten carry reviewed SQL, with rows written by `regenerate`, so mode full checks those answers too |
+
+Every case without SQL is `kind: routing`, so mode full's execution accuracy
+is over the ten answered cases only. The suite's header names the cases with
+two defensible answers (support holds the same customers as Chinook), which a
+routing change may flip on purpose.
 | `cross-database` | Three questions that need two databases |
 
-Every case also carries its datasource's name as a tag, so
-`--cases support` runs only those. Mode plans cannot run the suite, since its
+Every case also carries the names of the datasources it needs as tags, so
+`--cases support` runs every case about support, cross-database ones included. Mode plans cannot run the suite, since its
 cases have no plans. So the demo's `evals.yaml` names only `chinook.yaml`, and
 the routing suite is run by name:
 

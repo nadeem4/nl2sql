@@ -51,6 +51,10 @@ def test_routing_suite_cases_are_approved_and_regenerated(tmp_path):
     for ds in ("support", "webanalytics"):
         assert sum(c.datasources == [ds] for c in cases) >= 10, ds
     assert sum(len(c.datasources) > 1 for c in cases) >= 3
+    # Each case is tagged with every datasource it names, so --cases support finds them all.
+    assert all(set(c.datasources) <= set(c.tags) for c in cases)
+    # A case without reviewed SQL is a routing case, left out of execution accuracy.
+    assert all((c.kind == "routing") == (c.sql is None) for c in cases)
     # The Chinook suite's answerable questions are routed here too, where no recall miss hides a routing one.
     gold = {c.question for c in load_suite(CHINOOK_SUITE_PATH).cases if c.tables}
     assert gold <= {c.question for c in cases}

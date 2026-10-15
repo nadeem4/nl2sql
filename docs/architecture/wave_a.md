@@ -1747,9 +1747,24 @@ Phase R's change rather than asserting a number.
       (`test_routing_on_the_wide_schema`), not in `routing.yaml`: they name the
       test bed's datasources, which the demo does not have. Pagila and the
       whole wide schema are indexed side by side on PostgreSQL only, since
-      indexing 1,200 tables locally takes minutes (about 8 on a laptop); four
+      indexing 1,200 tables takes about 17 minutes on CI's runner; four
       questions about films must go to Pagila and four about payroll runs,
       ledger entries, vendor contacts and campaign clicks to the wide schema.
+      After review it runs only when the realdb workflow sets
+      `REALDB_WIDE_ROUTING` (nightly, on demand, and on pull requests that
+      change `indexing/`), and the realdb job's timeout is 60 minutes.
+    - **Routing cases are a kind (after review).** `EvalCase.kind` is `answer`
+      (the default, left out of a suite file) or `routing`. A routing case has
+      no `sql`, gets no `result_match` verdict, and is left out of execution
+      accuracy in every mode: the board's `accuracy.execution`, the record's
+      headline metrics and flips, and the gate's execution measures. Mode
+      retrieval still gates it by status. The loader rejects an approved
+      `answer` case with an `allowed` role and no `sql`, so a missing answer can
+      no longer pass as "any answer". Records keep each case's `kind`. The
+      Chinook suite and its digest are unchanged. The three cross-database
+      cases are tagged with both their datasources; the suite's header names the
+      cases with two defensible answers. Both changed the suite's digest, so
+      the routing baseline was recorded again from CI.
     - **Measured (key-free, local embeddings).** On the routing suite, routing
       top-1 is 76/78 and shortlist recall 77/78. The misses: "Which customers
       complained most about refunds?" and "How many purchases were there per

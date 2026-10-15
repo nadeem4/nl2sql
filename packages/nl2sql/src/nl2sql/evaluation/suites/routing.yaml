@@ -11,6 +11,20 @@
 #   `nl2sql eval regenerate` writes.
 # - cross-database: questions that need two datasources.
 #
+# A case without SQL is kind: routing: it says only where a question goes, and
+# is left out of execution accuracy in every mode.
+#
+# Two answers are defensible for a few cases; the suite pins the first:
+# - support.customers holds the same 59 customers as chinook.Customer (name,
+#   email, country, city), so routing_chinook_gold_001 (customers by country)
+#   and the gold questions that list customers by country or city could also
+#   be answered from support.
+# - routing_webanalytics_sample_04 (purchases per month in 2013) reads as
+#   naturally as chinook's invoices per month; the demo files it under
+#   webanalytics, as its sample question.
+# A routing change that ranks the other one first fails the gate on these;
+# read the flip before re-recording.
+#
 # CI runs it in mode retrieval (no key, no model) and gates every case:
 # routing must rank one of the case's datasources first and shortlist all of
 # them. Never edit rows by hand.
@@ -21,6 +35,7 @@ cases:
   question: How many customers do we have, by country?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -34,6 +49,7 @@ cases:
   question: Who are the top 5 customers by total spend?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -47,6 +63,7 @@ cases:
   question: Which artist has the most albums?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -60,6 +77,7 @@ cases:
   question: What is the total revenue per year?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -73,6 +91,7 @@ cases:
   question: Which genre sells the most tracks?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -86,6 +105,7 @@ cases:
   question: What is the average invoice total by billing country?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -99,6 +119,7 @@ cases:
   question: Which employees support the most customers?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -112,6 +133,7 @@ cases:
   question: What is the longest track in each genre?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -125,6 +147,7 @@ cases:
   question: Which customers bought jazz tracks but never rock?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -138,6 +161,7 @@ cases:
   question: What was the monthly revenue in 2013 for customers in the USA?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -151,6 +175,7 @@ cases:
   question: Which playlists contain tracks from more than three genres?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -164,6 +189,7 @@ cases:
   question: Who are the top customers by total spend?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -177,6 +203,7 @@ cases:
   question: Show me the five customers who have spent the most money.
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -190,6 +217,7 @@ cases:
   question: How much did we earn in each year?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -203,6 +231,7 @@ cases:
   question: Give me the yearly sales totals.
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -216,6 +245,7 @@ cases:
   question: Name the artist with the largest number of albums.
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -229,6 +259,7 @@ cases:
   question: Which musician released more albums than anyone else in the catalog?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -242,6 +273,7 @@ cases:
   question: List all the media types.
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -255,6 +287,7 @@ cases:
   question: How many tracks are longer than ten minutes?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -268,6 +301,7 @@ cases:
   question: Which tracks are from the album Let There Be Rock?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -281,6 +315,7 @@ cases:
   question: Where do our customers from Germany live?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -294,6 +329,7 @@ cases:
   question: List the customers where the country is Canada, with their email addresses.
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -307,6 +343,7 @@ cases:
   question: How many tracks are on the album From The Muddy Banks Of The Wishkah [Live]?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -320,6 +357,7 @@ cases:
   question: Which artist recorded the album Somewhere in Time?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -333,6 +371,7 @@ cases:
   question: Which artists have more than ten albums?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -346,6 +385,7 @@ cases:
   question: Which customers have spent more than 45 dollars in total?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -359,6 +399,7 @@ cases:
   question: How many invoices were issued in March 2010?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -372,6 +413,7 @@ cases:
   question: What was the total revenue in the fourth quarter of 2012?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -385,6 +427,7 @@ cases:
   question: Which month of 2011 had the highest revenue?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -398,6 +441,7 @@ cases:
   question: What are the top 3 countries by number of customers?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -411,6 +455,7 @@ cases:
   question: What is the total revenue per genre?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -424,6 +469,7 @@ cases:
   question: Which artist has earned the most revenue?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -437,6 +483,7 @@ cases:
   question: How many tracks of each media type are in the Grunge playlist?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -450,6 +497,7 @@ cases:
   question: How many different customers bought at least one track by AC/DC?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -463,6 +511,7 @@ cases:
   question: How many employees does the company have?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -476,6 +525,7 @@ cases:
   question: Who does Jane Peacock report to?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -489,6 +539,7 @@ cases:
   question: Which sales support agent brought in the most revenue from their customers?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -502,6 +553,7 @@ cases:
   question: What are the five longest tracks and how long are they in minutes?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -515,6 +567,7 @@ cases:
   question: How many tracks have never been purchased?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -528,6 +581,7 @@ cases:
   question: Which 5 customers bought the most jazz tracks?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold, sample]
   outcome: {admin: allowed}
@@ -541,6 +595,7 @@ cases:
   question: Which customers rank 11th to 20th by total spend?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -554,6 +609,7 @@ cases:
   question: How many invoices were issued in the most recent month in the data?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -567,6 +623,7 @@ cases:
   question: How many tracks are in the heavy metal genre?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, gold]
   outcome: {admin: allowed}
@@ -580,6 +637,7 @@ cases:
   question: Which artists have the most albums?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, paraphrase]
   outcome: {admin: allowed}
@@ -593,6 +651,7 @@ cases:
   question: What were total invoice sales by country?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, paraphrase]
   outcome: {admin: allowed}
@@ -606,6 +665,7 @@ cases:
   question: Which employee supports the most customers?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, paraphrase]
   outcome: {admin: allowed}
@@ -619,6 +679,7 @@ cases:
   question: What is the most popular music genre by tracks sold?
   datasources: [chinook]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, chinook, paraphrase]
   outcome: {admin: allowed}
@@ -632,6 +693,7 @@ cases:
   question: How many support tickets are still open, by priority?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, sample]
   outcome: {admin: allowed}
@@ -645,6 +707,7 @@ cases:
   question: Which support agents resolved the most tickets?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, sample]
   outcome: {admin: allowed}
@@ -658,6 +721,7 @@ cases:
   question: What is the average time to close a ticket, by category?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, sample]
   outcome: {admin: allowed}
@@ -671,6 +735,7 @@ cases:
   question: Which customers raised the most support tickets?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, sample]
   outcome: {admin: allowed}
@@ -684,6 +749,7 @@ cases:
   question: Which agent handles the most escalated tickets?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, paraphrase]
   outcome: {admin: allowed}
@@ -697,6 +763,7 @@ cases:
   question: How long do urgent tickets take to resolve on average?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, paraphrase]
   outcome: {admin: allowed}
@@ -710,6 +777,7 @@ cases:
   question: List tickets opened this month that are still unassigned.
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, paraphrase]
   outcome: {admin: allowed}
@@ -723,6 +791,7 @@ cases:
   question: What share of tickets are about billing?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, paraphrase]
   outcome: {admin: allowed}
@@ -736,6 +805,7 @@ cases:
   question: Which customers complained most about refunds?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, paraphrase]
   outcome: {admin: allowed}
@@ -749,6 +819,7 @@ cases:
   question: How many tickets did each agent close last quarter?
   datasources: [support]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, support, paraphrase]
   outcome: {admin: allowed}
@@ -849,6 +920,7 @@ cases:
   question: Which pages were viewed the most last year?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, sample]
   outcome: {admin: allowed}
@@ -886,6 +958,7 @@ cases:
   question: What is the bounce rate by device type?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, sample]
   outcome: {admin: allowed}
@@ -922,6 +995,7 @@ cases:
   question: Which landing pages have the highest bounce rate?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, paraphrase]
   outcome: {admin: allowed}
@@ -935,6 +1009,7 @@ cases:
   question: How many visitors used mobile browsers?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, paraphrase]
   outcome: {admin: allowed}
@@ -948,6 +1023,7 @@ cases:
   question: Which referrer domains bring the most signups?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, paraphrase]
   outcome: {admin: allowed}
@@ -961,6 +1037,7 @@ cases:
   question: What is the average session duration by operating system?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, paraphrase]
   outcome: {admin: allowed}
@@ -974,6 +1051,7 @@ cases:
   question: How many newsletter signups came from social media?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, paraphrase]
   outcome: {admin: allowed}
@@ -987,6 +1065,7 @@ cases:
   question: Which marketing channel converts best to purchases?
   datasources: [webanalytics]
   status: approved
+  kind: routing
   origin: hand
   tags: [routing, webanalytics, paraphrase]
   outcome: {admin: allowed}
@@ -1101,8 +1180,9 @@ cases:
   question: For customers who opened support tickets, how much have they spent on music invoices?
   datasources: [chinook, support]
   status: approved
+  kind: routing
   origin: hand
-  tags: [routing, cross-database]
+  tags: [routing, chinook, support, cross-database]
   outcome: {admin: allowed}
   tables: []
   columns: []
@@ -1114,8 +1194,9 @@ cases:
   question: Do the customers with the most website sessions also have the highest invoice totals?
   datasources: [chinook, webanalytics]
   status: approved
+  kind: routing
   origin: hand
-  tags: [routing, cross-database]
+  tags: [routing, chinook, webanalytics, cross-database]
   outcome: {admin: allowed}
   tables: []
   columns: []
@@ -1127,8 +1208,9 @@ cases:
   question: Which customers both raised support tickets and made a purchase on the website?
   datasources: [support, webanalytics]
   status: approved
+  kind: routing
   origin: hand
-  tags: [routing, cross-database]
+  tags: [routing, support, webanalytics, cross-database]
   outcome: {admin: allowed}
   tables: []
   columns: []

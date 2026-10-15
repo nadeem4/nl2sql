@@ -132,7 +132,10 @@ Pagila and the whole wide schema side by side on PostgreSQL, and checks that
 questions about films go to Pagila and questions about payroll runs or ledger
 entries go to the wide schema, however many tables there are to vote
 ([the routing suite](../evals/cases.md#the-routing-suite)). Indexing the
-wide schema takes minutes, so the test runs on PostgreSQL only.
+wide schema takes about 17 minutes on CI's runner, so the test runs on
+PostgreSQL only, and only when `REALDB_WIDE_ROUTING` is `true`: the workflow
+sets it nightly, on demand, and on pull requests that change
+`nl2sql/indexing/` (or the test itself). It skips otherwise.
 
 ## The `realdb` marker and fixtures
 

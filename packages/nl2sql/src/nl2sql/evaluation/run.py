@@ -190,7 +190,7 @@ def _record(suite: str, case: EvalCase, role: str, pass_no: int, scored: Dict[st
     samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
     faithfulness = scored["scores"].get("faithfulness", {})
     return {
-        "suite": suite, "id": case.id, "question": case.question, "role": role,
+        "suite": suite, "id": case.id, "question": case.question, "role": role, "kind": case.kind,
         "expected": case.outcome[role], **scored, "pass": pass_no,
         "tags": list(case.tags), "difficulty": case.difficulty,
         "sql": result.sub_queries[0].sql if result.sub_queries else "",

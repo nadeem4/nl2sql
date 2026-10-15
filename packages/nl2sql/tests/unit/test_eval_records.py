@@ -407,6 +407,17 @@ def test_a_routing_record_holds_routing_top1_and_shortlist_and_renders_without_r
     assert "| chinook+support+webanalytics | 2026-09-21 | abcdef1 | - | - | 100.0% / 100.0% |" in block
 
 
+def test_a_routing_records_case_count_is_its_routing_cases(tmp_path):
+    records.write_records(_routing_report(), tmp_path, recorded_at=WHEN, engine_version="1", code=CODE)
+    page = records.render_history(records.load_records(tmp_path))
+    row = next(line for line in page.splitlines() if "routing @" in line)
+    assert "| 2 |" in row  # "Cases scored": the two routing cases, not the 0 recall cases
+
+
+def test_a_slim_record_keeps_a_routing_cases_kind():
+    assert records.slim_result({"id": "r", "role": "admin", "kind": "routing", "scores": {}})["kind"] == "routing"
+
+
 def test_the_pages_name_nl2sql_eval_not_nl2sql_benchmark(tmp_path):
     _write(tmp_path, 19)
     page = records.render_history(records.load_records(tmp_path)) + records.render_readme_block([])

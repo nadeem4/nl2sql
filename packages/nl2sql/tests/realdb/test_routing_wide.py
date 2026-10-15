@@ -9,11 +9,15 @@ retrieval (no model), so the routing scorer decides it as it does the
 routing suite's: the right datasource first, and every one it needs
 shortlisted.
 
-The wide schema's index takes minutes to build, so it is built once, on
-PostgreSQL; routing reads the index, not the database, so another server
-would measure the same thing again.
+The wide schema's index takes about 17 minutes to build on CI's runner, so
+it is built once, on PostgreSQL (routing reads the index, not the database,
+so another server would measure the same thing again), and only when
+``REALDB_WIDE_ROUTING`` is ``true``: the realdb workflow sets it nightly, on
+demand, and on pull requests that change ``indexing/``.
 """
 from __future__ import annotations
+
+import os
 
 import pytest
 
@@ -42,6 +46,9 @@ CASES = [
 def test_routing_on_the_wide_schema(server, tmp_path):
     if server.name != "postgres":
         pytest.skip("The wide schema's index is built once, on PostgreSQL (see the module docstring).")
+    if os.environ.get("REALDB_WIDE_ROUTING") != "true":
+        pytest.skip("REALDB_WIDE_ROUTING is not true: the wide-schema routing test runs nightly, on demand, "
+                    "and on pull requests that change indexing/.")
     sources = {"pagila": datasource(server, description=PAGILA), "wide": datasource(server, "wide", description=WIDE)}
     config = make_config(tmp_path / "project", datasources=[
         s.model_dump(mode="json", exclude_defaults=True) for s in sources.values()])

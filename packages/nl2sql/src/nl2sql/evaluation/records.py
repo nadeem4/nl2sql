@@ -198,9 +198,9 @@ def _share(num: int, den: int) -> Optional[float]:
 
 def _execution_metrics(board: Dict[str, Any], passes: int) -> Dict[str, Any]:
     """The headline numbers of a mode full or plans board: execution accuracy first (0.6's measure)."""
-    from nl2sql.evaluation.report import execution_passed, reliable, wilson_interval
+    from nl2sql.evaluation.report import execution_passed, execution_records, reliable, wilson_interval
 
-    results = board.get("results") or []
+    results = execution_records(board.get("results") or [])  # a routing case has no execution verdict
     cases = board["completed_cases"]
     tokens = board["tokens_by_node"].values()
     lenient = sum(execution_passed(r, lenient=True) for r in results)
@@ -253,7 +253,7 @@ def _retrieval_metrics(board: Dict[str, Any]) -> Dict[str, Any]:
             "routing_shortlist": routing.get("shortlist")}
 
 
-_RESULT_FIELDS = ("id", "role", "pass", "status", "lenient_status", "cost")
+_RESULT_FIELDS = ("id", "role", "pass", "status", "lenient_status", "cost", "kind")
 _SCORE_DETAIL = ("lenient", "error")  # what execution_passed and case_status read
 
 
@@ -464,7 +464,7 @@ def flips(new: Dict[str, Any], old: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     run, or one written before they were kept).
     """
     from nl2sql.evaluation.gate import question_flips
-    from nl2sql.evaluation.report import execution_passed
+    from nl2sql.evaluation.report import execution_passed, execution_records
 
     now = (new.get("scoreboard") or {}).get("results")
     before = (old.get("scoreboard") or {}).get("results")
@@ -472,7 +472,7 @@ def flips(new: Dict[str, Any], old: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     if mode_of(new) == "retrieval":
         return question_flips(now, before, passed=lambda r: r["status"] == "pass")
-    return question_flips(now, before, passed=execution_passed)
+    return question_flips(execution_records(now), execution_records(before), passed=execution_passed)
 
 
 def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]], *, show_flips: bool = False) -> str:
@@ -653,7 +653,8 @@ def _retrieval_section(group: List[Dict[str, Any]], previous) -> str:
          "Column recall", "Routing top-1 / shortlist", "Δ vs previous", "Tables / columns sent"],
         [[_when(r), _commit(r), r.get("note") or "-", _dataset(r), _schema(r),
           f"k {r['settings']['table_k']} tables / {r['settings']['planning_k']} planning",
-          r["settings"].get("embedding", "-"), r["metrics"]["questions"], _pct(r["metrics"]["table_recall"]),
+          r["settings"].get("embedding", "-"), r["metrics"]["questions"] or r["metrics"].get("routing_cases") or 0,
+          _pct(r["metrics"]["table_recall"]),
           _pct(r["metrics"]["column_recall"]), _routing_cell(r), describe_change(r, previous[id(r)]),
           _sent(r["metrics"])] for r in group])
     return ("`nl2sql eval run --mode retrieval`: the share of each answerable case's needed tables and\n"

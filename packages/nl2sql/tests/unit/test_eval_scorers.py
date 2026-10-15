@@ -112,9 +112,24 @@ def test_result_match_does_not_apply_to_a_refusal_or_an_unanswerable_case():
     assert result_match.score(_run(_case({"a": "unanswerable"}, rows=None), "a", NOT_ANSWERABLE)).passed is None
 
 
-def test_result_match_does_not_apply_to_an_allowed_case_with_no_reviewed_answer():
-    # A routing case: it says where the question goes, not what it returns.
-    case = _case({"admin": "allowed"}, rows=None)
+def test_an_approved_answerable_case_without_sql_is_refused_unless_it_is_a_routing_case():
+    with pytest.raises(ValueError, match="no sql.*kind: routing"):
+        EvalCase(id="q9", question="?", datasources=["chinook"], status="approved", outcome={"admin": "allowed"})
+    routing = EvalCase(id="q9", question="?", datasources=["chinook"], status="approved", kind="routing",
+                       outcome={"admin": "allowed"})
+    assert routing.kind == "routing"
+    # A draft may still lack its SQL, and an unanswerable case never has one.
+    EvalCase(id="d", question="?", status="draft", outcome={"admin": "allowed"})
+    EvalCase(id="u", question="?", status="approved", outcome={"admin": "unanswerable"})
+    with pytest.raises(ValueError, match="routing case.*sql"):
+        EvalCase(id="r", question="?", datasources=["chinook"], kind="routing", sql="SELECT 1",
+                 outcome={"admin": "allowed"})
+
+
+def test_result_match_does_not_apply_to_a_routing_case():
+    # A routing case says where the question goes, not what it returns.
+    case = EvalCase(id="r", question="?", datasources=["chinook"], status="approved", kind="routing",
+                    outcome={"admin": "allowed"})
     assert result_match.score(_run(case, "admin", _rows_result([["USA", 13]]))).passed is None
 
 

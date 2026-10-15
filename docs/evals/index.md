@@ -212,7 +212,8 @@ break: `ok` is false and nothing is compared.
 **The gate reads execution accuracy.** A case passes when `result_match` and
 `outcome` pass; no other scorer counts. That is `accuracy.execution`, the
 measure 0.6's tier 2 published, so a run compares with the history published
-before 0.7 and a faithfulness verdict alone is never a regression. With
+before 0.7 and a faithfulness verdict alone is never a regression. A
+`kind: routing` case has no rows to check and is left out of it. With
 curated answers on, it is checked twice: as users see it, and on the
 generated path. Mode retrieval has no execution, so its cases are read by
 their status.
