@@ -145,8 +145,9 @@ def _ask(run: Any, case: EvalCase, role: str) -> Tuple[QueryResult, Optional[Dic
         state = run_with_graph(run, case.question, user_context=user, callbacks=[sent], scope=scope)
         result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
                                    sample_rows=_ALL_ROWS)
-    except Exception as exc:
-        scope.fail(f"The run failed: {exc}")
+    except BaseException as exc:
+        # A KeyboardInterrupt too: every scope ends with a terminal event.
+        scope.fail(f"The run failed: {exc or type(exc).__name__}")
         raise
     api.close_scope(scope, result)
     return result, sent.tables
