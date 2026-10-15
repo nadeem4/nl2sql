@@ -391,8 +391,10 @@ Concretely:
 - `nl2sql/__init__.py` imports only the `NL2SQL` class. Every other public name (`QueryResult`, `Event`, `CancellationToken`, the API classes, the eval shapes) is imported the first time it is asked for, through the module's `__getattr__`. `from nl2sql import QueryResult` works as it always did.
 - `nl2sql/public_api.py` imports the runtime (`Runtime` and the API classes) inside `NL2SQL.__init__`, not at the top of the module.
 - Runtime modules import their heavy libraries where they are used, as the adapters already do.
+- Only `nl2sql/observers/otel.py` imports `opentelemetry`, and only inside the observer: OpenTelemetry is the `otel` extra, and an engine without an `otel` observer never loads that module.
 
 ### Enforcement Points
+- `test_only_the_otel_observer_imports_opentelemetry`, `test_the_otel_observer_imports_opentelemetry_only_when_it_is_built` and `test_building_an_engine_loads_no_otel_observer` in `packages/nl2sql/tests/architecture/test_boundaries.py`. A built engine may still have `opentelemetry` in `sys.modules`: chromadb, a core dependency, installs its SDK, and langsmith imports it whenever it is installed. The rule holds the engine's own code.
 - `test_importing_nl2sql_loads_no_heavy_library` in `packages/nl2sql/tests/architecture/test_boundaries.py` — imports `nl2sql` in a fresh interpreter and checks `sys.modules`
 - `test_import_nl2sql_stays_within_its_time_budget` in the same module — the cumulative figure `python -X importtime` reports for `nl2sql`, best of five, under 500 ms. It measures imports only, not wall-clock time, so a busy runner does not fail it.
 

@@ -221,8 +221,9 @@ class RunScope:
 
     def fail(self, message: str, error_code: str = "UNKNOWN_ERROR") -> Optional[Event]:
         """Close with ``run.failed``: the run could not start, or crashed outside the pipeline."""
-        return self._close("run.failed", {"message": message, "error_code": str(getattr(error_code, "value",
-                                                                                         error_code))})
+        return self._close("run.failed", {"message": message,
+                                          "error_code": str(getattr(error_code, "value", error_code)),
+                                          "user_id": self.user_id, "roles": self.roles})
 
     def _duration(self) -> float:
         return round(time.perf_counter() - self._started_at, 4) if self._started_at is not None else 0.0

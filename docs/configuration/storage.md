@@ -84,7 +84,10 @@ results: { type: local, max_age_days: 2 }
 ```
 
 `engine.storage.purge()` deletes the traces and result files last written
-before that age and returns the counts, `{"traces": 3, "results": 12}`. A
+before that age, and the [audit observer's](observers.md#audit) day files older
+than its `max_age_days` (90 by default), and returns the counts,
+`{"traces": 3, "results": 12, "audit": 1}` (no `audit` when the engine runs no
+audit observer). A
 plugin trace or results store is purged when it has a `max_age_days`
 attribute, and left alone when it does not (a bucket with its own lifecycle
 rule, say). Three things call it:

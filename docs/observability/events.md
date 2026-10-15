@@ -38,8 +38,10 @@ data.
 
 `engine.events.catalog()` lists every event: its `name`, `description`,
 whether a run has it (`run`), whether the caller's stream carries it
-(`stream`), whether the audit observer writes it (`audit`) and its data's JSON
-Schema (`data_schema`). The catalog lives in `nl2sql/events/catalog.py`; a name
+(`stream`), whether the [audit observer](../configuration/observers.md#audit)
+writes it (`audit`, narrowed by `audit_only` to some values of a field: of
+`hook.decision`, only `deny`, `needs_approval`, `approved` and `error`) and its
+data's JSON Schema (`data_schema`). The catalog lives in `nl2sql/events/catalog.py`; a name
 that is not in it cannot be published.
 
 Run events (they carry the run's `trace_id`):
@@ -54,8 +56,8 @@ Run events (they carry the run's `trace_id`):
 | `sanity.flagged` | `code`, `sub_query_id`, `retry` | yes |
 | `run.limit_reached` | `limit`, `value`, `spent` | yes |
 | `run.finished` | a summary, never rows: `status`, `duration_s`, `usage`, `error_codes`, `source`, `datasources`, `tables` (`datasource.schema.table`), `result_manifest`, `user_id`, `roles` | yes, with `result` added |
-| `run.failed` | `message`, `error_code` | yes |
-| `llm.call` | the model, its tokens, latency and cost | no |
+| `run.failed` | `message`, `error_code`, `user_id`, `roles` | yes |
+| `llm.call` | `node`, `agent`, `model`, the six token counts, `latency_s`, `cost`, `usage_reported`, `error` (redacted) | no |
 | `llm.parse_retry` | `agent`, `schema`, `attempt`, `errors` | no |
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
 | `policy.decision` | a denial: `datasource_id`, `schema`, `table`, `rule`, `step` | no |
@@ -65,10 +67,11 @@ Engine events (`datasource.failed`, `index.started`, `index.column_failed`,
 `index.swapped`, `index.failed`, `schema.drifted`, `retention.purged`,
 `llm.changed`, `eval.case`, `eval.finished`) carry no `trace_id`. Which PR
 of Wave A starts publishing each one is in its description; `node.*`,
-`answer.delta`, `result.manifest` and the three `run.*` events are published
-today. While a [hook](../configuration/hooks.md) is attached at
-`answer.after`, a run publishes no `answer.delta` and sends `result.manifest`
-only after the hooks allowed the answer (never, on a deny).
+`answer.delta`, `result.manifest`, the three `run.*` events, `llm.call`,
+`plan_cache.lookup` and `llm.changed` are published today. While a
+[hook](../configuration/hooks.md) is attached at `answer.after`, a run
+publishes no `answer.delta` and sends `result.manifest` only after the hooks
+allowed the answer (never, on a deny).
 
 ## The run's stream
 
@@ -146,6 +149,9 @@ detaches it.
   subscriber and event name, at WARNING, on the `nl2sql.events` logger; it
   never fails a run.
 - **One bus per engine.** Two engines in one process share no subscriber.
+
+The engine's own observers (`log`, `audit`, `otel` and plugins) subscribe the
+same way, from the `observers` section: see [Observers](../configuration/observers.md).
 
 ## Logs carry the run's `trace_id`
 

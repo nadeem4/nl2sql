@@ -124,7 +124,8 @@ def test_a_run_that_cannot_start_ends_in_one_run_failed(monkeypatch):
     events = list(QueryAPI(fake_runtime(artifact_store=None)).stream_query("q"))
 
     assert [e.name for e in events] == ["run.started", "run.failed"]
-    assert events[-1].data == {"message": "The run failed: no graph today", "error_code": "UNKNOWN_ERROR"}
+    assert events[-1].data == {"message": "The run failed: no graph today", "error_code": "UNKNOWN_ERROR",
+                               "user_id": None, "roles": []}
     assert events[-1].trace_id == events[0].trace_id
 
 

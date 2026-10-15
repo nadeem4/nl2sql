@@ -229,7 +229,7 @@ def test_storage_purge_applies_each_stores_max_age(tmp_path):
         engine._runtime.results.write("t1/old/manifest.json", [b"{}"])
         _age(engine._runtime.results.directory / "t1" / "old" / "manifest.json", 8)
 
-        assert engine.storage.purge() == {"traces": 1, "results": 1}
+        assert engine.storage.purge() == {"traces": 1, "results": 1, "audit": 0}
         assert engine.traces.get("new-run") is not None
 
 
@@ -238,7 +238,7 @@ def test_storage_purge_skips_a_store_without_max_age_days(tmp_path):
     results = MemoryResults()
     with NL2SQL(_config(tmp_path, traces=traces, results=results)) as engine:
         before = datetime.now(timezone.utc)
-        assert engine.storage.purge() == {"traces": 0}
+        assert engine.storage.purge() == {"traces": 0, "audit": 0}
 
     assert before - timedelta(days=3, seconds=5) < traces.purged_before < before - timedelta(days=3) + timedelta(
         seconds=5)

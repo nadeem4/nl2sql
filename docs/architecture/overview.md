@@ -67,7 +67,7 @@ flowchart LR
 - **Execution layer**: `ExecutorNode` routes to capability-driven executor services (e.g., SQL executor).
 - **Adapter / Plugin backend**: adapters implement `DatasourceAdapter` and are discovered via entry points.
 - **Artifact store**: executor results are persisted as Parquet artifacts and referenced by `ArtifactRef`.
-- **Observability**: structured logs, OpenTelemetry metrics, and audit events.
+- **Observability**: structured logs, and events that observers turn into a log, an audit log and OpenTelemetry metrics and traces.
 
 ## End-to-end flow
 

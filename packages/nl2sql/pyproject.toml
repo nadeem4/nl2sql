@@ -34,9 +34,6 @@ dependencies = [
     "chromadb>=1.5,<2",
     "nl2sql-sdk[sqlalchemy]~=0.6.0", # x-release-please-version
     "pydantic>=2.0",
-    "opentelemetry-api>=1.20.0",
-    "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-exporter-otlp>=1.20.0",
     "sqlglot>=23.0.0",
     # For the parquet artifact store. The engine never imports it and polars
     # reads and writes local parquet without it; it stays until the remote
@@ -79,7 +76,9 @@ mssql = [
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'", # Optional fallback
 ]
-mysql = ["pymysql[rsa]>=1.1.0"]  # rsa: cryptography, for MySQL 8's default caching_sha2_password login
+mysql = ["pymysql[rsa]>=1.1.0"]
+# The `otel` observer: OpenTelemetry metrics and traces, exported over OTLP.
+otel = ["opentelemetry-api>=1.20.0", "opentelemetry-sdk>=1.20.0", "opentelemetry-exporter-otlp>=1.20.0"]  # rsa: cryptography, for MySQL 8's default caching_sha2_password login
 postgres = ["psycopg2-binary>=2.9"]
 all = [
     "duckdb",
@@ -141,6 +140,11 @@ chroma = "nl2sql.storage.chroma:ChromaIndex"
 sqlite = "nl2sql.storage.sqlite:SqliteState"
 files = "nl2sql.storage.files:FilesTraces"
 local = "nl2sql.storage.local:LocalResults"
+
+[project.entry-points."nl2sql.observers"]
+log = "nl2sql.observers.log:LogObserver"
+audit = "nl2sql.observers.audit:AuditObserver"
+otel = "nl2sql.observers.otel:OtelObserver"
 
 [tool.setuptools.packages.find]
 where = ["src"]

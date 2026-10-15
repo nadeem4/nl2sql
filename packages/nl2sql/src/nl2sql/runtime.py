@@ -148,9 +148,21 @@ class Runtime:
             except (RegistryError, ValueError) as e:
                 problem("policies.check", str(e))
         self.hooks = self._build_hooks(config, problem)
+        from nl2sql.observers import build_observers
+
+        # Subscribed in config order once nothing else is wrong; closed again when something is.
+        observers = build_observers(
+            config.observers, registry=self.registry, secrets=self.secret_manager, folder=config.storage.path,
+            problem=problem)
         if problems:
+            for observer in observers:
+                if not any(observer is given for given in config.observers or []):  # a caller's object stays theirs
+                    _close_quietly(observer)
             self.llm_registry.close()
             raise ConfigError(problems, source=source)
+        self.observers = observers
+        for observer in observers:
+            self.bus.subscribe(observer)
 
         self._config = config
         self.policy_engine = PolicyEngine(config.policies, self.ds_registry, self.policy_check)
@@ -325,7 +337,7 @@ class Runtime:
 
     def replace_llm(self, llm: Union["LLM", Mapping[str, Any]], *, by: Optional["UserContext"] = None,
                     via: str = "python") -> "LLMChange":
-        """Swaps in ``llm`` as one step, and logs and audits the change. Never calls a model.
+        """Swaps in ``llm`` as one step, logs it and publishes ``llm.changed``. Never calls a model.
 
         ``llm`` is validated as the ``llm`` section of ``nl2sql.yaml`` is, and
         every agent's API key must resolve. A mapping is that section as
@@ -358,7 +370,9 @@ class Runtime:
             old = self.llm_registry.swap(new)
             self._config = self._config.model_copy(update={"llm": llm})
         change = LLMChange(by=_who(by, via), changes=_llm_changes(old, new))
-        _log_llm_change(change, tenant_id=self.tenant_id)
+        _log_llm_change(change)
+        self.bus.publish("llm.changed", {"by": dict(change.by), "changes": dict(change.changes)},
+                         tenant_id=self.tenant_id)
         return change
 
     def derive(self, changes: Dict[str, Any]) -> "Runtime":
@@ -577,14 +591,18 @@ def _who(by: Optional["UserContext"], via: str) -> Dict[str, Any]:
     return who
 
 
-def _log_llm_change(change: "LLMChange", tenant_id: Optional[str]) -> None:
-    """One INFO line and one ``llm.changed`` audit record. Neither ever holds a key."""
-    from nl2sql.common.event_logger import event_logger
-
+def _log_llm_change(change: "LLMChange") -> None:
+    """One INFO line; ``replace_llm`` publishes ``llm.changed``, which the audit observer writes. Never a key."""
     by = change.by
     who = f"by user={by['user_id']} roles=[{','.join(by['roles'])}] " if "user_id" in by else ""
     what = "; ".join(f"{agent}: {c['old']} -> {c['new']}" for agent, c in change.changes.items())
     llm_logger.info(f"LLM replaced {who}via {by['via']}: {what or 'no provider or model changed'}")
-    event_logger.log_event("llm.changed", {"by": dict(by), "changes": dict(change.changes)},
-                           tenant_id=tenant_id)
 
+
+def _close_quietly(piece: Any) -> None:
+    close = getattr(piece, "close", None)
+    if callable(close):
+        try:
+            close()
+        except Exception as e:
+            logger.warning(f"Closing {type(piece).__name__} failed: {e}")

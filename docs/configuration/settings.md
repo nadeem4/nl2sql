@@ -56,7 +56,7 @@ In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
 `nl2sql.config`.
 
 Where the engine's events, logs and metrics go is not a setting: it is the
-[`observers` section](system.md#observers-hooks-and-evals) of
+[`observers` section](observers.md) of
 `nl2sql.yaml`. The 0.6 `observability` group (`exporter`, `otlp_endpoint`)
 is gone; an `otel` observer takes its place. The `schema` group is the attribute `schema_`
 (`cfg.settings.schema_.max_versions`), because `schema` would shadow a

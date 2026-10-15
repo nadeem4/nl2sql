@@ -33,10 +33,9 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.outputs import LLMResult
 from pydantic import BaseModel, Field
 
-from nl2sql.common.context import current_datasource_id
-from nl2sql.common.metrics import token_usage_counter
+from nl2sql.events import publish
 from nl2sql.llm.failures import redact_keys
-from nl2sql.llm.wires import wire_named
+from nl2sql.llm.wires import AGENT_KEY, wire_named
 
 # Per-model prices, per million tokens:
 # {"input": .., "output": .., "cached_input": .., "cache_write": ..}.
@@ -176,6 +175,9 @@ class TokenUsageCallback(BaseCallbackHandler):
     every run inside a node, including the chat-model run. That metadata is
     only passed to the *start* callbacks, so the call is opened there and
     closed in ``on_llm_end``. Sub-queries run in parallel, hence the lock.
+
+    Each finished call is also published as ``llm.call`` on the run's scope
+    (nothing outside a run), with the agent the client was built for.
     """
 
     def __init__(self, prices: Optional[Prices] = None) -> None:
@@ -190,7 +192,8 @@ class TokenUsageCallback(BaseCallbackHandler):
         params = kwargs.get("invocation_params") or {}
         requested = metadata.get("ls_model_name") or params.get("model") or params.get("model_name") or ""
         with self._lock:
-            self._open[run_id] = (metadata.get("langgraph_node") or "unknown", str(requested), time.perf_counter())
+            self._open[run_id] = (metadata.get("langgraph_node") or "unknown", str(requested), time.perf_counter(),
+                                  metadata.get(AGENT_KEY))
 
     def on_chat_model_start(self, serialized, messages, *, run_id: UUID, metadata=None, **kwargs: Any) -> None:
         self._start(run_id, metadata, kwargs)
@@ -201,7 +204,7 @@ class TokenUsageCallback(BaseCallbackHandler):
     def _finish(self, run_id: UUID, response: Optional[LLMResult], error: Optional[BaseException]) -> None:
         with self._lock:
             opened = self._open.pop(run_id, None)
-        node, requested, t0 = opened or ("unknown", "", time.perf_counter())
+        node, requested, t0, agent = opened or ("unknown", "", time.perf_counter(), None)
         tokens = read_usage(response) if response is not None else None
         call = LLMCallUsage(
             node=node,
@@ -217,32 +220,14 @@ class TokenUsageCallback(BaseCallbackHandler):
         with self._lock:
             self._calls.append(call)
             self._by_run[run_id] = call
-        if tokens is not None:
-            self._emit_metrics(call)
+        # On the run's bus: the audit trail of model calls, and the otel observer's token counter.
+        publish("llm.call", {**call.model_dump(), "agent": agent})
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> None:
         self._finish(run_id, response, None)
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
         self._finish(run_id, None, error)
-
-    @staticmethod
-    def _emit_metrics(call: LLMCallUsage) -> None:
-        """The ``nl2sql.token.usage`` OpenTelemetry counter, one point per token type."""
-        base = {
-            "node": call.node,
-            "model": call.model or "unknown",
-            "datasource_id": str(current_datasource_id.get() or "none"),
-        }
-        for kind, value in (
-            ("input", call.input_tokens),
-            ("cached_input", call.cached_input_tokens),
-            ("cache_write_input", call.cache_write_input_tokens),
-            ("output", call.output_tokens),
-            ("reasoning", call.reasoning_tokens),
-            ("total", call.total_tokens),
-        ):
-            token_usage_counter.add(value, attributes={**base, "type": kind})
 
     def call_for(self, run_id: UUID) -> Optional[LLMCallUsage]:
         """The record for one finished LLM run, e.g. for a run trace to attach."""

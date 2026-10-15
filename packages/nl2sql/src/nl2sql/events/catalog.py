@@ -20,7 +20,10 @@ later event joins it by its own entry, not by an edit elsewhere:
   caller-safe allow-list, D17 (``STREAM_EVENTS``). Operator data (a policy
   denial names a table, a hook decision its reasons, a model call its cost)
   stays off it and reaches an operator through ``engine.events.subscribe``.
-- ``audit``: the ``audit`` observer writes it (``AUDIT_EVENTS``, D19).
+- ``audit``: the ``audit`` observer writes it (``AUDIT_EVENTS``, D19), and
+  ``audit_only``, when set, narrows it to the values named per data field
+  (``hook.decision``: only ``deny``, ``needs_approval``, ``approved`` and
+  ``error``).
 """
 from __future__ import annotations
 
@@ -93,6 +96,8 @@ class RunFinished(EventData):
 class RunFailed(EventData):
     message: str
     error_code: str
+    user_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
 
 
 class NodeStarted(EventData):
@@ -267,6 +272,12 @@ class EventSpec(BaseModel):
     run: bool
     stream: bool = False  # on the caller's stream (D17)
     audit: bool = False   # written by the audit observer (D19)
+    # With ``audit``: write the event only when each named data field has one of these values.
+    audit_only: Dict[str, FrozenSet[str]] = Field(default_factory=dict)
+
+    def audited(self, data: Dict[str, Any]) -> bool:
+        """Whether the audit observer writes an event with this ``data``."""
+        return self.audit and all(data.get(field) in values for field, values in self.audit_only.items())
 
 
 class EventInfo(BaseModel):
@@ -277,12 +288,14 @@ class EventInfo(BaseModel):
     run: bool
     stream: bool = False
     audit: bool = False
+    audit_only: Dict[str, List[str]] = Field(default_factory=dict)
     data_schema: Dict[str, Any]
 
 
 def _spec(model: Type[EventData], description: str, *, run: bool, stream: bool = False,
-          audit: bool = False) -> EventSpec:
-    return EventSpec(model=model, description=description, run=run, stream=stream, audit=audit)
+          audit: bool = False, audit_only: Optional[Dict[str, FrozenSet[str]]] = None) -> EventSpec:
+    return EventSpec(model=model, description=description, run=run, stream=stream, audit=audit,
+                     audit_only=audit_only or {})
 
 
 CATALOG: Dict[str, EventSpec] = {
@@ -301,15 +314,18 @@ CATALOG: Dict[str, EventSpec] = {
                          stream=True),
     "result.manifest": _spec(ResultManifestData, "The run's results were saved: what they are, never their "
                                                  "rows.", run=True, stream=True),
-    "llm.call": _spec(LLMCall, "A model call finished: tokens, latency and cost (E2).", run=True),
+    "llm.call": _spec(LLMCall, "A model call finished: tokens, latency and cost. Published by "
+                                 "TokenUsageCallback.", run=True),
     "llm.parse_retry": _spec(LLMParseRetry, "A structured answer did not parse and is asked for again (E4).",
                              run=True),
-    "plan_cache.lookup": _spec(PlanCacheLookup, "The plan cache was asked for a plan (E2).", run=True),
+    "plan_cache.lookup": _spec(PlanCacheLookup, "The plan cache was asked for a plan. Published by "
+                                                 "PlanCache.get.", run=True),
     "policy.decision": _spec(PolicyDecision, "A denial at an enforcement point: the validator, the curated "
                                              "matcher or the resolver (E4).", run=True, audit=True),
     "hook.decision": _spec(HookDecision, "A hook answered at one of the six points (H1). The audit "
                                          "observer writes deny, needs_approval, approved and error.",
-                           run=True, audit=True),
+                           run=True, audit=True,
+                           audit_only={"decision": frozenset({"deny", "needs_approval", "approved", "error"})}),
     "run.limit_reached": _spec(RunLimitReached, "The question reached its cost or call cap (E3).", run=True,
                                stream=True, audit=True),
     "sanity.flagged": _spec(SanityFlagged, "An answer sanity check found something (S1).", run=True,
@@ -324,7 +340,8 @@ CATALOG: Dict[str, EventSpec] = {
                             audit=True),
     "retention.purged": _spec(RetentionPurged, "Old traces, results and audit files were deleted (E4).",
                               run=False, audit=True),
-    "llm.changed": _spec(LLMChanged, "The LLM configuration was replaced; never a key (E2).", run=False,
+    "llm.changed": _spec(LLMChanged, "The LLM configuration was replaced; never a key. Published by "
+                                      "engine.llm.replace.", run=False,
                          audit=True),
     "eval.case": _spec(EvalCase, "An eval case finished (V1).", run=False),
     "eval.finished": _spec(EvalFinished, "An eval run finished (V1).", run=False),
@@ -333,7 +350,7 @@ CATALOG: Dict[str, EventSpec] = {
 RUN_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.run)
 # The caller-safe allow-list (D17): what ``stream_query`` yields of its own run.
 STREAM_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.stream)
-# What the ``audit`` observer writes (D19); of ``hook.decision`` it keeps only the decisions its entry names.
+# What the ``audit`` observer writes (D19); ``EventSpec.audited`` applies an entry's ``audit_only``.
 AUDIT_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.audit)
 
 
@@ -341,7 +358,8 @@ def catalog() -> List[EventInfo]:
     """Every catalogued event: name, description, whether a run has it, whether the caller's stream
     carries it and the audit observer writes it, and its data's JSON Schema."""
     return [EventInfo(name=name, description=spec.description, run=spec.run, stream=spec.stream,
-                      audit=spec.audit, data_schema=spec.model.model_json_schema(by_alias=True))
+                      audit=spec.audit, audit_only={k: sorted(v) for k, v in spec.audit_only.items()},
+                      data_schema=spec.model.model_json_schema(by_alias=True))
             for name, spec in CATALOG.items()]
 
 

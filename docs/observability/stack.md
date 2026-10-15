@@ -1,9 +1,8 @@
 # Observability Stack
 
 NL2SQL provides **structured logging** always, **per-question token and time
-telemetry** on every run, plus **OpenTelemetry metrics** and **audit events**.
-
-Read the scope literally, because it is narrow:
+telemetry** on every run, and **events** that observers turn into logs, an
+**audit log** and **OpenTelemetry metrics and traces**.
 
 - **Every run reports its cost and timings in the result.** `run_with_graph()`
   always attaches `NodeTimingCallback` (wall-clock seconds per node, into
@@ -11,19 +10,20 @@ Read the scope literally, because it is narrow:
   output / reasoning tokens and model seconds per node and per question, into
   `QueryResult.usage`). That covers the Python API, the REST API, the CLI and
   the demo playground. See [the query API](../api/core/query.md#usage-tokens-calls-and-model-time).
-- **The token counter is recorded on every run; the node-duration histogram is
-  CLI-only.** `TokenUsageCallback` records `nl2sql.token.usage` for every
-  caller. `nl2sql run` records `nl2sql.node.duration` from the `node.finished`
-  events of `engine.stream_query`, the same events any caller can read.
-- **Metrics are off by default.** `OBSERVABILITY_EXPORTER` defaults to `none`,
-  which installs no meter provider, so every recording is discarded. The
-  supported values are `none`, `console` and `otlp`.
-- **There is no tracing.** No span is ever started anywhere in the codebase, and
-  there is no Jaeger exporter and no Prometheus exporter. `opentelemetry-exporter-otlp`
-  is the only exporter dependency, and it is used for metrics over gRPC.
-- **The audit log records exactly one event type**, `llm.changed`, written
-  when `engine.llm.replace` swaps the LLM. It is not a record of queries
-  executed, roles, validation decisions or row counts.
+- **Everything else is an event, and observers decide where it goes.** A run
+  publishes its steps (`node.*`), each model call (`llm.call`, from
+  `TokenUsageCallback`), each plan cache lookup (`plan_cache.lookup`) and its
+  summary (`run.finished`); `engine.llm.replace` publishes `llm.changed`. The
+  [observers](../configuration/observers.md) in the `observers` section
+  receive them: by default `log` and `audit`.
+- **OpenTelemetry is an observer, and an extra.** An `otel` observer (with
+  `pip install "nl2sql-engine[otel]"`) records the metrics below and one span
+  per run with a child span per step, on providers of its own, exported over
+  OTLP (gRPC) or to the console. Without one, nothing exports to OpenTelemetry.
+- **The audit log is the `audit` observer's.** JSON lines under
+  `<storage.path>/audit/`, one summary line per run plus the denials,
+  approvals, limits and changes; 90 days by default, purged by
+  `engine.storage.purge()`.
 
 ## Telemetry flow
 
@@ -31,57 +31,47 @@ Read the scope literally, because it is narrow:
 sequenceDiagram
     participant Pipeline as run_with_graph()
     participant Usage as TokenUsageCallback
-    participant Stream as stream_query events
-    participant Run as nl2sql run (CLI only)
-    participant Metrics as OpenTelemetry metrics
+    participant Bus as The engine's bus
+    participant Observers as log, audit, otel
     participant Result as QueryResult
 
     Pipeline->>Usage: always attached
-    Usage->>Metrics: nl2sql.token.usage
     Usage->>Result: usage
-    Pipeline->>Stream: node.started, node.finished
-    Stream->>Run: each event
-    Run->>Metrics: configure_metrics(), nl2sql.node.duration
+    Usage->>Bus: llm.call
+    Pipeline->>Bus: node.started, node.finished, run.finished
+    Bus->>Observers: each event, in config order
 ```
 
 ## Metrics
 
-`configure_metrics()` installs an OpenTelemetry meter provider. Exported metrics include:
+The `otel` observer records:
 
-- `nl2sql.node.duration` (histogram), attribute `node`. Not recorded until
-  the `otel` observer arrives (see below).
-- `nl2sql.token.usage` (counter), attributes `node`, `model`, `datasource_id`
-  and `type`: one point per LLM call for each of `input`, `cached_input`,
-  `cache_write_input`, `output`, `reasoning` and `total`. Every run.
+- `nl2sql.node.duration` (histogram, seconds), attribute `node`, from
+  `node.finished`.
+- `nl2sql.token.usage` (counter), attributes `node`, `model` and `type`: one
+  point per LLM call for each of `input`, `cached_input`, `cache_write_input`,
+  `output`, `reasoning` and `total`, from `llm.call`.
 - `nl2sql.plan_cache.lookups` (counter), attributes `result` (`hit` or `miss`)
-  and `datasource_id`: one point per plan cache lookup by the AST planner.
-  Every run with `PLAN_CACHE_ENABLED` on. The per-question view is
+  and `datasource_id`, from `plan_cache.lookup`. The per-question view is
   `QueryResult.usage.plan_cache_hits` and `sub_queries[].plan_source`; see
   [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).
+- `nl2sql.run.cost` (histogram, USD), attribute `status`, from
+  `run.finished` when the run was priced.
 
-No meter provider is installed unless the embedding application installs
-one; the counters are then recorded against OpenTelemetry's no-op provider
-and discarded. The 0.6 `settings.observability` section, and `nl2sql run`'s
-call to `configure_metrics()` that read it, are gone: release 0.7 replaces
-them with an `otel` observer in the `observers` section
-([Wave A](../architecture/wave_a.md#4-observers)), and until it lands nothing
-exports to OpenTelemetry. Token usage
-is not kept in a process-wide list; read it from `QueryResult.usage`.
+The 0.6 `datasource_id` attribute on `nl2sql.token.usage` is gone: `llm.call`
+does not carry it. Token usage is not kept in a process-wide list; read it
+from `QueryResult.usage`.
 
 ## Audit logging
 
-`EventLogger` writes JSON events to a rotating log file at `logs/audit_events.log`
-(relative to the working directory, 10 MB × 5). Payloads are sanitized to redact
-sensitive keys.
-
-The only event written anywhere in the codebase is `llm.changed`, from
-`engine.llm.replace` (the Python API, `PUT /api/v1/settings/llm` and the
-playground's model switch). Its payload is who made the change (`via`, and the
-user id and roles when known) and each agent whose provider or model changed,
-old and new; never a key. The `llm_interaction` event the CLI's monitor
-callback used to write went with that callback, when `nl2sql run` moved onto
-the public API. Treat the log as a record of model changes, not as a
-compliance audit trail.
+The `audit` observer writes `<storage.path>/audit/<date>.jsonl`, one JSON line
+per audited event: one summary per run (`run.finished` or `run.failed`: the
+user, roles, datasources, tables read, status and source; never rows), and
+each `policy.decision`, `hook.decision` that denied, asked for or carried an
+approval or failed, `run.limit_reached`, `llm.changed`, `index.swapped`,
+`retention.purged` and `schema.drifted`. `llm.changed` names who made the
+change and each agent's old and new provider and model, never a key. See
+[Observers → audit](../configuration/observers.md#audit).
 
 ## Structured logging
 
@@ -89,8 +79,7 @@ The library does not configure logging on import; the application entry point ca
 
 ## Source references
 
-- Metrics: `packages/nl2sql/src/nl2sql/common/metrics.py`
-- Audit logging: `packages/nl2sql/src/nl2sql/common/event_logger.py`
-- The CLI's step timings: `packages/nl2sql/src/nl2sql/cli/commands/run.py`
+- Observers: `packages/nl2sql/src/nl2sql/observers/` (`log.py`, `audit.py`, `otel.py`)
+- Events: `packages/nl2sql/src/nl2sql/events/`
 - Token usage: `packages/nl2sql/src/nl2sql/services/callbacks/token_handler.py`
 - Logging: `packages/nl2sql/src/nl2sql/common/logger.py`

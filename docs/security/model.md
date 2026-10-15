@@ -143,7 +143,7 @@ flowchart TD
     Scope --> Retriever[SchemaRetrieverNode: hides denied tables]
     Scope --> Validator[LogicalValidatorNode: refuses denied tables]
     Validator --> Executor[ExecutorNode]
-    Executor --> Audit[EventLogger]
+    Executor --> Audit[audit observer: storage.path/audit/]
 ```
 
 ## Policy enforcement details
@@ -176,4 +176,4 @@ Validation rules are enforced by `LogicalValidatorNode` and documented in `../ar
 - The policy check contract: `packages/sdk/src/nl2sql_sdk/policy.py`
 - Validator node: `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
 - Hiding denied tables: `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
-- Audit logger: `packages/nl2sql/src/nl2sql/common/event_logger.py`
+- The audit log: `packages/nl2sql/src/nl2sql/observers/audit.py` (see [Observers](../configuration/observers.md#audit))

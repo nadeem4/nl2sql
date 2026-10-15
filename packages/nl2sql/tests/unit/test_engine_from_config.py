@@ -427,6 +427,8 @@ def test_4_in_code_passing_objects(tmp_path):
         # An empty registry names no store either, so each slot gets its object.
         storage=Storage(path=folder, index=ChromaIndex(folder / "index"), state=SqliteState(folder / "state.db"),
                         traces=FilesTraces(folder / "traces"), results=LocalResults(folder / "results")),
+        # Nor an observer: the default log and audit are names too.
+        observers=[],
     ), registry=Registry.empty())
 
     assert engine._runtime.ds_registry.get_adapter("dw") is adapter
