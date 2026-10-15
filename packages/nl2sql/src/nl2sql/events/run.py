@@ -38,7 +38,7 @@ from pydantic import BaseModel
 
 from nl2sql.common.logger import tenant_context, trace_context
 from nl2sql.events.bus import EventBus, Subscription
-from nl2sql.events.catalog import RunFinished, RunStarted
+from nl2sql.events.catalog import ResultSummaryData, RunFinished, RunStarted, UsageTotalsData
 from nl2sql_sdk.events import Event
 
 _current: contextvars.ContextVar[Optional["RunScope"]] = contextvars.ContextVar("nl2sql_run_scope", default=None)
@@ -66,8 +66,21 @@ def _is_callback_handler(piece: Any) -> bool:
     return isinstance(piece, BaseCallbackHandler)
 
 
+def _own_fields(model: type, values: Mapping[str, Any]) -> dict:
+    """``values`` cut to ``model``'s fields: a field added to the engine model does not ride along unlisted."""
+    return {key: value for key, value in values.items() if key in model.model_fields}
+
+
 class RunScope:
-    """One question on the bus: its ``trace_id``, its run-scoped pieces and its two ends."""
+    """One question on the bus: its ``trace_id``, its run-scoped pieces and its two ends.
+
+    The scope holds its lock while the bus delivers each of its events, so
+    ``run.finished`` is always the run's last event. The cost: the events of
+    parallel sub-queries are delivered one at a time, and ``finish`` (also a
+    timed-out run's) waits for the delivery in flight. A subscriber or
+    observer must therefore return quickly and never block: hand slow work
+    (a network export, a disk write) to a queue of its own.
+    """
 
     def __init__(self, bus: EventBus, *, question: str, user_context: Any = None,
                  datasource_id: Optional[str] = None, execute: bool = True, tenant_id: Optional[str] = None,
@@ -107,8 +120,11 @@ class RunScope:
         - A LangChain callback handler (the budget) joins the graph's callbacks.
         - An object with ``close`` is closed when the scope closes.
 
-        Returns ``piece``.
+        Returns ``piece``. A closed scope refuses it (``RuntimeError``): it
+        would never be detached.
         """
+        if self._closed:
+            raise RuntimeError("This run's scope is closed; nothing can be attached to it.")
         handler = _is_callback_handler(piece)
         if handler:
             self._handlers.append(piece)
@@ -173,12 +189,13 @@ class RunScope:
         return self._close("run.finished", RunFinished(
             status=result.status,
             duration_s=self._duration(),
-            usage=result.usage.total.model_dump(),
+            usage=_own_fields(UsageTotalsData, result.usage.total.model_dump()),
             error_codes=[str(error.get("error_code") or "") for error in result.errors],
             source=result.source.type,
             datasources=sorted({sq.datasource_id for sq in result.sub_queries if sq.datasource_id}),
             tables=sorted(set(tables)),
-            result_manifest=[summary.model_dump(mode="json") for summary in result.result_manifest],
+            result_manifest=[_own_fields(ResultSummaryData, summary.model_dump(mode="json"))
+                             for summary in result.result_manifest],
             user_id=self.user_id,
             roles=self.roles,
         ))
@@ -192,17 +209,17 @@ class RunScope:
         return round(time.perf_counter() - self._started_at, 4) if self._started_at is not None else 0.0
 
     def _close(self, name: str, data: Any) -> Optional[Event]:
+        """Publish the terminal event, then detach and close every piece, even when a piece raised on it."""
         with self._lock:
             if self._closed:
                 return None
+            self._closed = True
+            subscriptions, self._subscriptions = self._subscriptions, []
+            closers, self._closers = self._closers, []
             try:
-                event = self.bus.publish(name, data, trace_id=self.trace_id, tenant_id=self.tenant_id)
+                return self.bus.publish(name, data, trace_id=self.trace_id, tenant_id=self.tenant_id)
             finally:
-                self._closed = True
-                subscriptions, self._subscriptions = self._subscriptions, []
-                closers, self._closers = self._closers, []
-        for subscription in subscriptions:
-            subscription.close()
-        for close in closers:
-            close()
-        return event
+                for subscription in subscriptions:
+                    subscription.close()
+                for close in closers:
+                    close()

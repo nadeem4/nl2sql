@@ -92,7 +92,11 @@ def global_callback(
     # After the .env, so a NL2SQL_LOG_LEVEL or NL2SQL_LOG_FORMAT written there
     # applies. The library never configures logging on import: the entry
     # point owns it.
-    configure_logging(json_format=None if log_format is None else log_format == "json")
+    try:
+        configure_logging(json_format=None if log_format is None else log_format == "json")
+    except ValueError as error:  # NL2SQL_LOG_FORMAT is neither text nor json
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()

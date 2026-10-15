@@ -25,7 +25,7 @@ _EXPORTS = {
     # Wave A: events, the run's stop and approval shapes.
     "nl2sql_sdk.events": ("Event", "Observer"),
     "nl2sql.limits": ("RunStop",),
-    "nl2sql.hooks.approval": ("ApprovalRequest", "Approval"),
+    "nl2sql.hooks.approval": ("ApprovalRequest", "Approval", "VerifiedRef"),
     "nl2sql.common.errors": ("ErrorSeverity", "ErrorCode", "PipelineError"),
     "nl2sql.common.cancellation": ("CancellationToken",),
     "nl2sql_sdk.policy": ("UserContext",),
@@ -80,6 +80,7 @@ __all__ = [
     "RunStop",
     "ApprovalRequest",
     "Approval",
+    "VerifiedRef",
     "ObserverConfig",
     "HookConfig",
     "EvalsConfig",

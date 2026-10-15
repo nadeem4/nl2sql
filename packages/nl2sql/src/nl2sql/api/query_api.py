@@ -377,8 +377,9 @@ class QueryAPI:
                 state,
                 artifact_store=getattr(self._ctx, "artifact_store", None),
             )
-        except Exception as exc:
-            scope.fail(f"The run failed: {exc}", ErrorCode.UNKNOWN_ERROR)
+        except BaseException as exc:
+            # A KeyboardInterrupt too: every scope ends with a terminal event.
+            scope.fail(f"The run failed: {exc or type(exc).__name__}", ErrorCode.UNKNOWN_ERROR)
             raise
         self.close_scope(scope, result)
         return result
@@ -462,11 +463,14 @@ class QueryAPI:
                 result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
                 self.close_scope(scope, result)
                 events.put(QueryEvent(type="final", data=result.model_dump(mode="json")))
-            except Exception as exc:
+            except BaseException as exc:
+                # A KeyboardInterrupt too: every scope ends with a terminal event.
+                message = f"The run failed: {exc or type(exc).__name__}"
                 if scope is not None:
-                    scope.fail(f"The run failed: {exc}", ErrorCode.UNKNOWN_ERROR)
-                events.put(QueryEvent(type="error", data={"message": f"The run failed: {exc}",
-                                                          "error_code": "UNKNOWN_ERROR"}))
+                    scope.fail(message, ErrorCode.UNKNOWN_ERROR)
+                events.put(QueryEvent(type="error", data={"message": message, "error_code": "UNKNOWN_ERROR"}))
+                if not isinstance(exc, Exception):
+                    raise
             finally:
                 events.put(None)
 

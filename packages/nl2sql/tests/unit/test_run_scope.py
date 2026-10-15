@@ -348,3 +348,117 @@ def test_close_scope_with_a_result_built_without_a_graph_run():
     assert [e.name for e in events] == ["run.started", "run.finished"]
     assert events[1].data["status"] == "error"
     assert events[1].data["error_codes"] == ["UNKNOWN_ERROR"]
+
+
+# ---------------------------------------------------------------- closing whatever happens (review of #313)
+
+def test_a_piece_that_raises_on_run_finished_is_still_detached_and_closed():
+    bus = EventBus()
+
+    class Collector:
+        closed = False
+
+        def on_event(self, event):
+            if event.name == "run.finished":
+                raise RuntimeError("collector broke")
+
+        def close(self):
+            self.closed = True
+
+    piece = Collector()
+    scope = RunScope(bus, question="q", user_context=_USER)
+    scope.attach(piece)
+    scope.start()
+
+    with pytest.raises(RuntimeError, match="collector broke"):
+        scope.finish(QueryResult(trace_id=scope.trace_id))
+
+    assert scope.closed
+    assert bus._subscriptions == (), "the run's subscription must not outlive its scope"
+    assert piece.closed
+
+
+def test_attach_on_a_closed_scope_is_refused_and_subscribes_nothing():
+    bus = EventBus()
+    scope = RunScope(bus, question="q", user_context=_USER)
+    scope.start()
+    scope.finish(QueryResult(trace_id=scope.trace_id))
+
+    with pytest.raises(RuntimeError, match="closed"):
+        scope.attach(lambda event: None)
+    assert bus._subscriptions == ()
+
+
+def test_run_finished_ignores_a_field_the_catalog_does_not_list():
+    """A field added to ``UsageTotals`` or ``ResultSummary`` must not fail every run's ``run.finished``."""
+    from nl2sql.execution.artifacts.results import ResultSummary
+    from nl2sql.services.callbacks.token_handler import UsageTotals
+
+    class NewUsage(UsageTotals):
+        a_new_counter: int = 7
+
+    class NewSummary(ResultSummary):
+        a_new_flag: bool = True
+
+    bus = EventBus()
+    events = _capture(bus)
+    scope = RunScope(bus, question="q", user_context=_USER)
+    scope.start()
+    result = QueryResult(trace_id=scope.trace_id)
+    result.usage.total = NewUsage(calls=2)
+    result.result_manifest = [NewSummary(node_id="n1", columns=["a"], row_count=3)]
+
+    scope.finish(result)
+
+    finished = events[-1]
+    assert finished.name == "run.finished"
+    assert finished.data["usage"]["calls"] == 2 and "a_new_counter" not in finished.data["usage"]
+    assert finished.data["result_manifest"][0]["row_count"] == 3
+    assert "a_new_flag" not in finished.data["result_manifest"][0]
+
+
+def test_the_callers_context_reaches_the_graph(monkeypatch):
+    import contextvars
+
+    request_key = contextvars.ContextVar("request_key", default=None)
+    seen = []
+
+    def on_invoke(state, config):
+        seen.append(request_key.get())
+        return {}
+
+    _use_graph(monkeypatch, _FakeGraph(on_invoke))
+    ctx = _ctx()
+    token = request_key.set("the-callers-key")
+    try:
+        QueryAPI(ctx).run_query("q", user_context=_USER)
+    finally:
+        request_key.reset(token)
+
+    assert seen == ["the-callers-key"]
+
+
+def _interrupted(ctx, execute=True):
+    raise KeyboardInterrupt()
+
+
+def test_a_keyboard_interrupt_closes_the_scope_with_run_failed(monkeypatch):
+    monkeypatch.setattr(runtime, "build_graph", _interrupted)
+    ctx = _ctx()
+    events = _capture(ctx.bus)
+
+    with pytest.raises(KeyboardInterrupt):
+        QueryAPI(ctx).run_query("q", user_context=_USER)
+
+    assert [e.name for e in events] == ["run.started", "run.failed"]
+
+
+def test_a_keyboard_interrupt_in_a_stream_closes_the_scope_with_run_failed(monkeypatch):
+    monkeypatch.setattr(runtime, "build_graph", _interrupted)
+    monkeypatch.setattr(threading, "excepthook", lambda args: None)
+    ctx = _ctx()
+    events = _capture(ctx.bus)
+
+    list(QueryAPI(ctx).stream_query("q", user_context=_USER))
+
+    assert [e.name for e in events] == ["run.started", "run.failed"]

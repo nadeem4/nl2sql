@@ -211,9 +211,11 @@ sits follows from the code as it is:
    published with the result's summary. The scope makes the run's `trace_id`
    and hands it to `run_with_graph`, which puts it in `GraphState`.
 2. **Its context is entered inside the worker.** `run_with_graph` submits the
-   graph to its own `ThreadPoolExecutor` without copying the context
-   (`pipeline/runtime.py`), which is why `policy_engine.run()` is entered
-   inside `_invoke`. The scope's context variables (the `trace_id`, the
+   graph to its own `ThreadPoolExecutor` with the caller's
+   `copy_context()` (`pipeline/runtime.py`; 0.6 submitted it without one),
+   so the worker inherits the caller's context variables (a request's keys,
+   the run's pinned LLM set), and `policy_engine.run()` is entered inside
+   `_invoke`. The scope's context variables (the `trace_id`, the
    `tenant_id` and the scope itself) are entered there too, beside it;
    LangGraph's own worker threads then inherit them, as they already inherit
    `current_datasource_id`. Code deep in a run (the structured-output retry
@@ -359,7 +361,19 @@ names in the same PR.
     during a run carry its `trace_id` and `tenant_id`. `attach` takes a
     function or an object with `on_event` (subscribed to this run's events
     with `fail="raise"`), a LangChain callback handler (added to the
-    graph's callbacks) and anything with `close` (closed with the scope).
+    graph's callbacks) and anything with `close` (closed with the scope);
+    a closed scope refuses `attach` with `RuntimeError`. Closing detaches
+    every subscription and calls every `close` even when an attached piece
+    raised on the terminal event. `run_query` and `stream_query` close the
+    scope with `run.failed` on any `BaseException` (a `KeyboardInterrupt`
+    too) and re-raise it. The scope holds its lock while the bus delivers
+    each of its events, so `run.finished` is always last; the cost is that
+    a run's events reach subscribers one at a time and `finish` (a timed-out
+    run's too) waits for the delivery in flight, so an observer must never
+    block (the `Observer` and `RunScope` docstrings say so; E2's `audit` and
+    `otel` hand slow work to a queue). `run.finished`'s `usage` and
+    `result_manifest` copy only the catalog models' own fields, so a field
+    added to `UsageTotals` or `ResultSummary` never fails a run.
     `run.finished`'s `tables` come from each sub-query's plan, or a verified
     query's SQL, as `datasource.schema.table`. `engine.events` and
     `engine.evals` are empty namespaces; E1 adds `subscribe` and `catalog`.
@@ -654,7 +668,8 @@ not declare is a `ConfigError` at build.
     validated: `HookConfig` (`points`, `on_error`, `approver_roles`, and the
     hook's own keys) or an object with `__call__`. `HookPoint`, the six point
     names, is defined in `nl2sql/config/models.py`, where the config and the
-    `hook.decision` event both read it; H1 imports it from there.
+    `hook.decision` event both read it, and re-exported from `nl2sql.hooks`,
+    where H1 imports it.
 
 ### The architecture test
 

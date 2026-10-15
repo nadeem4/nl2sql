@@ -75,3 +75,17 @@ def test_the_cli_takes_log_format_for_any_command(monkeypatch, tmp_path):
     result = CliRunner().invoke(app, ["--log-format", "json", "list-adapters"])
     assert result.exit_code == 0, result.output
     assert _formatter()
+
+
+def test_the_cli_refuses_an_unknown_nl2sql_log_format_in_one_line(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from nl2sql.cli.main import app
+
+    monkeypatch.setenv("NL2SQL_LOG_FORMAT", "xml")
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(app, ["list-adapters"])
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit), "a config error, not a traceback"
+    assert "NL2SQL_LOG_FORMAT" in result.output and "text or json" in result.output

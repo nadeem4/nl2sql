@@ -293,3 +293,17 @@ def test_engine_close_closes_the_bus(tmp_path):
     engine._runtime.bus.subscribe(Observer())
     engine.close()
     assert closed == [True]
+
+
+def test_hook_point_is_importable_from_nl2sql_hooks():
+    from nl2sql.config.models import HookPoint as defined
+    from nl2sql.hooks import HookPoint
+
+    assert HookPoint is defined
+
+
+def test_verified_ref_is_exported_from_nl2sql():
+    from nl2sql import VerifiedRef
+    from nl2sql.hooks.approval import VerifiedRef as defined
+
+    assert VerifiedRef is defined

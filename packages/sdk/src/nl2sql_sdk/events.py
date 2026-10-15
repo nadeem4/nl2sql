@@ -48,8 +48,11 @@ class Observer(Protocol):
 
     ``events`` is the names it wants; None means every event. ``on_event`` is
     called synchronously on the publishing thread, which may be one of a
-    run's worker threads, so an observer that keeps state locks it, and a slow
-    one slows the run. Observers fail open: an exception from ``on_event`` is
+    run's worker threads, so an observer that keeps state locks it. A run's
+    events are delivered one at a time (so ``run.finished`` is always last),
+    and a run, a timed-out one too, cannot end while a delivery is in flight:
+    ``on_event`` must return quickly and never block. Hand slow work (a
+    network export, a disk write) to a queue of your own. Observers fail open: an exception from ``on_event`` is
     logged and skipped, and never fails a run. ``close`` is called when the
     engine closes.
 

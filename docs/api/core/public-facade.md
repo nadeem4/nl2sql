@@ -233,7 +233,7 @@ submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`,
 `UserContext`, `CancellationToken`, `configure_logging`,
 `TraceContextFilter`, the event types (`Event`, `Observer`), a run's ending
-(`RunStop`, `ApprovalRequest`, `Approval`), what the namespaces
+(`RunStop`, `ApprovalRequest`, `Approval`, `VerifiedRef`), what the namespaces
 return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
