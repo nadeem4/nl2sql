@@ -54,7 +54,10 @@ class ExecutorNode:
         ``ALL_NULL_COLUMN``). Each check retries at most once per sub-query,
         within ``settings.pipeline.retries.max``; a pinned plan is never
         retried, so its findings are warnings. Only tables the caller's scope
-        allows are probed. ``sanity.flagged`` is published for each finding.
+        allows are probed. A probe runs outside ``execute.before`` and
+        ``execute.after``, so when any hook is attached at ``execute.before``
+        (an operator gating the SQL) no probe runs: only the null check, which
+        reads the saved result. ``sanity.flagged`` is published for each finding.
         A failure here never fails the run.
         """
         if not self.sanity_checks or response.errors:
@@ -78,6 +81,7 @@ class ExecutorNode:
                 row_count=response.metrics.get("row_count"),
                 frame=lambda: self.artifact_store.scan_parquet(artifact) if artifact is not None else None,
                 can_retry=lambda code: retries_left and code not in retried,
+                probes=not self.hooks.attached("execute.before"),
             )
         except Exception as exc:
             logger.warning(f"Sanity checks skipped: {exc}")

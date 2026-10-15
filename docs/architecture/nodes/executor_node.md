@@ -97,6 +97,15 @@ check that fails to run reports nothing, and a failure in the checks never
 fails the run. A verified query is not checked: it runs in the
 [curated matcher](curated_matcher_node.md), not through this node.
 
+**Probes and hooks.** A probe (the value check's and the fan-out check's) is
+SQL the [hooks](../../configuration/hooks.md) never see: it runs outside
+`execute.before` and `execute.after`, and nothing publishes it. So when any
+hook is attached at `execute.before` (an operator gating the SQL that reaches
+the database), no probe runs: only the all-null check, which reads the saved
+result and sends nothing to the database. `settings.pipeline.sanity_checks:
+false` turns every check off. A probe is bounded by the datasource's timeout;
+one that times out is skipped silently.
+
 | Check | Runs on | Code | Then |
 |---|---|---|---|
 | Missing filter value | an empty result | `VALUE_NOT_FOUND` | A close value and a retry left: an `ERROR`, retried once. Otherwise a `WARNING`. |
@@ -122,20 +131,33 @@ primary key (from the snapshot, through the sub-query's `relevant_tables`);
 every table on the near side of that join is repeated. One table joined to two
 others on their many side (a many-to-many sum: invoices and tickets of one
 customer) is the same case. A table with no known primary key is taken as
-unique, so it is never suspected.
+unique, so it is never suspected: a warehouse that declares no keys
+(Snowflake or BigQuery often do not, nor do views) gets no fan-out check.
 
 A suspected `COUNT`, `SUM` or `AVG` over a column of a repeated table (not
-already `DISTINCT`) is confirmed by one probe over the plan's own `FROM`, joins
-and `WHERE`: `SELECT COUNT(*), COUNT(DISTINCT <the table's primary key>) ...
-LIMIT 1`. More rows than keys confirms it. The probe needs a single-column
-primary key and every table of the plan readable by the caller.
+already `DISTINCT`) is confirmed by one probe over the plan's own `FROM`,
+joins, `WHERE` and `GROUP BY`: does any group hold one row of that table more
+than once?
+
+```sql
+SELECT 1 FROM <the plan's FROM and joins>
+WHERE <the plan's WHERE> AND NOT <alias>.<primary key> IS NULL
+GROUP BY <the plan's groups>, <alias>.<primary key>
+HAVING COUNT(*) > 1 LIMIT 1
+```
+
+A row confirms it. The rows an outer join null-extends have no key, so they
+never count, and a row that appears once in each of several groups (which a
+grouped aggregate counts rightly) never counts either. The probe needs a
+single-column primary key and every table of the plan readable by the caller.
+The key keeps its case as reflected and is spelled as the generator spells a
+column, rendered by the adapter in its dialect.
 
 Under `COUNT` the planner is told to count distinct values, which the plan can
 say (`Expr.distinct`). Under `SUM` or `AVG` the repair (aggregate the many
 side first) needs a derived table the plan cannot express, so it is a warning:
-"SUM(Customer.Credit) may count each Customer row more than once: joining
-Invoice repeats them (412 rows for 59 Customer rows)." Messages carry counts,
-never values.
+"SUM(Customer.Credit) may count some Customer rows more than once: joining
+Invoice repeats them." Messages name tables and columns, never values.
 
 ### All-null columns
 

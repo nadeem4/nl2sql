@@ -9,11 +9,17 @@ snapshot). Taking one join out of the plan's tree splits the tables in two;
 every table on the near side is repeated. This covers a many-to-many sum too:
 Invoice and Ticket both joined to Customer repeat each invoice once per ticket.
 
-A suspected fan-out is confirmed by a probe over the plan's own FROM, joins
-and WHERE: ``COUNT(*)`` against ``COUNT(DISTINCT <the repeated table's primary
-key>)``. It is a sqlglot tree rendered by the adapter, returns one row, and
-runs only when the role may read every table in the plan. A table with no
-known single-column primary key is not probed.
+A suspected fan-out is confirmed by a probe over the plan's own FROM, joins,
+WHERE and GROUP BY: does any group hold one row of the repeated table more
+than once? ``SELECT 1 ... WHERE <plan's WHERE> AND <pk> IS NOT NULL GROUP BY
+<plan's groups>, <pk> HAVING COUNT(*) > 1 LIMIT 1``. The rows an outer join
+null-extends have no key, so they never count, and a row repeated across
+groups (one per group, which a grouped aggregate counts rightly) never counts
+either. It is a sqlglot tree rendered by the adapter, returns at most one row,
+and runs only when the role may read every table in the plan. A table with no
+known single-column primary key is not probed. The key keeps its case as
+reflected and is spelled as the generator spells a column, so the probe names
+it as the query did.
 """
 from __future__ import annotations
 
@@ -43,8 +49,8 @@ class _Suspect:
 
 
 def _keys(tables: List[Any]) -> Dict[str, List[str]]:
-    """Each table's primary key from the snapshot, by lower-case table name."""
-    return {str(t.name).lower(): [str(c).lower() for c in (t.primary_key or [])] for t in tables}
+    """Each table's primary key from the snapshot, as reflected, by lower-case table name."""
+    return {str(t.name).lower(): [str(c) for c in (t.primary_key or [])] for t in tables}
 
 
 def _join_columns(condition: Optional[Expr]) -> List[Tuple[str, str, str, str]]:
@@ -63,7 +69,7 @@ def _join_columns(condition: Optional[Expr]) -> List[Tuple[str, str, str, str]]:
 def _unique(alias: str, columns: Set[str], declared: Dict[str, TableRef], keys: Dict[str, List[str]]) -> bool:
     """Whether ``columns`` hold the whole primary key of ``alias``'s table. An unknown key counts as unique."""
     key = keys.get(declared[alias].name.lower()) if alias in declared else None
-    return not key or set(key) <= columns
+    return not key or {k.lower() for k in key} <= columns
 
 
 def _near_side(edges: List[Tuple[str, str]], cut: int, start: str) -> Set[str]:
@@ -116,25 +122,27 @@ def _suspects(plan: PlanModel, keys: Dict[str, List[str]]) -> List[_Suspect]:
     return found
 
 
-def _probe(plan: PlanModel, adapter: Any, alias: str, key: str) -> Tuple[int, int]:
-    """``(rows, distinct keys of alias)`` over the plan's FROM, joins and WHERE."""
+def _probe(plan: PlanModel, adapter: Any, alias: str, key: str) -> bool:
+    """Whether some group of the plan holds one row of ``alias`` (by its key ``key``) more than once."""
     visitor = SqlVisitor()
     declared = {t.alias: t for t in plan.tables}
-    query = exp.select(
-        exp.Count(this=exp.Star()),
-        exp.Count(this=exp.Distinct(expressions=[exp.column(key, table=alias)])),
-    ).from_(_table(plan.tables[0]))
+    pk = exp.Column(this=exp.to_identifier(key), table=exp.Identifier(this=alias, quoted=False))
+    query = exp.select(exp.Literal.number(1)).from_(_table(plan.tables[0]))
     query = GeneratorNode.attach_joins(query, plan, declared, plan.tables[0].alias, visitor)
     if plan.where:
         query = query.where(visitor.visit(plan.where))
+    query = query.where(exp.Not(this=exp.Is(this=pk.copy(), expression=exp.Null())))
+    for group in plan.group_by:
+        query = query.group_by(visitor.visit(group.expr))
+    query = query.group_by(pk.copy()).having(exp.GT(this=exp.Count(this=exp.Star()),
+                                                   expression=exp.Literal.number(1)))
     query = query.limit(1)
     render = getattr(adapter, "render_sql", None)
     sql = render(query) if callable(render) else query.sql(dialect=adapter.get_dialect())
     frame = adapter.execute(AdapterRequest(plan_type="sql", payload={"sql": sql}))
-    if not frame.success or not frame.rows:
+    if not frame.success:
         raise LookupError(frame.error.safe_message if frame.error else "probe failed")
-    rows, distinct = frame.rows[0][0], frame.rows[0][1]
-    return int(rows or 0), int(distinct or 0)
+    return bool(frame.rows)
 
 
 def check_fan_out(
@@ -157,7 +165,7 @@ def check_fan_out(
     if not suspects or not all(allowed(t) for t in plan.tables):
         return []
     declared = {t.alias: t for t in plan.tables}
-    confirmed: Dict[str, Optional[Tuple[int, int]]] = {}
+    confirmed: Dict[str, bool] = {}
     errors: List[PipelineError] = []
     for s in suspects:
         table = declared[s.alias].name
@@ -166,30 +174,26 @@ def check_fan_out(
             continue
         if s.alias not in confirmed:
             try:
-                rows, distinct = _probe(plan, adapter, s.alias, key[0])
-                confirmed[s.alias] = (rows, distinct) if rows > distinct else None
+                confirmed[s.alias] = _probe(plan, adapter, s.alias, key[0])
             except LookupError as exc:
                 logger.info("Fan-out probe skipped for %s: %s", table, exc)
-                confirmed[s.alias] = None
-        counts = confirmed[s.alias]
-        if counts is None:
+                confirmed[s.alias] = False
+        if not confirmed[s.alias]:
             continue
-        rows, distinct = counts
         by = declared[s.repeated_by].name
         if s.function == "COUNT" and can_retry:
             errors.append(PipelineError(
                 node="executor",
-                message=(f"COUNT({table}.{s.column}) counts each {table} row once per matching {by} row: the "
-                         f"joins give {rows} rows for {distinct} {table} rows. Count distinct values instead "
-                         f"(set distinct on the COUNT)."),
+                message=(f"COUNT({table}.{s.column}) counts each {table} row once per matching {by} row. "
+                         f"Count distinct values instead (set distinct on the COUNT)."),
                 severity=ErrorSeverity.ERROR,
                 error_code=ErrorCode.JOIN_FAN_OUT,
             ))
             continue
         errors.append(PipelineError(
             node="executor",
-            message=(f"{s.function}({table}.{s.column}) may count each {table} row more than once: joining "
-                     f"{by} repeats them ({rows} rows for {distinct} {table} rows)."),
+            message=(f"{s.function}({table}.{s.column}) may count some {table} rows more than once: joining "
+                     f"{by} repeats them."),
             severity=ErrorSeverity.WARNING,
             error_code=ErrorCode.JOIN_FAN_OUT,
         ))

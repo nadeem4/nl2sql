@@ -167,7 +167,8 @@ def test_an_unknown_role_is_refused_cleanly(demo_project, tmp_path):
 
 @pytest.mark.e2e
 @pytest.mark.parametrize("role", ["ghost", ""], ids=["unknown-role", "no-role"])
-def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_project, monkeypatch, role):
+def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_project, monkeypatch, role,
+                                                                         tmp_path):
     """An unknown role reaches the engine and is refused; no role at all never
     reaches it: the API's auth dependency answers 401 first."""
     from fastapi.testclient import TestClient
@@ -175,7 +176,8 @@ def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_p
     pytest.importorskip("nl2sql_api")
     from nl2sql_api.main import app
 
-    server = _serve(demo_project, _top_customers_rules(), "rbac-api.yaml", api={"role_header": "X-NL2SQL-Role"})
+    server = _serve(demo_project, _top_customers_rules(), "rbac-api.yaml", store=tmp_path,
+                    api={"role_header": "X-NL2SQL-Role"})
     monkeypatch.setenv("NL2SQL_CONFIG", str(demo_project / "rbac-api.yaml"))
     for key, value in _env().items():
         monkeypatch.setenv(key, value)

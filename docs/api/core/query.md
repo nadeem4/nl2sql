@@ -188,6 +188,13 @@ synthesizer says them; see the
 [executor's sanity checks](../../architecture/nodes/executor_node.md#answer-sanity-checks).
 `settings.pipeline.sanity_checks: false` turns those checks off.
 
+0.7 changed this shape: a warning was a dict with `error_code` and `severity`,
+and is now a `RunWarning` with `code`, and `detail.recovered` where `severity`
+said `ERROR`. A run's state is never kept across an upgrade (a run that ended
+`needs_approval` is asked again, not resumed; see
+[Wave A, D10](../../architecture/wave_a.md#7-approval)), so no older warning is
+ever read back.
+
 ## Streaming a run
 
 ### NL2SQL.stream_query

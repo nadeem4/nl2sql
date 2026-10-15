@@ -22,8 +22,10 @@ from nl2sql.api.query_api import result_from_state
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.execution.contracts import ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
+from nl2sql.hooks import Allow
+from nl2sql.hooks.runner import HookBinding, HookRunner
 from nl2sql.pipeline.nodes.ast_planner.schemas import (
-    ASTPlannerResponse, Expr, JoinSpec, PlanModel, SelectItem, TableRef,
+    ASTPlannerResponse, Expr, GroupByItem, JoinSpec, PlanModel, SelectItem, TableRef,
 )
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
@@ -54,8 +56,8 @@ def _agg(name, alias, column, distinct=False):
     return Expr(kind="func", func_name=name, args=[_col(alias, column)], is_aggregate=True, distinct=distinct)
 
 
-def _join(left, right, left_col, right_col):
-    return JoinSpec(left_alias=left, right_alias=right,
+def _join(left, right, left_col, right_col, join_type="inner"):
+    return JoinSpec(left_alias=left, right_alias=right, join_type=join_type,
                     condition=_bin("=", _col(left, left_col), _col(right, right_col)))
 
 
@@ -227,7 +229,50 @@ def test_probe_is_rendered_by_the_adapter(adapter):
 
     [sql] = spy.sql
     assert spy.rendered == 1
-    assert sql.upper().startswith("SELECT COUNT(*)") and "COUNT(DISTINCT" in sql.upper()
+    upper = sql.upper()
+    assert upper.startswith("SELECT 1") and "NOT C.CUSTOMERID IS NULL" in upper and "HAVING COUNT(*) > 1" in upper
+    # The key keeps its case as reflected: a case-sensitive collation finds it.
+    assert "CustomerId" in sql and "customerid" not in sql
+
+
+def test_null_extended_rows_of_an_outer_join_are_not_a_fan_out(tmp_path):
+    # The review's repro: no invoice is repeated (each customer has at most one
+    # ticket), so COUNT(i.InvoiceId) = 2 is right, though the LEFT joins give 4 rows.
+    path = tmp_path / "outer.sqlite"
+    with sqlite3.connect(path) as con:
+        con.execute("CREATE TABLE Customer (CustomerId INTEGER PRIMARY KEY, Credit REAL)")
+        con.execute("CREATE TABLE Invoice (InvoiceId INTEGER PRIMARY KEY, CustomerId INTEGER, Total REAL)")
+        con.execute("CREATE TABLE Ticket (TicketId INTEGER PRIMARY KEY, CustomerId INTEGER)")
+        con.executemany("INSERT INTO Customer VALUES (?, ?)", [(1, 1.0), (2, 2.0), (3, 3.0)])
+        con.executemany("INSERT INTO Invoice VALUES (?, ?, ?)", [(1, 1, 5.0), (2, 1, 6.0)])
+        con.executemany("INSERT INTO Ticket VALUES (?, ?)", [(1, 1), (2, 2)])
+    outer = SqliteAdapter("outer", SqliteConnection(database=path.as_posix()), Limits(row_limit=1000))
+    plan = _plan(_agg("COUNT", "i", "InvoiceId"), tables=(CUSTOMER, INVOICE, TICKET),
+                 joins=[_join("c", "i", "CustomerId", "CustomerId", "left"),
+                        _join("c", "t", "CustomerId", "CustomerId", "left")])
+
+    assert _fan_out(plan, outer) == []
+
+
+def test_a_group_on_the_many_side_is_not_a_fan_out(adapter):
+    # The review's repro: one row per ticket, so every count is 1 and right.
+    plan = PlanModel(tables=[CUSTOMER, TICKET], joins=[_join("c", "t", "CustomerId", "CustomerId")],
+                     select_items=[SelectItem(expr=_col("t", "TicketId")),
+                                   SelectItem(expr=_agg("COUNT", "c", "CustomerId"))],
+                     group_by=[GroupByItem(expr=_col("t", "TicketId"))])
+
+    assert _fan_out(plan, adapter) == []
+
+
+def test_a_group_that_still_repeats_rows_is_a_fan_out(adapter):
+    # Grouped by customer, each customer's credit is still added once per invoice.
+    plan = PlanModel(tables=[CUSTOMER, INVOICE], joins=[_join("c", "i", "CustomerId", "CustomerId")],
+                     select_items=[SelectItem(expr=_col("c", "CustomerId")),
+                                   SelectItem(expr=_agg("SUM", "c", "Credit"))],
+                     group_by=[GroupByItem(expr=_col("c", "CustomerId"))])
+
+    [warning] = _fan_out(plan, adapter)
+    assert warning.error_code == ErrorCode.JOIN_FAN_OUT
 
 
 def test_denied_table_is_never_probed(adapter):
@@ -272,7 +317,7 @@ def test_closest_value_comes_from_sample_values_without_a_query(tmp_path):
 
 # --- the executor: the switch, the verified path, the event ---------------------------
 
-def _executor(adapter, monkeypatch, row_count, settings=None):
+def _executor(adapter, monkeypatch, row_count, settings=None, hooks=None):
     def execute(self, request):
         return ExecutorResponse(executor_name="sql_executor", subgraph_name="sql_agent", node_id="sq1",
                                 trace_id="t", tenant_id="t1", metrics={"row_count": row_count})
@@ -280,7 +325,8 @@ def _executor(adapter, monkeypatch, row_count, settings=None):
     monkeypatch.setattr(SqlExecutorService, "execute", execute)
     registry = stub_ds_registry(adapter, limits=Limits(row_limit=1000), supports=lambda *_a: True)
     ctx = fake_runtime(settings={"tenant_id": "t1", **(settings or {})}, ds_registry=registry,
-                       policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": ["*"]}}})
+                       policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": ["*"]}}},
+                       **({"hooks": hooks} if hooks is not None else {}))
     return ExecutorNode(ctx)
 
 
@@ -303,6 +349,25 @@ def test_sanity_checks_off(adapter, monkeypatch):
     result = _executor(spy, monkeypatch, 0, {"pipeline": {"sanity_checks": False}})(_state(MISSING))
 
     assert result["errors"] == [] and spy.sql == []
+
+
+def test_no_probe_runs_when_a_hook_gates_the_sql(adapter, monkeypatch):
+    # An operator gating SQL at execute.before never has unseen SQL run: the probes are skipped.
+    spy = _Spy(adapter)
+    gate = HookRunner([HookBinding(name="gate", hook=lambda ctx: Allow(), points=frozenset({"execute.before"}))])
+
+    result = _executor(spy, monkeypatch, 0, hooks=gate)(_state(MISSING))
+
+    assert result["errors"] == [] and spy.sql == []
+
+
+def test_a_hook_elsewhere_leaves_the_probes_on(adapter, monkeypatch):
+    spy = _Spy(adapter)
+    other = HookRunner([HookBinding(name="other", hook=lambda ctx: Allow(), points=frozenset({"answer.after"}))])
+
+    _executor(spy, monkeypatch, 0, hooks=other)(_state(MISSING))
+
+    assert spy.sql
 
 
 def test_each_finding_publishes_sanity_flagged(adapter, monkeypatch):

@@ -51,6 +51,15 @@ the validator refuse. `datasources.after` may only remove datasources; the
 resolver checks what is left against the caller's role again. After the
 validator nothing may change the SQL, the plan or the result.
 
+**The answer sanity checks' probes are not hooked.** After a sub-query runs,
+the executor may send small checking queries of its own (does a filter value
+exist, did a join repeat rows; see the
+[executor's sanity checks](../architecture/nodes/executor_node.md#answer-sanity-checks)).
+They run outside `execute.before` and `execute.after`. So when any hook is
+attached at `execute.before`, no probe runs at all: SQL a hook gates never has
+unseen SQL beside it. `settings.pipeline.sanity_checks: false` turns the checks
+off entirely.
+
 **The verified path** has no routing and no plan, so only `run.before`,
 `execute.before`, `execute.after` and `answer.after` apply. A deny there ends
 the run; it does not fall back to the generated path. **A plan-only run**

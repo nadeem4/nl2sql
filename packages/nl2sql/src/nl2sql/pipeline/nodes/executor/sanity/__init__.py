@@ -7,7 +7,10 @@
 rendered by the adapter, bounded, and never run on a table the caller's scope
 denies. A check that fails to run reports nothing. The executor runs them
 after ``execute.after``; ``settings.pipeline.sanity_checks: false`` turns them
-off. See docs/architecture/nodes/executor_node.md.
+off. A probe is SQL the hooks never see (it runs outside ``execute.before``
+and ``execute.after``), so with ``probes`` false (a hook is attached at
+``execute.before``) the probing checks are skipped and only the null check,
+which reads the saved result, runs. See docs/architecture/nodes/executor_node.md.
 """
 from __future__ import annotations
 
@@ -56,19 +59,22 @@ def run_checks(
     row_count: Optional[int],
     frame: Callable[[], Optional[pl.LazyFrame]],
     can_retry: Callable[[ErrorCode], bool],
+    probes: bool = True,
 ) -> List[PipelineError]:
     """Every finding for one sub-query's result.
 
     ``row_count`` 0 runs the value check; a result with rows runs the fan-out
     and null checks (``frame`` opens the saved result). ``can_retry(code)``
-    says whether a finding of ``code`` may still be retried.
+    says whether a finding of ``code`` may still be retried. ``probes`` false
+    skips the checks that query the database (values, fan-out).
     """
     checks: List[Callable[[], List[PipelineError]]] = []
-    if row_count == 0:
+    if row_count == 0 and probes:
         checks.append(lambda: check_values(plan, adapter, allowed, can_retry(ErrorCode.VALUE_NOT_FOUND),
                                            row_limit, samples=_samples(tables)))
     elif row_count:
-        checks.append(lambda: check_fan_out(plan, adapter, allowed, tables, can_retry(ErrorCode.JOIN_FAN_OUT)))
+        if probes:
+            checks.append(lambda: check_fan_out(plan, adapter, allowed, tables, can_retry(ErrorCode.JOIN_FAN_OUT)))
         checks.append(lambda: _nulls(frame()))
     found: List[PipelineError] = []
     for check in checks:

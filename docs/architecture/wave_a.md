@@ -1866,11 +1866,19 @@ The answer synthesizer is given the warnings, as it is given
       every table on the near side of that join in the plan's join tree is
       repeated, which covers the many-to-many sum. A `COUNT`, `SUM` or `AVG`
       (not `DISTINCT`) of a plain column of a repeated table is confirmed by
-      `SELECT COUNT(*), COUNT(DISTINCT alias.pk) FROM <the plan's FROM and
-      joins> WHERE <the plan's WHERE> LIMIT 1`, built with the generator's
+      `SELECT 1 FROM <the plan's FROM and joins> WHERE <the plan's WHERE>
+      AND NOT alias.pk IS NULL GROUP BY <the plan's groups>, alias.pk HAVING
+      COUNT(*) > 1 LIMIT 1` (after review: a `COUNT(*)` against
+      `COUNT(DISTINCT pk)` over the whole join gave false findings on outer
+      joins and grouped plans), built with the generator's
       `GeneratorNode.attach_joins` (now a static method) and rendered by the
-      adapter. No probe without a single-column primary key or with a table
-      the scope denies. The check lives in the executor, per sub-query, not
+      adapter; the key keeps its reflected case. No probe without a
+      single-column primary key or with a table the scope denies.
+    - **Probes and hooks** (owner's decision after review). A probe, the
+      value check's or the fan-out check's, runs outside `execute.before` and
+      `execute.after`. So no probe runs when any hook is attached at
+      `execute.before` (`run_checks(..., probes=False)`): only the null check
+      does. `settings.pipeline.sanity_checks: false` stays the off switch. The check lives in the executor, per sub-query, not
       in the aggregator beside `unconverted_join_keys`: the repeated rows are
       inside one sub-query's SQL, which the aggregator never sees.
     - **All-null.** `check_nulls(frame)` reads the saved result's null counts
@@ -1899,9 +1907,14 @@ The answer synthesizer is given the warnings, as it is given
     - **`sanity.flagged`** is published through `nl2sql.events.publish` for
       each finding: `code`, `sub_query_id`, `retry` (true for a retried
       `ERROR`).
-    - **Not done.** The playground's node inspector still reads a warning's
-      `error_code` and so shows a typed warning's message without its code;
-      its bundle is left for the web app's next rebuild.
+    - **The playground.** `NodeInspector.jsx` reads a warning's `code` (and
+      a downgraded error's `error_code`); the bundle is rebuilt.
+    - **Breaking for REST clients.** `QueryResult.warnings[]` items lost
+      `error_code` and `severity` for `code` and `detail.recovered`. Runs are
+      not stored across an upgrade, so no older warning is read back.
+    - **Tests.** Every e2e test that opened the session demo's shared
+      `state.db` (the `fake_llm` fixture, the RBAC API test, both evals
+      tests, the temperature test) now gets a private copy.
 
 ## 12. MCP server (stdio)
 

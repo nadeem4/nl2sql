@@ -37,11 +37,11 @@ def _env():
 
 
 @pytest.mark.e2e
-def test_a_rejected_temperature_tells_the_user_what_to_set(demo_project):
+def test_a_rejected_temperature_tells_the_user_what_to_set(demo_project, tmp_path):
     server = FakeLLMServer(RULES_COUNT_CUSTOMERS, reject_temperature=True).start()
     try:
         _write_config(demo_project, "temp-rejected.yaml", server,
-                      {"model": "gpt-5.5", "temperature": 0.0})
+                      {"model": "gpt-5.5", "temperature": 0.0}, store=tmp_path)
         r = run_cli(demo_project, _env(), "run", QUESTION, config="temp-rejected.yaml")
     finally:
         server.stop()
