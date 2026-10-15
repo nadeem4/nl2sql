@@ -10,7 +10,9 @@ wiki, a data catalog) implements ``KnowledgeSource`` and is installed under the
 Every model is strict (``extra="forbid"``). Every text field is at most
 ``item_max_chars`` long (500 unless the validation context says otherwise, as
 the engine passes ``settings.knowledge.item_max_chars``): a longer one is a
-load error naming the item, so nothing is silently cut. ``notes`` is for
+load error naming the item, so nothing is silently cut. Every name (a table,
+a column, a code, a rule id, a datasource id) is at most ``NAME_MAX_CHARS``
+(255). ``notes`` is for
 people and never sent to a model.
 
 This module imports only pydantic and the standard library. See
@@ -45,6 +47,19 @@ def _capped(value: str, info: ValidationInfo) -> str:
 Text = Annotated[str, AfterValidator(_capped)]
 """A glossary text: at most ``item_max_chars`` characters."""
 
+NAME_MAX_CHARS = 255
+"""The longest a name may be: a table or column name, a code, a rule id, a datasource id."""
+
+
+def _name(value: str) -> str:
+    if len(value) > NAME_MAX_CHARS:
+        raise ValueError(f"is a name {len(value)} characters long; a name is at most {NAME_MAX_CHARS}")
+    return value
+
+
+Name = Annotated[str, AfterValidator(_name)]
+"""A name in a glossary (a table, ``table.column``, a code, a rule id): at most ``NAME_MAX_CHARS`` characters."""
+
 
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -66,7 +81,7 @@ class ColumnKnowledge(_Model):
     role: Optional[Role] = None
     unit: Optional[Text] = None
     grain: Optional[Grain] = None
-    values: Dict[str, Text] = Field(default_factory=dict)
+    values: Dict[Name, Text] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _values_on_an_enum_only(self) -> "ColumnKnowledge":
@@ -75,7 +90,7 @@ class ColumnKnowledge(_Model):
         return self
 
 
-ColumnNames = Union[str, List[str]]
+ColumnNames = Union[Name, List[Name]]
 """``table.column``, or a list of them for a composite key."""
 
 
@@ -94,16 +109,16 @@ class Term(_Model):
     term: Text = Field(min_length=1)
     synonyms: List[Text] = Field(default_factory=list)
     definition: Optional[Text] = None
-    columns: List[str] = Field(default_factory=list)
-    tables: List[str] = Field(default_factory=list)
+    columns: List[Name] = Field(default_factory=list)
+    tables: List[Name] = Field(default_factory=list)
 
 
 class Rule(_Model):
     """A business rule in prose (D40), sent when a sub-query reads one of ``tables`` (empty: every sub-query)."""
 
-    id: str
+    id: Name
     text: Text = Field(min_length=1)
-    tables: List[str] = Field(default_factory=list)
+    tables: List[Name] = Field(default_factory=list)
 
     @field_validator("id")
     @classmethod
@@ -116,8 +131,8 @@ class Rule(_Model):
 class DatasourceKnowledge(_Model):
     """One datasource's knowledge. Table and column names are resolved against the live snapshot when used."""
 
-    tables: Dict[str, TableKnowledge] = Field(default_factory=dict)
-    columns: Dict[str, ColumnKnowledge] = Field(default_factory=dict)
+    tables: Dict[Name, TableKnowledge] = Field(default_factory=dict)
+    columns: Dict[Name, ColumnKnowledge] = Field(default_factory=dict)
     joins: List[JoinKnowledge] = Field(default_factory=list)
     terms: List[Term] = Field(default_factory=list)
     rules: List[Rule] = Field(default_factory=list)
@@ -137,7 +152,7 @@ class Glossary(_Model):
     """A whole glossary: ``version: 1`` and the knowledge per datasource id."""
 
     version: Literal[1]
-    datasources: Dict[str, DatasourceKnowledge] = Field(default_factory=dict)
+    datasources: Dict[Name, DatasourceKnowledge] = Field(default_factory=dict)
 
 
 @runtime_checkable
@@ -167,6 +182,8 @@ class KnowledgeSource(Protocol):
 
 __all__ = [
     "ITEM_MAX_CHARS",
+    "NAME_MAX_CHARS",
+    "Name",
     "Role",
     "Grain",
     "Cardinality",

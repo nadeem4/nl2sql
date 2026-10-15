@@ -1491,6 +1491,13 @@ flowchart TD
       `demo_config(glossary=...)` overrides it.
     - **Drift.** `DriftImpact.glossary_items` and the finder `_glossary_items`,
       filtered with `visible` to the tables the caller reads.
+    - **After review (#333).** `sources()` shows a reload's `error` only to a
+      caller who may reload; others get `HIDDEN_ERROR`. The mention check also
+      reads rule ids and enum codes, and `visible(..., also_denied=deny_names(scope))`
+      adds the names a role denies explicitly (a table kept out of the index).
+      The SDK caps names at `NAME_MAX_CHARS` (255); the `yaml` source refuses a
+      file over `GLOSSARY_MAX_BYTES` (5 MB). `write_glossary` fsyncs, keeps the
+      file's mode and maps a `PermissionError` to `ReviewError(NOT_WRITABLE)`.
 
 **The demo recording.** K2 changes the planner's structured output from
 `PlanModel` to `PlannerAnswer`, and the replay provider keys on the

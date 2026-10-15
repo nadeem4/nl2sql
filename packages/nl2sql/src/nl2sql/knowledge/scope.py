@@ -3,10 +3,14 @@
 An item is left out when it names a table the caller cannot read (a table,
 a column of one, either side of a join, a term's or a rule's tables or
 columns), or when any of its texts mentions, as a whole word and ignoring
-case, the name of a table on that datasource the caller cannot read. So
-knowledge never names a hidden table by its name. A paraphrase ("the pay
-table") cannot be caught this way; the validator still refuses any plan on
-the table (docs/architecture/wave_b.md, section 4).
+case, the name of a table on that datasource the caller cannot read, or of a
+table one of its roles denies by name (which covers a table kept out of the
+index). The texts are every free text and every name an item carries: a rule
+id and an enum code count. So knowledge never names a hidden table by its
+exact name. A paraphrase ("the pay table"), a plural or singular ("salary"
+for ``salaries``) and a name inside a longer identifier (``salaries_history``)
+cannot be caught this way; the validator still refuses any plan on the table
+(docs/architecture/wave_b.md, section 4).
 
 The check needs the datasource's snapshot, to know which tables are denied:
 without one, nothing is visible (fails closed).
@@ -29,6 +33,23 @@ def denied_table_names(snapshot: SchemaSnapshot, allows: Allows) -> Set[str]:
     """The names (lower case) of the snapshot's tables the caller may not read."""
     return {t.table.table_name.lower() for t in snapshot.contract.tables.values()
             if not allows(t.table.schema_name, t.table.table_name)}
+
+
+def deny_names(scope) -> Set[str]:
+    """The table names (lower case) the caller's roles, or its policy check, deny by name on the scope's datasource.
+
+    Only a pattern whose table part has no wildcard names a table, and only a
+    name the scope still refuses counts (another role may allow it).
+    """
+    grants = [*scope.grants, *([scope.check] if scope.check is not None else [])]
+    names = set()
+    for grant in grants:
+        for pattern in grant.deny:
+            table = pattern.table
+            if (table and not any(c in table for c in "*?[") and pattern.covers_datasource(scope.datasource_id)
+                    and not scope.allows(pattern.schema if pattern.schema and pattern.schema != "*" else None, table)):
+                names.add(table.lower())
+    return names
 
 
 def _pattern(names: Set[str]) -> Optional["re.Pattern[str]"]:
@@ -64,12 +85,15 @@ def _names(value) -> List[str]:
     return [value] if isinstance(value, str) else list(value)
 
 
-def visible(knowledge: DatasourceKnowledge, snapshot: Optional[SchemaSnapshot], allows: Allows
-            ) -> DatasourceKnowledge:
-    """What of ``knowledge`` a caller whose scope ``allows`` may see; nothing without a snapshot."""
+def visible(knowledge: DatasourceKnowledge, snapshot: Optional[SchemaSnapshot], allows: Allows,
+            also_denied: Iterable[str] = ()) -> DatasourceKnowledge:
+    """What of ``knowledge`` a caller whose scope ``allows`` may see; nothing without a snapshot.
+
+    ``also_denied``: more table names no text may mention (``deny_names(scope)``).
+    """
     if snapshot is None:
         return DatasourceKnowledge()
-    pattern = _pattern(denied_table_names(snapshot, allows))
+    pattern = _pattern(denied_table_names(snapshot, allows) | {n.lower() for n in also_denied})
 
     def table_ok(name: str) -> bool:
         return _table_allowed(name, snapshot, allows)
@@ -81,7 +105,7 @@ def visible(knowledge: DatasourceKnowledge, snapshot: Optional[SchemaSnapshot], 
               if table_ok(name) and not _mentions([name, item.description, item.notes], pattern)}
     columns = {name: item for name, item in knowledge.columns.items()
                if column_ok(name) and not _mentions([name, item.description, item.notes, item.unit, *item.synonyms,
-                                                     *item.values.values()], pattern)}
+                                                     *item.values, *item.values.values()], pattern)}
     joins = [join for join in knowledge.joins
              if all(column_ok(n) for n in _names(join.from_) + _names(join.to))
              and not _mentions([join.notes], pattern)]
@@ -89,7 +113,7 @@ def visible(knowledge: DatasourceKnowledge, snapshot: Optional[SchemaSnapshot], 
              if all(table_ok(n) for n in term.tables) and all(column_ok(n) for n in term.columns)
              and not _mentions([term.term, term.definition, *term.synonyms], pattern)]
     rules = [rule for rule in knowledge.rules
-             if all(table_ok(n) for n in rule.tables) and not _mentions([rule.text], pattern)]
+             if all(table_ok(n) for n in rule.tables) and not _mentions([rule.id, rule.text], pattern)]
     examples = [example for example in knowledge.examples if not _mentions([example], pattern)]
     return DatasourceKnowledge.model_validate(
         {"tables": tables, "columns": columns, "joins": joins, "terms": terms, "rules": rules,
@@ -113,7 +137,7 @@ def _prefixes(knowledge: DatasourceKnowledge) -> List[str]:
 
 
 def with_schema_facts(shown: DatasourceKnowledge, provenance: Dict[str, str], snapshot: SchemaSnapshot,
-                      allows: Allows, *, dialect: Optional[str]
+                      allows: Allows, *, dialect: Optional[str], also_denied: Iterable[str] = ()
                       ) -> Tuple[DatasourceKnowledge, Dict[str, str], Dict[str, str]]:
     """``shown`` (already filtered) with what the schema adds, as ``show`` returns it, and each item's origin.
 
@@ -125,7 +149,7 @@ def with_schema_facts(shown: DatasourceKnowledge, provenance: Dict[str, str], sn
     """
     from nl2sql.knowledge.resolve import derived_roles, resolve_column, resolve_table, table_label
 
-    pattern = _pattern(denied_table_names(snapshot, allows))
+    pattern = _pattern(denied_table_names(snapshot, allows) | {n.lower() for n in also_denied})
     prefixes = _prefixes(shown)
     origins: Dict[str, str] = {}
     sources: Dict[str, str] = {}

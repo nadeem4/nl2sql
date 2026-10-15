@@ -91,8 +91,11 @@ datasources:
 
 Every model is strict: an unknown key is an error. Every text is at most
 `settings.knowledge.item_max_chars` (500) characters; a longer one is a load
-error naming the item, so nothing is silently cut. `notes` is for people: it
-is shown by `knowledge show` and never sent to a model.
+error naming the item, so nothing is silently cut. Every name (a table, a
+column, a code, a rule id, a term's tables and columns) is at most 255
+characters, and the `yaml` source reads a glossary file of at most 5 MB.
+`notes` is for people: it is shown by `knowledge show` and never sent to a
+model.
 
 ### Names
 
@@ -138,9 +141,17 @@ Every method takes the caller as a required keyword (`user_context`), with
 no admin default. A caller sees only what its scope reaches: an item that
 names a table it cannot read (a table, a column of one, either side of a
 join, a term's or a rule's tables or columns), or whose text mentions such a
-table by name (a whole word, case ignored), is left out. Knowledge therefore
-never names a hidden table. A paraphrase ("the pay table") cannot be caught
-this way; the validator still refuses any plan on the table.
+table by name (a whole word, case ignored), is left out. The texts checked
+are every free text and every name an item carries, a rule's id and an enum
+column's codes included. The names checked are the datasource's indexed
+tables the caller cannot read, plus every table one of its roles denies by
+name, so a table kept out of the index is covered too. Knowledge therefore
+never names a hidden table by its exact name.
+
+What the check cannot catch: a paraphrase ("the pay table"), a plural or
+singular ("salary" for `salaries`), and a name inside a longer identifier
+(`salaries_history`), as well as a table hidden only by a wildcard pattern
+and not indexed. The validator still refuses any plan on the table.
 
 Checking names against the scope needs the datasource's indexed schema, so a
 datasource that is not indexed yet shows nothing but that problem.
@@ -153,7 +164,7 @@ only as JSON values (Wave B's K2).
 
 | Method | What it does |
 | --- | --- |
-| `engine.knowledge.sources(*, user_context)` | Each source (`KnowledgeSourceInfo`): its `type`, item counts per datasource the caller reaches (counting what the caller may see), `sha256`, `loaded_at` and the last reload's `error` |
+| `engine.knowledge.sources(*, user_context)` | Each source (`KnowledgeSourceInfo`): its `type`, item counts per datasource the caller reaches (counting what the caller may see), `sha256`, `loaded_at` and the last reload's `error`. The error quotes the file (its path, its lines, the tables it names), so only a caller who may reload (an admin role, or any caller under `allow_all`) sees it; anyone else gets a fixed text saying the reload failed and an admin can see why |
 | `engine.knowledge.show(datasource_id=None, *, user_context)` | The merged knowledge as the engine uses it (`DatasourceKnowledgeView`): `knowledge` with derived roles and database comments filled in, `origins` and `sources` per item, `digest` and `problems` |
 | `engine.knowledge.export(path=None, *, datasource_ids=None, user_context)` | The knowledge-source items the caller may see as one canonical `glossary.yaml`, returned and, with `path`, written there. It refuses to write over a config file or a knowledge source's own file. Derived roles and database comments are not exported. |
 | `engine.knowledge.reload(*, user_context)` | Loads every source again and swaps atomically; needs an admin role (`policies.admin_roles`; any caller under `allow_all`). Runs in flight keep the knowledge they started with. |
@@ -185,7 +196,10 @@ canonical form: a fixed header comment, the keys in the models' order,
 tables, columns and code values sorted by name, lists in their own order.
 Comments are not kept, so write remarks in a `notes:` field. The write
 refuses when the file changed since the engine loaded it, writes through a
-symlink (the link is kept), and replaces the file atomically. `export`
+symlink (the link is kept), and replaces the file atomically: the new text
+goes to a temporary file, flushed to disk and given the file's mode, which is
+renamed over it. A file another program holds open (on Windows) is refused
+with a review error saying to close it. `export`
 writes the same canonical form, and the demo glossary is kept in it.
 
 ## The `KnowledgeSource` interface
