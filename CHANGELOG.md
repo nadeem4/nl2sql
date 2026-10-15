@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.7.0](https://github.com/nadeem4/nl2sql/compare/v0.6.0...v0.7.0) (2026-10-15)
+
+
+### Features
+
+* **adapters:** an encrypt option for SQL Server connections ([#307](https://github.com/nadeem4/nl2sql/issues/307)) ([4a294ba](https://github.com/nadeem4/nl2sql/commit/4a294badc3d310fcc4f9647b62858f822b9eae75))
+* **cost:** the dated price table, per-question caps and a reusable budget (E3) ([#326](https://github.com/nadeem4/nl2sql/issues/326)) ([db34901](https://github.com/nadeem4/nl2sql/commit/db34901fb1849052bf08720bbc2ed311b5ccb442))
+* **evals:** engine.evals core — suites, Chinook moved, scorers, run, regenerate (V1) ([#317](https://github.com/nadeem4/nl2sql/issues/317)) ([aa4292b](https://github.com/nadeem4/nl2sql/commit/aa4292bfa5dac786d144b3cb8c5afa0869054f57))
+* **evals:** nl2sql eval, the regression gate on execution accuracy, records by mode and suite (V2) ([#320](https://github.com/nadeem4/nl2sql/issues/320)) ([cb7b5c3](https://github.com/nadeem4/nl2sql/commit/cb7b5c3f7582b1a1b1ebb20cc2c41a7d4b07b165))
+* **evals:** seeding draft eval cases from a datasource (V3) ([#328](https://github.com/nadeem4/nl2sql/issues/328)) ([147b05a](https://github.com/nadeem4/nl2sql/commit/147b05a62f519d03027ce877bfa748151db52e8b))
+* **evals:** the routing suite and gate over the demo's three databases (R3) ([#323](https://github.com/nadeem4/nl2sql/issues/323)) ([5920d3f](https://github.com/nadeem4/nl2sql/commit/5920d3f11e5d847c32c0b4c0541e5f901a9780db))
+* **events:** run events on the bus, the caller-safe stream and engine.events (E1) ([#314](https://github.com/nadeem4/nl2sql/issues/314)) ([62e2e0d](https://github.com/nadeem4/nl2sql/commit/62e2e0db0d6194f9177ebde5768f3f04d990921a))
+* **events:** the Phase 2 events published: index, datasource, parse retry, policy denials, purge (E4) ([#321](https://github.com/nadeem4/nl2sql/issues/321)) ([ea8d939](https://github.com/nadeem4/nl2sql/commit/ea8d939027b6ddda0de9ace835c58128e98e4f4c))
+* **events:** Wave A foundation — event bus, catalog, run scope, registry kinds (A0) ([#313](https://github.com/nadeem4/nl2sql/issues/313)) ([653fa73](https://github.com/nadeem4/nl2sql/commit/653fa73c76eb2bc764795d19e9ee6e3c78e4617e))
+* **hooks:** approval and the public pinned-plan entry (H2) ([#319](https://github.com/nadeem4/nl2sql/issues/319)) ([35d7f1b](https://github.com/nadeem4/nl2sql/commit/35d7f1b4e41abad298a5323233bdf0c2e1b9cf47))
+* **hooks:** the hook runner, the six points and the boundary test (H1) ([#315](https://github.com/nadeem4/nl2sql/issues/315)) ([f839a15](https://github.com/nadeem4/nl2sql/commit/f839a1525277f60b5f5d21c9b2b46f87833dd8fb))
+* **mcp:** MCP server over stdio and the caller's schema (M1) ([#325](https://github.com/nadeem4/nl2sql/issues/325)) ([0277fe5](https://github.com/nadeem4/nl2sql/commit/0277fe5f9b62a144f25ed5ca131f018b9ae74cd7))
+* **observers:** log, audit and otel observers; llm.call and llm.changed on the bus (E2) ([#318](https://github.com/nadeem4/nl2sql/issues/318)) ([8fd2b60](https://github.com/nadeem4/nl2sql/commit/8fd2b60ff8c1cbd01f21ba8e411343b37dee9e20))
+* **routing:** one entry per example phrasing, votes, rank fusion and the routing settings (R1) ([#316](https://github.com/nadeem4/nl2sql/issues/316)) ([d924099](https://github.com/nadeem4/nl2sql/commit/d924099c6c00adbe1a0ae013aeb97b7e46d79c4d))
+* **routing:** the sub-query limit and join-key coercion (R2) ([#322](https://github.com/nadeem4/nl2sql/issues/322)) ([d66419b](https://github.com/nadeem4/nl2sql/commit/d66419bbc6c628a589c47988ebcdbd811c043f4d))
+* **sanity:** join fan-out, all-null and value checks; typed RunWarning (S1) ([#324](https://github.com/nadeem4/nl2sql/issues/324)) ([646596e](https://github.com/nadeem4/nl2sql/commit/646596e053bb472756d2c4ed69844aaaa6126530))
+* **schema:** schema drift: check, diff, impact (D1) ([#327](https://github.com/nadeem4/nl2sql/issues/327)) ([5d37713](https://github.com/nadeem4/nl2sql/commit/5d37713f99cf1c1e27d1594fc402e0c71d1073f6))
+
+
+### Documentation
+
+* **architecture:** Wave A design (events, observers, hooks, evals, routing) ([#308](https://github.com/nadeem4/nl2sql/issues/308)) ([a465654](https://github.com/nadeem4/nl2sql/commit/a46565411d0b66dbbd3b5ca541f5e49e37892ec1))
+* **architecture:** Wave B design (knowledge, profiler, clarify, cost guard) ([#310](https://github.com/nadeem4/nl2sql/issues/310)) ([36f6d20](https://github.com/nadeem4/nl2sql/commit/36f6d2017077317aef85a291fe8ae73078f1935d))
+* **architecture:** Wave C design (conversation, charts, dashboards, launchpad, MCP over HTTP) ([#311](https://github.com/nadeem4/nl2sql/issues/311)) ([4f86a9a](https://github.com/nadeem4/nl2sql/commit/4f86a9af9c9c9fafa2b7e1b77cc155a1862bcd4b))
+* **architecture:** Wave D design (API v1, web app, Compose, terminal app) ([#312](https://github.com/nadeem4/nl2sql/issues/312)) ([02e4a39](https://github.com/nadeem4/nl2sql/commit/02e4a3907bb55f715f6a024b2e9632ad239619f3))
+* correct two outdated rules in CLAUDE.md ([#306](https://github.com/nadeem4/nl2sql/issues/306)) ([782b291](https://github.com/nadeem4/nl2sql/commit/782b2911f376e1cf97170bbc42d7e29f3c9a2324))
+* **release:** notes for 0.7.0 ([#331](https://github.com/nadeem4/nl2sql/issues/331)) ([544e48e](https://github.com/nadeem4/nl2sql/commit/544e48ef4402f3cca1a42da10be763c9d689ba6d))
+
 ## [0.6.0](https://github.com/nadeem4/nl2sql/compare/v0.5.0...v0.6.0) (2026-10-15)
 
 
