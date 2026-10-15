@@ -69,6 +69,7 @@ nav:
     - Phase 2 (design): architecture/phase2.md
     - Wave A (design): architecture/wave_a.md
     - Wave B (design): architecture/wave_b.md
+    - Wave C (design): architecture/wave_c.md
     - Wave D (design): architecture/wave_d.md
     - Subgraphs:
       - Main Pipeline Graph: architecture/subgraphs/main_pipeline_graph.md
