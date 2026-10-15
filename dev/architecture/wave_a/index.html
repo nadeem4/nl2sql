@@ -3204,7 +3204,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1 and E2 are built. Phase 1 is
+as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1, E2 and V2 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -5093,6 +5093,38 @@ series_break)</code>.</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built: the gate (V2)</p>
+<p><code>engine.evals.gate(report, baseline) -&gt; GateResult(ok, regressions,
+series_break, compared)</code>, with <code>evals.yaml</code>'s <code>gate</code> settings, built on
+V1's statistics in <code>nl2sql/evaluation/gate.py</code> (<code>gate</code>, <code>load_baseline</code>).
+Where the code differs from the section above, after the owner's
+decision of 2026-10-15:</p>
+<ul>
+<li><strong>It reads execution accuracy, not <code>overall</code>.</strong> A case passes the gate
+  on <code>result_match</code> and <code>outcome</code> only
+  (<code>nl2sql.evaluation.report.execution_passed</code>), the measure 0.6's tier 2
+  published, so a faithfulness miss is never a regression and a 0.7 run
+  compares with the 0.6 history. "Both accuracies" are that measure as
+  users see it and on the generated path (each case's <code>generated</code> run),
+  the second only when the run had curated answers on. Mode retrieval
+  has no execution and is read by status.</li>
+<li><strong>A baseline is a report, a record or a <code>benchmarks/</code> folder</strong> (the
+  newest record of the run's mode, database and config). A record 0.6
+  wrote has no scores; its status was execution accuracy and is read so.</li>
+<li><strong>A series break is not <code>ok</code>.</strong> The gate uses the history's own rule,
+  <code>records.series_key</code> (mode, suite digest, schema fingerprint and, in
+  mode full, roles and curated answers), plus the roles each run actually
+  ran. A series break compares nothing for that config, and
+  <code>nl2sql eval run</code> exits 2 after printing the other configs' regressions.</li>
+<li><strong>The allowance is per mode.</strong> <code>max_regressions</code> and McNemar (two-sided,
+  counted only when more cases were lost than gained) apply to mode full.
+  Modes plans and retrieval run no model and allow no flip.</li>
+<li><strong>A missing or unreadable baseline exits 2</strong> with a one-line error.</li>
+<li><strong>Routing has no suite yet</strong> (Phase R adds it), so CI gates mode
+  retrieval on Chinook only.</li>
+</ul>
+</div>
 <h3 id="the-cli">The CLI</h3>
 <table>
 <thead>
@@ -5121,6 +5153,43 @@ series_break)</code>.</p>
 </tbody>
 </table>
 <p><code>nl2sql benchmark</code> and all its subcommands are deleted.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the CLI and the records (V2)</p>
+<p><code>nl2sql eval run</code>, <code>regenerate</code> and <code>publish</code> are in
+<code>cli/commands/eval.py</code>. Where they differ from the table:</p>
+<ul>
+<li><strong><code>run</code></strong> also takes <code>--passes</code>. <code>--llm</code> takes <code>PRESET</code>, <code>FILE.yaml</code>,
+  <code>NAME=PRESET</code> or <code>NAME=FILE</code>. The report goes to <code>--out</code>, by default
+  <code>eval_&lt;mode&gt;.json</code> next to <code>nl2sql.yaml</code>, with a <code>run</code> stamp (when, and
+  which engine version and commit) for <code>publish</code>. Exit codes: 0, 1 on a
+  regression, 2 on a usage error or a baseline that cannot be compared,
+  3 at the cost cap. Mode full refuses to start with <code>CI</code> set (the one
+  <code>CI</code> read, in <code>READS_THE_ENVIRONMENT</code>).</li>
+<li><strong><code>publish [REPORT ...] [--note] [--from DIR ...]</code></strong> writes one record
+  per config of each report, then rebuilds <code>docs/benchmarks.md</code> and the
+  README block from every record. With no report it only rebuilds the
+  pages, as <code>benchmark publish</code> did.</li>
+<li><strong>Records are keyed by mode and suite digest:</strong>
+<code>benchmarks/&lt;mode&gt;/&lt;database&gt;/...json</code>, <code>kind</code> the mode and <code>dataset</code>
+  the suite's name and digest (several suites: their digests joined and
+  hashed, <code>report.suite_identity</code>). Every mode is recorded; a record keeps
+  the config's whole board.</li>
+<li><strong>The headline accuracy is execution accuracy</strong> (<code>metrics.accuracy</code> is
+  <code>accuracy.execution</code>), so the published series reads the same as 0.6's;
+  <code>accuracy_all_scorers</code> and <code>accuracy_generated</code> sit beside it.</li>
+<li><strong>0.6's records stay readable.</strong> Kind <code>tier2</code> is read as mode full
+  (<code>records.mode_of</code>), so the history shows those runs in the mode full
+  table, as a new series (the suite changed).</li>
+<li><strong>Records are slim</strong>: one compact JSON line, each case's verdicts and
+  cost only (<code>records.slim_result</code>). The full report is CI's
+  <code>eval-reports</code> artifact. A retrieval record names its embedder.</li>
+<li><strong>CI's baselines are recorded on CI</strong> (ubuntu-latest, Python 3.12):
+  the integration job uploads <code>eval_plans.json</code> and <code>eval_retrieval.json</code>,
+  and <code>nl2sql eval publish</code> records them from that artifact, the run's URL
+  in the note. The steps are in <code>benchmarks/README.md</code>; a suite, schema or
+  routing change re-records both the same way.</li>
+</ul>
+</div>
 <h3 id="seeding-benchmark-your-own-database">Seeding: benchmark your own database</h3>
 <p><code>engine.evals.seed("sales", count=20, out="evals/sales.yaml")</code> (D26):</p>
 <ol>

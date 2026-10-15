@@ -3724,6 +3724,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-regression-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regression gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#in-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3731,6 +3753,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="In CI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#re-recording-cis-baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-recording CI's baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -5129,6 +5168,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-regression-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regression gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#in-ci" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5136,6 +5197,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="In CI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#re-recording-cis-baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Re-recording CI's baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -5203,6 +5281,10 @@ configures the regression gate, which compares a run with a baseline.</p>
 <tr>
 <td><code>engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)</code></td>
 <td>Runs every approved case once per role in its <code>outcome</code> map, <code>passes</code> times, and returns an <code>EvalReport</code></td>
+</tr>
+<tr>
+<td><code>engine.evals.gate(report, baseline)</code></td>
+<td>The regression gate: <code>report</code> against a baseline report, record or <code>benchmarks/</code> folder, with <code>evals.yaml</code>'s <code>gate</code> settings. Returns a <code>GateResult</code> (<a href="#the-regression-gate">The gate</a>)</td>
 </tr>
 <tr>
 <td><code>engine.evals.regenerate(path, *, allow_packaged=False)</code></td>
@@ -5404,11 +5486,165 @@ closes with an empty result. Every finished case also publishes <code>eval.case<
 with the suite, case, role, whether it passed, the answer's source, each
 scorer's verdict and its cost. The end of the run publishes <code>eval.finished</code>,
 with the suites, the number of cases, both accuracies and the dollars spent.</p>
+<h2 id="the-regression-gate">The regression gate</h2>
+<p><code>engine.evals.gate(report, baseline)</code> compares a run with a baseline and
+returns a <code>GateResult</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ok</code></td>
+<td>True only when the runs were compared and nothing regressed</td>
+</tr>
+<tr>
+<td><code>regressions</code></td>
+<td>One line per problem: too many cases flipped to fail, a significant drop, or a cost rise</td>
+</tr>
+<tr>
+<td><code>series_break</code></td>
+<td>Why nothing was compared: another suite digest, another mode, or no config in common</td>
+</tr>
+<tr>
+<td><code>compared</code></td>
+<td>Per config and measure: the cases that flipped each way, McNemar's p-value, both accuracies and both costs per case</td>
+</tr>
+</tbody>
+</table>
+<p>The baseline is an <code>EvalReport</code> (or the JSON <code>nl2sql eval run</code> writes), a
+record from <code>benchmarks/</code>, or a path to either. A path to a <code>benchmarks/</code>
+folder means its newest record of the run's mode, database and config.</p>
+<p><strong>Only the same suite and mode compare.</strong> Two runs are compared only when the
+suites' digests match and the mode is the same. Anything else is a series
+break: <code>ok</code> is false and nothing is compared.</p>
+<p><strong>The gate reads execution accuracy.</strong> A case passes when <code>result_match</code> and
+<code>outcome</code> pass; no other scorer counts. That is <code>accuracy.execution</code>, the
+measure 0.6's tier 2 published, so a run compares with the history published
+before 0.7 and a faithfulness verdict alone is never a regression. With
+curated answers on, it is checked twice: as users see it, and on the
+generated path. Mode retrieval has no execution, so its cases are read by
+their status.</p>
+<p>For each config both runs have, the gate fails when:</p>
+<ul>
+<li>more cases passed in the baseline and fail now than are allowed. Mode
+  full allows <code>max_regressions</code> (2 by default), because the model is noisy.
+  Modes plans and retrieval run no model, so they allow <strong>none</strong>: any flip is
+  a real break;</li>
+<li>in mode full, more cases were lost than gained and McNemar's exact
+  <strong>two-sided</strong> p-value on the flips is under <code>alpha</code>; or</li>
+<li>cost per case rose by more than <code>max_cost_increase</code>.</li>
+</ul>
+<p>Comparable means what the history page means by it (<code>records.series_key</code>):
+the same mode, suite digest and schema fingerprint and, in mode full, the
+same roles and curated answers. Both runs must also have run the same roles,
+so a role left out cannot quietly shrink the comparison.</p>
+<p>The statistics are in
+<a href="../testing/evaluation-dataset/#reading-a-run-intervals-flips-and-passk">the Chinook suite</a>.</p>
+<h2 id="the-cli">The CLI</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>nl2sql eval run [--suite PATH ...] [--mode full\|plans\|retrieval] [--llm SPEC ...] [--cases ID/TAG ...] [--passes N] [--max-cost USD] [--baseline PATH] [--out FILE]</code></td>
+<td><code>engine.evals.run</code>, then <code>engine.evals.gate</code> with <code>--baseline</code></td>
+</tr>
+<tr>
+<td><code>nl2sql eval regenerate PATH</code></td>
+<td><code>engine.evals.regenerate</code>; exits 1 when a case's SQL failed</td>
+</tr>
+<tr>
+<td><code>nl2sql eval publish [REPORT ...] [--note TEXT] [--from DIR ...]</code></td>
+<td>Records each report under <code>benchmarks/</code>, then rebuilds <a href="../benchmarks/">the results page</a> and the README block. Run from the repo root</td>
+</tr>
+</tbody>
+</table>
+<p><code>--llm</code> names an LLM config to compare in mode full, and repeats:</p>
+<ul>
+<li><code>gpt-5.4</code>, <code>mini-helpers</code> or <code>claude-planner</code>: a preset from
+  <code>nl2sql/evaluation/presets/</code>, named by itself;</li>
+<li><code>mine.yaml</code>: a file holding an <code>llm</code> section, named by its stem;</li>
+<li><code>NAME=PRESET</code> or <code>NAME=FILE</code>: either, under a name you choose.</li>
+</ul>
+<p>Without it, the config's own <code>llm</code> section runs as <code>default</code>.</p>
+<p><code>nl2sql eval run</code> writes the report to <code>--out</code>, by default
+<code>eval_&lt;mode&gt;.json</code> next to <code>nl2sql.yaml</code>, with a <code>run</code> stamp: when it ran,
+and the engine version and commit. <code>nl2sql eval publish</code> records that stamp,
+not the time it publishes.</p>
+<table>
+<thead>
+<tr>
+<th>Exit code</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>The run finished, and nothing regressed against <code>--baseline</code></td>
+</tr>
+<tr>
+<td>1</td>
+<td>A regression against <code>--baseline</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>A usage error: a bad <code>--llm</code>, a run the engine refuses (no cost cap, an unpriced model), mode full with <code>CI</code> set (whatever its value, <code>CI=false</code> included), a missing or unreadable baseline, or one that cannot be compared</td>
+</tr>
+<tr>
+<td>3</td>
+<td>The cost cap stopped mode full early: the report is partial</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># From a demo folder: the key-free gate CI runs, against the repo's records</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>plans<span class="w"> </span>--baseline<span class="w"> </span>../benchmarks
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># A paid run comparing two configs, under a $10 cap</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span><span class="nv">mini</span><span class="o">=</span>mini-helpers<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># From the repo root: record it and rebuild the results page</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>publish<span class="w"> </span>demo/eval_full.json<span class="w"> </span>--note<span class="w"> </span><span class="s2">"slim prompts"</span>
+</code></pre></div>
 <h2 id="in-ci">In CI</h2>
-<p>The key-free integration job runs <code>engine.evals.run(mode="plans")</code> on the
-Chinook suite, and every case must pass for every role
-(<code>tests/e2e/test_evals_plans.py</code>). Mode <code>full</code> spends a key and never runs in
-CI.</p>
+<p>The key-free integration job runs the eval gate on the demo's Chinook suite,
+after indexing it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>plans<span class="w"> </span>--baseline<span class="w"> </span>benchmarks
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>benchmarks
+</code></pre></div>
+<p>Each run is gated against the newest record of its mode in <code>benchmarks/</code>
+(<code>plans/chinook/</code> and <code>retrieval/chinook/</code>), and both reports are uploaded
+as the <code>eval-reports</code> artifact whether the gate passed or not. A changed suite
+or schema starts a new series, so the gate exits 2 until both baselines are
+recorded again. The same job also runs <code>tests/e2e/test_evals_plans.py</code>, where
+every case must pass for every role.</p>
+<h3 id="re-recording-cis-baselines">Re-recording CI's baselines</h3>
+<p>CI's plans and retrieval baselines are recorded <strong>on CI's own runner</strong>
+(<code>ubuntu-latest</code>, Python 3.12), never on a laptop: retrieval recall passes a
+case only at 100% column recall, which near-tie rankings of the local ONNX
+embedder can move between platforms.</p>
+<ol>
+<li>Push the change. The integration job's "Eval gate" step runs both modes and
+   uploads <code>eval_plans.json</code> and <code>eval_retrieval.json</code> as the <code>eval-reports</code>
+   artifact, pass or fail.</li>
+<li>Download them: <code>gh run download &lt;run id&gt; -n eval-reports -D eval-reports</code>.</li>
+<li>From the repo root, record them, naming where they came from:
+   <code>nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/&lt;run id&gt;"</code>.</li>
+<li>Commit the two records and the regenerated pages in the same PR, and push.
+   The next run gates against them.</li>
+</ol>
+<p>Never edit a record by hand, <code>engine_version</code> included. A change that moves
+the gate on purpose (a suite change, routing or retrieval work) re-records
+both baselines this way, in the PR that makes the change.</p>
+<p>Mode <code>full</code> spends a key: <code>nl2sql eval run --mode full</code> refuses to start when
+<code>CI</code> is set. The owner runs it before a release
+(<a href="../development/releasing/#the-pre-release-eval">Releasing</a>).</p>
 
 
 

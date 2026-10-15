@@ -5653,7 +5653,10 @@ window functions, so a few plans express the answer differently from <code>sql</
 in the key-free integration job. It builds an engine on the generated demo
 with no API key in the environment, runs <code>engine.evals.run(mode="plans")</code>, and
 requires every case to pass -- allowed, refused and unanswerable, for every
-role -- with none skipped.</p>
+role -- with none skipped. The same job runs
+<code>nl2sql eval run --mode plans --baseline benchmarks</code>, which gates the run
+against the newest mode plans record in <code>benchmarks/</code>
+(<a href="../../evals/#in-ci">In CI</a>).</p>
 <p>When a gold plan fails, the fault is in the engine or in the plan. Fix an
 engine bug with a regression test. Never change the gold data to make a plan
 pass.</p>
@@ -5680,6 +5683,9 @@ money, so it never runs in CI and never runs without a dollar cap
   (<code>openrouter/meta-llama/llama-3.3-70b-instruct</code>, <code>ollama/llama3</code>) and runs
   at temperature 0 (none for <code>anthropic</code>).</li>
 </ul>
+<p>From the command line, <code>--llm</code> takes a preset, a file or <code>NAME=</code> either:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="w"> </span>--llm<span class="w"> </span><span class="nv">mini</span><span class="o">=</span>mini-helpers<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">10</span>
+</code></pre></div>
 <p>The presets in <code>nl2sql/evaluation/presets/</code> are <code>llm</code> sections, shipped in the
 package:</p>
 <table>
@@ -5864,7 +5870,13 @@ flip is a fair coin. Ten lost and none gained is p = 0.002; five each way is
 p = 1.0.</p>
 <p>A case counts as passed only when <strong>every</strong> pass passed, so over three passes
 a case that has become flaky reads as a regression.</p>
-<p>The regression gate fails a run when, for any config both reports name:</p>
+<p>The regression gate (<code>engine.evals.gate</code>, <code>nl2sql eval run --baseline</code>)
+compares only comparable runs (the same mode, suite digest, schema and, in
+mode full, roles and curated answers), and a case passes on
+<strong>execution accuracy</strong> (<code>result_match</code> and <code>outcome</code>), the measure 0.6's tier
+2 published: a faithfulness miss alone is not a regression. With curated
+answers on it checks that accuracy as users see it and on the generated path.
+It fails a run when, for any config both runs name:</p>
 <table>
 <thead>
 <tr>
@@ -5876,11 +5888,11 @@ a case that has become flaky reads as a regression.</p>
 <tbody>
 <tr>
 <td>More than <code>max_regressions</code> cases flipped from pass to fail</td>
-<td>2</td>
-<td>A handful of named cases is something a person can go and read</td>
+<td>2 in mode full; always 0 in modes plans and retrieval</td>
+<td>A handful of named cases is something a person can go and read; with no model, any flip is a bug</td>
 </tr>
 <tr>
-<td>The flips are one-sided enough that McNemar's exact p &lt; <code>alpha</code></td>
+<td>Mode full: more cases lost than gained, and McNemar's exact two-sided p &lt; <code>alpha</code></td>
 <td>0.05</td>
 <td>A small but real drop should not pass because it is under the count</td>
 </tr>
@@ -5901,7 +5913,7 @@ often it happens to be right (<a href="https://arxiv.org/abs/2406.12045">tau-ben
 identical across passes.</p>
 <h3 id="results-over-time">Results over time</h3>
 <p>A recorded run is a JSON file under the repo's <code>benchmarks/</code> folder:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>benchmarks/&lt;kind&gt;/&lt;database&gt;/&lt;YYYY-MM-DD&gt;_&lt;shortsha&gt;_&lt;config&gt;.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>benchmarks/&lt;kind&gt;/&lt;database&gt;/&lt;YYYY-MM-DD&gt;_&lt;shortsha&gt;_&lt;config&gt;.json
 </code></pre></div>
 <table>
 <thead>
@@ -5912,8 +5924,8 @@ identical across passes.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>kind</code></td>
-<td><code>tier2</code> (mode full) or <code>retrieval</code></td>
+<td><code>mode</code></td>
+<td><code>full</code>, <code>plans</code> or <code>retrieval</code>; 0.6 wrote mode full runs under <code>tier2</code>, read as <code>full</code></td>
 </tr>
 <tr>
 <td><code>database</code></td>
@@ -5941,7 +5953,7 @@ identical across passes.</p>
 <tbody>
 <tr>
 <td><code>schema</code>, <code>kind</code></td>
-<td>The record format (2) and the kind</td>
+<td>The record format (2) and the run's mode</td>
 </tr>
 <tr>
 <td><code>recorded_at</code></td>
@@ -5961,7 +5973,7 @@ identical across passes.</p>
 </tr>
 <tr>
 <td><code>dataset</code></td>
-<td>The suite file's name and sha256, taken with LF line endings so a Windows checkout hashes the same</td>
+<td>The suite's name and digest (a SHA-256 of its LF bytes, so a Windows checkout hashes the same). A record 0.6 wrote names <code>chinook_gold.yaml</code></td>
 </tr>
 <tr>
 <td><code>database</code></td>
@@ -5973,19 +5985,28 @@ identical across passes.</p>
 </tr>
 <tr>
 <td><code>metrics</code></td>
-<td>The headline numbers: accuracy (strict and lenient) with their intervals, <code>pass_k</code>, answerability, dollars, tokens, latency, determinism and faithfulness; or, for retrieval, the recall summary</td>
+<td>The headline numbers: execution accuracy (strict and lenient) with their intervals, then <code>accuracy_all_scorers</code> and <code>accuracy_generated</code>, <code>pass_k</code>, answerability, dollars, tokens, latency, determinism and faithfulness; or, for retrieval, the recall summary</td>
+</tr>
+<tr>
+<td><code>scoreboard</code></td>
+<td>The config's whole board, every case record included</td>
 </tr>
 </tbody>
 </table>
+<p><strong>The headline accuracy is execution accuracy</strong> (<code>accuracy.execution</code>), the
+measure 0.6's tier 2 published, so the series reads the same before and
+after 0.7. The 0.6 records are on the 0.6 gold file, so the first 0.7 run
+starts a new series beside them.</p>
 <p>Records are never edited after writing: a run writes a new file. Two runs are
-comparable when they share the kind, the dataset sha and the schema
+comparable when they share the mode, the suite digest and the schema
 fingerprint, and for mode full the roles and whether curated answers were on.
-<code>nl2sql.evaluation.records.publish()</code>, run from the repo root, reads every
-record and rewrites <a href="../../benchmarks/">docs/benchmarks.md</a> and the README's
-results block. It reads no clock, so the same records always give
-byte-identical pages. <code>packages/nl2sql/tests/unit/test_benchmark_records.py</code>
-checks in CI, with no key, that the committed pages are exactly what
-<code>publish</code> makes from the committed records.</p>
+<code>nl2sql eval publish REPORT ...</code>, run from the repo root, writes the records
+of the reports <code>nl2sql eval run</code> saved, then reads every record and rewrites
+<a href="../../benchmarks/">docs/benchmarks.md</a> and the README's results block. It
+reads no clock, so the same records always give byte-identical pages.
+<code>packages/nl2sql/tests/unit/test_eval_records.py</code> checks in CI, with no key,
+that the committed pages are exactly what <code>publish</code> makes from the committed
+records.</p>
 <h3 id="how-mode-full-is-tested">How mode full is tested</h3>
 <p><code>packages/nl2sql/tests/e2e/test_evals_full_fake_llm.py</code> runs mode full with no
 key and no spending. It points two <code>llm</code> sections at two <code>FakeLLMServer</code>s
@@ -6029,8 +6050,16 @@ answers are faithful and the bad server's answer on its wrong rows is not.</p>
 <td>The faithfulness rules</td>
 </tr>
 <tr>
-<td><code>tests/unit/test_benchmark_records.py</code></td>
+<td><code>tests/unit/test_eval_records.py</code></td>
 <td>The records</td>
+</tr>
+<tr>
+<td><code>tests/unit/test_eval_gate.py</code></td>
+<td>The gate: same suite and mode, execution accuracy, both accuracies, baselines from records</td>
+</tr>
+<tr>
+<td><code>tests/cli/test_eval_command.py</code></td>
+<td><code>nl2sql eval run</code>, <code>regenerate</code> and <code>publish</code>, with their exit codes</td>
 </tr>
 </tbody>
 </table>
@@ -6091,6 +6120,10 @@ A missed column is one the planner cannot select, filter or join on.</p>
 </tr>
 </tbody>
 </table>
+<p>The first 0.7 record (2026-10-15, CI's baseline) scores each answerable case
+once per role allowed to read it, 96 case runs over 43 cases: 97.9% table
+recall, 76.5% column recall, 7.98 tables and 22.2 columns sent on average.
+It is a new series: the suite is not the 0.6 gold file.</p>
 <p>Most misses are columns of a table that was sent. Once one column entry of
 a table is picked, or a relationship entry adds its key columns, only those
 columns are sent rather than all of them. So <code>Invoice</code> often reaches the
@@ -6101,7 +6134,10 @@ planner as <code>BillingCountry</code> or a key without <code>Total</code> or <c
 <p><code>packages/nl2sql/tests/e2e/test_evals_retrieval.py</code> runs mode retrieval on the
 generated demo in the key-free integration job. It checks that the run covers
 every answerable case and reports recall and routing, not what the recall
-is.</p>
+is. The same job gates the recall itself:
+<code>nl2sql eval run --mode retrieval --baseline benchmarks</code> fails when more than
+two cases stopped passing (perfect recall, and routing where it applies)
+against the newest mode retrieval record, or the loss is significant.</p>
 
 
 
