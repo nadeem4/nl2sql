@@ -16,7 +16,7 @@
         <link rel="prev" href="../source/">
       
       
-        <link rel="next" href="../../configuration/system/">
+        <link rel="next" href="../mcp/">
       
       
         
@@ -2045,6 +2045,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -5557,7 +5585,9 @@ before any SQL is generated. <code>policies.yaml</code> sets <code>refusal_names
 true</code>, so the demo's refusal names the role and table; outside the demo the
 message is the generic "You do not have permission to see the data this
 question requires." See
-<a href="../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.</p>
+<a href="../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.
+The playground's schema panel follows the <strong>Ask as</strong> role too: it lists only
+the tables that role may read (<code>engine.datasources.schema(..., user_context=)</code>).</p>
 <h3 id="api-keys-in-the-demo">API keys in the demo</h3>
 <p><code>embeddings.yaml</code> says <code>provider: local</code>, so schema chunks are
 embedded with the key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb

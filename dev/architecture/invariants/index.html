@@ -3615,6 +3615,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -8654,7 +8682,7 @@
 <hr />
 <h2 id="policy-enforcement-is-namespaced-and-fail-closed">Policy Enforcement Is Namespaced and Fail-Closed</h2>
 <h3 id="definition_10">Definition</h3>
-<p>A role allows and denies tables with patterns that are <code>*</code>, <code>datasource</code> or <code>datasource.schema.table</code> (each part a glob, matched regardless of case); a two-part pattern is rejected when the config loads. Policy checks fail if the datasource ID is missing. Access is decided on datasource, schema and table: a table the plan names without a schema is in the adapter's default schema. Deny beats allow within a role; across roles a table is readable when some role allows it and that same role does not deny it. Every place that decides table access asks one <code>Scope</code> (<code>PolicyEngine.scope(user, datasource_id)</code> in <code>nl2sql.policies</code>), and nothing outside <code>nl2sql/policies/</code> matches a policy pattern. A run builds each datasource's scope once and keeps it. An optional policy check (<code>nl2sql_sdk.policy.PolicyCheck</code>) is asked once per caller and datasource per run; its grant is intersected with the roles, so neither widens the other, and any exception from it denies the datasource for the run: it never fails open.</p>
+<p>A role allows and denies tables with patterns that are <code>*</code>, <code>datasource</code> or <code>datasource.schema.table</code> (each part a glob, matched regardless of case); a two-part pattern is rejected when the config loads. Policy checks fail if the datasource ID is missing. Access is decided on datasource, schema and table: a table the plan names without a schema is in the adapter's default schema. Deny beats allow within a role; across roles a table is readable when some role allows it and that same role does not deny it. Every place that decides table access asks one <code>Scope</code> (<code>PolicyEngine.scope(user, datasource_id)</code> in <code>nl2sql.policies</code>), <code>engine.datasources.schema(..., user_context=)</code> included, and nothing outside <code>nl2sql/policies/</code> matches a policy pattern. A run builds each datasource's scope once and keeps it. An optional policy check (<code>nl2sql_sdk.policy.PolicyCheck</code>) is asked once per caller and datasource per run; its grant is intersected with the roles, so neither widens the other, and any exception from it denies the datasource for the run: it never fails open.</p>
 <h3 id="enforcement-points_10">Enforcement Points</h3>
 <ul>
 <li><code>Role</code> in <code>nl2sql.config.models</code> (the pattern shape, through <code>nl2sql.policies.patterns.parse_pattern</code>)</li>
@@ -8816,7 +8844,7 @@ different <code>storage.path</code> values never share a store.</p>
 <li>Only <code>nl2sql/storage/</code> imports <code>chromadb</code> (or <code>langchain_chroma</code>). The engine embeds, ranks and filters through the <code>IndexStore</code> interface (<code>nl2sql_sdk.stores</code>), so a plugin index store works the same way as the built-in <code>chroma</code> one. The one exception is the local embedder, <code>nl2sql/embeddings/local.py</code>, whose model is the ONNX all-MiniLM-L6-v2 that ships inside chromadb.</li>
 <li>Only <code>nl2sql/storage/</code> imports <code>sqlite3</code>. Schema snapshots, the plan cache, feedback and the index lock are reached through the <code>StateStore</code> interface, so a plugin state store works the same way as the built-in <code>sqlite</code> one. The SQLite adapter (its driver) reads a datasource, not the engine's state, and is exempt. An eval suite's expected rows come through the datasource's adapter, so nothing in <code>nl2sql/evaluation/</code> imports <code>sqlite3</code> (<code>test_gold_does_not_import_sqlite3</code>).</li>
 <li>Nothing outside <code>nl2sql/cli/</code> imports the CLI, and <code>nl2sql.cli.demo</code> never imports <code>nl2sql.cli.commands</code>.</li>
-<li><code>nl2sql_api</code> imports only the top-level <code>nl2sql</code> namespace, and so do the playground and <code>nl2sql demo</code>, apart from a named list of exceptions (<code>STILL_IMPORTED_FROM_INSIDE</code>: the provider catalogue in <code>llm/providers.py</code>, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import <code>nl2sql.feedback</code>, <code>nl2sql.tracing</code>, <code>nl2sql.pipeline</code>, <code>nl2sql.indexing</code> or <code>PROVIDER_PRESETS</code>: <code>engine.feedback</code>, <code>engine.traces.get</code>, <code>engine.about()</code>, <code>engine.index.inspect_defaults()</code> and <code>engine.llm.providers()</code> serve them. The CLI, the playground and <code>nl2sql_api</code> reach the engine only through <code>NL2SQL</code>'s public methods and namespaces, never the runtime behind them (<code>engine._runtime</code>, a namespace's <code>_ctx</code>).</li>
+<li><code>nl2sql_api</code> imports only the top-level <code>nl2sql</code> namespace, and so do the playground and <code>nl2sql demo</code>, apart from a named list of exceptions (<code>STILL_IMPORTED_FROM_INSIDE</code>: the provider catalogue in <code>llm/providers.py</code>, the hosted demo's per-request keys, and the demo's replay machinery and questions). In particular they never import <code>nl2sql.feedback</code>, <code>nl2sql.tracing</code>, <code>nl2sql.pipeline</code>, <code>nl2sql.indexing</code> or <code>PROVIDER_PRESETS</code>: <code>engine.feedback</code>, <code>engine.traces.get</code>, <code>engine.about()</code>, <code>engine.index.inspect_defaults()</code> and <code>engine.llm.providers()</code> serve them. The CLI, the playground and <code>nl2sql_api</code> reach the engine only through <code>NL2SQL</code>'s public methods and namespaces, never the runtime behind them (<code>engine._runtime</code>, a namespace's <code>_ctx</code>). The MCP server (<code>nl2sql/mcp/</code>) imports only the top-level <code>nl2sql</code> and, under the same rule, never the runtime; it is the only code that imports <code>mcp</code>, the <code>mcp</code> extra (<code>test_mcp_uses_only_the_public_api</code>). The SDK's <code>FastMCP</code> settings are pydantic-settings that read <code>FASTMCP_*</code> variables and the working directory's <code>.env</code>; the server passes every setting explicitly, so neither changes it, and nothing is written.</li>
 <li>The runtime (<code>pipeline</code>, <code>execution</code>, <code>indexing</code>, <code>datasources</code>, <code>llm</code>, <code>policies</code>, <code>aggregation</code>, <code>schema</code>, <code>services</code>, <code>context</code>, <code>public_api</code>) never imports <code>nl2sql.evaluation</code> or <code>nl2sql.feedback</code> at module scope. A deferred import inside a function is fine.</li>
 <li>A provider's API-key environment variable is read in <code>nl2sql/llm/</code> only. <code>PROVIDER_PRESETS</code> (<code>llm/registry.py</code>) is the one table; everything the CLI, the playground, evaluation and the REST API know about providers derives from it through <code>llm/providers.py</code>.</li>
 </ul>
@@ -8834,7 +8862,7 @@ different <code>storage.path</code> values never share a store.</p>
 <hr />
 <h2 id="importing-nl2sql-is-light">Importing nl2sql Is Light</h2>
 <h3 id="definition_22">Definition</h3>
-<p><code>import nl2sql</code> loads none of <code>chromadb</code>, <code>onnxruntime</code>, <code>sqlalchemy</code>, <code>psycopg2</code>, <code>psycopg</code>, <code>pymysql</code>, <code>pyodbc</code>, <code>pymssql</code>, <code>duckdb</code>, <code>duckdb_engine</code>, <code>textual</code> or <code>opentelemetry</code>, and its imports stay under 500 ms.</p>
+<p><code>import nl2sql</code> loads none of <code>chromadb</code>, <code>onnxruntime</code>, <code>sqlalchemy</code>, <code>psycopg2</code>, <code>psycopg</code>, <code>pymysql</code>, <code>pyodbc</code>, <code>pymssql</code>, <code>duckdb</code>, <code>duckdb_engine</code>, <code>textual</code>, <code>opentelemetry</code> or <code>mcp</code>, and its imports stay under 500 ms.</p>
 <p>Concretely:</p>
 <ul>
 <li><code>nl2sql/__init__.py</code> imports only the <code>NL2SQL</code> class. Every other public name (<code>QueryResult</code>, <code>Event</code>, <code>CancellationToken</code>, the API classes, the eval shapes) is imported the first time it is asked for, through the module's <code>__getattr__</code>. <code>from nl2sql import QueryResult</code> works as it always did.</li>

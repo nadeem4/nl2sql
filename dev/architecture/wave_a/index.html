@@ -1346,6 +1346,18 @@
   </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/mcp/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -3421,8 +3433,8 @@ the first draft (PR #308) changed several of them; those are marked
 </tr>
 <tr>
 <td>D33</td>
-<td><strong>MCP is stdio only in 0.7,</strong> behind the <code>mcp</code> extra; the caller's role comes from <code>nl2sql mcp --role</code>, by default <code>policies.default_role</code>, and with neither the server refuses to start. <code>engine.datasources.schema()</code> requires a <code>user_context</code> and hides denied tables (bug B29); there is no default admin view.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td><strong>MCP is stdio only in 0.7,</strong> behind the <code>mcp</code> extra; the caller's role comes from <code>nl2sql mcp --role</code>, by default <code>policies.default_role</code>, and with neither the server refuses to start, except under <code>policies.allow_all</code>, where it starts and logs a warning that every table is readable; an unknown <code>--role</code> is refused, <code>allow_all</code> included. Over MCP a refusal is always the generic one, whatever <code>refusal_names_tables</code> says. <code>engine.datasources.schema()</code> requires a <code>user_context</code> and hides denied tables (bug B29); there is no default admin view, and the playground's <code>/api/schema</code> requires its <code>role</code>.</td>
+<td>decided overnight, amended after review (twice: the second after the attack review of PR #325), owner to confirm</td>
 <td><a href="#12-mcp-server-stdio">MCP server</a></td>
 </tr>
 <tr>
@@ -5913,7 +5925,7 @@ over stdio, using the official <code>mcp</code> Python SDK.</p>
 </tr>
 <tr>
 <td><strong>Public facade only</strong></td>
-<td><code>nl2sql/mcp/server.py</code> imports the top-level <code>nl2sql</code> and <code>mcp</code>, nothing else from the engine, held by the same test that holds the API and the playground. <code>nl2sql/cli/commands/mcp.py</code> builds the engine and calls <code>serve(engine, user_context)</code>.</td>
+<td><code>nl2sql/mcp/server.py</code> imports the top-level <code>nl2sql</code> and <code>mcp</code>, nothing else from the engine, held by the same test that holds the API and the playground. <code>nl2sql/cli/commands/mcp.py</code> builds the engine and calls <code>build_server(engine, identity).run("stdio")</code>; <code>identity</code> is a <code>UserContext</code> or a function returning one, asked on every call, so Wave C can name a caller per HTTP request.</td>
 </tr>
 <tr>
 <td><strong>Who is asking (D33)</strong></td>
@@ -5964,6 +5976,44 @@ required, and drops the tables its scope denies (B29). There is no default:
 an app that forgot the argument would fail open. A caller that wants the
 whole schema passes an admin <code>UserContext</code> explicitly. The playground's
 schema panel passes the selected role.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the MCP server and the caller's schema (M1)</p>
+<p><code>nl2sql/mcp/server.py</code> has <code>build_server(engine, identity) -&gt; FastMCP</code>
+(official <code>mcp</code> SDK, the <code>mcp</code> extra <code>mcp&gt;=1.10,&lt;2</code>) and <code>PREVIEW_ROWS =
+20</code>; <code>nl2sql mcp --role ... --user ...</code> is <code>cli/commands/mcp.py</code>
+(<code>caller(policies, roles, user)</code>, <code>mcp_command</code>). Shapes the design did
+not fix: every tool returns a JSON object (its structured content).
+<code>ask</code> returns <code>status</code> (the run's <code>RunStatus</code>, so Wave B's
+<code>needs_clarification</code> needs no new field; its <code>clarification</code> gets its own
+key), <code>answer</code> (<code>summary</code>, <code>content</code>), <code>sub_queries</code> (<code>id</code>,
+<code>datasource_id</code>, <code>sql</code>, <code>columns</code>, <code>rows</code>, <code>total_rows</code>, <code>truncated</code>),
+<code>truncated</code>, <code>source</code>, <code>warnings</code> (<code>code</code>, <code>message</code>), <code>trace_id</code>, and
+<code>errors</code> (<code>code</code>, <code>node</code>, <code>message</code>), <code>approvals_needed</code> and <code>stop</code> when
+set. An error's or warning's message is kept only for the codes written
+for the asker (refusals, hooks, limits, providers, the answer checks);
+any other message is replaced by its code and the trace id, since it may
+carry an exception's text. An exception out of the engine is
+<code>INTERNAL_ERROR</code>, logged; <code>ask</code> with a <code>datasource_id</code> the caller cannot
+reach is <code>DATASOURCE_NOT_FOUND</code> without running. <code>describe_table</code> answers
+<code>status: ok</code> with the <code>schema()</code> table, or <code>not_found</code> (a denied table,
+a missing one and a table in an unreachable datasource alike) with the
+<code>tables</code> the caller may read, or <code>ambiguous</code> when a bare name matches
+tables in two schemas. <code>nl2sql mcp</code> also starts without a role under
+<code>allow_all</code> (with a warning), and refuses a role the policies do not
+define, under <code>allow_all</code> too. After the attack review of PR #325: the
+identity is resolved inside each tool's guard (a resolver that raises
+gives <code>INTERNAL_ERROR</code>); <code>SECURITY_VIOLATION</code> always carries the generic
+refusal (<code>GENERIC_REFUSAL</code>); FastMCP is built with explicit settings; and
+<code>/api/schema</code> without <code>?role=</code> is a 400. <code>datasources.schema(datasource_id, *,
+user_context)</code> filters through <code>policy_engine.scope(...).allows</code>
+(<code>schema_view(..., allows=)</code>), drops a foreign key to a denied table, and
+is in the boundary test's <code>ACCESS_DECISIONS</code>. The playground's
+<code>/api/schema</code> requires <code>?role=</code> (400 without it) and the page sends its
+<strong>Ask as</strong> role. <code>mcp</code> is in <code>FORBIDDEN_AT_IMPORT</code>
+(which is what <code>test_import_nl2sql_does_not_load_mcp</code> was to check), and
+<code>test_mcp_uses_only_the_public_api</code> holds <code>nl2sql/mcp/</code> to the
+top-level <code>nl2sql</code> and <code>mcp</code> to <code>nl2sql/mcp/</code>.</p>
+</div>
 <h2 id="13-the-registry-after-wave-a">13. The registry after Wave A</h2>
 <table>
 <thead>

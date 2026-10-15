@@ -1774,6 +1774,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5517,9 +5545,10 @@ datasource the trace used is not configured here or does not answer; the
 message names each one and why. <code>nl2sql trace replay</code> is built on it (see
 <a href="../../../observability/debugging/">Debugging</a>).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">demo</span><span class="p">()</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>   <span class="c1"># 'Album'</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                              <span class="c1"># 'ok'</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">inspect</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">admin</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])</span>                         <span class="c1"># the schema is always one caller's view</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="s2">"chinook"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">admin</span><span class="p">)[</span><span class="s2">"tables"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"name"</span><span class="p">]</span>   <span class="c1"># 'Album'</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">health</span><span class="p">()[</span><span class="s2">"status"</span><span class="p">]</span>                              <span class="c1"># 'ok'</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">inspect</span><span class="p">(</span><span class="s2">"top customers"</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">)[</span><span class="s2">"picks"</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="top-level-exports">Top-level exports</h3>
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine

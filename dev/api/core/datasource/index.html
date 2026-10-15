@@ -1774,6 +1774,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5074,7 +5102,7 @@ forms, and a test of a datasource before it is added.</p>
 <li>List every adapter type the registry can name, installed or not, with its connection model's JSON Schema.</li>
 <li>Test a configured datasource, as <code>check()</code> does, or a <code>Datasource</code> that is not added, registering nothing.</li>
 <li>Add a <code>Datasource</code> (validated, built, not connected) and remove one.</li>
-<li>Return the indexed schema as the planner is given it.</li>
+<li>Return the indexed schema as the planner is given it, as one caller may see it.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
@@ -5124,9 +5152,9 @@ forms, and a test of a datasource before it is added.</p>
 <td>Takes the datasource out of routing and out of <code>engine.config</code>, and closes its adapter's pool. Its index entries stay until the next full <code>index.build</code> or <code>index.clear</code>. Raises <code>ValueError</code> for an unknown id.</td>
 </tr>
 <tr>
-<td><code>schema(datasource_id)</code></td>
+<td><code>schema(datasource_id, *, user_context)</code></td>
 <td><code>dict</code></td>
-<td>The indexed schema as the planner is given it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). Read from the snapshot the datasource's live index build was made from, not the database; before the first index <code>tables</code> is empty.</td>
+<td>The indexed schema as the planner is given it, as <code>user_context</code> may see it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). A table the caller's roles deny is left out, and so is a foreign key that refers to one; a caller whose roles do not reach the datasource gets no tables. <code>user_context</code> is required: there is no default view, so code that forgot it fails instead of showing everything. Pass an admin's <code>UserContext</code> for the whole schema. Read from the snapshot the datasource's live index build was made from, not the database; before the first index <code>tables</code> is empty.</td>
 </tr>
 </tbody>
 </table>
@@ -5253,16 +5281,17 @@ forms, and a test of a datasource before it is added.</p>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">else</span><span class="p">:</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">status</span><span class="o">.</span><span class="n">stage</span><span class="p">,</span> <span class="n">status</span><span class="o">.</span><span class="n">reason</span><span class="p">,</span> <span class="n">status</span><span class="o">.</span><span class="n">fix</span><span class="p">)</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Datasource</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Datasource</span><span class="p">,</span> <span class="n">UserContext</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">check</span><span class="p">()</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">[(</span><span class="n">d</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">d</span><span class="o">.</span><span class="n">status</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">list</span><span class="p">()]</span>   <span class="c1"># [('shop', 'ready'), ('hr', 'failed')]</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hr"</span><span class="p">)</span><span class="o">.</span><span class="n">reason</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"ledger"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sqlite"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"database"</span><span class="p">:</span> <span class="s2">"ledger.db"</span><span class="p">}))</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="s2">"ledger"</span><span class="p">)</span><span class="o">.</span><span class="n">status</span>                 <span class="c1"># 'ready'</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"ledger"</span><span class="p">])</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="s2">"shop"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]))[</span><span class="s2">"tables"</span><span class="p">]</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"ledger"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"sqlite"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"database"</span><span class="p">:</span> <span class="s2">"ledger.db"</span><span class="p">}))</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">test</span><span class="p">(</span><span class="s2">"ledger"</span><span class="p">)</span><span class="o">.</span><span class="n">status</span>                 <span class="c1"># 'ready'</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"ledger"</span><span class="p">])</span>
 </code></pre></div>
 <p>To add every datasource of another <code>nl2sql.yaml</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>
