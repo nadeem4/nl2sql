@@ -96,6 +96,20 @@ def test_json_output(project):
     assert report["status"] == "drifted" and report["diff"]["tables_added"][0]["table_name"] == "Author"
 
 
+def test_checking_nothing_exits_2(project):
+    """A role that reaches no datasource checked nothing, which is not "nothing drifted"."""
+    make_config(project, datasources=[{"id": "books", "type": "sqlite", "connection": {"database": "books.sqlite"}}],
+                policies={"roles": {"viewer": {"description": "Books", "allow": ["books"]}}})
+    _index(project)
+    _sql(project / "books.sqlite", "DROP TABLE Book")
+
+    result, out = _check(project)              # as admin, which this config does not have
+
+    assert result.exit_code == 2, out
+    assert "nothing was checked" in out.lower()
+    assert _check(project, "--role", "viewer")[0].exit_code == 1
+
+
 def test_check_cannot_be_combined_with_a_build_option(project):
     result, out = _check(project, "--curated-only")
 

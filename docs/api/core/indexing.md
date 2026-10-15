@@ -131,7 +131,8 @@ Each `DriftReport` has `datasource_id`, `status` (`unchanged`, `drifted`,
 `not_indexed`, `failed`), `live_version`, `checked_at`, and for `drifted` the
 `diff` (a `SchemaDiff`, `to_version` `None`) and its `impact` (a
 `DriftImpact`: verified queries, policy rules and preferred tables it
-breaks); `error` (redacted) for `failed`. Drift publishes `schema.drifted`.
+breaks); `error` (redacted) for `failed`. Drift publishes `schema.drifted`,
+once per drift and engine.
 Nothing is stored and nothing is rebuilt. `user_context` is required: the
 caller sees drift only in tables its scope may read, a datasource it cannot
 reach is left out (or, named, is a `ValueError` like an unknown one). See
@@ -143,7 +144,7 @@ Signature:
 `versions(datasource_id, *, user_context) -> list[SchemaVersionInfo]`
 
 The datasource's stored schema versions, newest first: `schema_version`,
-`fingerprint`, `live` (the live build pointer names it) and `has_diff` (a
+`fingerprint` (of the schema without the tables the caller may not read), `live` (the live build pointer names it) and `has_diff` (a
 build stored the diff that introduced it, with something the caller may
 read).
 

@@ -29,11 +29,13 @@ made from. It writes nothing.
 | --- | --- |
 | 0 | Nothing drifted (a datasource never indexed is reported and does not change the code) |
 | 1 | At least one datasource drifted |
-| 2 | At least one check failed (the database could not be read, or the config did not load); wins over 1 |
+| 2 | At least one check failed (the database could not be read, or the config did not load), or nothing was checked (no datasource is configured, or the role reaches none); wins over 1 |
 
 So a cron job or a CI step can act on it. `--role` (repeatable, default
 `admin`, as `nl2sql run`) is the role the check runs as; drift shows only in
-the tables it may read. `--json` prints the reports.
+the tables it may read. A role that reaches no datasource checks nothing and
+exits 2, so a gate never passes on a check that did not run. `--json` prints
+the reports.
 
 From code:
 
@@ -87,7 +89,7 @@ published with `detected_by: "build"`. It is pruned with its snapshot.
 
 | Method | Returns |
 | --- | --- |
-| `engine.index.versions(datasource_id, *, user_context)` | Each stored version, newest first: `schema_version`, `fingerprint`, `live`, `has_diff` |
+| `engine.index.versions(datasource_id, *, user_context)` | Each stored version, newest first: `schema_version`, `fingerprint` (of the schema as the caller may see it), `live`, `has_diff` |
 | `engine.index.diff(datasource_id, schema_version=None, *, user_context)` | The diff that introduced the version (the live one by default), or `None` |
 
 Reading these is the measurement: how often a datasource's structure changes
@@ -100,7 +102,7 @@ data the engine already has:
 
 | Field | What |
 | --- | --- |
-| `verified_queries` | Each verified query (`datasource_id`, `query_id`, `reasons`) whose SQL reads a dropped table, a dropped column, or a column whose type changed |
+| `verified_queries` | Each verified query (`datasource_id`, `query_id`, `reasons`) whose SQL reads a dropped table, a dropped column, or a column whose type changed. A column is matched by its table (its qualifier's alias, or the only table read); an unqualified column in a query of several tables is reported as one it *may* read |
 | `policy_rules` | Each role's `allow` or `deny` pattern (`role`, `kind`, `pattern`) that matched a dropped table and now matches nothing |
 | `preferred_tables` | The datasource's `preferred_tables` that were dropped |
 
@@ -113,7 +115,11 @@ rebuild already makes its old plans unreachable.
 the tables its scope may read:
 
 - A table its roles deny is left out of the diff, and so is a foreign key
-  that refers to one; the impact is computed from what is left.
+  that refers to one; the impact is computed from what is left, against the
+  tables it may read.
+- The `fingerprint` `versions()` shows is of the schema without the denied
+  tables, so a change only to a denied table looks like a statistics-only
+  rebuild.
 - Drift only in denied tables is `unchanged` for that caller, and such a
   stored diff reads as `None` (`has_diff` false).
 - A datasource it cannot reach is left out of `check()`; named, it is a
@@ -122,7 +128,11 @@ the tables its scope may read:
 `schema.drifted` is an operator event: it is on the engine's bus
 (`engine.events.subscribe`) and in the audit log, never on a caller's
 `stream_query`. It carries the versions and the whole diff's counts, and no
-table names. See [Events](../observability/events.md).
+table names. A check publishes a drift once: while the same drift of the same
+build stays, later checks (by any caller) publish nothing, so a check every
+few minutes writes one audit line per change. This is remembered in memory
+per engine, so a new process publishes it once more. A build publishes each
+diff it stores. See [Events](../observability/events.md).
 
 ## Source references
 

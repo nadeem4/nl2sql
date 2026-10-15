@@ -169,8 +169,9 @@ def run_drift_check(engine, datasource_ids: Optional[List[str]], roles: List[str
     """``nl2sql index --check``: prints each datasource's drift report; returns the exit code.
 
     0 when nothing drifted, 1 when something did, 2 when a check failed (a
-    failure wins). Never re-indexes. A datasource never indexed is reported
-    and does not change the code.
+    failure wins) or nothing was checked (no datasource, or the roles reach
+    none). Never re-indexes. A datasource never indexed is reported and does
+    not change the code.
     """
     from nl2sql import UserContext
 
@@ -206,8 +207,10 @@ def run_drift_check(engine, datasource_ids: Optional[List[str]], roles: List[str
                                             "nothing", markup=False, soft_wrap=True)
                 for name in impact.preferred_tables:
                     presenter.console.print(f"    preferred table {name} was dropped", markup=False, soft_wrap=True)
-        if not reports:
-            presenter.print_warning("No datasource to check: none is configured, or the role reaches none.")
+    if not reports:
+        presenter.print_error("Nothing was checked: no datasource is configured, or the role(s) "
+                              f"{', '.join(roles)} reach none. Pass --role with a role that reads them.")
+        return 2
     if any(r.status == "failed" for r in reports):
         return 2
     return 1 if any(r.status == "drifted" for r in reports) else 0

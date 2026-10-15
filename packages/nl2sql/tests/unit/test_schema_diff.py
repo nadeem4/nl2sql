@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 
-from nl2sql.schema.diff import diff_contracts, visible_diff
+from nl2sql.schema.diff import diff_contracts, visible_contract, visible_diff
 from nl2sql.schema.fingerprint import generate_schema_fingerprint
 from nl2sql_sdk.schema import (
     ColumnContract,
@@ -178,3 +178,15 @@ def test_visible_diff_drops_every_table_the_scope_denies():
     assert [c.column for c in visible.columns_changed] == ["id"]
     assert visible.foreign_keys_added == []  # it refers to a denied table
     assert visible.counts()["tables_added"] == 0
+
+
+def test_visible_contract_drops_denied_tables_and_foreign_keys_to_them():
+    secret = _table("main", "salaries", _col("id"))
+    fk = ForeignKeyContract(constrained_columns=["id"], referred_table=secret.table, referred_columns=["id"])
+    orders = _table("main", "orders", *ORDERS.columns.values(), fks=[fk])
+
+    visible = visible_contract(_contract(orders, secret), lambda schema, table: table != "salaries")
+
+    assert list(visible.tables) == ["main.orders"]
+    assert visible.tables["main.orders"].foreign_keys == []
+    assert generate_schema_fingerprint(visible) == generate_schema_fingerprint(_contract(ORDERS))

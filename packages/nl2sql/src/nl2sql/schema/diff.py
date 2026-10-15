@@ -110,5 +110,21 @@ def visible_diff(diff: SchemaDiff, allows: Allows) -> SchemaDiff:
     })
 
 
+def visible_contract(contract: SchemaContract, allows: Allows) -> SchemaContract:
+    """``contract`` without the tables ``allows`` refuses, nor the foreign keys that refer to one.
+
+    Its fingerprint is what ``engine.index.versions`` shows a caller, so a
+    change only to a denied table looks to it like a statistics-only one.
+    """
+    tables = {}
+    for key, table in contract.tables.items():
+        if not allows(table.table.schema_name, table.table.table_name):
+            continue
+        fks = [fk for fk in table.foreign_keys
+               if allows(fk.referred_table.schema_name, fk.referred_table.table_name)]
+        tables[key] = table if len(fks) == len(table.foreign_keys) else table.model_copy(update={"foreign_keys": fks})
+    return contract.model_copy(update={"tables": tables})
+
+
 def _readable_fks(fks: List[ForeignKeyRef], readable: Callable[[TableRef], bool]) -> List[ForeignKeyRef]:
     return [fk for fk in fks if readable(fk.table) and readable(fk.referred_table)]

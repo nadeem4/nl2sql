@@ -176,7 +176,9 @@ class VerifiedSql:
 
     placeholders: Set[str]
     tables: List[Tuple[str, str]]  # (schema or "", table), CTE names excluded
-    columns: Set[str] = field(default_factory=set)  # every column name it references, lower-cased
+    # Every column it references, lower-cased: (schema or "", table, column). The table is the one
+    # its qualifier (or the only table read) names, or "" when it cannot be told.
+    columns: Set[Tuple[str, str, str]] = field(default_factory=set)
 
 
 def inspect_verified_sql(sql: str, dialect: str) -> VerifiedSql:
@@ -218,7 +220,11 @@ def inspect_verified_sql(sql: str, dialect: str) -> VerifiedSql:
     ctes = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
     tables = sorted({(t.db or "", t.name) for t in tree.find_all(exp.Table)
                      if t.name and not (not t.db and t.name.lower() in ctes)})
-    columns = {c.name.lower() for c in tree.find_all(exp.Column) if c.name}
+    aliases = {t.alias_or_name.lower(): ((t.db or "").lower(), t.name.lower())
+               for t in tree.find_all(exp.Table) if t.name and not (not t.db and t.name.lower() in ctes)}
+    only = next(iter(aliases.values())) if len(set(aliases.values())) == 1 else ("", "")
+    columns = {(*(aliases.get(c.table.lower(), ("", "")) if c.table else only), c.name.lower())
+               for c in tree.find_all(exp.Column) if c.name}
     return VerifiedSql(placeholders=placeholders, tables=tables, columns=columns)
 
 

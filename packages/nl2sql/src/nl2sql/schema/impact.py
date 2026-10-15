@@ -64,9 +64,11 @@ def _same_table(ref: TableRef, schema: str, name: str) -> bool:
 def _verified_queries(ctx: Any, diff: SchemaDiff, tables: List[TableRef], impact: DriftImpact) -> None:
     """Each verified query reading a dropped table or column, or a column whose type changed.
 
-    From the same sqlglot parse ``nl2sql curated validate`` uses: a query is
-    hit when one of its tables is the column's table and the column's name is
-    one it references.
+    From the same sqlglot parse ``nl2sql curated validate`` uses. A column is
+    matched by its table: a qualified column (``o.note``) by the table its
+    alias names, an unqualified one in a single-table query by that table.
+    An unqualified column in a query of several tables cannot be told apart,
+    so it is reported as one the query *may* read.
     """
     curated = getattr(ctx, "curated", None)
     section = curated.datasources.get(diff.datasource_id) if curated is not None else None
@@ -88,9 +90,13 @@ def _verified_queries(ctx: Any, diff: SchemaDiff, tables: List[TableRef], impact
             continue  # startup and `nl2sql curated validate` report it
         reasons = [f"reads dropped table {ref.schema_name}.{ref.table_name}"
                    for ref in diff.tables_dropped if any(_same_table(ref, s, n) for s, n in parsed.tables)]
-        reasons += [f"reads {what} column {ref.schema_name}.{ref.table_name}.{column}"
-                    for ref, column, what in columns
-                    if column.lower() in parsed.columns and any(_same_table(ref, s, n) for s, n in parsed.tables)]
+        for ref, column, what in columns:
+            name = column.lower()
+            if any(c == name and t and _same_table(ref, s, t) for s, t, c in parsed.columns):
+                reasons.append(f"reads {what} column {ref.schema_name}.{ref.table_name}.{column}")
+            elif (any(c == name and not t for _, t, c in parsed.columns)
+                  and any(_same_table(ref, s, n) for s, n in parsed.tables)):
+                reasons.append(f"may read {what} column {ref.schema_name}.{ref.table_name}.{column}")
         if reasons:
             impact.verified_queries.append(ImpactedQuery(datasource_id=diff.datasource_id, query_id=query.id,
                                                          reasons=reasons))

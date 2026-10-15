@@ -8,12 +8,15 @@ the engine's bus with the whole diff's counts and no table names.
 """
 from __future__ import annotations
 
+import hashlib
+import threading
+import weakref
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel
 
-from nl2sql.schema.diff import diff_contracts, visible_diff
+from nl2sql.schema.diff import diff_contracts, visible_contract, visible_diff
 from nl2sql.schema.fingerprint import generate_schema_fingerprint
 from nl2sql.schema.impact import DriftImpact, drift_impact
 from nl2sql_sdk.schema import SchemaDiff
@@ -80,13 +83,36 @@ def check(ctx: "Runtime", datasource_id: str, scope: "Scope") -> DriftReport:
     if generate_schema_fingerprint(live.contract) == generate_schema_fingerprint(stored.contract):
         return report
     diff = diff_contracts(stored.contract, live.contract, from_version=pointer.schema_version, to_version=None)
-    publish_drift(ctx, diff, "check")
+    _publish_check_drift(ctx, diff)
     visible = visible_diff(diff, scope.allows)
     if visible.is_empty():
         return report
     report.status, report.diff = "drifted", visible
-    report.impact = drift_impact(ctx, visible, [t.table for t in live.contract.tables.values()])
+    # Only the tables the caller may read, so the impact never turns on a denied table's existence.
+    readable = [t.table for t in live.contract.tables.values()
+                if scope.allows(t.table.schema_name, t.table.table_name)]
+    report.impact = drift_impact(ctx, visible, readable)
     return report
+
+
+# The drift each engine's checks last published, per datasource: (live version, the diff's digest).
+_LAST_CHECK_DRIFT: "weakref.WeakKeyDictionary[Any, Dict[str, Tuple[str, str]]]" = weakref.WeakKeyDictionary()
+_LAST_CHECK_LOCK = threading.Lock()
+
+
+def _publish_check_drift(ctx: "Runtime", diff: SchemaDiff) -> None:
+    """``schema.drifted`` from a check, once per drift: not again while the same drift of the same build stays.
+
+    Kept in memory per engine, so a check every few minutes writes one audit
+    line per change, not one per check; a new engine publishes it once more.
+    """
+    key = (diff.from_version, hashlib.sha256(diff.model_dump_json().encode()).hexdigest())
+    with _LAST_CHECK_LOCK:
+        seen = _LAST_CHECK_DRIFT.setdefault(ctx, {})
+        if seen.get(diff.datasource_id) == key:
+            return
+        seen[diff.datasource_id] = key
+    publish_drift(ctx, diff, "check")
 
 
 def versions(ctx: "Runtime", datasource_id: str, scope: "Scope") -> List[SchemaVersionInfo]:
@@ -98,7 +124,9 @@ def versions(ctx: "Runtime", datasource_id: str, scope: "Scope") -> List[SchemaV
         if snapshot is None:
             continue
         out.append(SchemaVersionInfo(
-            schema_version=version, fingerprint=generate_schema_fingerprint(snapshot.contract),
+            schema_version=version,
+            # Of what the caller may see: a change only to a denied table looks like a statistics one.
+            fingerprint=generate_schema_fingerprint(visible_contract(snapshot.contract, scope.allows)),
             live=pointer is not None and pointer.schema_version == version,
             has_diff=stored_diff(ctx, datasource_id, version, scope) is not None))
     return out

@@ -1853,7 +1853,19 @@ rebuild already makes its plans unreachable.
     `preferred_tables`). Wave B adds `glossary_terms` as one more field and
     one more finder appended to `FINDERS`; no caller changes. Verified
     queries are matched from `inspect_verified_sql`, which now also returns
-    `columns` (every referenced column name, lower-cased).
+    `columns`.
+    After review: `SchemaVersionInfo.fingerprint` is of
+    `visible_contract(contract, scope.allows)` (the denied tables and the
+    foreign keys to them removed), so a denied-only change looks like a
+    statistics-only one; the policy-rule impact compares against the live
+    tables the caller may read; a check publishes `schema.drifted` once per
+    drift (`_publish_check_drift` remembers `(from_version, the diff's
+    sha256)` per datasource in a `WeakKeyDictionary` keyed by the runtime, so
+    per engine and in memory only); `inspect_verified_sql`'s `columns` are
+    `(schema, table, column)` with the table its qualifier's alias names (or
+    the only table read, or `""`), and an unqualified column in a
+    multi-table query is a "may read" reason. `nl2sql index --check` exits 2
+    when nothing was checked.
     `nl2sql.policies.patterns_matching(roles, datasource_id, tables)` takes
     `policies.roles` too and returns `(role, kind, pattern)` triples; the
     boundary test now flags imports of the `nl2sql.policies.patterns`

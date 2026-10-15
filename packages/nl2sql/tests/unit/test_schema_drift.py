@@ -31,7 +31,8 @@ SHOP = {"id": "shop", "type": "sqlite", "description": "Orders and customers",
 
 ROLES = {"admin": {"description": "Everything", "allow": ["*"]},
          "analyst": {"description": "All but pay", "allow": ["shop"], "deny": ["shop.main.salaries"]},
-         "hr": {"description": "Pay", "allow": ["shop.main.salaries"]}}
+         "hr": {"description": "Pay", "allow": ["shop.main.salaries"]},
+         "auditor": {"description": "The s tables", "allow": ["shop.main.s*"]}}
 
 QUERIES = [
     {"id": "order_totals", "description": "Totals", "questions": ["What do orders total?"],
@@ -59,7 +60,8 @@ def _engine(tmp_path: Path) -> NL2SQL:
         _sql(tmp_path / "shop.db",
              "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT)",
              "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, total REAL)",
-             "CREATE TABLE salaries (id INTEGER PRIMARY KEY, amount REAL)")
+             "CREATE TABLE salaries (id INTEGER PRIMARY KEY, amount REAL)",
+             "CREATE TABLE stock (id INTEGER PRIMARY KEY, sku TEXT)")
     (tmp_path / "curated.yaml").write_text(
         yaml.safe_dump({"datasources": {"shop": {"verified_queries": QUERIES}}}), encoding="utf-8")
     cfg = make_config(tmp_path, datasources=[SHOP], policies={"roles": ROLES}, curated={"file": "curated.yaml"},
@@ -222,7 +224,8 @@ def test_patterns_matching_names_each_roles_pattern_that_matches_a_table():
     matched = patterns_matching(roles, "shop", [("main", "salaries")])
 
     assert matched == {("admin", "allow", "*"), ("analyst", "allow", "shop"),
-                       ("analyst", "deny", "shop.main.salaries"), ("hr", "allow", "shop.main.salaries")}
+                       ("analyst", "deny", "shop.main.salaries"), ("hr", "allow", "shop.main.salaries"),
+                       ("auditor", "allow", "shop.main.s*")}
     assert patterns_matching(roles, "other", [("main", "salaries")]) == {("admin", "allow", "*")}
 
 
@@ -277,3 +280,77 @@ def test_user_context_is_required(engine):
         engine.index.diff("shop")
     with pytest.raises(TypeError):
         engine.index.versions("shop")
+
+
+def test_a_denied_only_change_looks_like_a_statistics_change_to_the_caller(engine):
+    """The fingerprint ``versions`` reports is of the contract the caller may see."""
+    _sql(_db(engine), "INSERT INTO orders (customer_id, total) VALUES (1, 9.5)")   # statistics only
+    assert engine.index.build().ok
+    stats_only = engine.index.versions("shop", user_context=ANALYST)
+    assert stats_only[0].fingerprint == stats_only[1].fingerprint
+
+    _sql(_db(engine), "ALTER TABLE salaries ADD COLUMN bonus REAL")             # denied to the analyst
+    assert engine.index.build().ok
+
+    analyst = engine.index.versions("shop", user_context=ANALYST)
+    admin = engine.index.versions("shop", user_context=ADMIN)
+    assert analyst[0].fingerprint == analyst[1].fingerprint and not analyst[0].has_diff
+    assert admin[0].fingerprint != admin[1].fingerprint and admin[0].has_diff
+
+
+def test_policy_rule_impact_reads_only_the_tables_the_caller_may_read(engine):
+    """``shop.main.s*`` still matches salaries, which the analyst may not read: for it, the rule matches nothing now."""
+    _sql(_db(engine), "DROP TABLE stock")
+
+    [admin] = engine.index.check(user_context=ADMIN)
+    [analyst] = engine.index.check(user_context=ANALYST)
+
+    rule = ("auditor", "allow", "shop.main.s*")
+    assert rule not in {(r.role, r.kind, r.pattern) for r in admin.impact.policy_rules}
+    assert rule in {(r.role, r.kind, r.pattern) for r in analyst.impact.policy_rules}
+
+
+def test_a_check_publishes_a_drift_once_until_it_changes(engine, drifted):
+    _sql(_db(engine), "ALTER TABLE orders ADD COLUMN placed_at TEXT")
+
+    engine.index.check(user_context=ADMIN)
+    engine.index.check(user_context=ADMIN)
+    engine.index.check(user_context=ANALYST)
+    assert len(drifted) == 1
+
+    _sql(_db(engine), "DROP TABLE customers")
+    engine.index.check(user_context=ADMIN)
+    assert len(drifted) == 2
+    assert drifted[1].data["counts"]["tables_dropped"] == 1
+
+
+def test_verified_query_impact_reads_columns_by_their_table():
+    """A column qualified by another table is no hit; an unqualified one in a join is a "may read"."""
+    from types import SimpleNamespace
+
+    from nl2sql.config.curated import VerifiedQuery
+    from nl2sql.schema.impact import drift_impact
+    from nl2sql_sdk.schema import ColumnRef, SchemaDiff, TableRef
+
+    def query(qid, sql):
+        return VerifiedQuery(id=qid, description=qid, questions=[f"{qid}?"], sql=sql)
+
+    queries = [query("other_table", "SELECT c.note FROM customers c JOIN orders o ON o.customer_id = c.id"),
+               query("this_table", "SELECT o.note FROM customers c JOIN orders o ON o.customer_id = c.id"),
+               query("ambiguous", "SELECT note FROM customers c JOIN orders o ON o.customer_id = c.id"),
+               query("single", "SELECT note FROM orders")]
+    ctx = SimpleNamespace(
+        curated=SimpleNamespace(datasources={"shop": SimpleNamespace(verified_queries=queries)}),
+        ds_registry=SimpleNamespace(get_dialect=lambda ds: "sqlite", get_preferred_tables=lambda ds: []),
+        config=SimpleNamespace(policies=SimpleNamespace(roles={})))
+    orders = TableRef(schema_name="main", table_name="orders")
+    diff = SchemaDiff(datasource_id="shop", from_version="v1",
+                      columns_dropped=[ColumnRef(table=orders, column_name="note")])
+
+    impact = drift_impact(ctx, diff, [orders])
+
+    reasons = {q.query_id: q.reasons for q in impact.verified_queries}
+    assert set(reasons) == {"this_table", "ambiguous", "single"}
+    assert reasons["this_table"] == ["reads dropped column main.orders.note"]
+    assert reasons["single"] == ["reads dropped column main.orders.note"]
+    assert reasons["ambiguous"] == ["may read dropped column main.orders.note"]
