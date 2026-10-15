@@ -60,6 +60,16 @@ attached at `execute.before`, no probe runs at all: SQL a hook gates never has
 unseen SQL beside it. `settings.pipeline.sanity_checks: false` turns the checks
 off entirely.
 
+**Eval seeding is hooked; `regenerate` is not.** `engine.evals.seed`
+([Benchmark your own database](../evals/seeding.md)) runs SQL a model
+proposed, so each draft's SQL passes `execute.before` and `execute.after` like
+a question's: every hook sees it (an approval hook, a cost guard), and a deny,
+a hook failure or a `NeedsApproval` drops the draft (`dropped_hooked`).
+`execute.after` gets a summary of the first row only (seeding reads one row
+to see that the query returns any), so its `row_count` is a floor and
+`truncated` is true. `engine.evals.regenerate` runs SQL a person reviewed and
+approved (a suite's gold `sql` and `alt_sql`) and calls no hook.
+
 **The verified path** has no routing and no plan, so only `run.before`,
 `execute.before`, `execute.after` and `answer.after` apply. A deny there ends
 the run; it does not fall back to the generated path. **A plan-only run**

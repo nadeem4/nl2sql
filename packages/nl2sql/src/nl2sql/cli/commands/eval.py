@@ -6,7 +6,7 @@
 * ``regenerate`` -- ``engine.evals.regenerate``: a suite's expected rows, through the adapter.
 * ``seed``       -- ``engine.evals.seed``: draft cases from a datasource, as the
   caller ``--role`` names (else ``policies.default_role``; with neither it
-  refuses). Exits 2 on a refusal, 3 when the cost cap stopped it early.
+  refuses). Exits 2 on a refusal, 3 when the cost cap or the call limit stopped it.
 * ``publish``    -- each report given becomes one record per config under
   ``benchmarks/``; then ``docs/benchmarks.md`` and the README block are
   rebuilt from every record. Run from the repo root.
@@ -244,7 +244,7 @@ def seed_command(
     The model writes questions with typed plans, five per call; each plan is
     validated and rendered by the engine and run read-only, and the survivors
     are appended as status: draft. Review each, set status: approved, then run
-    `nl2sql eval regenerate`. Exits 2 on a refusal, 3 when the cost cap stopped it.
+    `nl2sql eval regenerate`. Exits 2 on a refusal, 3 when the cost cap or the call limit stopped it.
     """
     from nl2sql import UserContext
 
@@ -261,13 +261,18 @@ def seed_command(
             _usage(str(error))
     console.print(escape(
         f"Wrote {report.written} draft case(s) to {report.path}; dropped {report.dropped_invalid} invalid, "
-        f"{report.dropped_failed} failed, {report.dropped_empty} empty, {report.dropped_duplicate} duplicate."),
+        f"{report.dropped_hooked} stopped by a hook, {report.dropped_failed} failed, {report.dropped_empty} empty, "
+        f"{report.dropped_duplicate} duplicate."),
         soft_wrap=True)
     cost = report.usage.total.cost
     console.print(escape(f"{report.usage.total.calls} model call(s)"
                          + (f", ${cost:.4f}" if cost is not None else "")), soft_wrap=True)
     if report.stopped_at_cost_cap:
         console.print("[yellow]Stopped at the cost cap: fewer drafts than asked for.[/yellow]", soft_wrap=True)
+        raise typer.Exit(EXIT_STOPPED_AT_MAX_COST)
+    if report.stopped_at_call_limit:
+        console.print("[yellow]Stopped at the call limit (three model calls per batch of five): the model's "
+                      "answers kept being dropped, so fewer drafts than asked for.[/yellow]", soft_wrap=True)
         raise typer.Exit(EXIT_STOPPED_AT_MAX_COST)
 
 

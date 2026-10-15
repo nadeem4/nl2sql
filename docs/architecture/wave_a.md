@@ -1511,28 +1511,44 @@ series_break)`.
       its tables) is a `PermissionError` before any call. The model is shown
       the tables through `SchemaRetrieverNode.visible_tables(user_context,
       datasource_id)`, new and public: the planner's own rendering for that
-      caller. `outcome` names every role of the caller.
+      caller. `outcome` marks `allowed` each of the caller's roles whose own
+      scope reads every table of the plan (after review of PR #328); other
+      roles get no entry.
     - **Plans go through the pinned-plan entry.** Each proposed plan runs as
       `run_query(question, plan=SuppliedPlan(...), execute=False,
       user_context=...)`: `plan.after`, the validator and the generator under
       the caller's scope, with no model call, in a run scope of its own
-      (`run.started` and `run.finished`). The SQL then runs through the
-      adapter as `regenerate` runs it, so `execute.before` and
-      `execute.after` do not see it; no row is kept. A question that reads
-      as SQL (the decomposer's `SubQuery` check) is dropped as invalid.
+      (`run.started` and `run.finished`). The draft keeps the plan that
+      produced the SQL (`result.sub_queries[0].plan`), so a `plan.after`
+      change wins. A question that reads as SQL (the decomposer's `SubQuery`
+      check) is dropped as invalid.
+    - **The SQL passes `execute.before` and `execute.after`** (the session
+      lead's decision on the review of PR #328): it is model-proposed, so an
+      approval hook or Wave B's cost guard must see it. A deny, a hook
+      failure or `needs_approval` drops the case (`dropped_hooked`).
+      `execute.after` gets a summary of the first row (`truncated: true`).
+      `regenerate` runs human-reviewed gold SQL and stays unhooked; both are
+      documented in `configuration/hooks.md`. The rows are checked with
+      `execute_batches(request, 1)` where the adapter streams; no row is kept.
     - **The structured output is `SeedBatch`** (`cases`: `SeedCase` with
       `question`, `difficulty` and a `PlanModel`), the name a fake LLM rule
       answers. A call whose answer never parses counts its batch as invalid.
     - **The budget** is `Budget(max_cost_usd, max_llm_calls, setting="evals")`
       with at most three calls per batch of five (`CALLS_PER_BATCH`), so a
-      model answering nothing usable stops. `max_cost_usd` is required (the
+      model answering nothing usable stops; the report says so
+      (`stopped_at_call_limit`), and the CLI exits 3 as at the cost cap. Each
+      call is shown the count of questions already written and the newest
+      ten (`RECENT_QUESTIONS`), not all of them. `max_cost_usd` is required (the
       argument, else `evals.yaml`'s), and an unpriced `eval_seeder` model is
       an `UnknownPriceError` before any call.
-    - **Drafts never go into reviewed cases**: like `feedback export`, `out`
-      may not be a packaged suite, a suite `evals.yaml` names, or a file
-      holding approved cases. `SeedReport` also carries `path`.
+    - **Drafts never go into reviewed cases**: `out` may not be a packaged
+      suite, a suite `evals.yaml` names, or a file holding approved cases.
+      The guard is `nl2sql.evaluation.suite.check_target(path, configured)`,
+      which `feedback export` calls too. `SeedReport` also carries `path`,
+      `dropped_hooked` and `stopped_at_call_limit`.
     - **The CLI** asks as `--role`, else `policies.default_role`, and exits 2
-      without one; it exits 2 on any refusal and 3 at the cost cap, and
+      without one; it exits 2 on any refusal and 3 at the cost cap or the
+      call limit, and
       refuses to run with `CI` set, as mode full does. It takes no `--llm`:
       `llm.agents.eval_seeder` picks the model.
 

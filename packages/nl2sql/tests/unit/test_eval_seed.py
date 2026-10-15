@@ -24,7 +24,8 @@ from nl2sql.config import Embeddings
 from nl2sql.datasets import CHINOOK_DB_PATH
 from nl2sql.evaluation.run import UnknownPriceError
 from nl2sql.evaluation.seed import BATCH_SIZE, SeedReport
-from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
+from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, check_target, load_suite
+from nl2sql.hooks import Allow, Deny, HookBinding, HookRunner, Modify, NeedsApproval
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
@@ -96,6 +97,8 @@ def env():
         policies={"roles": {"admin": {"description": "everything", "allow": ["*"]},
                             "analyst": {"description": "no employees", "allow": ["chinook"],
                                         "deny": ["chinook.main.Employee"]},
+                            "viewer": {"description": "the music catalog",
+                                       "allow": ["chinook.main.Album", "chinook.main.Artist"]},
                             "outsider": {"description": "another database", "allow": ["other"]}}},
         evals={"max_cost_usd": 2.0})
     ctx = Runtime.from_config(config.model_copy(update={"embeddings": Embeddings(instance=FakeEmbeddings(size=8))}))
@@ -196,7 +199,20 @@ def test_seed_gives_up_when_the_model_keeps_answering_nothing(env, tmp_path):
     _, seeder = env
     # At most three calls per batch of five, whatever the model answers.
     assert len(seeder.server.calls) == 3 and report.written == 0
-    assert report.stopped_at_cost_cap is False
+    assert report.stopped_at_cost_cap is False and report.stopped_at_call_limit is True
+
+
+def test_each_call_is_shown_a_bounded_list_of_what_is_written(env, tmp_path):
+    out = tmp_path / "seeded.yaml"
+    _seed(env, out, _valid(5), _valid(5, 5), _valid(2, 10), count=12)
+    report = _seed(env, out, [_gold("chinook_008")], count=1)
+
+    _, seeder = env
+    assert report.written == 1
+    [prompt] = seeder.prompts
+    assert "12 questions are already written" in prompt
+    assert GOLD[VALID[-1]].question in prompt          # the latest ones
+    assert GOLD[VALID[0]].question not in prompt       # not every one, every call
 
 
 # ---------------------------------------------------------------- what is kept
@@ -226,10 +242,10 @@ def test_failing_or_empty_sql_is_dropped(env, tmp_path, monkeypatch):
         def __getattr__(self, name):
             return getattr(real, name)
 
-        def execute(self, request):
+        def execute_batches(self, request, batch_size):
             if "Genre" in request.payload["sql"]:
-                return real.execute(request.model_copy(update={"payload": {"sql": "SELECT nope FROM Genre"}}))
-            return real.execute(request)
+                request = request.model_copy(update={"payload": {"sql": "SELECT nope FROM Genre"}})
+            return real.execute_batches(request, batch_size)
 
     get_adapter = ctx.ds_registry.get_adapter
     monkeypatch.setattr(ctx.ds_registry, "get_adapter",
@@ -238,6 +254,93 @@ def test_failing_or_empty_sql_is_dropped(env, tmp_path, monkeypatch):
     report = _seed(env, out, [empty, failing, *_valid(1)], count=3)
 
     assert report.dropped_empty == 1 and report.dropped_failed == 1 and report.written == 1
+
+
+def test_rows_are_checked_by_reading_one_row(env, tmp_path, monkeypatch):
+    ctx, _ = env
+    real = ctx.ds_registry.get_adapter("chinook")
+    seen = []
+
+    class _Spy:
+        def __getattr__(self, name):
+            return getattr(real, name)
+
+        def execute(self, request):
+            seen.append("execute")
+            return real.execute(request)
+
+        def execute_batches(self, request, batch_size):
+            seen.append(batch_size)
+            return real.execute_batches(request, batch_size)
+
+    get_adapter = ctx.ds_registry.get_adapter
+    monkeypatch.setattr(ctx.ds_registry, "get_adapter", lambda ds: _Spy() if ds == "chinook" else get_adapter(ds))
+    report = _seed(env, tmp_path / "seeded.yaml", _valid(2))
+    assert report.written == 2 and seen == [1, 1]
+
+
+def _hooks(monkeypatch, ctx, fn, points):
+    seen = []
+
+    def hook(hctx):
+        seen.append((hctx.point, hctx))
+        return fn(hctx)
+
+    monkeypatch.setattr(ctx, "hooks", HookRunner([HookBinding(name="h", hook=hook, points=frozenset(points),
+                                                               on_error="closed", approver_roles=None)]))
+    return seen
+
+
+def test_the_draft_holds_the_plan_that_produced_its_sql(env, tmp_path, monkeypatch):
+    ctx, _ = env
+    artists = _plan("Artist", "Name")
+    _hooks(monkeypatch, ctx, lambda hctx: Modify(plan=artists), ["plan.after"])
+    out = tmp_path / "seeded.yaml"
+    report = _seed(env, out, _valid(1))  # the model proposes a Customer plan; the hook swaps it
+
+    assert report.written == 1
+    [case] = load_suite(out).cases
+    assert "Artist" in case.sql and "Customer" not in case.sql
+    assert case.tables == ["Artist"] and case.columns == ["Artist.Name"]
+    assert case.plan["tables"] == [{"name": "Artist", "alias": "t1"}]
+
+
+def test_seeding_sql_passes_the_execute_hooks(env, tmp_path, monkeypatch):
+    ctx, _ = env
+
+    def decide(hctx):
+        if hctx.point == "execute.before" and "MediaType" in hctx.sql:
+            return Deny(reason="no media types")
+        if hctx.point == "execute.before" and "Track" in hctx.sql:
+            return NeedsApproval(reason="ask first")
+        if hctx.point == "execute.after" and "Artist" in hctx.sql:
+            raise RuntimeError("the hook broke")
+        return None
+
+    seen = _hooks(monkeypatch, ctx, lambda hctx: decide(hctx) or Allow(), ["execute.before", "execute.after"])
+    # chinook_018 reads MediaType, chinook_019 Track, chinook_003 Album and Artist, chinook_001 Customer.
+    out = tmp_path / "seeded.yaml"
+    report = _seed(env, out, [_gold("chinook_018"), _gold("chinook_019"), _gold("chinook_003"), *_valid(1)],
+                   count=4)
+
+    assert report.dropped_hooked == 3 and report.written == 1
+    assert [c.question for c in load_suite(out).cases] == [GOLD["chinook_001"].question]
+    before = [h for p, h in seen if p == "execute.before"]
+    after = [h for p, h in seen if p == "execute.after"]
+    assert len(before) == 4 and len(after) == 2
+    assert before[-1].user.roles == ["analyst"] and before[-1].tables == ["chinook.main.Customer"]
+    assert after[-1].result.row_count >= 1
+
+
+def test_outcome_names_only_the_roles_that_can_read_the_plan(env, tmp_path):
+    out = tmp_path / "seeded.yaml"
+    report = _seed(env, out, [_gold("chinook_001"), _gold("chinook_003")],
+                   user=UserContext(roles=["analyst", "viewer"]))
+
+    assert report.written == 2
+    customers, artists = load_suite(out).cases
+    assert customers.outcome == {"analyst": "allowed"}  # viewer may not read Customer: left for the reviewer
+    assert artists.outcome == {"analyst": "allowed", "viewer": "allowed"}
 
 
 def test_drafts_are_written_as_draft_and_seeded(env, tmp_path):
@@ -317,6 +420,14 @@ def test_seed_refuses_a_role_that_cannot_read_the_datasource(env, tmp_path, role
 
 
 # ---------------------------------------------------------------- where drafts may go
+
+
+def test_the_drafts_target_guard_lives_with_the_suites():
+    import nl2sql.api.feedback_api as feedback_api
+    import nl2sql.evaluation.seed as seed_module
+
+    assert seed_module.check_target is check_target
+    assert "holds_approved_cases" not in open(feedback_api.__file__, encoding="utf-8").read()
 
 
 def test_seed_never_writes_into_reviewed_cases(env, tmp_path):

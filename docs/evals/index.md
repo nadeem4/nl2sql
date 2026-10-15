@@ -248,7 +248,7 @@ The statistics are in
 | --- | --- |
 | `nl2sql eval run [--suite PATH ...] [--mode full\|plans\|retrieval] [--llm SPEC ...] [--cases ID/TAG ...] [--passes N] [--max-cost USD] [--baseline PATH] [--out FILE]` | `engine.evals.run`, then `engine.evals.gate` with `--baseline` |
 | `nl2sql eval regenerate PATH` | `engine.evals.regenerate`; exits 1 when a case's SQL failed |
-| `nl2sql eval seed --datasource ID --out PATH [--count N] [--role R] [--max-cost USD]` | `engine.evals.seed`, as `--role` (else `policies.default_role`); exits 2 on a refusal, 3 at the cost cap, and refuses to run when `CI` is set ([Benchmark your own database](seeding.md)) |
+| `nl2sql eval seed --datasource ID --out PATH [--count N] [--role R] [--max-cost USD]` | `engine.evals.seed`, as `--role` (else `policies.default_role`); exits 2 on a refusal, 3 at the cost cap or the call limit, and refuses to run when `CI` is set ([Benchmark your own database](seeding.md)) |
 | `nl2sql eval publish [REPORT ...] [--note TEXT] [--from DIR ...]` | Records each report under `benchmarks/`, then rebuilds [the results page](../benchmarks.md) and the README block. Run from the repo root |
 
 `--llm` names an LLM config to compare in mode full, and repeats:

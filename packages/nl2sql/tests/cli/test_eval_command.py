@@ -231,6 +231,18 @@ def test_eval_seed_takes_the_default_role_and_refuses_without_one(engine):
     assert engine.evals.calls[0]["user_context"].roles == ["viewer"] and engine.evals.calls[0]["count"] == 20
 
 
+def test_eval_seed_exits_3_at_the_call_limit(engine):
+    engine.evals.seeded = SeedReport(path="s.yaml", written=0, stopped_at_call_limit=True)
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--role", "r", "--out", "s.yaml"])
+    assert result.exit_code == 3 and "call limit" in _out(result)
+
+
+def test_eval_seed_reports_hooked_drops(engine):
+    engine.evals.seeded = SeedReport(path="s.yaml", written=1, dropped_hooked=2)
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--role", "r", "--out", "s.yaml"])
+    assert result.exit_code == 0 and "2 stopped by a hook" in _out(result)
+
+
 def test_eval_seed_exits_3_at_the_cost_cap(engine):
     engine.evals.seeded = SeedReport(path="s.yaml", written=5, stopped_at_cost_cap=True)
     result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--role", "r", "--out", "s.yaml"])

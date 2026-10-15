@@ -154,10 +154,13 @@ class EvalsAPI:
         The ``eval_seeder`` agent is shown the tables the caller may read and
         asked for questions with typed plans, five per call, never SQL. Each
         plan passes the logical validator and the generator under the caller's
-        scope, and its SQL runs read-only through the datasource's adapter; a
-        plan that is refused, fails or returns no rows is dropped and counted.
-        Survivors are written as ``status: draft``, ``origin: seeded``, with no
-        rows: a person reviews each one, approves it, and runs ``regenerate``.
+        scope, then its SQL passes the ``execute.before`` and ``execute.after``
+        hooks and runs read-only through the datasource's adapter; a plan that
+        is refused, stopped by a hook, fails or returns no rows is dropped and
+        counted. Survivors are written as ``status: draft``, ``origin: seeded``,
+        with no rows and ``allowed`` for each of the caller's roles that reads
+        every table of the plan: a person reviews each one, approves it, and
+        runs ``regenerate``.
 
         Args:
             datasource_id: The datasource to seed from; it must have an index build.

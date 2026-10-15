@@ -28,7 +28,9 @@ flowchart LR
   S["The caller's tables<br/>(the live index build)"] --> M["eval_seeder<br/>5 questions + typed plans"]
   M --> V["Logical validator<br/>and generator"]
   V -->|refused| DI["dropped_invalid"]
-  V --> X["The adapter runs the SQL<br/>read-only"]
+  V --> H["execute.before and<br/>execute.after hooks"]
+  H -->|"deny, failure,<br/>approval"| DH["dropped_hooked"]
+  H --> X["The adapter runs the SQL<br/>read-only"]
   X -->|fails| DF["dropped_failed"]
   X -->|no rows| DE["dropped_empty"]
   X --> W["Appended as a draft"]
@@ -48,17 +50,25 @@ flowchart LR
    as a pinned plan under the caller's scope: the `plan.after` hooks, the
    logical validator and the generator, with no model call. A plan the
    validator refuses, a table the role may not read included, is dropped and
-   counted.
-4. **The SQL runs read-only.** The generated SQL runs through the
-   datasource's adapter, as `regenerate` runs a suite's SQL: a read-only
-   session, the datasource's timeout, and the row limit the generator wrote
-   into the SQL. A query that fails or returns no rows is dropped. No row is
-   kept.
-5. **Survivors are appended as drafts.** Each one is written with
+   counted. When a `plan.after` hook changes the plan, the draft keeps the
+   changed plan: the one that produced its SQL.
+4. **The SQL passes the execute hooks.** The SQL is model-proposed, so it
+   goes through `execute.before` and `execute.after` exactly as a question's
+   SQL does: an approval hook or a cost guard sees it. A deny, a hook failure
+   or a `NeedsApproval` drops the case (`dropped_hooked`); nothing is queued
+   for approval. `regenerate` is different on purpose: it runs SQL a person
+   reviewed and approved, and calls no hook ([Hooks](../configuration/hooks.md)).
+5. **The SQL runs read-only.** The generated SQL runs through the
+   datasource's adapter: a read-only session, the datasource's timeout, and
+   the row limit the generator wrote into the SQL. Only the first row is read
+   (`execute_batches(request, 1)` where the adapter streams), which is enough
+   to know the query returns rows. A query that fails or returns no rows is
+   dropped. No row is kept.
+6. **Survivors are appended as drafts.** Each one is written with
    `status: draft`, `origin: seeded`, the question, the engine's SQL, the
-   plan, the tables and columns the plan reads, and `outcome` set to the
-   caller's role `allowed`. `rows` stay empty. A question already in the
-   file is skipped and counted as a duplicate.
+   plan, the tables and columns the plan reads, and an `outcome`. A question
+   already in the file is skipped and counted as a duplicate. `rows` stay
+   empty.
 
 ## Who it seeds as
 
@@ -71,8 +81,11 @@ Seeding needs a caller, and it fails closed:
 - `nl2sql eval seed` asks as `--role`, else `policies.default_role`. With
   neither, it exits 2.
 
-The drafts hold only what that role may read, and their `outcome` names that
-role. Add the outcome for every other role when you review them.
+The drafts hold only what the caller may read. A draft's `outcome` marks
+`allowed` each of the caller's roles whose **own** scope reads every table of
+the plan; a role that reads only some of them (a caller's scope is the union
+of its roles) gets no entry. Add the outcome for every other role when you
+review them.
 
 ## What it costs
 
@@ -86,10 +99,13 @@ not apply. It runs under a budget of its own:
   otherwise seeding raises `UnknownPriceError` before any call.
 - **At most three calls per batch of five,** parse retries included, so a
   model that keeps answering nothing usable stops on its own.
+- **A prompt that does not grow with the file.** Each call is told how many
+  questions are already written and shown only the newest ten, so it does
+  not repeat them.
 
-The budget is checked before each call. When the cap is reached, the next
-call is never sent, the drafts so far are written, and the report says
-`stopped_at_cost_cap`. The `eval_seeder` agent runs on the top-level `llm`
+The budget is checked before each call. When either limit is reached, the
+next call is never sent, the drafts so far are written, and the report says
+which: `stopped_at_cost_cap` or `stopped_at_call_limit`. The `eval_seeder` agent runs on the top-level `llm`
 unless `llm.agents.eval_seeder` names another model
 ([Agents](../configuration/llm.md)).
 
@@ -101,16 +117,18 @@ unless `llm.agents.eval_seeder` names another model
 | --- | --- |
 | `path` | The suite file written |
 | `written` | Drafts appended |
-| `dropped_invalid` | Plans the validator or a hook refused, questions that read as SQL, and the questions of a call whose answer never parsed |
+| `dropped_invalid` | Plans the validator or a `plan.after` hook refused, questions that read as SQL, and the questions of a call whose answer never parsed |
+| `dropped_hooked` | SQL an `execute.before` or `execute.after` hook denied, failed on, or asked approval for |
 | `dropped_failed` | Queries the database rejected |
 | `dropped_empty` | Queries that returned no rows |
 | `dropped_duplicate` | Questions already in the file, or proposed twice |
 | `stopped_at_cost_cap` | Whether the dollar cap stopped seeding early |
+| `stopped_at_call_limit` | Whether the three-calls-per-batch limit stopped it early |
 | `usage` | The model calls, tokens and dollars spent |
 
 `nl2sql eval seed` prints the counts and the dollars, exits 2 on a refusal
 (no role, an unreadable datasource, no cost cap, an unpriced model, a refused
-`--out`) and 3 when the cost cap stopped it. Like mode full, it refuses to run
+`--out`) and 3 when the cost cap or the call limit stopped it. Like mode full, it refuses to run
 when `CI` is set.
 
 ## Where drafts may go
