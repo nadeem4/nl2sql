@@ -2,9 +2,9 @@
 
 !!! note "Status: design"
     This page is the design for Wave A of the product redesign, which ships
-    as release 0.7. Nothing on it is built yet. Each pull request in
+    as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did. Phase 1 is
+    as Phase 1 and Phase 2 did; A0, the foundation, is built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -211,9 +211,11 @@ sits follows from the code as it is:
    published with the result's summary. The scope makes the run's `trace_id`
    and hands it to `run_with_graph`, which puts it in `GraphState`.
 2. **Its context is entered inside the worker.** `run_with_graph` submits the
-   graph to its own `ThreadPoolExecutor` without copying the context
-   (`pipeline/runtime.py`), which is why `policy_engine.run()` is entered
-   inside `_invoke`. The scope's context variables (the `trace_id`, the
+   graph to its own `ThreadPoolExecutor` with the caller's
+   `copy_context()` (`pipeline/runtime.py`; 0.6 submitted it without one),
+   so the worker inherits the caller's context variables (a request's keys,
+   the run's pinned LLM set), and `policy_engine.run()` is entered inside
+   `_invoke`. The scope's context variables (the `trace_id`, the
    `tenant_id` and the scope itself) are entered there too, beside it;
    LangGraph's own worker threads then inherit them, as they already inherit
    `current_datasource_id`. Code deep in a run (the structured-output retry
@@ -331,6 +333,51 @@ names in the same PR.
 
 `Event` is exported from `nl2sql` (from `nl2sql_sdk.events`, lazily).
 
+!!! note "Built: the event, the bus, the catalog and the run scope (A0)"
+    `nl2sql_sdk/events.py` holds `Event` (with `sse()`, whose `data` line is
+    the whole event as JSON) and the `Observer` protocol. `nl2sql/events/`
+    holds `EventBus` (`bus.py`; `publish` also takes `tenant_id`), the catalog
+    with a strict model per event and `catalog()` returning `EventInfo`
+    (`catalog.py`, which also defines `RunStatus`), and `RunScope`,
+    `current_scope()` and the module `publish` (`run.py`). `Runtime.bus` is
+    built with the runtime and closed with it. `QueryAPI.open_scope(question,
+    datasource_id=, execute=, user_context=)` makes the scope, with the run's
+    usage collector, and calls `start()` (which publishes `run.started`);
+    `QueryAPI.close_scope(scope, result)` closes it with
+    `finish(result, tables=...)`, or `fail(message, code)` when the summary
+    cannot be built, and a `result` built without a graph run is accepted.
+    `run_query` and `stream_query` open their own scope, or take an open one
+    as `scope=` (internal; Wave C's turn opens it before its rewrite call) and
+    close it. `RunScope.callbacks()` is the usage collector and the LangChain
+    handlers attached (the budget, from E3): a model call made in the run
+    but outside the graph passes them, inside `entered()`, so it counts in
+    the run's `usage` and carries its `trace_id`. `run_with_graph` takes
+    `scope=`, uses its `trace_id` and its usage collector, enters it beside
+    `policy_engine.run()` in `_invoke` (submitted with the caller's
+    `copy_context()`) and adds its `callbacks()` to the graph's. That is all
+    of Wave C's A2 need ([wave_c.md](wave_c.md)); E1 keeps `scope=` when it
+    moves `stream_query` to `Event`s. The
+    scope sets the context `TraceContextFilter` reads, so log lines written
+    during a run carry its `trace_id` and `tenant_id`. `attach` takes a
+    function or an object with `on_event` (subscribed to this run's events
+    with `fail="raise"`), a LangChain callback handler (added to the
+    graph's callbacks) and anything with `close` (closed with the scope);
+    a closed scope refuses `attach` with `RuntimeError`. Closing detaches
+    every subscription and calls every `close` even when an attached piece
+    raised on the terminal event. `run_query` and `stream_query` close the
+    scope with `run.failed` on any `BaseException` (a `KeyboardInterrupt`
+    too) and re-raise it. The scope holds its lock while the bus delivers
+    each of its events, so `run.finished` is always last; the cost is that
+    a run's events reach subscribers one at a time and `finish` (a timed-out
+    run's too) waits for the delivery in flight, so an observer must never
+    block (the `Observer` and `RunScope` docstrings say so; E2's `audit` and
+    `otel` hand slow work to a queue). `run.finished`'s `usage` and
+    `result_manifest` copy only the catalog models' own fields, so a field
+    added to `UsageTotals` or `ResultSummary` never fails a run.
+    `run.finished`'s `tables` come from each sub-query's plan, or a verified
+    query's SQL, as `datasource.schema.table`. `engine.events` and
+    `engine.evals` are empty namespaces; E1 adds `subscribe` and `catalog`.
+
 ## 4. Observers
 
 ### The registry kind and the config
@@ -371,6 +418,17 @@ Config(..., observers=[ObserverConfig(type="log"), MyObserver()])   # a {type: .
 | **Validation** | `type` is resolved and the block validated by the observer's `config_model` at `NL2SQL(...)`, with the usual "did you mean". `otel` without the extra installed is a `ConfigError` naming `pip install "nl2sql-engine[otel]"`. |
 | **Built when the engine is** | Subscribed to `Runtime.bus` in config order, and closed by `engine.close()`. |
 | **`settings.observability`** | Deleted. `exporter: otlp` and `otlp_endpoint` become an `otel` block. Its two readers go with it in A0: `cli/commands/run.py` (`configure_metrics`) and `cli/common/engine.py` (JSON logs under `otlp`). Between A0 and E2 nothing exports to OpenTelemetry; no release falls in between. |
+
+!!! note "Built: the observer kind and the section (A0)"
+    The `observer` registry kind (`add_observer`, `@registry.observer`) and
+    the `observers` section (`ObserverConfig`, or an object with
+    `on_event`) are accepted and validated; nothing builds an observer yet
+    (E2). `Config.observers` is `None` when the section is absent, which E2
+    reads as `log` and `audit`. `settings.observability` and its readers
+    (`nl2sql run`'s `configure_metrics`, the CLI's and `nl2sql-api`'s switch
+    to JSON logs) are gone. `nl2sql --log-format text|json` and
+    `NL2SQL_LOG_FORMAT` choose the log format; `configure_logging(json_format=None)`
+    reads the variable.
 
 ### Built-in observers
 
@@ -605,6 +663,14 @@ Config(..., hooks=[HookConfig(type="corp_sql_review", points=["execute.before"])
 `registry.add_hook(name, cls)`, `@registry.hook(name)`. A point the hook does
 not declare is a `ConfigError` at build.
 
+!!! note "Built: the hook kind and the section (A0)"
+    The `hook` registry kind and the `hooks` section are accepted and
+    validated: `HookConfig` (`points`, `on_error`, `approver_roles`, and the
+    hook's own keys) or an object with `__call__`. `HookPoint`, the six point
+    names, is defined in `nl2sql/config/models.py`, where the config and the
+    `hook.decision` event both read it, and re-exported from `nl2sql.hooks`,
+    where H1 imports it.
+
 ### The architecture test
 
 `test_hooks_modify_only_before_the_validator` holds the boundary three ways:
@@ -691,6 +757,22 @@ class Approval(BaseModel):                 # passed back on the re-run
    `needs_approval` again with the new SQL: an approval never covers SQL
    nobody saw.
 
+!!! note "Built: the shapes on the result (A0)"
+    `ApprovalRequest`, `Approval` and `VerifiedRef` (`id`, `params`) are in
+    `nl2sql/hooks/approval.py`, and `RunStop` in `nl2sql/limits.py`; all are
+    exported from `nl2sql`. `QueryResult.status` is a `RunStatus`
+    (`success`, `plan_only`, `error`, `needs_approval`, `stopped`, and
+    `needs_clarification`, reserved for Wave B), or `None` when nothing ran
+    and nothing failed (0.6's `""`). `result_from_state` reads the state's
+    `approvals_needed` and `stop`, and sets the status from them before
+    looking at errors, so H2 and E3 put those keys in the state and touch no
+    result code. The error codes `HOOK_DENIED`, `HOOK_FAILED`,
+    `NEEDS_APPROVAL`, `RUN_LIMIT_REACHED` and `QUESTION_TOO_BROAD` (never
+    retried), `JOIN_KEY_TYPE_MISMATCH` and `JOIN_FAN_OUT` (retried) and
+    `JOIN_KEY_UNCONVERTED` and `ALL_NULL_COLUMN` (warnings) are in
+    `ErrorCode`; `DECLARED_AHEAD` in `test_boundary_tidy_ups.py` lists each
+    with the PR that raises it, which takes it off the list.
+
 Nothing is stored: no queue, no expiry, no table. The asking app holds the
 request until someone acts on it. An `Approval` is not signed and does not
 expire (D24): it is trusted as far as the `user_context` a caller passes is
@@ -753,6 +835,14 @@ cases:
 | `tables`, `columns` | `needed_tables`, `needed_columns` | |
 | `sql`, `rows`, `alt_sql`, `alt_rows` | `gold_sql`, `gold_result`, `alt_gold_sql`, `alt_gold_result` | Same values |
 | `plan` | `chinook_gold_plans.yaml`, by id | Folded into the case |
+
+!!! note "Built: the section and the settings (A0)"
+    `EvalsConfig` (with `EvalGate`) is `Config.evals`, from `evals.yaml`;
+    `suites` are paths relative to `nl2sql.yaml`, resolved by V1. The
+    settings the other tracks read are in place with their defaults:
+    `settings.pipeline.max_llm_calls`, `max_cost_usd` and `sanity_checks`,
+    `settings.routing`, and `settings.retrieval.table_k`, `planning_k` and
+    `decomposer_tables`; `eval_seeder` is in `AgentName`.
 
 `evals.yaml` is a config section file like the others: strict keys, loaded
 with the config. A suite file is data: it is read when a run asks for it,
@@ -1249,6 +1339,11 @@ schema panel passes the selected role.
 
 New on `Registry`: `add_observer`, `add_hook`, `add_scorer` and their
 decorators. Knowledge sources stay for Wave B.
+
+!!! note "Built: the three kinds (A0)"
+    `observer`, `hook` and `scorer` are in `nl2sql/registry.py` (`GROUPS`,
+    `INTERFACE_VERSIONS` at 1, `add_*` and the decorators). No built-in is
+    declared yet: E2 adds the observers and V1 the scorers.
 
 ## 14. Bugs Wave A fixes
 

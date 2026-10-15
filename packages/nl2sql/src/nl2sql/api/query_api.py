@@ -13,15 +13,18 @@ from typing import Optional, List, Dict, Any, Iterator, Literal
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
-from nl2sql.pipeline.runtime import run_with_graph
+from nl2sql.pipeline.runtime import run_with_graph, usage_prices
 from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
-from nl2sql.common.errors import ErrorSeverity
+from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql.events import RunScope, RunStatus
+from nl2sql.hooks.approval import ApprovalRequest
+from nl2sql.limits import RunStop
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import QueryEvent, RunEvents
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
-from nl2sql.services.callbacks.token_handler import QuestionUsage
+from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
 
 DEFAULT_SAMPLE_ROWS = 50
 
@@ -90,7 +93,11 @@ class QueryResult(BaseModel):
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
     warnings: List[Dict[str, Any]] = Field(default_factory=list)
     artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
-    status: str = Field(default="")
+    # How the run ended: success, plan_only, error, needs_approval (see
+    # approvals_needed), stopped (see stop), or needs_clarification (reserved
+    # for Wave B's clarification result; nothing produces it yet). None when
+    # nothing ran and nothing failed.
+    status: Optional[RunStatus] = None
     timings: Dict[str, float] = Field(default_factory=dict)
     usage: QuestionUsage = Field(default_factory=QuestionUsage)
     trace_path: Optional[str] = None
@@ -100,6 +107,11 @@ class QueryResult(BaseModel):
     result_manifest: List[ResultSummary] = Field(default_factory=list)
     # A verified query's answer, or a generated one.
     source: AnswerSource = Field(default_factory=AnswerSource)
+    # Why the run stopped at a limit (settings.pipeline.max_llm_calls or max_cost_usd), when status is "stopped".
+    stop: Optional[RunStop] = None
+    # What a person must approve before the question runs, one per pending sub-query, when status is
+    # "needs_approval". Re-run the question with an Approval for each.
+    approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -213,13 +225,22 @@ def _overall_status(
     sub_queries: List[SubQueryResult],
     blocking_errors: List[Dict[str, Any]],
     state: Dict[str, Any],
-) -> str:
-    """Summarise the run for a caller that renders one badge."""
+) -> Optional[str]:
+    """Summarise the run for a caller that renders one badge.
+
+    A run that asked for approval, or stopped at a limit, says so before its
+    error does: the state's ``approvals_needed`` and ``stop`` are how the
+    pipeline reports them.
+    """
+    if state.get("approvals_needed"):
+        return "needs_approval"
+    if state.get("stop"):
+        return "stopped"
     if blocking_errors:
         return "error"
     if not sub_queries:
         # Nothing ran, so neither "plan_only" nor "success" would be true.
-        return ""
+        return None
     outputs = list((state.get("subgraph_outputs") or {}).values())
     produced_rows = any(sub_query.rows is not None for sub_query in sub_queries) or any(
         _field(output, "artifact") is not None for output in outputs
@@ -263,7 +284,39 @@ def result_from_state(
         truncated=any(sq.truncated for sq in sub_queries),
         result_manifest=list(_field(state.get("aggregator_response"), "results", None) or []),
         source=_source(state.get("verified_match")),
+        stop=state.get("stop"),
+        approvals_needed=list(state.get("approvals_needed") or []),
     )
+
+
+def tables_read(result: QueryResult, ds_registry: Any = None) -> List[str]:
+    """The tables ``result``'s sub-queries read, as ``datasource.schema.table``, for the run's summary.
+
+    From each sub-query's plan or, on the verified path, from its SQL parsed
+    in the adapter's dialect. A table with no schema is in the adapter's
+    default schema. A sub-query whose tables cannot be read is left out: a
+    summary never fails a run over a table name.
+    """
+    from nl2sql.config.curated import inspect_verified_sql
+    from nl2sql.policies.scope import default_schema
+
+    tables = set()
+    for sq in result.sub_queries:
+        ds_id = sq.datasource_id
+        if not ds_id:
+            continue
+        pairs: List[Any] = []
+        if sq.plan:
+            pairs = [(t.get("schema_name"), t.get("name")) for t in sq.plan.get("tables") or []]
+        elif sq.sql and ds_registry is not None:
+            try:
+                pairs = list(inspect_verified_sql(sq.sql, ds_registry.get_dialect(ds_id)).tables)
+            except Exception:
+                pairs = []
+        for schema, table in pairs:
+            if table:
+                tables.add(f"{ds_id}.{schema or default_schema(ds_registry, ds_id)}.{table}")
+    return sorted(tables)
 
 
 def _source(match: Any) -> AnswerSource:
@@ -289,6 +342,7 @@ class QueryAPI:
         execute: bool = True,
         user_context: Optional[UserContext] = None,
         cancellation_token: Optional[CancellationToken] = None,
+        scope: Optional[RunScope] = None,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -301,22 +355,62 @@ class QueryAPI:
             cancellation_token: Optional token the caller cancels to stop the
                 run. It stops before the next step or model call; the one in
                 flight finishes, and the result carries a ``CANCELLED`` error.
+            scope: A scope :meth:`open_scope` opened (Wave C's turn); the run
+                goes on in it and closes it, instead of opening its own.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
         """
-        state = run_with_graph(
-            self._ctx,
-            question,
-            datasource_id=datasource_id,
-            execute=execute,
-            user_context=user_context,
-            cancellation_token=cancellation_token,
-        )
-        return result_from_state(
-            state,
-            artifact_store=getattr(self._ctx, "artifact_store", None),
-        )
+        scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
+                                         user_context=user_context)
+        try:
+            state = run_with_graph(
+                self._ctx,
+                question,
+                datasource_id=datasource_id,
+                execute=execute,
+                user_context=user_context,
+                cancellation_token=cancellation_token,
+                scope=scope,
+            )
+            result = result_from_state(
+                state,
+                artifact_store=getattr(self._ctx, "artifact_store", None),
+            )
+        except BaseException as exc:
+            # A KeyboardInterrupt too: every scope ends with a terminal event.
+            scope.fail(f"The run failed: {exc or type(exc).__name__}", ErrorCode.UNKNOWN_ERROR)
+            raise
+        self.close_scope(scope, result)
+        return result
+
+    def open_scope(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
+                   user_context: Optional[UserContext] = None) -> RunScope:
+        """Open a run's scope on the engine's bus and publish ``run.started`` (wave_a.md, section 3).
+
+        ``run_query`` and ``stream_query`` open one themselves. A caller that
+        works in the run before the question runs (Wave C's rewrite) opens it
+        here, makes its model calls with ``scope.callbacks()`` inside
+        ``scope.entered()``, then passes it as ``scope=``, or closes it with
+        :meth:`close_scope` and a result built without a graph run.
+        """
+        scope = RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
+                         execute=execute, tenant_id=self._ctx.tenant_id,
+                         usage=TokenUsageCallback(prices=usage_prices(self._ctx)))
+        scope.start()
+        return scope
+
+    def close_scope(self, scope: RunScope, result: QueryResult) -> None:
+        """Close ``scope`` with ``run.finished``, the result's summary; ``run.failed`` if that cannot be built.
+
+        ``result`` may be one built without a graph run (Wave C's failed
+        rewrite). A scope closes once; closing it again does nothing.
+        """
+        try:
+            scope.finish(result, tables=tables_read(result, getattr(self._ctx, "ds_registry", None)))
+        except Exception as exc:
+            scope.fail(f"The run's summary could not be built: {exc}", ErrorCode.UNKNOWN_ERROR)
+            raise
 
     def stream_query(
         self,
@@ -326,6 +420,7 @@ class QueryAPI:
         execute: bool = True,
         user_context: Optional[UserContext] = None,
         cancellation_token: Optional[CancellationToken] = None,
+        scope: Optional[RunScope] = None,
     ) -> Iterator[QueryEvent]:
         """
         Run a question as :meth:`run_query` does, yielding the run as it happens.
@@ -343,12 +438,17 @@ class QueryAPI:
         The run goes on in a thread of its own; the caller's context (a
         request's keys) goes with it. Closing the iterator early -- a client
         that went away -- cancels the run before its next step or model call.
+        ``scope`` is as for :meth:`run_query`.
         """
         token = cancellation_token or CancellationToken()
         events: "queue.Queue[Optional[QueryEvent]]" = queue.Queue()
+        opened = scope
 
         def run() -> None:
+            scope: Optional[RunScope] = opened
             try:
+                scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
+                                                 user_context=user_context)
                 state = run_with_graph(
                     self._ctx,
                     question,
@@ -358,12 +458,19 @@ class QueryAPI:
                     user_context=user_context,
                     cancellation_token=token,
                     stream_answer=True,
+                    scope=scope,
                 )
                 result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
+                self.close_scope(scope, result)
                 events.put(QueryEvent(type="final", data=result.model_dump(mode="json")))
-            except Exception as exc:
-                events.put(QueryEvent(type="error", data={"message": f"The run failed: {exc}",
-                                                          "error_code": "UNKNOWN_ERROR"}))
+            except BaseException as exc:
+                # A KeyboardInterrupt too: every scope ends with a terminal event.
+                message = f"The run failed: {exc or type(exc).__name__}"
+                if scope is not None:
+                    scope.fail(message, ErrorCode.UNKNOWN_ERROR)
+                events.put(QueryEvent(type="error", data={"message": message, "error_code": "UNKNOWN_ERROR"}))
+                if not isinstance(exc, Exception):
+                    raise
             finally:
                 events.put(None)
 

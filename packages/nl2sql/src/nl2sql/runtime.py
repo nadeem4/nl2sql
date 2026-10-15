@@ -79,10 +79,15 @@ class Runtime:
         from nl2sql.llm import LLMRegistry
         from nl2sql.secrets import SecretManager
 
+        from nl2sql.events import EventBus
+
         self = cls()
         self.registry = registry if registry is not None else Registry.default()
         self._lock = RLock()
         self._closed = False
+        # The engine's events: one bus per engine, shared by its derived and
+        # run-scoped runtimes (docs/architecture/wave_a.md, section 3).
+        self.bus = EventBus()
         source = "nl2sql.yaml" if config.folder is not None else "Config"
         problems: List[Problem] = []
 
@@ -443,6 +448,7 @@ class Runtime:
             if self._closed:
                 return
             self._closed = True
+        self.bus.close()
         self.ds_registry.close()
         self.llm_registry.close()
         for store in (getattr(self, "state", None), getattr(self, "index", None),

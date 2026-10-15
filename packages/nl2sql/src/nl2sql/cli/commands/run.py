@@ -31,7 +31,6 @@ def run_pipeline(
     if config.no_exec:
         presenter.print_warning("Execution disabled (--no-exec): plan, validation and SQL only.")
 
-    record_step = _step_metrics(engine)
     user_context = UserContext(roles=[config.role], tenant_id=engine.config.settings.tenant_id)
     steps: List[Tuple[str, float, bool]] = []
     result: Optional[QueryResult] = None
@@ -48,7 +47,6 @@ def run_pipeline(
                 step = (str(event.data.get("node")), float(event.data.get("seconds") or 0.0),
                         bool(event.data.get("ok", True)))
                 steps.append(step)
-                record_step(step[0], step[1])
             elif event.type == "final":
                 result = QueryResult.model_validate(event.data)
             elif event.type == "error":
@@ -76,15 +74,6 @@ def run_pipeline(
     # RBAC refusal included) makes its status "error". Warnings alone do not.
     if result.status == "error":
         sys.exit(1)
-
-
-def _step_metrics(engine):
-    """Records each step's time on ``nl2sql.node.duration``, with the exporter the config names."""
-    from nl2sql.common.metrics import configure_metrics, node_duration_histogram
-
-    observability = engine.config.settings.observability
-    configure_metrics(exporter_type=observability.exporter, otlp_endpoint=observability.otlp_endpoint)
-    return lambda node, seconds: node_duration_histogram.record(seconds, {"node": node})
 
 
 def _print_result(presenter: ConsolePresenter, config: RunConfig, result: QueryResult) -> None:

@@ -54,6 +54,24 @@ class ErrorCode(str, Enum):
     PROVIDER_MODEL_UNAVAILABLE = "PROVIDER_MODEL_UNAVAILABLE"
     # The model's structured answer still did not parse after the agent's parse_retries.
     MODEL_OUTPUT_INVALID = "MODEL_OUTPUT_INVALID"
+    # Wave A (docs/architecture/wave_a.md). A hook denied the run or a part of it.
+    HOOK_DENIED = "HOOK_DENIED"
+    # A hook raised, returned something that is not a decision, or a decision its point does not allow.
+    HOOK_FAILED = "HOOK_FAILED"
+    # A hook asked for a person's approval; the result carries the requests.
+    NEEDS_APPROVAL = "NEEDS_APPROVAL"
+    # The question reached settings.pipeline.max_llm_calls or max_cost_usd.
+    RUN_LIMIT_REACHED = "RUN_LIMIT_REACHED"
+    # The decomposition needs more than settings.routing.max_sub_queries sub-queries.
+    QUESTION_TOO_BROAD = "QUESTION_TOO_BROAD"
+    # A join key's column cannot be coerced to its declared type; retried for another column.
+    JOIN_KEY_TYPE_MISMATCH = "JOIN_KEY_TYPE_MISMATCH"
+    # A warning: join key values that did not convert to the declared type and joined nothing.
+    JOIN_KEY_UNCONVERTED = "JOIN_KEY_UNCONVERTED"
+    # A join repeated the rows an aggregate counts; under COUNT retried once, else a warning.
+    JOIN_FAN_OUT = "JOIN_FAN_OUT"
+    # A warning: a result column whose every value is null.
+    ALL_NULL_COLUMN = "ALL_NULL_COLUMN"
 
 
 
@@ -74,6 +92,12 @@ FATAL_ERRORS = {
     ErrorCode.PROVIDER_TIMEOUT,
     ErrorCode.PROVIDER_UNAVAILABLE,
     ErrorCode.PROVIDER_MODEL_UNAVAILABLE,
+    # Each ends the run by design: a retry would meet the same hook, limit or question.
+    ErrorCode.HOOK_DENIED,
+    ErrorCode.HOOK_FAILED,
+    ErrorCode.NEEDS_APPROVAL,
+    ErrorCode.RUN_LIMIT_REACHED,
+    ErrorCode.QUESTION_TOO_BROAD,
 }
 
 SAFE_ERROR_MESSAGES = {

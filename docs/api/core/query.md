@@ -73,13 +73,15 @@ Fields:
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
 | `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
 | `artifact_refs` | `Dict[str, ArtifactRef]` | no | Result artifact references keyed by execution node id. |
-| `status` | `str` | no | `"success"`, `"error"`, `"plan_only"`, or `""` when nothing ran. |
+| `status` | `Optional[RunStatus]` | no | `"success"`, `"plan_only"`, `"error"`, `"needs_approval"`, `"stopped"`, `"needs_clarification"`, or `None` when nothing ran and nothing failed. See below. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node, plus `LangGraph` for the whole run. |
 | `usage` | `QuestionUsage` | no | LLM calls, tokens and model time per node and for the whole question. See below. |
 | `trace_path` | `Optional[str]` | no | Where this run's trace file was written, or `None` when `TRACE_MODE` did not write one. See [Debugging a Run](../../observability/debugging.md). |
 | `truncated` | `bool` | no | True when any sub-query's result reached its row limit, so rows may be missing. See `sub_queries[].truncated`. |
 | `result_manifest` | `List[ResultSummary]` | no | The run's saved results, one per terminal DAG node (`node_id`, `columns`, `row_count`, `truncated`): the manifest the aggregator writes beside them. Never the rows; see [Reading a run's saved results](#reading-a-runs-saved-results). Empty when nothing was saved. |
 | `source` | `AnswerSource` | no | Where the answer came from: `type` `"verified"` with the verified query's `id`, `datasource_id` and the `params` it ran with, or `type` `"generated"` with the other fields `None`. See [Curated answers](../../configuration/curated.md#what-happens-at-question-time). |
+| `stop` | `Optional[RunStop]` | no | Set when `status` is `"stopped"`: the `limit` the run reached (`max_llm_calls` or `max_cost_usd`), its configured `value`, and what was `spent`. |
+| `approvals_needed` | `List[ApprovalRequest]` | no | Set when `status` is `"needs_approval"`: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an `Approval` for each. |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as the same summary dict.
@@ -91,10 +93,15 @@ original `severity` and a `sub_query_id`. The run trace and
 sub-query that failed without a blocking error of its own (it ended with no SQL
 on warnings alone) adds a `MISSING_SQL` error, so the run reports `"error"`.
 
-`status` is derived: `"error"` when any blocking error is present, otherwise
-`"plan_only"` when no sub-query produced rows or an artifact (an `execute=False`
-run), otherwise `"success"`. A state with no sub-queries and no errors leaves it
-empty.
+`status` is derived: `"needs_approval"` when a hook asked for approval
+(`approvals_needed`), `"stopped"` when the run reached a per-question limit
+(`stop`), otherwise `"error"` when any blocking error is present, otherwise
+`"plan_only"` when no sub-query produced rows or an artifact (an
+`execute=False` run), otherwise `"success"`. A state with no sub-queries and no
+errors leaves it `None`. `"needs_clarification"` is reserved for Wave B's
+clarification result: nothing produces it yet. Hooks, approval and the caps
+that produce `"needs_approval"` and `"stopped"` arrive with release 0.7 (see
+[Wave A](../../architecture/wave_a.md)).
 
 Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set lives in artifact storage, addressed through `artifact_refs`; each

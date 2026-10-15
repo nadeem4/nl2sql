@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
+import contextvars
 import datetime as _dt
 import signal
 import sys
 import threading
 import time
 import traceback
-from typing import Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 
 from langchain_core.callbacks import BaseCallbackHandler
 
@@ -24,6 +26,9 @@ from nl2sql.pipeline.timing import NodeTimingCallback
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 from nl2sql.tracing.recorder import TraceRecorder
 from nl2sql.tracing.trace import write_run_trace
+
+if TYPE_CHECKING:
+    from nl2sql.events import RunScope
 
 # What a caller is told when the run ran out of time. It is returned in the
 # answer synthesizer's own shape, which is the only place `result_from_state`
@@ -147,6 +152,11 @@ def _pin_index(ctx: Runtime):
     return pin() if callable(pin) else ctx
 
 
+def usage_prices(ctx: Runtime) -> Dict:
+    """The price table a run's ``TokenUsageCallback`` costs its calls with."""
+    return {model: price.model_dump(exclude_none=True) for model, price in ctx.config.llm.prices.items()}
+
+
 def run_with_graph(
     ctx: Runtime,
     user_query: str,
@@ -157,6 +167,7 @@ def run_with_graph(
     cancellation_token: Optional[CancellationToken] = None,
     trace_mode: Optional[str] = None,
     stream_answer: bool = False,
+    scope: Optional["RunScope"] = None,
 ) -> Dict:
     """Convenience function to run the full pipeline.
 
@@ -167,6 +178,11 @@ def run_with_graph(
     ``stream_answer`` asks the answer model to stream its answer, so a
     callback's ``on_llm_new_token`` sees it as it is written
     (``stream_query`` passes it with a :class:`~nl2sql.pipeline.events.RunEvents`).
+    ``scope`` is the run's :class:`~nl2sql.events.RunScope`, opened and closed
+    by the caller: the run takes its ``trace_id``, enters its context in the
+    worker (so the run's events and log lines carry it, on LangGraph's
+    threads too) and adds its ``callbacks()``: its usage collector, when it
+    has one, is the run's.
     """
     token = cancellation_token or CancellationToken()
     run_done = threading.Event()
@@ -193,13 +209,16 @@ def run_with_graph(
         user_query=user_query,
         user_context=user_context or UserContext(),
         datasource_id=datasource_id,
+        **({"trace_id": scope.trace_id} if scope is not None else {}),
     )
 
     settings = ctx.settings
     timeout_sec = settings.pipeline.timeout_s
     timing = NodeTimingCallback()
-    usage = TokenUsageCallback(prices={model: price.model_dump(exclude_none=True)
-                                       for model, price in ctx.config.llm.prices.items()})
+    # The scope's collector, when it has one, so a model call made in the run
+    # before the graph (Wave C's rewrite) counts in the run's usage.
+    usage = (scope.usage if scope is not None and scope.usage is not None
+             else TokenUsageCallback(prices=usage_prices(ctx)))
     recorder = TraceRecorder()
     started_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     # The date the prompts were told; a trace replay pins it, or every planner
@@ -252,15 +271,20 @@ def run_with_graph(
             **_telemetry(),
         }, "cancelled")
 
+    attached = [cb for cb in scope.callbacks() if cb is not usage] if scope is not None else []
+
     def _invoke():
         # The run's scopes are pinned in the worker's context: each
         # datasource's Scope is built once, so every step decides the same way.
-        with ctx.policy_engine.run():
+        # The run's RunScope is entered beside them, so LangGraph's own worker
+        # threads inherit its trace_id and events reach it.
+        with ctx.policy_engine.run(), (scope.entered() if scope is not None else contextlib.nullcontext()):
             return graph.invoke(
                 initial_state.model_dump(),
                 config={
                     "configurable": {"cancellation_token": token, "stream_answer": stream_answer},
-                    "callbacks": [_StopWhenCancelled(token), *(callbacks or []), timing, usage, recorder],
+                    "callbacks": [_StopWhenCancelled(token), *(callbacks or []), *attached, timing, usage,
+                                  recorder],
                 },
             )
 
@@ -271,7 +295,9 @@ def run_with_graph(
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="nl2sql-run")
     future = None
     try:
-        future = pool.submit(_invoke)
+        # The worker starts from the caller's context (a request's keys, a
+        # stream's thread), as LangGraph's own workers start from the worker's.
+        future = pool.submit(contextvars.copy_context().run, _invoke)
         # Released when the graph is done, which a timed-out run is not yet.
         future.add_done_callback(lambda _: run_llms.release())
         try:

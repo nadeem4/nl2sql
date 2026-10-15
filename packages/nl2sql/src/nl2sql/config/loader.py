@@ -37,6 +37,9 @@ Loc = Tuple[Union[str, int], ...]
 
 _UNIONS = (Union, getattr(types, "UnionType", Union))
 
+# The sections whose body is a list, in nl2sql.yaml or in their own file.
+LIST_SECTIONS = ("datasources", "observers", "hooks")
+
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_-]*):([^{}]+)\}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -305,7 +308,7 @@ class _Loader:
 
         self.sources[section] = ("file", label)
         ok, body = self._read(target, label, loc)
-        body = self._body(body, label, loc, as_list=section == "datasources") if ok else None
+        body = self._body(body, label, loc, as_list=section in LIST_SECTIONS) if ok else None
         if body is None:
             del data[section]
         else:
@@ -355,7 +358,7 @@ class _Loader:
                 self._file_problem(label, "version", "Only nl2sql.yaml has a version.", loc + ("version",))
                 body = {k: v for k, v in body.items() if k != "version"}
         if as_list and not isinstance(body, list):
-            self._file_problem(label, "", "Must hold the list of datasources.", loc)
+            self._file_problem(label, "", f"Must hold the list of {loc[0]}.", loc)
             return None
         if not as_list and not isinstance(body, dict):
             self._file_problem(label, "", "Must hold a mapping of keys.", loc)

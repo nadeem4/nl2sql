@@ -24,11 +24,9 @@ async def lifespan(app: FastAPI):
     load_env_file()
     # The library no longer configures logging on import, so the application
     # entry point owns it - before anything that logs is constructed, at
-    # NL2SQL_LOG_LEVEL (else INFO). An OTLP deployment then switches to JSON logs.
+    # NL2SQL_LOG_LEVEL (else INFO), as text or, with NL2SQL_LOG_FORMAT=json, JSON lines.
     configure_logging()
     engine = NL2SQL.from_config()
-    if engine.config.settings.observability.exporter == "otlp":
-        configure_logging(json_format=True)
     # Refuse to start when a required datasource cannot connect (EngineNotReady);
     # an optional one that fails leaves the API serving the others.
     try:

@@ -75,15 +75,28 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_record)
 
 
-def configure_logging(level: Optional[str] = None, json_format: bool = False):
-    """Configures the root logger.
+LOG_FORMATS = ("text", "json")
+
+
+def configure_logging(level: Optional[str] = None, json_format: Optional[bool] = None):
+    """Configures the root logger. For the entry points: logging handlers are process-wide.
 
     Args:
         level (str): The logging level. Without one, ``NL2SQL_LOG_LEVEL``,
             else INFO.
-        json_format (bool): Whether to use JSON formatting (default: False).
+        json_format (bool): One JSON object per line. Without a choice,
+            ``NL2SQL_LOG_FORMAT`` (``text`` or ``json``), else text. The CLI's
+            ``--log-format`` passes it.
+
+    Raises:
+        ValueError: ``NL2SQL_LOG_FORMAT`` is neither text nor json.
     """
     level = level or os.environ.get("NL2SQL_LOG_LEVEL") or "INFO"
+    if json_format is None:
+        chosen = (os.environ.get("NL2SQL_LOG_FORMAT") or "text").strip().lower()
+        if chosen not in LOG_FORMATS:
+            raise ValueError(f"NL2SQL_LOG_FORMAT is '{chosen}'; it takes text or json.")
+        json_format = chosen == "json"
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
     

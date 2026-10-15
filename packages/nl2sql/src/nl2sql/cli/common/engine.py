@@ -51,14 +51,11 @@ def build_engine(ctx: typer.Context, *, check: bool = True) -> "NL2SQL":
     degraded.
     """
     from nl2sql import NL2SQL, ConfigError, EngineNotReady
-    from nl2sql.common.logger import configure_logging
 
     try:
         engine = NL2SQL(load_project_config(ctx))
     except ConfigError as error:
         _fail(error)
-    if engine.config.settings.observability.exporter == "otlp":
-        configure_logging(json_format=True)
     if not check:
         return engine
     try:

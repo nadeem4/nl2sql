@@ -90,7 +90,19 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
     raised = set(re.findall(r"ErrorCode\.([A-Z_]+)", source))
     explained = {code.name for code in SAFE_ERROR_MESSAGES}
 
-    assert {member.name for member in ErrorCode} - raised - explained == set()
+    assert {member.name for member in ErrorCode} - raised - explained - set(DECLARED_AHEAD) == set()
+    # A code declared ahead leaves the list in the PR that raises it.
+    assert not set(DECLARED_AHEAD) & raised, sorted(set(DECLARED_AHEAD) & raised)
+
+
+# Wave A's codes, added by its foundation PR before their producers so the
+# parallel PRs never edit errors.py (docs/architecture/wave_a.md, D35), each
+# with the PR that raises it.
+DECLARED_AHEAD = {
+    "HOOK_DENIED": "H1", "HOOK_FAILED": "H1", "NEEDS_APPROVAL": "H2", "RUN_LIMIT_REACHED": "E3",
+    "QUESTION_TOO_BROAD": "R2", "JOIN_KEY_TYPE_MISMATCH": "R2", "JOIN_KEY_UNCONVERTED": "R2",
+    "JOIN_FAN_OUT": "S1", "ALL_NULL_COLUMN": "S1",
+}
 
 
 def test_cancelled_is_a_string_not_a_one_tuple():

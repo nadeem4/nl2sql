@@ -8,7 +8,9 @@ import nl2sql
 PUBLIC_SURFACE = {
     # The engine and its questions
     "NL2SQL", "QueryResult", "SubQueryResult", "RowSample", "AnswerSource", "QueryEvent",
-    "CancellationToken", "UserContext", "QuestionUsage",
+    "CancellationToken", "UserContext", "QuestionUsage", "RunStop", "ApprovalRequest", "Approval", "VerifiedRef",
+    # Events
+    "Event", "Observer",
     # Saved results
     "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return
@@ -18,9 +20,10 @@ PUBLIC_SURFACE = {
     # The config, and building an engine from it
     "Config", "load_config", "load_env_file", "ConfigError", "Registry", "Datasource", "Limits", "LLM",
     "AgentLLM", "Embeddings", "Policies", "Role", "Storage", "StoreConfig", "Secrets", "Curated", "Settings",
+    "ObserverConfig", "HookConfig", "EvalsConfig",
     "CheckReport", "DatasourceStatus", "EngineNotReady",
     # Entry-point hooks
-    "configure_logging",
+    "configure_logging", "TraceContextFilter",
     # The benchmark
     "BenchmarkAPI", "BenchmarkConfig",
 }

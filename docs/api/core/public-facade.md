@@ -119,6 +119,8 @@ engine.results       # manifest, page, csv
 engine.feedback      # record, list, stats, export, clear
 engine.traces        # get, replay
 engine.storage       # info, purge
+engine.events        # the engine's events (filled in release 0.7)
+engine.evals         # evaluation (filled in release 0.7)
 engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2
 ```
 
@@ -133,6 +135,7 @@ engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_
 | `feedback` | below, and [Feedback and signals](../../observability/feedback.md) |
 | `traces`, `about()` | below |
 | `benchmark` | [Benchmarks](../../benchmarks.md) |
+| `events`, `evals` | Empty in this release; [Wave A](../../architecture/wave_a.md) fills them |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.
@@ -228,11 +231,14 @@ Clients import everything they need from `nl2sql` itself, never from an engine
 submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `AnswerSource`, `ResultSummary`, `ResultManifest`, `ResultPage`,
 `ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`,
-`UserContext`, `CancellationToken`, `configure_logging`, what the namespaces
+`UserContext`, `CancellationToken`, `configure_logging`,
+`TraceContextFilter`, the event types (`Event`, `Observer`), a run's ending
+(`RunStop`, `ApprovalRequest`, `Approval`, `VerifiedRef`), what the namespaces
 return (`DatasourceInfo`, `DatasourceType`, `IndexProgress`, `LLMChange`), the config (`Config`,
 `load_config`, `load_env_file`, `ConfigError`, `Registry` and the section
 classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
-`Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`), what `check()` reports
+`Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`,
+`ObserverConfig`, `HookConfig`, `EvalsConfig`), what `check()` reports
 (`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
 (`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the benchmark's
 `BenchmarkAPI` and `BenchmarkConfig`. The list is fixed by
