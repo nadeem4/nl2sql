@@ -37,7 +37,7 @@ from pydantic import BaseModel, Field
 
 from nl2sql.events import publish
 from nl2sql.llm.failures import redact_keys
-from nl2sql.llm.prices import call_cost, price_for
+from nl2sql.llm.prices import call_cost, price_for_call
 from nl2sql.llm.wires import AGENT_KEY, wire_named
 
 # ``llm.prices``: per model, a ``Price`` (or the same keys as a mapping), per million tokens.
@@ -135,8 +135,8 @@ def _model_name(response: LLMResult) -> str:
 
 def _cost(call: LLMCallUsage, requested_model: str, prices: Optional[Prices],
           cache_write_multiplier: float = 1.0) -> Optional[float]:
-    """Price a call by its served model name, else by the configured one (``price_for``, exact names)."""
-    price = price_for(call.model, prices) or price_for(requested_model, prices)
+    """Price a call: ``llm.prices`` by its served name, then its configured one, then the table (``price_for_call``)."""
+    price = price_for_call(call.model, requested_model, prices)
     if price is None:
         return None
     return call_cost(price, input_tokens=call.input_tokens, output_tokens=call.output_tokens,

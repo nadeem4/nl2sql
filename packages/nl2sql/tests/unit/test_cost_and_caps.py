@@ -414,3 +414,64 @@ def test_engine_llm_prices_is_the_effective_table(tmp_path):
     assert rows["gpt-5.4"]["source"] == "config" and rows["gpt-5.4"]["input"] == 9
     assert rows["claude-opus-5"]["source"] == "table" and rows["claude-opus-5"]["cache_write"] == 6.25
     assert rows["claude-opus-5"]["citation"]
+
+
+# ---------------------------------------------------------------- review fixes (PR #326)
+
+def test_a_config_price_for_the_configured_name_wins_over_the_table_for_the_served_name():
+    # A deployment alias whose responses carry a table model's name keeps its negotiated rate.
+    prices = {"acme-gpt": Price(input=1.0, output=1.0)}
+    call = _call(TokenUsageCallback(prices=prices), MILLION, requested="acme-gpt", reported="gpt-5.4")
+    assert call.cost == pytest.approx(1.0)
+    # The served name's own override still comes first.
+    both = {**prices, "gpt-5.4": Price(input=3.0, output=3.0)}
+    call = _call(TokenUsageCallback(prices=both), MILLION, requested="acme-gpt", reported="gpt-5.4")
+    assert call.cost == pytest.approx(3.0)
+
+
+@pytest.mark.parametrize("field", ["input", "output", "cached_input", "cache_write"])
+def test_a_negative_price_is_rejected(field):
+    from pydantic import ValidationError
+
+    rates = {"input": 1.0, "output": 1.0, field: -1.0}
+    with pytest.raises(ValidationError):
+        Price(**rates)
+    assert Price(input=0, output=0).input == 0
+
+
+def test_a_timeout_after_a_limit_stop_reports_stopped(monkeypatch):
+    import time
+
+    model = FakeListChatModel(responses=["a"] * 10)
+
+    def slow_planner(state, config):
+        for _ in range(2):
+            try:
+                model.invoke("plan", config={"callbacks": config["callbacks"]})
+            except Exception:
+                pass
+        time.sleep(1.0)  # still unwinding when the timeout fires
+        return {}
+
+    monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: _FakeGraph(slow_planner))
+    ctx = fake_runtime(settings={"pipeline": {"max_llm_calls": 1}})
+    pipeline = ctx.config.settings.pipeline.model_copy(update={"timeout_s": 0.3})
+    ctx.config = ctx.config.model_copy(update={"settings": ctx.config.settings.model_copy(
+        update={"pipeline": pipeline})})
+    result = query_api.QueryAPI(ctx).run_query("How many?", user_context=_USER)
+    assert result.status == "stopped"
+    assert [e["error_code"] for e in result.errors] == ["RUN_LIMIT_REACHED"]
+
+
+def test_an_eval_call_with_unknown_counts_is_counted_as_unknown_not_zero():
+    from nl2sql.evaluation import run as eval_run
+    from nl2sql.llm.models import AgentConfig, LLMFileConfig
+    from nl2sql.services.callbacks.token_handler import LLMCallUsage, QuestionUsage
+
+    cfg = LLMFileConfig(default=AgentConfig(provider="openai", model="gpt-5.4"), agents={})
+    usage = QuestionUsage(calls=[
+        LLMCallUsage(node="decomposer", input_tokens=1_000_000, output_tokens=0),
+        LLMCallUsage(node="ast_planner", usage_reported=False, error="timeout"),
+    ])
+    assert eval_run.question_cost(usage, cfg) == pytest.approx(2.50)
+    assert eval_run.unknown_cost_calls(usage) == 1

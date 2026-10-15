@@ -13,7 +13,12 @@ and ``cache_write`` are parts of ``input_tokens``; reasoning tokens are part
 of ``output_tokens`` and billed as output. OpenAI charges nothing extra to
 write its automatic prompt cache, so its ``cache_write`` is the input rate (it
 reports no cache writes anyway). Anthropic bills a 5-minute cache write at
-1.25x input and a cache read at 0.1x input. A config row may leave
+1.25x input and a cache read at 0.1x input; a 1-hour cache write costs 2x
+input, but the engine only ever asks for the 5-minute cache, so
+``cache_write`` is the 5-minute rate.
+
+The OpenAI rows still need verifying against OpenAI's published prices
+(owner to confirm); the Anthropic rows match Anthropic's first-party prices. A config row may leave
 ``cached_input`` and ``cache_write`` out: a cache read then costs the input
 rate, and a cache write the input rate times the wire's
 ``cache_write_multiplier`` (1.25 on Anthropic's wire, 1 on OpenAI's).
@@ -36,6 +41,7 @@ class ModelPrice(NamedTuple):
     source: str
 
 
+# Owner to confirm: not yet re-verified against OpenAI's published prices (review of PR #326).
 _OPENAI = "OpenAI pricing page, checked 2026-09-21"
 _ANTHROPIC = ("Anthropic model table in the claude-api skill (cached 2026-06-24); "
               "cache write 1.25x and cache read 0.1x of input")
@@ -73,6 +79,20 @@ def price_for(model: Optional[str], overrides: Optional[Mapping[str, Any]] = Non
     if overrides and model in overrides:
         return _from_config(overrides[model])
     return PRICES.get(model)
+
+
+def price_for_call(served: Optional[str], configured: Optional[str],
+                   overrides: Optional[Mapping[str, Any]] = None) -> Optional[ModelPrice]:
+    """A call's price: ``llm.prices`` by the served name, then by the configured name, then the table for either.
+
+    Every override comes before the table, so a negotiated rate for a
+    deployment alias (``acme-gpt``) holds even when the provider reports a
+    model the table lists (``gpt-5.4``).
+    """
+    for name in (served, configured):
+        if name and overrides and name in overrides:
+            return _from_config(overrides[name])
+    return price_for(served) or price_for(configured)
 
 
 def call_cost(price: ModelPrice, *, input_tokens: Optional[int], output_tokens: Optional[int],

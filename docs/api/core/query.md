@@ -455,7 +455,7 @@ are summed here.
 Cost is `(input - cached - cache_write) * input_price + cached * cached_input_price
 + cache_write * cache_write_price + output * output_price`, per million tokens; a
 cache count the provider did not report is not split out of `input`. Prices are
-looked up in `llm.prices`, then in the dated table, by the served model name,
-then by the configured one, by exact match only, so a `gpt-4o` price never
-prices `gpt-4o-mini`. A call with no price, or no input or output count, has a
+looked up in `llm.prices` by the served model name, then by the configured one,
+and only then in the dated table by either, by exact match only, so a `gpt-4o`
+price never prices `gpt-4o-mini`. A call with no price, or no input or output count, has a
 `null` cost. See [Prices](../../configuration/llm.md#prices).

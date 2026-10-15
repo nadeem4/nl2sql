@@ -367,6 +367,9 @@ def run_with_graph(
         try:
             result = future.result(timeout=timeout_sec)
         except concurrent.futures.TimeoutError:
+            # A budget stop the worker was still unwinding from is the run's ending, not the timeout.
+            if isinstance(token.reason, RunStop):
+                return _stopped(token.reason)
             # The worker keeps running the graph until its nodes observe the
             # cancelled token. That is a background wind-down, not a hang: the
             # caller is answered now.

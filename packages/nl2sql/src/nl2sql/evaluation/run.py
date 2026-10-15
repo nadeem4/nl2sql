@@ -40,6 +40,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 from langchain_core.callbacks import BaseCallbackHandler
 
 from nl2sql.api.query_api import QueryAPI, QueryResult, result_from_state
+from nl2sql.common.logger import get_logger
 from nl2sql.config import LLM
 from nl2sql.events.catalog import EvalCase as EvalCaseEvent
 from nl2sql.events.catalog import EvalFinished
@@ -58,6 +59,8 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage
 
 # Every row is compared, so the sample is never the thing that caps a result.
 _ALL_ROWS = 100_000
+
+logger = get_logger(__name__)
 
 LLMConfigs = Union[None, LLM, LLMFileConfig, Mapping[str, Union[LLM, LLMFileConfig]]]
 OnCase = Callable[[str, Dict[str, Any], float], None]
@@ -90,9 +93,11 @@ def check_prices(llm_configs: Dict[str, LLMFileConfig], prices: Optional[Mapping
 
 
 def question_cost(usage: QuestionUsage, cfg: LLMFileConfig, prices: Optional[Mapping[str, Any]] = None) -> float:
-    """Dollars for one case: each call priced by the model its node is configured with.
+    """Dollars for one case that can be counted: each call priced by the model its node is configured with.
 
-    A call that reported no token counts (a failed call) adds nothing it could count.
+    A call that reported no input or output count (a failed call) has an
+    unknown cost: it is not added as 0 but left out, and counted by
+    :func:`unknown_cost_calls`, which mode full reports.
     """
     from nl2sql.llm.wires import wire_named
 
@@ -107,8 +112,14 @@ def question_cost(usage: QuestionUsage, cfg: LLMFileConfig, prices: Optional[Map
                          output_tokens=call.output_tokens, cached_input_tokens=call.cached_input_tokens,
                          cache_write_input_tokens=call.cache_write_input_tokens,
                          cache_write_multiplier=wire_named(agent.provider).cache_write_multiplier)
-        total += cost or 0.0
+        if cost is not None:
+            total += cost
     return total
+
+
+def unknown_cost_calls(usage: QuestionUsage) -> int:
+    """The calls of one case whose cost is unknown: no input or output count was reported."""
+    return sum(1 for call in usage.calls if call.input_tokens is None or call.output_tokens is None)
 
 
 def llm_configs(ctx: Any, llm: LLMConfigs) -> Dict[str, LLMFileConfig]:
@@ -397,6 +408,23 @@ def _one(run: Any, job: _Case, mode: str, scorers: Dict[str, Scorer], pass_no: i
     return _record(job.suite, job.case, job.role, pass_no, scored, result, 0.0, latency), result
 
 
+def _count_unknown(report: EvalReport, result: Optional[QueryResult]) -> None:
+    """Adds a case's calls of unknown cost to the report; warns once per run.
+
+    The cost cap counts what it can price. A call with no counts cannot be
+    priced, so it is neither added as 0 nor guessed: the run goes on, the
+    spend it reports is a lower bound, and ``report.unknown_cost_calls`` says
+    by how many calls.
+    """
+    unknown = unknown_cost_calls(result.usage) if result is not None else 0
+    if not unknown:
+        return
+    if not report.unknown_cost_calls:
+        logger.warning("A model call reported no token counts, so its cost is unknown and not counted toward "
+                       "max_cost_usd; the run's spend is a lower bound (see unknown_cost_calls in the report).")
+    report.unknown_cost_calls += unknown
+
+
 def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: EvalReport, base: Dict[str, Any],
               llm: LLMConfigs, passes: int, max_cost_usd: Optional[float], on_case: Optional[OnCase],
               prices: Mapping[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
@@ -425,6 +453,7 @@ def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: E
                     break
                 record, result = _one(run, job, "full", scorers, pass_no)
                 cost = question_cost(result.usage, cfg, prices) if result else 0.0
+                _count_unknown(report, result)
                 if result is not None and result.source.type == "verified":
                     # D12: what the model alone would have answered, scored as the generated answer.
                     if generated_run is None:
@@ -432,6 +461,7 @@ def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: E
                         generated_run.llm_registry.replace_llms(agents)
                     second, second_result = _one(generated_run, job, "full", scorers, pass_no)
                     cost += question_cost(second_result.usage, cfg, prices) if second_result else 0.0
+                    _count_unknown(report, second_result)
                     record["generated"] = {k: second[k] for k in ("status", "reason", "lenient_status", "scores",
                                                                   "sql")}
                 record["cost"] = round(cost, 8)

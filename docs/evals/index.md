@@ -108,6 +108,10 @@ checks the cap before every case:
   `stopped: "max_cost"`.
 - **The first case always runs.** So a run can pass the cap by at most one
   case's cost.
+- **An unknown cost is not counted as zero.** A call that reported no token
+  counts (a failed call) cannot be priced. The run goes on, leaves it out of
+  `spent` (so `spent` is a lower bound), counts it in the report's
+  `unknown_cost_calls`, and logs one warning.
 
 Each call is priced by the model its node is configured with, and the dollars
 are in `report.spent` and each record's `cost`.

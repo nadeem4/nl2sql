@@ -14,8 +14,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import (BaseModel, BeforeValidator, ConfigDict, Field, NonNegativeInt, PositiveFloat, PositiveInt,
-                      PrivateAttr, field_validator, model_validator)
+from pydantic import (BaseModel, BeforeValidator, ConfigDict, Field, NonNegativeFloat, NonNegativeInt, PositiveFloat,
+                      PositiveInt, PrivateAttr, field_validator, model_validator)
 from pydantic.fields import FieldInfo
 from typing_extensions import Annotated
 
@@ -171,10 +171,11 @@ def _is_data(value: Any) -> bool:
 class Price(_Model):
     """Prices per million tokens for one model."""
 
-    input: float
-    output: float
-    cached_input: Optional[float] = None
-    cache_write: Optional[float] = None
+    # Never negative: a negative rate would drive a run's spend down and lift settings.pipeline.max_cost_usd.
+    input: NonNegativeFloat
+    output: NonNegativeFloat
+    cached_input: Optional[NonNegativeFloat] = None
+    cache_write: Optional[NonNegativeFloat] = None
 
 
 # How a structured answer is asked for: a forced tool call, a JSON schema the

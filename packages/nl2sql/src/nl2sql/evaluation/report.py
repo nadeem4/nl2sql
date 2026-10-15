@@ -42,6 +42,8 @@ class EvalReport(BaseModel):
     clarify: bool = False
     max_cost_usd: Optional[float] = None
     spent: float = 0.0
+    # Mode full: calls whose cost is unknown (no token counts reported); not counted in spent.
+    unknown_cost_calls: int = 0
     stopped: Optional[str] = None  # "max_cost" when the cap stopped the run
     skipped: int = 0  # role runs left out: a clarify case, with clarify off
     prices_checked_on: Optional[str] = None

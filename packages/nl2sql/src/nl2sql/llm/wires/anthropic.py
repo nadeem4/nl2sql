@@ -126,6 +126,8 @@ class AnthropicWire:
         return usage(
             opt_int(metadata.get("input_tokens")),
             opt_int(details.get("cache_read")),
+            # One bucket at the 5-minute rate (1.25x input). A 1-hour write costs 2x input; the engine only
+            # sets the 5-minute cache, so split the 1h key out if a 1-hour TTL is ever used.
             sum_known(*(opt_int(details.get(k)) for k in ("cache_creation", *_CACHE_WRITE_BY_TTL))),
             opt_int(metadata.get("output_tokens")),
             opt_int((metadata.get("output_token_details") or {}).get("reasoning")),

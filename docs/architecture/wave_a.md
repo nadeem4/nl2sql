@@ -734,6 +734,14 @@ pipeline:
     unpriced model (`llm.model`, `llm.agents.<agent>.model`; a model object
     by its `model_name`) when `max_cost_usd` is set, with the fix
     `add llm.prices.<model> ...`. Tests: `tests/unit/test_cost_and_caps.py`.
+    After review (PR #326): a call is priced by `price_for_call(served,
+    configured, overrides)`, every `llm.prices` override (served name, then
+    configured name) before the table for either name; `Price`'s four rates
+    are `NonNegativeFloat`; a timeout that fires while a budget stop unwinds
+    reports `stopped`; mode full counts a call with no token counts in
+    `EvalReport.unknown_cost_calls` (new `unknown_cost_calls(usage)`, one
+    warning per run) instead of adding 0; the OpenAI rows are marked for the
+    owner to re-verify.
 
 ## 6. Hooks
 
