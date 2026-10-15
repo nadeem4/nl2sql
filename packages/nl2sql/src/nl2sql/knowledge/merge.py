@@ -219,6 +219,10 @@ def _merge_fields(first: Optional[Any], later: Any, cls, path: str, label: str,
         elif data.get(name) is None and value is not None:
             data[name] = value
             provenance[f"{path}.{name}"] = label
+    if data.get("values") and data.get("role") != "enum":
+        # An earlier source set another role, which wins: a later source's code values do not apply.
+        del data["values"]
+        provenance.pop(f"{path}.values", None)
     return cls.model_validate(data, context=_UNCAPPED)
 
 

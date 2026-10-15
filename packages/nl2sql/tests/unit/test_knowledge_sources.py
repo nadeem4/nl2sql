@@ -271,6 +271,15 @@ def test_first_source_wins_a_description_and_lists_union():
     assert provenance["terms.margin"] == "wiki"
 
 
+def test_a_later_sources_code_values_do_not_outlive_an_earlier_role():
+    first = {"version": 1, "datasources": {"shop": {"columns": {"orders.status": {"role": "text"}}}}}
+    second = {"version": 1, "datasources": {"shop": {"columns": {"orders.status": {
+        "role": "enum", "values": {"1": "open"}}}}}}
+
+    column = merge([_loaded("yaml", first), _loaded("wiki", second)]).datasources["shop"].columns["orders.status"]
+    assert (column.role, column.values) == ("text", {})
+
+
 def test_the_digest_follows_the_merged_knowledge():
     one = merge([_loaded("yaml", GLOSSARY)])
     same = merge([_loaded("yaml", GLOSSARY)])
