@@ -21,6 +21,11 @@ logger = get_logger("router")
 _HOOK_ENDINGS = {ErrorCode.HOOK_DENIED, ErrorCode.HOOK_FAILED, ErrorCode.NEEDS_APPROVAL}
 
 
+def pinned_route(state: GraphState) -> str:
+    """``end`` when the pinned entry refused a datasource, else ``continue`` to the layer router."""
+    return "end" if state.errors else "continue"
+
+
 def resolver_route(state: GraphState) -> str:
     resolver_response = state.datasource_resolver_response
     if not resolver_response:

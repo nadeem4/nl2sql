@@ -25,7 +25,7 @@ Source:
 `packages/nl2sql/src/nl2sql/public_api.py`, `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> QueryResult`
+`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None) -> QueryResult`
 
 Every argument after the question is keyword-only. `run_query` passes the runtime's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
@@ -38,6 +38,68 @@ Parameters:
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
 | `user_context` | `Optional[UserContext]` | no | RBAC context. Omitted (or `None`), the run starts with an empty `UserContext`, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
 | `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The playground cancels it when the browser drops the request. |
+| `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`: `datasource_id`, `sub_query`, `plan`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the plan's own, or the call raises `ValueError` before anything runs. |
+| `approvals` | `Optional[Sequence[Approval]]` | no | Approvals for an earlier run's `approvals_needed`. See [Approval](#approval). |
+
+#### Running a plan you hold
+
+`run_query(question, plan=SuppliedPlan(datasource_id=..., sub_query=..., plan=...))`
+runs one sub-query's plan without routing or planning: the curated matcher,
+the datasource resolver, the decomposer and the planner's model call are
+skipped. What is not skipped:
+
+- The datasource is checked against `user_context`'s scope, as the resolver
+  would; a datasource the caller may not read ends the run with
+  `SECURITY_VIOLATION` before anything runs.
+- The plan passes the `plan.after` hooks, the logical validator (so a table
+  outside the caller's scope is refused) and the generator, like any plan.
+- It is never written to the plan cache, and a validator failure ends the
+  sub-query with the validator's error: the refiner is never asked for a
+  different plan. A database error is not retried either.
+
+The sub-query's `plan_source` is `"supplied"`. The question is still asked:
+the answer is written for it. The same entry serves the approved re-run
+(`"approved"`) and, in Wave B, a plan the asker chose (`"chosen"`).
+
+#### Approval
+
+A hook at `execute.before` may answer `NeedsApproval(reason)`. The run then
+ends with `status: "needs_approval"`, the error `NEEDS_APPROVAL` and one
+`ApprovalRequest` per pending sub-query in `approvals_needed`: the question,
+the asker's `user_id` and `tenant_id`, the hook, the datasource, the run's
+decomposition, the sub-query and its plan (or, on the verified path, the
+verified query's id and values), the SQL and its SHA-256, the reason, and the
+roles that may approve (for display). Its `id` is a SHA-256 over a fixed list
+of those fields (`REQUEST_ID_FIELDS`: all but the reason and the roles), each
+without the values it holds at their defaults, so an edit shows, the same
+request always has the same id, and a field added in a later version keeps
+the ids of requests an app stored before.
+
+An approver re-runs the question as the asker:
+
+```python
+result = engine.run_query(question, user_context=asker)
+if result.status == "needs_approval":
+    approvals = [Approval(request=r, by=approver) for r in result.approvals_needed]
+    result = engine.run_query(question, user_context=asker, approvals=approvals)
+```
+
+The engine, not the hook, checks each approval. An approval pins nothing when
+its request was edited (its `id` no longer matches), its `sql` is not the SQL
+of its `sql_sha256` (the SQL an approver reads is the SQL whose hash is
+checked), it is for another question or another asker, its hook is not
+configured, or `by` holds none of that hook's approver roles. Then the run
+plans as usual and the hook asks again. Otherwise the re-run takes the
+request's decomposition and plan (`plan_source: "approved"`, no resolver,
+decomposer or planner call) and validates and generates the SQL again. At `execute.before` the approval
+counts as the hook's `Allow` only when it is for that hook and datasource,
+the hash of the SQL just generated equals the request's (and, on the verified
+path, the values are the same), and `by` holds one of the hook's configured
+`approver_roles` (by default `policies.admin_roles`), never the roles the
+request lists. Then the next hook still runs. Anything else asks again: the
+run ends `needs_approval` with a new request. Nothing is stored, and an
+`Approval` is not signed and does not expire: it is trusted as far as the
+`user_context` a caller passes. See [Hooks](../../configuration/hooks.md#approval).
 
 Returns:
 `QueryResult`, built from the pipeline graph state by `result_from_state`.
@@ -118,7 +180,7 @@ Source:
 `packages/nl2sql/src/nl2sql/events/catalog.py`
 
 Signature:
-`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> Iterator[Event]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None) -> Iterator[Event]`
 
 The same run as `run_query`, with the same parameters, yielded as it happens:
 the run's own events on the engine's bus ([Events](../../observability/events.md)),
@@ -249,7 +311,7 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
 | `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. `"dropped"` when a [hook](../../configuration/hooks.md) denied it with `scope="sub_query"`: the run went on without it. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
-| `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), otherwise `"llm"`. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
+| `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved for Wave B), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
 

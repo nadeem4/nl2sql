@@ -61,6 +61,10 @@ PIPELINE_STEPS: List[PipelineStep] = [
           "Picks the verified query a data team wrote that answers the question, if one does, and "
           "runs its SQL with the values bound; otherwise the steps below run. Only when curated "
           "answers are configured."),
+    _step("pinned_entry", "Pinned plan",
+          "Takes a plan given with the question (a caller's own, or an approved one) instead of "
+          "routing and planning, after checking this role may read its datasource. Only when a "
+          "plan is pinned."),
     _step("datasource_resolver", "Answerability check",
           "Decides whether the connected databases can answer the question at all, and which one "
           "it is about, before anything else runs."),

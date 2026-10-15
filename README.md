@@ -83,11 +83,11 @@ flowchart LR
     G --> E[Executor] --> A([Answer])
 ```
 
-That is the shape of a run; the full pipeline is **14 steps**, six of them
+That is the shape of a run; the full pipeline is **15 steps**, six of them
 decided by a model, and the playground's Pipeline page lists them all. The
 first, matching the question to a verified query a data team wrote
 ([curated answers](docs/configuration/curated.md)), runs only when
-`curated.yaml` is configured.
+`curated.yaml` is configured; the second only when a run is given its plan.
 
 Architecture detail: [System Architecture](docs/architecture/overview.md),
 [Pipeline](docs/architecture/pipeline.md),

@@ -8,7 +8,7 @@ import nl2sql
 PUBLIC_SURFACE = {
     # The engine and its questions
     "NL2SQL", "QueryResult", "SubQueryResult", "RowSample", "AnswerSource",
-    "CancellationToken", "UserContext", "QuestionUsage", "RunStop", "ApprovalRequest", "Approval", "VerifiedRef",
+    "CancellationToken", "UserContext", "QuestionUsage", "RunStop", "ApprovalRequest", "Approval", "VerifiedRef", "SuppliedPlan",
     # Events
     "Event", "Observer",
     # Saved results

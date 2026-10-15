@@ -13,10 +13,11 @@
 ## Responsibilities
 
 - Serve a pinned plan from the plan cache on a first attempt, without an LLM call.
+- Return a plan the run pins (`state.pinned_plan`: a supplied, approved or chosen plan) without an LLM call, through `after_plan()` with `plan_source` set to its source.
 - Serialize `relevant_tables` into the planning prompt.
 - Pass user intent, expected schema, and error feedback to the LLM.
 - Run the `plan.after` hooks on the plan (the planner's or the cached one) in `after_plan()`, the one place every plan the validator gets passes through.
-- Return `ASTPlannerResponse` with the `PlanModel` the hooks let through, the planner's own plan (`planner_plan`, which the plan cache stores) and its `plan_source` (`"llm"` or `"cache"`).
+- Return `ASTPlannerResponse` with the `PlanModel` the hooks let through, the planner's own plan (`planner_plan`, which the plan cache stores) and its `plan_source` (`"llm"`, `"cache"`, or `"supplied"`, `"approved"` or `"chosen"` for a pinned plan). Only an `"llm"` plan is ever cached.
 
 ---
 

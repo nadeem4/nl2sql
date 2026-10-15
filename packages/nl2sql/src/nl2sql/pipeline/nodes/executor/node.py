@@ -59,7 +59,9 @@ class ExecutorNode:
         try:
             scope = self.policy_engine.scope(state.user_context, ds_id)
             already_retried = any(e.error_code == ErrorCode.VALUE_NOT_FOUND for e in state.errors)
-            can_retry = not already_retried and state.retry_count < self.max_retries
+            # A pinned plan is never retried (nl2sql.pipeline.pinned), so its missing value is a warning.
+            can_retry = (not already_retried and state.retry_count < self.max_retries
+                         and getattr(state, "pinned_plan", None) is None)
             errors = check_values(
                 plan,
                 self.ds_registry.get_adapter(ds_id),
@@ -83,7 +85,7 @@ class ExecutorNode:
                       for t in plan.tables]
         return dict(trace_id=state.trace_id, question=getattr(state, "user_query", "") or "",
                     user=state.user_context or UserContext(), datasource_id=ds_id, sub_query=state.sub_query,
-                    plan=plan, sql=sql, tables=tables)
+                    plan=plan, sql=sql, tables=tables, approvals=list(getattr(state, "approvals", None) or []))
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:

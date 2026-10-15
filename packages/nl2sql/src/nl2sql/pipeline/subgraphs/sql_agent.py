@@ -33,6 +33,10 @@ def build_sql_agent_graph(
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner
     (Executor: query rejected by the database) -> RetryHandler -> Refiner -> Planner
 
+    A pinned plan (supplied, approved or chosen) is never retried: the refiner
+    would replace the plan the caller or the approver gave, so a validator or
+    database failure ends the sub-query with its own error.
+
     Args:
         ctx: The application context.
         execute: When False the executor is left out of the graph entirely, so
@@ -48,7 +52,8 @@ def build_sql_agent_graph(
     retries = ctx.settings.pipeline.retries
 
     def _get_retry_count(state: SubgraphExecutionState) -> int:
-        return state.retry_count
+        # A pinned plan has no retries: it reads as spent.
+        return retries.max if state.pinned_plan is not None else state.retry_count
 
     def _token(config: Optional[RunnableConfig]) -> Optional[CancellationToken]:
         """Read the current run's cancellation token from the RunnableConfig.

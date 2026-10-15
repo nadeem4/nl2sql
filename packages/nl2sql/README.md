@@ -39,9 +39,10 @@ of the six model-using steps on a provider and model of its own.
 - Only a plan that passes is rendered to SQL, deterministically, with `sqlglot`,
   then executed and summarised.
 
-The whole pipeline is 14 steps, six of them decided by a model; the
+The whole pipeline is 15 steps, six of them decided by a model; the
 playground's Pipeline page lists them. The first, matching a verified query
-from `curated.yaml`, runs only when curated answers are configured.
+from `curated.yaml`, runs only when curated answers are configured; the
+second only when a run is given its plan.
 
 ## Quickstart
 

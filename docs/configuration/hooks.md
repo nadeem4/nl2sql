@@ -81,12 +81,22 @@ the run; it does not fall back to the generated path. **A plan-only run**
   to the caller. With `on_error: open`, an
   exception is logged and counts as `Allow`; a disallowed decision still
   fails, because it is a bug in the hook, not an outage.
-- **Approval.** `NeedsApproval` at `execute.before` stops the SQL with the
-  error `NEEDS_APPROVAL`. The approval round trip (the request on the result
-  and the approved re-run) is [Wave A's H2](../architecture/wave_a.md#7-approval).
+- **Approval.** `NeedsApproval` at `execute.before` (on the generated or the
+  verified path) ends the run with `status: "needs_approval"`, the error
+  `NEEDS_APPROVAL` and an `ApprovalRequest` per pending sub-query in
+  `approvals_needed`. Re-running the question as the asker with
+  `approvals=[Approval(request=..., by=<the approver>)]` pins what was
+  approved and generates the SQL again; the engine accepts the approval
+  only if the request is unedited, the question and the asker are this
+  run's, the hash of the new SQL matches, and the approver holds one of the
+  hook's `approver_roles` (by default `policies.admin_roles`). An accepted
+  approval counts as `Allow` (`hook.decision` with `decision: "approved"`
+  and the `approver`), and the next hook at the point still runs. A hook
+  also sees the run's approvals as `ctx.approvals`. See
+  [Query API → Approval](../api/core/query.md#approval).
 - **Timeouts** are the hook's own; the pipeline's `timeout_s` bounds the run.
 - **Events.** Every hook asked publishes `hook.decision` (`hook`, `point`,
-  `decision`, `reason`, `sub_query_id`, `seconds`).
+  `decision`, `reason`, `sub_query_id`, `approver`, `seconds`).
 - **The plan cache keeps the planner's plan**, never a hook's change of it;
   `plan.after` runs on every cache hit, so a change applies afresh on each
   run and stops the moment the hook config changes.

@@ -5,6 +5,9 @@ from typing import Any, Callable, Dict, FrozenSet, List, Optional
 from langchain_core.runnables import Runnable, RunnableConfig
 
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.hooks import hooks_of
+from nl2sql.hooks.approval import ApprovalRequest
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 from nl2sql.execution.dag import ExecutionDAG
 from nl2sql.pipeline.plan_cache import plan_cache_for, planner_of
@@ -69,7 +72,9 @@ def build_scan_payload(
     subgraph_name: str,
     node_id: str,
 ) -> Dict[str, Any]:
-    trace_id = state.trace_id   
+    trace_id = state.trace_id
+    pinned = getattr(state, "pinned", None)
+    pinned_plan = pinned.plans.get(node_id) if pinned is not None else None
     return {
         "subgraph_id": f"{subgraph_name}:{node_id}:{trace_id}",
         "subgraph_name": subgraph_name,
@@ -78,6 +83,9 @@ def build_scan_payload(
         "user_context": state.user_context,
         "decomposer_response": state.decomposer_response,
         "datasource_resolver_response": state.datasource_resolver_response,
+        "pinned_plan": pinned_plan,
+        "pinned_source": pinned.source if pinned_plan is not None else None,
+        "approvals": list(getattr(state, "approvals", None) or []),
     }
 
 def _as_warning(error: PipelineError, sub_query_id: str) -> Dict[str, Any]:
@@ -93,6 +101,32 @@ def _as_warning(error: PipelineError, sub_query_id: str) -> Dict[str, Any]:
         "severity": getattr(error.severity, "value", error.severity),
         "sub_query_id": sub_query_id,
     }
+
+
+def _approval_requests(ctx: Runtime, errors: List[PipelineError], state_dict: Dict[str, Any], sub_query: Any,
+                       planner_response: Any, sql: Optional[str]) -> List[ApprovalRequest]:
+    """The request for each ``NEEDS_APPROVAL`` this sub-query ended with (one hook at most asks).
+
+    It pins the run's decomposition, the sub-query and its plan as
+    ``plan.after`` got it (``planner_plan``): the re-run passes that plan
+    through ``plan.after`` again, so a hook's change is applied once, as on
+    this run, and the SQL generated again can match the hash.
+    """
+    asked = [e for e in errors if e.error_code == ErrorCode.NEEDS_APPROVAL]
+    if not asked or not sql:
+        return []
+    hooks = hooks_of(ctx)
+    plan = planner_response.planner_plan if planner_response else None
+    requests = []
+    for error in asked:
+        details = error.details or {}
+        hook = details.get("hook") or ""
+        requests.append(ApprovalRequest.build(
+            question=state_dict.get("user_query") or "", asker=state_dict.get("user_context") or UserContext(),
+            hook=hook, datasource_id=sub_query.datasource_id, sql=sql, reason=details.get("reason") or "",
+            approver_roles=hooks.approver_roles(hook), decomposition=state_dict.get("decomposer_response"),
+            sub_query=sub_query, plan=plan))
+    return requests
 
 
 def wrap_subgraph(
@@ -131,6 +165,9 @@ def wrap_subgraph(
             sub_query=sub_query,
             subgraph_id=subgraph_id,
             subgraph_name=subgraph_name,
+            pinned_plan=state_dict.get("pinned_plan"),
+            pinned_source=state_dict.get("pinned_source"),
+            approvals=state_dict.get("approvals") or [],
         )
         # Propagate the run config (carrying the cancellation token) into the subgraph.
         result = subgraph.invoke(sub_state.model_dump(), config=config)
@@ -219,6 +256,8 @@ def wrap_subgraph(
         return {
             "artifact_refs": artifact_refs,
             "subgraph_outputs": {subgraph_id: subgraph_output},
+            "approvals_needed": [] if succeeded else _approval_requests(
+                ctx, errors, state_dict, sub_query, planner_response, sql_draft),
             "errors": [] if succeeded else errors,
             "warnings": [_as_warning(e, sub_query.id) for e in errors] if succeeded else [],
             "reasoning": returned_state.reasoning,

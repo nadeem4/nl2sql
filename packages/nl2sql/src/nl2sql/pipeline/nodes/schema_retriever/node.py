@@ -235,7 +235,10 @@ class SchemaRetrieverNode:
             visible = self._visible(state, datasource_id, snapshot)
             preferred = self._preferred(datasource_id)
             limit = self.full_snapshot_max_tables
-            if snapshot and len(visible) <= limit:
+            # A pinned plan is not planned here: the validator checks it against every table the caller may
+            # read, so it gets them all and no search runs.
+            pinned = getattr(state, "pinned_plan", None) is not None
+            if snapshot and (len(visible) <= limit or pinned):
                 tables_out = self._build_tables_from_snapshot(
                     snapshot, resolved_tables=None, schema_version=schema_version,
                     visible=visible, preferred=preferred,

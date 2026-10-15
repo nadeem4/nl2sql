@@ -7,13 +7,14 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql.common.errors import PipelineError
+from nl2sql.hooks.approval import Approval, ApprovalRequest
 from nl2sql.policies import UserContext
 from nl2sql.pipeline.nodes.curated_matcher.schemas import VerifiedMatch
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerResponse
-from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
+from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
@@ -21,6 +22,7 @@ from nl2sql.execution.dag import ExecutionDAG
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table
+from nl2sql.pipeline.pinned import PinnedRun, PinnedSource
 
 
 def update_results(current: Dict, new: Dict) -> Dict:
@@ -51,6 +53,10 @@ class GraphState(BaseModel):
         warnings (List[Dict[str, Any]]): Warning messages emitted by nodes.
         subgraph_id (Optional[str]): ID of the subgraph execution.
         subgraph_name (Optional[str]): Name of the subgraph execution.
+        pinned (Optional[PinnedRun]): A pinned decomposition and plans (supplied, approved or chosen); the
+            run enters at the pinned entry instead of routing and decomposing.
+        approvals (List[Approval]): The approvals the run was asked with; the hooks at execute.before see them.
+        approvals_needed (List[ApprovalRequest]): What a person must approve; the run ends ``needs_approval``.
     """
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
@@ -72,6 +78,9 @@ class GraphState(BaseModel):
     warnings: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
     subgraph_id: Optional[str] = Field(default=None)
     subgraph_name: Optional[str] = Field(default=None)
+    pinned: Optional[PinnedRun] = Field(default=None)
+    approvals: List[Approval] = Field(default_factory=list)
+    approvals_needed: Annotated[List[ApprovalRequest], operator.add] = Field(default_factory=list)
 
 
 class SubgraphExecutionState(BaseModel):
@@ -85,6 +94,10 @@ class SubgraphExecutionState(BaseModel):
     subgraph_id: Optional[str] = None
     subgraph_name: Optional[str] = None
     relevant_tables: List[Table] = Field(default_factory=list)
+    # A pinned plan, returned by the planner as ``plan_source=pinned_source``; never refined or cached.
+    pinned_plan: Optional[PlanModel] = None
+    pinned_source: Optional[PinnedSource] = None
+    approvals: List[Approval] = Field(default_factory=list)
 
     ast_planner_response: Optional[ASTPlannerResponse] = Field(default=None)
     logical_validator_response: Optional[LogicalValidatorResponse] = Field(default=None)

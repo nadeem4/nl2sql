@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import pathlib
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from nl2sql.api.curated_api import CuratedAPI
@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from nl2sql.api.storage_api import StorageAPI
     from nl2sql.api.traces_api import TracesAPI
     from nl2sql.policies import UserContext
+    from nl2sql.hooks.approval import Approval
+    from nl2sql.pipeline.pinned import SuppliedPlan
     from nl2sql.check import CheckReport
     from nl2sql.common.cancellation import CancellationToken
     from nl2sql.config import LLM, Config
@@ -253,21 +255,35 @@ class NL2SQL:
 
     def run_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                   user_context: Optional["UserContext"] = None,
-                  cancellation_token: Optional["CancellationToken"] = None) -> "QueryResult":
+                  cancellation_token: Optional["CancellationToken"] = None,
+                  plan: Optional["SuppliedPlan"] = None,
+                  approvals: Optional[Sequence["Approval"]] = None) -> "QueryResult":
         """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
 
         ``datasource_id`` skips routing; ``execute=False`` stops after the SQL
         is generated (plan only). ``user_context`` carries the caller's roles.
         Pass a :class:`~nl2sql.CancellationToken` and call its ``cancel()``
         from another thread to stop the run before its next step.
+
+        ``plan`` (a :class:`~nl2sql.SuppliedPlan`) runs a plan the caller
+        holds: no routing, decomposing or planning, but its datasource is
+        checked against the caller's scope and the plan passes the
+        ``plan.after`` hooks, the validator and the generator; it is never
+        cached. ``approvals`` answer an earlier run's ``approvals_needed``:
+        re-run the question with the asker's ``user_context`` and an
+        :class:`~nl2sql.Approval` per request. The engine checks each one and
+        pins the approved plan (``plan_source="approved"``).
         """
         self._ensure_open()
         return self._queries.run_query(question, datasource_id=datasource_id, execute=execute,
-                                       user_context=user_context, cancellation_token=cancellation_token)
+                                       user_context=user_context, cancellation_token=cancellation_token,
+                                       plan=plan, approvals=approvals)
 
     def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                      user_context: Optional["UserContext"] = None,
-                     cancellation_token: Optional["CancellationToken"] = None) -> Iterator["Event"]:
+                     cancellation_token: Optional["CancellationToken"] = None,
+                     plan: Optional["SuppliedPlan"] = None,
+                     approvals: Optional[Sequence["Approval"]] = None) -> Iterator["Event"]:
         """
         Run a question as ``run_query`` does, yielding its :class:`~nl2sql.Event`
         values as they are published, from the caller-safe allow-list:
@@ -279,10 +295,12 @@ class NL2SQL:
         (``policy.decision``, ``hook.decision``, ``llm.call``) are never on
         it: subscribe to ``events`` for those. ``event.sse()`` is the event as
         one Server-Sent Event. Closing the iterator early cancels the run.
+        ``plan`` and ``approvals`` are as for :meth:`run_query`.
         """
         self._ensure_open()
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
-                                          user_context=user_context, cancellation_token=cancellation_token)
+                                          user_context=user_context, cancellation_token=cancellation_token,
+                                          plan=plan, approvals=approvals)
 
     def clear_plan_cache(self) -> int:
         """Remove every cached plan from the state store; returns how many there were.

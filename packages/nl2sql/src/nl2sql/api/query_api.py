@@ -10,7 +10,7 @@ import contextvars
 import queue
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal
+from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Sequence
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
@@ -21,11 +21,12 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
 from nl2sql_sdk.events import Event
 from nl2sql.hooks import hooks_of
-from nl2sql.hooks.approval import ApprovalRequest
+from nl2sql.hooks.approval import Approval, ApprovalRequest
 from nl2sql.limits import RunStop
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import RunEvents
+from nl2sql.pipeline.pinned import PinnedRun, SuppliedPlan, check_pinned
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
 
@@ -55,8 +56,10 @@ class SubQueryResult(BaseModel):
     retry_count: int = Field(default=0)
     # "cache" when the plan came from the plan cache (no planner LLM call; it
     # was still validated, generated and executed), "verified" when there was
-    # no plan because a verified query's SQL ran, else "llm".
-    plan_source: str = Field(default="llm")
+    # no plan because a verified query's SQL ran, "supplied" for a plan passed
+    # to run_query(plan=...), "approved" for an approval's pinned plan
+    # ("chosen" is Wave B's), else "llm".
+    plan_source: Literal["llm", "cache", "verified", "supplied", "approved", "chosen"] = "llm"
     # The row ceiling that bounded this sub-query's SQL, when the plan asked for
     # no smaller LIMIT; ``truncated`` is True when the result reached it, so
     # rows may be missing.
@@ -340,6 +343,16 @@ def _source(match: Any) -> AnswerSource:
                         params=dict(_field(match, "params", None) or {}))
 
 
+def _pin(plan: Optional[SuppliedPlan], pinned: Optional[PinnedRun], approvals: Optional[Sequence[Approval]],
+         datasource_id: Optional[str]) -> Optional[PinnedRun]:
+    """The run's pin from ``plan`` or ``pinned``, checked before the run's scope opens (``check_pinned``)."""
+    if plan is not None and pinned is not None:
+        raise ValueError("Pass a plan or a pin, not both.")
+    pin = PinnedRun.supplied(plan) if plan is not None else pinned
+    check_pinned(pin, list(approvals or []), datasource_id)
+    return pin
+
+
 class QueryAPI:
     """Runs questions for ``NL2SQL.run_query`` and ``stream_query``. Internal: reach it through ``NL2SQL``."""
 
@@ -355,6 +368,9 @@ class QueryAPI:
         user_context: Optional[UserContext] = None,
         cancellation_token: Optional[CancellationToken] = None,
         scope: Optional[RunScope] = None,
+        plan: Optional[SuppliedPlan] = None,
+        approvals: Optional[Sequence[Approval]] = None,
+        pinned: Optional[PinnedRun] = None,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -369,10 +385,25 @@ class QueryAPI:
                 flight finishes, and the result carries a ``CANCELLED`` error.
             scope: A scope :meth:`open_scope` opened (Wave C's turn); the run
                 goes on in it and closes it, instead of opening its own.
+            plan: A plan the caller holds: the run skips the curated matcher,
+                the resolver, the decomposer and the planner, and validates,
+                generates and runs it under ``user_context``'s scope.
+            approvals: Approvals for what an earlier run of the question asked
+                (its ``approvals_needed``); the first that is this run's, by a
+                holder of the hook's approver roles, pins its decomposition
+                and plan.
+            pinned: (internal) a pin of another source, such as Wave B's
+                chosen plan, in place of ``plan``.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
+
+        Raises:
+            ValueError: at the call, before anything runs: ``datasource_id``
+                is not the plan's datasource, a chosen plan comes with
+                approvals, or both ``plan`` and ``pinned`` are given.
         """
+        pinned = _pin(plan, pinned, approvals, datasource_id)
         scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                          user_context=user_context)
         # Entered here too, not only in the graph's worker, so every log line of the run carries its trace_id.
@@ -386,6 +417,8 @@ class QueryAPI:
                     user_context=user_context,
                     cancellation_token=cancellation_token,
                     scope=scope,
+                    pinned=pinned,
+                    approvals=approvals,
                 )
                 result = result_from_state(
                     state,
@@ -444,6 +477,9 @@ class QueryAPI:
         cancellation_token: Optional[CancellationToken] = None,
         scope: Optional[RunScope] = None,
         names: Iterable[str] = STREAM_EVENTS,
+        plan: Optional[SuppliedPlan] = None,
+        approvals: Optional[Sequence[Approval]] = None,
+        pinned: Optional[PinnedRun] = None,
     ) -> Iterator[Event]:
         """
         Run a question as :meth:`run_query` does, yielding its events as they are published.
@@ -470,16 +506,20 @@ class QueryAPI:
         ``ValueError``, raised at the call. Whatever breaks, the stream ends
         with exactly one terminal event. ``names``
         (internal) is the allow-list; Wave C's conversation stream adds its
-        own events to it.
+        own events to it. ``plan``, ``approvals`` and ``pinned`` are as for
+        :meth:`run_query`, and refused the same way, at the call.
         """
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
+        pinned = _pin(plan, pinned, approvals, datasource_id)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
-                            token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names))
+                            token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
+                            pinned=pinned, approvals=approvals)
 
     def _stream(self, question: str, *, datasource_id: Optional[str], execute: bool,
                 user_context: Optional[UserContext], token: CancellationToken, opened: Optional[RunScope],
-                allowed: frozenset) -> Iterator[Event]:
+                allowed: frozenset, pinned: Optional[PinnedRun] = None,
+                approvals: Optional[Sequence[Approval]] = None) -> Iterator[Event]:
         """:meth:`stream_query`'s run, on a thread of its own, and the events it hands over."""
         events: "queue.Queue[Optional[Event]]" = queue.Queue()
         terminal_sent = threading.Event()
@@ -507,6 +547,8 @@ class QueryAPI:
                         cancellation_token=token,
                         stream_answer=True,
                         scope=scope,
+                        pinned=pinned,
+                        approvals=approvals,
                     )
                     result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
                     finished = self.close_scope(scope, result)
