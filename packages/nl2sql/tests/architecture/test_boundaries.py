@@ -778,6 +778,7 @@ ACCESS_DECISIONS = [
     "pipeline/nodes/executor/node.py",
     "api/policy_api.py",
     "api/datasource_api.py",
+    "api/indexing_api.py",  # schema drift: a caller sees drift only in tables it may read (D1)
 ]
 # The 0.5 access helpers. A second way to decide is how two nodes come to disagree.
 OLD_ACCESS_NAMES = {"table_allowed", "get_allowed_tables", "get_allowed_datasources", "RBAC", "RolePolicy"}
@@ -789,9 +790,11 @@ def test_every_access_decision_goes_through_scope():
     for path in engine_files:
         for lineno, imported, _ in imports(path):
             # Pattern matching is the policies package's alone; the config only
-            # asks it whether a pattern is well formed.
-            if imported == "fnmatch" or (imported.startswith("nl2sql.policies.patterns")
-                                         and _where(path) != "nl2sql/src/nl2sql/config/models.py"):
+            # asks it whether a pattern is well formed. Its public functions
+            # (``nl2sql.policies.patterns_matching``, which drift's impact asks)
+            # are the package's door, not the module.
+            in_patterns = imported == "nl2sql.policies.patterns" or imported.startswith("nl2sql.policies.patterns.")
+            if imported == "fnmatch" or (in_patterns and _where(path) != "nl2sql/src/nl2sql/config/models.py"):
                 offenders.append(f"{_where(path)}:{lineno} imports {imported}")
             if imported.startswith("nl2sql.auth"):
                 offenders.append(f"{_where(path)}:{lineno} imports {imported}")

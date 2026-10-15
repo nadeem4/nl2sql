@@ -4,7 +4,9 @@ A store is named by ``type`` in one of the four ``storage`` sub-blocks, for
 example ``index: {type: qdrant, url: ...}``. Every store class has:
 
 * ``interface_version``: the version of these interfaces it was written for
-  (``1``). The engine accepts exactly the version it was built for.
+  (``2``). The engine accepts exactly the version it was built for. Version 2
+  added ``StateStore.put_schema_diff`` and ``get_schema_diff``; the version is
+  one per kind, so every store class declares it, whatever its slot.
 * ``slot``: the sub-block it fills, ``"index"``, ``"state"``, ``"traces"`` or
   ``"results"``. Store names share one entry point group, ``nl2sql.stores``,
   and the engine refuses a store in the wrong slot.
@@ -40,7 +42,7 @@ from typing import (
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .schema import SchemaSnapshot
+from .schema import SchemaDiff, SchemaSnapshot
 
 Slot = Literal["index", "state", "traces", "results"]
 
@@ -141,7 +143,7 @@ class IndexStore(Store, Protocol):
 
 
 class StateStore(Store, Protocol):
-    """Schema snapshots, the plan cache, feedback, migrations and a lock."""
+    """Schema snapshots and their diffs, the plan cache, feedback, migrations and a lock."""
 
     slot: ClassVar[Literal["state"]]
 
@@ -165,7 +167,20 @@ class StateStore(Store, Protocol):
 
     def keep_snapshots(self, datasource_id: str, keep: Set[str]) -> int:
         """Delete every snapshot of ``datasource_id`` whose version is not in ``keep``, and the plans
-        cached on them; return how many snapshots."""
+        cached on them and their diffs; return how many snapshots."""
+        ...
+
+    def put_schema_diff(self, diff: SchemaDiff) -> None:
+        """Store the diff that introduced ``diff.to_version``, keyed by datasource and that version.
+
+        A diff stored for the same version before is replaced. A diff with no
+        ``to_version`` (one against the live database) is refused with ``ValueError``.
+        """
+        ...
+
+    def get_schema_diff(self, datasource_id: str, schema_version: str) -> Optional[SchemaDiff]:
+        """The diff that introduced ``schema_version``; None when none was stored (a first build, or
+        a build whose structure did not change)."""
         ...
 
     def get_plan(self, key: str, datasource_id: str, schema_version: str) -> Optional[str]: ...

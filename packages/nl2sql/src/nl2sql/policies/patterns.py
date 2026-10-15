@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fnmatch import fnmatchcase
-from typing import Iterable, List, Optional
+from typing import Any, Iterable, List, Mapping, Optional, Set, Tuple
 
 SHAPES = "'*', 'datasource' or 'datasource.schema.table'"
 
@@ -43,6 +43,26 @@ def matching_datasources(text: str, datasource_ids: Iterable[str]) -> List[str]:
     """The ids in ``datasource_ids`` the pattern ``text`` can match inside, sorted."""
     pattern = parse_pattern(text)
     return sorted(ds for ds in datasource_ids if pattern.covers_datasource(ds))
+
+
+def patterns_matching(roles: Mapping[str, Any], datasource_id: str,
+                      tables: Iterable[Tuple[str, str]]) -> Set[Tuple[str, str, str]]:
+    """Each role's pattern that matches one of ``tables`` (``(schema, table)``) in ``datasource_id``.
+
+    ``roles`` is ``policies.roles``: each role has ``allow`` and ``deny``
+    pattern lists. Returns ``(role, "allow" or "deny", pattern)``. Schema
+    drift's impact asks it which rules matched a dropped table and match
+    nothing left (``nl2sql/schema/impact.py``), so pattern matching stays here.
+    """
+    tables = list(tables)
+    found: Set[Tuple[str, str, str]] = set()
+    for name, role in roles.items():
+        for kind in ("allow", "deny"):
+            for text in getattr(role, kind):
+                pattern = parse_pattern(text)
+                if any(pattern.matches(datasource_id, schema, table) for schema, table in tables):
+                    found.add((name, kind, text))
+    return found
 
 
 def parse_pattern(text: str) -> Pattern:

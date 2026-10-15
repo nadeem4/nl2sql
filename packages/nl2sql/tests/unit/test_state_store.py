@@ -14,6 +14,7 @@ from nl2sql.storage.sqlite import LockHeld, SqliteState
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
+    SchemaDiff,
     SchemaMetadata,
     SchemaSnapshot,
     TableContract,
@@ -94,6 +95,48 @@ def test_keep_snapshots_deletes_the_rest_and_their_plans(store):
     assert store.get_plan("q", "ds1", v2) == "{}"
 
 
+# -- schema diffs (store interface version 2, D31) ---------------------------------
+
+
+def _diff(to_version: str, from_version: str = "v0") -> SchemaDiff:
+    return SchemaDiff(datasource_id="ds1", from_version=from_version, to_version=to_version,
+                      tables_added=[TableRef(schema_name="public", table_name="orders")],
+                      engine_type=("sqlite", "postgres"))
+
+
+def test_a_schema_diff_round_trips_keyed_by_datasource_and_version(store):
+    version = store.put_snapshot(_snapshot("orders"))
+
+    store.put_schema_diff(_diff(version))
+
+    assert store.get_schema_diff("ds1", version) == _diff(version)
+    assert store.get_schema_diff("ds1", "nope") is None
+    assert store.get_schema_diff("other", version) is None
+    store.put_schema_diff(_diff(version, from_version="v9"))   # recomputed: replaces
+    assert store.get_schema_diff("ds1", version).from_version == "v9"
+
+
+def test_a_diff_without_a_to_version_is_refused(store):
+    with pytest.raises(ValueError, match="to_version"):
+        store.put_schema_diff(_diff(None))
+
+
+def test_diff_is_pruned_with_its_snapshot(store):
+    v1 = store.put_snapshot(_snapshot("users"))
+    v2 = store.put_snapshot(_snapshot("orders"))
+    store.put_schema_diff(_diff(v1))
+    store.put_schema_diff(_diff(v2))
+
+    store.keep_snapshots("ds1", {v2})
+
+    assert store.get_schema_diff("ds1", v1) is None
+    assert store.get_schema_diff("ds1", v2) is not None
+
+
+def test_the_state_store_implements_store_interface_version_2():
+    assert SqliteState.interface_version == 2
+
+
 # -- the plan cache --------------------------------------------------------------
 
 
@@ -145,6 +188,7 @@ def test_migrate_applies_each_migration_once(tmp_path):
     state.close()
 
     assert applied and applied == sorted(applied)
+    assert applied[-1] == "0004_schema_diffs"
     assert again == []
 
 

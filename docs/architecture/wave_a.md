@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2, E4 and S1 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2, E4, S1 and D1 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -1807,6 +1807,60 @@ build at any check.
 
 The plan cache needs no impact entry: it is keyed on `schema_version`, so a
 rebuild already makes its plans unreachable.
+
+!!! note "Built: schema drift (D1)"
+    `nl2sql_sdk.schema` holds `SchemaDiff` (with `counts()` and
+    `is_empty()`), `ColumnChange` and `ForeignKeyRef`, exported from
+    `nl2sql_sdk` and `SchemaDiff` from `nl2sql` too. Three shapes differ from
+    the sketch above, so a caller's scope can filter them without parsing
+    names: tables are `TableRef`s (not `str`), `ColumnChange.table` is a
+    `TableRef`, and a foreign key is a `ForeignKeyRef` (`table`, `columns`,
+    `referred_table`, `referred_columns`) rather than a string. A table added
+    or dropped is listed once, without its columns or foreign keys.
+    `nl2sql/schema/diff.py` has `diff_contracts(old, new, *, from_version,
+    to_version)` and `visible_diff(diff, allows)`; a seeded random property
+    test holds that the diff is empty exactly when the fingerprints match.
+    The `store` kind is at interface version 2 (`INTERFACE_VERSIONS`), all
+    four built-in stores declare it, and `SqliteState` adds migration
+    `0004_schema_diffs` (`schema_diffs`, keyed by datasource and
+    `to_version`; `put_schema_diff` replaces and refuses a diff with no
+    `to_version`; `keep_snapshots` deletes a pruned version's diff).
+    Wave B takes version 3 and migration 5, Wave C version 4 and migration 6.
+    `IndexingOrchestrator._record_drift` runs after the commit (a failure is
+    logged, never fails the live build) and publishes through
+    `nl2sql/schema/drift.py`'s `publish_drift(ctx, diff, detected_by)` on
+    `ctx.bus` with the engine's `tenant_id`. **The caller's scope (binding
+    extra):** `engine.index.check(datasource_ids=None, *, user_context)`,
+    `versions(datasource_id, *, user_context)` and `diff(datasource_id,
+    schema_version=None, *, user_context)` all require `user_context`, as
+    `datasources.schema` does (M1). A caller sees only the tables its
+    `Scope.allows`: drift only in denied tables is `unchanged` (and a stored
+    diff reads `None`, `has_diff` false); a datasource it cannot reach is
+    left out of `check()` and, named, is the same `ValueError` as an unknown
+    id. `schema.drifted` carries the whole diff's counts and no table name;
+    it is audited and off the stream (`STREAM_EVENTS`). `DriftReport` and
+    `SchemaVersionInfo` live in `nl2sql/schema/drift.py`;
+    `SchemaVersionInfo` has `schema_version`, `fingerprint`, `live`,
+    `has_diff` and no `created_at`, since the store interface records no
+    creation time (the `sqlite` version string starts with one).
+    The check reflects with the datasource's `IndexScope` copied to
+    `profile: catalog, sample_values: false`; a failure's error is
+    `redact_for(ctx, ...)`. **Impact:** `nl2sql/schema/impact.py`'s
+    `drift_impact(ctx, diff, tables)` runs every finder in `FINDERS` over
+    the (caller-visible) diff, each filling its own field of `DriftImpact`
+    (`verified_queries`: `ImpactedQuery(datasource_id, query_id, reasons)`;
+    `policy_rules`: `ImpactedRule(role, kind, pattern)`;
+    `preferred_tables`). Wave B adds `glossary_terms` as one more field and
+    one more finder appended to `FINDERS`; no caller changes. Verified
+    queries are matched from `inspect_verified_sql`, which now also returns
+    `columns` (every referenced column name, lower-cased).
+    `nl2sql.policies.patterns_matching(roles, datasource_id, tables)` takes
+    `policies.roles` too and returns `(role, kind, pattern)` triples; the
+    boundary test now flags imports of the `nl2sql.policies.patterns`
+    module only (its prefix also caught `patterns_matching`), and
+    `api/indexing_api.py` joined its access-decision list. `nl2sql index
+    --check` also takes `--role` (repeatable, default `admin` as `nl2sql
+    run`) and `--json`; a config that fails to load exits 2.
 
 ## 11. Answer sanity checks
 

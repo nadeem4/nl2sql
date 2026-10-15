@@ -2,14 +2,17 @@
 
 ## Purpose
 `engine.index`: build the vector index that retrieval and grounding read,
-report its health, clear it, prune other embedding models' indexes, and
-inspect one search of it.
+report its health, clear it, prune other embedding models' indexes,
+inspect one search of it, and measure schema drift.
 
 ## Responsibilities
 - Build the index for some or every datasource, beside the live entries.
 - Report each datasource's progress as it goes, for a console or a job.
 - Report the index's health, clear it, and run one inspected search (and say
   what that search uses by default).
+- Compare each live database with the schema its build was made from, and
+  read the stored versions and the diffs between them, as the caller may see
+  them.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/indexing_api.py` (`IndexAPI`, internal)
@@ -21,6 +24,7 @@ inspect one search of it.
 - `packages/nl2sql/src/nl2sql/storage/chroma.py`
 - `packages/nl2sql/src/nl2sql/indexing/enrichment_service.py`
 - `packages/nl2sql/src/nl2sql/storage/sqlite.py`
+- `packages/nl2sql/src/nl2sql/schema/drift.py`, `diff.py`, `impact.py` (schema drift)
 
 ## Public Surface
 
@@ -115,6 +119,42 @@ One MMR search of the live index, as the engine runs it: the candidate pool
 with scores, the picks in order and what was dropped. `types` limits the
 entry types (`schema.table`, ...). It reads index metadata only and needs no
 LLM.
+
+### index.check
+
+Signature:
+`check(datasource_ids=None, *, user_context) -> list[DriftReport]`
+
+Compares each datasource's live database (reflected with its `index` scope,
+catalog only, no profiling) with the snapshot its live build was made from.
+Each `DriftReport` has `datasource_id`, `status` (`unchanged`, `drifted`,
+`not_indexed`, `failed`), `live_version`, `checked_at`, and for `drifted` the
+`diff` (a `SchemaDiff`, `to_version` `None`) and its `impact` (a
+`DriftImpact`: verified queries, policy rules and preferred tables it
+breaks); `error` (redacted) for `failed`. Drift publishes `schema.drifted`.
+Nothing is stored and nothing is rebuilt. `user_context` is required: the
+caller sees drift only in tables its scope may read, a datasource it cannot
+reach is left out (or, named, is a `ValueError` like an unknown one). See
+[Schema Drift](../../schema/drift.md).
+
+### index.versions
+
+Signature:
+`versions(datasource_id, *, user_context) -> list[SchemaVersionInfo]`
+
+The datasource's stored schema versions, newest first: `schema_version`,
+`fingerprint`, `live` (the live build pointer names it) and `has_diff` (a
+build stored the diff that introduced it, with something the caller may
+read).
+
+### index.diff
+
+Signature:
+`diff(datasource_id, schema_version=None, *, user_context) -> SchemaDiff | None`
+
+The stored diff that introduced `schema_version` (the live one by default),
+as the caller may see it; `None` for a first build, a version whose
+structure did not change, or drift only in tables the caller may not read.
 
 ### index.inspect_defaults
 

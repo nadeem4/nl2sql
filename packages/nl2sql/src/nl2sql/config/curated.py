@@ -176,12 +176,14 @@ class VerifiedSql:
 
     placeholders: Set[str]
     tables: List[Tuple[str, str]]  # (schema or "", table), CTE names excluded
+    columns: Set[str] = field(default_factory=set)  # every column name it references, lower-cased
 
 
 def inspect_verified_sql(sql: str, dialect: str) -> VerifiedSql:
     """Parse ``sql`` in ``dialect`` and check it is exactly one read-only query.
 
-    Returns its ``:name`` placeholders and the tables it reads. Raises
+    Returns its ``:name`` placeholders, the tables it reads and the column
+    names it references (schema drift's impact reads them). Raises
     :class:`CuratedSqlError` otherwise.
     """
     import sqlglot
@@ -216,7 +218,8 @@ def inspect_verified_sql(sql: str, dialect: str) -> VerifiedSql:
     ctes = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
     tables = sorted({(t.db or "", t.name) for t in tree.find_all(exp.Table)
                      if t.name and not (not t.db and t.name.lower() in ctes)})
-    return VerifiedSql(placeholders=placeholders, tables=tables)
+    columns = {c.name.lower() for c in tree.find_all(exp.Column) if c.name}
+    return VerifiedSql(placeholders=placeholders, tables=tables, columns=columns)
 
 
 @dataclass

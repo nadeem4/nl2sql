@@ -15,6 +15,8 @@ PUBLIC_SURFACE = {
     "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return
     "DatasourceInfo", "DatasourceType", "IndexProgress", "LLMChange",
+    # Schema drift
+    "DriftReport", "DriftImpact", "SchemaDiff", "SchemaVersionInfo",
     # Errors
     "ErrorSeverity", "ErrorCode", "PipelineError", "RunWarning",
     # The config, and building an engine from it

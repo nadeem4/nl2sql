@@ -142,7 +142,8 @@ flowchart TD
     C -->|no| D[Raise: the pointer still names the previous build and v1]
     C -->|yes| E[set_pointers: datasource to the new build and v2]
     E --> F[Delete the datasource's builds older than the one replaced]
-    F --> G[keep_snapshots: delete the snapshots nothing can read any more]
+    F --> H[If v2's structure differs from v1's: store the diff, publish schema.drifted]
+    H --> G[keep_snapshots: delete the snapshots nothing can read any more]
 ```
 
 - Each datasource's `BuildPointer` names its live `build_id` and the
@@ -175,6 +176,10 @@ flowchart TD
   names (in any namespace), the one just replaced and the newest
   `settings.schema.max_versions` are kept. See
   [The state store](../schema/store.md#which-snapshots-are-kept).
+- **A structural change is recorded.** When the new version's structure
+  differs from the one it replaced, the diff between them is stored beside it
+  and `schema.drifted` is published; nothing else happens. See
+  [Schema Drift](../schema/drift.md), which also covers `nl2sql index --check`.
 - `engine.datasources.schema()`, `engine.curated.validate()` and an eval report's
   database identity read the snapshot the live pointer names too.
 

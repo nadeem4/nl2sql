@@ -12,7 +12,11 @@ A build, in order (docs/architecture/phase2.md, section 4):
    schema version. That one write is the commit.
 4. The datasource's builds other than the new one and the one just replaced
    are deleted, so a run that pinned the previous pointer keeps its entries.
-5. Its snapshots are deleted except the versions a pointer names (in any
+5. When the new version's structure differs from the version it replaced, the
+   diff between them is stored beside the new version and ``schema.drifted``
+   is published (D31, docs/architecture/wave_a.md, section 10). A version
+   whose statistics alone changed gets no diff.
+6. Its snapshots are deleted except the versions a pointer names (in any
    namespace), the one just replaced, and the newest
    ``settings.schema.max_versions``.
 
@@ -37,7 +41,9 @@ from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash, curated_s
 from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
 from nl2sql.indexing.models import BaseChunk
 from nl2sql.indexing.retrieval import CURATED_TYPE
-from nl2sql_sdk.schema import IndexIssue
+from nl2sql.schema.diff import diff_contracts
+from nl2sql.schema.drift import publish_drift
+from nl2sql_sdk.schema import IndexIssue, SchemaContract
 from nl2sql_sdk.stores import BuildPointer, Entry, Filter
 
 if TYPE_CHECKING:
@@ -135,6 +141,8 @@ class IndexingOrchestrator:
                                                   "message": self._issue_message(issue)})
         previous = self.index.pointers(self.namespace).get(datasource_id)
         self._commit(datasource_id, schema_version, chunks, [], curated_hash(curated))
+        if previous is not None:
+            self._record_drift(datasource_id, previous.schema_version, schema_version, schema_snapshot.contract)
         self._keep_snapshots(datasource_id, previous.schema_version if previous else None)
         stats = _stats(datasource_id, schema_version, [c.type for c in chunks])
         if schema_snapshot.issues:
@@ -160,6 +168,28 @@ class IndexingOrchestrator:
 
     def _publish(self, name: str, data: Dict[str, Any]) -> None:
         self.bus.publish(name, data, tenant_id=self.tenant_id)
+
+    def _record_drift(self, datasource_id: str, replaced: str, schema_version: str,
+                      contract: SchemaContract) -> None:
+        """Stores the diff from the replaced version to the new one and publishes ``schema.drifted``.
+
+        Only for a structural change. A failure is logged and never fails the
+        build, which is already live.
+        """
+        if replaced == schema_version:
+            return
+        try:
+            old = self.state.get_snapshot(datasource_id, replaced)
+            if old is None:
+                return
+            diff = diff_contracts(old.contract, contract, from_version=replaced, to_version=schema_version)
+            if diff.is_empty():
+                return
+            self.state.put_schema_diff(diff)
+            publish_drift(self._ctx, diff, "build")
+        except Exception as exc:
+            logger.warning(f"Could not record the schema diff of {datasource_id} ({replaced} to "
+                           f"{schema_version}): {exc}")
 
     def _keep_snapshots(self, datasource_id: str, replaced: Optional[str]) -> None:
         """Deletes the datasource's snapshots that nothing can read any more.

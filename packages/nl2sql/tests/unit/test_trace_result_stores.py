@@ -38,7 +38,7 @@ class _NoKeys(BaseModel):
 class MemoryTraces:
     """A plugin trace store that keeps documents in a dict."""
 
-    interface_version: ClassVar[int] = 1
+    interface_version: ClassVar[int] = 2
     slot: ClassVar[str] = "traces"
     config_model: ClassVar[type] = _NoKeys
     max_age_days = 3
@@ -65,7 +65,7 @@ class MemoryTraces:
 class MemoryResults:
     """A plugin results store that keeps bytes in a dict, as a remote store would."""
 
-    interface_version: ClassVar[int] = 1
+    interface_version: ClassVar[int] = 2
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type] = _NoKeys
 

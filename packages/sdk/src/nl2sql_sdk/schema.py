@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Optional, Tuple, Union, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -131,3 +131,63 @@ class SchemaSnapshot(BaseModel):
     contract: SchemaContract
     metadata: SchemaMetadata
     issues: List[IndexIssue] = Field(default_factory=list)
+
+
+# -- the structural diff between two snapshots of one datasource ---------------------
+
+ColumnValue = Union[str, bool, None]
+
+
+class ColumnChange(BaseModel):
+    """A column on both sides whose type, nullability or primary key changed: ``{"type": (old, new)}``."""
+
+    table: TableRef
+    column: str
+    changes: Dict[Literal["type", "nullable", "pk"], Tuple[ColumnValue, ColumnValue]]
+
+
+class ForeignKeyRef(BaseModel):
+    """A foreign key of ``table``: its ``columns`` refer to ``referred_columns`` of ``referred_table``."""
+
+    table: TableRef
+    columns: List[str]
+    referred_table: TableRef
+    referred_columns: List[str]
+
+
+class SchemaDiff(BaseModel):
+    """What changed in a datasource's structure between ``from_version`` and ``to_version``.
+
+    It compares exactly what the schema fingerprint covers: tables, columns,
+    their types, nullability and primary keys, foreign keys, and the
+    ``engine_type``, which is ``(old, new)`` when it changed. A rename is a
+    drop and an add. ``to_version`` is None for the live database, which has
+    no version. A table that was added or dropped is listed once, without its
+    columns or foreign keys.
+    """
+
+    datasource_id: str
+    from_version: str
+    to_version: Optional[str] = None
+    tables_added: List[TableRef] = Field(default_factory=list)
+    tables_dropped: List[TableRef] = Field(default_factory=list)
+    columns_added: List[ColumnRef] = Field(default_factory=list)
+    columns_dropped: List[ColumnRef] = Field(default_factory=list)
+    columns_changed: List[ColumnChange] = Field(default_factory=list)
+    foreign_keys_added: List[ForeignKeyRef] = Field(default_factory=list)
+    foreign_keys_dropped: List[ForeignKeyRef] = Field(default_factory=list)
+    engine_type: Optional[Tuple[str, str]] = None
+
+    def counts(self) -> Dict[str, int]:
+        """How many of each change; ``engine_type`` is 1 when it changed. What ``schema.drifted`` carries."""
+        return {
+            "tables_added": len(self.tables_added), "tables_dropped": len(self.tables_dropped),
+            "columns_added": len(self.columns_added), "columns_dropped": len(self.columns_dropped),
+            "columns_changed": len(self.columns_changed),
+            "foreign_keys_added": len(self.foreign_keys_added),
+            "foreign_keys_dropped": len(self.foreign_keys_dropped),
+            "engine_type": int(self.engine_type is not None),
+        }
+
+    def is_empty(self) -> bool:
+        return not any(self.counts().values())
