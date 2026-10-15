@@ -95,10 +95,8 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 
 # Wave A's codes, added by its foundation PR before their producers so the
 # parallel PRs never edit errors.py (docs/architecture/wave_a.md, D35), each
-# with the PR that raises it.
-DECLARED_AHEAD = {
-    "RUN_LIMIT_REACHED": "E3",
-}
+# with the PR that raises it. All of them are raised now (S1, E3).
+DECLARED_AHEAD: dict = {}
 
 
 def test_cancelled_is_a_string_not_a_one_tuple():
