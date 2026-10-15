@@ -1438,6 +1438,16 @@ retrieval:
   retried: a model that ignored the limit once will usually do so again, and
   the question is the thing to change.
 
+!!! note "Built: the sub-query limit (R2)"
+    `DecomposerNode` reads `settings.routing.max_sub_queries` once, in its
+    constructor (`self.max_sub_queries`), and the system prompt states it as
+    rule 10 ("Use at most 6 sub_queries"), a `{max_sub_queries}` template
+    variable, so the system message stays the same for one engine. The count
+    is of the model's own sub-queries, before any is dropped as unmapped. Over
+    it, the node returns an empty `DecomposerResponse`, no DAG and one
+    `QUESTION_TOO_BROAD` error (`ERROR`, in `FATAL_ERRORS`), with the message
+    above; the model is called once.
+
 ### The join-key type check
 
 A `join` or `compare` combine group joins two sub-queries' results in the
@@ -1491,6 +1501,52 @@ in two parts (D30):
 No dialect name is written in the engine: the dialect comes from the adapter,
 as the generator already does. `test_text_and_integer_keys_join_after_coercion`
 is B30's test.
+
+!!! note "Built: join-key coercion and the check (R2)"
+    - **One set of rules.** `nl2sql/aggregation/join_keys.py` (plain Python)
+      holds the categories, `DTYPE_CATEGORY`, `coercible(a, b)` and
+      `join_dtype(left, right)`, the type both sides are cast to: the shared
+      dtype; text parsed as the other side's type; `int` and `float` meet as
+      `float`, `date` and `datetime` as `datetime`, a number and `bool` as
+      `bool`. The decomposer's schema, the aggregator and the validator all
+      read it.
+    - **The decomposer.** `DecomposerResponse.validate_join_key_types()`
+      resolves each key against its side's `expected_schema` with
+      `resolve_key` (so `right.customer_id` is `customer_id`); the side is the
+      input's place in engine order (`input_order`). `ExpectedColumn.join_key`,
+      `JoinKeyPair.left_dtype` and `JoinKeyPair.right_dtype` are
+      `SkipJsonSchema`, set only by `mark_join_keys()` in
+      `decomposer/node.py`, which replaces whatever the model sent. The DAG
+      carries the pair's dtypes in the combine node's `join_keys` attributes
+      (`dag.py` dumps the pair, so it is unchanged).
+    - **The aggregator.** `PolarsDuckdbEngine.combine` casts each side first
+      to its own declared dtype and then to the joined one, so a value is read
+      the way its sub-query declared it. Text is stripped before it is parsed;
+      a text boolean is `true`/`false`/`t`/`f`/`yes`/`no`/`1`/`0`; a number
+      cast to a boolean is 1 or 0, anything else null.
+      `PolarsDuckdbEngine.unconverted_join_keys(inputs, join_keys)` counts the
+      values that became null (it collects the key columns only), and
+      `AggregationService.execute(..., warnings=[...])` gathers them; the node
+      turns each into a `JOIN_KEY_UNCONVERTED` warning dict on the state's
+      `warnings` (`node`, `message`, `error_code`, `severity`, `sub_query_id`),
+      naming the datasource: "1 of 3 support.customer_id values are not
+      numbers and joined nothing." S1's typed `RunWarning` is not on main yet,
+      so this uses the existing warnings mechanism; S1 moves it.
+    - **The validator.** `pipeline/nodes/validator/join_keys.py`,
+      `join_key_type_errors(plan, sub_query, relevant_tables, dialect)`, called
+      from `_validate_static` before the buildability check. The column type is
+      the schema snapshot's `Column.type`. sqlglot's `BOOLEAN` is a boolean,
+      its numeric types a number (`BIT` included), its text types text, its
+      temporal types temporal; anything else, an unparsable type or no type
+      is `other` and not checked. The message is "The join key order_key is
+      declared a date, but Orders.OrderKey is a number. Select a column that
+      holds a date for this key."
+    - **The demo.** `test_a_key_declared_text_on_one_side_joins_after_coercion`
+      (`tests/e2e/test_multi_sub_query_fake_llm.py`) joins Chinook's integer
+      `CustomerId` to support's `customer_id` declared as text and gets the
+      SQLite answer. The demo databases store both keys as integers, so the
+      text-against-integer case itself is the unit test above. The design lists
+      no `realdb` test for R2.
 
 ### The routing gate
 

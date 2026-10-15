@@ -100,8 +100,8 @@ schema retriever and the resolver had before 0.7 (`TABLE_K`, `PLANNING_K`,
 Cross-database routing: which datasources a question goes to, and how far it
 may spread. The resolver reads `candidates`, `max_datasources` and
 `floor_ratio` ([Routing](../architecture/indexing.md#routing-five-signals-fused));
-`max_sub_queries` is read from release 0.7's limits work
-([Wave A](../architecture/wave_a.md#limits)).
+the decomposer reads `max_sub_queries`
+([Wave A, Limits](../architecture/wave_a.md#limits)).
 
 | Key | Default | Description |
 | --- | --- | --- |

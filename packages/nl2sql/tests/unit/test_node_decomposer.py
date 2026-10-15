@@ -1,6 +1,6 @@
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode
 from nl2sql.pipeline.nodes.decomposer.schemas import (
     DecomposerResponse,
@@ -47,7 +47,7 @@ def test_decomposer_maps_unmapped_and_stabilizes_ids():
         ],
         unmapped_subqueries=[],
     )
-    ctx = SimpleNamespace(llm_registry=MagicMock())
+    ctx = fake_runtime(llm_registry=MagicMock())
     ctx.llm_registry.get_llm.return_value = llm
     node = DecomposerNode(ctx)
     node.chain = MagicMock()

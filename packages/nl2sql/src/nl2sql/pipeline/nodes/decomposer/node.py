@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, Any, List, TYPE_CHECKING
+from typing import Dict, Any, List, Tuple, TYPE_CHECKING
 
 from langchain_core.runnables import Runnable
 
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
 from .dag import build_execution_dag
-from .schemas import DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp
+from .schemas import CombineGroup, DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp, key_column
 from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
 from nl2sql.aggregation.columns import combined_columns, input_order, missing_columns_message, post_op_columns
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
@@ -94,6 +94,40 @@ def fold_single_input_ops(response: DecomposerResponse) -> DecomposerResponse:
     })
 
 
+def mark_join_keys(
+    sub_queries: List[SubQuery], combine_groups: List[CombineGroup]
+) -> Tuple[List[SubQuery], List[CombineGroup]]:
+    """The engine's own copies: join-key columns flagged, each key pair carrying its sides' dtypes.
+
+    Whatever the model sent for ``join_key``, ``left_dtype`` and
+    ``right_dtype`` is replaced: they are not in its tool schema, and only
+    this function sets them. The logical validator reads the flag (a join-key
+    column whose type cannot be coerced is retried) and the aggregator the
+    dtypes (both sides are cast to one type before the join). D30.
+    """
+    by_id = {sq.id: sq for sq in sub_queries}
+    keys: Dict[str, set] = {sq.id: set() for sq in sub_queries}
+    groups = []
+    for group in combine_groups:
+        if group.operation not in _TWO_SIDED or len(group.inputs) < 2:
+            groups.append(group)
+            continue
+        left, right = (by_id[i.subquery_id] for i in
+                       sorted(group.inputs, key=lambda i: input_order(i.role, i.subquery_id))[:2])
+        pairs = []
+        for pair in group.join_keys:
+            left_column, right_column = key_column(pair.left, left), key_column(pair.right, right)
+            keys[left.id].add(left_column.name)
+            keys[right.id].add(right_column.name)
+            pairs.append(pair.model_copy(update={"left_dtype": left_column.dtype,
+                                                 "right_dtype": right_column.dtype}))
+        groups.append(group.model_copy(update={"join_keys": pairs}))
+    marked = [sq.model_copy(update={"expected_schema": [
+        c.model_copy(update={"join_key": c.name in keys[sq.id]}) for c in sq.expected_schema]})
+        for sq in sub_queries]
+    return marked, groups
+
+
 def post_combine_problems(response: DecomposerResponse) -> List[str]:
     """Why each post-combine op cannot run on what its combine group produces.
 
@@ -142,6 +176,7 @@ class DecomposerNode:
         """
         self.node_name = self.__class__.__name__.lower().replace('node', '')
         self.llm = ctx.llm_registry.get_llm(self.node_name)
+        self.max_sub_queries = ctx.settings.routing.max_sub_queries
         self.prompt = DECOMPOSER_PROMPT
         self.chain = self.prompt | structured(self.llm, DecomposerResponse)
 
@@ -149,6 +184,18 @@ class DecomposerNode:
         data = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
         digest = hashlib.sha256(data.encode("utf-8")).hexdigest()[:12]
         return f"{prefix}_{digest}"
+
+    def _too_broad(self) -> Dict[str, Any]:
+        """Ends the run: the decomposition has more than ``settings.routing.max_sub_queries`` sub-queries."""
+        message = (f"This question needs more than {self.max_sub_queries} separate queries. "
+                   f"Ask about fewer things at once.")
+        logger.error(message)
+        return {
+            "decomposer_response": DecomposerResponse(sub_queries=[], combine_groups=[]),
+            "reasoning": [{"node": self.node_name, "content": message, "type": "error"}],
+            "errors": [PipelineError(node=self.node_name, message=message, severity=ErrorSeverity.ERROR,
+                                     error_code=ErrorCode.QUESTION_TOO_BROAD)],
+        }
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         """Executes the decomposer node.
@@ -203,8 +250,14 @@ class DecomposerNode:
                         resolved_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
                     ),
                     "feedback": feedback,
+                    "max_sub_queries": self.max_sub_queries,
                 }
             )
+
+            if len(llm_response.sub_queries) > self.max_sub_queries:
+                # Not asked again (D29): a model that ignored the limit once
+                # usually does again, and the question is what has to change.
+                return self._too_broad()
 
             llm_response = fold_single_input_ops(llm_response)
 
@@ -329,6 +382,7 @@ class DecomposerNode:
                     ],
                 }
 
+            final_sub_queries, combine_groups = mark_join_keys(final_sub_queries, combine_groups)
             combine_groups = sorted(combine_groups, key=lambda g: g.group_id)
             final_sub_queries = sorted(final_sub_queries, key=lambda s: s.id)
 

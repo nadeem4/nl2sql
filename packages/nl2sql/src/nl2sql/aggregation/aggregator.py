@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import AbstractSet, Dict, List, Tuple
+from typing import Any, AbstractSet, Dict, List, Optional, Tuple
 
 import polars as pl
 from nl2sql.execution.contracts import ArtifactRef
@@ -22,6 +22,7 @@ class AggregationService:
         dag: ExecutionDAG,
         artifact_refs: Dict[str, ArtifactRef],
         dropped: AbstractSet[str] = frozenset(),
+        warnings: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, pl.LazyFrame]:
         """Each terminal node of the DAG as a lazy polars frame, keyed by node id.
 
@@ -33,6 +34,10 @@ class AggregationService:
         A combine group goes on without them, except a ``join`` or ``compare``,
         which would have one side: it is dropped whole, with its post-combine
         ops. A dropped node has no frame, so it is missing from the result.
+
+        ``warnings``, when given, gets one entry for each side of a join key
+        whose values did not all convert to the key's type (see
+        ``PolarsDuckdbEngine.unconverted_join_keys``).
         """
         if not dag:
             raise ValueError("No ExecutionDAG found for aggregation.")
@@ -75,11 +80,14 @@ class AggregationService:
                 if node.kind == "combine":
                     upstream = incoming_edges.get(node_id, [])
                     inputs = self._ordered_inputs(upstream, computed)
-                    computed[node_id] = self.engine.combine(
-                        node.attributes.get("operation"),
-                        inputs,
-                        node.attributes.get("join_keys", []),
-                    )
+                    operation = node.attributes.get("operation")
+                    join_keys = node.attributes.get("join_keys", [])
+                    computed[node_id] = self.engine.combine(operation, inputs, join_keys)
+                    if warnings is not None and operation in _TWO_SIDED:
+                        sources = [e.from_id for e in sorted(upstream, key=lambda e: input_order(e.role, e.from_id))
+                                   if e.from_id in computed]
+                        warnings.extend(self.engine.unconverted_join_keys(
+                            [(source, computed[source]) for source in sources], join_keys))
                     continue
 
                 if node.kind.startswith("post_"):

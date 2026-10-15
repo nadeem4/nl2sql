@@ -14,6 +14,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
 from nl2sql.aggregation import AggregationService
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
+from nl2sql.aggregation.join_keys import DTYPE_PLURAL
 
 logger = get_logger("aggregator")
 
@@ -63,7 +64,8 @@ class EngineAggregatorNode:
                 return self._truncated(refused)
             dropped = {output.sub_query.id for output in (state.subgraph_outputs or {}).values()
                        if output.status == "dropped" and output.sub_query}
-            frames = self.service.execute(dag, state.artifact_refs, dropped)
+            unconverted: List[Dict[str, Any]] = []
+            frames = self.service.execute(dag, state.artifact_refs, dropped, unconverted)
             gone = self._dropped_groups(dag, dropped)
             if dropped and not frames:
                 return self._all_dropped(dropped)
@@ -89,7 +91,7 @@ class EngineAggregatorNode:
                         "sub_query_id": sq_id,
                     }
                     for operation, sq_id, cap in capped
-                ] + gone,
+                ] + gone + self._unconverted(state, unconverted),
             }
         except Exception as exc:
             logger.error(f"Node {self.node_name} failed: {exc}")
@@ -105,6 +107,19 @@ class EngineAggregatorNode:
                 "reasoning": [{"node": self.node_name, "content": f"Error: {str(exc)}", "type": "error"}],
                 "errors": [error],
             }
+
+    def _unconverted(self, state: GraphState, found: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """A ``JOIN_KEY_UNCONVERTED`` warning for each side of a join key with values that did not convert."""
+        datasources = {sq.id: sq.datasource_id for sq in
+                       (state.decomposer_response.sub_queries if state.decomposer_response else [])}
+        return [{
+            "node": self.node_name,
+            "message": (f"{f['failed']} of {f['total']} {datasources.get(f['sub_query_id'], f['sub_query_id'])}."
+                        f"{f['column']} values are not {DTYPE_PLURAL[f['dtype']]} and joined nothing."),
+            "error_code": ErrorCode.JOIN_KEY_UNCONVERTED.value,
+            "severity": ErrorSeverity.WARNING.value,
+            "sub_query_id": f["sub_query_id"],
+        } for f in found]
 
     def _dropped_groups(self, dag, dropped: Set[str]) -> List[Dict[str, Any]]:
         """A warning for each combine group a hook's dropped sub-query left unanswered.

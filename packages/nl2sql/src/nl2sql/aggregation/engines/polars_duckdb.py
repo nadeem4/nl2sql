@@ -6,6 +6,7 @@ import duckdb
 import polars as pl
 
 from nl2sql.aggregation.columns import missing_columns_message, post_op_columns, resolve_key
+from nl2sql.aggregation.join_keys import join_dtype
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.artifacts import ArtifactStore
 
@@ -24,6 +25,60 @@ def _names(frame: Frame) -> List[str]:
 def _column(frame: Frame, key: str) -> str:
     """A join key as a column of ``frame``; see :func:`~nl2sql.aggregation.columns.resolve_key`."""
     return resolve_key(_names(frame), key)
+
+
+_POLARS_TYPES = {"int": pl.Int64, "float": pl.Float64, "string": pl.String, "bool": pl.Boolean,
+                 "date": pl.Date, "datetime": pl.Datetime}
+_TRUE, _FALSE = ["true", "t", "yes", "y", "1"], ["false", "f", "no", "n", "0"]
+
+
+def _cast(value: pl.Expr, current: pl.DataType, dtype: str) -> pl.Expr:
+    """``value`` (of polars type ``current``) as the declared ``dtype``; null where it does not convert."""
+    target = _POLARS_TYPES[dtype]
+    if current == target:
+        return value
+    if current == pl.String:
+        text = value.str.strip_chars()
+        if dtype == "bool":
+            lower = text.str.to_lowercase()
+            return pl.when(lower.is_in(_TRUE)).then(True).when(lower.is_in(_FALSE)).then(False)
+        if dtype == "date":
+            return text.str.to_date(strict=False)
+        if dtype == "datetime":
+            return pl.coalesce(text.str.to_datetime(strict=False), text.str.to_date(strict=False).cast(pl.Datetime))
+        return text.cast(target, strict=False)
+    if dtype == "bool" and current.is_numeric():
+        return pl.when(value == 1).then(True).when(value == 0).then(False)
+    return value.cast(target, strict=False)
+
+
+def _coerced_key(frame: Frame, column: str, declared: str, target: str) -> pl.Expr:
+    """A join key cast first to its side's declared dtype, then to the type both sides meet as.
+
+    Through the declared type, so a value is read the way its sub-query said
+    it is: a date declared as text joins a number key as its text, which is
+    not a number, rather than as a count of days.
+    """
+    current = frame.collect_schema()[column]
+    return _cast(_cast(pl.col(column), current, declared), _POLARS_TYPES[declared], target)
+
+
+def _coerce_keys(left: Frame, right: Frame, join_keys: List[Dict[str, Any]]) -> Tuple[Frame, Frame]:
+    """Both sides of every typed join key cast to one type, in polars (wave_a.md, D30).
+
+    A key the decomposer gave no dtypes (none reaches here from a run) is left
+    as it is. A value that does not convert becomes null and matches nothing;
+    :meth:`PolarsDuckdbEngine.unconverted_join_keys` counts those.
+    """
+    for key in join_keys:
+        left_dtype, right_dtype = key.get("left_dtype"), key.get("right_dtype")
+        if not left_dtype or not right_dtype:
+            continue
+        target = join_dtype(left_dtype, right_dtype)
+        left_column, right_column = _column(left, key.get("left")), _column(right, key.get("right"))
+        left = left.with_columns(_coerced_key(left, left_column, left_dtype, target).alias(left_column))
+        right = right.with_columns(_coerced_key(right, right_column, right_dtype, target).alias(right_column))
+    return left, right
 
 
 def _check_attributes(frame: Frame, names: List[str]) -> None:
@@ -116,14 +171,12 @@ class PolarsDuckdbEngine:
                 f"A {operation} needs two inputs and got {len(frames)}; refusing to answer from one side."
             )
         if operation == "join":
-            left = frames[0]
-            right = frames[1]
+            left, right = _coerce_keys(frames[0], frames[1], join_keys)
             left_on = [_column(left, k.get("left")) for k in join_keys]
             right_on = [_column(right, k.get("right")) for k in join_keys]
             return left.join(right, left_on=left_on, right_on=right_on, how="inner", suffix="_right")
         if operation == "compare":
-            left = frames[0]
-            right = frames[1]
+            left, right = _coerce_keys(frames[0], frames[1], join_keys)
             left_on = [_column(left, k.get("left")) for k in join_keys]
             right_on = [_column(right, k.get("right")) for k in join_keys]
             joined = left.join(right, left_on=left_on, right_on=right_on, how="inner", suffix="_right")
@@ -140,6 +193,41 @@ class PolarsDuckdbEngine:
             diff_exprs = [(pl.col(l) != pl.col(r)) for l, r in diff_cols]
             return joined.filter(pl.any_horizontal(diff_exprs))
         raise ValueError(f"Unsupported combine operation '{operation}'.")
+
+    def unconverted_join_keys(
+        self,
+        inputs: List[Tuple[str, Frame]],
+        join_keys: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Each side's join-key values that did not convert to the type the join casts to.
+
+        ``inputs`` are ``(sub-query id, frame)`` in engine order. One entry per
+        side and key with any: ``sub_query_id``, ``column``, ``failed`` (values
+        that became null), ``total`` (values that were not null) and ``dtype``
+        (the type they were cast to). Counting reads the key columns, so it
+        collects them; a join of typed keys only.
+        """
+        if len(inputs) < 2:
+            return []
+        found = []
+        for key in join_keys:
+            left_dtype, right_dtype = key.get("left_dtype"), key.get("right_dtype")
+            if not left_dtype or not right_dtype:
+                continue
+            target = join_dtype(left_dtype, right_dtype)
+            for (source_id, frame), name, declared in ((inputs[0], key.get("left"), left_dtype),
+                                                      (inputs[1], key.get("right"), right_dtype)):
+                column = _column(frame, name)
+                original = pl.col(column)
+                failed, total = frame.select(
+                    (original.is_not_null() & _coerced_key(frame, column, declared, target).is_null())
+                    .sum().alias("failed"),
+                    original.is_not_null().sum().alias("total"),
+                ).collect().row(0)
+                if failed:
+                    found.append({"sub_query_id": source_id, "column": column, "failed": failed, "total": total,
+                                  "dtype": target})
+        return found
 
     def post_op(self, operation: str, frame: Frame, attributes: Dict[str, Any]) -> Frame:
         """Applies one post-combine op, every field it carries, in SQL's order.

@@ -16,6 +16,8 @@
 - Filter sub‑queries by resolved/allowed/unsupported datasources.
 - Stabilize IDs using a hash of sub‑query content.
 - Normalize and sort combine groups and post‑combine operations.
+- Refuse a decomposition with more than `settings.routing.max_sub_queries` sub-queries (`QUESTION_TOO_BROAD`).
+- Mark each join key's column on its own copy of the sub-queries, and copy each side's declared `dtype` onto the key pair.
 - Build the `ExecutionDAG` the layer router walks and the aggregator runs (`decomposer/dag.py`). The DAG is a pure function of the response above, so it is code here rather than a node of its own.
 
 ---
@@ -71,6 +73,8 @@ Side effects:
 1. Validate resolver response; raise if no resolved datasources.
 2. Build `resolved_payload` and `schema_version_map`. The payload has one entry per resolved datasource, sorted by id: `datasource_id`, `description`, `tables` (sorted bare table names, at most 30, set by the resolver) and `more_tables` (how many tables were left out, present only when some were). The resolver fills these for every path, so an explicit `datasource_id` or a single registered datasource gets the same context as a vector search. The index metadata (chunk id, type, schema version) is not sent.
 3. Invoke LLM chain with `user_query` and resolved datasources. The prompt is two messages: the system message holds the fixed instructions and output format (cacheable), the human message holds the resolved datasources (as JSON with sorted keys) and then the question. Rule 1 tells the model to pick each sub-query's datasource from these descriptions and tables. A sub-query carries its own `filters` (a threshold on a metric included), `order_by` and `limit`: "the artist with the most albums" is `order_by album_count desc, limit 1`. `post_combine_ops` are only for operations across two or more combined sub-queries, and the prompt's example has none. The answer is a call to the `DecomposerResponse` tool whose arguments are the decomposition itself; both the prompt and the tool's description (the model's docstring) say not to wrap them under another key, which Claude did on the anthropic wire while the tool had no description.
+   - The system message states the limit, `settings.routing.max_sub_queries` (rule 10, "Use at most 6 sub_queries"). A decomposition with more ends the run here with `QUESTION_TOO_BROAD`: "This question needs more than 6 separate queries. Ask about fewer things at once." No DAG is built and the model is not asked again: a model that ignored the limit once usually does again, and the question is what has to change ([Wave A, D29](../wave_a.md#limits)).
+   - `DecomposerResponse` requires each `join`/`compare` key to name a column in the `expected_schema` of its side's sub-query (a side or sub-query prefix such as `right.customer` resolves to the bare name), with a `dtype`, and the two dtypes to be coercible: a number or a boolean never joins a date. A violation is a `ValueError`, which parse-and-retry sends back to the model with the reason.
    - `fold_single_input_ops()` then moves every `filter`, `sort` and `limit` op on a combine group with one sub-query (used by no other group) into that sub-query: filters are appended, `order_by` terms appended, and the smallest limit kept. With one input there is nothing to combine, and left as post-combine ops they reached only the aggregated answer, never the sub-query's SQL or rows (the first gpt-5.4 tier 2 run returned every row for ten superlative and top-N questions this way). A group with an `aggregate` or `project` op is left to the aggregator.
 4. For each LLM sub‑query:
    - Validate datasource existence and RBAC allowance.
@@ -78,11 +82,12 @@ Side effects:
    - Two sub-queries the model wrote identically hash to the same ID, but each is still a sub-query of its own (a combine group may name both), so a repeat takes the next ordinal: `sq_<hash>`, `sq_<hash>_2`, and so on. Both run, and the DAG gets one scan node per sub-query. Before this, the shared ID gave the DAG one node id for two nodes, and the run ended with `PLANNER_FAILED` ("contains a cycle").
    - Attach schema version.
 5. Remap combine groups to stable sub‑query IDs. An input whose sub-query was dropped in step 4 is removed from its group, and a group left with no inputs is removed. A `join` or `compare` group left with fewer than two inputs is **refused**: the run ends here with `PLANNER_FAILED`, before any scan runs, and no DAG is built. The message names the group and why each input was dropped (`restricted_datasource`, `no_datasource`, `unsupported_datasource`) but not the datasource. The model is not asked again: a restricted or unresolved datasource is not something a new decomposition changes. Before this, the group was kept with its one input and the engine returned that side alone as the "join", so "customers with an open ticket who spent the most" was answered as "customers who spent the most", with no error. A `union` that lost an input still runs on the inputs that remain; the dropped intent is reported in `unmapped_subqueries`.
-6. Assign deterministic IDs to post‑combine ops.
-7. Sort sub‑queries, combine groups, and post‑combine ops.
-8. Check every post-combine op against the columns its combine group will produce (`post_combine_problems()`). A sub-query's result columns are its `expected_schema` names (the logical validator holds each plan to them), and the combined columns follow by the engine's own rules in `nl2sql/aggregation/columns.py`: a `join`/`compare` drops the right-hand join keys and suffixes any other right-hand name the left also has with `_right`. A group whose sub-query declares no `expected_schema` is not checked. If an op reads a column that will not exist, the model is asked once more, with the reason appended to the human message ("PREVIOUS ANSWER REJECTED: ..."). A second rejected answer ends the run here with `PLANNER_FAILED` and the same reason, before any scan runs; nothing after the decomposer can ask for a new decomposition, so this used to fail in the aggregator after every scan.
-9. Return `DecomposerResponse`.
-10. On exception, emit `ORCHESTRATOR_CRASH` error.
+6. `mark_join_keys()` sets `ExpectedColumn.join_key` on the engine's own copy of each sub-query (true on each join-key column, false on every other) and copies each side's declared dtype onto the pair (`JoinKeyPair.left_dtype`, `right_dtype`). The three fields are `SkipJsonSchema`: they are not in the model's tool schema, and whatever the model sent for them is replaced. The logical validator reads the flag and the aggregator the dtypes ([Wave A, D30](../wave_a.md#the-join-key-type-check)).
+7. Assign deterministic IDs to post‑combine ops.
+8. Sort sub‑queries, combine groups, and post‑combine ops.
+9. Check every post-combine op against the columns its combine group will produce (`post_combine_problems()`). A sub-query's result columns are its `expected_schema` names (the logical validator holds each plan to them), and the combined columns follow by the engine's own rules in `nl2sql/aggregation/columns.py`: a `join`/`compare` drops the right-hand join keys and suffixes any other right-hand name the left also has with `_right`. A group whose sub-query declares no `expected_schema` is not checked. If an op reads a column that will not exist, the model is asked once more, with the reason appended to the human message ("PREVIOUS ANSWER REJECTED: ..."). A second rejected answer ends the run here with `PLANNER_FAILED` and the same reason, before any scan runs; nothing after the decomposer can ask for a new decomposition, so this used to fail in the aggregator after every scan.
+10. Return `DecomposerResponse`.
+11. On exception, emit `ORCHESTRATOR_CRASH` error.
 
 ---
 
@@ -115,7 +120,8 @@ Key contracts:
 
 Emits `PipelineError` with:
 
-- `PLANNER_FAILED` when a decomposition is rejected twice (step 8), with the reason;
+- `PLANNER_FAILED` when a decomposition is rejected twice (step 9), with the reason;
+- `QUESTION_TOO_BROAD` when the decomposition has more than `settings.routing.max_sub_queries` sub-queries; never retried;
 - `PLANNER_FAILED` when a `join`/`compare` combine group has fewer than two inputs (step 5), for example because RBAC dropped one side;
 - `ORCHESTRATOR_CRASH` on exceptions; a provider's refusal of the call is a `PROVIDER_*` error instead (see [provider failures](../../observability/error-handling.md#provider-failures)).
 

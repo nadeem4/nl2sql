@@ -27,6 +27,7 @@ from nl2sql.pipeline.nodes.generator.node import (
 from nl2sql.runtime import Runtime
 from nl2sql.common.logger import get_logger
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
+from nl2sql.pipeline.nodes.validator.join_keys import join_key_type_errors
 
 
 logger = get_logger("logical_validator")
@@ -869,6 +870,9 @@ class LogicalValidatorNode:
                     error_code=ErrorCode.COLUMN_NOT_FOUND,
                 )
             )
+
+        # A join key whose column cannot take its declared type (D30).
+        errors.extend(join_key_type_errors(plan, state.sub_query, state.relevant_tables, self._plan_dialect(state)))
 
         # Last, so every check above keeps its own error code: whatever the
         # generator would still refuse to build.

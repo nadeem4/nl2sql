@@ -98,7 +98,6 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # with the PR that raises it.
 DECLARED_AHEAD = {
     "RUN_LIMIT_REACHED": "E3",
-    "QUESTION_TOO_BROAD": "R2", "JOIN_KEY_TYPE_MISMATCH": "R2", "JOIN_KEY_UNCONVERTED": "R2",
     "JOIN_FAN_OUT": "S1", "ALL_NULL_COLUMN": "S1",
 }
 

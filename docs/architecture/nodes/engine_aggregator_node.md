@@ -70,6 +70,7 @@ Side effects:
 1. Read `execution_dag` and `artifact_refs`.
    - Check every combine input against its row cap (see *Row cap before a combine* below). A capped input to a `join`/`compare` ends the run here with `RESULT_TRUNCATED`; a capped input to a `union` adds a `RESULT_TRUNCATED` warning and aggregation goes on.
 2. Invoke `AggregationService.execute(dag, artifact_refs)`.
+   - A `join`/`compare` combine casts both sides of each key to one type before the join, in polars, non-strictly ([Wave A, D30](../wave_a.md#the-join-key-type-check)). The types are the ones the decomposer declared (`JoinKeyPair.left_dtype`, `right_dtype`): each side is cast first to its own, then both to the type they meet as (`nl2sql/aggregation/join_keys.py`: text is parsed as the other side's type, an int and a float meet as a float, a date and a datetime as a datetime, a number and a boolean as a boolean by 0 and 1). A value that does not convert becomes null and matches nothing; `AggregationService.execute` counts them per side (`PolarsDuckdbEngine.unconverted_join_keys`) and the node adds a `JOIN_KEY_UNCONVERTED` warning for each, carried to `QueryResult.warnings`: "3 of 412 support.customer_ref values are not numbers and joined nothing." No dialect is involved: this is compute on result frames.
    - A `join`/`compare` combine resolves each join key against its frame's columns. A key written with a side or sub-query prefix (`right.customer`, `sq_2.customer`) resolves to the bare column when only that exists; an unknown key is left for polars to report. A `join`/`compare` with fewer than two inputs raises (`AGGREGATOR_FAILED`) instead of returning the one frame it has; the decomposer refuses such a group before anything runs, so this is the last line of defence.
    - A post-combine op (`PolarsDuckdbEngine.post_op`) applies every field it carries, in SQL's order: the reshaping its `operation` names (`aggregate` groups with polars' `group_by`, `project` selects `expected_schema`), then its `filters` (after an aggregate they filter the aggregated rows, as HAVING does), its `order_by`, and its `limit`. A `filter` op with `order_by` and `limit`, as the decomposer's prompt used to show, keeps all three.
    - Before polars is asked for any column, a post-combine op's attributes (`group_by`, `metrics`, `project`'s `expected_schema`, `filters`, `order_by`) are checked against the combined frame. An attribute the frame does not have is refused with the columns it does have, and a side-qualified one (`right.customer`) with the reason — see *No anti-join* below. The decomposer runs the same check on the decomposition before anything executes (`nl2sql/aggregation/columns.py`, shared with this engine) and asks the model again once, so here it is the last line of defence.
@@ -180,6 +181,7 @@ Key contracts:
 Emits `PipelineError` with:
 
 - `AGGREGATOR_FAILED`
+- `JOIN_KEY_UNCONVERTED`, a warning: join-key values that did not convert to the key's type
 - `RESULT_TRUNCATED`, an error when a `join`/`compare` input hit its row cap, a warning when a `union` input did
 
 Logs failures via `logger.error`.

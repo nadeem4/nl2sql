@@ -168,6 +168,24 @@ def test_two_datasources_joined_on_customer_give_the_sqlite_answer(demo_project,
 
 
 @pytest.mark.e2e
+def test_a_key_declared_text_on_one_side_joins_after_coercion(demo_project, tmp_path):
+    # B30 (wave_a.md, D30): the support side declares its customer_id text,
+    # Chinook's an integer. The validator accepts a number column declared as
+    # text, the aggregator casts both sides to one type, and the answer is the
+    # SQLite one.
+    tickets = {**OPEN_TICKETS_SQ, "expected_schema": [{"name": "customer_id", "dtype": "string"},
+                                                       {"name": "open_tickets", "dtype": "int"}]}
+    rules = _rules(["chinook", "support"], _join_decomposition(MUSIC_SPEND_SQ, tickets),
+                   [(MUSIC_SPEND_INTENT, MUSIC_SPEND_PLAN), (OPEN_TICKETS_INTENT, OPEN_TICKETS_PLAN)])
+    server, r, doc = _run(demo_project, tmp_path, rules, "multi-sq-text-key.yaml")
+
+    assert doc["result"]["errors"] == [], r.stdout + r.stderr
+    assert not [w for w in doc["result"].get("warnings") or [] if "JOIN_KEY" in json.dumps(w)]
+    ids = _answer_ids(doc)
+    assert ids[:2] == [45, 37] and set(ids[2:4]) == {7, 25} and ids[4] == 5, ids
+
+
+@pytest.mark.e2e
 def test_two_sub_queries_on_one_datasource_keep_their_own_results(demo_project, tmp_path):
     # Customer 6 spent the most (49.62) and customer 26 next (47.62). Joined
     # with a frame of itself, music_spend would still sort the same; the

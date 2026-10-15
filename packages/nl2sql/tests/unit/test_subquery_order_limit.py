@@ -18,9 +18,9 @@ never did, so the SQL and the rows scored returned everything. Now:
 """
 import json
 from datetime import date
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_EXAMPLES, PLANNER_SYSTEM_PROMPT
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
@@ -50,7 +50,7 @@ def _op(operation, **kw):
 
 
 def _decompose(response: DecomposerResponse) -> DecomposerResponse:
-    node = DecomposerNode(SimpleNamespace(llm_registry=MagicMock()))
+    node = DecomposerNode(fake_runtime(llm_registry=MagicMock()))
     node.chain = MagicMock()
     node.chain.invoke.return_value = response
     state = GraphState(

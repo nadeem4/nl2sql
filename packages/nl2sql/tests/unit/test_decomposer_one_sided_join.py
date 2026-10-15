@@ -11,12 +11,12 @@ before any sub-query runs. The model is ``FakeLLMServer``: no key, no network.
 """
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
 
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
 from nl2sql.common.errors import ErrorCode
 from nl2sql.llm.wires import WIRES
@@ -53,7 +53,7 @@ def _run(payload, allowed):
     try:
         llm = WIRES["openai"].build_client("gpt-5.4", 0.0, api_key="-".join(["fake", "decomposer", "key"]),
                                            base_url=server.base_url, tags=["decomposer"])
-        ctx = SimpleNamespace(llm_registry=MagicMock())
+        ctx = fake_runtime(llm_registry=MagicMock())
         ctx.llm_registry.get_llm.return_value = llm
         state = GraphState(
             user_query=QUESTION,
