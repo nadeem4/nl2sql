@@ -531,23 +531,17 @@ class SQLAlchemyAdapter:
     def probe_overlap(self, left: ColumnRef, right: ColumnRef, sample_rows: int) -> Overlap:
         """Of up to ``sample_rows`` distinct non-null values of ``left``, how many exist in ``right``.
 
-        One statement in SQLAlchemy Core: a ``DISTINCT`` sample of ``left``
-        with a limit, and an ``EXISTS`` on ``right`` for each value. It runs on
-        the adapter's own connections, so under the session's read-only
-        setting and ``limits.timeout_ms`` where the adapter enforces them.
-        Distinct values, so one popular key does not fill the sample. A
-        failure raises ``RuntimeError`` naming the two columns and the
-        driver's error class, never its message: a conversion error quotes
-        the value it could not convert.
+        One statement (``overlap_statement``). It runs on the adapter's own
+        connections, so under the session's read-only setting and
+        ``limits.timeout_ms`` where the adapter enforces them. Distinct
+        values, so one popular key does not fill the sample. The limit caps
+        the sample, not the read: ``DISTINCT`` usually reads all of ``left``
+        before the limit applies, so on a large table only the timeout bounds
+        the probe. A failure raises ``RuntimeError`` naming the two columns
+        and the driver's error class, never its message: a conversion error
+        quotes the value it could not convert.
         """
-        left_column = table(left.table.table_name, column(left.column_name), schema=left.table.schema_name
-                            ).c[left.column_name]
-        right_table = table(right.table.table_name, column(right.column_name), schema=right.table.schema_name)
-        sample = (select(left_column.label("value")).where(left_column.is_not(None)).distinct()
-                  .limit(max(1, int(sample_rows))).subquery("sample"))
-        found = select(literal_column("1")).select_from(right_table).where(
-            right_table.c[right.column_name] == sample.c.value).exists()
-        stmt = select(func.count(), func.count(case((found, 1)))).select_from(sample)
+        stmt = overlap_statement(left, right, sample_rows)
         try:
             with self.engine.connect() as conn:
                 sampled, matched = conn.execute(stmt).one()
@@ -751,3 +745,21 @@ def _name(ref: TableRef) -> str:
 
 def _column_name(ref: ColumnRef) -> str:
     return f"{_name(ref.table)}.{ref.column_name}"
+
+
+def overlap_statement(left: ColumnRef, right: ColumnRef, sample_rows: int):
+    """``SELECT COUNT(*), SUM(hit)``: a ``DISTINCT`` non-null sample of ``left`` with a limit, each value flagged
+    1 when it ``EXISTS`` in ``right``.
+
+    The flag is computed in a subquery and only a plain column is
+    aggregated: SQL Server refuses an aggregate over a subquery (Msg 130).
+    """
+    left_column = table(left.table.table_name, column(left.column_name), schema=left.table.schema_name
+                        ).c[left.column_name]
+    right_table = table(right.table.table_name, column(right.column_name), schema=right.table.schema_name)
+    sample = (select(left_column.label("value")).where(left_column.is_not(None)).distinct()
+              .limit(max(1, int(sample_rows))).subquery("sample"))
+    found = select(literal_column("1")).select_from(right_table).where(
+        right_table.c[right.column_name] == sample.c.value).exists()
+    flagged = select(case((found, 1), else_=0).label("hit")).select_from(sample).subquery("flagged")
+    return select(func.count(), func.sum(flagged.c.hit)).select_from(flagged)

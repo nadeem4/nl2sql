@@ -7,6 +7,7 @@ plans in the shape each server returns.
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 import time
 from contextlib import closing
@@ -27,6 +28,7 @@ from nl2sql_sdk import (
     ProfilingAdapterProtocol,
     TableRef,
 )
+from nl2sql_sdk.sqlalchemy.adapter import overlap_statement
 
 ESTIMATES = DatasourceCapability.ESTIMATES_COST
 
@@ -135,38 +137,113 @@ def test_overlap_failure_never_shows_values(lite):
 # --- The server adapters' plan readers --------------------------------------------
 
 
+def test_overlap_aggregates_no_subquery():
+    """SQL Server refuses an aggregate over a subquery (Msg 130): the EXISTS flag is computed one level down."""
+    from sqlalchemy.dialects import mssql
+
+    sql = str(overlap_statement(_col("s", "a", "x"), _col("s", "b", "y"), 10).compile(dialect=mssql.dialect()))
+    assert "EXISTS" in sql
+    assert not re.search(r"(count|sum)\((?:(?!\bFROM\b).)*\bEXISTS", sql, re.IGNORECASE | re.DOTALL), sql
+
+
+def test_duckdb_counts_a_table_whose_name_needs_quoting(tmp_path):
+    path = str(tmp_path / "quoted.duckdb")
+    with closing(duckdb.connect(path)) as conn:
+        conn.execute('CREATE SCHEMA "My.Schema"')
+        conn.execute('CREATE TABLE "My.Schema"."Big Orders" (id INTEGER, amount INTEGER)')
+        conn.execute('INSERT INTO "My.Schema"."Big Orders" SELECT range, range * 2 FROM range(1000)')
+        conn.execute('CREATE TABLE "order" (id INTEGER)')
+        conn.execute('INSERT INTO "order" SELECT range FROM range(300)')
+    adapter = DuckdbAdapter("duck", DuckdbConnection(database=path), Limits(timeout_ms=5000))
+    try:
+        assert adapter.estimate('SELECT id FROM "My.Schema"."Big Orders" WHERE amount = 51', {}).rows == 1000
+        assert adapter.estimate('SELECT id FROM "order" WHERE id % 1000 = 999', {}).rows == 300
+    finally:
+        adapter.close()
+
+
+# --- The server adapters' plan readers --------------------------------------------
+
+
+def _scan(relation, rows, kind="Seq Scan"):
+    return {"Node Type": kind, "Schema": "public", "Relation Name": relation, "Plan Rows": rows}
+
+
 def test_postgres_seq_scan_counts_the_table_and_an_index_scan_its_plan_rows():
-    plan = {"Node Type": "Nested Loop", "Plan Rows": 1, "Total Cost": 42.5, "Plans": [
-        {"Node Type": "Seq Scan", "Schema": "public", "Relation Name": "rental", "Plan Rows": 1},
-        {"Node Type": "Index Scan", "Schema": "public", "Relation Name": "customer", "Plan Rows": 1},
-        {"Node Type": "Bitmap Heap Scan", "Schema": "public", "Relation Name": "film", "Plan Rows": 9, "Plans": [
-            {"Node Type": "Bitmap Index Scan", "Plan Rows": 10}]},
+    plan = {"Node Type": "Hash Join", "Plan Rows": 1, "Total Cost": 42.5, "Plans": [
+        _scan("rental", 1),
+        {"Node Type": "Hash", "Plans": [
+            {"Node Type": "Bitmap Heap Scan", "Schema": "public", "Relation Name": "film", "Plan Rows": 9, "Plans": [
+                {"Node Type": "Bitmap Index Scan", "Plan Rows": 10}]}]},
     ]}
-    assert scans(plan) == ([("public", "rental")], 11)
+    assert scans(plan) == ([("public", "rental", 1)], 10)
 
 
-def test_mysql_counts_rows_examined_per_scan_and_skips_derived_tables():
+def test_postgres_nested_loop_counts_the_inner_side_once_per_outer_row():
+    plan = {"Node Type": "Nested Loop", "Plan Rows": 5, "Plans": [
+        _scan("rental", 1000),
+        _scan("customer", 1, "Index Scan"),
+    ]}
+    assert scans(plan) == ([("public", "rental", 1)], 1000)
+
+    # An inner Seq Scan is re-read for each outer row, unless a Materialize keeps its rows.
+    rescanned = {"Node Type": "Nested Loop", "Plans": [_scan("a", 10), _scan("b", 3)]}
+    assert scans(rescanned) == ([("public", "a", 1), ("public", "b", 10)], 0)
+    materialized = {"Node Type": "Nested Loop", "Plans": [
+        _scan("a", 10), {"Node Type": "Materialize", "Plans": [_scan("b", 3)]}]}
+    assert scans(materialized) == ([("public", "a", 1), ("public", "b", 1)], 0)
+
+
+def test_mysql_multiplies_per_scan_rows_by_the_rows_joined_before():
     plan = {"query_block": {"cost_info": {"query_cost": "1700.25"}, "nested_loop": [
-        {"table": {"table_name": "rental", "access_type": "ALL", "rows_examined_per_scan": 16008}},
-        {"table": {"table_name": "customer", "access_type": "eq_ref", "rows_examined_per_scan": 1}},
-        {"table": {"table_name": "<derived2>", "rows_examined_per_scan": 500, "materialized_from_subquery": {
-            "query_block": {"table": {"table_name": "film", "access_type": "ALL", "rows_examined_per_scan": 1000}}}}},
+        {"table": {"table_name": "rental", "access_type": "ALL", "rows_examined_per_scan": 16000,
+                   "rows_produced_per_join": 1600}},
+        {"table": {"table_name": "customer", "access_type": "eq_ref", "rows_examined_per_scan": 1,
+                   "rows_produced_per_join": 1600}},
+        # A hash join reads its table once.
+        {"table": {"table_name": "film", "access_type": "ALL", "rows_examined_per_scan": 1000,
+                   "using_join_buffer": "hash join"}},
     ]}}
-    assert rows_examined(plan) == 16008 + 1 + 1000
+    assert rows_examined(plan) == 16000 + 1600 + 1000
 
 
-_SHOWPLAN = """<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan"><BatchSequence><Batch>
-<Statements><StmtSimple StatementSubtreeCost="0.25"><QueryPlan>
-<RelOp PhysicalOp="Nested Loops" EstimateRows="1">
+def test_mysql_skips_a_materialized_derived_table_but_counts_what_it_reads():
+    plan = {"query_block": {"table": {
+        "table_name": "dt", "access_type": "ALL", "rows_examined_per_scan": 500,
+        "materialized_from_subquery": {"query_block": {"table": {
+            "table_name": "film", "access_type": "ALL", "rows_examined_per_scan": 1000}}}}}}
+    assert rows_examined(plan) == 1000
+    union = {"query_block": {"union_result": {"table_name": "<union1,2>", "query_specifications": [
+        {"query_block": {"table": {"table_name": "a", "rows_examined_per_scan": 7}}},
+        {"query_block": {"table": {"table_name": "b", "rows_examined_per_scan": 8}}}]}}}
+    assert rows_examined(union) == 15
+
+
+def _showplan(body, cost=' StatementSubtreeCost="0.25"'):
+    return ('<ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan"><BatchSequence><Batch>'
+            f'<Statements><StmtSimple{cost}><QueryPlan>{body}</QueryPlan></StmtSimple></Statements>'
+            '</Batch></BatchSequence></ShowPlanXML>')
+
+
+_JOIN = """<RelOp PhysicalOp="Nested Loops" EstimateRows="1" EstimatedTotalSubtreeCost="0.5">
  <RelOp PhysicalOp="Clustered Index Scan" EstimateRows="1" EstimatedRowsRead="847">
   <IndexScan><Object Schema="[SalesLT]" Table="[Customer]" Index="[PK_Customer]"/></IndexScan></RelOp>
- <RelOp PhysicalOp="Table Scan" EstimateRows="1">
+ <RelOp PhysicalOp="Table Scan" EstimateRows="1" EstimateRebinds="0" EstimateRewinds="2">
   <TableScan><Object Schema="[dbo]" Table="[Heap]"/></TableScan></RelOp>
- <RelOp PhysicalOp="Clustered Index Seek" EstimateRows="1">
+ <RelOp PhysicalOp="Clustered Index Seek" EstimateRows="1" EstimateRebinds="846" EstimateRewinds="0">
   <IndexScan><Object Schema="[SalesLT]" Table="[Address]"/></IndexScan></RelOp>
-</RelOp></QueryPlan></StmtSimple></Statements></Batch></BatchSequence></ShowPlanXML>"""
+ <RelOp PhysicalOp="Columnstore Index Scan" EstimateRows="1" EstimatedRowsRead="5000">
+  <IndexScan><Object Schema="[dbo]" Table="[Facts]"/></IndexScan></RelOp>
+</RelOp>"""
 
 
-def test_mssql_reads_rows_read_and_names_the_scans_it_must_count():
-    read, cost, uncounted = read_showplan(_SHOWPLAN)
-    assert (read, cost, uncounted) == (848, 0.25, [("dbo", "Heap")])
+def test_mssql_reads_rows_read_per_execution_and_names_the_scans_it_must_count():
+    read, cost, uncounted = read_showplan(_showplan(_JOIN))
+    # 847 + an inner seek run 847 times + a columnstore scan; the heap is scanned 3 times from the catalog.
+    assert (read, cost, uncounted) == (847 + 847 + 5000, 0.25, [("dbo", "Heap", 3)])
+
+
+def test_mssql_cost_falls_back_to_the_plan_and_is_none_when_absent():
+    assert read_showplan(_showplan(_JOIN, cost=""))[1] == 0.5
+    bare = '<RelOp PhysicalOp="Clustered Index Scan" EstimatedRowsRead="1"><IndexScan/></RelOp>'
+    assert read_showplan(_showplan(bare, cost=""))[1] is None

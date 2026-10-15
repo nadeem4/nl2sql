@@ -423,7 +423,8 @@ class AdapterConformance:
     def test_kit_estimate_of_a_missing_table_raises(self, build):
         adapter = build()
         self._estimating(adapter)
-        with pytest.raises(Exception):
+        # RuntimeError is the contract: the engine's cost rule reads it as "no estimate".
+        with pytest.raises(RuntimeError):
             adapter.estimate(self._query(adapter, "SELECT id FROM {a}.kit_missing_table"), {})
 
     # --- Overlap (ProfilingAdapterProtocol) ----------------------------------

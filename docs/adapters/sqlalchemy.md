@@ -290,8 +290,14 @@ of up to `sample_rows` distinct non-null values of `left`, how many exist in
 `right`. One statement in SQLAlchemy Core, a `DISTINCT` sample with a limit
 and an `EXISTS` on `right`, on the adapter's own connections, so it runs
 read-only and under `limits.timeout_ms` wherever `session_setup` enforces
-them. A failure raises `RuntimeError` naming the columns and the driver's
-error class, never the driver's message, which can quote a sampled value.
+them. The value flag is computed in a subquery and only a plain column is
+aggregated, since SQL Server refuses an aggregate over a subquery. A failure
+raises `RuntimeError` naming the columns and the driver's error class, never
+the driver's message, which can quote a sampled value.
+
+The limit caps the sample, not the read: `DISTINCT` usually reads all of
+`left` before the limit applies, so on a large table only `timeout_ms`
+bounds the probe.
 
 The base has no `estimate`: reading a plan is the database's own. See
 [Adding `estimate`](development.md#adding-estimate).

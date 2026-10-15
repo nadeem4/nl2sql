@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, text
@@ -24,6 +24,8 @@ _STAGE_BY_MESSAGE = (
 )
 # Plan nodes that read through an index: each counts its own Plan Rows.
 _INDEX_SCANS = {"Index Scan", "Index Only Scan", "Bitmap Index Scan"}
+# What reading an unexpected plan raises: it becomes the same RuntimeError as a failed EXPLAIN.
+_UNREADABLE = (KeyError, TypeError, ValueError, AttributeError, IndexError)
 
 
 class PostgresConnection(SQLAlchemyConnection):
@@ -67,32 +69,39 @@ class PostgresAdapter(SQLAlchemyAdapter):
     def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
         """The rows ``sql`` reads, from ``EXPLAIN (FORMAT JSON, VERBOSE)``, without running it.
 
-        A ``Seq Scan`` counts its relation's ``pg_class.reltuples``, not its
-        ``Plan Rows``, which is what is left after the filter; an index scan
-        counts its ``Plan Rows``. A relation never analyzed (no
-        ``reltuples``) counts the planner's estimate of a scan of the whole
-        relation, which it makes from the relation's size on disk. ``cost``
-        is the plan's ``Total Cost``. Runs read-only, under ``statement_timeout``.
+        A ``Seq Scan`` counts its whole relation, not its ``Plan Rows``
+        (what is left after the filter): the ``Plan Rows`` of an unfiltered
+        scan of it, which the planner makes from ``pg_class.reltuples``
+        scaled to the relation's current size on disk, so a relation never
+        analyzed has one too. ``Index Scan``, ``Index Only Scan`` and
+        ``Bitmap Index Scan`` count their ``Plan Rows``. A scan on the inner
+        side of a ``Nested Loop`` counts once per outer row, unless a
+        ``Materialize`` keeps its rows. Not counted: ``Foreign Scan``,
+        ``Function Scan`` and scans under a correlated ``SubPlan`` more than
+        once. ``cost`` is the plan's ``Total Cost``. Runs read-only, under
+        ``statement_timeout``.
         """
         try:
             with self.engine.connect() as conn:
                 plan = _plan(self._run(conn, f"EXPLAIN (FORMAT JSON, VERBOSE) {sql}", parameters).scalar())
                 seq_scans, rows = scans(plan)
-                sizes: Dict[Tuple[str, str], int] = {}
-                for schema in {schema for schema, _ in seq_scans}:
-                    sizes.update({(schema, name): n for name, n in self.row_estimates(conn, schema).items()})
-                for relation in seq_scans:
-                    rows += sizes[relation] if relation in sizes else self._planned_size(conn, relation)
+                sizes = {(schema, name): self._planned_size(conn, schema, name)
+                         for schema, name, _ in seq_scans}
+            rows += sum(sizes[(schema, name)] * times for schema, name, times in seq_scans)
+            cost = plan.get("Total Cost")
+            return Estimate(rows=int(rows), cost=float(cost) if cost is not None else None,
+                            source="EXPLAIN (FORMAT JSON) and pg_class.reltuples")
         except SQLAlchemyError as exc:
             raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
-        return Estimate(rows=rows, cost=float(plan.get("Total Cost") or 0),
-                        source="EXPLAIN (FORMAT JSON) and pg_class.reltuples")
+        except _UNREADABLE as exc:
+            raise RuntimeError(f"{self} could not estimate the query: the plan could not be read "
+                               f"({type(exc).__name__})") from None
 
-    def _planned_size(self, conn: Connection, relation: Tuple[str, str]) -> int:
+    def _planned_size(self, conn: Connection, schema: str, name: str) -> int:
         """The planner's estimate of a relation's rows: ``Plan Rows`` of an unfiltered scan of it."""
         quote = conn.dialect.identifier_preparer.quote
-        name = f"{quote(relation[0])}.{quote(relation[1])}"
-        return int(_plan(conn.execute(text(f"EXPLAIN (FORMAT JSON) SELECT * FROM {name}")).scalar())["Plan Rows"])
+        return int(_plan(conn.execute(text(f"EXPLAIN (FORMAT JSON) SELECT * FROM {quote(schema)}.{quote(name)}"))
+                         .scalar())["Plan Rows"])
 
     def session_setup(self, dbapi_connection: Any) -> None:
         """Every transaction read-only, and ``limits.timeout_ms`` as the server's ``statement_timeout``.
@@ -139,18 +148,34 @@ def _plan(explained: Any) -> Dict[str, Any]:
     return (json.loads(explained) if isinstance(explained, str) else explained)[0]["Plan"]
 
 
-def _nodes(plan: Dict[str, Any]) -> Iterator[Dict[str, Any]]:
-    yield plan
-    for child in plan.get("Plans") or []:
-        yield from _nodes(child)
+def scans(plan: Dict[str, Any]) -> Tuple[List[Tuple[str, str, float]], float]:
+    """``(each Seq Scan's (schema, relation, times it runs), the rows the index scans read)``.
 
+    A node runs once per run of its parent, and the inner side of a
+    ``Nested Loop`` once per row of its outer side; below a ``Materialize``
+    the rows are read once per run of the loop above it.
+    """
+    seq_scans: List[Tuple[str, str, float]] = []
+    rows = 0.0
 
-def scans(plan: Dict[str, Any]) -> Tuple[List[Tuple[str, str]], int]:
-    """``(the (schema, relation) of each Seq Scan, the Plan Rows of the index scans added up)``."""
-    seq_scans, rows = [], 0
-    for node in _nodes(plan):
-        if node.get("Node Type") == "Seq Scan":
-            seq_scans.append((node["Schema"], node["Relation Name"]))
-        elif node.get("Node Type") in _INDEX_SCANS:
-            rows += int(node.get("Plan Rows") or 0)
+    def walk(node: Dict[str, Any], times: float, once: float) -> None:
+        nonlocal rows
+        kind = node.get("Node Type")
+        if kind == "Seq Scan":
+            seq_scans.append((node["Schema"], node["Relation Name"], times))
+        elif kind in _INDEX_SCANS:
+            rows += float(node.get("Plan Rows") or 0) * times
+        children = node.get("Plans") or []
+        if kind == "Nested Loop" and len(children) == 2:
+            outer, inner = children
+            walk(outer, times, times)
+            walk(inner, times * max(1.0, float(outer.get("Plan Rows") or 1)), times)
+            return
+        for child in children:
+            if kind == "Materialize":
+                walk(child, once, once)
+            else:
+                walk(child, times, once)
+
+    walk(plan, 1, 1)
     return seq_scans, rows

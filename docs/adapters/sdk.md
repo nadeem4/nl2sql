@@ -279,14 +279,18 @@ On the built-ins:
   built-ins and every adapter on the base have it. It is one statement in
   SQLAlchemy Core (a `DISTINCT` sample of `left` with a limit, and an
   `EXISTS` on `right`), run on the adapter's own connections, so read-only
-  and under `timeout_ms` wherever the adapter enforces them. A failure
-  raises `RuntimeError` naming the two columns and the driver's error
-  class, never the driver's message, which can quote a value.
+  and under `timeout_ms` wherever the adapter enforces them. The limit caps
+  the sample, not the read: `DISTINCT` can read all of `left`, so on a
+  large table the timeout is what bounds it. A failure raises
+  `RuntimeError` naming the two columns and the driver's error class, never
+  the driver's message, which can quote a value.
 - **`estimate`** is on PostgreSQL, MySQL, SQL Server and DuckDB, which
   declare `ESTIMATES_COST`. SQLite does not: `EXPLAIN QUERY PLAN` has no row
   estimates. Each reads the database's plan without running the query and
-  adds up what its scan operators read; the four adapter pages say how. A
-  failure raises `RuntimeError` with the driver's first line.
+  adds up what its scan operators read, per execution where the plan
+  gives the executions; the four adapter pages say how and what they do not
+  count. Every failure raises `RuntimeError`, which the cost rule reads as
+  "no estimate".
 
 ### Result types every adapter returns
 

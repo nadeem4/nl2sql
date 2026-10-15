@@ -21,6 +21,8 @@ LARGE = {
     "mysql": ("rental", "return_date < '1900-01-01'"),
     "mssql": ("SalesLT.Customer", "ModifiedDate < '1900-01-01'"),
 }
+# The same filter with the date as a bound parameter, as the engine passes values.
+BOUND = {name: (table, where.replace("'1900-01-01'", ":d")) for name, (table, where) in LARGE.items()}
 
 
 @pytest.fixture
@@ -62,6 +64,32 @@ def test_estimate_counts_rows_read_not_returned(server, adapter_for):
     assert estimate.rows is not None and estimate.rows >= total / 2, (estimate, total)
     assert estimate.cost is not None and estimate.cost > 0
     assert estimate.source
+
+
+def test_estimate_with_bound_parameters(server, adapter_for):
+    table, where = BOUND[server.name]
+    total = _admin(server, f"SELECT COUNT(*) FROM {table}")
+    estimate = adapter_for().estimate(f"SELECT * FROM {table} WHERE {where}", {"d": "1900-01-01"})
+    assert estimate.rows is not None and estimate.rows >= total / 2, (estimate, total)
+
+
+def test_estimate_leaves_no_session_reading_plans(server, adapter_for):
+    """After an estimate, a query returns rows, on the same adapter and on a new one (SQL Server's SHOWPLAN is reset)."""
+    table, where = LARGE[server.name]
+    adapter = adapter_for()
+    adapter.estimate(f"SELECT * FROM {table} WHERE {where}", {})
+    for one in (adapter, adapter_for(), adapter_for()):
+        result = one.execute_sql("SELECT 1 AS one")
+        assert result.columns == ["one"] and result.rows == [[1]], result
+
+
+def test_mysql_derived_table_is_not_counted_twice(server, adapter_for):
+    if server.name != "mysql":
+        pytest.skip("MySQL's EXPLAIN names a derived table beside the tables it reads")
+    total = _admin(server, "SELECT COUNT(*) FROM rental")
+    estimate = adapter_for().estimate(
+        "SELECT * FROM (SELECT rental_id, return_date FROM rental) dt WHERE dt.return_date < '1900-01-01'", {})
+    assert total / 2 <= estimate.rows <= total * 1.5, (estimate, total)
 
 
 def test_estimate_needs_no_write(server, adapter_for):
