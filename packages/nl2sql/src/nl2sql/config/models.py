@@ -96,7 +96,7 @@ AgentName = Literal[
     "ast_planner",
     "refiner",
     "answer_synthesizer",
-    "indexing_enrichment",
+    "profiler",  # drafting table and column descriptions, only with profile(draft=True) (Wave B, D44)
     "eval_seeder",  # seeding a draft eval suite (V3)
 ]
 
@@ -250,16 +250,37 @@ class Embeddings(_Model):
 
 # ---------------------------------------------------------------- policies
 
+CostAction = Literal["allow", "confirm", "refuse"]
+
+
+class CostRule(_Model):
+    """The cost guard (``policies.cost``): a limit on the rows a query is estimated to read.
+
+    ``over_limit``, and ``unknown`` (no estimate: not declared, failed, or no
+    rows), each ``allow``, ``confirm`` (a person approves, through Wave A's
+    approval) or ``refuse``. ``max_estimated_rows: null`` is no limit. On a
+    role, the fields it sets replace the top-level ones for that role. Enforced
+    by the built-in ``policy.cost`` hook from C2 (docs/architecture/wave_b.md,
+    section 9).
+    """
+
+    max_estimated_rows: Optional[PositiveInt] = None
+    over_limit: CostAction = "confirm"
+    unknown: CostAction = "allow"
+
+
 class Role(_Model):
     """What one role may read: allow and deny patterns over ``datasource.schema.table``.
 
     A pattern is ``*``, ``datasource`` or ``datasource.schema.table``, each part
-    a glob; matching ignores case. Deny beats allow within the role.
+    a glob; matching ignores case. Deny beats allow within the role. ``cost``
+    replaces, for this role, the fields of ``policies.cost`` it sets.
     """
 
     description: str
     allow: List[str] = Field(default_factory=list)
     deny: List[str] = Field(default_factory=list)
+    cost: Optional[CostRule] = None
 
     @field_validator("allow", "deny")
     @classmethod
@@ -284,6 +305,8 @@ class Policies(_Model):
     refusal_names_tables: bool = False
     roles: Dict[str, Role] = Field(default_factory=dict)
     check: Any = None  # a PolicyCheckConfig or a check object
+    # The cost guard; absent, no estimate is ever asked for. Valid beside allow_all, which opens tables, not cost.
+    cost: Optional[CostRule] = None
 
     @field_validator("check", mode="before")
     @classmethod
@@ -490,6 +513,38 @@ class FeedbackSettings(_Model):
     enabled: bool = True
 
 
+class KnowledgeSettings(_Model):
+    """How much knowledge reaches a prompt (read from K1 and K2)."""
+
+    item_max_chars: PositiveInt = 500  # one glossary text; longer is a load error
+    block_max_chars: PositiveInt = 4000  # the whole [BUSINESS_CONTEXT] block; cut by score, and traced
+    top_k: PositiveInt = 8  # matched terms kept per sub-query
+    match_floor: float = Field(0.6, ge=0.0, le=1.0)  # a term entry's similarity to match (K3)
+
+
+class ClarifySettings(_Model):
+    """Clarify instead of guess (read from L1)."""
+
+    enabled: bool = True
+
+
+class ProfilerSettings(_Model):
+    """The schema profiler's bounds (read from P1 and P2)."""
+
+    sample_rows: PositiveInt = 1000  # distinct values one overlap probe reads
+    max_probes: PositiveInt = 200  # overlap probes per datasource
+    time_budget_s: PositiveFloat = 60  # per datasource; no probe starts after it
+    min_overlap: float = Field(0.9, ge=0.0, le=1.0)
+    enum_max_distinct: PositiveInt = 50
+    max_cost_usd: PositiveFloat = 0.50  # drafting, per profile call
+
+
+class ReviewSettings(_Model):
+    """The review queue (read from Q1)."""
+
+    max_age_days: PositiveInt = 365  # decided proposals are purged after this
+
+
 class Settings(_Model):
     """Tuning knobs. Every field has a default, so the section is optional."""
 
@@ -505,6 +560,10 @@ class Settings(_Model):
     schema_: SchemaSettings = Field(default_factory=SchemaSettings, alias="schema")
     curated: CuratedSettings = Field(default_factory=CuratedSettings)
     feedback: FeedbackSettings = Field(default_factory=FeedbackSettings)
+    knowledge: KnowledgeSettings = Field(default_factory=KnowledgeSettings)
+    clarify: ClarifySettings = Field(default_factory=ClarifySettings)
+    profiler: ProfilerSettings = Field(default_factory=ProfilerSettings)
+    review: ReviewSettings = Field(default_factory=ReviewSettings)
 
 
 # ---------------------------------------------------------------- observers, hooks, evals
@@ -536,7 +595,15 @@ class HookConfig(_PluginBlock):
     approver_roles: Optional[List[str]] = None
 
 
-_EXAMPLE = {"an observer": "log", "a hook": "corp_sql_review"}
+class KnowledgeSourceConfig(_PluginBlock):
+    """One knowledge source, by name: ``KnowledgeSourceConfig(type="yaml", path="glossary.yaml")``.
+
+    The source's ``config_model`` checks the other keys. The engine builds and
+    loads its knowledge sources from K1 (docs/architecture/wave_b.md, section 3).
+    """
+
+
+_EXAMPLE = {"an observer": "log", "a hook": "corp_sql_review", "a knowledge source": "yaml"}
 
 
 def _entry(block: type, kind: str, method: str):
@@ -557,6 +624,8 @@ def _entry(block: type, kind: str, method: str):
 ObserverEntry = Annotated[Union[ObserverConfig, Any],
                           BeforeValidator(_entry(ObserverConfig, "an observer", "on_event"))]
 HookEntry = Annotated[Union[HookConfig, Any], BeforeValidator(_entry(HookConfig, "a hook", "__call__"))]
+KnowledgeEntry = Annotated[Union[KnowledgeSourceConfig, Any],
+                           BeforeValidator(_entry(KnowledgeSourceConfig, "a knowledge source", "load"))]
 
 # The built-in scorers (from V1): the default list.
 DEFAULT_SCORERS = ("result_match", "outcome", "faithfulness", "retrieval_recall", "routing")
@@ -615,6 +684,8 @@ class Config(_Model):
     observers: Optional[List[ObserverEntry]] = None
     hooks: List[HookEntry] = Field(default_factory=list)  # run in this order
     evals: EvalsConfig = Field(default_factory=EvalsConfig)
+    # The knowledge sources, in precedence order; [] (no section) means no knowledge.
+    knowledge: List[KnowledgeEntry] = Field(default_factory=list)
 
     # The folder of the nl2sql.yaml this config was loaded from, set by
     # load_config and kept by every copy; None when it was built in code.

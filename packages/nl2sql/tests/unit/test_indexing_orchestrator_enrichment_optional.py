@@ -90,7 +90,7 @@ def keyless_registry(monkeypatch) -> LLMRegistry:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     registry = LLMRegistry(SecretManager())
     registry.register_llm(
-        AgentConfig(name="indexing_enrichment", provider="openai", model="gpt-4o-mini")
+        AgentConfig(name="profiler", provider="openai", model="gpt-4o-mini")
     )
     return registry
 

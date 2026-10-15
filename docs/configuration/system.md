@@ -53,6 +53,7 @@ api:         { file: api.yaml }          # optional, read by nl2sql-api only
 observers:   { file: observers.yaml }    # optional: where events, logs and metrics go
 hooks:       { file: hooks.yaml }        # optional
 evals:       { file: evals.yaml }        # optional
+knowledge:   { file: knowledge.yaml }    # optional: where the glossary comes from (0.8)
 ```
 
 A small project can write every section inline instead. This file builds the
@@ -85,6 +86,7 @@ storage:    { path: .nl2sql }
 | `observers` | no | [below](#observers-hooks-and-evals) | A list. Absent means the default observers, `log` and `audit`; `[]` means none. |
 | `hooks` | no | [below](#observers-hooks-and-evals) | A list, run in its order. |
 | `evals` | no | [below](#observers-hooks-and-evals) | The eval suites, scorers and regression gate. |
+| `knowledge` | no | [below](#knowledge) | A list of knowledge sources, in precedence order. Absent (or `[]`) means no knowledge. |
 
 From Python:
 
@@ -108,7 +110,7 @@ See [Public Facade → Creating an engine](../api/core/public-facade.md#creating
 | No `version` | Only `nl2sql.yaml` has `version:`. |
 | Datasource folder | `datasources: {file: datasources/}` names a folder. Every `*.yaml` in it, sorted by name and not recursive, holds one datasource. `id` may be left out and defaults to the file name; if it is given, it must equal the file name. |
 | Datasource file | `datasources: {file: datasources.yaml}` names a file whose body is the list. |
-| List sections | `observers` and `hooks` are lists too: their file's body is the list. |
+| List sections | `observers`, `hooks` and `knowledge` are lists too: their file's body is the list. |
 | Literal paths | `file:` values are never interpolated. |
 | Each file once | Including the same file twice is an error. |
 
@@ -175,6 +177,30 @@ from nl2sql import Config, HookConfig, ObserverConfig
 
 Config(..., observers=[ObserverConfig(type="log"), MyObserver()],
        hooks=[HookConfig(type="corp_sql_review", points=["execute.before"]), MyHook()])
+```
+
+### Knowledge
+
+A section added for release 0.8 ([Wave B](../architecture/wave_b.md)): the
+knowledge sources the glossary comes from, in precedence order. It is
+accepted and validated now; the engine loads the sources from Wave B's K1.
+
+```yaml
+# knowledge.yaml: a list, in precedence order
+- type: yaml
+  path: glossary.yaml             # relative to nl2sql.yaml
+- type: corp_catalog              # a plugin; its config_model checks the rest
+  url: "${env:CATALOG_URL}"
+```
+
+| Section | Item | Rule |
+| --- | --- | --- |
+| `knowledge` | `{type: <name>, ...}` (`KnowledgeSourceConfig`) or a knowledge source object in code (one with `load`) | `type` names a registered knowledge source (`nl2sql.knowledge_sources`); its `config_model` checks the other keys and keeps their `${...}` references until it is built. A source only reads; `glossary.yaml` itself is data, not a config section. |
+
+```python
+from nl2sql import Config, KnowledgeSourceConfig
+
+Config(..., knowledge=[KnowledgeSourceConfig(type="yaml", path="glossary.yaml"), MySource()])
 ```
 
 ### Strict keys and errors

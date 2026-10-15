@@ -69,7 +69,7 @@ class IndexingOrchestrator:
         """
         Args:
             ctx: The engine's runtime.
-            enrich: Whether to ask the ``indexing_enrichment`` LLM for
+            enrich: Whether to ask the ``profiler`` LLM for
                 descriptions. Off by default: enrichment spends tokens, so
                 every caller turns it on only when asked.
         """

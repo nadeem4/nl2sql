@@ -28,6 +28,10 @@ PUBLIC_SURFACE = {
     "configure_logging", "TraceContextFilter",
     # Evals: suites, reports and the scorer interface
     "EvalSuite", "EvalCase", "EvalReport", "RegenerateReport", "GateResult", "Scorer", "Score", "CaseRun",
+    # Wave B: knowledge, the review queue, the profiler, clarification and the explanation
+    "KnowledgeSourceConfig", "CostRule", "KnowledgeSourceInfo", "DatasourceKnowledgeView", "Proposal",
+    "AcceptReport", "ReviewError", "ProfileReport", "ClarificationRequest", "ClarificationOption",
+    "ClarificationChoice", "Explanation", "ExplainedStep", "TermUse",
 }
 
 

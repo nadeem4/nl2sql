@@ -10,10 +10,11 @@ from nl2sql_sdk.schema import TableMetadata, ColumnMetadata
 from nl2sql.common.logger import get_logger
 from nl2sql.llm.wires import structured
 
-logger = get_logger("indexing_enrichment")
+logger = get_logger("profiler")
 
 # Name of the agent in the llm section of nl2sql.yaml that enrichment calls.
-ENRICHMENT_LLM_NAME = "indexing_enrichment"
+# The agent drafting descriptions; it moves to nl2sql/profiler/drafts.py with K3 (docs/architecture/wave_b.md, D44).
+ENRICHMENT_LLM_NAME = "profiler"
 
 
 class DatasourceEnrichment(BaseModel):
@@ -278,7 +279,7 @@ def enrich_schema_snapshot(
 
     Args:
         snapshot: Schema snapshot to enrich.
-        llm_registry: Registry the ``indexing_enrichment`` client is built from.
+        llm_registry: Registry the ``profiler`` client is built from.
         datasource_description: Operator-supplied description, if any.
         existing_questions: Example questions already configured.
         max_questions: Upper bound on the merged question list.

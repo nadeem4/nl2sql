@@ -5,7 +5,9 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from nl2sql.common.errors import PipelineError
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlanAlternative, PlanModel
+from nl2sql_sdk.models import Estimate
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
@@ -32,3 +34,10 @@ class SubgraphOutput(BaseModel):
     validation: List[ValidationCheck] = Field(default_factory=list)
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
     status: Optional[str] = None
+    # Wave B (docs/architecture/wave_b.md, D59): the knowledge the prompts carried (K2), the planner's
+    # other readings when the run did not ask (L1; the explanation lists them as assumptions) and
+    # the cost estimate the cost rule read (C2).
+    knowledge_used: Optional[KnowledgeUsed] = None
+    ambiguous_phrase: Optional[str] = None
+    alternatives: List[PlanAlternative] = Field(default_factory=list)
+    estimate: Optional[Estimate] = None

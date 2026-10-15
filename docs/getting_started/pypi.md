@@ -98,7 +98,7 @@ model: gpt-5.4
 temperature: 0.0
 # api_key is optional: without it OPENAI_API_KEY is read.
 agents:
-  indexing_enrichment: { model: gpt-5.4-mini }
+  profiler: { model: gpt-5.4-mini }
 ```
 
 To route chat through [OpenRouter](https://openrouter.ai) instead — one key for
@@ -165,7 +165,7 @@ engine.index.build(["runtime_pg"])
 The `description` is indexed as given, even though no file lists
 `runtime_pg`, and the datasource joins `engine.config`. Indexing makes no LLM call unless you ask for one:
 `engine.index.build(["runtime_pg"], enrich=True)` has the
-`indexing_enrichment` agent write descriptions for tables and columns the
+`profiler` agent write descriptions for tables and columns the
 database left without a comment.
 
 You can also add the datasources of another config:

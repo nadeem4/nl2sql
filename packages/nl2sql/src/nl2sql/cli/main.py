@@ -28,6 +28,9 @@ from nl2sql.cli.commands.config_check import app as config_app
 from nl2sql.cli.commands.feedback import app as feedback_app
 from nl2sql.cli.commands.eval import app as eval_app
 from nl2sql.cli.commands.storage import app as storage_app
+from nl2sql.cli.commands.knowledge import app as knowledge_app
+from nl2sql.cli.commands.review import app as review_app
+from nl2sql.cli.commands.profile import app as profile_app
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import configure_output_encoding
 from nl2sql.cli.types import RunConfig
@@ -47,6 +50,9 @@ app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cach
 app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
 app.add_typer(storage_app, name="storage", help="Retention for traces and results (`nl2sql storage purge`).")
 app.add_typer(eval_app, name="eval", help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `publish`.")
+app.add_typer(knowledge_app, name="knowledge", help="The glossary as the engine uses it (from 0.8).")
+app.add_typer(review_app, name="review", help="The review queue: proposals to accept or reject (from 0.8).")
+app.add_typer(profile_app, name="profile", help="Profile the indexed schema and file what it finds for review (from 0.8).")
 
 
 def _version_callback(value: bool) -> None:
@@ -165,7 +171,7 @@ def index(
     enrich: Annotated[bool, typer.Option(
         "--enrich",
         help=(
-            "Ask the indexing_enrichment LLM to write table and column descriptions where the "
+            "Ask the profiler LLM to write table and column descriptions where the "
             "database has none. Spends tokens; off by default."
         ),
     )] = False,

@@ -190,20 +190,25 @@ WAVE_A_EVENTS = {
     "datasource.failed", "index.started", "index.column_failed", "index.swapped", "index.failed",
     "schema.drifted", "retention.purged", "llm.changed", "eval.case", "eval.finished",
 }
+# docs/architecture/wave_b.md, section 11, added by its foundation PR (B0).
+WAVE_B_EVENTS = {
+    "knowledge.loaded", "knowledge.used", "clarification.requested", "cost.estimated", "profile.finished",
+    "proposal.created", "proposal.decided",
+}
 
 
-def test_the_catalog_lists_every_wave_a_event():
-    assert set(CATALOG) == WAVE_A_EVENTS
+def test_the_catalog_lists_every_wave_a_and_wave_b_event():
+    assert set(CATALOG) == WAVE_A_EVENTS | WAVE_B_EVENTS
     assert RUN_EVENTS == {"run.started", "run.finished", "run.failed", "node.started", "node.finished",
                           "answer.delta", "result.manifest", "llm.call", "llm.parse_retry",
                           "plan_cache.lookup", "policy.decision", "hook.decision", "run.limit_reached",
-                          "sanity.flagged"}
+                          "sanity.flagged", "knowledge.used", "clarification.requested", "cost.estimated"}
 
 
 def test_catalog_describes_each_event_with_its_json_schema():
     infos = {info.name: info for info in catalog()}
 
-    assert set(infos) == WAVE_A_EVENTS
+    assert set(infos) == WAVE_A_EVENTS | WAVE_B_EVENTS
     finished = infos["run.finished"]
     assert finished.description
     assert "status" in finished.data_schema["properties"]

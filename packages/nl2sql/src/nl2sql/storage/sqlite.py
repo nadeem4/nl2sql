@@ -1,8 +1,9 @@
 """The ``sqlite`` state store: ``<storage.path>/state.db``.
 
 Schema snapshots and the diffs between them, the plan cache, answer feedback,
-the migrations that build them, and a lock (docs/architecture/phase2.md,
-section 4; the diffs, docs/architecture/wave_a.md, section 10).
+the review queue's proposals, the migrations that build them, and a lock
+(docs/architecture/phase2.md, section 4; the diffs, docs/architecture/wave_a.md,
+section 10; proposals, wave_b.md, section 5).
 
 * **Snapshots are immutable.** A row is keyed by ``(datasource_id,
   schema_version)`` and never updated: new content is a new version, and
@@ -35,6 +36,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.schema.fingerprint import generate_schema_fingerprint
 from nl2sql.storage import NoKeys
 from nl2sql_sdk.schema import SchemaContract, SchemaDiff, SchemaMetadata, SchemaSnapshot
+from nl2sql_sdk.stores import Proposal, ProposalStatus
 
 logger = get_logger(__name__)
 
@@ -123,11 +125,28 @@ def _schema_diffs(connection: sqlite3.Connection) -> None:
     """)
 
 
+def _proposals(connection: sqlite3.Connection) -> None:
+    """The review queue (D41): one row per proposal, its fields as JSON, the filtered ones as columns too."""
+    connection.executescript("""
+        CREATE TABLE IF NOT EXISTS proposals (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL,
+            datasource_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            decided_at TEXT,
+            proposal_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals (status, created_at);
+    """)
+
+
 MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0001_adopt_0_5_tables", _adopt_0_5),
     ("0002_feedback_datasources_and_source", _feedback_datasources_and_source),
     ("0003_immutable_snapshots_and_locks", _immutable_snapshots_and_locks),
     ("0004_schema_diffs", _schema_diffs),
+    ("0005_proposals", _proposals),
 ]
 
 # -- feedback columns --------------------------------------------------------------
@@ -136,6 +155,15 @@ _FEEDBACK_COLUMNS = ("trace_id", "created_at", "rating", "note", "question", "ro
                      "error_codes", "retries", "validator_failures", "plan_cache_hits", "sub_queries",
                      "models", "engine_version", "datasource_ids", "source")
 _JSON_COLUMNS = ("sql", "error_codes", "models", "datasource_ids")
+
+
+def _utc(moment: Optional[datetime]) -> Optional[str]:
+    """``moment`` as sortable ISO text in UTC; a naive one is taken as UTC."""
+    if moment is None:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).isoformat(timespec="microseconds")
 
 
 def _locked(method):
@@ -149,7 +177,7 @@ def _locked(method):
 class SqliteState:
     """The built-in ``StateStore``, on one SQLite file (or ``:memory:``, for tests)."""
 
-    interface_version: ClassVar[int] = 2
+    interface_version: ClassVar[int] = 3
     slot: ClassVar[str] = "state"
     config_model: ClassVar[type] = NoKeys
 
@@ -344,6 +372,65 @@ class SqliteState:
         connection = self._conn()
         with connection:
             return connection.execute("DELETE FROM feedback;").rowcount
+
+    # -- proposals ---------------------------------------------------------------
+
+    @_locked
+    def put_proposal(self, proposal: Proposal) -> None:
+        """Stores ``proposal``, replacing the row with its ``id``."""
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO proposals (id, kind, datasource_id, status, created_at, decided_at, "
+                "proposal_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
+                (proposal.id, proposal.kind, proposal.datasource_id, proposal.status, _utc(proposal.created_at),
+                 _utc(proposal.decided_at), proposal.model_dump_json()))
+
+    @_locked
+    def get_proposal(self, proposal_id: str) -> Optional[Proposal]:
+        row = self._conn().execute("SELECT proposal_json FROM proposals WHERE id = ?;", (proposal_id,)).fetchone()
+        return Proposal.model_validate_json(row[0]) if row else None
+
+    @_locked
+    def list_proposals(self, kind: Optional[str] = None, status: Optional[str] = None,
+                       datasource_id: Optional[str] = None, limit: Optional[int] = None) -> List[Proposal]:
+        """The proposals matching every filter given, newest first."""
+        where, values = [], []
+        for column, value in (("kind", kind), ("status", status), ("datasource_id", datasource_id)):
+            if value is not None:
+                where.append(f"{column} = ?")
+                values.append(value)
+        sql = "SELECT proposal_json FROM proposals"
+        if where:
+            sql += " WHERE " + " AND ".join(where)
+        sql += " ORDER BY created_at DESC, id"
+        if limit is not None:
+            sql += " LIMIT ?"
+            values.append(int(limit))
+        return [Proposal.model_validate_json(row[0]) for row in self._conn().execute(sql + ";", values)]
+
+    @_locked
+    def decide_proposal(self, proposal_id: str, status: ProposalStatus, *, by: Optional[str],
+                        reason: Optional[str] = None, wrote: Optional[str] = None,
+                        at: Optional[datetime] = None) -> Optional[Proposal]:
+        """Records the decision on the proposal; None when there is no such id."""
+        proposal = self.get_proposal(proposal_id)
+        if proposal is None:
+            return None
+        decided = proposal.model_copy(update={
+            "status": status, "decided_by": by, "reason": reason, "wrote": wrote,
+            "decided_at": at or datetime.fromtimestamp(self.clock(), tz=timezone.utc)})
+        self.put_proposal(Proposal.model_validate(decided.model_dump()))
+        return decided
+
+    @_locked
+    def purge_proposals(self, older_than: datetime) -> int:
+        """Deletes the decided proposals decided before ``older_than``; returns how many."""
+        connection = self._conn()
+        with connection:
+            return connection.execute(
+                "DELETE FROM proposals WHERE status != 'proposed' AND decided_at < ?;",
+                (_utc(older_than),)).rowcount
 
     # -- the lock ----------------------------------------------------------------
 

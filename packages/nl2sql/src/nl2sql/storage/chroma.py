@@ -24,7 +24,7 @@ DIMENSION_KEY = "dimension"
 
 
 class ChromaIndex:
-    interface_version: ClassVar[int] = 2
+    interface_version: ClassVar[int] = 3
     slot: ClassVar[str] = "index"
     config_model: ClassVar[type] = NoKeys
 

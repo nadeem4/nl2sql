@@ -38,7 +38,7 @@ Loc = Tuple[Union[str, int], ...]
 _UNIONS = (Union, getattr(types, "UnionType", Union))
 
 # The sections whose body is a list, in nl2sql.yaml or in their own file.
-LIST_SECTIONS = ("datasources", "observers", "hooks")
+LIST_SECTIONS = ("datasources", "observers", "hooks", "knowledge")
 
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_-]*):([^{}]+)\}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")

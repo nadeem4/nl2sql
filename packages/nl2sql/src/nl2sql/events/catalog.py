@@ -260,6 +260,73 @@ class EvalFinished(EventData):
     gate: Optional[Dict[str, Any]] = None
 
 
+# ---------------------------------------------------------------- Wave B (docs/architecture/wave_b.md, section 11)
+
+class KnowledgeSourceData(EventData):
+    type: str
+    counts: Dict[str, Dict[str, int]] = Field(default_factory=dict)  # per datasource, per kind
+    sha256: Optional[str] = None
+
+
+class KnowledgeLoaded(EventData):
+    sources: List[KnowledgeSourceData] = Field(default_factory=list)
+    digests: Dict[str, str] = Field(default_factory=dict)  # per datasource
+    error: Optional[str] = None  # a reload that failed; the previous knowledge stayed live
+
+
+class KnowledgeUsedData(EventData):
+    sub_query_id: Optional[str] = None
+    datasource_id: str
+    terms: Dict[str, float] = Field(default_factory=dict)  # term name to its match score
+    rules: List[str] = Field(default_factory=list)  # rule ids
+    dropped: List[str] = Field(default_factory=list)  # cut by settings.knowledge.block_max_chars
+    digest: str
+
+
+class ClarificationRequested(EventData):
+    sub_query_id: Optional[str] = None
+    phrase: str
+    options: int
+
+
+class CostEstimated(EventData):
+    datasource_id: str
+    sub_query_id: Optional[str] = None
+    # Estimate.rows: the rows the query is expected to read. Not "rows": no event has a field of that
+    # name, so a result's rows can never ride along under it (D15).
+    estimated_rows: Optional[int] = None
+    cost: Optional[float] = None
+    limit: Optional[int] = None
+    decision: Literal["allow", "confirm", "refuse"]
+
+
+class ProfileFinished(EventData):
+    datasource_id: str
+    proposals: Dict[str, int] = Field(default_factory=dict)  # by kind
+    probes: int = 0
+    skipped_by_budget: int = 0
+    drafted: int = 0
+    stopped_by: Literal["done", "time_budget", "max_probes", "cost_cap"] = "done"
+    cost: Optional[float] = None
+    seconds: float = 0.0
+
+
+class ProposalCreated(EventData):
+    id: str
+    kind: str
+    datasource_id: str
+    origin: str
+
+
+class ProposalDecided(EventData):
+    id: str
+    kind: str
+    datasource_id: str
+    decision: Literal["accepted", "rejected"]
+    by: Optional[str] = None
+    wrote: Optional[str] = None
+
+
 # ---------------------------------------------------------------- the catalog
 
 class EventSpec(BaseModel):
@@ -354,6 +421,23 @@ CATALOG: Dict[str, EventSpec] = {
                          audit=True),
     "eval.case": _spec(EvalCase, "An eval case finished (V1).", run=False),
     "eval.finished": _spec(EvalFinished, "An eval run finished (V1).", run=False),
+    # Wave B. None is on the caller's stream (D17): they carry glossary text, options and estimates, operator
+    # matters. A caller learns of a clarification from the result run.finished carries.
+    "knowledge.loaded": _spec(KnowledgeLoaded, "The knowledge sources were loaded, at build or by "
+                                               "engine.knowledge.reload() (K1).", run=False),
+    "knowledge.used": _spec(KnowledgeUsedData, "A sub-query's prompts carried glossary terms and rules. "
+                                               "Published by the schema retriever (K2).", run=True),
+    "clarification.requested": _spec(ClarificationRequested, "A run ended asking which reading was meant. "
+                                                             "Published by the clarifier (L1).", run=True),
+    "cost.estimated": _spec(CostEstimated, "The database estimated a sub-query's rows read, and the cost rule "
+                                           "decided. Published by policy.cost (C2). The audit observer writes "
+                                           "confirm and refuse.", run=True, audit=True,
+                            audit_only={"decision": frozenset({"confirm", "refuse"})}),
+    "profile.finished": _spec(ProfileFinished, "A datasource's profile finished: its counts, never values. "
+                                               "Published by engine.knowledge.profile (P1).", run=False),
+    "proposal.created": _spec(ProposalCreated, "A proposal entered the review queue (Q1).", run=False),
+    "proposal.decided": _spec(ProposalDecided, "A proposal was accepted or rejected, by whom and into which "
+                                               "file (Q1).", run=False, audit=True),
 }
 
 RUN_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.run)

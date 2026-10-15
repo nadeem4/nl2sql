@@ -67,7 +67,7 @@ def test_a_model_missing_from_the_price_table_is_an_error_naming_config_node_and
 
 
 def test_an_unused_agent_does_not_need_a_price():
-    run.check_prices({"x": _cfg(indexing_enrichment="gpt-9-turbo")})
+    run.check_prices({"x": _cfg(profiler="gpt-9-turbo")})
 
 
 def test_the_built_in_presets_are_priced_verified_and_keyless():

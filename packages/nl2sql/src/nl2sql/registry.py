@@ -17,7 +17,8 @@ import importlib.util
 from importlib.metadata import EntryPoint, entry_points
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
-Kind = Literal["adapter", "llm", "embeddings", "secrets", "store", "policy_check", "observer", "hook", "scorer"]
+Kind = Literal["adapter", "llm", "embeddings", "secrets", "store", "policy_check", "observer", "hook", "scorer",
+               "knowledge_source"]
 
 # The entry point group each kind is installed under.
 GROUPS: Dict[str, str] = {
@@ -30,12 +31,14 @@ GROUPS: Dict[str, str] = {
     "observer": "nl2sql.observers",
     "hook": "nl2sql.hooks",
     "scorer": "nl2sql.scorers",
+    "knowledge_source": "nl2sql.knowledge_sources",
 }
 
 # The interface version this engine was built for, per kind. Anything else is
 # a load error: there are no minor versions and no window for old ones.
-INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 2,
-                                   "policy_check": 1, "observer": 1, "hook": 1, "scorer": 1}
+INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 3,
+                                   "policy_check": 1, "observer": 1, "hook": 1, "scorer": 1,
+                                   "knowledge_source": 1}
 
 # How a kind reads in a message.
 _LABELS: Dict[str, str] = {
@@ -48,6 +51,7 @@ _LABELS: Dict[str, str] = {
     "observer": "observer",
     "hook": "hook",
     "scorer": "scorer",
+    "knowledge_source": "knowledge source",
 }
 
 # The attribute naming the modules a kind needs before it can be built.
@@ -94,7 +98,7 @@ def missing_modules(kind: str, target: Any) -> List[str]:
 
 class Registry:
     """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores, policy
-    checks, observers, hooks and scorers."""
+    checks, observers, hooks, scorers and knowledge sources."""
 
     def __init__(self) -> None:
         self._installed: Dict[str, Dict[str, List[_Entry]]] = {kind: {} for kind in GROUPS}
@@ -148,6 +152,9 @@ class Registry:
     def add_scorer(self, name: str, cls: type, *, replace: bool = False) -> None:
         self._add("scorer", name, cls, replace)
 
+    def add_knowledge_source(self, name: str, cls: type, *, replace: bool = False) -> None:
+        self._add("knowledge_source", name, cls, replace)
+
     def adapter(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("adapter", name)
 
@@ -174,6 +181,9 @@ class Registry:
 
     def scorer(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("scorer", name)
+
+    def knowledge_source(self, name: str) -> Callable[[Any], Any]:
+        return self._decorator("knowledge_source", name)
 
     def _decorator(self, kind: str, name: str) -> Callable[[Any], Any]:
         def register(target: Any) -> Any:
