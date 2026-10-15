@@ -5504,7 +5504,8 @@ another trace format.</p>
 index <code>namespace</code>. <code>engine.storage.purge()</code> deletes the traces and results
 older than their store's <code>max_age_days</code>, and the audit observer's day files
 older than its own, and returns the counts,
-<code>{"traces": 3, "results": 12, "audit": 1}</code>. See
+<code>{"traces": 3, "results": 12, "audit": 1}</code>, which it also publishes as
+<code>retention.purged</code>. See
 <a href="../../../configuration/storage/#retention">Storage → Retention</a>.</p>
 <p><code>engine.traces.replay(trace)</code> re-runs a recorded question, answering every LLM
 call from the trace document (no model is called), on a runtime of its own so

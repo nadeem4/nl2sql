@@ -5177,7 +5177,7 @@ that is not in it cannot be published.</p>
 </tr>
 <tr>
 <td><code>llm.parse_retry</code></td>
-<td><code>agent</code>, <code>schema</code>, <code>attempt</code>, <code>errors</code></td>
+<td><code>agent</code>, <code>schema</code>, <code>attempt</code> (1 for the first retry), <code>errors</code> (the validation messages only, never the model's answer)</td>
 <td>no</td>
 </tr>
 <tr>
@@ -5187,7 +5187,7 @@ that is not in it cannot be published.</p>
 </tr>
 <tr>
 <td><code>policy.decision</code></td>
-<td>a denial: <code>datasource_id</code>, <code>schema</code>, <code>table</code>, <code>rule</code>, <code>step</code></td>
+<td>a denial: <code>datasource_id</code>, <code>schema</code>, <code>table</code> (both None for a datasource), <code>rule</code>, <code>step</code> (<code>logical_validator</code>, <code>curated_matcher</code> or <code>datasource_resolver</code>)</td>
 <td>no</td>
 </tr>
 <tr>
@@ -5197,12 +5197,79 @@ that is not in it cannot be published.</p>
 </tr>
 </tbody>
 </table>
-<p>Engine events (<code>datasource.failed</code>, <code>index.started</code>, <code>index.column_failed</code>,
-<code>index.swapped</code>, <code>index.failed</code>, <code>schema.drifted</code>, <code>retention.purged</code>,
-<code>llm.changed</code>, <code>eval.case</code>, <code>eval.finished</code>) carry no <code>trace_id</code>. Which PR
-of Wave A starts publishing each one is in its description; <code>node.*</code>,
-<code>answer.delta</code>, <code>result.manifest</code>, the three <code>run.*</code> events, <code>llm.call</code>,
-<code>plan_cache.lookup</code> and <code>llm.changed</code> are published today. While a
+<p>Engine events carry no <code>trace_id</code>: they happen outside any question and go
+on the engine's bus directly.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Data</th>
+<th>Published when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>datasource.failed</code></td>
+<td><code>datasource_id</code>, <code>stage</code>, <code>message</code>, <code>fix</code></td>
+<td>a connection check fails: the engine's start, <code>engine.check()</code> and <code>engine.datasources.test()</code> (by id, or with a <code>Datasource</code> it builds and tests)</td>
+</tr>
+<tr>
+<td><code>index.started</code></td>
+<td><code>datasource_id</code>, <code>namespace</code></td>
+<td><code>engine.index.build</code> starts one datasource</td>
+</tr>
+<tr>
+<td><code>index.column_failed</code></td>
+<td><code>datasource_id</code>, <code>table</code>, <code>column</code>, <code>stage</code>, <code>message</code></td>
+<td>one per issue the adapter reported (a column it could not profile, a table it could not reflect): the issue only, never the column's statistics or sample values. For the <code>values</code> and <code>profile</code> stages, whose driver message may quote a value, <code>message</code> is a fixed sentence and the error's type</td>
+</tr>
+<tr>
+<td><code>index.swapped</code></td>
+<td><code>datasource_id</code>, <code>namespace</code>, <code>build_id</code>, <code>schema_version</code>, <code>replaced_build_id</code>, <code>replaced_schema_version</code>, <code>counts</code> (entries by type)</td>
+<td>a datasource's new build goes live (audited)</td>
+</tr>
+<tr>
+<td><code>index.failed</code></td>
+<td><code>datasource_id</code>, <code>reason</code></td>
+<td>one datasource's build fails; its previous build stays live</td>
+</tr>
+<tr>
+<td><code>schema.drifted</code></td>
+<td><code>datasource_id</code>, <code>from_version</code>, <code>to_version</code>, <code>detected_by</code>, the diff's <code>counts</code></td>
+<td>not yet published (D1)</td>
+</tr>
+<tr>
+<td><code>retention.purged</code></td>
+<td><code>counts</code>: what <code>engine.storage.purge()</code> returned (<code>traces</code>, <code>results</code>, <code>audit</code>)</td>
+<td><code>engine.storage.purge()</code> ran (audited)</td>
+</tr>
+<tr>
+<td><code>llm.changed</code></td>
+<td><code>by</code>, <code>changes</code> (never a key)</td>
+<td><code>engine.llm.replace</code> (audited)</td>
+</tr>
+<tr>
+<td><code>eval.case</code>, <code>eval.finished</code></td>
+<td>see <a href="../../evals/">Evals</a></td>
+<td><code>engine.evals.run</code></td>
+</tr>
+</tbody>
+</table>
+<p>The driver and exception text in <code>datasource.failed</code> (<code>message</code>, <code>fix</code>),
+<code>index.failed</code> (<code>reason</code>) and <code>index.column_failed</code> (<code>message</code>) is redacted
+as a trace is: every secret the engine knows of, and every secret-shaped
+substring, such as the password in <code>scheme://user:password@host</code> or
+<code>user:password@host</code> and a <code>password=...</code> pair, becomes <code>[REDACTED]</code>.</p>
+<p><code>policy.decision</code> is published for denials only, and only where a refusal is
+enforced (the logical validator refusing a table of the plan, the curated
+matcher refusing a verified query, the datasource resolver refusing every
+datasource it was asked about). The validator publishes a refused table
+once per check, even when the plan names it twice. A scope asked only to filter (routing that
+skips some datasources, the schema retriever, the value check) publishes
+nothing, so the bus is not flooded with tables
+nobody asked for. Every catalogued event is published today except
+<code>run.limit_reached</code>, <code>sanity.flagged</code> and <code>schema.drifted</code>, whose Wave A
+PRs are named in their descriptions. While a
 <a href="../../configuration/hooks/">hook</a> is attached at <code>answer.after</code>, a run
 publishes no <code>answer.delta</code> and sends <code>result.manifest</code> only after the hooks
 allowed the answer (never, on a deny).</p>

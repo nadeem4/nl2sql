@@ -5668,7 +5668,8 @@ matching its patterns yourself, and leave out your database's system schemas.
 <code>on_table</code> is called with each table's <code>schema.table</code> as it is read, for
 progress.</p>
 <p>The snapshot's <code>issues</code> list holds an <code>IndexIssue</code> (<code>table</code>, <code>column</code>,
-<code>stage</code>, <code>message</code>) for each table or column indexed without something, and
+<code>stage</code>, <code>message</code>, and <code>error_type</code>, the exception's class name when an
+exception caused it) for each table or column indexed without something, and
 each table's <code>row_count_source</code> says where its <code>row_count</code> came from:
 <code>catalog</code> (an estimate) or <code>exact</code> (a count).</p>
 <h4 id="executerequest-adapterrequest-resultframe"><code>execute(request: AdapterRequest) -&gt; ResultFrame</code></h4>

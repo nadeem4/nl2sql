@@ -3230,7 +3230,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2 and V2 are built. Phase 1 is
+as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2 and E4 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -4066,6 +4066,58 @@ the list ends before it. That reads <code>scope.events</code> in
 rebuilt) and <code>nl2sql-api</code>'s stream route read the new names; each SSE
 <code>data</code> line is the whole event. The invariant <em>Events Carry No Rows, and
 the Stream Carries No Operator Data</em> is in <code>invariants.md</code>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: the Phase 2 events, published (E4)</p>
+<p>Engine events go through <code>ctx.bus</code> explicitly, never a context variable,
+because an index build and a purge run outside any <code>RunScope</code>; each
+carries the engine's <code>tenant_id</code>. <code>rebuild_index</code> wraps its
+<code>on_datasource</code> callback, so every <code>IndexProgress</code> it reports <code>started</code>
+publishes <code>index.started</code> (with <code>ctx.namespace</code>) and every <code>failed</code> one
+<code>index.failed</code> (a datasource that is unavailable, unknown, locked out by
+another build, or whose build raised). <code>IndexingOrchestrator</code> keeps
+<code>ctx.bus</code> and <code>ctx.tenant_id</code>: <code>index_datasource</code> publishes one
+<code>index.column_failed</code> per <code>IndexIssue</code> before the commit (<code>table</code>,
+<code>column</code>, <code>stage</code>, <code>message</code>: the issue, never the column's statistics or
+sample values, D15), and <code>_commit</code> publishes <code>index.swapped</code> after the
+pointer switch, with <code>counts</code> by entry type and the replaced pointer's
+<code>build_id</code> and <code>schema_version</code> (None on a first build), so a curated-only
+refresh publishes it too. <code>Runtime._published(status)</code> publishes
+<code>datasource.failed</code> for a failed <code>DatasourceStatus</code>; <code>check_datasource</code>
+returns through it, and <code>try_datasource</code> is now <code>_published</code> around
+<code>_try_datasource</code> (the old body), which is the whole <code>runtime.py</code> change.
+<code>StorageAPI.purge</code> publishes <code>retention.purged</code> with the counts it
+returns (audited, so the audit observer writes it to the current day's
+file after deleting the old ones). Run events use the module <code>publish</code>:
+<code>structured()</code>'s retry loop publishes <code>llm.parse_retry</code> before each retry
+(<code>attempt</code> 1 is the first retry; <code>errors</code> are pydantic's <code>path: message</code>
+lines, or the exception's type name, never the model's answer).
+<code>policy.decision</code> is published at the three enforcement points only
+(D16 amended): <code>LogicalValidatorNode._validate_policy</code> per refused table
+(<code>step: logical_validator</code>, <code>schema</code> the table's or the scope's default),
+<code>CuratedMatcherNode._check_access</code> on the refused table (<code>step:
+curated_matcher</code>; it now asks <code>scope.rule_for</code>, which <code>allows</code> wraps),
+and the resolver when the role check refuses every datasource it was
+asked about: every registered one before the routing search (R1's
+scope filter), or the explicit or only one (<code>_publish_refusals</code>, one
+per datasource, <code>schema</code> and <code>table</code> None,
+<code>step: datasource_resolver</code>, <code>rule</code> naming the roles or the policy
+check). The resolver's re-check after <code>datasources.after</code> hooks publishes
+nothing; the hook's own <code>hook.decision</code> covers it. After review:
+<code>datasource.failed</code> (<code>message</code>, <code>fix</code>), <code>index.failed</code> and
+<code>index.column_failed</code> run their text through
+<code>nl2sql.tracing.trace.redact_for(ctx, text)</code> (the trace's <code>Redactor</code> with
+<code>collect_secrets(ctx)</code>; its patterns now also catch a bare
+<code>user:password@host</code>). For the <code>values</code> and <code>profile</code> stages,
+<code>index.column_failed</code>'s <code>message</code> is a fixed sentence plus the new
+<code>IndexIssue.error_type</code> (SDK, optional, set by the SQLAlchemy base), so a
+cast error quoting a cell value never reaches the bus. The rule comes
+from the new <code>Scope.datasource_rule()</code> (<code>reaches_datasource</code> is
+<code>datasource_rule() is None</code>), which names a failed policy check, and the
+validator publishes once per (schema, table, rule). Test fakes that build
+an orchestrator or call <code>rebuild_index</code> need <code>bus</code> and <code>tenant_id</code>
+(<code>tests/unit/index_helpers.py</code>'s <code>TestIndex</code> has them). Tests:
+<code>tests/unit/test_phase2_events.py</code>.</p>
 </div>
 <h2 id="4-observers">4. Observers</h2>
 <h3 id="the-registry-kind-and-the-config">The registry kind and the config</h3>
