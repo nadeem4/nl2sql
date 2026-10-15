@@ -192,10 +192,10 @@ def test_ask_never_returns_exception_text():
         {"node": "logical_validator", "message": "You do not have permission to see the data.",
          "error_code": "SECURITY_VIOLATION", "severity": "ERROR"}], warnings=[
         # An earlier attempt a retry recovered from, and an answer check's own warning.
-        {"node": "executor", "message": "no such column: password=hunter2", "error_code": "EXECUTION_FAILED",
-         "severity": "ERROR", "sub_query_id": "sq1"},
+        {"node": "executor", "message": "no such column: password=hunter2", "code": "EXECUTION_FAILED",
+         "sub_query_id": "sq1", "detail": {"recovered": True}},
         {"node": "aggregator", "message": "Sub-query 'sq1' returned 1000 rows, the row cap.",
-         "error_code": "RESULT_TRUNCATED", "severity": "WARNING"}]))
+         "code": "RESULT_TRUNCATED"}]))
     raised = _Engine(RuntimeError("could not connect to postgres://admin:hunter2@db"))
 
     run = _call(crashed, ADMIN, "ask", question="q")
