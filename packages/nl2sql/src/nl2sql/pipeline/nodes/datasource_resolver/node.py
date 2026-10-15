@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
-from langchain_core.documents import Document
 from nl2sql.policies import UserContext
 from nl2sql.common.logger import get_logger
 from nl2sql.hooks import hooks_of
@@ -20,10 +19,6 @@ from .schemas import AnswerabilityResponse, DatasourceResolverResponse, Resolved
 
 logger = get_logger("datasource_resolver")
 
-# Table names per datasource the decomposer is shown; the rest are counted, so
-# a large schema does not bloat its prompt.
-MAX_DECOMPOSER_TABLES = 30
-
 
 class DatasourceResolverNode:
     """Picks the datasources a question goes to, and refuses what none can answer.
@@ -32,15 +27,19 @@ class DatasourceResolverNode:
 
     1. Candidates. An explicit ``datasource_id`` is used as given. With exactly
        one datasource registered, that one is used without a vector search.
-       Otherwise a vector search over the datasource entries picks them.
+       Otherwise routing (``Retriever.route``) ranks the datasources the
+       caller's scope reaches, and only those: a datasource the role may not
+       read is never searched. ``settings.routing.candidates`` and
+       ``floor_ratio`` bound what it returns.
     2. The role check: candidates the caller's role may not read are dropped;
        none left is a ``SECURITY_VIOLATION``, before any model call.
     3. The answerability check: one small structured LLM call over the allowed
        candidates' descriptions and table lists. An empty verdict ends the run
-       with ``QUESTION_NOT_ANSWERABLE`` before the decomposer. After a vector
-       search only the datasources the verdict names (and the role may read)
-       go forward, each with its description and a capped table list for the
-       decomposer.
+       with ``QUESTION_NOT_ANSWERABLE`` before the decomposer. After routing
+       only the datasources the verdict names (and the role may read) go
+       forward, at most ``settings.routing.max_datasources`` of them in fused
+       order, each with its description and a table list for the decomposer
+       capped at ``settings.retrieval.decomposer_tables``.
 
     Each datasource's schema version and snapshot are its live build's, read
     through the run's pinned index pointers (``ctx.vector_store``), never the
@@ -53,6 +52,8 @@ class DatasourceResolverNode:
         self.policy_engine = ctx.policy_engine
         self.ds_registry = ctx.ds_registry
         self.hooks = hooks_of(ctx)
+        self.routing = ctx.settings.routing
+        self.decomposer_tables = ctx.settings.retrieval.decomposer_tables
         # Registered as agent "datasourceresolver"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.answerability_chain = ANSWERABILITY_PROMPT | structured(self.llm, AnswerabilityResponse)
@@ -93,24 +94,6 @@ class DatasourceResolverNode:
                 )
             ],
         }
-
-    def _get_candidate_datasources(
-        self,
-        candidate_docs: list[Document],
-    ) -> Dict[str, ResolvedDatasource]:
-        candidate_datasources: Dict[str, ResolvedDatasource] = {}
-        for doc in candidate_docs:
-            ds_id = doc.metadata.get("datasource_id")
-            if not ds_id or ds_id in candidate_datasources:
-                continue
-            candidate_datasources[ds_id] = ResolvedDatasource(
-                datasource_id=ds_id,
-                # Sorted: the decomposer prints this into its prompt, and the
-                # vector store returns it in no fixed order.
-                metadata=dict(sorted(doc.metadata.items())),
-                schema_version=self.vector_store.schema_version(ds_id),
-            )
-        return candidate_datasources
 
     def _get_allowed_datasource_ids(
         self,
@@ -163,8 +146,8 @@ class DatasourceResolverNode:
         description, tables = self._summary(user_context, datasource.datasource_id)
         return datasource.model_copy(update={
             "description": description,
-            "tables": tables[:MAX_DECOMPOSER_TABLES],
-            "more_tables": max(0, len(tables) - MAX_DECOMPOSER_TABLES),
+            "tables": tables[:self.decomposer_tables],
+            "more_tables": max(0, len(tables) - self.decomposer_tables),
         })
 
     def _judge_answerability(self, user_context: UserContext, question: str,
@@ -272,10 +255,23 @@ class DatasourceResolverNode:
                         severity=ErrorSeverity.ERROR,
                         error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED,
                     )
-                candidate_docs = self.vector_store.retrieve_datasource_candidates(
-                    state.user_query, k=5, explain=searches
+                # The scope filter comes before the search: a datasource the
+                # caller may not read is never searched, so it never ranks.
+                reachable = self._get_allowed_datasource_ids(state.user_context, registered_ids)
+                if not reachable:
+                    return self._error_response(
+                        resolved_datasources=[],
+                        allowed_ids=[],
+                        unsupported_ids=[],
+                        message="No allowed datasources.",
+                        severity=ErrorSeverity.CRITICAL,
+                        error_code=ErrorCode.SECURITY_VIOLATION,
+                    )
+                routed = self.vector_store.route(
+                    state.user_query, reachable, explain=searches,
+                    limit=self.routing.candidates, floor_ratio=self.routing.floor_ratio,
                 )
-                candidates = list(self._get_candidate_datasources(candidate_docs).values())
+                candidates = [self._direct_candidate(c.datasource_id) for c in routed]
                 if not candidates:
                     message = "No datasource candidates resolved."
                     if self._index_is_empty():
@@ -295,7 +291,7 @@ class DatasourceResolverNode:
                         error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED,
                     )
                 searched = True
-                how = "Ranked by vector similarity."
+                how = "Ranked by routing: five signals fused with reciprocal rank fusion."
 
             candidate_ids = [c.datasource_id for c in candidates]
             unsupported_ids = self._get_unsupported_datasources(candidate_ids)
@@ -318,8 +314,10 @@ class DatasourceResolverNode:
             if searched:
                 # Only what the verdict accepted goes forward, and only what
                 # the role may read: the verdict cannot add a datasource.
+                # At most max_datasources, the best by fused score first.
                 answerable = set(verdict.answerable_datasource_ids)
-                forward_ids = [ds_id for ds_id in allowed_ids if ds_id in answerable]
+                forward_ids = [ds_id for ds_id in allowed_ids
+                               if ds_id in answerable][:self.routing.max_datasources]
             else:
                 # One candidate, chosen without a search: a non-empty verdict
                 # accepts it.
@@ -339,8 +337,8 @@ class DatasourceResolverNode:
                 response["reasoning"] = [{"node": self.node_name, "content": f"Not answerable: {verdict.reason}"}]
                 return response
 
-            # Sorted by id: the decomposer prints these into its prompt, and
-            # the vector store returns them in no fixed order.
+            # Sorted by id: the decomposer prints these into its prompt, so the
+            # same datasources give the same prompt whatever their fused order.
             forwarded = sorted(
                 (self._with_context(state.user_context, c) for c in candidates if c.datasource_id in forward_ids),
                 key=lambda c: c.datasource_id,

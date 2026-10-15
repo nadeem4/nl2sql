@@ -9,7 +9,8 @@ from nl2sql.runtime import Runtime
 
 
 # The entry types the index holds, in the order the inspector lists them.
-ENTRY_TYPES = ["schema.datasource", "schema.table", "schema.column", "schema.relationship", "schema.metric"]
+ENTRY_TYPES = ["schema.datasource", "schema.datasource_example", "schema.table", "schema.column",
+               "schema.relationship", "schema.metric"]
 
 
 class IndexAPI:

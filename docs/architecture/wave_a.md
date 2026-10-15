@@ -1283,6 +1283,48 @@ The answerability verdict is unchanged in shape (it already returns a list):
 it may pick several of the candidates, and the resolver forwards at most
 `max_datasources` of them, in fused order.
 
+!!! note "Built: entries, votes, fusion and the retrieval settings (R1)"
+    - **Entries.** `DatasourceExampleChunk` (`schema.datasource_example`) in
+      `indexing/models.py`; `build_example_chunks(datasource_id, questions,
+      schema_version)` in `indexing/chunk_builder.py` takes the question list
+      from its caller (`SchemaChunkBuilder` passes the orchestrator's
+      `sample_questions`, or enrichment's), so Wave B adds the glossary's
+      `examples` to that list without changing it. Blank and repeated
+      questions are skipped; ids hash the question. `DatasourceChunk` lost
+      `examples`. `ENTRY_TYPES` lists the new type.
+    - **Routing.** `Retriever.route(question, datasource_ids, explain=None, *,
+      limit=5, floor_ratio=0.5) -> list[RouteCandidate]` replaces
+      `retrieve_datasource_candidates`, which is deleted. `limit` and
+      `floor_ratio` are keyword arguments the resolver fills from
+      `settings.routing.candidates` and `floor_ratio` (the retriever reads no
+      settings). `RouteCandidate` (`datasource_id`, `score`, `ranks`) is in
+      `indexing/models.py`; `ROUTE_SIGNALS`, `fuse(rankings, rrf_k)` and
+      `shortlist(fused, limit, floor_ratio)` are module functions in
+      `indexing/retrieval.py`; `VOTE_K = 20` and `RRF_K = 60` are on
+      `Retriever`. The trace gets one `route.<signal>` record per signal and a
+      `routing` record (`signals`, `fused`, `picks`, `dropped` with `floor` or
+      `limit`, `rrf_k`, `vote_k`, `candidates`, `floor_ratio`).
+    - **The resolver.** The scope filter runs before routing: no reachable
+      datasource is a `SECURITY_VIOLATION` with no search. It forwards at most
+      `max_datasources` of the accepted candidates, best by fused score; the
+      forwarded list stays sorted by id, so the decomposer's prompt does not
+      depend on the fused order. `ResolvedDatasource.metadata` is empty on
+      every path now (it held the datasource entry's metadata, which nothing
+      read). `MAX_DECOMPOSER_TABLES` is `settings.retrieval.decomposer_tables`.
+    - **The schema retriever** reads `settings.retrieval.table_k` and
+      `planning_k`; `TABLE_K` and `PLANNING_K` are deleted.
+    - **The retrieval scorers** (`evaluation/scorers/retrieval_recall.py`,
+      after V1): `routed()` ranks with `route` under `settings.routing`
+      (then cut at the caller's limit, `max_datasources` in mode
+      `retrieval`), and `retrieval_settings()` reads `settings.retrieval`.
+    - **Baseline.** The 0.6 retrieval baseline, recorded on `main` before any
+      of this changed, is
+      `benchmarks/retrieval/chinook/2026-10-15_653fa73_retrieval.json`:
+      table recall 0.9767, column recall 0.7185 and
+      `datasource_top1_accuracy` 0.9535 (41 of 43 Chinook questions; the two
+      misses went to `support`), over the demo's three datasources with the
+      local embeddings.
+
 ### Limits
 
 ```yaml

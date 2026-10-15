@@ -115,7 +115,7 @@ The share of each answerable gold question's needed tables and columns that sche
 
 | Database | Date (UTC) | Commit | Table recall | Column recall | Δ vs previous |
 | --- | --- | --- | --- | --- | --- |
-| chinook | 2026-09-22 | 571cd16 | 98.5% | 72.6% | first run |
+| chinook | 2026-10-15 | 653fa73 | 97.7% | 71.9% | new series (dataset changed) |
 
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->

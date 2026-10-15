@@ -15,6 +15,7 @@ import pytest
 
 from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql.indexing.models import RouteCandidate
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
 from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
@@ -55,10 +56,6 @@ SNAPSHOTS = {
 }
 
 
-def _doc(ds_id):
-    return SimpleNamespace(metadata={"datasource_id": ds_id, "schema_version": "v1"})
-
-
 class SpyStore:
     """A vector store that records every search. Every datasource's live build is at v1."""
 
@@ -66,9 +63,10 @@ class SpyStore:
         self.searches = []
         self.ds_ids = list(ds_ids)
 
-    def retrieve_datasource_candidates(self, query, k=5, explain=None):
-        self.searches.append(query)
-        return [_doc(ds_id) for ds_id in self.ds_ids]
+    def route(self, question, datasource_ids, explain=None, **_settings):
+        """Ranks the datasources it is asked about in ``ds_ids`` order."""
+        self.searches.append(question)
+        return [RouteCandidate(datasource_id=ds_id, score=1.0) for ds_id in self.ds_ids if ds_id in datasource_ids]
 
     def schema_version(self, ds_id):
         return "v1"

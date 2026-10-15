@@ -1,13 +1,12 @@
-"""Datasource candidates come from every datasource entry, not an approximate search.
+"""Routing's description signal reads every datasource entry, not an approximate search.
 
 There is one ``schema.datasource`` entry per datasource, a handful among
 hundreds of table, column and verified-query entries. An index store's nearest-neighbour
 search with a ``where`` filter is approximate (HNSW), and with so few entries
-passing the filter it can return fewer than exist: a datasource then silently
-drops out of the candidates. Since the resolver forwards only what the
-answerability verdict names among the candidates, a missing candidate refuses a
-question its datasource could answer. The datasource search therefore ranks
-every datasource entry exactly.
+passing the filter it can return fewer than exist: a datasource would then
+silently lose its description vote. The description search in
+``Retriever.route`` therefore ranks every datasource entry exactly, so every
+datasource the caller reaches is ranked at least once.
 """
 from __future__ import annotations
 
@@ -15,6 +14,8 @@ from index_helpers import Chunk, TestIndex  # same directory
 from test_retrieval_trace import BagEmbeddings  # same directory
 
 from nl2sql.indexing.retrieval import Retriever
+
+IDS = ["chinook", "support", "webanalytics"]
 
 
 class LossyIndex:
@@ -43,23 +44,24 @@ def _store(tmp_path) -> Retriever:
     return index.retriever()
 
 
-def test_a_datasource_the_approximate_search_misses_is_still_a_candidate(tmp_path):
+def test_a_datasource_the_approximate_search_misses_is_still_ranked(tmp_path):
     store = _store(tmp_path)
     store.index = LossyIndex(store.index, "chinook")
 
-    docs = store.retrieve_datasource_candidates("Top 500 customers by sales in 2012", k=5)
+    routed = store.route("Top 500 customers by sales in 2012", IDS, floor_ratio=0.0)
 
-    assert sorted(d.metadata["datasource_id"] for d in docs) == ["chinook", "support", "webanalytics"]
+    assert sorted(c.datasource_id for c in routed) == IDS
+    assert next(c for c in routed if c.datasource_id == "chinook").ranks == {"description": 1}
 
 
 def test_the_exact_ranking_puts_the_nearest_datasource_first_and_records_it(tmp_path):
     store = _store(tmp_path)
     explain: list = []
 
-    docs = store.retrieve_datasource_candidates("music sales invoice", k=5, explain=explain)
+    store.route("music sales invoice", IDS, explain=explain, floor_ratio=0.0)
 
-    [record] = explain
-    assert record["search"] == "datasources"
+    record = explain[0]
+    assert record["search"] == "route.description"
     assert record["pool"][0]["datasource_id"] == "chinook"
     assert [p["similarity"] for p in record["pool"]] == sorted((p["similarity"] for p in record["pool"]), reverse=True)
-    assert {d.metadata["datasource_id"] for d in docs} == {"chinook", "support", "webanalytics"}
+    assert {p["datasource_id"] for p in record["pool"]} == set(IDS)

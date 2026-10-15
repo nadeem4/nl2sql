@@ -34,4 +34,5 @@ and no LLM. Mean over questions; tables and columns sent are means too.
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Questions | Table recall | Column recall | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-15 13:05:04 | 653fa73 | 0.6 baseline before Phase R (R1) | chinook_gold.yaml @8be35a10 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 43 | 97.7% | 71.9% | new series (dataset changed) | 8.2 / 24.1 |
 | 2026-09-22 03:39:36 | 571cd16 | first retrieval baseline | chinook_gold.yaml @7d104084 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 39 | 98.5% | 72.6% | first run | 8.3 / 24.2 |

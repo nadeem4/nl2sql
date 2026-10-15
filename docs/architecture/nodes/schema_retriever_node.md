@@ -92,9 +92,9 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. Build semantic query with `_build_semantic_query()`.
-2. Retrieve table/metric chunks via `retrieve_schema_context()`.
-3. If no table chunks, retrieve columns via `retrieve_column_candidates()`.
-4. If tables are identified, retrieve columns/relationships via `retrieve_planning_context()`.
+2. Retrieve table/metric chunks via `retrieve_schema_context()`, `k = settings.retrieval.table_k` (8).
+3. If no table chunks, retrieve columns via `retrieve_column_candidates()`, `k = table_k`.
+4. If tables are identified, retrieve columns/relationships via `retrieve_planning_context()`, `k = settings.retrieval.planning_k` (12).
 5. Resolve schema snapshot via `_resolve_snapshot()`.
 6. Build `Table` objects with `_build_tables_from_snapshot()`.
 7. If no tables were found, return full snapshot with warning.
@@ -181,7 +181,7 @@ Key contracts:
 
 ## Configuration
 
-- No direct settings used in this node.
+- `settings.retrieval.full_snapshot_max_tables`, `table_k` and `planning_k` (see [Settings](../../configuration/settings.md#retrieval)).
 - Vector store configuration is set in `Runtime`.
 
 ---

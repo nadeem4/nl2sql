@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, 
 import numpy as np
 from langchain_core.documents import Document
 
-from nl2sql.indexing.models import VerifiedQueryCandidate
+from nl2sql.indexing.models import RouteCandidate, VerifiedQueryCandidate
 from nl2sql_sdk.stores import BuildPointer, Filter, Hit
 
 if TYPE_CHECKING:
@@ -41,6 +41,54 @@ if TYPE_CHECKING:
 _ROUND = 4
 
 CURATED_TYPE = "curated.verified_query"
+
+# Routing's signals, in the order they are searched and recorded, and the entry
+# type each one searches. Each ranks datasources by their best entry.
+ROUTE_SIGNALS: Dict[str, str] = {
+    "description": "schema.datasource",
+    "examples": "schema.datasource_example",
+    "curated": CURATED_TYPE,
+    "tables": "schema.table",
+    "columns": "schema.column",
+}
+
+
+def fuse(rankings: Mapping[str, Sequence[str]], rrf_k: int) -> List[RouteCandidate]:
+    """Reciprocal rank fusion: ``score(ds) = sum over signals of 1 / (rrf_k + rank)``, best first.
+
+    ``rankings`` maps a signal to its datasource ids, best first. A datasource
+    a signal did not rank adds nothing from it. Ties go to the smaller id.
+    """
+    scores: Dict[str, float] = {}
+    ranks: Dict[str, Dict[str, int]] = {}
+    for signal, ranked in rankings.items():
+        for rank, datasource_id in enumerate(ranked, start=1):
+            scores[datasource_id] = scores.get(datasource_id, 0.0) + 1.0 / (rrf_k + rank)
+            ranks.setdefault(datasource_id, {})[signal] = rank
+    order = sorted(scores, key=lambda ds: (-scores[ds], ds))
+    return [RouteCandidate(datasource_id=ds, score=scores[ds], ranks=ranks[ds]) for ds in order]
+
+
+def shortlist(fused: Sequence[RouteCandidate], limit: int,
+              floor_ratio: float) -> Tuple[List[RouteCandidate], List[Dict[str, str]]]:
+    """The top ``limit`` of ``fused``, without any scoring under ``floor_ratio`` times the best.
+
+    Returns the kept candidates and, for the trace, each dropped datasource
+    with why: ``floor`` or ``limit``.
+    """
+    if not fused:
+        return [], []
+    floor = floor_ratio * fused[0].score
+    kept: List[RouteCandidate] = []
+    dropped: List[Dict[str, str]] = []
+    for candidate in fused:
+        if candidate.score < floor:
+            dropped.append({"datasource_id": candidate.datasource_id, "reason": "floor"})
+        elif len(kept) >= limit:
+            dropped.append({"datasource_id": candidate.datasource_id, "reason": "limit"})
+        else:
+            kept.append(candidate)
+    return kept, dropped
 
 
 def namespace_for(info: "EmbeddingInfo") -> str:
@@ -93,7 +141,7 @@ def maximal_marginal_relevance(query: Sequence[float], vectors: Sequence[Sequenc
 def entry_label(metadata: Mapping[str, Any]) -> str:
     """A short readable name for an index entry: the datasource, table, column or join."""
     kind = metadata.get("type") or ""
-    if kind == "schema.datasource":
+    if kind in ("schema.datasource", "schema.datasource_example"):
         return str(metadata.get("datasource_id") or "")
     if kind == "schema.column":
         return f"{metadata.get('table')}.{metadata.get('column')}"
@@ -130,6 +178,11 @@ class Retriever:
     FETCH_MULTIPLIER = 4
     LAMBDA_MULT = 0.7
     CURATED_FETCH_MULTIPLIER = 10
+    # Routing (route): the entries each vote search reads, and the reciprocal
+    # rank fusion constant (the value the RRF literature uses). Constants until
+    # the routing suite shows a reason to tune them (D28).
+    VOTE_K = 20
+    RRF_K = 60
 
     def __init__(self, index: "IndexStore", namespace: str, embeddings: Any,
                  pointers: Mapping[str, BuildPointer], state: Any = None):
@@ -259,14 +312,90 @@ class Retriever:
 
     # ------------------------------------------------------------ the pipeline's searches
 
-    def retrieve_datasource_candidates(self, query: str, k: int = 3,
-                                       explain: Optional[List[Dict[str, Any]]] = None) -> List[Document]:
-        """The datasource entries most like ``query``, one per datasource."""
-        where = Filter(eq={"type": "schema.datasource"}, **{"in": self._live()})
-        # Exact: one entry per datasource, a handful among hundreds, and
-        # approximate search under a filter that selective can miss one,
-        # which would drop that datasource from the question's routing.
-        return self._search("datasources", query, where, k, explain, {"types": ["schema.datasource"]}, exact=True)
+    def route(self, question: str, datasource_ids: Sequence[str],
+              explain: Optional[List[Dict[str, Any]]] = None, *,
+              limit: int = 5, floor_ratio: float = 0.5) -> List[RouteCandidate]:
+        """The datasources ``question`` most likely needs, best first (docs/architecture/wave_a.md, section 9).
+
+        Five searches (:data:`ROUTE_SIGNALS`) run over the live builds of
+        ``datasource_ids`` only, so a datasource the caller's scope does not
+        reach is never searched, let alone ranked. Each ranks datasources by
+        their best entry: the description over every datasource entry,
+        exactly; the example questions, verified queries, tables and columns
+        over their ``VOTE_K`` nearest entries. The ranks are fused with
+        reciprocal rank fusion (``RRF_K``), and the top ``limit`` are kept,
+        less any scoring under ``floor_ratio`` times the best.
+
+        ``explain`` gets one record per signal (``route.<signal>``: the pool
+        by similarity, each datasource's best entry picked) and a ``routing``
+        record: each signal's ranking, the fused scores, the picks and what
+        was dropped and why.
+        """
+        from nl2sql.common.resilience import VECTOR_BREAKER
+
+        ids = [ds for ds in dict.fromkeys(datasource_ids) if ds in self.pointers]
+        if not ids:
+            return []
+        live = self._live(ids)
+
+        @VECTOR_BREAKER
+        def _execute():
+            embedding = self.embeddings.embed_query(question)
+            found = {}
+            for signal, entry_type in ROUTE_SIGNALS.items():
+                where = Filter(eq={"type": entry_type}, **{"in": live})
+                # The description search is exact: one entry per datasource, a
+                # handful among hundreds, and approximate search under a filter
+                # that selective can miss one.
+                found[signal] = (self.index.get(self.namespace, where, with_vectors=True)
+                                 if signal == "description" else
+                                 self.index.query(self.namespace, embedding, k=self.VOTE_K, where=where,
+                                                  with_vectors=True))
+            return embedding, found
+
+        embedding, found = _execute()
+        rankings: Dict[str, List[str]] = {}
+        records: List[Dict[str, Any]] = []
+        for signal, entries in found.items():
+            scores = cosine_similarity([embedding], [e.vector for e in entries])[0] if entries else []
+            order = sorted(range(len(entries)), key=lambda i: (-float(scores[i]), entries[i].id))
+            ranked: List[str] = []
+            picks: List[str] = []
+            pool: List[Dict[str, Any]] = []
+            for rank, i in enumerate(order, start=1):
+                md = entries[i].metadata
+                datasource_id = md.get("datasource_id")
+                best = datasource_id is not None and datasource_id not in ranked
+                if best:
+                    ranked.append(datasource_id)
+                    picks.append(md.get("id") or entries[i].id)
+                pool.append({"rank": rank, "id": md.get("id") or entries[i].id, "label": entry_label(md),
+                             "type": md.get("type"), "datasource_id": datasource_id, "table": md.get("table"),
+                             "column": md.get("column"), "similarity": round(float(scores[i]), _ROUND),
+                             "picked": best})
+            rankings[signal] = ranked
+            k = len(entries) if signal == "description" else self.VOTE_K
+            records.append({
+                "search": f"route.{signal}", "filter": {"datasource_ids": ids, "types": [ROUTE_SIGNALS[signal]]},
+                # A plain similarity ranking: MMR with lambda 1.
+                "query": question, "k": k, "fetch_k": k, "lambda_mult": 1.0,
+                "pool": pool, "picks": picks, "dropped": [p["id"] for p in pool if not p["picked"]],
+            })
+
+        fused = fuse(rankings, self.RRF_K)
+        kept, dropped = shortlist(fused, limit, floor_ratio)
+        if explain is not None:
+            explain.extend(records)
+            explain.append({
+                "search": "routing", "query": question, "rrf_k": self.RRF_K, "vote_k": self.VOTE_K,
+                "candidates": limit, "floor_ratio": floor_ratio,
+                "signals": rankings,
+                "fused": [{"datasource_id": c.datasource_id, "score": round(c.score, 6), "ranks": c.ranks}
+                          for c in fused],
+                "picks": [c.datasource_id for c in kept],
+                "dropped": dropped,
+            })
+        return kept
 
     @staticmethod
     def _tables(tables: Optional[List[str]]) -> Dict[str, List[Any]]:
