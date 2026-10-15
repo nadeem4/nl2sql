@@ -15,8 +15,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import socket
 import stat
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -34,7 +36,7 @@ FAKE_GCLOUD = textwrap.dedent('''
               "env": {k: v for k, v in os.environ.items()
                       if k.startswith(("TESTBED_", "REALDB_", "CLOUDSDK_SSH_"))}}
     if "ssh" in argv:
-        record["stdin"] = sys.stdin.read()
+        record["stdin"] = sys.stdin.buffer.read().decode("utf-8")    # bytes: a carriage return stays visible
     with open(os.environ["FAKE_GCLOUD_LOG"], "a", encoding="utf-8") as log:
         log.write(json.dumps(record) + "\\n")
 
@@ -242,6 +244,38 @@ def test_compose_reads_its_stdin_through_plink(tb):
     earlier = [c for c in calls if c["argv"][:2] in (["compute", "ssh"], ["compute", "scp"]) and c is not _compose(calls)]
     for c in earlier:
         assert "CLOUDSDK_SSH_PUTTY_FORCE_CONNECT" not in c["env"]
+
+
+def test_compose_stdin_is_bytes_with_bare_newlines(tb, monkeypatch):
+    # Text mode turns "\n" into "\r\n" on Windows, and the servers were then
+    # initialised with every password plus a carriage return.
+    real_run = tb.subprocess.run
+    inputs = []
+
+    def spy(*args, **kwargs):
+        if kwargs.get("input") is not None:
+            inputs.append(kwargs)
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(tb.subprocess, "run", spy)
+    assert tb.main(["up"]) == 0
+
+    assert len(inputs) == 1
+    sent = inputs[0]
+    assert isinstance(sent["input"], bytes) and b"\r" not in sent["input"]
+    assert not sent.get("text") and not sent.get("universal_newlines") and not sent.get("encoding")
+    assert "\r" not in _compose(tb.calls())["stdin"]
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash, the VM's shell")
+def test_compose_strips_a_carriage_return_from_each_password(tb):
+    show = ' && printf "%s|%s|%s" "$TESTBED_POSTGRES_PASSWORD" "$TESTBED_MYSQL_PASSWORD" "$TESTBED_MSSQL_PASSWORD"'
+    result = subprocess.run(["bash", "-c", tb.READ_PASSWORDS + show], input=b"abc\r\ndef\nghi\r\n",
+                            capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == b"abc|def|ghi"
+    assert tb.COMPOSE.startswith(tb.READ_PASSWORDS + " && ")
+    assert '"' not in tb.COMPOSE      # on Windows a double quote would unquote the `&&` in gcloud.cmd
 
 
 def test_waits_for_docker_before_compose_and_gives_up(tb):
