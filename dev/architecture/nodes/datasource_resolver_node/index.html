@@ -2479,7 +2479,7 @@
 <h1 id="datasourceresolvernode">DatasourceResolverNode</h1>
 <h2 id="overview">Overview</h2>
 <ul>
-<li>Picks the datasources a question goes to: an explicit override, the only registered datasource, or a vector search when more than one is registered.</li>
+<li>Picks the datasources a question goes to: an explicit override, the only registered datasource, or routing (five signals fused with reciprocal rank fusion) when more than one is registered.</li>
 <li>Enforces RBAC and the schema version mismatch policy before planning.</li>
 <li>Refuses a question no datasource can answer, with one small structured LLM call, before the decomposer runs.</li>
 <li>Sits at the entry of the control graph and gates the pipeline.</li>
@@ -2492,12 +2492,12 @@
 <li>Choose candidate datasources:<ul>
 <li>an explicit <code>datasource_id</code> is used as given;</li>
 <li>with exactly one datasource registered, that one is used and no vector search runs;</li>
-<li>otherwise <code>Retriever.retrieve_datasource_candidates()</code> ranks them.</li>
+<li>otherwise <code>Retriever.route()</code> ranks the datasources the caller's scope reaches (see <a href="../../indexing/#routing-five-signals-fused">Routing</a>).</li>
 </ul>
 </li>
 <li>Validate datasource IDs against the registered adapter list.</li>
 <li>Enforce RBAC datasource access.</li>
-<li>Judge answerability over the allowed candidates, refuse with <code>QUESTION_NOT_ANSWERABLE</code> when none can answer, and forward only the candidates the verdict names.</li>
+<li>Judge answerability over the allowed candidates, refuse with <code>QUESTION_NOT_ANSWERABLE</code> when none can answer, and forward only the candidates the verdict names, at most <code>settings.routing.max_datasources</code> of them.</li>
 <li>Give each forwarded datasource its description and a capped table list, for the decomposer to route on.</li>
 <li>Populate <code>DatasourceResolverResponse</code> in <code>GraphState</code>.</li>
 </ul>
@@ -2517,16 +2517,17 @@
 <h2 id="inputs">Inputs</h2>
 <p>From <code>GraphState</code>:</p>
 <ul>
-<li><code>user_query</code> (str, required): the question; used for vector retrieval (more than one datasource) and for the answerability check.</li>
+<li><code>user_query</code> (str, required): the question; used for routing (more than one datasource) and for the answerability check.</li>
 <li><code>datasource_id</code> (Optional[str]): explicit override for datasource selection.</li>
 <li><code>user_context</code> (<code>UserContext</code>, required): RBAC enforcement.</li>
 </ul>
 <p>Context dependencies (<code>Runtime</code>):</p>
 <ul>
-<li><code>vector_store</code>: the run's pinned <code>Retriever</code>. It ranks the candidates when more than one datasource is registered and no override is given, and gives each datasource's live schema version and snapshot (the snapshot's description and table list feed the answerability check and the decomposer's routing context).</li>
+<li><code>vector_store</code>: the run's pinned <code>Retriever</code>. Its <code>route</code> ranks the candidates when more than one datasource is registered and no override is given, and gives each datasource's live schema version and snapshot (the snapshot's description and table list feed the answerability check and the decomposer's routing context).</li>
 <li><code>ds_registry</code>: adapter registry for registered IDs.</li>
 <li><code>rbac</code>: filters allowed datasources.</li>
 <li><code>llm_registry</code>: the answerability check's model, agent name <code>datasourceresolver</code> (falls back to <code>default</code>).</li>
+<li><code>settings.routing</code> (<code>candidates</code>, <code>max_datasources</code>, <code>floor_ratio</code>) and <code>settings.retrieval.decomposer_tables</code>.</li>
 </ul>
 <p>Validation performed:</p>
 <ul>
@@ -2545,7 +2546,7 @@
 <p>Side effects:</p>
 <ul>
 <li>One LLM call (the answerability check) once the role check passes.</li>
-<li>A vector store retrieval when more than one datasource is registered and no override is given.</li>
+<li>Routing's five index searches (one embedding of the question) when more than one datasource is registered and no override is given.</li>
 </ul>
 <hr/>
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
@@ -2553,20 +2554,20 @@
 <li>Candidates:<ul>
 <li><code>state.datasource_id</code> set: it must be registered (<code>INVALID_STATE</code> otherwise); it is the only candidate.</li>
 <li>Exactly one datasource registered: it is the only candidate; no vector search.</li>
-<li>Otherwise: the vector store must exist (<code>SCHEMA_RETRIEVAL_FAILED</code> otherwise); <code>retrieve_datasource_candidates(k=5)</code> gives the candidates (an exact ranking of every datasource entry, so no datasource is missed by the approximate search), and none is <code>SCHEMA_RETRIEVAL_FAILED</code> (with a re-index hint when the index is empty).</li>
+<li>Otherwise: the vector store must exist (<code>SCHEMA_RETRIEVAL_FAILED</code> otherwise). The scope filter comes first: the registered datasources the caller's role may not read are left out, and none left is a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code> with no search and no model call. <code>Retriever.route</code> then ranks the rest (the description, example, verified-query, table and column signals, fused with reciprocal rank fusion), keeping the top <code>settings.routing.candidates</code> (3) and dropping any whose best similarity is under <code>settings.routing.floor_ratio</code> (0.5) times the most similar one's. Only the tables the role may read vote: a table or column entry of a hidden table, or a verified query that reads one, is dropped before ranking and never reaches the trace. The description signal ranks every datasource entry exactly, so no reachable datasource is missed by the approximate search. No candidate is <code>SCHEMA_RETRIEVAL_FAILED</code> (with a re-index hint when the index is empty).</li>
 </ul>
 </li>
 <li>Role check: candidates the role may not read are dropped. None left is a <code>CRITICAL</code> <code>SECURITY_VIOLATION</code>, and no model call is made.</li>
 <li>Schema version mismatch policy (<code>fail</code> returns <code>INVALID_STATE</code>; <code>warn</code> adds a warning).</li>
 <li>Answerability check over the <strong>allowed</strong> candidates only (see below). An empty verdict returns <code>QUESTION_NOT_ANSWERABLE</code>.</li>
-<li>Narrow to the verdict. After a vector search, only the allowed candidates the verdict names go forward; a candidate the verdict rejects never reaches the decomposer, and a verdict naming only unknown ids is <code>QUESTION_NOT_ANSWERABLE</code>. With an override or a single datasource there is one candidate, and a non-empty verdict accepts it.</li>
-<li>Attach routing context to each forwarded datasource, from the snapshot its live build was made from: <code>description</code>, <code>tables</code> (sorted bare table names, at most 30) and <code>more_tables</code> (how many were left out).</li>
+<li>Narrow to the verdict. After routing, only the allowed candidates the verdict names go forward, at most <code>settings.routing.max_datasources</code> (3) of them, the best by fused score first; a candidate the verdict rejects never reaches the decomposer, and a verdict naming only unknown ids is <code>QUESTION_NOT_ANSWERABLE</code>. With an override or a single datasource there is one candidate, and a non-empty verdict accepts it.</li>
+<li>Attach routing context to each forwarded datasource, from the snapshot its live build was made from: <code>description</code>, <code>tables</code> (sorted bare table names, at most <code>settings.retrieval.decomposer_tables</code>, 30) and <code>more_tables</code> (how many were left out).</li>
 <li>Return <code>DatasourceResolverResponse</code> with the forwarded datasources (sorted by id), their IDs as <code>allowed_datasource_ids</code>, and unsupported IDs.</li>
 <li>On exceptions, log and return <code>SCHEMA_RETRIEVAL_FAILED</code> with the exception text; a provider's refusal of the model call is a <code>PROVIDER_*</code> error instead (see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>).</li>
 </ol>
 <p>A single registered datasource is the shortcut, not the usual case: with more
-than one - the demo registers three - the vector search runs, and nothing else
-in the flow changes.</p>
+than one - the demo registers three - routing runs, and nothing else in the
+flow changes.</p>
 <h3 id="order-of-checks">Order of checks</h3>
 <p>The role check runs before the answerability check, so:</p>
 <ul>
@@ -2595,7 +2596,7 @@ in the flow changes.</p>
 <ul>
 <li><code>{datasources}</code> is a JSON list, one entry per allowed candidate, sorted by id, with sorted keys: <code>description</code> (the datasource description from the live build's snapshot, which indexing takes from the datasources config) and <code>tables</code> (sorted bare table names).</li>
 <li>The instructions and datasources come first (the system message) and the question last (the human message), so the prompt is byte-identical across questions up to the question and a provider's prompt cache can serve the prefix. OpenAI caches only prompts of 1,024 tokens or more, so with one small datasource nothing is cached; the prefix grows, and becomes cacheable, with more datasources.</li>
-<li>The verdict refuses and narrows: an empty list refuses the question, and after a vector search only the allowed candidates it names reach the decomposer. It cannot add a datasource the role may not read.</li>
+<li>The verdict refuses and narrows: an empty list refuses the question, and after routing only the allowed candidates it names reach the decomposer. It cannot add a datasource the role may not read.</li>
 <li>For Chinook on its own the rendered prompt is about 260 tokens (<code>o200k_base</code>), plus the <code>AnswerabilityResponse</code> function schema; the demo now registers three datasources, so its prompt is correspondingly longer.</li>
 </ul>
 <hr/>
@@ -2614,7 +2615,7 @@ in the flow changes.</p>
 <h2 id="determinism-guarantees">Determinism Guarantees</h2>
 <ul>
 <li>Candidate choice is deterministic for an override or a single datasource.</li>
-<li>Vector ranking may vary with more than one datasource.</li>
+<li>Routing's ranking may vary with more than one datasource (approximate searches; ties in fused score go to the smaller id).</li>
 <li>The answerability prompt is serialized deterministically; the verdict is a model call at the configured temperature and seed.</li>
 </ul>
 <hr/>
@@ -2637,7 +2638,7 @@ in the flow changes.</p>
 <h2 id="performance-characteristics">Performance Characteristics</h2>
 <ul>
 <li>One small LLM call per question once the role check passes; it saves the decomposer, planner and synthesizer calls on every unanswerable question.</li>
-<li>A vector store retrieval (MMR search) only with more than one datasource.</li>
+<li>Routing (one question embedding, five index searches, no model) only with more than one datasource.</li>
 <li>RBAC checks are in-memory operations; schema lookups are store reads.</li>
 </ul>
 <hr/>
@@ -2647,8 +2648,11 @@ in the flow changes.</p>
 <li>The answerability call is recorded like every LLM call: usage under node <code>datasource_resolver</code> in <code>QueryResult.usage</code>, and in the run trace keyed by node, sub-query, attempt and call.</li>
 <li>Vector retrieval uses <code>VECTOR_BREAKER</code> at the vector store layer.</li>
 <li>Returns a <code>retrieval</code> record in its update for the run trace: the query
-  embedded and the datasource search's pool with scores, MMR picks and drops;
-  or <code>skipped: true</code> and why (an explicit <code>datasource_id</code>, a single registered
+  embedded, one search record per routing signal (<code>route.description</code>,
+  <code>route.examples</code>, <code>route.curated</code>, <code>route.tables</code>, <code>route.columns</code>: the pool
+  with similarities, each datasource's best entry picked) and a <code>routing</code>
+  record (each signal's datasource ranking, the fused scores and ranks, the
+  datasources kept and those dropped with why); or <code>skipped: true</code> and why (an explicit <code>datasource_id</code>, a single registered
   datasource, no vector store). The answerability check is not part of it: it
   is an LLM call and is traced as one.
   See <a href="../../../observability/debugging/#retrieval">Debugging a run</a>.</li>
@@ -2657,6 +2661,7 @@ in the flow changes.</p>
 <h2 id="configuration">Configuration</h2>
 <ul>
 <li>LLM agent <code>datasourceresolver</code> in the LLM config (optional; see <a href="../../../configuration/llm/#per-node-models">LLM configuration</a>)</li>
+<li><code>settings.routing.candidates</code>, <code>max_datasources</code> and <code>floor_ratio</code>, and <code>settings.retrieval.decomposer_tables</code> (see <a href="../../../configuration/settings/">Settings</a>)</li>
 </ul>
 <hr/>
 <h2 id="extension-points">Extension Points</h2>

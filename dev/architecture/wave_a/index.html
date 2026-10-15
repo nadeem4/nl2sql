@@ -3365,8 +3365,8 @@ the first draft (PR #308) changed several of them; those are marked
 </tr>
 <tr>
 <td>D28</td>
-<td><strong>Routing fuses five signals with reciprocal rank fusion</strong> (<code>k = 60</code>), keeps the top 3, and drops a datasource scoring under half the best. <code>candidates</code>, <code>max_datasources</code>, <code>max_sub_queries</code> and <code>floor_ratio</code> are settings; the vote depth and the fusion constant stay constants until a measurement asks for a knob.</td>
-<td>decided overnight, amended after review, owner to confirm</td>
+<td><strong>Routing fuses five signals with reciprocal rank fusion</strong> (<code>k = 60</code>), keeps the top 3 (<code>candidates</code> defaults to 3), and drops a datasource whose best entry similarity is under half the most similar datasource's: the floor is on similarity, not on the fused score, because the fused scores of a handful of datasources are always within a few percent of each other. A datasource a signal did not rank gets the rank after the last one it did, so having entries of a type (only one datasource with verified queries, say) is not a vote. Only entries the caller's scope allows vote: a hidden table or column, or a verified query that reads a hidden table, never votes or reaches the trace. <code>candidates</code>, <code>max_datasources</code>, <code>max_sub_queries</code> and <code>floor_ratio</code> are settings; the vote depth and the fusion constant stay constants until a measurement asks for a knob.</td>
+<td>decided overnight, amended after review (twice: the floor on similarity, the absent rank, table scope, after the review of PR #316), owner to confirm</td>
 <td><a href="#9-phase-r-cross-database-routing">Phase R</a></td>
 </tr>
 <tr>
@@ -5225,26 +5225,95 @@ search ranks datasources by their best entry:</p>
 </tbody>
 </table>
 <p>The ranks are fused with reciprocal rank fusion (D28):</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-13-1" id="__codelineno-13-1" name="__codelineno-13-1"></a>score(ds) = sum over signals s where ds ranks:  1 / (RRF_K + rank_s(ds))
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-13-1" id="__codelineno-13-1" name="__codelineno-13-1"></a>score(ds) = sum over signals s:  1 / (RRF_K + rank_s(ds))
 </code></pre></div>
+<p>where <code>rank_s(ds)</code> is <code>len(ranked_s) + 1</code> for a datasource signal <code>s</code> did not
+rank (amended after review: otherwise merely having entries of a type is a
+vote).</p>
 <p><code>VOTE_K = 20</code> and <code>RRF_K = 60</code> (the value the RRF literature uses) are
 constants on <code>Retriever</code>, beside <code>FETCH_MULTIPLIER</code> and <code>LAMBDA_MULT</code>, until
 the routing suite shows a reason to tune them.</p>
-<p>Then the candidates are the top <code>candidates</code> by score, dropping any whose
-score is under <code>floor_ratio</code> times the best. The trace records each signal's
+<p>Then the candidates are the top <code>candidates</code> by score, dropping any whose best
+entry similarity is under <code>floor_ratio</code> times the most similar candidate's
+(amended after review: a floor on the fused score never fires). The searches
+see only the entries the caller's scope allows: a table or column of a hidden
+table, or a verified query that reads one, is dropped before it can vote or be
+recorded. The trace records each signal's
 ranking and the fused scores (<code>retrieval.searches</code>, with a new
 <code>routing</code> record), so the playground's inspector and an eval can show why a
 datasource was or was not chosen.</p>
 <p>The answerability verdict is unchanged in shape (it already returns a list):
 it may pick several of the candidates, and the resolver forwards at most
 <code>max_datasources</code> of them, in fused order.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: entries, votes, fusion and the retrieval settings (R1)</p>
+<ul>
+<li><strong>Entries.</strong> <code>DatasourceExampleChunk</code> (<code>schema.datasource_example</code>) in
+  <code>indexing/models.py</code>; <code>build_example_chunks(datasource_id, questions,
+  schema_version)</code> in <code>indexing/chunk_builder.py</code> takes the question list
+  from its caller (<code>SchemaChunkBuilder</code> passes the orchestrator's
+  <code>sample_questions</code>, or enrichment's), so Wave B adds the glossary's
+  <code>examples</code> to that list without changing it. Blank and repeated
+  questions are skipped; ids hash the question. <code>DatasourceChunk</code> lost
+  <code>examples</code>. <code>ENTRY_TYPES</code> lists the new type.</li>
+<li><strong>Routing.</strong> <code>Retriever.route(question, datasource_ids, explain=None, *,
+  limit=3, floor_ratio=0.5, allows=None) -&gt; list[RouteCandidate]</code> replaces
+  <code>retrieve_datasource_candidates</code>, which is deleted. <code>limit</code>,
+  <code>floor_ratio</code> and <code>allows</code> (an entry check) are keyword arguments the
+  resolver fills from <code>settings.routing.candidates</code>, <code>floor_ratio</code> and the
+  caller's scope (the retriever reads no settings and no policy).
+  <code>RouteCandidate</code> (<code>datasource_id</code>, <code>score</code>, <code>ranks</code>, <code>similarity</code>) is in
+  <code>indexing/models.py</code>; <code>ROUTE_SIGNALS</code>, <code>fuse(rankings, rrf_k,
+  datasource_ids, similarity=None)</code> (an unranked datasource gets rank
+  <code>len(ranked) + 1</code>) and <code>shortlist(fused, limit, floor_ratio)</code> (the floor
+  on best similarity) are module functions in <code>indexing/retrieval.py</code>;
+  <code>VOTE_K = 20</code> and <code>RRF_K = 60</code> are on <code>Retriever</code>. The trace gets one
+  <code>route.&lt;signal&gt;</code> record per signal and a <code>routing</code> record (<code>signals</code>,
+  <code>fused</code> with each similarity, a <code>pool</code> of the fused datasources, <code>picks</code>,
+  <code>dropped</code> with <code>floor</code> or <code>limit</code>, <code>rrf_k</code>, <code>vote_k</code>, <code>candidates</code>,
+  <code>floor_ratio</code>).</li>
+<li><strong>Table scope (after the review of PR #316).</strong> The resolver's
+  <code>_route_filter</code> passes <code>allows</code>: a table or column entry votes only when
+  its (datasource, table) is visible in the live snapshot, a verified query
+  only when every table its SQL reads is. Refused entries are dropped
+  before ranking or recording, over-fetching so <code>VOTE_K</code> counts allowed
+  entries. <code>routing.candidates</code> now defaults to 3, as D28 says.</li>
+<li><strong>The resolver.</strong> The scope filter runs before routing: no reachable
+  datasource is a <code>SECURITY_VIOLATION</code> with no search. It forwards at most
+  <code>max_datasources</code> of the accepted candidates, best by fused score; the
+  forwarded list stays sorted by id, so the decomposer's prompt does not
+  depend on the fused order. <code>ResolvedDatasource.metadata</code> is empty on
+  every path now (it held the datasource entry's metadata, which nothing
+  read). <code>MAX_DECOMPOSER_TABLES</code> is <code>settings.retrieval.decomposer_tables</code>.</li>
+<li><strong>The schema retriever</strong> reads <code>settings.retrieval.table_k</code> and
+  <code>planning_k</code>; <code>TABLE_K</code> and <code>PLANNING_K</code> are deleted.</li>
+<li><strong>The retrieval scorers</strong> (<code>evaluation/scorers/retrieval_recall.py</code>,
+  after V1): <code>routed()</code> ranks with <code>route</code> under <code>settings.routing</code>
+  (then cut at the caller's limit, <code>max_datasources</code> in mode
+  <code>retrieval</code>), and <code>retrieval_settings()</code> reads <code>settings.retrieval</code>.</li>
+<li><strong>Baseline.</strong> The 0.6 retrieval baseline, recorded on <code>main</code> before any
+  of this changed, is
+  <code>benchmarks/retrieval/chinook/2026-10-15_653fa73_retrieval.json</code>:
+  table recall 0.9767, column recall 0.7185 and
+  <code>datasource_top1_accuracy</code> 0.9535 (41 of 43 Chinook questions; the two
+  misses went to <code>support</code>), over the demo's three datasources with the
+  local embeddings.</li>
+<li><strong>Measured after the review (key-free, local embeddings).</strong> Routing
+  top-1 over 79 questions across the demo's three datasources (the 43
+  Chinook gold questions, the 20 sample questions and 16 paraphrases
+  written for this check): 0.6 75/79; R1 before the review 62/79 (the
+  curated free vote sent 17 of the 20 support and webanalytics questions
+  to chinook); R1 after it 77/79. The expected datasource was among the
+  shortlisted candidates for all 79 in every version.</li>
+</ul>
+</div>
 <h3 id="limits">Limits</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-14-1" id="__codelineno-14-1" name="__codelineno-14-1"></a><span class="c1"># settings.yaml</span>
 <a href="#__codelineno-14-2" id="__codelineno-14-2" name="__codelineno-14-2"></a><span class="nt">routing</span><span class="p">:</span>
-<a href="#__codelineno-14-3" id="__codelineno-14-3" name="__codelineno-14-3"></a><span class="w">  </span><span class="nt">candidates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w">          </span><span class="c1"># datasources shown to the answerability check</span>
+<a href="#__codelineno-14-3" id="__codelineno-14-3" name="__codelineno-14-3"></a><span class="w">  </span><span class="nt">candidates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w">          </span><span class="c1"># datasources shown to the answerability check</span>
 <a href="#__codelineno-14-4" id="__codelineno-14-4" name="__codelineno-14-4"></a><span class="w">  </span><span class="nt">max_datasources</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w">     </span><span class="c1"># datasources one question may use</span>
 <a href="#__codelineno-14-5" id="__codelineno-14-5" name="__codelineno-14-5"></a><span class="w">  </span><span class="nt">max_sub_queries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6</span><span class="w">     </span><span class="c1"># sub-queries one question may have</span>
-<a href="#__codelineno-14-6" id="__codelineno-14-6" name="__codelineno-14-6"></a><span class="w">  </span><span class="nt">floor_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span><span class="w">       </span><span class="c1"># drop a candidate scoring under this share of the best</span>
+<a href="#__codelineno-14-6" id="__codelineno-14-6" name="__codelineno-14-6"></a><span class="w">  </span><span class="nt">floor_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span><span class="w">       </span><span class="c1"># drop a candidate less similar than this share of the most similar</span>
 <a href="#__codelineno-14-7" id="__codelineno-14-7" name="__codelineno-14-7"></a><span class="nt">retrieval</span><span class="p">:</span>
 <a href="#__codelineno-14-8" id="__codelineno-14-8" name="__codelineno-14-8"></a><span class="w">  </span><span class="nt">full_snapshot_max_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span><span class="w">     </span><span class="c1"># exists</span>
 <a href="#__codelineno-14-9" id="__codelineno-14-9" name="__codelineno-14-9"></a><span class="w">  </span><span class="nt">table_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span><span class="w">                       </span><span class="c1"># was SchemaRetrieverNode.TABLE_K</span>

@@ -5345,17 +5345,25 @@ object in <code>outputs</code>: what the vector search retrieved and how MMR cho
 <a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="p">}</span>
 </code></pre></div>
 <ul>
-<li><strong><code>query</code></strong> is the text actually embedded: the question for the resolver, and
+<li><strong><code>query</code></strong> is the text actually embedded: the question for the resolver's routing, and
   for the schema retriever the sub-query's intent, filters, group-by, expected
   columns and metrics, one per line.</li>
 <li><strong><code>pool</code></strong> is every candidate, nearest first. <code>similarity</code> is the cosine
-  similarity MMR uses; <code>distance</code> is Chroma's (squared L2), and <code>null</code> for the
-  resolver's <code>datasources</code> search, which scores every datasource entry itself
-  rather than asking Chroma's approximate search. <code>pick_order</code> is the
+  similarity MMR uses; <code>distance</code> is Chroma's (squared L2). The resolver's
+  routing searches record no distance: each ranks its pool by similarity
+  alone (recorded as <code>lambda_mult</code> 1), and its picks are each datasource's
+  best entry. <code>pick_order</code> is the
   order MMR picked in, <code>mmr_score</code> the score the pick won with, and
   <code>redundancy</code> its similarity to the closest earlier pick.</li>
 <li><strong><code>searches</code></strong> lists each search in order; the schema retriever runs <code>tables</code>
-  (or <code>columns</code> when that finds nothing), then <code>planning</code> over the tables found.</li>
+  (or <code>columns</code> when that finds nothing), then <code>planning</code> over the tables found.
+  The resolver runs one search per routing signal (<code>route.description</code>,
+  <code>route.examples</code>, <code>route.curated</code>, <code>route.tables</code>, <code>route.columns</code>) and ends
+  with a <code>routing</code> record: each signal's datasource ranking (<code>signals</code>), the
+  fused reciprocal-rank scores with each datasource's ranks (<code>fused</code>), the
+  datasources kept (<code>picks</code>) and those dropped (<code>dropped</code>, with <code>floor</code> or
+  <code>limit</code>), and the <code>rrf_k</code>, <code>vote_k</code>, <code>candidates</code> and <code>floor_ratio</code> used. See
+  <a href="../../architecture/indexing/#routing-five-signals-fused">Routing</a>.</li>
 <li><strong><code>tables</code></strong> (schema retriever) is what survived: the tables and columns sent
   to the planner.</li>
 <li><strong><code>skipped: true</code></strong> with a <code>reason</code> means no search ran: the schema is small

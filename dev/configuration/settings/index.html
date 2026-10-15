@@ -5166,7 +5166,7 @@ different settings.</p>
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="nt">planning_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">12</span>
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">decomposer_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">routing</span><span class="p">:</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">candidates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">candidates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
 <a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">max_datasources</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
 <a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">max_sub_queries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6</span>
 <a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span><span class="nt">floor_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
@@ -5288,27 +5288,29 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 <tr>
 <td><code>table_k</code></td>
 <td><code>8</code></td>
-<td>Tables the schema retriever keeps for a sub-query.</td>
+<td>Table entries the schema retriever's search keeps for a sub-query (and column entries, when no table matches).</td>
 </tr>
 <tr>
 <td><code>planning_k</code></td>
 <td><code>12</code></td>
-<td>Schema entries the planner is shown for a sub-query.</td>
+<td>Column and relationship entries of those tables the planner is shown for a sub-query.</td>
 </tr>
 <tr>
 <td><code>decomposer_tables</code></td>
 <td><code>30</code></td>
-<td>Tables the decomposer is shown per datasource.</td>
+<td>Table names the decomposer is shown per datasource; the rest are counted.</td>
 </tr>
 </tbody>
 </table>
-<p><code>table_k</code>, <code>planning_k</code> and <code>decomposer_tables</code> replace constants in the
-schema retriever and the resolver; the nodes read them from release 0.7's
-routing work (<a href="../../architecture/wave_a/#limits">Wave A</a>).</p>
+<p><code>table_k</code>, <code>planning_k</code> and <code>decomposer_tables</code> replace the constants the
+schema retriever and the resolver had before 0.7 (<code>TABLE_K</code>, <code>PLANNING_K</code>,
+<code>MAX_DECOMPOSER_TABLES</code>).</p>
 <h2 id="routing"><code>routing</code></h2>
 <p>Cross-database routing: which datasources a question goes to, and how far it
-may spread. Read from release 0.7's routing work
-(<a href="../../architecture/wave_a/#9-phase-r-cross-database-routing">Wave A</a>).</p>
+may spread. The resolver reads <code>candidates</code>, <code>max_datasources</code> and
+<code>floor_ratio</code> (<a href="../../architecture/indexing/#routing-five-signals-fused">Routing</a>);
+<code>max_sub_queries</code> is read from release 0.7's limits work
+(<a href="../../architecture/wave_a/#limits">Wave A</a>).</p>
 <table>
 <thead>
 <tr>
@@ -5320,13 +5322,13 @@ may spread. Read from release 0.7's routing work
 <tbody>
 <tr>
 <td><code>candidates</code></td>
-<td><code>5</code></td>
-<td>Datasources shown to the answerability check.</td>
+<td><code>3</code></td>
+<td>Datasources routing keeps for the answerability check, best by fused score first.</td>
 </tr>
 <tr>
 <td><code>max_datasources</code></td>
 <td><code>3</code></td>
-<td>Datasources one question may use.</td>
+<td>Datasources one question may use: of those the answerability check accepts, the resolver forwards at most this many, best first.</td>
 </tr>
 <tr>
 <td><code>max_sub_queries</code></td>
@@ -5336,7 +5338,7 @@ may spread. Read from release 0.7's routing work
 <tr>
 <td><code>floor_ratio</code></td>
 <td><code>0.5</code></td>
-<td>A candidate scoring under this share of the best is dropped, between 0 and 1.</td>
+<td>A candidate whose best index-entry similarity to the question is under this share of the most similar candidate's is dropped, between 0 and 1. It is on similarity, not on the fused score: with a handful of datasources every reciprocal-rank score is within a few percent of the best. <code>0</code> keeps every candidate up to <code>candidates</code>.</td>
 </tr>
 </tbody>
 </table>

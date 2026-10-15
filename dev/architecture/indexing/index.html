@@ -553,6 +553,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#routing-five-signals-fused">
+<span class="md-ellipsis">
+      
+        Routing: five signals, fused
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#tenant-isolation-current-state">
 <span class="md-ellipsis">
       
@@ -2461,6 +2470,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#routing-five-signals-fused">
+<span class="md-ellipsis">
+      
+        Routing: five signals, fused
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#tenant-isolation-current-state">
 <span class="md-ellipsis">
       
@@ -2543,7 +2561,16 @@ catalog in the current implementation.</p>
 <h2 id="chunk-types-and-contracts">Chunk types and contracts</h2>
 <p>Chunk types are defined in <code>nl2sql.indexing.models</code>:</p>
 <ul>
-<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description, domains, and example questions. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> of a <code>Datasource</code> passed to <code>engine.datasources.add</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the <code>SAMPLE_QUESTIONS</code> file.</li>
+<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description and domains. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> of a <code>Datasource</code> passed to <code>engine.datasources.add</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced.</li>
+<li><strong>DatasourceExampleChunk</strong> (<code>schema.datasource_example</code>): one example question
+  the datasource answers, one entry per question, so the fifth question moves
+  routing as much as the first (in the datasource entry's one text it barely
+  moved the vector). <code>build_example_chunks(datasource_id, questions,
+  schema_version)</code> builds them from a list the caller assembles: today the
+  datasource's <code>sample_questions</code> (or enrichment's), and from Wave B the
+  glossary's <code>examples</code> too. A blank or repeated question is skipped. Ids:
+  <code>schema.datasource_example:&lt;datasource_id&gt;:&lt;12 hex of the question's
+  SHA-256&gt;:&lt;schema_version&gt;</code>.</li>
 <li><strong>TableChunk</strong> (<code>schema.table</code>): table name, PKs, column list, FK summaries, row counts.</li>
 <li><strong>ColumnChunk</strong> (<code>schema.column</code>): column type, stats, synonyms, PII flags.</li>
 <li><strong>RelationshipChunk</strong> (<code>schema.relationship</code>): FK relationships, columns, cardinality.</li>
@@ -2599,8 +2626,8 @@ the pipeline calls it yet; the matcher that will is described in
   and <code>to_columns</code> are stored comma-joined; the retriever splits them again.</li>
 </ul>
 <p>The store never embeds and never depends on LangChain. <code>build_id</code> is stripped
-from retrieved entries, because the resolver prints a datasource entry's
-metadata into the decomposer prompt.</p>
+from retrieved entries, because retrieved metadata reaches the planner's
+prompt and a build id would change it on every rebuild.</p>
 <h2 id="one-namespace-per-embedding-model">One namespace per embedding model</h2>
 <p>Entries live in a <strong>namespace</strong> per embedding model:
 <code>nl2sql__&lt;model slug&gt;__&lt;dimension&gt;</code>, for example
@@ -2682,7 +2709,8 @@ playground and <code>GET /api/v1/index/status</code> show it (through
 <h2 id="chunking-strategy-as-implemented">Chunking strategy (as implemented)</h2>
 <p>Chunking is aligned to planning intent:</p>
 <ul>
-<li><strong>Routing</strong> uses datasource-level chunks.</li>
+<li><strong>Routing</strong> uses the datasource and example entries, the verified queries,
+  and the table and column entries as votes (see <a href="#routing-five-signals-fused">Routing</a>).</li>
 <li><strong>Schema context</strong> uses table/metric chunks.</li>
 <li><strong>Planning context</strong> uses columns and relationships for specific tables.</li>
 </ul>
@@ -2756,35 +2784,31 @@ re-ranking is this:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>DatasourceResolverNode</code></td>
-<td><code>datasources</code></td>
-<td>datasource</td>
-<td>5</td>
-<td>20</td>
-</tr>
-<tr>
 <td><code>SchemaRetrieverNode</code></td>
 <td><code>tables</code></td>
 <td>table, metric</td>
-<td>8</td>
+<td><code>table_k</code> (8)</td>
 <td>32</td>
 </tr>
 <tr>
 <td><code>SchemaRetrieverNode</code>, when <code>tables</code> finds nothing</td>
 <td><code>columns</code></td>
 <td>column</td>
-<td>8</td>
+<td><code>table_k</code> (8)</td>
 <td>32</td>
 </tr>
 <tr>
 <td><code>SchemaRetrieverNode</code>, over the tables found</td>
 <td><code>planning</code></td>
 <td>column, relationship</td>
-<td>12</td>
+<td><code>planning_k</code> (12)</td>
 <td>48</td>
 </tr>
 </tbody>
 </table>
+<p><code>table_k</code> and <code>planning_k</code> are <code>settings.retrieval</code> settings (see
+<a href="../../configuration/settings/">Settings</a>). The resolver's routing searches are
+not MMR; they are described <a href="#routing-five-signals-fused">below</a>.</p>
 <p>The schema retriever runs none of these when the schema has
 <code>SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES</code> tables or fewer (15 by default, so
 each of the demo's three schemas, at 11, 4 and 5 tables, is always sent whole);
@@ -2806,12 +2830,115 @@ and the playground's Retrieval inspector (<code>engine.index.inspect</code>) run
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the <strong>Copy as text</strong> output.</p>
-<p>The resolver's <code>datasources</code> search is exact: instead of the store's nearest-neighbour
-query it reads every live <code>schema.datasource</code> entry (<code>IndexStore.get</code>), scores it by cosine similarity and
-takes the nearest. There is one such entry per datasource among hundreds of
-others, and an approximate (HNSW) search under a filter that selective can
-return fewer entries than exist, which dropped a datasource from a question's
-candidates now and then. The other searches stay approximate.</p>
+<h2 id="routing-five-signals-fused">Routing: five signals, fused</h2>
+<p><code>Retriever.route(question, datasource_ids, explain, *, limit, floor_ratio, allows)</code>
+ranks the datasources a question most likely needs, as a list of
+<code>RouteCandidate</code>:</p>
+<ul>
+<li><code>datasource_id</code>;</li>
+<li><code>score</code>, its fused score;</li>
+<li><code>ranks</code>, its rank in each signal that ranked it;</li>
+<li><code>similarity</code>, its best entry's cosine similarity to the question.</li>
+</ul>
+<p>The resolver calls it with the datasources the caller's scope reaches, and
+only those: a datasource the role may not read is never searched, so it never
+ranks. It also passes <code>allows</code>, its entry check:</p>
+<ul>
+<li>A table or column entry votes only when its table is one of that
+  datasource's visible tables in the live snapshot. The check is on the
+  (datasource, table) pair, because two datasources can hold a table of the
+  same name.</li>
+<li>A verified query votes only when every table its SQL reads is visible. A
+  query whose SQL does not parse never votes.</li>
+</ul>
+<p>An entry <code>allows</code> refuses is dropped before anything is ranked or recorded, so
+a denied table never votes and never appears in the trace. The searches fetch
+more until they hold <code>VOTE_K</code> allowed entries or the index runs out.</p>
+<p><code>route</code> embeds the question once and runs five searches over the reachable
+datasources' live builds (<code>ROUTE_SIGNALS</code>). Each ranks datasources by their
+best entry:</p>
+<table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Entries</th>
+<th>Search</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>description</code></td>
+<td><code>schema.datasource</code></td>
+<td>every entry, exactly</td>
+</tr>
+<tr>
+<td><code>examples</code></td>
+<td><code>schema.datasource_example</code></td>
+<td>the nearest <code>VOTE_K</code> (20)</td>
+</tr>
+<tr>
+<td><code>curated</code></td>
+<td><code>curated.verified_query</code></td>
+<td>the nearest <code>VOTE_K</code></td>
+</tr>
+<tr>
+<td><code>tables</code></td>
+<td><code>schema.table</code></td>
+<td>the nearest <code>VOTE_K</code></td>
+</tr>
+<tr>
+<td><code>columns</code></td>
+<td><code>schema.column</code></td>
+<td>the nearest <code>VOTE_K</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fusion.</strong> The ranks are fused with reciprocal rank fusion (<code>fuse</code>):
+<code>score(ds) = sum over the signals of 1 / (RRF_K + rank)</code>, with <code>RRF_K = 60</code>.</p>
+<ul>
+<li>A datasource a signal did not rank gets the rank after the last one it did
+  rank (<code>len(ranked) + 1</code>). It has no entry of that type, or none among the
+  nearest. Having entries of a type is therefore not a vote: only ranking well
+  in a signal is.</li>
+<li>Without that penalty, the one datasource with verified queries would collect
+  a curated vote on every question and win nearly all of them.</li>
+<li>A signal that ranked nothing is skipped.</li>
+<li>A datasource with no example questions is still routed by its description,
+  tables and columns.</li>
+</ul>
+<p><strong>Shortlist.</strong> <code>shortlist</code> then keeps the top <code>limit</code>
+(<code>settings.routing.candidates</code>, 3). It also drops any datasource whose best
+similarity is under <code>floor_ratio</code> (<code>settings.routing.floor_ratio</code>, 0.5) times
+the most similar candidate's.</p>
+<ul>
+<li>The floor is on similarity, not on the fused score. With a handful of
+  datasources every reciprocal-rank score is within a few percent of the best,
+  so a floor on the score would never fire.</li>
+<li><code>VOTE_K</code> and <code>RRF_K</code> are constants on <code>Retriever</code> until the routing suite
+  shows a reason to tune them.</li>
+</ul>
+<p>The <code>description</code> search is exact: instead of the store's nearest-neighbour
+query it reads every live <code>schema.datasource</code> entry (<code>IndexStore.get</code>) and
+scores each by cosine similarity. There is one such entry per datasource among
+hundreds of others. An approximate (HNSW) search under a filter that selective
+can return fewer entries than exist, which would cost a datasource its vote.
+So every datasource the caller reaches is ranked at least once. The other four
+searches are approximate.</p>
+<p>Given an <code>explain</code> list, <code>route</code> appends:</p>
+<ul>
+<li>One record per signal: <code>route.description</code>, <code>route.examples</code>,
+  <code>route.curated</code>, <code>route.tables</code> and <code>route.columns</code>. Each holds the pool by
+  similarity, with each datasource's best entry marked picked, and is recorded
+  as a search with <code>lambda_mult</code> 1.</li>
+<li>Then a <code>routing</code> record:</li>
+<li><code>rrf_k</code>, <code>vote_k</code>, <code>candidates</code> and <code>floor_ratio</code>;</li>
+<li>each signal's datasource ranking (<code>signals</code>);</li>
+<li>the fused datasources (<code>fused</code>: score, ranks, best similarity), also given
+    as a <code>pool</code> so a search view can draw it;</li>
+<li>the datasources kept (<code>picks</code>);</li>
+<li>those dropped and why (<code>dropped</code>: <code>floor</code> or <code>limit</code>).</li>
+</ul>
+<p>The records name datasources and the ids of allowed entries, never entry text.</p>
 <h2 id="tenant-isolation-current-state">Tenant isolation (current state)</h2>
 <p>Tenant scoping is <strong>not implemented</strong> in indexing:</p>
 <ul>

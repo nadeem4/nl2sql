@@ -6061,10 +6061,12 @@ question yet. The rail says so too, under the database switcher: each question
 is answered from one database, and joining across them is planned. Clicking a
 question from another pile moves the switcher to that database, so the schema
 on the left is the one the question is about.</p>
-<p>They are also indexed, per datasource: the <code>schema.datasource</code> entry the
-resolver matches every question against carries that datasource's configured
-description and its own questions (<code>sample_questions</code> in its datasource
-file), which is how the resolver tells the three apart. Re-index
+<p>They are also indexed, per datasource, each question as an entry of its own
+(<code>schema.datasource_example</code>, from <code>sample_questions</code> in its datasource file),
+beside the <code>schema.datasource</code> entry with the configured description. Routing
+votes with both, and with each datasource's tables and columns, which is how
+the resolver tells the three apart (see
+<a href="../../architecture/indexing/#routing-five-signals-fused">Routing</a>). Re-index
 (<code>nl2sql index</code>) after editing them.</p>
 <p>Whether a given question is answered correctly depends on the model; see
 <a href="https://github.com/nadeem4/nl2sql#known-limitations">Known limitations</a>.</p>

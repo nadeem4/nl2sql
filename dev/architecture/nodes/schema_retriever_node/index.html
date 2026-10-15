@@ -2537,9 +2537,9 @@
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
 <li>Build semantic query with <code>_build_semantic_query()</code>.</li>
-<li>Retrieve table/metric chunks via <code>retrieve_schema_context()</code>.</li>
-<li>If no table chunks, retrieve columns via <code>retrieve_column_candidates()</code>.</li>
-<li>If tables are identified, retrieve columns/relationships via <code>retrieve_planning_context()</code>.</li>
+<li>Retrieve table/metric chunks via <code>retrieve_schema_context()</code>, <code>k = settings.retrieval.table_k</code> (8).</li>
+<li>If no table chunks, retrieve columns via <code>retrieve_column_candidates()</code>, <code>k = table_k</code>.</li>
+<li>If tables are identified, retrieve columns/relationships via <code>retrieve_planning_context()</code>, <code>k = settings.retrieval.planning_k</code> (12).</li>
 <li>Resolve schema snapshot via <code>_resolve_snapshot()</code>.</li>
 <li>Build <code>Table</code> objects with <code>_build_tables_from_snapshot()</code>.</li>
 <li>If no tables were found, return full snapshot with warning.</li>
@@ -2614,7 +2614,7 @@ matched against snapshot tables by bare name or <code>schema.table</code>, case 
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
-<li>No direct settings used in this node.</li>
+<li><code>settings.retrieval.full_snapshot_max_tables</code>, <code>table_k</code> and <code>planning_k</code> (see <a href="../../../configuration/settings/#retrieval">Settings</a>).</li>
 <li>Vector store configuration is set in <code>Runtime</code>.</li>
 </ul>
 <hr/>
