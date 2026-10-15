@@ -6,7 +6,6 @@ the OpenAI client's own endpoint variable pointing at the fake. No real key is
 used and nothing is spent.
 """
 import os
-import shutil
 
 import pytest
 
@@ -15,6 +14,7 @@ pytest.importorskip("fastapi")
 from nl2sql.cli.demo.llm_config import point_llm_config_at  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
+from .conftest import copy_demo  # noqa: E402
 from .recordings_chinook import RULES_COUNT_CUSTOMERS  # noqa: E402
 
 FAKE_KEY = "-".join(["sk", "proj", "e2e" + "z" * 30 + "7d3e"])
@@ -27,7 +27,7 @@ def test_a_key_saved_in_the_panel_turns_replay_into_live(demo_project, tmp_path,
     from nl2sql import NL2SQL
     from nl2sql.cli.demo.playground.app import build_app
     project = tmp_path / "demo"
-    shutil.copytree(demo_project, project)
+    copy_demo(demo_project, project)
     replay = FakeLLMServer([]).start()  # records nothing: every question misses
     live = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     # Replay mode, as `nl2sql demo` leaves it: llm.yaml on the replay server with its placeholder key.

@@ -31,18 +31,38 @@ def _base_env() -> dict:
     return env
 
 
+# What the session demo project holds at ``.nl2sql`` once it is indexed: a file,
+# so anything that opens the shared store fails at once instead of racing.
+SHARED_STORE_GUARD = """The session demo project's index and state store were moved out of this folder.
+A test opening them shared one state.db with every other test, and CI failed
+with "disk I/O error" in whichever test ran next. Give the test its own copy:
+project_config(..., storage=private_storage(demo_project, tmp_path / "store")),
+or copy_demo(demo_project, tmp_path / "demo") for a whole project.
+"""
+
+
+def _pristine(root: Path) -> Path:
+    """Where the session demo project's indexed ``.nl2sql`` is kept; nothing opens it."""
+    return root.parent / f"{root.name}-store"
+
+
 @pytest.fixture(scope="session")
 def demo_project(tmp_path_factory):
     """A demo project written by ``nl2sql init --demo`` and indexed locally (no key).
 
-    Its index, verified queries included, lives in ``<root>/.nl2sql``. Tests
-    run against variants of its ``nl2sql.yaml`` written by ``project_config``.
+    Its index, verified queries included, is built into ``<root>/.nl2sql`` and
+    then moved aside, leaving a file of that name (``SHARED_STORE_GUARD``): no
+    test may open the shared store. Tests run against variants of its
+    ``nl2sql.yaml`` written by ``project_config``, each on a private copy of
+    the store (``private_storage``), or on a whole copy (``copy_demo``).
     """
     root = tmp_path_factory.mktemp("demo")
     env = _base_env()
     subprocess.run(CLI + ["init", "--demo", str(root)], env=env, check=True, timeout=300)
     subprocess.run(CLI + ["--config", str(root / "nl2sql.yaml"), "index"], cwd=root, env=env,
                    check=True, timeout=900)
+    shutil.move(str(root / ".nl2sql"), str(_pristine(root)))
+    (root / ".nl2sql").write_text(SHARED_STORE_GUARD, encoding="utf-8")
     return root
 
 
@@ -58,12 +78,11 @@ def project_config(root: Path, name: str, *, llm: dict, curated: Any = False,
     """Write ``<root>/<name>``: an ``nl2sql.yaml`` over the demo project's datasources and index.
 
     The demo's datasources, embeddings and policies are included by file. The
-    plan cache is off unless ``settings`` turns it on: the demo's state store
-    is shared by every test in the session, and a plan one test cached would
-    skip the planner in the next. Curated answers are off unless ``curated``:
+    plan cache is off unless ``settings`` turns it on: a store reused by a
+    second run would otherwise skip the planner the recorded rules expect. Curated answers are off unless ``curated``:
     ``True`` includes the demo's ``curated.yaml``, a dict is the section inline.
     ``storage`` names a private store (see ``private_storage``); without it the
-    demo's own ``.nl2sql`` (with the session's index) is used.
+    config points at the demo's ``.nl2sql``, which no run can open.
     """
     merged: Dict[str, Any] = {"pipeline": {"plan_cache": False}}
     for group, values in (settings or {}).items():
@@ -89,9 +108,16 @@ def project_config(root: Path, name: str, *, llm: dict, curated: Any = False,
 
 
 def private_storage(root: Path, target: Path) -> Path:
-    """A copy of the demo's index and state store at ``target``, for a test that writes traces or plans."""
-    shutil.copytree(root / ".nl2sql" / "index", target / "index")
-    shutil.copy2(root / ".nl2sql" / "state.db", target / "state.db")
+    """A copy of the demo's index and state store at ``target``: every run needs its own."""
+    shutil.copytree(_pristine(root) / "index", target / "index")
+    shutil.copy2(_pristine(root) / "state.db", target / "state.db")
+    return target
+
+
+def copy_demo(root: Path, target: Path) -> Path:
+    """A copy of the whole demo project at ``target``, with its own index and state store."""
+    shutil.copytree(root, target, ignore=lambda folder, names: [".nl2sql"] if Path(folder) == root else [])
+    private_storage(root, target / ".nl2sql")
     return target
 
 
@@ -100,9 +126,7 @@ def fake_llm(demo_project, tmp_path):
     """``fake_llm(rules)`` serves ``rules``; returns ``(server, env)`` and writes ``fake.yaml``.
 
     ``fake.yaml`` points at a private copy of the demo's index and state store
-    (``private_storage``): engines of different tests opening the one shared
-    ``state.db`` in turn failed CI with ``disk I/O error`` at ``PRAGMA
-    journal_mode=WAL``, depending on the order pytest-randomly picked.
+    (``private_storage``), as every test's config must.
     """
     servers = []
     store = private_storage(demo_project, tmp_path / "fake-llm-store")

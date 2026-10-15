@@ -6,7 +6,6 @@ record with Claude, ship the file, replay on the hosted demo with no key -- runs
 with no real key and nothing spent.
 """
 import importlib.util
-import shutil
 from pathlib import Path
 
 import pytest
@@ -17,6 +16,7 @@ from nl2sql.datasets.demo import CHINOOK_QUESTIONS, DEMO_QUESTIONS  # noqa: E402
 from nl2sql.llm.replay import ReplayStore  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
+from .conftest import copy_demo  # noqa: E402
 from .recordings_chinook import RULES_COUNT_CUSTOMERS  # noqa: E402
 
 SCRIPT = Path(__file__).resolve().parents[4] / "scripts" / "record_demo_answers.py"
@@ -41,7 +41,7 @@ def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project
     from nl2sql.cli.demo.playground.hosted import Hosted, Replay
 
     project = tmp_path / "demo"
-    shutil.copytree(demo_project, project)
+    copy_demo(demo_project, project)
     # The fake model says every question is Chinook's; routing alone would send the
     # support and webanalytics questions elsewhere and drop chinook under the floor.
     with open(project / "settings.yaml", "a", encoding="utf-8") as settings:

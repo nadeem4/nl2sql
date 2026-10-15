@@ -10,7 +10,9 @@ section 4; the diffs, docs/architecture/wave_a.md, section 10).
   ``UPDATE``. Old versions go only through :meth:`SqliteState.keep_snapshots`.
 * **Migrations.** ``nl2sql_meta`` records each numbered migration applied.
   Migration 1 creates 0.5's three tables if they are missing, so a 0.5
-  ``state.db`` is adopted as it is.
+  ``state.db`` is adopted as it is. They run in one ``BEGIN IMMEDIATE``
+  transaction that re-reads ``nl2sql_meta`` first, so two stores opening a
+  new file at once apply each migration exactly once.
 * **The lock** is a lease: a ``locks`` row taken in a ``BEGIN IMMEDIATE``
   transaction, with an expiry so a holder that died cannot block forever.
 
@@ -45,9 +47,24 @@ class LockHeld(RuntimeError):
 
 # -- migrations --------------------------------------------------------------------
 
+def _script(connection: sqlite3.Connection, script: str) -> None:
+    """Runs ``script`` one statement at a time, inside the caller's transaction.
+
+    ``executescript`` would commit that transaction first.
+    """
+    statement = ""
+    for line in script.splitlines(keepends=True):
+        statement += line
+        if sqlite3.complete_statement(statement):
+            connection.execute(statement)
+            statement = ""
+    if statement.strip():
+        raise ValueError(f"An incomplete statement in a migration: {statement.strip()!r}")
+
+
 def _adopt_0_5(connection: sqlite3.Connection) -> None:
     """0.5's three tables, as 0.5 created them; a 0.5 file already has them."""
-    connection.executescript("""
+    _script(connection, """
         CREATE TABLE IF NOT EXISTS schema_snapshots (
             datasource_id TEXT NOT NULL,
             schema_version TEXT NOT NULL,
@@ -98,7 +115,7 @@ def _feedback_datasources_and_source(connection: sqlite3.Connection) -> None:
 
 
 def _immutable_snapshots_and_locks(connection: sqlite3.Connection) -> None:
-    connection.executescript("""
+    _script(connection, """
         CREATE TRIGGER IF NOT EXISTS schema_snapshots_are_immutable
             BEFORE UPDATE ON schema_snapshots
             BEGIN SELECT RAISE(ABORT, 'schema snapshots are immutable'); END;
@@ -112,7 +129,7 @@ def _immutable_snapshots_and_locks(connection: sqlite3.Connection) -> None:
 
 def _schema_diffs(connection: sqlite3.Connection) -> None:
     """The structural diff that introduced each version, beside its snapshot (D31)."""
-    connection.executescript("""
+    _script(connection, """
         CREATE TABLE IF NOT EXISTS schema_diffs (
             datasource_id TEXT NOT NULL,
             schema_version TEXT NOT NULL,
@@ -136,6 +153,23 @@ _FEEDBACK_COLUMNS = ("trace_id", "created_at", "rating", "note", "question", "ro
                      "error_codes", "retries", "validator_failures", "plan_cache_hits", "sub_queries",
                      "models", "engine_version", "datasource_ids", "source")
 _JSON_COLUMNS = ("sql", "error_codes", "models", "datasource_ids")
+
+
+def _write_ahead_log(connection: sqlite3.Connection, wait_s: float = 5.0) -> None:
+    """Switches the file to WAL, waiting out another connection switching it too.
+
+    Changing the journal mode answers "database is locked" at once rather than
+    through the busy timeout, so stores opening a new file together retry here.
+    """
+    deadline = time.monotonic() + wait_s
+    while True:
+        try:
+            connection.execute("PRAGMA journal_mode=WAL;")
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc) or time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
 
 
 def _locked(method):
@@ -170,7 +204,7 @@ class SqliteState:
             if isinstance(self.path, Path):
                 self.path.parent.mkdir(parents=True, exist_ok=True)
             self._connection = sqlite3.connect(str(self.path), check_same_thread=False)
-            self._connection.execute("PRAGMA journal_mode=WAL;")
+            _write_ahead_log(self._connection)
         return self._connection
 
     @_locked
@@ -181,22 +215,32 @@ class SqliteState:
 
     @_locked
     def migrate(self) -> List[str]:
-        """Applies the migrations not yet recorded in ``nl2sql_meta``, in order; returns their names."""
+        """Applies the migrations not yet recorded in ``nl2sql_meta``, in order; returns their names.
+
+        All in one ``BEGIN IMMEDIATE`` transaction, which takes the write lock
+        before ``nl2sql_meta`` is read: another store migrating the same file
+        waits for it, then finds every migration applied.
+        """
         connection = self._conn()
-        with connection:
+        connection.execute("BEGIN IMMEDIATE;")
+        try:
             connection.execute("CREATE TABLE IF NOT EXISTS nl2sql_meta ("
                                "migration TEXT PRIMARY KEY, applied_at INTEGER NOT NULL);")
-        done = {row[0] for row in connection.execute("SELECT migration FROM nl2sql_meta;")}
-        applied = []
-        for name, migration in MIGRATIONS:
-            if name in done:
-                continue
-            with connection:
+            done = {row[0] for row in connection.execute("SELECT migration FROM nl2sql_meta;")}
+            applied = []
+            for name, migration in MIGRATIONS:
+                if name in done:
+                    continue
                 migration(connection)
                 connection.execute("INSERT INTO nl2sql_meta (migration, applied_at) VALUES (?, ?);",
                                    (name, int(self.clock())))
+                applied.append(name)
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
+        for name in applied:
             logger.info(f"Applied state migration {name}")
-            applied.append(name)
         return applied
 
     # -- snapshots ---------------------------------------------------------------

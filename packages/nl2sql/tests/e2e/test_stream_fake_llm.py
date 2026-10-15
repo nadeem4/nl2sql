@@ -15,6 +15,7 @@ import pytest
 
 pytest.importorskip("fastapi")
 
+from .conftest import copy_demo  # noqa: E402
 from .test_answer_preview_fake_llm import ANSWER, QUESTION, RULES  # noqa: E402
 from .test_result_paging_fake_llm import _env  # noqa: E402
 
@@ -131,7 +132,6 @@ def test_the_playground_streams_server_sent_events(demo_project, fake_llm, monke
 @pytest.mark.e2e
 def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, tmp_path, monkeypatch):
     """The hosted Space, keyless, streaming each guided question from the packaged recordings."""
-    import shutil
 
     from fastapi.testclient import TestClient
 
@@ -145,7 +145,7 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
     from nl2sql.testing.fake_llm import FakeLLMServer
 
     project = tmp_path / "demo"
-    shutil.copytree(demo_project, project)
+    copy_demo(demo_project, project)
     store = ReplayStore.load(replay_recordings(project / "nowhere"))
     assert set(store.covered(DEMO_QUESTIONS)) == set(DEMO_QUESTIONS)
 
