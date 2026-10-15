@@ -115,7 +115,7 @@ The share of each answerable case's needed tables and columns that schema retrie
 
 | Database | Date (UTC) | Commit | Table recall | Column recall | Δ vs previous |
 | --- | --- | --- | --- | --- | --- |
-| chinook | 2026-10-15 | 653fa73 | 97.7% | 71.9% | new series (suite changed) |
+| chinook | 2026-10-15 | 1099c15 | 97.9% | 76.5% | new series (suite changed) |
 
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->
