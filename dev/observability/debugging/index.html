@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../stack/">
+        <link rel="prev" href="../events/">
       
       
         <link rel="next" href="../feedback/">
@@ -2799,6 +2799,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -5006,9 +5034,20 @@ by time.</p>
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">"settings"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"the run's settings section: pipeline, retrieval, results, traces, schema, ..."</span><span class="p">},</span>
 <a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">"limits"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"sample_rows"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_field_chars"</span><span class="p">:</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span><span class="w"> </span><span class="nt">"max_list_items"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="nt">"note"</span><span class="p">:</span><span class="w"> </span><span class="s2">"..."</span><span class="p">},</span>
 <a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">"nodes"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"... one entry per node execution, below ..."</span><span class="p">],</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"the QueryResult, rows capped"</span><span class="p">}</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">}</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">"events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"... the run's bus events, below ..."</span><span class="p">],</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">"result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"..."</span><span class="p">:</span><span class="w"> </span><span class="s2">"the QueryResult, rows capped"</span><span class="p">}</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="p">}</span>
 </code></pre></div>
+<p><code>events</code> lists the run's own <a href="../events/">events</a> in the order they were
+published (<code>run.started</code>, each <code>node.started</code> and <code>node.finished</code> with its
+<code>sub_query_id</code>, <code>result.manifest</code>, <code>llm.call</code> and the rest), every one but
+<code>answer.delta</code>, whose text the result holds whole. Each is the event as JSON:
+<code>name</code>, <code>at</code>, <code>trace_id</code>, <code>tenant_id</code> and <code>data</code>. The trace is written before
+the run's <code>run.finished</code> is published, so the list ends just before it; the
+trace's <code>result</code> is what that event summarises.</p>
+<p>A log line written while the run was in flight carries the same <code>trace_id</code>,
+on the caller's thread and on every graph worker thread, so grepping the
+logs for a trace's id finds its lines (<a href="../events/#logs-carry-the-runs-trace_id">Events</a>).</p>
 <p>One entry of <code>nodes</code> (the planner's second attempt, from a run whose first plan
 named a column that does not exist; long values shortened here):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>

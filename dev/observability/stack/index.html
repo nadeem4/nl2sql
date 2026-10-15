@@ -8,7 +8,7 @@
 <meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
 <meta content="Platform Engineering" name="author"/>
 <link href="../../storage/artifact-store/" rel="prev"/>
-<link href="../debugging/" rel="next"/>
+<link href="../events/" rel="next"/>
 <link href="../../assets/favicon.svg" rel="icon"/>
 <meta content="mkdocs-1.6.1, mkdocs-material-9.7.7" name="generator"/>
 <title>Observability Stack - NL2SQL Platform</title>
@@ -1287,6 +1287,18 @@
 </nav>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../events/">
+<span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../debugging/">
 <span class="md-ellipsis">
     
@@ -2140,7 +2152,7 @@ telemetry</strong> on every run, plus <strong>OpenTelemetry metrics</strong> and
   the demo playground. See <a href="../../api/core/query/#usage-tokens-calls-and-model-time">the query API</a>.</li>
 <li><strong>The token counter is recorded on every run; the node-duration histogram is
   CLI-only.</strong> <code>TokenUsageCallback</code> records <code>nl2sql.token.usage</code> for every
-  caller. <code>nl2sql run</code> records <code>nl2sql.node.duration</code> from the <code>node_finished</code>
+  caller. <code>nl2sql run</code> records <code>nl2sql.node.duration</code> from the <code>node.finished</code>
   events of <code>engine.stream_query</code>, the same events any caller can read.</li>
 <li><strong>Metrics are off by default.</strong> <code>OBSERVABILITY_EXPORTER</code> defaults to <code>none</code>,
   which installs no meter provider, so every recording is discarded. The
@@ -2164,7 +2176,7 @@ telemetry</strong> on every run, plus <strong>OpenTelemetry metrics</strong> and
     Pipeline-&gt;&gt;Usage: always attached
     Usage-&gt;&gt;Metrics: nl2sql.token.usage
     Usage-&gt;&gt;Result: usage
-    Pipeline-&gt;&gt;Stream: node_started, node_finished
+    Pipeline-&gt;&gt;Stream: node.started, node.finished
     Stream-&gt;&gt;Run: each event
     Run-&gt;&gt;Metrics: configure_metrics(), nl2sql.node.duration</code></pre>
 <h2 id="metrics">Metrics</h2>

@@ -2799,6 +2799,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../observability/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../observability/debugging/" class="md-nav__link">
         
   
@@ -5156,83 +5184,104 @@ combined result is listed in <code>result_manifest</code> and read back by the r
 <h2 id="streaming-a-run">Streaming a run</h2>
 <h3 id="nl2sqlstream_query">NL2SQL.stream_query</h3>
 <p>Source:
-<code>packages/nl2sql/src/nl2sql/api/query_api.py</code>, events in
-<code>packages/nl2sql/src/nl2sql/pipeline/events.py</code></p>
+<code>packages/nl2sql/src/nl2sql/api/query_api.py</code>, step events in
+<code>packages/nl2sql/src/nl2sql/pipeline/events.py</code>, the allow-list in
+<code>packages/nl2sql/src/nl2sql/events/catalog.py</code></p>
 <p>Signature:
-<code>stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; Iterator[QueryEvent]</code></p>
-<p>The same run as <code>run_query</code>, with the same parameters, yielded as it happens.
-<code>nl2sql run</code> shows its live progress from these events.</p>
+<code>stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -&gt; Iterator[Event]</code></p>
+<p>The same run as <code>run_query</code>, with the same parameters, yielded as it happens:
+the run's own events on the engine's bus (<a href="../../../observability/events/">Events</a>),
+from the caller-safe allow-list. <code>nl2sql run</code> shows its live progress from them.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="s2">"Which genre sells the most tracks?"</span><span class="p">,</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                                 <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])):</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"node_finished"</span><span class="p">:</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"node.finished"</span><span class="p">:</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'node'</span><span class="p">]</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'seconds'</span><span class="p">]</span><span class="si">}</span><span class="s2"> s"</span><span class="p">)</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"answer_delta"</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"field"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"summary"</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"answer.delta"</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"field"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"summary"</span><span class="p">:</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">type</span> <span class="o">==</span> <span class="s2">"final"</span><span class="p">:</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span>          <span class="c1"># run_query's QueryResult, as JSON</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"run.finished"</span><span class="p">:</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"result"</span><span class="p">]</span>   <span class="c1"># run_query's QueryResult, as JSON</span>
 </code></pre></div>
-<p>A <code>QueryEvent</code> has a <code>type</code> and a JSON-ready <code>data</code> dict; <code>event.sse()</code> is the
-event as one Server-Sent Event (<code>event: &lt;type&gt;</code> and <code>data: &lt;json&gt;</code>), which is how
-<code>nl2sql-api</code> and the playground send it.</p>
+<p>An <code>Event</code> (<code>nl2sql.Event</code>, from <code>nl2sql_sdk.events</code>) has a <code>name</code>, <code>at</code> (UTC),
+the run's <code>trace_id</code>, its <code>tenant_id</code> and a JSON-ready <code>data</code> dict;
+<code>event.sse()</code> is the event as one Server-Sent Event (<code>event: &lt;name&gt;</code>, and the
+whole event as JSON on the <code>data</code> line), which is how <code>nl2sql-api</code> and the
+playground send it.</p>
 <table>
 <thead>
 <tr>
-<th>type</th>
+<th>name</th>
 <th>data</th>
 <th>when</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>node_started</code></td>
-<td><code>node</code></td>
-<td>A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry).</td>
+<td><code>run.started</code></td>
+<td><code>question</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code>, <code>datasource_id</code>, <code>execute</code></td>
+<td>The run began. Always first.</td>
 </tr>
 <tr>
-<td><code>node_finished</code></td>
-<td><code>node</code>, <code>seconds</code>, <code>ok</code></td>
+<td><code>node.started</code></td>
+<td><code>node</code>, <code>sub_query_id</code></td>
+<td>A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry). <code>sub_query_id</code> is None outside a sub-query.</td>
+</tr>
+<tr>
+<td><code>node.finished</code></td>
+<td><code>node</code>, <code>sub_query_id</code>, <code>seconds</code>, <code>ok</code></td>
 <td>The step ended; <code>ok</code> is False when it raised.</td>
 </tr>
 <tr>
-<td><code>result_manifest</code></td>
-<td><code>trace_id</code>, <code>results</code></td>
-<td>The aggregator saved the results: <code>results</code> is the run's <code>result_manifest</code> and <code>trace_id</code> its <code>request_id</code>, so <code>engine.results.page</code> can be called before the answer is written.</td>
+<td><code>result.manifest</code></td>
+<td><code>results</code></td>
+<td>The aggregator saved the results: <code>results</code> is the run's <code>result_manifest</code> and the event's <code>trace_id</code> its <code>request_id</code>, so <code>engine.results.page</code> can be called before the answer is written.</td>
 </tr>
 <tr>
-<td><code>answer_delta</code></td>
+<td><code>answer.delta</code></td>
 <td><code>field</code>, <code>text</code></td>
 <td>The next piece of <code>final_answer.summary</code> or <code>final_answer.content</code>, as the answer model writes it.</td>
 </tr>
 <tr>
-<td><code>final</code></td>
-<td><code>QueryResult.model_dump(mode="json")</code></td>
-<td>The run finished: exactly what <code>run_query</code> returns. A refusal, a provider failure, a timeout or a cancel is a <code>final</code> with <code>status: "error"</code>, as <code>run_query</code> returns it.</td>
+<td><code>sanity.flagged</code>, <code>run.limit_reached</code></td>
+<td>see <a href="../../../observability/events/">Events</a></td>
+<td>Published by the sanity checks and the caps when they arrive (Wave A's S1 and E3).</td>
 </tr>
 <tr>
-<td><code>error</code></td>
+<td><code>run.finished</code></td>
+<td>the run's summary (<code>status</code>, <code>duration_s</code>, <code>usage</code>, <code>error_codes</code>, <code>source</code>, <code>datasources</code>, <code>tables</code>, <code>result_manifest</code>, <code>user_id</code>, <code>roles</code>) plus <code>result</code></td>
+<td>The run finished. <code>result</code> is exactly what <code>run_query</code> returns, as JSON; it is on the stream's copy only, never on the bus. A refusal, a provider failure, a timeout or a cancel is a <code>run.finished</code> with <code>status: "error"</code>, as <code>run_query</code> returns it.</td>
+</tr>
+<tr>
+<td><code>run.failed</code></td>
 <td><code>message</code>, <code>error_code</code></td>
 <td>The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built).</td>
 </tr>
 </tbody>
 </table>
-<p>Every stream ends in exactly one <code>final</code> or <code>error</code>.</p>
+<p>Every stream ends in exactly one <code>run.finished</code> or <code>run.failed</code>. Operator
+events (<code>policy.decision</code>, <code>hook.decision</code>, <code>llm.call</code>, <code>plan_cache.lookup</code>)
+are never on it: a denial would tell a denied caller which table exists, and the
+rest are operator data. An operator reads them with <code>engine.events.subscribe</code>.</p>
 <p>How it works:</p>
 <ul>
 <li>The run goes on a thread of its own, started on the first <code>next()</code>; the caller's
   context goes with it, so request-scoped keys (<code>nl2sql.llm.request_key</code>) reach the
   graph as they do in <code>run_query</code>.</li>
-<li><code>run_with_graph</code> is given a <code>RunEvents</code> callback, the same kind of LangChain
-  callback as the timing and usage ones. A node's own run (its name is its
-  <code>langgraph_node</code>) is a <code>node_started</code> / <code>node_finished</code>; the runnables inside a
-  node are not events. The aggregator's end carries the manifest.</li>
+<li>Every run (streamed or not) has a <code>RunScope</code>, and <code>QueryAPI.open_scope</code> attaches
+  a <code>RunEvents</code> to it: a LangChain callback the graph gets with the scope's
+  callbacks, which publishes through the scope. A node's own run (its name is its
+  <code>langgraph_node</code>) is a <code>node.started</code> / <code>node.finished</code>; the runnables inside a
+  node are not events. The aggregator's end publishes <code>result.manifest</code>. The
+  stream subscribes to its scope's events from the allow-list
+  (<code>nl2sql.events.STREAM_EVENTS</code>), so it yields exactly what the bus carries, in
+  publish order, and then its own <code>run.finished</code> with the result.</li>
 <li><code>run_with_graph(stream_answer=True)</code> asks the answer synthesizer to stream: its
   chain is <code>streaming_structured</code> (<code>nl2sql.llm.wires</code>) instead of <code>structured</code>, the
   same request with <code>stream</code> on. Each piece of the answer's tool call reaches
   <code>on_llm_new_token</code>; <code>RunEvents</code> parses the arguments so far as partial JSON and
-  emits what <code>summary</code> and <code>content</code> gained. The pieces are joined into one message
+  publishes what <code>summary</code> and <code>content</code> gained as <code>answer.delta</code>. The pieces are joined into one message
   before the parser sees it, so the answer, and the token usage the call reports,
   are the unstreamed call's. On the Anthropic wire the joined message gets the same
   tool-call repair as an unstreamed one.</li>
@@ -5242,7 +5291,7 @@ event as one Server-Sent Event (<code>event: &lt;type&gt;</code> and <code>data:
 <p>Token by token, per wire: both the OpenAI wire (OpenAI, OpenRouter, Ollama, any
 OpenAI-compatible endpoint) and the Anthropic wire stream the answer's forced tool
 call, so the answer streams on every provider; how finely is the provider's choice,
-and one that sends the whole answer at once gives one <code>answer_delta</code> per field. The
+and one that sends the whole answer at once gives one <code>answer.delta</code> per field. The
 other model steps return a typed object the next step needs whole, and are not
 streamed. <code>FakeLLMServer</code> streams both wires, a word at a time, so replay mode and
 the keyless tests stream too.</p>

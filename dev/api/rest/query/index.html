@@ -2799,6 +2799,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../observability/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../observability/debugging/" class="md-nav__link">
         
   
@@ -5385,7 +5413,11 @@ event loop.</p>
 (<code>Content-Type: text/event-stream</code>). The request body, the caller role and the 401
 are exactly those of <code>/query</code>. Delegates to <code>engine.stream_query(...)</code> (see
 <a href="../../core/query/#streaming-a-run">the core query API</a>).</p>
-<p>Each event is an <code>event:</code> line naming its type and one <code>data:</code> line of JSON:</p>
+<p>The events are the engine's own run events
+(<a href="../../../observability/events/">Events</a>), from the caller-safe allow-list. Each
+is an <code>event:</code> line naming it and one <code>data:</code> line holding the whole event as
+JSON: <code>name</code>, <code>at</code> (UTC), <code>trace_id</code> (the run's, its <code>request_id</code> for the result
+routes), <code>tenant_id</code> and <code>data</code>. The table lists each event's <code>data</code>:</p>
 <table>
 <thead>
 <tr>
@@ -5396,62 +5428,71 @@ are exactly those of <code>/query</code>. Delegates to <code>engine.stream_query
 </thead>
 <tbody>
 <tr>
-<td><code>node_started</code></td>
-<td><code>node</code></td>
+<td><code>run.started</code></td>
+<td><code>question</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code>, <code>datasource_id</code>, <code>execute</code></td>
+<td>The run began. Always first.</td>
+</tr>
+<tr>
+<td><code>node.started</code></td>
+<td><code>node</code>, <code>sub_query_id</code></td>
 <td>A pipeline step began. The SQL agent's steps (<code>ast_planner</code>, <code>logical_validator</code>, <code>generator</code>, <code>executor</code>) come once per sub-query, and again on a retry.</td>
 </tr>
 <tr>
-<td><code>node_finished</code></td>
-<td><code>node</code>, <code>seconds</code>, <code>ok</code></td>
+<td><code>node.finished</code></td>
+<td><code>node</code>, <code>sub_query_id</code>, <code>seconds</code>, <code>ok</code></td>
 <td>The step ended; <code>ok</code> is <code>false</code> when it raised.</td>
 </tr>
 <tr>
-<td><code>result_manifest</code></td>
-<td><code>trace_id</code>, <code>results</code></td>
-<td>The aggregator saved the run's results. <code>results</code> is the <code>result_manifest</code> the final response will carry, so a client can start paging the rows (with <code>trace_id</code> as <code>request_id</code>) before the answer is written.</td>
+<td><code>result.manifest</code></td>
+<td><code>results</code></td>
+<td>The aggregator saved the run's results. <code>results</code> is the <code>result_manifest</code> the final response will carry, so a client can start paging the rows (with the event's <code>trace_id</code> as <code>request_id</code>) before the answer is written.</td>
 </tr>
 <tr>
-<td><code>answer_delta</code></td>
+<td><code>answer.delta</code></td>
 <td><code>field</code>, <code>text</code></td>
 <td>The next piece of the answer's <code>summary</code> or <code>content</code>, as the answer model writes it. Joined in order, the pieces of a field are that field of <code>final_answer</code>.</td>
 </tr>
 <tr>
-<td><code>final</code></td>
-<td>the <code>QueryResponse</code></td>
-<td>The last event of a run that finished: exactly what <code>/query</code> returns for it. A refusal or a provider failure is a <code>final</code> with <code>status: "error"</code>, as <code>/query</code> returns it.</td>
+<td><code>sanity.flagged</code>, <code>run.limit_reached</code></td>
+<td>see <a href="../../../observability/events/">Events</a></td>
+<td>A sanity check's finding; a cost or call cap reached.</td>
 </tr>
 <tr>
-<td><code>error</code></td>
+<td><code>run.finished</code></td>
+<td>the run's summary, plus <code>result</code>: the <code>QueryResponse</code></td>
+<td>The last event of a run that finished: <code>result</code> is exactly what <code>/query</code> returns for it. A refusal or a provider failure is a <code>run.finished</code> with <code>status: "error"</code>, as <code>/query</code> returns it.</td>
+</tr>
+<tr>
+<td><code>run.failed</code></td>
 <td><code>message</code>, <code>error_code</code></td>
 <td>The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server).</td>
 </tr>
 </tbody>
 </table>
-<p>Every stream ends in exactly one <code>final</code> or one <code>error</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>event: node_started
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>data: {"node": "datasource_resolver"}
+<p>Every stream ends in exactly one <code>run.finished</code> or one <code>run.failed</code>. Policy
+denials, hook decisions and model calls are never on it; they are an
+operator's, through <code>engine.events.subscribe</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>event: run.started
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>data: {"name": "run.started", "at": "2026-10-15T09:12:03.120Z", "trace_id": "0f1c...", "tenant_id": null, "data": {"question": "Who are the top 5 customers by revenue?", ...}}
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>event: node_finished
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>data: {"node": "datasource_resolver", "seconds": 0.41, "ok": true}
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>event: node.started
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>data: {"name": "node.started", ..., "data": {"node": "datasource_resolver", "sub_query_id": null}}
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>...
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>event: result_manifest
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>data: {"trace_id": "0f1c...", "results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false}]}
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>event: node.finished
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>data: {"name": "node.finished", ..., "data": {"node": "datasource_resolver", "sub_query_id": null, "seconds": 0.41, "ok": true}}
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>...
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>event: node_started
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>data: {"node": "answer_synthesizer"}
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>event: result.manifest
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>data: {"name": "result.manifest", ..., "trace_id": "0f1c...", "data": {"results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false}]}}
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
-<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>event: answer_delta
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>data: {"field": "summary", "text": "Acme leads "}
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>event: answer.delta
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>data: {"name": "answer.delta", ..., "data": {"field": "summary", "text": "Acme leads "}}
 <a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
-<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>event: answer_delta
-<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>data: {"field": "summary", "text": "the top 5 customers"}
-<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>
-<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>...
-<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
-<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>event: final
-<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>data: {"sub_queries": [...], "final_answer": {...}, "status": "success", ...}
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>...
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>event: run.finished
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>data: {"name": "run.finished", ..., "data": {"status": "success", "duration_s": 6.2, ..., "result": {"sub_queries": [...], "final_answer": {...}, "status": "success", ...}}}
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query/stream<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-NL2SQL-Role: admin"</span><span class="w"> </span><span class="se">\</span>
@@ -5463,10 +5504,10 @@ OpenAI's (OpenAI, OpenRouter, Ollama and any OpenAI-compatible endpoint) streams
 the answer's tool call as argument pieces, Anthropic's as <code>input_json_delta</code>
 pieces, and the engine reads <code>summary</code> and <code>content</code> out of them as they grow.
 How finely the text arrives is the provider's choice: a provider or a local
-server that sends the whole answer in one piece gives one <code>answer_delta</code> per
+server that sends the whole answer in one piece gives one <code>answer.delta</code> per
 field. The other model steps (resolver, decomposer, planner, refiner) return a
 typed object the next step needs whole, so they are not streamed; their progress
-is their <code>node_started</code> and <code>node_finished</code>. A streamed answer reports the same
+is their <code>node.started</code> and <code>node.finished</code>. A streamed answer reports the same
 token usage as an unstreamed one (<code>stream_options.include_usage</code> is sent on the
 OpenAI wire).</p>
 <p>The route answers <code>Cache-Control: no-cache</code> and <code>X-Accel-Buffering: no</code>, so a
@@ -5548,8 +5589,8 @@ caller (<code>get_user_context</code> override, role <code>admin</code>), so no 
 network access is required. <code>packages/api/tests/test_auth.py</code> covers the role
 sources and the 401.</p>
 <p><code>packages/api/tests/test_query_stream_route.py</code> covers the stream route the same
-way: the content type, the events in order, a <code>final</code> equal to the <code>/query</code>
-response, the 401 and the <code>error</code> event. <code>packages/nl2sql/tests/e2e/test_stream_fake_llm.py</code>
+way: the content type, the events in order, a <code>run.finished</code> whose <code>result</code> equals
+the <code>/query</code> response, the 401 and the <code>run.failed</code> event. <code>packages/nl2sql/tests/e2e/test_stream_fake_llm.py</code>
 streams a question on the demo databases through this route with no key.</p>
 
 

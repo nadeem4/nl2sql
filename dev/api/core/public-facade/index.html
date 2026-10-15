@@ -2799,6 +2799,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../observability/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../observability/debugging/" class="md-nav__link">
         
   
@@ -5124,7 +5152,7 @@ datasource fails.</p>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">engine</span><span class="o">.</span><span class="n">feedback</span>      <span class="c1"># record, list, stats, export, clear</span>
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">engine</span><span class="o">.</span><span class="n">traces</span>        <span class="c1"># get, replay</span>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span>       <span class="c1"># info, purge</span>
-<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">engine</span><span class="o">.</span><span class="n">events</span>        <span class="c1"># the engine's events (filled in release 0.7)</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">engine</span><span class="o">.</span><span class="n">events</span>        <span class="c1"># subscribe, catalog</span>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span>         <span class="c1"># evaluation (filled in release 0.7)</span>
 <a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">engine</span><span class="o">.</span><span class="n">benchmark</span>     <span class="c1"># run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2</span>
 </code></pre></div>
@@ -5173,8 +5201,12 @@ datasource fails.</p>
 <td><a href="../../../benchmarks/">Benchmarks</a></td>
 </tr>
 <tr>
-<td><code>events</code>, <code>evals</code></td>
-<td>Empty in this release; <a href="../../../architecture/wave_a/">Wave A</a> fills them</td>
+<td><code>events</code></td>
+<td><a href="../../../observability/events/">Events</a></td>
+</tr>
+<tr>
+<td><code>evals</code></td>
+<td>Empty in this release; <a href="../../../architecture/wave_a/">Wave A</a> fills it</td>
 </tr>
 </tbody>
 </table>
@@ -5275,7 +5307,7 @@ message names each one and why. <code>nl2sql trace replay</code> is built on it 
 <p>Clients import everything they need from <code>nl2sql</code> itself, never from an engine
 submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</code>, <code>RowSample</code>,
 <code>AnswerSource</code>, <code>ResultSummary</code>, <code>ResultManifest</code>, <code>ResultPage</code>,
-<code>ResultNotFound</code>, <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>, <code>QueryEvent</code>,
+<code>ResultNotFound</code>, <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>,
 <code>UserContext</code>, <code>CancellationToken</code>, <code>configure_logging</code>,
 <code>TraceContextFilter</code>, the event types (<code>Event</code>, <code>Observer</code>), a run's ending
 (<code>RunStop</code>, <code>ApprovalRequest</code>, <code>Approval</code>, <code>VerifiedRef</code>), what the namespaces

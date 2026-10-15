@@ -1750,6 +1750,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/events/">
+<span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../observability/debugging/">
 <span class="md-ellipsis">
     
@@ -4858,7 +4870,7 @@ about 2 seconds warm.</p>
 <p>How Phase 1 gets there:
 - <code>nl2sql/__init__.py</code> imports only <code>nl2sql.config</code> (pydantic models),
   <code>nl2sql.registry</code> and the <code>NL2SQL</code> class. Everything else that it exports
-  (result types, <code>QueryEvent</code>, <code>CancellationToken</code>) goes through the module's
+  (result types, <code>Event</code>, <code>CancellationToken</code>) goes through the module's
   <code>__getattr__</code>, which is the pattern it already uses for <code>BenchmarkAPI</code>.
 - The facade module imports the runtime inside <code>NL2SQL.__init__</code>, not at the
   top of the module.
@@ -4909,7 +4921,7 @@ settled these details:</p>
   runtime behind it. <code>nl2sql run</code> shows its live progress from
   <code>stream_query</code>'s events (the <code>PipelineRunner</code> and the monitor callback
   are deleted; <code>--show-perf</code> is each step's time from its
-  <code>node_finished</code> event, and the CLI records <code>nl2sql.node.duration</code> from
+  <code>node_finished</code> event (<code>node.finished</code> from Wave A), and the CLI records <code>nl2sql.node.duration</code> from
   them). <code>index.build</code> gains <code>on_datasource</code>, called with an
   <code>IndexProgress</code> (<code>datasource_id</code>, <code>state</code>: <code>started</code>, <code>done</code> with
   <code>counts</code>, or <code>failed</code> with <code>reason</code>) that a console line and a Phase 4

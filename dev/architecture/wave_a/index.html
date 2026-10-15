@@ -1769,6 +1769,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/events/">
+<span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../observability/debugging/">
 <span class="md-ellipsis">
     
@@ -3097,7 +3109,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0, the foundation, is built. Phase 1 is
+as Phase 1 and Phase 2 did; A0, the foundation, and E1 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -3886,6 +3898,54 @@ added to <code>UsageTotals</code> or <code>ResultSummary</code> never fails a ru
 query's SQL, as <code>datasource.schema.table</code>. <code>engine.events</code> and
 <code>engine.evals</code> are empty namespaces; E1 adds <code>subscribe</code> and <code>catalog</code>.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built: run events, the stream and <code>engine.events</code> (E1)</p>
+<p><code>pipeline/events.py</code>'s <code>RunEvents(publish)</code> is a LangChain callback that
+publishes <code>node.started</code>, <code>node.finished</code> (each with its
+<code>sub_query_id</code>, from the sub-query subgraph's <code>subgraph_id</code> and inherited
+by the runs inside it), <code>result.manifest</code> (<code>results</code> only; the event's
+<code>trace_id</code> is the <code>request_id</code>) and <code>answer.delta</code>. <code>QueryAPI.open_scope</code>
+attaches one to every scope (<code>scope.attach(RunEvents(scope.publish))</code>),
+so every run publishes its steps, streamed or not, and
+<code>scope.callbacks()</code> is now the usage collector, the <code>RunEvents</code>, then
+whatever was attached. <code>QueryEvent</code> is deleted, with its export.
+<strong>The allow-list is one definition:</strong> each catalog entry (<code>EventSpec</code>)
+has <code>stream</code> and <code>audit</code> flags, and <code>nl2sql.events.STREAM_EVENTS</code> (D17)
+and <code>AUDIT_EVENTS</code> (D19, which E2's <code>audit</code> observer reads; of
+<code>hook.decision</code> it keeps the decisions the entry's description names)
+are derived from them; <code>EventInfo</code> reports both. A later event joins a
+list by its own catalog entry (Wave B's events stay off the stream). The
+stream: <code>QueryAPI.stream_query(..., scope=None, names=STREAM_EVENTS)</code>
+yields <code>Event</code>s. <code>RunScope.follow(fn, names)</code> replays what the scope
+already published (<code>RunScope.events</code>, a new list of every event the
+scope published, in order) and attaches <code>fn</code>, both under the scope's
+lock, so an event published meanwhile is neither lost nor doubled; the
+stream follows its scope with <code>names</code> minus <code>run.finished</code>, and puts its
+own <code>run.finished</code>: the summary
+<code>close_scope</code> (which now returns the published event) returned, plus
+<code>data.result</code>. So a scope opened before the stream (Wave C's turn, need
+A2) still gives the stream its <code>run.started</code> and anything the turn
+published in it, and <code>names</code> (internal) is where Wave C's
+<code>conversations.stream</code> adds <code>conversation.rewritten</code> (need A4); it
+appends <code>conversation.turn</code> after the stream's <code>run.finished</code> itself.
+The stream ends with exactly one terminal event whatever breaks: when
+no <code>run.failed</code> reached it (the scope could not open, was already
+closed, or a collector raised on its terminal event), it ends with a
+<code>run.failed</code> built in place, with the scope's <code>trace_id</code> when there is
+a scope. A <code>KeyboardInterrupt</code> ends it the same way. <code>scope=</code> is kept on
+<code>run_query</code> and <code>stream_query</code>; a closed <code>scope=</code> is a <code>ValueError</code> at
+the call. <code>engine.events.subscribe(fn, names=None)</code> subscribes to
+<code>Runtime.bus</code> (fail open) and <code>catalog()</code> returns <code>catalog()</code>. The trace
+document has <code>events</code> (the scope's events but <code>answer.delta</code>); since
+<code>run_with_graph</code> writes the trace before <code>run.finished</code> is published,
+the list ends before it. That reads <code>scope.events</code> in
+<code>pipeline/runtime.py</code> (one argument to <code>write_run_trace</code>), not
+<code>tracing/recorder.py</code>, a small difference from the file list above.
+<code>nl2sql run</code>, the playground (<code>app.py</code> and <code>web/playground/src/stream.js</code>,
+rebuilt) and <code>nl2sql-api</code>'s stream route read the new names; each SSE
+<code>data</code> line is the whole event. The invariant <em>Events Carry No Rows, and
+the Stream Carries No Operator Data</em> is in <code>invariants.md</code>.</p>
+</div>
 <h2 id="4-observers">4. Observers</h2>
 <h3 id="the-registry-kind-and-the-config">The registry kind and the config</h3>
 <table>
@@ -4046,6 +4106,16 @@ result depends on them:</p>
   configured; <code>--log-format json</code> (and <code>NL2SQL_LOG_FORMAT</code>) chooses it for
   any command. <code>NL2SQL_LOG_FORMAT</code> joins <code>READS_THE_ENVIRONMENT</code>.</li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Built: log correlation (E1)</p>
+<p><code>run_query</code> and <code>stream_query</code>'s thread run inside <code>scope.entered()</code> as
+well as the graph's worker, so every log line written during a run, on
+the caller's thread or a LangGraph worker thread, carries its <code>trace_id</code>
+and <code>tenant_id</code> (<code>test_every_log_line_in_a_run_has_its_trace_id</code>,
+<code>test_log_lines_on_worker_threads_have_the_trace_id</code>).
+<code>docs/observability/events.md</code> shows a library caller adding
+<code>TraceContextFilter</code>.</p>
+</div>
 <h2 id="5-cost-the-price-table-and-per-question-caps">5. Cost, the price table and per-question caps</h2>
 <h3 id="the-price-table">The price table</h3>
 <p><code>evaluation/prices.py</code> moves to <code>nl2sql/llm/prices.py</code> (D11). It keeps its
