@@ -10,17 +10,24 @@ on every PR (0.6's tier 1).
 import pytest
 
 from nl2sql import NL2SQL, load_config
+from nl2sql.config import Storage
 from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 
-from .conftest import PROVIDER_KEYS
+from .conftest import PROVIDER_KEYS, private_storage
+
+
+def _private(demo_project, tmp_path):
+    """The demo's config on a private copy of its index and state store: the shared ``state.db`` raced."""
+    config = load_config(demo_project / "nl2sql.yaml")
+    return config.model_copy(update={"storage": Storage(path=private_storage(demo_project, tmp_path / "store"))})
 
 
 @pytest.mark.e2e
-def test_mode_plans_needs_no_key(demo_project, monkeypatch):
+def test_mode_plans_needs_no_key(demo_project, monkeypatch, tmp_path):
     for variable in PROVIDER_KEYS:
         monkeypatch.delenv(variable, raising=False)
     events = []
-    with NL2SQL(load_config(demo_project / "nl2sql.yaml")) as engine:
+    with NL2SQL(_private(demo_project, tmp_path)) as engine:
         engine._runtime.bus.subscribe(events.append, names=["eval.case", "eval.finished", "run.started"])
         report = engine.evals.run(mode="plans")
 

@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import GraphState
 
-from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode, RunWarning
 from nl2sql.common.logger import get_logger
 from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
@@ -21,23 +21,27 @@ from .prompts import ANSWER_SYNTHESIZER_PROMPT, VERIFIED_QUERY_SECTION
 logger = get_logger("answer_synthesizer")
 
 
-def _notes(warnings: List[Dict[str, Any]], code: str) -> List[str]:
-    """The messages of the run's ``code`` warnings, each once.
+def _notes(warnings: List[RunWarning], *codes: str) -> List[str]:
+    """The messages of the run's warnings with one of ``codes``, each once.
 
-    Only WARNING ones: an ERROR one belonged to an attempt a retry has since
-    replaced, or ended the run.
+    Not a recovered one: it belonged to an attempt a retry has since replaced.
     """
     notes: List[str] = []
     for w in warnings or []:
-        if w.get("error_code") == code and w.get("severity") == "WARNING":
-            if w.get("message") and w["message"] not in notes:
-                notes.append(w["message"])
+        if w.code in codes and not w.detail.get("recovered"):
+            if w.message and w.message not in notes:
+                notes.append(w.message)
     return notes
 
 
-def _missing_values(warnings: List[Dict[str, Any]]) -> List[str]:
-    """The run's "there is no Genre with Name 'Polka'" notes (``VALUE_NOT_FOUND``)."""
-    return _notes(warnings, "VALUE_NOT_FOUND")
+# The sanity checks' findings the answer is told about and says: "there is no
+# Genre with Name 'Polka'", a sum over rows a join repeated, a column with no value.
+_DATA_NOTES = ("VALUE_NOT_FOUND", "JOIN_FAN_OUT", "ALL_NULL_COLUMN")
+
+
+def _data_notes(warnings: List[RunWarning]) -> List[str]:
+    """The run's sanity-check notes (``executor/sanity/``)."""
+    return _notes(warnings, *_DATA_NOTES)
 
 
 def result_preview(result: Dict[str, Any], preview_rows: int,
@@ -150,7 +154,7 @@ class AnswerSynthesizerNode:
                     u.model_dump()
                     for u in (state.decomposer_response.unmapped_subqueries or [])
                 ]
-            notes = _missing_values(state.warnings)
+            notes = _data_notes(state.warnings)
             cut = _cut_results(state)
             inputs = {
                 "user_query": state.user_query,

@@ -6,12 +6,21 @@ covers every answerable case and reports recall and routing, not what they are.
 import pytest
 
 from nl2sql import NL2SQL, load_config
+from nl2sql.config import Storage
 from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
+
+from .conftest import private_storage
+
+
+def _private(demo_project, tmp_path):
+    """The demo's config on a private copy of its index and state store: the shared ``state.db`` raced."""
+    config = load_config(demo_project / "nl2sql.yaml")
+    return config.model_copy(update={"storage": Storage(path=private_storage(demo_project, tmp_path / "store"))})
 
 
 @pytest.mark.e2e
-def test_mode_retrieval_scores_every_answerable_case(demo_project):
-    with NL2SQL(load_config(demo_project / "nl2sql.yaml")) as engine:
+def test_mode_retrieval_scores_every_answerable_case(demo_project, tmp_path):
+    with NL2SQL(_private(demo_project, tmp_path)) as engine:
         report = engine.evals.run(mode="retrieval", roles=["admin"])
 
     board = report.configs["retrieval"]

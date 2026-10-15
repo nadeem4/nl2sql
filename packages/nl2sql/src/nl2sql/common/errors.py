@@ -1,6 +1,6 @@
 from enum import Enum, auto
-from typing import Optional, Any
-from pydantic import BaseModel, ConfigDict
+from typing import Any, Dict, Optional
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ErrorSeverity(str, Enum):
@@ -154,3 +154,32 @@ class PipelineError(BaseModel):
         """
         return SAFE_ERROR_MESSAGES.get(self.error_code, self.message)
 
+
+class RunWarning(BaseModel):
+    """Something a run's answer should say, without failing the run (``QueryResult.warnings``).
+
+    Not ``Warning``, which is a Python builtin. ``code`` is an ``ErrorCode``
+    value (``VALUE_NOT_FOUND``, ``JOIN_FAN_OUT``, ``ALL_NULL_COLUMN``,
+    ``JOIN_KEY_UNCONVERTED``, ``RESULT_TRUNCATED``, ...), ``node`` the node that
+    found it, ``message`` what the answer says, and ``sub_query_id`` the
+    sub-query it is about, when it is about one. ``detail`` holds what a
+    program may branch on; it never holds result rows or sample values.
+    ``detail["recovered"]`` is True for an earlier attempt's error that a
+    retry has since replaced: the trace of a retry, not something the answer
+    says.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    node: str
+    message: str
+    sub_query_id: Optional[str] = None
+    detail: Dict[str, Any] = Field(default_factory=dict)
+
+    @classmethod
+    def of(cls, error: PipelineError, sub_query_id: Optional[str] = None) -> "RunWarning":
+        """``error`` as a warning of a run that went on. Its ``details`` stay behind: they are not sent to callers."""
+        recovered = error.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)
+        return cls(code=getattr(error.error_code, "value", str(error.error_code)), node=error.node,
+                   message=error.message, sub_query_id=sub_query_id,
+                   detail={"recovered": True} if recovered else {})

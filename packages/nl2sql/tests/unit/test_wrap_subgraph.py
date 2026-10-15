@@ -119,9 +119,9 @@ def test_a_retry_that_recovers_reports_success_and_keeps_the_history():
     assert [e.error_code for e in output.errors] == [ErrorCode.TABLE_NOT_FOUND]
     assert out["errors"] == []
     [superseded] = out["warnings"]
-    assert superseded["error_code"] == "TABLE_NOT_FOUND"
-    assert superseded["severity"] == "ERROR"
-    assert superseded["sub_query_id"] == "sq1"
+    assert superseded.code == "TABLE_NOT_FOUND"
+    assert superseded.detail == {"recovered": True}
+    assert superseded.sub_query_id == "sq1"
 
 
 def test_sql_that_did_not_execute_reports_error():
@@ -171,4 +171,4 @@ def test_the_question_status_follows_the_sub_query():
     assert recovered.sub_queries[0].status == "success"
     assert recovered.status == "success"
     assert recovered.errors == []
-    assert [w["error_code"] for w in recovered.warnings] == ["TABLE_NOT_FOUND"]
+    assert [w.code for w in recovered.warnings] == ["TABLE_NOT_FOUND"]

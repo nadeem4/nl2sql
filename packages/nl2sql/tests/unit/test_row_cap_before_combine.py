@@ -138,8 +138,8 @@ def test_a_union_with_a_capped_input_runs_and_warns(tmp_path):
     assert not out.get("errors")
     assert len(out["aggregator_response"].terminal_results["combine_g1"]) == 6
     [warning] = out["warnings"]
-    assert warning["error_code"] == ErrorCode.RESULT_TRUNCATED.value
-    assert warning["sub_query_id"] == "sq_a"
+    assert warning.code == ErrorCode.RESULT_TRUNCATED.value
+    assert warning.sub_query_id == "sq_a"
 
 
 def test_inputs_under_the_cap_join_as_before(tmp_path):

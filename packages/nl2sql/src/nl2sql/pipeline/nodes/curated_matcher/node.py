@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from nl2sql.common.errors import ErrorCode, PipelineError
+from nl2sql.common.errors import ErrorCode, PipelineError, RunWarning
 from nl2sql.common.logger import get_logger
 from nl2sql.events import publish
 from nl2sql.execution.artifacts.results import ResultSummary
@@ -175,8 +175,8 @@ class CuratedMatcherNode:
             record["detail"] = fallback.detail
             out = {}
             if fallback.reason == "execution_failed":
-                out["warnings"] = [{"node": self.node_name, "message": fallback.detail,
-                                    "error_code": "CURATED_FALLBACK", "severity": "WARNING"}]
+                out["warnings"] = [RunWarning(code="CURATED_FALLBACK", node=self.node_name,
+                                              message=fallback.detail)]
             logger.info(f"Curated answers fell back ({fallback.reason}): {fallback.detail}")
         except Exception as exc:  # never an error of the run
             logger.warning(f"Curated matcher failed, falling back: {exc}")

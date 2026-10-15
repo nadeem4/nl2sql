@@ -15,7 +15,7 @@ Result Limit (whether the result was cut short at the row limit):
 Unmapped Subqueries (if any):
 {unmapped_subqueries}
 
-Data Notes (values the question filtered on that do not exist):
+Data Notes (checks on the result: values the question filtered on that do not exist, totals a join may have counted more than once, columns with no values):
 {data_notes}
 
 Instructions:
@@ -25,7 +25,7 @@ Instructions:
 4. If the result limit says the result was cut short, say it was cut at that many rows and that the user should narrow the question. Never present a cut result as complete.
 5. If results contain error messages, explain them clearly.
 6. If there are unmapped subqueries, add user-facing warnings that explain what was skipped and why.
-7. If there are data notes, say that the value does not exist (and name the closest values if given) instead of reporting an empty result as a finding.
+7. If there are data notes, say what they say: that a value does not exist (and name the closest values if given) instead of reporting an empty result as a finding; that a total may count rows more than once; that a column has no values.
 """
 
 # Appended only when a verified query answered, so a generated answer's prompt

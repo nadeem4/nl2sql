@@ -31,7 +31,7 @@ def _query_result() -> QueryResult:
         final_answer={"summary": "Revenue by region", "format_type": "table", "content": "| region |"},
         trace_id="trace-123",
         reasoning=[{"node": "decomposer", "message": "split into 1 sub-query"}],
-        warnings=[{"node": "executor", "message": "row limit applied"}],
+        warnings=[{"code": "RESULT_TRUNCATED", "node": "executor", "message": "row limit applied"}],
         artifact_refs={"sq-1": _artifact_ref()},
     )
 

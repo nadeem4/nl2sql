@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 
 import polars as pl
 
-from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
+from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode, RunWarning
 from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
@@ -80,16 +80,15 @@ class EngineAggregatorNode:
                 "aggregator_response": aggregator_response,
                 "reasoning": [{"node": self.node_name, "content": "ExecutionDAG aggregation executed successfully."}],
                 "warnings": [
-                    {
-                        "node": self.node_name,
-                        "message": (
+                    RunWarning(
+                        code=ErrorCode.RESULT_TRUNCATED.value,
+                        node=self.node_name,
+                        message=(
                             f"Sub-query '{sq_id}' returned {cap} rows, the row cap, so its part of the "
                             f"{operation} may be incomplete."
                         ),
-                        "error_code": ErrorCode.RESULT_TRUNCATED.value,
-                        "severity": ErrorSeverity.WARNING.value,
-                        "sub_query_id": sq_id,
-                    }
+                        sub_query_id=sq_id,
+                    )
                     for operation, sq_id, cap in capped
                 ] + gone + self._unconverted(state, unconverted),
             }
@@ -108,20 +107,20 @@ class EngineAggregatorNode:
                 "errors": [error],
             }
 
-    def _unconverted(self, state: GraphState, found: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _unconverted(self, state: GraphState, found: List[Dict[str, Any]]) -> List[RunWarning]:
         """A ``JOIN_KEY_UNCONVERTED`` warning for each side of a join key with values that did not convert."""
         datasources = {sq.id: sq.datasource_id for sq in
                        (state.decomposer_response.sub_queries if state.decomposer_response else [])}
-        return [{
-            "node": self.node_name,
-            "message": (f"{f['failed']} of {f['total']} {datasources.get(f['sub_query_id'], f['sub_query_id'])}."
-                        f"{f['column']} values are not {DTYPE_PLURAL[f['dtype']]} and joined nothing."),
-            "error_code": ErrorCode.JOIN_KEY_UNCONVERTED.value,
-            "severity": ErrorSeverity.WARNING.value,
-            "sub_query_id": f["sub_query_id"],
-        } for f in found]
+        return [RunWarning(
+            code=ErrorCode.JOIN_KEY_UNCONVERTED.value,
+            node=self.node_name,
+            message=(f"{f['failed']} of {f['total']} {datasources.get(f['sub_query_id'], f['sub_query_id'])}."
+                     f"{f['column']} values are not {DTYPE_PLURAL[f['dtype']]} and joined nothing."),
+            sub_query_id=f["sub_query_id"],
+            detail={"column": f["column"], "failed": f["failed"], "total": f["total"], "dtype": f["dtype"]},
+        ) for f in found]
 
-    def _dropped_groups(self, dag, dropped: Set[str]) -> List[Dict[str, Any]]:
+    def _dropped_groups(self, dag, dropped: Set[str]) -> List[RunWarning]:
         """A warning for each combine group a hook's dropped sub-query left unanswered.
 
         A ``join`` or ``compare`` with one input dropped is dropped whole (it
@@ -135,13 +134,12 @@ class EngineAggregatorNode:
                 continue
             if operation in _TWO_SIDED or inputs <= dropped:
                 missing = ", ".join(f"'{i}'" for i in sorted(inputs & dropped))
-                warnings.append({
-                    "node": self.node_name,
-                    "message": (f"The {operation} '{node.attributes.get('group_id')}' was not answered: it needs "
-                                f"sub-query {missing}, which a hook stopped."),
-                    "error_code": ErrorCode.HOOK_DENIED.value,
-                    "severity": ErrorSeverity.WARNING.value,
-                })
+                warnings.append(RunWarning(
+                    code=ErrorCode.HOOK_DENIED.value,
+                    node=self.node_name,
+                    message=(f"The {operation} '{node.attributes.get('group_id')}' was not answered: it needs "
+                             f"sub-query {missing}, which a hook stopped."),
+                ))
         return warnings
 
     def _all_dropped(self, dropped: Set[str]) -> Dict[str, Any]:

@@ -25,7 +25,7 @@ Fields (exact names and types from code):
 - `subgraph_outputs: Annotated[Dict[str, SubgraphOutput], update_results]`
 - `errors: Annotated[List[PipelineError], operator.add]`
 - `reasoning: Annotated[List[Dict[str, Any]], operator.add]`
-- `warnings: Annotated[List[Dict[str, Any]], operator.add]`
+- `warnings: Annotated[List[RunWarning], operator.add]`
 - `subgraph_id: Optional[str]`
 - `subgraph_name: Optional[str]`
 - `pinned: Optional[PinnedRun]` (a pinned decomposition and plans; `source` is a `PinnedSource`: `supplied`, `approved` or `chosen`)
@@ -57,7 +57,7 @@ Fields (exact names and types from code):
 - `retry_count: int`
 - `errors: Annotated[List[PipelineError], operator.add]`
 - `reasoning: Annotated[List[Dict[str, Any]], operator.add]`
-- `warnings: Annotated[List[Dict[str, Any]], operator.add]`
+- `warnings: Annotated[List[RunWarning], operator.add]`
 
 ### Subgraph output structure
 - `SubgraphOutput` in `packages/nl2sql/src/nl2sql/pipeline/subgraphs/schemas.py`

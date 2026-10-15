@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from nl2sql.adapters.sqlite.adapter import SqliteAdapter, SqliteConnection
-from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
 from nl2sql_sdk import Limits
 from nl2sql.execution.contracts import ExecutorResponse
@@ -30,7 +30,7 @@ from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AggregatedResponse
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, Expr, PlanModel, SelectItem, TableRef
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.executor.node import ExecutorNode
-from nl2sql.pipeline.nodes.executor.value_check import check_values, filter_literals
+from nl2sql.pipeline.nodes.executor.sanity.values import check_values, filter_literals
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
@@ -291,9 +291,9 @@ def test_the_answer_is_told_that_the_value_does_not_exist():
     node.chain = MagicMock()
     node.chain.invoke.return_value = AggregatedResponse(summary="No customers bought Polka.", format_type="text",
                                                         content="None.")
-    missing = {"node": "executor", "message": "There is no Genre with Name 'Polka'.",
-               "error_code": "VALUE_NOT_FOUND", "severity": "WARNING", "sub_query_id": "sq1"}
-    recovered = {**missing, "message": "No Genre.Name value is 'Jaz'", "severity": "ERROR"}
+    missing = RunWarning(node="executor", message="There is no Genre with Name 'Polka'.",
+                         code="VALUE_NOT_FOUND", sub_query_id="sq1")
+    recovered = missing.model_copy(update={"message": "No Genre.Name value is 'Jaz'", "detail": {"recovered": True}})
 
     result = node(GraphState(user_query="Who bought Polka?", warnings=[missing, recovered],
                              aggregator_response=AggregatorResponse(terminal_results={"sq1": []})))

@@ -44,7 +44,8 @@ function Problems({ run }) {
   const items = [
     ...(run.exception ? [{ kind: "error", text: run.exception }] : []),
     ...(run.errors || []).map((e) => ({ kind: "error", text: e.error_code ? `${e.error_code}: ${e.message}` : pretty(e) })),
-    ...(run.warnings || []).map((w) => ({ kind: "warning", text: w.error_code ? `${w.error_code}: ${w.message}` : (w.message || pretty(w)) })),
+    // A node's warnings are RunWarnings: `code`, `message`.
+    ...(run.warnings || []).map((w) => ({ kind: "warning", text: w.code ? `${w.code}: ${w.message}` : (w.message || pretty(w)) })),
   ];
   if (!items.length) return null;
   return (

@@ -86,3 +86,11 @@ def test_a_recovered_run_points_at_the_first_warning(tmp_path):
     _result, out = _show(str(path))
     [line] = [ln for ln in out.splitlines() if ln.startswith("First warning")]
     assert "logical_validator" in line
+
+
+def test_a_node_warning_is_named_by_its_code():
+    from nl2sql.cli.commands.trace import _first_error
+
+    node = {"errors": [], "warnings": [{"code": "JOIN_FAN_OUT", "node": "executor", "message": "counted twice"}]}
+
+    assert _first_error(node) == "JOIN_FAN_OUT: counted twice"
