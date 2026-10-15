@@ -71,6 +71,7 @@ def test_estimate_with_bound_parameters(server, adapter_for):
     total = _admin(server, f"SELECT COUNT(*) FROM {table}")
     estimate = adapter_for().estimate(f"SELECT * FROM {table} WHERE {where}", {"d": "1900-01-01"})
     assert estimate.rows is not None and estimate.rows >= total / 2, (estimate, total)
+    assert estimate.cost is not None and estimate.cost > 0, estimate
 
 
 def test_estimate_leaves_no_session_reading_plans(server, adapter_for):

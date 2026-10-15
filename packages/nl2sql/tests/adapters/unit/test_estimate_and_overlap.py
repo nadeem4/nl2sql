@@ -247,3 +247,18 @@ def test_mssql_cost_falls_back_to_the_plan_and_is_none_when_absent():
     assert read_showplan(_showplan(_JOIN, cost=""))[1] == 0.5
     bare = '<RelOp PhysicalOp="Clustered Index Scan" EstimatedRowsRead="1"><IndexScan/></RelOp>'
     assert read_showplan(_showplan(bare, cost=""))[1] is None
+
+
+def test_mssql_estimate_writes_parameters_as_literals():
+    """Under SHOWPLAN, a statement sent with parameters (an RPC) returns no plan, so they are written in as literals.
+
+    The values are escaped as SQL Server literals, so a quote cannot end one.
+    """
+    from nl2sql.adapters.mssql.adapter import MssqlAdapter, MssqlConnection
+
+    adapter = MssqlAdapter("ms", MssqlConnection(host="h", database="d", user="u", password="p"), Limits())
+    sql = adapter.inline_parameters("SELECT * FROM t WHERE d < :d AND name = :name AND n = :n",
+                                    {"d": "1900-01-01", "name": "O'Brien; SET SHOWPLAN_XML OFF", "n": 3})
+    assert ":d" not in sql and ":name" not in sql and ":n" not in sql
+    assert "'1900-01-01'" in sql and "'O''Brien; SET SHOWPLAN_XML OFF'" in sql and "n = 3" in sql
+    assert adapter.inline_parameters("SELECT 1 AS one", {}) == "SELECT 1 AS one"

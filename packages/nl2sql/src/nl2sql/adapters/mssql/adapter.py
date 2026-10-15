@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, text
+from sqlalchemy.dialects import mssql
 from sqlalchemy.exc import SQLAlchemyError
 
 from nl2sql_sdk import DatasourceCapability, Estimate
@@ -118,6 +119,12 @@ class MssqlAdapter(SQLAlchemyAdapter):
         nested loop). ``cost`` is ``StatementSubtreeCost``, or the plan's
         top ``EstimatedTotalSubtreeCost``; None when the plan has neither.
 
+        ``parameters`` are written into the statement as escaped literals
+        (``inline_parameters``): sent as parameters, the statement is an RPC
+        (``sp_executesql``), for which SHOWPLAN returns no plan. Nothing runs
+        while SHOWPLAN is on, and a literal cannot end early, so a value
+        cannot turn SHOWPLAN off.
+
         SHOWPLAN is a session setting, and pyodbc's ODBC pooling hands a
         closed connection's session to the next one, so it is turned off
         again before the connection is closed; the connection is then
@@ -128,7 +135,7 @@ class MssqlAdapter(SQLAlchemyAdapter):
             with self.engine.connect() as conn:
                 try:
                     conn.exec_driver_sql("SET SHOWPLAN_XML ON")
-                    result = self._run(conn, sql, parameters)
+                    result = conn.exec_driver_sql(self.inline_parameters(sql, parameters))
                     plan = result.scalar() if result.returns_rows else None
                 finally:
                     try:
@@ -147,6 +154,16 @@ class MssqlAdapter(SQLAlchemyAdapter):
         except (KeyError, TypeError, ValueError, AttributeError, ElementTree.ParseError) as exc:
             raise RuntimeError(f"{self} could not estimate the query: the plan could not be read "
                                f"({type(exc).__name__})") from None
+
+    def inline_parameters(self, sql: str, parameters: Optional[Dict[str, Any]]) -> str:
+        """``sql`` with its ``:name`` parameters written in as SQL Server literals, quotes escaped.
+
+        A value SQLAlchemy cannot write as a literal raises ``CompileError``.
+        """
+        if not parameters:
+            return sql
+        statement = text(sql).bindparams(**parameters)
+        return str(statement.compile(dialect=mssql.dialect(), compile_kwargs={"literal_binds": True}))
 
     def session_setup(self, dbapi_connection: Any) -> None:
         """``limits.timeout_ms`` as pyodbc's query timeout: the client cancels.

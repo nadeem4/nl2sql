@@ -1107,7 +1107,10 @@ missing table raises.
       to the next connection, so `invalidate()` alone leaked it into later
       adapters (the first `realdb` run showed it). The estimate now runs `SET
       SHOWPLAN_XML OFF` in a `finally`, then invalidates the connection.
-      `cost` is `StatementSubtreeCost`, else the top `RelOp`'s
+      Bound parameters are written in as escaped literals
+      (`inline_parameters`): sent as parameters, the statement is an
+      `sp_executesql` call, for which SHOWPLAN returned no plan (`realdb`
+      showed `rows=0`). `cost` is `StatementSubtreeCost`, else the top `RelOp`'s
       `EstimatedTotalSubtreeCost`, else None. The test bed's reader login
       lacks `SHOWPLAN`; its estimate raises.
     - **duckdb** reads the scan's `Table` as DuckDB prints it
