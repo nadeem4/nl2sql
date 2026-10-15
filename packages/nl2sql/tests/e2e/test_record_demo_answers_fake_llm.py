@@ -42,6 +42,10 @@ def test_record_with_claude_then_replay_to_a_keyless_hosted_visitor(demo_project
 
     project = tmp_path / "demo"
     shutil.copytree(demo_project, project)
+    # The fake model says every question is Chinook's; routing alone would send the
+    # support and webanalytics questions elsewhere and drop chinook under the floor.
+    with open(project / "settings.yaml", "a", encoding="utf-8") as settings:
+        settings.write("routing:\n  floor_ratio: 0\n")
     out = tmp_path / "chinook.json"
     monkeypatch.chdir(tmp_path)
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY"):

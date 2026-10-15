@@ -30,6 +30,10 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
 
     project = tmp_path / "demo"
     shutil.copytree(demo_project, project)
+    # The fake model says every question is Chinook's; routing alone would send the
+    # support and webanalytics questions elsewhere and drop chinook under the floor.
+    with open(project / "settings.yaml", "a", encoding="utf-8") as settings:
+        settings.write("routing:\n  floor_ratio: 0\n")
     monkeypatch.setenv("OPENAI_API_KEY", FAKE_KEY)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
