@@ -113,6 +113,16 @@ class CombineGroup(BaseModel):
                 raise ValueError("Compare/join combine groups require roles.")
             if not self.join_keys:
                 raise ValueError("Compare/join combine groups require join_keys.")
+            # The engine joins the left-hand input to the right-hand one; with
+            # two of a side, which is which would turn on sub-query ids, and a
+            # third input would be ignored. One input is the node's to refuse
+            # (a side RBAC dropped is reported as such).
+            sides = sorted(input_order(i.role, "")[0] for i in self.inputs)
+            if sides not in ([0], [1], [0, 1]):
+                raise ValueError(
+                    f"Combine group '{self.group_id}' is a {self.operation}: it needs exactly one left-hand input "
+                    f"(role left, base or primary) and one right-hand input (role right, compare or secondary)."
+                )
         return self
 
 

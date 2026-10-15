@@ -147,7 +147,8 @@ class ASTPlannerNode:
             semantic_context = semantic_context_of(state.sub_query)
             expected_schema = []
             if state.sub_query and state.sub_query.expected_schema:
-                expected_schema = [c.model_dump() for c in state.sub_query.expected_schema]
+                # join_key is the engine's flag for the validator, not part of the contract the planner meets.
+                expected_schema = [c.model_dump(exclude={"join_key"}) for c in state.sub_query.expected_schema]
             plan: PlanModel = self.chain.invoke(
                 {
                     "relevant_tables": relevant_tables,

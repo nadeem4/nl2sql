@@ -1507,8 +1507,9 @@ is B30's test.
       holds the categories, `DTYPE_CATEGORY`, `coercible(a, b)` and
       `join_dtype(left, right)`, the type both sides are cast to: the shared
       dtype; text parsed as the other side's type; `int` and `float` meet as
-      `float`, `date` and `datetime` as `datetime`, a number and `bool` as
-      `bool`. The decomposer's schema, the aggregator and the validator all
+      `int` (not `float`: a non-whole value cannot equal a whole one, and a
+      float cannot tell ids above 2^53 apart), `date` and `datetime` as
+      `datetime`, a number and `bool` as `bool`. The decomposer's schema, the aggregator and the validator all
       read it.
     - **The decomposer.** `DecomposerResponse.validate_join_key_types()`
       resolves each key against its side's `expected_schema` with
@@ -1516,12 +1517,25 @@ is B30's test.
       input's place in engine order (`input_order`). `ExpectedColumn.join_key`,
       `JoinKeyPair.left_dtype` and `JoinKeyPair.right_dtype` are
       `SkipJsonSchema`, set only by `mark_join_keys()` in
-      `decomposer/node.py`, which replaces whatever the model sent. The DAG
+      `decomposer/node.py`, which replaces whatever the model sent and
+      leaves a key it cannot find untyped rather than crash. `join_key` is
+      excluded from the stable sub-query id and from the planner's
+      `expected_schema`. `CombineGroup.validate_roles()` refuses two inputs on one side, or a third input,
+      in a `join`/`compare`. The DAG
       carries the pair's dtypes in the combine node's `join_keys` attributes
       (`dag.py` dumps the pair, so it is unchanged).
     - **The aggregator.** `PolarsDuckdbEngine.combine` casts each side first
       to its own declared dtype and then to the joined one, so a value is read
-      the way its sub-query declared it. Text is stripped before it is parsed;
+      the way its sub-query declared it (a number goes straight to the
+      joined number type, and two `float` keys over integer frames join as
+      `int`). A cast nulls, never changes, a value: a float or decimal that
+      is not whole is not an `int`. Timestamps of any unit or zone become
+      naive UTC microseconds (exact dtypes are compared, not the bare
+      `pl.Datetime` class); text is parsed only by the ISO formats in
+      `_DATE_FORMATS`, `_NAIVE_FORMATS` and `_OFFSET_FORMATS`, never by
+      inference; a `Time` key declared a date or timestamp is null. Every one
+      of those nulls is counted, so none ends the run as `AGGREGATOR_FAILED`.
+      Text is stripped on both sides, of a text key too;
       a text boolean is `true`/`false`/`t`/`f`/`yes`/`no`/`1`/`0`; a number
       cast to a boolean is 1 or 0, anything else null.
       `PolarsDuckdbEngine.unconverted_join_keys(inputs, join_keys)` counts the
@@ -1530,7 +1544,7 @@ is B30's test.
       turns each into a `JOIN_KEY_UNCONVERTED` warning dict on the state's
       `warnings` (`node`, `message`, `error_code`, `severity`, `sub_query_id`),
       naming the datasource: "1 of 3 support.customer_id values are not
-      numbers and joined nothing." S1's typed `RunWarning` is not on main yet,
+      whole numbers and joined nothing." S1's typed `RunWarning` is not on main yet,
       so this uses the existing warnings mechanism; S1 moves it.
     - **The validator.** `pipeline/nodes/validator/join_keys.py`,
       `join_key_type_errors(plan, sub_query, relevant_tables, dialect)`, called

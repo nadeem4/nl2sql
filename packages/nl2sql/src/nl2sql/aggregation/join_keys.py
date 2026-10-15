@@ -20,7 +20,7 @@ _NEVER = {frozenset({NUMBER, TEMPORAL}), frozenset({BOOLEAN, TEMPORAL})}
 # How a message names a declared type, as one value and as many.
 DTYPE_NOUN = {"int": "a number", "float": "a number", "string": "text", "date": "a date",
               "datetime": "a date and time", "bool": "a boolean"}
-DTYPE_PLURAL = {"int": "numbers", "float": "numbers", "string": "text", "date": "dates",
+DTYPE_PLURAL = {"int": "whole numbers", "float": "numbers", "string": "text", "date": "dates",
                 "datetime": "dates and times", "bool": "booleans"}
 CATEGORY_NOUN = {NUMBER: "a number", TEXT: "text", TEMPORAL: "a date or time", BOOLEAN: "a boolean"}
 
@@ -37,14 +37,15 @@ def join_dtype(left: str, right: str) -> str:
     """The one type both sides of a join key are cast to.
 
     Text is parsed as the other side's type; a whole number and a decimal meet
-    as a decimal, a date and a timestamp as a timestamp, a number and a boolean
-    as a boolean (0 and 1).
+    as a whole number (a decimal that is not whole could never equal one, and
+    a float cannot tell large ids apart), a date and a timestamp as a
+    timestamp, a number and a boolean as a boolean (0 and 1).
     """
     if left == right:
         return left
     categories = {DTYPE_CATEGORY[left], DTYPE_CATEGORY[right]}
     if categories == {NUMBER}:
-        return "float"
+        return "int"
     if categories == {TEMPORAL}:
         return "datetime"
     if DTYPE_CATEGORY[left] == TEXT:

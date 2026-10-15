@@ -117,6 +117,11 @@ def mark_join_keys(
         pairs = []
         for pair in group.join_keys:
             left_column, right_column = key_column(pair.left, left), key_column(pair.right, right)
+            if left_column is None or right_column is None:
+                # DecomposerResponse refuses such a key; left untyped, the
+                # engine joins it as it is rather than crash the run here.
+                pairs.append(pair)
+                continue
             keys[left.id].add(left_column.name)
             keys[right.id].add(right_column.name)
             pairs.append(pair.model_copy(update={"left_dtype": left_column.dtype,
@@ -310,7 +315,8 @@ class DecomposerNode:
                         "group_by": [g.model_dump() for g in llm_sq.group_by],
                         "order_by": [o.model_dump() for o in llm_sq.order_by],
                         "limit": llm_sq.limit,
-                        "expected_schema": [c.model_dump() for c in llm_sq.expected_schema],
+                        # join_key is the node's own flag, never part of the id.
+                        "expected_schema": [c.model_dump(exclude={"join_key"}) for c in llm_sq.expected_schema],
                     },
                 )
                 # Identical sub-queries hash to the same id. Each is still a

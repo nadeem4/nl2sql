@@ -25,7 +25,7 @@ Prevents physical SQL leakage into semantic planning stages and keeps decomposer
 ## Combine Groups Require Roles and Typed Join Keys
 
 ### Definition
-Combine groups with `compare` or `join` operations must include a role for every input and at least one join key pair. Each key names a column in the `expected_schema` of its side's sub-query, that column declares a `dtype`, and the two sides' dtypes can be coerced to each other: a number or a boolean never joins a date ([Wave A, D30](wave_a.md#the-join-key-type-check)). The aggregator casts both sides of each key to one type before the join, in polars; a value that does not convert joins nothing and is a `JOIN_KEY_UNCONVERTED` warning.
+Combine groups with `compare` or `join` operations must include a role for every input, at most one left-hand input (`left`, `base` or `primary`) and one right-hand input (`right`, `compare` or `secondary`), and at least one join key pair; a group with only one side is refused by the decomposer node. Each key names a column in the `expected_schema` of its side's sub-query, that column declares a `dtype`, and the two sides' dtypes can be coerced to each other: a number or a boolean never joins a date ([Wave A, D30](wave_a.md#the-join-key-type-check)). The aggregator casts both sides of each key to one type before the join, in polars; a value that does not convert joins nothing and is a `JOIN_KEY_UNCONVERTED` warning.
 
 ### Enforcement Points
 - `CombineGroup.validate_roles()` and `DecomposerResponse.validate_join_key_types()` in `nl2sql.pipeline.nodes.decomposer.schemas`

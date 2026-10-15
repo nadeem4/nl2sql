@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import duckdb
 import polars as pl
 
 from nl2sql.aggregation.columns import missing_columns_message, post_op_columns, resolve_key
-from nl2sql.aggregation.join_keys import join_dtype
+from nl2sql.aggregation.join_keys import DTYPE_CATEGORY, NUMBER, join_dtype
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.artifacts import ArtifactStore
 
@@ -28,27 +28,68 @@ def _column(frame: Frame, key: str) -> str:
 
 
 _POLARS_TYPES = {"int": pl.Int64, "float": pl.Float64, "string": pl.String, "bool": pl.Boolean,
-                 "date": pl.Date, "datetime": pl.Datetime}
+                 "date": pl.Date, "datetime": pl.Datetime("us")}
 _TRUE, _FALSE = ["true", "t", "yes", "y", "1"], ["false", "f", "no", "n", "0"]
+
+# Text is parsed against these formats only, never by inference: inference
+# fails on a column whose first value it cannot read, and ends the run.
+_DATE_FORMATS = ["%Y-%m-%d"]
+_NAIVE_FORMATS = ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M",
+                  "%Y-%m-%dT%H:%M:%S%.fZ", "%Y-%m-%d %H:%M:%S%.fZ"]
+_OFFSET_FORMATS = ["%Y-%m-%dT%H:%M:%S%.f%z", "%Y-%m-%d %H:%M:%S%.f%z"]
+
+
+def _parse_date(text: pl.Expr) -> pl.Expr:
+    return pl.coalesce(*(text.str.to_date(f, strict=False) for f in _DATE_FORMATS))
+
+
+def _parse_datetime(text: pl.Expr) -> pl.Expr:
+    """ISO text as a naive UTC timestamp in microseconds; null where no format fits."""
+    naive = [text.str.to_datetime(f, time_unit="us", strict=False) for f in _NAIVE_FORMATS]
+    zoned = [text.str.to_datetime(f, time_unit="us", time_zone="UTC", strict=False).dt.replace_time_zone(None)
+             for f in _OFFSET_FORMATS]
+    return pl.coalesce(*naive, *zoned, _parse_date(text).cast(pl.Datetime("us")))
+
+
+def _normalised(value: pl.Expr, current: pl.DataType) -> Tuple[pl.Expr, pl.DataType]:
+    """Text stripped; a timestamp of any unit or zone as naive UTC microseconds."""
+    if current == pl.String:
+        return value.str.strip_chars(), current
+    if isinstance(current, pl.Datetime):
+        if current.time_zone:
+            value = value.dt.convert_time_zone("UTC").dt.replace_time_zone(None)
+        return value.dt.cast_time_unit("us"), pl.Datetime("us")
+    return value, current
 
 
 def _cast(value: pl.Expr, current: pl.DataType, dtype: str) -> pl.Expr:
-    """``value`` (of polars type ``current``) as the declared ``dtype``; null where it does not convert."""
+    """``value`` (of polars type ``current``) as ``dtype``; null where it does not convert.
+
+    Never a changed value: a number that is not whole is not an integer (7.9
+    is not 7), and text that matches none of the ISO formats is not a date.
+    Null is what :meth:`PolarsDuckdbEngine.unconverted_join_keys` counts.
+    """
     target = _POLARS_TYPES[dtype]
+    value, current = _normalised(value, current)
     if current == target:
         return value
+    if current == pl.Time and dtype in ("date", "datetime"):
+        return pl.lit(None, dtype=target)
     if current == pl.String:
-        text = value.str.strip_chars()
         if dtype == "bool":
-            lower = text.str.to_lowercase()
+            lower = value.str.to_lowercase()
             return pl.when(lower.is_in(_TRUE)).then(True).when(lower.is_in(_FALSE)).then(False)
         if dtype == "date":
-            return text.str.to_date(strict=False)
+            return _parse_date(value)
         if dtype == "datetime":
-            return pl.coalesce(text.str.to_datetime(strict=False), text.str.to_date(strict=False).cast(pl.Datetime))
-        return text.cast(target, strict=False)
+            return _parse_datetime(value)
+        return value.cast(target, strict=False)
     if dtype == "bool" and current.is_numeric():
         return pl.when(value == 1).then(True).when(value == 0).then(False)
+    if dtype == "int" and (current.is_float() or current.is_decimal()):
+        return pl.when(value == value.round(0)).then(value.cast(pl.Int64, strict=False))
+    if dtype == "date" and current == pl.Datetime("us"):
+        return value.dt.date()
     return value.cast(target, strict=False)
 
 
@@ -57,10 +98,31 @@ def _coerced_key(frame: Frame, column: str, declared: str, target: str) -> pl.Ex
 
     Through the declared type, so a value is read the way its sub-query said
     it is: a date declared as text joins a number key as its text, which is
-    not a number, rather than as a count of days.
+    not a number, rather than as a count of days. A number goes straight to
+    the number type the sides meet as, so an integer id never passes through
+    a float (which cannot tell 2**53 from 2**53 + 1).
     """
     current = frame.collect_schema()[column]
+    if DTYPE_CATEGORY[declared] == NUMBER == DTYPE_CATEGORY[target]:
+        return _cast(pl.col(column), current, target)
     return _cast(_cast(pl.col(column), current, declared), _POLARS_TYPES[declared], target)
+
+
+def _key_types(left: Frame, right: Frame, key: Dict[str, Any]) -> Optional[Tuple[str, str, str]]:
+    """``(left column, right column, joined dtype)`` for a typed key; None for an untyped one.
+
+    Two keys declared ``float`` whose frames both hold integers meet as
+    ``int``: a float join would match ids above 2**53 that differ.
+    """
+    left_dtype, right_dtype = key.get("left_dtype"), key.get("right_dtype")
+    if not left_dtype or not right_dtype:
+        return None
+    left_column, right_column = _column(left, key.get("left")), _column(right, key.get("right"))
+    target = join_dtype(left_dtype, right_dtype)
+    if target == "float" and all(frame.collect_schema()[column].is_integer()
+                                 for frame, column in ((left, left_column), (right, right_column))):
+        target = "int"
+    return left_column, right_column, target
 
 
 def _coerce_keys(left: Frame, right: Frame, join_keys: List[Dict[str, Any]]) -> Tuple[Frame, Frame]:
@@ -71,13 +133,12 @@ def _coerce_keys(left: Frame, right: Frame, join_keys: List[Dict[str, Any]]) -> 
     :meth:`PolarsDuckdbEngine.unconverted_join_keys` counts those.
     """
     for key in join_keys:
-        left_dtype, right_dtype = key.get("left_dtype"), key.get("right_dtype")
-        if not left_dtype or not right_dtype:
+        types = _key_types(left, right, key)
+        if types is None:
             continue
-        target = join_dtype(left_dtype, right_dtype)
-        left_column, right_column = _column(left, key.get("left")), _column(right, key.get("right"))
-        left = left.with_columns(_coerced_key(left, left_column, left_dtype, target).alias(left_column))
-        right = right.with_columns(_coerced_key(right, right_column, right_dtype, target).alias(right_column))
+        left_column, right_column, target = types
+        left = left.with_columns(_coerced_key(left, left_column, key["left_dtype"], target).alias(left_column))
+        right = right.with_columns(_coerced_key(right, right_column, key["right_dtype"], target).alias(right_column))
     return left, right
 
 
@@ -210,14 +271,14 @@ class PolarsDuckdbEngine:
         if len(inputs) < 2:
             return []
         found = []
+        (left_id, left), (right_id, right) = inputs[0], inputs[1]
         for key in join_keys:
-            left_dtype, right_dtype = key.get("left_dtype"), key.get("right_dtype")
-            if not left_dtype or not right_dtype:
+            types = _key_types(left, right, key)
+            if types is None:
                 continue
-            target = join_dtype(left_dtype, right_dtype)
-            for (source_id, frame), name, declared in ((inputs[0], key.get("left"), left_dtype),
-                                                      (inputs[1], key.get("right"), right_dtype)):
-                column = _column(frame, name)
+            left_column, right_column, target = types
+            for source_id, frame, column, declared in ((left_id, left, left_column, key["left_dtype"]),
+                                                       (right_id, right, right_column, key["right_dtype"])):
                 original = pl.col(column)
                 failed, total = frame.select(
                     (original.is_not_null() & _coerced_key(frame, column, declared, target).is_null())

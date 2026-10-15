@@ -234,7 +234,7 @@ def test_the_aggregator_node_reports_unconverted_values_with_the_datasource(tmp_
 
     assert not out.get("errors"), out.get("errors")
     [warning] = [w for w in out["warnings"] if w["error_code"] == ErrorCode.JOIN_KEY_UNCONVERTED.value]
-    assert warning["message"] == "1 of 3 support.customer_id values are not numbers and joined nothing."
+    assert warning["message"] == "1 of 3 support.customer_id values are not whole numbers and joined nothing."
     assert warning["severity"] == ErrorSeverity.WARNING.value
     assert warning["sub_query_id"] == "sq_tickets"
 
@@ -297,3 +297,200 @@ def test_a_computed_join_key_is_not_checked():
     count = Expr(kind="func", func_name="COUNT", is_aggregate=True,
                  args=[Expr(kind="column", alias="t1", column_name="OrderKey")])
     assert _validate("integer", "date", expr=count) == []
+
+
+# --- the review of #322: every coercion either joins or is counted ----------
+
+import datetime as dt  # noqa: E402
+
+
+def _key(left_dtype, right_dtype, name="k"):
+    return {"left": name, "right": name, "left_dtype": left_dtype, "right_dtype": right_dtype}
+
+
+def _join_rows(left, right, key, columns=("a", "b")):
+    joined = _engine().combine("join", [("left", pl.LazyFrame(left)), ("right", pl.LazyFrame(right))], [key])
+    return sorted(joined.collect().select(*columns).rows())
+
+
+def _unconverted(left, right, key):
+    return _engine().unconverted_join_keys([("l", pl.LazyFrame(left)), ("r", pl.LazyFrame(right))], [key])
+
+
+UTC = dt.timezone.utc
+
+
+@pytest.mark.parametrize("left, right", [
+    # postgres timestamptz against a naive timestamp
+    (pl.Series("k", [dt.datetime(2024, 1, 2, 1, tzinfo=UTC)]), pl.Series("k", [dt.datetime(2024, 1, 2, 1)])),
+    # nanoseconds against microseconds
+    (pl.Series("k", [dt.datetime(2024, 1, 2, 1)], dtype=pl.Datetime("ns")),
+     pl.Series("k", [dt.datetime(2024, 1, 2, 1)], dtype=pl.Datetime("us"))),
+    # milliseconds, zoned elsewhere
+    (pl.Series("k", [dt.datetime(2024, 1, 2, 1, tzinfo=UTC)]).cast(pl.Datetime("ms", "Europe/Berlin")),
+     pl.Series("k", [dt.datetime(2024, 1, 2, 1)])),
+])
+def test_datetime_keys_of_any_unit_and_zone_join(left, right):
+    rows = _join_rows({"k": left, "a": [1]}, {"k": right, "b": [2]}, _key("datetime", "datetime"))
+
+    assert rows == [(1, 2)]
+
+
+def test_a_zoned_datetime_joins_a_date():
+    left = {"k": pl.Series([dt.datetime(2024, 1, 2, tzinfo=UTC)]), "a": [1]}
+    right = {"k": [dt.date(2024, 1, 2)], "b": [2]}
+
+    assert _join_rows(left, right, _key("datetime", "date")) == [(1, 2)]
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("2024-01-02T01:00:00+00:00", [(1, 2)]),
+    ("2024-01-02T03:00:00+02:00", [(1, 2)]),
+    ("2024-01-02T01:00:00Z", [(1, 2)]),
+    ("2024-01-02 01:00:00", [(1, 2)]),
+    ("2024-01-02T01:00:00.000", [(1, 2)]),
+    ("2024-01-02 01:00", [(1, 2)]),
+    ("not a date", []),
+])
+def test_text_parses_against_iso_formats_or_is_counted(text, expected):
+    left = {"k": [text], "a": [1]}
+    right = {"k": [dt.datetime(2024, 1, 2, 1)], "b": [2]}
+    key = _key("string", "datetime")
+
+    assert _join_rows(left, right, key) == expected
+    assert len(_unconverted(left, right, key)) == (0 if expected else 1)
+
+
+def test_text_that_is_not_an_iso_date_is_counted_not_a_failure():
+    # Format inference used to fail on the first value and end the run.
+    left = {"k": ["2024-01-02 13:00:00", "2024-01-03"], "a": [1, 2]}
+    right = {"k": [dt.date(2024, 1, 3)], "b": [3]}
+    key = _key("string", "date")
+
+    assert _join_rows(left, right, key) == [(2, 3)]
+    [found] = _unconverted(left, right, key)
+    assert (found["failed"], found["total"]) == (1, 2)
+
+
+def test_a_time_key_declared_datetime_is_counted_not_a_failure():
+    left = {"k": [dt.time(1, 0)], "a": [1]}
+    right = {"k": [dt.datetime(2024, 1, 2, 1)], "b": [2]}
+    key = _key("datetime", "datetime")
+
+    assert _join_rows(left, right, key) == []
+    assert _unconverted(left, right, key)[0]["failed"] == 1
+
+
+@pytest.mark.parametrize("values, dtype", [([7.9, 8.0], pl.Float64), ([7.5, 8.0], pl.Decimal(10, 2))])
+def test_a_number_that_is_not_whole_is_counted_not_rounded(values, dtype):
+    left = {"k": pl.Series(values, dtype=dtype), "a": [1, 2]}
+    right = {"k": [7, 8], "b": [3, 4]}
+    key = _key("float", "int")
+
+    assert _join_rows(left, right, key) == [(2, 4)]
+    [found] = _unconverted(left, right, key)
+    assert (found["sub_query_id"], found["failed"], found["dtype"]) == ("l", 1, "int")
+
+
+def test_large_ids_do_not_collide_when_an_int_meets_a_float():
+    big = 2 ** 53
+    left = {"k": [big, big + 1], "a": [1, 2]}
+    right = {"k": [float(big)], "b": [3]}
+
+    assert _join_rows(left, right, _key("int", "float")) == [(1, 3)]
+
+
+def test_large_ids_declared_float_on_both_sides_join_as_integers():
+    big = 2 ** 53
+    left = {"k": [big, big + 1], "a": [1, 2]}
+    right = {"k": [big + 1], "b": [3]}
+
+    assert _join_rows(left, right, _key("float", "float")) == [(2, 3)]
+
+
+def test_text_keys_are_stripped_on_both_sides():
+    left = {"k": ["7", " 8 "], "a": [1, 2]}
+    right = {"k": [" 7", "8"], "b": [3, 4]}
+
+    assert _join_rows(left, right, _key("string", "string")) == [(1, 3), (2, 4)]
+
+
+def test_zero_padded_text_matches_the_integer():
+    # Documented: text parsed as a number loses its padding, so 007 and 7 are both 7.
+    left = {"k": ["007", "7"], "a": [1, 2]}
+    right = {"k": [7], "b": [3]}
+
+    assert _join_rows(left, right, _key("string", "int")) == [(1, 3), (2, 3)]
+
+
+@pytest.mark.parametrize("roles", [("left", "left"), ("left", "base"), ("right", "compare")])
+def test_a_join_needs_one_left_and_one_right_input(roles):
+    payload = _join([("cust_a", "int")], [("cust_b", "int")], keys=[("cust_a", "cust_b")])
+    for inp, role in zip(payload["combine_groups"][0]["inputs"], roles):
+        inp["role"] = role
+
+    with pytest.raises(ValidationError, match="one left-hand input"):
+        DecomposerResponse.model_validate(payload)
+
+
+def test_a_join_of_three_inputs_is_refused():
+    payload = _join([("customer_id", "int")], [("customer_id", "int")])
+    payload["sub_queries"].append(_sub_query("sq_extra", "chinook", [("customer_id", "int")]))
+    payload["combine_groups"][0]["inputs"].append({"subquery_id": "sq_extra", "role": "right"})
+
+    with pytest.raises(ValidationError, match="one left-hand input"):
+        DecomposerResponse.model_validate(payload)
+
+
+def test_same_rank_roles_are_retried_not_a_crash():
+    bad = _join([("cust_a", "int")], [("cust_b", "int")], keys=[("cust_a", "cust_b")])
+    for inp in bad["combine_groups"][0]["inputs"]:
+        inp["role"] = "left"
+    good = _join([("cust_a", "int")], [("cust_b", "int")], keys=[("cust_a", "cust_b")])
+    rules = [Rule("DecomposerResponse", good, when="did not match the schema"), Rule("DecomposerResponse", bad)]
+
+    result, server = _decompose(rules)
+
+    assert not result.get("errors"), result.get("errors")
+    assert len(server.calls) == 2
+
+
+def test_mark_join_keys_leaves_a_key_it_cannot_find():
+    from nl2sql.pipeline.nodes.decomposer.node import mark_join_keys
+
+    response = DecomposerResponse.model_validate(GOOD)
+    [group] = response.combine_groups
+    stray = group.model_copy(update={"join_keys": [group.join_keys[0].model_copy(update={"left": "nope"})]})
+
+    _, [marked] = mark_join_keys(response.sub_queries, [stray])
+
+    assert marked.join_keys[0].left_dtype is None
+
+
+def test_the_join_key_flag_does_not_change_the_sub_query_id():
+    plain = _join([("customer_id", "int")], [("customer_id", "int")])
+    flagged = json.loads(json.dumps(plain))
+    flagged["sub_queries"][0]["expected_schema"][0]["join_key"] = True
+
+    ids = [sorted(sq.id for sq in _decompose([Rule("DecomposerResponse", p)])[0]["decomposer_response"].sub_queries)
+           for p in (plain, flagged)]
+
+    assert ids[0] == ids[1]
+
+
+def test_the_planner_prompt_does_not_carry_the_join_key_flag():
+    from unittest.mock import MagicMock
+
+    from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
+
+    ctx = fake_runtime(llm_registry=MagicMock())
+    node = ASTPlannerNode(ctx)
+    node.chain = MagicMock()
+    node.chain.invoke.return_value = None
+    sub_query = SubQuery(id="sq1", datasource_id="ds1", intent="q",
+                         expected_schema=[ExpectedColumn(name="customer_id", dtype="int", join_key=True)])
+
+    node(SubgraphExecutionState(trace_id="t", sub_query=sub_query))
+
+    [inputs] = node.chain.invoke.call_args.args
+    assert inputs["expected_schema"] == [{"name": "customer_id", "dtype": "int"}]
