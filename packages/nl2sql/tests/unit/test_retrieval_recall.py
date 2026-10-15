@@ -80,27 +80,39 @@ def test_mode_retrieval_asks_the_retriever_about_the_cases_datasource_with_the_s
 
 
 def _report(table=0.9, column=0.6):
-    return {"kind": "retrieval", "dataset": str(CHINOOK_SUITE_PATH),
-            "settings": {"table_k": 8, "planning_k": 12, "fetch_multiplier": 4, "lambda_mult": 0.7,
-                         "full_snapshot_max_tables": 0, "embedding": "all-MiniLM-L6-v2"},
-            "summary": {"questions": 39, "table_recall": table, "column_recall": column, "perfect_tables": 30,
-                        "perfect_columns": 10, "tables_sent": 4.5, "columns_sent": 20.1},
-            "results": []}
+    """A mode retrieval ``EvalReport``: one case, the recall as given."""
+    from nl2sql.evaluation import report
+
+    detail = {"table_recall": table, "column_recall": column, "tables_sent": 4.5, "columns_sent": 20.1}
+    scores = {"retrieval_recall": {"passed": False, "value": table, "detail": detail}}
+    status, _ = report.case_status(scores)
+    run = {"id": "chinook_001", "role": "admin", "pass": 1, "expected": "allowed", "status": status,
+           "lenient_status": status, "scores": scores, "cost": 0.0, "latency_s": 0.1}
+    board = report.score_config([run], passes=1)
+    board.update(planned_cases=1, completed_cases=1)
+    suite = load_suite(CHINOOK_SUITE_PATH)
+    return report.EvalReport(
+        mode="retrieval", suites=[{"name": suite.name, "path": str(suite.path), "digest": suite.digest()}],
+        configs={"retrieval": board},
+        settings={"retrieval": {"table_k": 8, "planning_k": 12, "fetch_multiplier": 4, "lambda_mult": 0.7,
+                                "full_snapshot_max_tables": 0, "query": "question",
+                                "embedding": "local:all-MiniLM-L6-v2"}})
 
 
 def test_a_retrieval_record_holds_the_run_the_settings_and_the_means(tmp_path):
-    path = records.write_retrieval_record(_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0",
-                                          code={"git_commit": "abc1234def", "git_dirty": False})
+    [path] = records.write_records(_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0",
+                                   code={"git_commit": "abc1234def", "git_dirty": False})
     assert path.relative_to(tmp_path).as_posix() == "retrieval/unknown/2026-09-21_abc1234_retrieval.json"
     [rec] = records.load_records(tmp_path)
     assert rec["kind"] == "retrieval" and rec["metrics"]["table_recall"] == 0.9
-    assert rec["settings"]["table_k"] == 8 and rec["dataset"]["name"] == "chinook.yaml"
+    assert rec["settings"]["table_k"] == 8 and rec["dataset"]["name"] == "chinook"
+    assert rec["settings"]["embedding"] == "local:all-MiniLM-L6-v2"
 
 
 def test_publish_adds_a_retrieval_section_newest_first(tmp_path):
     for when, recall in ((WHEN.replace(day=20), 0.8), (WHEN, 0.9)):
-        records.write_retrieval_record(_report(recall), tmp_path / "r", recorded_at=when, engine_version="0.9.0",
-                                       code={})
+        records.write_records(_report(recall), tmp_path / "r", recorded_at=when, engine_version="0.9.0",
+                              code={})
     page = records.render_history(records.load_records(tmp_path / "r"))
     section = page.split("## Retrieval recall")[1]
     assert section.index("90.0%") < section.index("80.0%")

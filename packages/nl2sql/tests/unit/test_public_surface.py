@@ -25,7 +25,7 @@ PUBLIC_SURFACE = {
     # Entry-point hooks
     "configure_logging", "TraceContextFilter",
     # Evals: suites, reports and the scorer interface
-    "EvalSuite", "EvalCase", "EvalReport", "RegenerateReport", "Scorer", "Score", "CaseRun",
+    "EvalSuite", "EvalCase", "EvalReport", "RegenerateReport", "GateResult", "Scorer", "Score", "CaseRun",
 }
 
 

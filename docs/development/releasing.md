@@ -159,6 +159,28 @@ The page's first paragraph, between `<!-- summary:start -->` and
 `<!-- summary:end -->`, also goes into the GitHub Release. See the
 `release-notes` job [below](#5-the-release-publishes-everything).
 
+### The pre-release eval
+
+Before merging a release PR, the owner runs the Chinook suite once on the
+real model, against the last published mode full record, and publishes the
+result. It spends the owner's key, so it is asked for explicitly and never
+runs in CI (`nl2sql eval run --mode full` refuses to start when `CI` is set):
+
+```bash
+# from a demo folder on the release PR's commit, with the key in its .env
+nl2sql eval run --mode full --llm gpt-5.4 --max-cost 5 --baseline ../benchmarks
+# from the repo root
+nl2sql eval publish <demo folder>/eval_full.json --note "0.X.0 release"
+```
+
+Exit 1 is a regression to look at before releasing; exit 2 means the
+baseline is on another suite (the first run after a suite change starts a
+new series, and its record becomes the next baseline); exit 3 means the cap
+stopped the run. Mode full allows two flipped cases plus McNemar's
+two-sided test, because the model is noisy. The gate reads execution accuracy, the measure the history
+has always published ([The regression gate](../evals/index.md#the-regression-gate)).
+Commit the record and the regenerated pages in their own PR.
+
 ### 4. Merging the release PR is the gate
 
 **This is the only manual step in a release**, after the release page.

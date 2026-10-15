@@ -45,6 +45,7 @@ print(report.accuracy, report.accuracy_generated)
 | --- | --- |
 | `engine.evals.load(path=None)` | The suites `evals.yaml` names, or the one file at `path`, as `EvalSuite`s |
 | `engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)` | Runs every approved case once per role in its `outcome` map, `passes` times, and returns an `EvalReport` |
+| `engine.evals.gate(report, baseline)` | The regression gate: `report` against a baseline report, record or `benchmarks/` folder, with `evals.yaml`'s `gate` settings. Returns a `GateResult` ([The gate](#the-regression-gate)) |
 | `engine.evals.regenerate(path, *, allow_packaged=False)` | Runs each approved case's `sql` and `alt_sql` through its datasource's adapter and writes `rows` and `alt_rows` ([Regenerating rows](cases.md#regenerating-rows)). A suite the package ships is refused unless `allow_packaged` |
 | `engine.evals.scorers()` | The registered scorer names: the five built-ins and any plugin's |
 
@@ -188,9 +189,127 @@ with the suite, case, role, whether it passed, the answer's source, each
 scorer's verdict and its cost. The end of the run publishes `eval.finished`,
 with the suites, the number of cases, both accuracies and the dollars spent.
 
+## The regression gate
+
+`engine.evals.gate(report, baseline)` compares a run with a baseline and
+returns a `GateResult`:
+
+| Field | What it is |
+| --- | --- |
+| `ok` | True only when the runs were compared and nothing regressed |
+| `regressions` | One line per problem: too many cases flipped to fail, a significant drop, or a cost rise |
+| `series_break` | Why nothing was compared: another suite digest, another mode, or no config in common |
+| `compared` | Per config and measure: the cases that flipped each way, McNemar's p-value, both accuracies and both costs per case |
+
+The baseline is an `EvalReport` (or the JSON `nl2sql eval run` writes), a
+record from `benchmarks/`, or a path to either. A path to a `benchmarks/`
+folder means its newest record of the run's mode, database and config.
+
+**Only the same suite and mode compare.** Two runs are compared only when the
+suites' digests match and the mode is the same. Anything else is a series
+break: `ok` is false and nothing is compared.
+
+**The gate reads execution accuracy.** A case passes when `result_match` and
+`outcome` pass; no other scorer counts. That is `accuracy.execution`, the
+measure 0.6's tier 2 published, so a run compares with the history published
+before 0.7 and a faithfulness verdict alone is never a regression. With
+curated answers on, it is checked twice: as users see it, and on the
+generated path. Mode retrieval has no execution, so its cases are read by
+their status.
+
+For each config both runs have, the gate fails when:
+
+- more cases passed in the baseline and fail now than are allowed. Mode
+  full allows `max_regressions` (2 by default), because the model is noisy.
+  Modes plans and retrieval run no model, so they allow **none**: any flip is
+  a real break;
+- in mode full, more cases were lost than gained and McNemar's exact
+  **two-sided** p-value on the flips is under `alpha`; or
+- cost per case rose by more than `max_cost_increase`.
+
+Comparable means what the history page means by it (`records.series_key`):
+the same mode, suite digest and schema fingerprint and, in mode full, the
+same roles and curated answers. Both runs must also have run the same roles,
+so a role left out cannot quietly shrink the comparison.
+
+The statistics are in
+[the Chinook suite](../testing/evaluation-dataset.md#reading-a-run-intervals-flips-and-passk).
+
+## The CLI
+
+| Command | What it does |
+| --- | --- |
+| `nl2sql eval run [--suite PATH ...] [--mode full\|plans\|retrieval] [--llm SPEC ...] [--cases ID/TAG ...] [--passes N] [--max-cost USD] [--baseline PATH] [--out FILE]` | `engine.evals.run`, then `engine.evals.gate` with `--baseline` |
+| `nl2sql eval regenerate PATH` | `engine.evals.regenerate`; exits 1 when a case's SQL failed |
+| `nl2sql eval publish [REPORT ...] [--note TEXT] [--from DIR ...]` | Records each report under `benchmarks/`, then rebuilds [the results page](../benchmarks.md) and the README block. Run from the repo root |
+
+`--llm` names an LLM config to compare in mode full, and repeats:
+
+- `gpt-5.4`, `mini-helpers` or `claude-planner`: a preset from
+  `nl2sql/evaluation/presets/`, named by itself;
+- `mine.yaml`: a file holding an `llm` section, named by its stem;
+- `NAME=PRESET` or `NAME=FILE`: either, under a name you choose.
+
+Without it, the config's own `llm` section runs as `default`.
+
+`nl2sql eval run` writes the report to `--out`, by default
+`eval_<mode>.json` next to `nl2sql.yaml`, with a `run` stamp: when it ran,
+and the engine version and commit. `nl2sql eval publish` records that stamp,
+not the time it publishes.
+
+| Exit code | When |
+| --- | --- |
+| 0 | The run finished, and nothing regressed against `--baseline` |
+| 1 | A regression against `--baseline` |
+| 2 | A usage error: a bad `--llm`, a run the engine refuses (no cost cap, an unpriced model), mode full with `CI` set (whatever its value, `CI=false` included), a missing or unreadable baseline, or one that cannot be compared |
+| 3 | The cost cap stopped mode full early: the report is partial |
+
+```bash
+# From a demo folder: the key-free gate CI runs, against the repo's records
+nl2sql eval run --mode plans --baseline ../benchmarks
+# A paid run comparing two configs, under a $10 cap
+nl2sql eval run --mode full --llm gpt-5.4 --llm mini=mini-helpers --max-cost 10
+# From the repo root: record it and rebuild the results page
+nl2sql eval publish demo/eval_full.json --note "slim prompts"
+```
+
 ## In CI
 
-The key-free integration job runs `engine.evals.run(mode="plans")` on the
-Chinook suite, and every case must pass for every role
-(`tests/e2e/test_evals_plans.py`). Mode `full` spends a key and never runs in
-CI.
+The key-free integration job runs the eval gate on the demo's Chinook suite,
+after indexing it:
+
+```bash
+nl2sql --config demo-ci/nl2sql.yaml eval run --mode plans --baseline benchmarks
+nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchmarks
+```
+
+Each run is gated against the newest record of its mode in `benchmarks/`
+(`plans/chinook/` and `retrieval/chinook/`), and both reports are uploaded
+as the `eval-reports` artifact whether the gate passed or not. A changed suite
+or schema starts a new series, so the gate exits 2 until both baselines are
+recorded again. The same job also runs `tests/e2e/test_evals_plans.py`, where
+every case must pass for every role.
+
+### Re-recording CI's baselines
+
+CI's plans and retrieval baselines are recorded **on CI's own runner**
+(`ubuntu-latest`, Python 3.12), never on a laptop: retrieval recall passes a
+case only at 100% column recall, which near-tie rankings of the local ONNX
+embedder can move between platforms.
+
+1. Push the change. The integration job's "Eval gate" step runs both modes and
+   uploads `eval_plans.json` and `eval_retrieval.json` as the `eval-reports`
+   artifact, pass or fail.
+2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.
+3. From the repo root, record them, naming where they came from:
+   `nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
+4. Commit the two records and the regenerated pages in the same PR, and push.
+   The next run gates against them.
+
+Never edit a record by hand, `engine_version` included. A change that moves
+the gate on purpose (a suite change, routing or retrieval work) re-records
+both baselines this way, in the PR that makes the change.
+
+Mode `full` spends a key: `nl2sql eval run --mode full` refuses to start when
+`CI` is set. The owner runs it before a release
+([Releasing](../development/releasing.md#the-pre-release-eval)).

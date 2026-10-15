@@ -281,7 +281,10 @@ Mode plans runs on every PR as `packages/nl2sql/tests/e2e/test_evals_plans.py`,
 in the key-free integration job. It builds an engine on the generated demo
 with no API key in the environment, runs `engine.evals.run(mode="plans")`, and
 requires every case to pass -- allowed, refused and unanswerable, for every
-role -- with none skipped.
+role -- with none skipped. The same job runs
+`nl2sql eval run --mode plans --baseline benchmarks`, which gates the run
+against the newest mode plans record in `benchmarks/`
+([In CI](../evals/index.md#in-ci)).
 
 When a gold plan fails, the fault is in the engine or in the plan. Fix an
 engine bug with a regression test. Never change the gold data to make a plan
@@ -313,6 +316,12 @@ report = engine.evals.run(llm={"gpt-5.4": model_config("gpt-5.4"),       # a com
 - **Any other model is written `provider/model`**
   (`openrouter/meta-llama/llama-3.3-70b-instruct`, `ollama/llama3`) and runs
   at temperature 0 (none for `anthropic`).
+
+From the command line, `--llm` takes a preset, a file or `NAME=` either:
+
+```bash
+nl2sql eval run --mode full --llm gpt-5.4 --llm mini=mini-helpers --max-cost 10
+```
 
 The presets in `nl2sql/evaluation/presets/` are `llm` sections, shipped in the
 package:
@@ -429,12 +438,18 @@ p = 1.0.
 A case counts as passed only when **every** pass passed, so over three passes
 a case that has become flaky reads as a regression.
 
-The regression gate fails a run when, for any config both reports name:
+The regression gate (`engine.evals.gate`, `nl2sql eval run --baseline`)
+compares only comparable runs (the same mode, suite digest, schema and, in
+mode full, roles and curated answers), and a case passes on
+**execution accuracy** (`result_match` and `outcome`), the measure 0.6's tier
+2 published: a faithfulness miss alone is not a regression. With curated
+answers on it checks that accuracy as users see it and on the generated path.
+It fails a run when, for any config both runs name:
 
 | Check | Default (`evals.yaml` `gate`) | Why |
 | --- | --- | --- |
-| More than `max_regressions` cases flipped from pass to fail | 2 | A handful of named cases is something a person can go and read |
-| The flips are one-sided enough that McNemar's exact p < `alpha` | 0.05 | A small but real drop should not pass because it is under the count |
+| More than `max_regressions` cases flipped from pass to fail | 2 in mode full; always 0 in modes plans and retrieval | A handful of named cases is something a person can go and read; with no model, any flip is a bug |
+| Mode full: more cases lost than gained, and McNemar's exact two-sided p < `alpha` | 0.05 | A small but real drop should not pass because it is under the count |
 | Cost per case rose by more than `max_cost_increase` | 0.2 | Unchanged |
 
 With `passes` above one the board also reports **pass^k**: the share of
@@ -456,7 +471,7 @@ benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 
 | Part | What it is |
 | --- | --- |
-| `kind` | `tier2` (mode full) or `retrieval` |
+| `mode` | `full`, `plans` or `retrieval`; 0.6 wrote mode full runs under `tier2`, read as `full` |
 | `database` | The datasource id (`chinook`) |
 | `shortsha` | The first seven characters of the engine commit |
 | `config` | The config name (`retrieval` for a retrieval run) |
@@ -467,25 +482,32 @@ Every record holds:
 
 | Field | What it is |
 | --- | --- |
-| `schema`, `kind` | The record format (2) and the kind |
+| `schema`, `kind` | The record format (2) and the run's mode |
 | `recorded_at` | UTC date and time |
 | `engine_version` | The installed `nl2sql-engine` version (the same for every run until a release) |
 | `git_commit`, `git_dirty` | The engine's commit and whether its tracked files had uncommitted changes. Found by walking up from the installed `nl2sql` package to its `.git`, so a run from the demo folder of an editable install still names the repo commit. `"unknown"` for a wheel install or without git, never null |
 | `note` | What changed, e.g. `"slim prompts"` (null without one) |
-| `dataset` | The suite file's name and sha256, taken with LF line endings so a Windows checkout hashes the same |
+| `dataset` | The suite's name and digest (a SHA-256 of its LF bytes, so a Windows checkout hashes the same). A record 0.6 wrote names `chinook_gold.yaml` |
 | `database` | `datasource_id`, `engine` (`sqlite`), `schema_fingerprint` and the `tables` and `columns` counts. The fingerprint hashes the latest indexed schema snapshot's tables, columns, types and keys, so re-indexing an unchanged database keeps it. Built from the datasources the suite's cases name, not every datasource the project registered: the demo registers three and this suite asks about Chinook, so a run there is still `chinook` with Chinook's fingerprint |
 | `config` | The config name, and `provider:model` per node |
-| `metrics` | The headline numbers: accuracy (strict and lenient) with their intervals, `pass_k`, answerability, dollars, tokens, latency, determinism and faithfulness; or, for retrieval, the recall summary |
+| `metrics` | The headline numbers: execution accuracy (strict and lenient) with their intervals, then `accuracy_all_scorers` and `accuracy_generated`, `pass_k`, answerability, dollars, tokens, latency, determinism and faithfulness; or, for retrieval, the recall summary |
+| `scoreboard` | The config's whole board, every case record included |
+
+**The headline accuracy is execution accuracy** (`accuracy.execution`), the
+measure 0.6's tier 2 published, so the series reads the same before and
+after 0.7. The 0.6 records are on the 0.6 gold file, so the first 0.7 run
+starts a new series beside them.
 
 Records are never edited after writing: a run writes a new file. Two runs are
-comparable when they share the kind, the dataset sha and the schema
+comparable when they share the mode, the suite digest and the schema
 fingerprint, and for mode full the roles and whether curated answers were on.
-`nl2sql.evaluation.records.publish()`, run from the repo root, reads every
-record and rewrites [docs/benchmarks.md](../benchmarks.md) and the README's
-results block. It reads no clock, so the same records always give
-byte-identical pages. `packages/nl2sql/tests/unit/test_benchmark_records.py`
-checks in CI, with no key, that the committed pages are exactly what
-`publish` makes from the committed records.
+`nl2sql eval publish REPORT ...`, run from the repo root, writes the records
+of the reports `nl2sql eval run` saved, then reads every record and rewrites
+[docs/benchmarks.md](../benchmarks.md) and the README's results block. It
+reads no clock, so the same records always give byte-identical pages.
+`packages/nl2sql/tests/unit/test_eval_records.py` checks in CI, with no key,
+that the committed pages are exactly what `publish` makes from the committed
+records.
 
 ### How mode full is tested
 
@@ -514,7 +536,9 @@ The unit tests cover the rest:
 | `tests/unit/test_eval_report.py` | Prices, the boards, the Wilson interval on known counts, McNemar's exact test on a constructed table, pass^k and the gate |
 | `tests/unit/test_eval_scorers.py` | Each scorer |
 | `tests/unit/test_answer_faithfulness.py` | The faithfulness rules |
-| `tests/unit/test_benchmark_records.py` | The records |
+| `tests/unit/test_eval_records.py` | The records |
+| `tests/unit/test_eval_gate.py` | The gate: same suite and mode, execution accuracy, both accuracies, baselines from records |
+| `tests/cli/test_eval_command.py` | `nl2sql eval run`, `regenerate` and `publish`, with their exit codes |
 
 ## Retrieval recall
 
@@ -563,6 +587,11 @@ The committed baseline (2026-09-22, engine 0.1.2, 39 questions):
 | --- | --- | --- | --- | --- |
 | 98.5% | 72.6% | 37 of 39 | 15 of 39 | 8.3 tables, 24.2 columns |
 
+The first 0.7 record (2026-10-15, CI's baseline) scores each answerable case
+once per role allowed to read it, 96 case runs over 43 cases: 97.9% table
+recall, 76.5% column recall, 7.98 tables and 22.2 columns sent on average.
+It is a new series: the suite is not the 0.6 gold file.
+
 Most misses are columns of a table that was sent. Once one column entry of
 a table is picked, or a relationship entry adds its key columns, only those
 columns are sent rather than all of them. So `Invoice` often reaches the
@@ -574,4 +603,7 @@ planner as `BillingCountry` or a key without `Total` or `InvoiceDate`
 `packages/nl2sql/tests/e2e/test_evals_retrieval.py` runs mode retrieval on the
 generated demo in the key-free integration job. It checks that the run covers
 every answerable case and reports recall and routing, not what the recall
-is.
+is. The same job gates the recall itself:
+`nl2sql eval run --mode retrieval --baseline benchmarks` fails when more than
+two cases stopped passing (perfect recall, and routing where it applies)
+against the newest mode retrieval record, or the loss is significant.

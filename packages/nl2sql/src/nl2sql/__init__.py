@@ -38,6 +38,7 @@ _EXPORTS = {
     "nl2sql.evaluation.suite": ("EvalSuite", "EvalCase"),
     "nl2sql.evaluation.report": ("EvalReport",),
     "nl2sql.evaluation.regenerate": ("RegenerateReport",),
+    "nl2sql.evaluation.gate": ("GateResult",),
     "nl2sql.evaluation.scorers": ("Scorer", "Score", "CaseRun"),
 }
 _LAZY = {name: module for module, names in _EXPORTS.items() for name in names}
@@ -87,6 +88,7 @@ __all__ = [
     "EvalCase",
     "EvalReport",
     "RegenerateReport",
+    "GateResult",
     "Scorer",
     "Score",
     "CaseRun",

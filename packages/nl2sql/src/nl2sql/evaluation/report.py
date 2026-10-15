@@ -16,8 +16,9 @@ each scorer's counts.
 """
 from __future__ import annotations
 
+import hashlib
 import math
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -153,14 +154,40 @@ def _pass_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "accuracy": _share(passed, len(records)), "lenient_accuracy": _share(lenient, len(records))}
 
 
-def _execution(record: Dict[str, Any]) -> bool:
-    """The 0.6 tier 2 measure: ``result_match`` and ``outcome`` passed where they apply; no other scorer counts."""
+EXECUTION_SCORERS = ("result_match", "outcome")
+
+
+def execution_passed(record: Dict[str, Any], lenient: bool = False) -> bool:
+    """Execution accuracy, the measure 0.6's tier 2 published: ``result_match`` and ``outcome`` passed.
+
+    No other scorer counts, so a faithfulness miss or a retrieval short of 1.0
+    leaves it alone. ``lenient`` reads ``result_match`` by its lenient verdict.
+    A record with no ``scores`` is one 0.6's tier 2 wrote: its ``status`` was
+    this measure, so it is read by its status.
+    """
+    if "scores" not in record:
+        return (_lenient(record) if lenient else record["status"]) == "pass"
     scores = record.get("scores") or {}
-    mine = {n: s for n, s in scores.items() if n in ("result_match", "outcome")}
+    mine = {n: s for n, s in scores.items() if n in EXECUTION_SCORERS}
     if any("error" in s.get("detail", {}) for s in mine.values()):
         return False
-    applied = [s for s in mine.values() if s.get("passed") is not None]
-    return bool(applied) and all(s["passed"] for s in applied)
+    applied = {n: s for n, s in mine.items() if s.get("passed") is not None}
+    if not applied:
+        return False
+    return all(s["detail"].get("lenient", s["passed"]) if lenient and n == "result_match" else s["passed"]
+               for n, s in applied.items())
+
+
+def suite_identity(report: Any) -> Dict[str, str]:
+    """``{name, sha256}`` of the suites a report ran: one suite's digest, or a digest of several joined by ``+``.
+
+    Two runs compare only when this matches: the gate and the records key on it.
+    """
+    suites = (report.suites if isinstance(report, EvalReport) else report.get("suites")) or []
+    names = "+".join(s["name"] for s in suites) or "unknown"
+    digests = [s["digest"] for s in suites]
+    digest = digests[0] if len(digests) == 1 else hashlib.sha256("+".join(digests).encode()).hexdigest()
+    return {"name": names, "sha256": digest}
 
 
 def _generated_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
@@ -179,10 +206,16 @@ def _by_case(records: Sequence[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]
     return runs
 
 
-def reliable(records: Sequence[Dict[str, Any]], lenient: bool = False) -> Dict[str, bool]:
-    """Per case and role, whether **every** pass passed: the pass^k rule."""
-    status = _lenient if lenient else (lambda r: r["status"])
-    return {q: all(status(r) == "pass" for r in runs) for q, runs in _by_case(records).items()}
+def reliable(records: Sequence[Dict[str, Any]], lenient: bool = False,
+             passed: Optional[Callable[[Dict[str, Any]], bool]] = None) -> Dict[str, bool]:
+    """Per case and role, whether **every** pass passed: the pass^k rule.
+
+    ``passed`` says whether one run passed; by default its ``status`` (or its
+    lenient status) is ``pass``.
+    """
+    if passed is None:
+        passed = (lambda r: _lenient(r) == "pass") if lenient else (lambda r: r["status"] == "pass")
+    return {q: all(passed(r) for r in runs) for q, runs in _by_case(records).items()}
 
 
 def _pass_k(records: Sequence[Dict[str, Any]], passes: int) -> Optional[Dict[str, Any]]:
@@ -290,7 +323,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     total_cost = sum(r.get("cost") or 0.0 for r in records)
     overall = _pass_rate(records)
     generated = _generated_rate(records)
-    executed = sum(_execution(r) for r in records)
+    executed = sum(execution_passed(r) for r in records)
     latencies = [r["latency_s"] for r in records if r.get("latency_s") is not None]
     return {
         "summary": summarize(records),
