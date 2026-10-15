@@ -109,6 +109,16 @@ rather than gating on `--collect-only`. The subset is worth keeping wide: every
 test that can run without a key should, because the ones that cannot are never
 run by CI at all.
 
+`tests/e2e` builds one demo project per session (`demo_project`), indexes it,
+then moves its `.nl2sql` aside and leaves a file of that name, so no test can
+open the shared index or state store. Each test runs on its own copy:
+`private_storage(demo_project, tmp_path / "store")` as `project_config`'s
+`storage`, or `copy_demo(demo_project, tmp_path / "demo")` for a whole
+project. When tests shared the one `state.db`, engines left open by one test,
+copies taken while it was open and CLI runs writing it all met in the same
+file, and CI failed with `disk I/O error` in whichever test pytest-randomly
+ran next.
+
 ## Randomised test order
 
 `pytest-randomly` shuffles the order of tests on every run, which turns

@@ -8,7 +8,6 @@ project, in no config, in the run's trace, in the response, in the process
 environment or in anything that was logged.
 """
 import logging
-import shutil
 
 import pytest
 
@@ -17,6 +16,7 @@ pytest.importorskip("fastapi")
 from nl2sql.cli.demo.llm_config import point_llm_config_at  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
+from .conftest import copy_demo  # noqa: E402
 from .recordings_chinook import RULES_COUNT_CUSTOMERS  # noqa: E402
 
 # Built at run time so no scanner mistakes a test fixture for a leaked key.
@@ -41,7 +41,7 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
     from nl2sql.cli.demo.playground.hosted import KEY_HEADER, Hosted
 
     project = tmp_path / "demo"
-    shutil.copytree(demo_project, project)
+    copy_demo(demo_project, project)
     # The stand-in provider, reached exactly as a real one would be: the
     # visitor's key as the bearer token, no key anywhere on the server.
     provider = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
@@ -114,7 +114,7 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
     pytest.importorskip("langchain_anthropic")
 
     project = tmp_path / "demo"
-    shutil.copytree(demo_project, project)
+    copy_demo(demo_project, project)
     provider = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     point_llm_config_at(project, provider.base_url)
     # Anthropic's endpoint is its preset's, exactly as in production; here the

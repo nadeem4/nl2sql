@@ -5,12 +5,15 @@ a file in ``tmp_path`` or on ``:memory:``.
 """
 from __future__ import annotations
 
+import os
 import sqlite3
+import stat
 import threading
+import time
 
 import pytest
 
-from nl2sql.storage.sqlite import LockHeld, SqliteState
+from nl2sql.storage.sqlite import MIGRATIONS, LockHeld, SqliteState
 from nl2sql_sdk.schema import (
     ColumnContract,
     SchemaContract,
@@ -312,3 +315,104 @@ def test_one_store_serves_many_threads_at_once(tmp_path):
     state.close()
 
     assert failures == []
+
+
+def test_stores_opening_one_fresh_file_at_once_migrate_it_exactly_once(tmp_path):
+    """Two engines (or an engine and a CLI run) opening a new ``state.db`` at
+    the same moment: each read "nothing applied" before the other wrote, so the
+    second applied a migration again and failed on its ``nl2sql_meta`` row or
+    on a column the first had just added."""
+    for attempt in range(10):
+        path = tmp_path / f"state-{attempt}.db"
+        stores = [SqliteState(path) for _ in range(6)]
+        failures = []
+        start = threading.Barrier(len(stores))
+
+        def open_and_migrate(store):
+            start.wait()
+            try:
+                store.migrate()
+            except Exception as exc:  # noqa: BLE001 - collected and asserted below
+                failures.append(repr(exc))
+
+        threads = [threading.Thread(target=open_and_migrate, args=(s,)) for s in stores]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        for store in stores:
+            store.close()
+
+        assert failures == []
+        with sqlite3.connect(path) as connection:
+            rows = [r[0] for r in connection.execute("SELECT migration FROM nl2sql_meta ORDER BY migration")]
+        connection.close()
+        assert rows == [name for name, _ in MIGRATIONS]
+
+
+def test_an_up_to_date_store_migrates_without_waiting_for_a_writer(tmp_path):
+    """Every engine start after the first finds nothing pending: it must not
+    queue behind another connection's write transaction to learn that."""
+    path = tmp_path / "state.db"
+    first = SqliteState(path)
+    first.migrate()
+    first.close()
+
+    writer = sqlite3.connect(path, timeout=0)
+    writer.execute("BEGIN IMMEDIATE;")
+    try:
+        store = SqliteState(path)
+        started = time.monotonic()
+        assert store.migrate() == []
+        assert time.monotonic() - started < 1
+        store.close()
+    finally:
+        writer.rollback()
+        writer.close()
+
+
+def test_an_up_to_date_read_only_store_opens(tmp_path):
+    path = tmp_path / "state.db"
+    first = SqliteState(path)
+    first.migrate()
+    version = first.put_snapshot(_snapshot())
+    first.close()
+    os.chmod(path, stat.S_IREAD)
+    try:
+        store = SqliteState(path)
+        assert store.migrate() == []
+        assert store.list_versions("ds1") == [version]
+        store.close()
+    finally:
+        os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+
+
+def test_a_failed_switch_to_wal_leaves_no_connection_behind(tmp_path, monkeypatch):
+    import nl2sql.storage.sqlite as module
+
+    def refuse(connection, wait_s=5.0):
+        raise sqlite3.OperationalError("database is locked")
+
+    store = SqliteState(tmp_path / "state.db")
+    monkeypatch.setattr(module, "_write_ahead_log", refuse)
+    with pytest.raises(sqlite3.OperationalError):
+        store.migrate()
+    monkeypatch.undo()
+    assert store._connection is None
+    assert store.migrate()  # the next use opens afresh, in WAL
+    assert store._conn().execute("PRAGMA journal_mode;").fetchone()[0] == "wal"
+    store.close()
+
+
+def test_a_migration_script_takes_one_statement_per_line():
+    from nl2sql.storage.sqlite import _script
+
+    connection = sqlite3.connect(":memory:")
+    _script(connection, """
+        CREATE TABLE a (x);
+        CREATE TRIGGER t BEFORE UPDATE ON a
+            BEGIN SELECT RAISE(ABORT, 'no; never'); END;
+    """)
+    with pytest.raises(sqlite3.ProgrammingError):
+        _script(connection, "CREATE TABLE b (x); CREATE TABLE c (x);\n")
+    connection.close()

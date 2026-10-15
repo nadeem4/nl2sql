@@ -4,7 +4,6 @@ The provider is a ``FakeLLMServer`` standing in for OpenAI, reached through the
 real ``RecordingProxy``. No real key is used and nothing is spent.
 """
 import json
-import shutil
 
 import pytest
 from typer.testing import CliRunner
@@ -17,6 +16,7 @@ from nl2sql.llm.providers import DEFAULT_OPENAI_MODEL  # noqa: E402
 from nl2sql.llm.replay import ReplayStore  # noqa: E402
 from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
+from .conftest import copy_demo  # noqa: E402
 from .recordings_chinook import RULES_COUNT_CUSTOMERS  # noqa: E402
 
 FAKE_KEY = "-".join(["sk", "proj", "e2e" + "r" * 30 + "0c1d"])
@@ -29,7 +29,7 @@ def test_record_then_replay_with_no_key(demo_project, tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     project = tmp_path / "demo"
-    shutil.copytree(demo_project, project)
+    copy_demo(demo_project, project)
     # The fake model says every question is Chinook's; routing alone would send the
     # support and webanalytics questions elsewhere and drop chinook under the floor.
     with open(project / "settings.yaml", "a", encoding="utf-8") as settings:
