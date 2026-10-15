@@ -438,11 +438,16 @@ class Runtime:
                              "is reachable from this machine. The log has the driver's error."))
 
     def _published(self, status: DatasourceStatus) -> DatasourceStatus:
-        """``status``, after publishing ``datasource.failed`` on the engine's bus when it failed."""
+        """``status``, after publishing ``datasource.failed`` on the engine's bus when it failed.
+
+        The driver's words are redacted (D15): a plugin adapter may echo its DSN.
+        """
         if status.status == "failed":
-            self.bus.publish("datasource.failed", {"datasource_id": status.id, "stage": status.stage,
-                                                   "message": status.reason or "", "fix": status.fix},
-                             tenant_id=self.tenant_id)
+            from nl2sql.tracing.trace import redact_for
+
+            self.bus.publish("datasource.failed", {
+                "datasource_id": status.id, "stage": status.stage, "message": redact_for(self, status.reason or ""),
+                "fix": redact_for(self, status.fix) if status.fix else None}, tenant_id=self.tenant_id)
         return status
 
     def try_datasource(self, datasource: "Datasource") -> DatasourceStatus:

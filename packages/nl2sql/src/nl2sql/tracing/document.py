@@ -49,6 +49,8 @@ _PATTERNS = (
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=\-]{8,}"), f"Bearer {REDACTED}"),
     # scheme://user:password@host -> scheme://user:[REDACTED]@host
     (re.compile(r"(://[^/\s:@]+):[^@\s/]+@"), rf"\1:{REDACTED}@"),
+    # user:password@host without a scheme, as a driver or a plugin adapter may echo it.
+    (re.compile(r"(?<![:/\w.\-])([\w.\-]+):(?!\[REDACTED\]@)[^@\s/:\[]+@(?=[\w\[])"), rf"\1:{REDACTED}@"),
     # key=value pairs in connection strings and headers.
     (re.compile(r"(?i)\b(password|pwd|passwd|secret|api[_-]?key|access[_-]?key|accountkey|"
                 r"sharedaccesskey|token)(\s*[=:]\s*)[^;\s,\"'&]+"), rf"\1\2{REDACTED}"),

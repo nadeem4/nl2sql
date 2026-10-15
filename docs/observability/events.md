@@ -70,7 +70,7 @@ on the engine's bus directly.
 | --- | --- | --- |
 | `datasource.failed` | `datasource_id`, `stage`, `message`, `fix` | a connection check fails: the engine's start, `engine.check()` and `engine.datasources.test()` (by id, or with a `Datasource` it builds and tests) |
 | `index.started` | `datasource_id`, `namespace` | `engine.index.build` starts one datasource |
-| `index.column_failed` | `datasource_id`, `table`, `column`, `stage`, `message` | one per issue the adapter reported (a column it could not profile, a table it could not reflect): the issue only, never the column's statistics or sample values |
+| `index.column_failed` | `datasource_id`, `table`, `column`, `stage`, `message` | one per issue the adapter reported (a column it could not profile, a table it could not reflect): the issue only, never the column's statistics or sample values. For the `values` and `profile` stages, whose driver message may quote a value, `message` is a fixed sentence and the error's type |
 | `index.swapped` | `datasource_id`, `namespace`, `build_id`, `schema_version`, `replaced_build_id`, `replaced_schema_version`, `counts` (entries by type) | a datasource's new build goes live (audited) |
 | `index.failed` | `datasource_id`, `reason` | one datasource's build fails; its previous build stays live |
 | `schema.drifted` | `datasource_id`, `from_version`, `to_version`, `detected_by`, the diff's `counts` | not yet published (D1) |
@@ -78,10 +78,17 @@ on the engine's bus directly.
 | `llm.changed` | `by`, `changes` (never a key) | `engine.llm.replace` (audited) |
 | `eval.case`, `eval.finished` | see [Evals](../evals/index.md) | `engine.evals.run` |
 
+The driver and exception text in `datasource.failed` (`message`, `fix`),
+`index.failed` (`reason`) and `index.column_failed` (`message`) is redacted
+as a trace is: every secret the engine knows of, and every secret-shaped
+substring, such as the password in `scheme://user:password@host` or
+`user:password@host` and a `password=...` pair, becomes `[REDACTED]`.
+
 `policy.decision` is published for denials only, and only where a refusal is
 enforced (the logical validator refusing a table of the plan, the curated
 matcher refusing a verified query, the datasource resolver refusing every
-datasource it was asked about). A scope asked only to filter (routing that
+datasource it was asked about). The validator publishes a refused table
+once per check, even when the plan names it twice. A scope asked only to filter (routing that
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
 nobody asked for. Every catalogued event is published today except

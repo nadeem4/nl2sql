@@ -425,8 +425,6 @@ def _publish_refusals(policy_engine, user_context: UserContext, datasource_ids: 
     filtering and publishes nothing.
     """
     for ds_id in datasource_ids:
-        scope = policy_engine.scope(user_context, ds_id)
-        roles = ", ".join(g.name for g in scope.grants) or "(none)"
-        rule = (f"no allow pattern of role(s) '{roles}' reaches '{ds_id}'"
-                if not any(g.reaches(ds_id) for g in scope.grants) else f"the policy check does not allow '{ds_id}'")
-        publish("policy.decision", {"datasource_id": ds_id, "rule": rule, "step": "datasource_resolver"})
+        rule = policy_engine.scope(user_context, ds_id).datasource_rule()
+        if rule is not None:
+            publish("policy.decision", {"datasource_id": ds_id, "rule": rule, "step": "datasource_resolver"})

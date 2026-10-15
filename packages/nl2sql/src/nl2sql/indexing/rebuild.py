@@ -162,5 +162,8 @@ def _publish(ctx, progress: IndexProgress) -> None:
         ctx.bus.publish("index.started", {"datasource_id": progress.datasource_id, "namespace": ctx.namespace},
                         tenant_id=ctx.tenant_id)
     elif progress.state == "failed":
-        ctx.bus.publish("index.failed", {"datasource_id": progress.datasource_id, "reason": progress.reason or ""},
-                        tenant_id=ctx.tenant_id)
+        from nl2sql.tracing.trace import redact_for
+
+        # The reason is exception text, so it is redacted (D15).
+        ctx.bus.publish("index.failed", {"datasource_id": progress.datasource_id,
+                                         "reason": redact_for(ctx, progress.reason or "")}, tenant_id=ctx.tenant_id)

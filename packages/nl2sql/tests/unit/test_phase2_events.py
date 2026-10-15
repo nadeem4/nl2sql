@@ -102,7 +102,11 @@ def test_index_build_failure_publishes_index_failed(tmp_path):
 
 
 def test_index_issue_publishes_column_failed(tmp_path):
-    issues = [IndexIssue(table="main.Artist", column="Name", stage="values", message="permission denied"),
+    # A driver's message can quote a cell value (a cast error while sampling), so for the values and
+    # profile stages only the error's type and a fixed description are published.
+    issues = [IndexIssue(table="main.Artist", column="Name", stage="values",
+                         message=f'invalid input syntax for type integer: "{SAMPLE}"', error_type="DataError"),
+              IndexIssue(table="main.Artist", column="ArtistId", stage="profile", message=f"bad value {SAMPLE}"),
               IndexIssue(table="main.*", stage="estimate", message="no catalog row estimates")]
     ctx = _ctx(tmp_path, _Adapter(_snapshot(issues)))
     seen = _capture(ctx.bus)
@@ -112,7 +116,9 @@ def test_index_issue_publishes_column_failed(tmp_path):
     failed = [e.data for e in seen if e.name == "index.column_failed"]
     assert failed == [
         {"datasource_id": "chinook", "table": "main.Artist", "column": "Name", "stage": "values",
-         "message": "permission denied"},
+         "message": "The column's values could not be read (DataError)."},
+        {"datasource_id": "chinook", "table": "main.Artist", "column": "ArtistId", "stage": "profile",
+         "message": "The column could not be profiled."},
         {"datasource_id": "chinook", "table": "main.*", "column": None, "stage": "estimate",
          "message": "no catalog row estimates"},
     ]
@@ -145,6 +151,51 @@ def test_failed_check_publishes_datasource_failed(tmp_path):
                             "fix": status.fix}
     assert typo.data["stage"] == tried.stage == "config"
     assert checked.trace_id is None and checked.tenant_id == engine.config.settings.tenant_id
+
+
+PASSWORD = "Hunter2SecretPw"
+LEAKY = (f"could not connect to postgresql://admin:{PASSWORD}@db.internal:5432/sales; password={PASSWORD}; "
+         f"retried admin:{PASSWORD}@db.internal")
+
+
+def test_datasource_failed_redacts_a_password_in_a_dsn(tmp_path):
+    from nl2sql import Datasource
+
+    class Plug:
+        datasource_id = "plug"
+
+        def test_connection(self):
+            raise RuntimeError(LEAKY)
+
+    with _engine(tmp_path) as engine:
+        seen = []
+        engine.events.subscribe(seen.append, names=["datasource.failed"])
+        engine.datasources.test(Datasource(id="plug", adapter=Plug()))
+
+    [event] = seen
+    assert PASSWORD not in event.model_dump_json()
+    assert "[REDACTED]" in event.data["message"] and "db.internal" in event.data["message"]
+
+
+def test_index_failed_redacts_a_password_in_a_dsn(tmp_path):
+    ctx = _ctx(tmp_path, _Adapter(error=RuntimeError(LEAKY)))
+    seen = _capture(ctx.bus, "index.failed")
+
+    assert not rebuild_index(ctx).ok
+
+    [event] = seen
+    assert PASSWORD not in event.model_dump_json() and "[REDACTED]" in event.data["reason"]
+
+
+def test_index_column_failed_redacts_a_password_in_a_dsn(tmp_path):
+    issue = IndexIssue(table="main.Artist", stage="reflect", message=LEAKY)
+    ctx = _ctx(tmp_path, _Adapter(_snapshot([issue])))
+    seen = _capture(ctx.bus, "index.column_failed")
+
+    assert rebuild_index(ctx).ok
+
+    [event] = seen
+    assert PASSWORD not in event.model_dump_json() and "[REDACTED]" in event.data["message"]
 
 
 def test_a_ready_check_publishes_nothing(tmp_path):
@@ -254,20 +305,34 @@ def test_validator_denial_publishes_policy_decision():
     assert "policy.decision" not in STREAM_EVENTS  # an operator event (D17)
 
 
-def test_retriever_filtering_publishes_nothing():
-    """A scope asked to filter (the retriever, the value check) publishes nothing (D16)."""
-    from nl2sql.policies.scope import PolicyEngine
-    from nl2sql.config import Policies
+def test_a_self_join_on_a_denied_table_publishes_one_policy_decision():
+    from nl2sql.pipeline.nodes.ast_planner.schemas import TableRef as PlanTable
+    from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
+    from nl2sql.testing.runtime import fake_runtime
 
-    engine = PolicyEngine(Policies.model_validate(
-        {"roles": {"user": {"description": "d", "allow": ["ds1.main.allowed"]}}}), None)
+    ctx = fake_runtime(ds_registry=SimpleNamespace(),
+                       policies={"roles": {"user": {"description": "d", "allow": ["ds1.main.allowed"]}}})
+    state = _validator_state("user")
+    plan = state.ast_planner_response.plan
+    state.ast_planner_response.plan = plan.model_copy(
+        update={"tables": [*plan.tables, PlanTable(name="secret", alias="s2")]})
+    bus = EventBus()
+    seen = _capture(bus, "policy.decision")
+    with RunScope(bus, question="q").entered():
+        LogicalValidatorNode(ctx)(state)
+
+    assert [(e.data["table"], e.data["step"]) for e in seen] == [("secret", "logical_validator")]
+
+
+def test_retriever_filtering_publishes_nothing():
+    """The schema retriever hides a denied table: filtering, not a refusal, so nothing is published (D16)."""
+    from test_policy_refusal import _assert_customer_is_hidden, _retrieve, _retriever  # same directory
+
     bus = EventBus()
     seen = _capture(bus)
-    scope = RunScope(bus, question="q")
-    with scope.entered():
-        filtered = engine.scope(UserContext(roles=["user"]), "ds1")
-        assert not filtered.allows("main", "secret") and filtered.rule_for("main", "secret")
-    assert seen == []
+    with RunScope(bus, question="q").entered():
+        _assert_customer_is_hidden(_retrieve(_retriever(), ["viewer"]))
+    assert [e.name for e in seen if e.name == "policy.decision"] == []
 
 
 def test_verified_query_refusal_publishes_policy_decision(db):
@@ -285,10 +350,10 @@ def test_verified_query_refusal_publishes_policy_decision(db):
     assert event.data["table"] in {"Invoice", "InvoiceLine"} and event.data["rule"]
 
 
-def test_resolver_refusal_publishes_policy_decision():
-    from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
+def _resolve(datasource_id=None):
     from nl2sql.llm import LLMRegistry
     from nl2sql.llm.models import AgentConfig
+    from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNode
     from nl2sql.pipeline.state import GraphState
     from nl2sql.secrets import SecretManager
     from nl2sql.testing.runtime import fake_runtime
@@ -297,9 +362,7 @@ def test_resolver_refusal_publishes_policy_decision():
     llm_registry = LLMRegistry(SecretManager())
     llm_registry.register_llm(AgentConfig(provider="openai", model="m", api_key="-".join(["fake", "key"]),
                                           base_url="http://127.0.0.1:9", name="default"))
-    doc = SimpleNamespace(metadata={"schema_version": "v1", "datasource_id": "ds1"})
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [doc],
-                                   schema_version=lambda _id: "v1", snapshot=lambda _id: None)
+    vector_store = SimpleNamespace(schema_version=lambda _id: "v1", snapshot=lambda _id: None)
     ctx = fake_runtime(vector_store=vector_store,
                        policies={"default_role": "r", "roles": {"r": {"description": "d", "allow": ["other"]}}},
                        llm_registry=llm_registry,
@@ -307,16 +370,41 @@ def test_resolver_refusal_publishes_policy_decision():
                                                    list_ids=lambda: ["ds1", "ds2"]))
     bus = EventBus()
     seen = _capture(bus, "policy.decision")
-    scope = RunScope(bus, question="q")
-    with scope.entered():
-        out = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext(roles=["r"])))
-
+    with RunScope(bus, question="q").entered():
+        out = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext(roles=["r"]),
+                                                     datasource_id=datasource_id))
     assert [e.error_code.value for e in out["errors"]] == ["SECURITY_VIOLATION"], out["errors"]
+    return seen
+
+
+def test_resolver_refusal_publishes_policy_decision():
+    seen = _resolve()
+
     assert [e.data["datasource_id"] for e in seen] == ["ds1", "ds2"]  # every registered one was refused
     event = seen[0]
     assert event.data["table"] is None
     assert event.data["schema"] is None and event.data["step"] == "datasource_resolver"
     assert event.data["rule"] == "no allow pattern of role(s) 'r' reaches 'ds1'"
+
+
+def test_explicit_datasource_refusal_publishes_policy_decision():
+    seen = _resolve(datasource_id="ds1")
+
+    assert [(e.data["datasource_id"], e.data["rule"]) for e in seen] == [
+        ("ds1", "no allow pattern of role(s) 'r' reaches 'ds1'")]
+
+
+def test_datasource_rule_names_the_roles_or_the_policy_check():
+    from nl2sql.policies.scope import RoleGrant, Scope
+
+    reaching = (RoleGrant.of("r", ["ds1"]),)
+    assert Scope("ds1", reaching).datasource_rule() is None
+    assert Scope("ds1", reaching).reaches_datasource()
+    assert Scope("ds1", (RoleGrant.of("r", ["other"]),)).datasource_rule() == (
+        "no allow pattern of role(s) 'r' reaches 'ds1'")
+    failed = Scope("ds1", reaching, check=RoleGrant("policy check 'acl' (failed: RuntimeError)", ()))
+    assert failed.datasource_rule() == "policy check 'acl' (failed: RuntimeError) does not reach 'ds1'"
+    assert not failed.reaches_datasource()
 
 
 @pytest.fixture

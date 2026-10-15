@@ -121,6 +121,10 @@ class IndexIssue(BaseModel):
     column: Optional[str] = None
     stage: Literal["reflect", "estimate", "profile", "values"]
     message: str
+    # The exception's class name, when an exception caused it. The engine's
+    # ``index.column_failed`` event says only this for the ``profile`` and
+    # ``values`` stages, whose message may quote a value from the data.
+    error_type: Optional[str] = None
 
 
 class SchemaSnapshot(BaseModel):

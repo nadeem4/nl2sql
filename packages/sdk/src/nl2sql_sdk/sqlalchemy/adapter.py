@@ -121,6 +121,11 @@ def driver_message(exc: BaseException) -> str:
     return first if len(first) <= _MAX_MESSAGE else first[: _MAX_MESSAGE - 3] + "..."
 
 
+def _error_type(exc: BaseException) -> str:
+    """The driver's exception class name (SQLAlchemy's wrapper's when there is no driver error)."""
+    return type(getattr(exc, "orig", None) or exc).__name__
+
+
 class ReflectedTable(NamedTuple):
     """One table or view as ``reflect`` reads it.
 
@@ -668,7 +673,8 @@ class SQLAlchemyAdapter:
             total, nulls, low, high, distinct = conn.execute(stmt).one()
         except Exception as exc:
             self._rollback(conn)
-            issues.append(IndexIssue(table=_name(ref), column=name, stage="profile", message=driver_message(exc)))
+            issues.append(IndexIssue(table=_name(ref), column=name, stage="profile", message=driver_message(exc),
+                                     error_type=_error_type(exc)))
             return None
 
         values: List[Any] = []
@@ -680,7 +686,7 @@ class SQLAlchemyAdapter:
             except Exception as exc:
                 self._rollback(conn)
                 issues.append(IndexIssue(table=_name(ref), column=name, stage="values",
-                                         message=driver_message(exc)))
+                                         message=driver_message(exc), error_type=_error_type(exc)))
         return ColumnStatistics(
             null_percentage=nulls / total if total else 0.0,
             distinct_count=int(distinct or 0),

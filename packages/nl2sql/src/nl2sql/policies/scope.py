@@ -69,8 +69,16 @@ class Scope:
 
     def reaches_datasource(self) -> bool:
         """Whether any role reaches this datasource, and the check (if any) does too."""
-        return (any(g.reaches(self.datasource_id) for g in self.grants)
-                and (self.check is None or self.check.reaches(self.datasource_id)))
+        return self.datasource_rule() is None
+
+    def datasource_rule(self) -> Optional[str]:
+        """Why this datasource may not be read at all, for the log and ``policy.decision``; ``None`` if it may."""
+        if not any(g.reaches(self.datasource_id) for g in self.grants):
+            roles = ", ".join(g.name for g in self.grants) or "(none)"
+            return f"no allow pattern of role(s) '{roles}' reaches '{self.datasource_id}'"
+        if self.check is not None and not self.check.reaches(self.datasource_id):
+            return f"{self.check.name} does not reach '{self.datasource_id}'"
+        return None
 
     def allows(self, schema: Optional[str], table: str) -> bool:
         """Whether ``schema.table`` may be read."""

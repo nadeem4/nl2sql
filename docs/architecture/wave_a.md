@@ -460,7 +460,18 @@ names in the same PR.
     per datasource, `schema` and `table` None,
     `step: datasource_resolver`, `rule` naming the roles or the policy
     check). The resolver's re-check after `datasources.after` hooks publishes
-    nothing; the hook's own `hook.decision` covers it. Test fakes that build
+    nothing; the hook's own `hook.decision` covers it. After review:
+    `datasource.failed` (`message`, `fix`), `index.failed` and
+    `index.column_failed` run their text through
+    `nl2sql.tracing.trace.redact_for(ctx, text)` (the trace's `Redactor` with
+    `collect_secrets(ctx)`; its patterns now also catch a bare
+    `user:password@host`). For the `values` and `profile` stages,
+    `index.column_failed`'s `message` is a fixed sentence plus the new
+    `IndexIssue.error_type` (SDK, optional, set by the SQLAlchemy base), so a
+    cast error quoting a cell value never reaches the bus. The rule comes
+    from the new `Scope.datasource_rule()` (`reaches_datasource` is
+    `datasource_rule() is None`), which names a failed policy check, and the
+    validator publishes once per (schema, table, rule). Test fakes that build
     an orchestrator or call `rebuild_index` need `bus` and `tenant_id`
     (`tests/unit/index_helpers.py`'s `TestIndex` has them). Tests:
     `tests/unit/test_phase2_events.py`.

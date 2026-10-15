@@ -660,6 +660,7 @@ class LogicalValidatorNode:
         # The schema retriever never showed the planner a table the scope
         # hides, so a plan naming one anyway is refused here.
         scope = self.policy_engine.scope(user_ctx, ds_id)
+        published = set()  # a self-join names a table twice; the operator hears of it once
         for t in plan.tables:
             # The schema the generator will write, or the default one.
             rule = scope.rule_for(t.schema_name, t.name)
@@ -673,8 +674,11 @@ class LogicalValidatorNode:
             # and trace); the user gets the table only when the deployment opts
             # in, because naming a table tells an unauthorised user that it exists.
             logger.warning("Policy denied role(s) %s access to '%s': %s.", roles, namespaced_name, rule)
-            publish("policy.decision", {"datasource_id": ds_id, "schema": t.schema_name or scope.default_schema,
-                                        "table": t.name, "rule": rule, "step": "logical_validator"})
+            decision = (t.schema_name or scope.default_schema, t.name, rule)
+            if decision not in published:
+                published.add(decision)
+                publish("policy.decision", {"datasource_id": ds_id, "schema": decision[0], "table": t.name,
+                                            "rule": rule, "step": "logical_validator"})
             if self.refusal_names_tables:
                 message = f"Role '{role or '(none)'}' denied access to '{namespaced_name}'."
             else:
