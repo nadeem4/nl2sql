@@ -3,8 +3,8 @@
 ``load`` reads the suites ``evals.yaml`` names, ``run`` runs them in one of
 three modes and returns an ``EvalReport``, ``regenerate`` writes a suite's
 expected rows through the datasource's adapter, and ``scorers`` lists the
-registered scorer names. The regression gate (``gate``) arrives with V2 and
-seeding (``seed``) with V3. This module never imports ``nl2sql.evaluation``
+registered scorer names, and ``gate`` compares a report with a baseline
+(the regression gate). Seeding (``seed``) arrives with V3. This module never imports ``nl2sql.evaluation``
 at module scope: building an engine never loads it.
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, 
 
 if TYPE_CHECKING:
     from nl2sql.config import LLM
+    from nl2sql.evaluation.gate import GateResult
     from nl2sql.evaluation.regenerate import RegenerateReport
     from nl2sql.evaluation.report import EvalReport
     from nl2sql.evaluation.suite import EvalSuite
@@ -109,6 +110,25 @@ class EvalsAPI:
         if hasattr(self._ctx, "vector_store"):
             report.database = database_identity(self._ctx, datasources)
         return report
+
+    def gate(self, report: "EvalReport", baseline: Any) -> "GateResult":
+        """``report`` against ``baseline``, with ``evals.yaml``'s ``gate`` settings.
+
+        ``baseline`` is another ``EvalReport`` (or its JSON), a record or a list
+        of records from ``benchmarks/``, or a path: a report or record file, or
+        a ``benchmarks/`` folder, whose newest record of the report's mode,
+        database and config is the baseline. A relative path is relative to the
+        working directory. Only runs of the same suite digest and mode are
+        compared, on execution accuracy (``result_match`` and ``outcome``), as
+        users see it and on the generated path; see ``nl2sql.evaluation.gate``.
+        """
+        from nl2sql.evaluation import gate
+
+        if isinstance(baseline, (str, Path)):
+            baseline = gate.load_baseline(baseline, report)
+        settings = self._ctx.config.evals.gate
+        return gate.gate(report, baseline, max_regressions=settings.max_regressions, alpha=settings.alpha,
+                         max_cost_increase=settings.max_cost_increase)
 
     def regenerate(self, path: Union[str, Path], *, allow_packaged: bool = False) -> "RegenerateReport":
         """Run each approved case's ``sql`` and ``alt_sql`` through its datasource's adapter and write the rows.

@@ -844,6 +844,7 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/secrets/providers/env.py": "the env secret provider: ${env:...}",
     "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
+    "nl2sql/src/nl2sql/cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
 }
 
 # The one function that loads a .env file, and the entry points that call it.

@@ -1,6 +1,11 @@
-"""Benchmark result records and `publish`: what a record holds, where it lives, comparable runs and stable pages."""
+"""Eval records and `publish`: what a record holds, where it lives, comparable runs and stable pages.
+
+A record is one config's board of an ``EvalReport``, keyed by the suite's
+digest and the run's mode. The records 0.6's ``nl2sql benchmark`` wrote
+(kind ``tier2``) stay readable: they are mode full runs, and the history
+shows them in the same series table.
+"""
 import datetime as dt
-import hashlib
 import json
 import pathlib
 import random
@@ -10,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from nl2sql.evaluation import records, report
+from nl2sql.evaluation.report import EvalReport
 from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 
 REPO = pathlib.Path(__file__).resolve().parents[4]
@@ -17,14 +23,22 @@ WHEN = dt.datetime(2026, 9, 21, 14, 5, 6, tzinfo=dt.timezone.utc)
 CODE = {"git_commit": "abcdef1234567890", "git_dirty": False}
 CHINOOK = {"datasource_id": "chinook", "engine": "sqlite", "schema_fingerprint": "ceed80fefde051bd",
            "tables": 11, "columns": 64}
+SUITE = {"name": "chinook", "path": str(CHINOOK_SUITE_PATH), "digest": load_suite(CHINOOK_SUITE_PATH).digest()}
 
 
-def _rec(qid, status, pass_no=1, cost=0.02):
-    return {"id": qid, "question": "?", "role": "admin", "expected": "allowed", "status": status, "reason": "",
+def _rec(qid, status, pass_no=1, cost=0.02, faithful=None):
+    """A case record: ``status`` is the rows' verdict; faithfulness follows it unless ``faithful`` says otherwise."""
+    faithful = status == "pass" if faithful is None else faithful
+    scores = {"result_match": {"passed": status == "pass", "value": None, "detail": {}},
+              "outcome": {"passed": True, "value": None, "detail": {}},
+              "faithfulness": {"passed": faithful, "value": None, "detail": {}}}
+    overall, reason = report.case_status(scores)
+    return {"id": qid, "question": "?", "role": "admin", "expected": "allowed", "status": overall,
+            "reason": reason, "lenient_status": overall, "scores": scores,
             "sql": "SELECT 1", "rows": 1, "gold_rows": 1, "pass": pass_no, "tags": ["join"], "difficulty": "easy",
             "cost": cost, "latency_s": 1.5, "rows_digest": "d", "error_codes": [], "refused_unanswerable": False,
-            "retries": 0, "timings": {},
-            "faithfulness": {"faithful": status == "pass", "unsupported_numbers": [] if status == "pass" else ["9"],
+            "retries": 0, "timings": {}, "source": "generated", "generated": None,
+            "faithfulness": {"faithful": faithful, "unsupported_numbers": [] if faithful else ["9"],
                              "unsupported_entities": [], "checked": 1},
             "tokens_by_node": {"ast_planner": {"calls": 1, "input_tokens": 1000, "cached_input_tokens": 400,
                                                "cache_write_input_tokens": 0, "output_tokens": 100,
@@ -32,39 +46,48 @@ def _rec(qid, status, pass_no=1, cost=0.02):
 
 
 def _board(names=("gpt-5.4",), passes=1, stopped=None, statuses=("pass", "fail"), database=CHINOOK,
-           roles=("admin",), cost=0.02):
+           roles=("admin",), cost=0.02, curated=False, suite=SUITE, faithful=None):
+    """A mode full ``EvalReport`` with one board per name."""
     configs = {}
     for name in names:
-        runs = [_rec(f"q{i}", s, p, cost) for p in range(1, passes + 1) for i, s in enumerate(statuses)]
+        runs = [_rec(f"q{i}", s, p, cost, faithful) for p in range(1, passes + 1) for i, s in enumerate(statuses)]
         board = report.score_config(runs, passes=passes)
         board.update(models={"astplanner": "openai:gpt-5.4", "decomposer": "openai:gpt-5.4-mini"},
                      planned_cases=len(runs), completed_cases=len(runs))
         configs[name] = board
-    return {"tier": 2, "dataset": str(CHINOOK_SUITE_PATH), "roles": list(roles), "passes": passes,
-            "questions": ["q0", "q1"], "max_cost": 5.0, "spent": 0.1, "stopped": stopped,
-            "prices_checked_on": "2026-09-21", "configs": configs, "comparison": report.compare(configs),
-            "database": database}
+    return EvalReport(mode="full", suites=[suite], roles=list(roles) if roles else None, passes=passes,
+                      curated=curated, max_cost_usd=5.0, spent=0.1, stopped=stopped,
+                      prices_checked_on="2026-09-21", configs=configs, database=database)
 
 
 def _retrieval_report(table=0.9, column=0.7, database=CHINOOK):
-    summary = {"questions": 3, "table_recall": table, "column_recall": column, "perfect_tables": 2,
-               "perfect_columns": 1, "tables_sent": 8.0, "columns_sent": 24.0}
-    return {"kind": "retrieval", "dataset": str(CHINOOK_SUITE_PATH), "database": database,
-            "settings": {"table_k": 8, "planning_k": 12, "embedding": "local"}, "summary": summary, "results": []}
+    """A mode retrieval ``EvalReport``: three cases, the recall means as given."""
+    runs = []
+    for i, (t, c) in enumerate(((table, column), (table, column), (table, column))):
+        detail = {"table_recall": t, "column_recall": c, "tables_sent": 8.0, "columns_sent": 24.0}
+        scores = {"retrieval_recall": {"passed": t == 1.0 and c == 1.0, "value": t, "detail": detail}}
+        status, _ = report.case_status(scores)
+        runs.append({"id": f"q{i}", "role": "admin", "pass": 1, "expected": "allowed", "status": status,
+                     "lenient_status": status, "scores": scores, "cost": 0.0, "latency_s": 0.1})
+    board = report.score_config(runs, passes=1)
+    board.update(planned_cases=3, completed_cases=3)
+    return EvalReport(mode="retrieval", suites=[SUITE], configs={"retrieval": board}, database=database,
+                      settings={"retrieval": {"table_k": 8, "planning_k": 12, "fetch_multiplier": 4,
+                                              "lambda_mult": 0.7, "full_snapshot_max_tables": 0,
+                                              "query": "question"}})
 
 
 def test_a_record_holds_when_what_on_which_code_data_and_database_and_the_headline_metrics():
     record = records.make_record(_board(passes=2), "gpt-5.4", recorded_at=WHEN, engine_version="0.9.0",
                                  code=CODE, note="slim prompts")
-    assert record["schema"] == 2 and record["kind"] == "tier2"
+    assert record["schema"] == 2 and record["kind"] == "full"
     assert record["recorded_at"] == "2026-09-21T14:05:06Z"
     assert record["engine_version"] == "0.9.0"
     assert (record["git_commit"], record["git_dirty"]) == ("abcdef1234567890", False)
     assert record["note"] == "slim prompts"
     assert record["database"] == CHINOOK
-    assert record["dataset"] == {"name": "chinook.yaml",
-                                 "sha256": hashlib.sha256(CHINOOK_SUITE_PATH.read_bytes().replace(b"\r\n", b"\n"))
-                                 .hexdigest()}
+    # The suite, by its name and digest: two runs compare only on the same digest.
+    assert record["dataset"] == {"name": "chinook", "sha256": SUITE["digest"]}
     assert record["config"] == {"name": "gpt-5.4", "models": {"astplanner": "openai:gpt-5.4",
                                                               "decomposer": "openai:gpt-5.4-mini"}}
     assert record["roles"] == ["admin"] and record["passes"] == 2
@@ -77,19 +100,30 @@ def test_a_record_holds_when_what_on_which_code_data_and_database_and_the_headli
     assert record["scoreboard"]["accuracy"]["overall"] == 0.5
 
 
+def test_the_headline_accuracy_is_execution_accuracy_the_measure_0_6_published():
+    # Every answer is unfaithful: overall is 0, but the rows are right in one case of two.
+    record = records.make_record(_board(faithful=False), "gpt-5.4", recorded_at=WHEN, engine_version="1",
+                                 code=CODE)
+    m = record["metrics"]
+    assert record["scoreboard"]["accuracy"]["overall"] == 0.0
+    assert m["accuracy"] == 0.5 == record["scoreboard"]["accuracy"]["execution"]
+    assert m["accuracy_interval"] == record["scoreboard"]["accuracy"]["execution_interval"]
+    assert m["accuracy_all_scorers"] == 0.0 and m["accuracy_generated"] == 0.0
+    assert "execution" in records.README_FULL_INTRO and "execution" in records.render_history([record])
+
+
 def test_without_a_known_code_or_database_the_record_says_unknown_not_null():
-    board = _board()
-    del board["database"]
+    board = _board(database=None)
     record = records.make_record(board, "gpt-5.4", recorded_at=WHEN, engine_version="1", code={})
     assert record["git_commit"] == "unknown" and record["git_dirty"] == "unknown"
     assert record["database"]["datasource_id"] == "unknown" and record["note"] is None
 
 
-def test_the_dataset_hash_ignores_line_endings(tmp_path):
-    lf, crlf = tmp_path / "lf.yaml", tmp_path / "crlf.yaml"
-    lf.write_bytes(b"- id: a\n- id: b\n")
-    crlf.write_bytes(b"- id: a\r\n- id: b\r\n")
-    assert records.dataset_id(lf)["sha256"] == records.dataset_id(crlf)["sha256"]
+def test_several_suites_are_one_dataset_with_a_combined_digest():
+    two = _board().model_copy(update={"suites": [SUITE, {"name": "routing", "path": "", "digest": "b" * 64}]})
+    dataset = records.make_record(two, "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)["dataset"]
+    assert dataset["name"] == "chinook+routing"
+    assert dataset["sha256"] not in (SUITE["digest"], "b" * 64) and len(dataset["sha256"]) == 64
 
 
 def test_a_stopped_run_is_recorded_as_partial():
@@ -98,23 +132,34 @@ def test_a_stopped_run_is_recorded_as_partial():
     assert record["stopped"] == "max_cost" and record["partial"] is True
 
 
-def test_records_live_under_kind_database_date_sha_config_and_are_never_overwritten(tmp_path):
+def test_records_live_under_mode_database_date_sha_config_and_are_never_overwritten(tmp_path):
     board = _board(names=("gpt-5.4", "claude/planner"))
     first = records.write_records(board, tmp_path, recorded_at=WHEN, engine_version="0.9.0", code=CODE)
     content = first[0].read_bytes()
     second = records.write_records(board, tmp_path, recorded_at=WHEN, engine_version="0.9.0", code=CODE, note="x")
     rel = [p.relative_to(tmp_path).as_posix() for p in first + second]
-    assert rel == ["tier2/chinook/2026-09-21_abcdef1_gpt-5.4.json",
-                   "tier2/chinook/2026-09-21_abcdef1_claude-planner.json",
-                   "tier2/chinook/2026-09-21_abcdef1_gpt-5.4-2.json",
-                   "tier2/chinook/2026-09-21_abcdef1_claude-planner-2.json"]
+    assert rel == ["full/chinook/2026-09-21_abcdef1_gpt-5.4.json",
+                   "full/chinook/2026-09-21_abcdef1_claude-planner.json",
+                   "full/chinook/2026-09-21_abcdef1_gpt-5.4-2.json",
+                   "full/chinook/2026-09-21_abcdef1_claude-planner-2.json"]
     assert first[0].read_bytes() == content
     assert json.loads(first[0].read_text(encoding="utf-8"))["config"]["name"] == "gpt-5.4"
-    path = records.write_retrieval_record(_retrieval_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0",
-                                          code={"git_commit": "unknown", "git_dirty": "unknown"}, note="baseline")
+    [path] = records.write_records(_retrieval_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0",
+                                   code={"git_commit": "unknown", "git_dirty": "unknown"}, note="baseline")
     assert path.relative_to(tmp_path).as_posix() == "retrieval/chinook/2026-09-21_unknown_retrieval.json"
     body = json.loads(path.read_text(encoding="utf-8"))
-    assert body["database"] == CHINOOK and body["note"] == "baseline" and "database" not in body["report"]
+    assert body["database"] == CHINOOK and body["note"] == "baseline"
+    assert body["settings"]["table_k"] == 8
+    assert body["metrics"] == {"questions": 3, "table_recall": 0.9, "column_recall": 0.7, "perfect_tables": 0,
+                               "perfect_columns": 0, "tables_sent": 8.0, "columns_sent": 24.0}
+
+
+def test_a_mode_plans_run_is_a_record_too(tmp_path):
+    plans = _board(names=("plans",), statuses=("pass", "pass")).model_copy(update={"mode": "plans"})
+    [path] = records.write_records(plans, tmp_path, recorded_at=WHEN, engine_version="1", code=CODE)
+    assert path.relative_to(tmp_path).as_posix() == "plans/chinook/2026-09-21_abcdef1_plans.json"
+    page = records.render_history(records.load_records(tmp_path))
+    assert "## Mode plans: chinook" in page and "100.0%" in page
 
 
 def _git(cwd, *args):
@@ -144,6 +189,12 @@ def test_the_git_commit_comes_from_the_package_checkout_not_the_current_folder(t
     assert len(records.code_version()["git_commit"]) == 40
 
 
+def test_a_run_stamp_names_when_and_which_code():
+    stamp = records.run_stamp(recorded_at=WHEN, engine_version="0.9.0", code=CODE)
+    assert stamp == {"recorded_at": "2026-09-21T14:05:06Z", "engine_version": "0.9.0",
+                     "git_commit": "abcdef1234567890", "git_dirty": False}
+
+
 def _snapshot(ds_id, tables, columns):
     """A schema snapshot with ``tables`` tables holding ``columns`` columns between them."""
     per = [columns // tables + (i < columns % tables) for i in range(tables)]
@@ -163,6 +214,8 @@ def _demo_ctx():
 
 def _fingerprinted_per_datasource(monkeypatch):
     """Fingerprint each contract by its datasource, Chinook's being the one the committed runs recorded."""
+    import hashlib
+
     import nl2sql.schema.fingerprint as protocol
     digests = {"chinook": CHINOOK["schema_fingerprint"].ljust(64, "0")}
     monkeypatch.setattr(protocol, "generate_schema_fingerprint",
@@ -182,15 +235,17 @@ def test_database_identity_fingerprints_the_live_schema_snapshot(monkeypatch):
     assert records.database_identity(empty)["schema_fingerprint"] == "unknown"
 
 
-def test_the_identity_is_the_datasets_own_datasources_not_every_registered_one(monkeypatch):
-    """With the demo's three databases registered, a Chinook gold run is still `chinook`."""
+def test_the_identity_is_the_suites_own_datasources_not_every_registered_one(monkeypatch):
+    """With the demo's three databases registered, a Chinook suite run is still `chinook`."""
     _fingerprinted_per_datasource(monkeypatch)
     ctx = _demo_ctx()
     identity = records.database_identity(ctx, _suite_datasources())
-    # Byte for byte what the two committed tier 2 runs and the retrieval run recorded.
+    # Byte for byte what the committed 0.6 runs recorded.
     assert identity == CHINOOK
     for path in sorted((REPO / "benchmarks").glob("*/chinook/*.json")):
         committed = json.loads(path.read_text(encoding="utf-8"))
+        if committed["recorded_at"] >= "2026-10":
+            continue  # 0.7 records: the demo's schema as it is now
         assert committed["database"] == identity, path
         fresh = {**committed, "database": identity}
         assert records.series_key(fresh) == records.series_key(committed)
@@ -209,20 +264,32 @@ def test_the_chinook_suite_names_one_datasource():
 
 
 def _write(root, day, name="gpt-5.4", statuses=("pass", "fail"), database=CHINOOK, roles=("admin",), cost=0.02,
-           note=None):
-    return records.write_records(_board(names=(name,), statuses=statuses, database=database, roles=roles, cost=cost),
+           note=None, suite=SUITE):
+    return records.write_records(_board(names=(name,), statuses=statuses, database=database, roles=roles, cost=cost,
+                                        suite=suite),
                                  root, recorded_at=WHEN.replace(day=day), engine_version="0.9.0", code=CODE,
                                  note=note)
 
 
-def test_runs_are_comparable_on_kind_dataset_schema_and_roles():
+def test_runs_are_comparable_on_mode_suite_schema_and_roles():
     a = records.make_record(_board(), "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)
     assert records.comparable(a, dict(a))
     other_schema = {**a, "database": {**CHINOOK, "schema_fingerprint": "0" * 16}}
-    other_data = {**a, "dataset": {"name": "x.yaml", "sha256": "1" * 64}}
+    other_data = {**a, "dataset": {"name": "x", "sha256": "1" * 64}}
     other_roles = {**a, "roles": ["sales"]}
     retrieval = {**a, "kind": "retrieval"}
     assert not any(records.comparable(a, b) for b in (other_schema, other_data, other_roles, retrieval))
+
+
+def test_a_0_6_tier_2_record_is_a_mode_full_run_on_another_suite():
+    old = json.loads((REPO / "benchmarks" / "tier2" / "chinook" / "2026-09-23_de42c40_gpt-5.4.json")
+                     .read_text(encoding="utf-8"))
+    new = records.make_record(_board(), "gpt-5.4", recorded_at=WHEN.replace(month=10), engine_version="0.7.0",
+                              code=CODE)
+    assert records.mode_of(old) == "full" and records.line_key(old) == records.line_key(new)
+    assert records.describe_change(new, old) == "new series (suite changed)"
+    # Its headline accuracy was the execution match, which is what a 0.7 record's headline is.
+    assert old["metrics"]["accuracy"] == pytest.approx(0.7907)
 
 
 def test_the_change_against_the_previous_run_of_the_same_config(tmp_path):
@@ -244,8 +311,7 @@ def test_the_change_against_the_previous_run_of_the_same_config(tmp_path):
 
 def test_a_run_with_curated_answers_on_is_marked_and_starts_its_own_series():
     off = records.make_record(_board(), "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)
-    on = records.make_record({**_board(), "curated": True}, "gpt-5.4", recorded_at=WHEN, engine_version="1",
-                             code=CODE)
+    on = records.make_record(_board(curated=True), "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)
     assert off["curated"] is False and on["curated"] is True
     assert not records.comparable(on, off)
     assert records.describe_change(on, off) == "new series (curated answers changed)"
@@ -254,31 +320,34 @@ def test_a_run_with_curated_answers_on_is_marked_and_starts_its_own_series():
     assert records.comparable(old, off)
 
 
-def test_a_changed_schema_or_dataset_starts_a_new_series(tmp_path):
+def test_a_changed_schema_or_suite_starts_a_new_series(tmp_path):
     _write(tmp_path, 19)
     _write(tmp_path, 20, database={**CHINOOK, "schema_fingerprint": "0123456789abcdef"})
     _write(tmp_path, 21, database={**CHINOOK, "schema_fingerprint": "0123456789abcdef"}, roles=("sales",))
+    _write(tmp_path, 22, database={**CHINOOK, "schema_fingerprint": "0123456789abcdef"}, roles=("sales",),
+           suite={**SUITE, "digest": "c" * 64})
     recs = records.load_records(tmp_path)
     previous = records.previous_runs(recs)
     by_day = {r["recorded_at"][8:10]: r for r in recs}
     assert records.describe_change(by_day["20"], previous[id(by_day["20"])]) == "new series (schema changed)"
     assert records.describe_change(by_day["21"], previous[id(by_day["21"])]) == "new series (roles changed)"
+    assert records.describe_change(by_day["22"], previous[id(by_day["22"])]) == "new series (suite changed)"
     page = records.render_history(recs)
-    assert page.split("### All runs")[1].count("new series") == 2
+    assert page.split("### All runs")[1].count("new series") == 3
 
 
-def test_history_groups_by_benchmark_then_database_newest_first(tmp_path):
+def test_history_groups_by_mode_then_database_newest_first(tmp_path):
     _write(tmp_path, 19, statuses=("fail", "fail"))
     _write(tmp_path, 20, note="slim prompts")
     _write(tmp_path, 21, name="mini", statuses=("pass", "pass"))
     _write(tmp_path, 21, database={**CHINOOK, "datasource_id": "northwind", "schema_fingerprint": "9" * 16})
     for day, table in ((19, 0.9), (20, 0.95)):
-        records.write_retrieval_record(_retrieval_report(table=table), tmp_path, recorded_at=WHEN.replace(day=day),
-                                       engine_version="0.9.0", code=CODE)
+        records.write_records(_retrieval_report(table=table), tmp_path, recorded_at=WHEN.replace(day=day),
+                              engine_version="0.9.0", code=CODE)
     page = records.render_history(records.load_records(tmp_path))
     headings = [line for line in page.splitlines() if line.startswith("## ")]
-    assert headings == ["## Tier 2: chinook (sqlite, 11 tables / 64 columns)",
-                        "## Tier 2: northwind (sqlite, 11 tables / 64 columns)",
+    assert headings == ["## Mode full: chinook (sqlite, 11 tables / 64 columns)",
+                        "## Mode full: northwind (sqlite, 11 tables / 64 columns)",
                         "## Retrieval recall: chinook (sqlite, 11 tables / 64 columns)"]
     chinook = page.split(headings[0])[1].split(headings[1])[0]
     runs = chinook.split("### All runs")[1]
@@ -290,11 +359,18 @@ def test_history_groups_by_benchmark_then_database_newest_first(tmp_path):
     assert "tables +5.0 pp, columns +0.0 pp" in retrieval and "first run" in retrieval
     block = records.render_readme_block(records.load_records(tmp_path))
     assert "docs/benchmarks.md" in block and "2026-09-19" not in block
-    tier2_part, retrieval_part = block.split(records.README_RETRIEVAL_HEADING)
-    assert records.README_TIER2_HEADING in tier2_part
-    assert "| gpt-5.4 | chinook | 2026-09-20 |" in tier2_part and "| gpt-5.4 | northwind | 2026-09-21 |" in tier2_part
-    assert "| mini | chinook | 2026-09-21 |" in tier2_part and "table_recall" not in tier2_part
+    full_part, retrieval_part = block.split(records.README_RETRIEVAL_HEADING)
+    assert records.README_FULL_HEADING in full_part
+    assert "| gpt-5.4 | chinook | 2026-09-20 |" in full_part and "| gpt-5.4 | northwind | 2026-09-21 |" in full_part
+    assert "| mini | chinook | 2026-09-21 |" in full_part and "table_recall" not in full_part
     assert "| chinook | 2026-09-20 | abcdef1 | 95.0% | 70.0% |" in retrieval_part
+
+
+def test_the_pages_name_nl2sql_eval_not_nl2sql_benchmark(tmp_path):
+    _write(tmp_path, 19)
+    page = records.render_history(records.load_records(tmp_path)) + records.render_readme_block([])
+    assert "nl2sql eval publish" in page and "nl2sql eval run" in page
+    assert "nl2sql benchmark" not in page
 
 
 def test_publish_is_byte_identical_whatever_order_the_records_are_read_in(tmp_path):
@@ -318,15 +394,15 @@ def test_a_record_without_faithfulness_shows_a_dash(tmp_path):
 def test_the_empty_state(tmp_path):
     assert records.EMPTY in records.render_history([])
     block = records.render_readme_block([])
-    assert records.TIER2_EMPTY in block and records.RETRIEVAL_EMPTY in block
-    assert block.index(records.README_TIER2_HEADING) < block.index(records.README_RETRIEVAL_HEADING)
+    assert records.FULL_EMPTY in block and records.RETRIEVAL_EMPTY in block
+    assert block.index(records.README_FULL_HEADING) < block.index(records.README_RETRIEVAL_HEADING)
     assert records.load_records(tmp_path / "missing") == []
 
 
-def test_the_readme_block_says_when_one_benchmark_has_no_run_yet(tmp_path):
-    records.write_retrieval_record(_retrieval_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0", code=CODE)
+def test_the_readme_block_says_when_one_mode_has_no_run_yet(tmp_path):
+    records.write_records(_retrieval_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0", code=CODE)
     block = records.render_readme_block(records.load_records(tmp_path))
-    assert records.TIER2_EMPTY in block and records.RETRIEVAL_EMPTY not in block
+    assert records.FULL_EMPTY in block and records.RETRIEVAL_EMPTY not in block
     assert "| chinook | 2026-09-21 | abcdef1 | 90.0% | 70.0% | first run |" in block
 
 
@@ -348,7 +424,7 @@ def test_import_copies_new_records_skips_identical_ones_and_reports_conflicts(tm
     [new] = _write(demo / "benchmarks", 19)
     [same] = _write(demo / "benchmarks", 20)
     [clash] = _write(demo / "benchmarks", 21)
-    (repo / "tier2" / "chinook").mkdir(parents=True)
+    (repo / "full" / "chinook").mkdir(parents=True)
     (repo / same.relative_to(demo / "benchmarks")).write_bytes(same.read_bytes())
     mine = repo / clash.relative_to(demo / "benchmarks")
     mine.write_text('{"mine": true}\n', encoding="utf-8")
@@ -380,6 +456,16 @@ def test_every_committed_record_is_in_the_current_layout_and_where_its_fields_sa
         assert r["_file"].rsplit("/", 1)[1].startswith(expected.stem)
 
 
+def test_the_ci_baselines_are_on_the_chinook_suite_as_it_is_now():
+    """CI's key-free gate compares against these: a changed suite needs a new baseline (`nl2sql eval publish`)."""
+    committed = records.load_records(REPO / records.BENCHMARKS_DIR)
+    for mode in ("plans", "retrieval"):
+        newest = next(r for r in committed if records.mode_of(r) == mode)
+        assert newest["dataset"]["sha256"] == SUITE["digest"], mode
+    plans = next(r for r in committed if records.mode_of(r) == "plans")
+    assert plans["metrics"]["accuracy"] == 1.0
+
+
 def test_the_migrated_retrieval_baseline():
     path = REPO / "benchmarks" / "retrieval" / "chinook" / "2026-09-22_571cd16_retrieval.json"
     r = json.loads(path.read_text(encoding="utf-8"))
@@ -392,9 +478,9 @@ def test_the_committed_pages_match_what_publish_generates_from_the_committed_rec
     committed = records.load_records(REPO / records.BENCHMARKS_DIR)
     history = (REPO / records.HISTORY_PATH).read_text(encoding="utf-8")
     readme = (REPO / records.README_PATH).read_text(encoding="utf-8")
-    assert history == records.render_history(committed), "run nl2sql.evaluation.records.publish() from the repo root and commit the result"
+    assert history == records.render_history(committed), "run `nl2sql eval publish` from the repo root and commit the result"
     assert readme == records.replace_block(readme, records.render_readme_block(committed)), \
-        "run nl2sql.evaluation.records.publish() from the repo root and commit the result"
+        "run `nl2sql eval publish` from the repo root and commit the result"
 
 
 # --- statistics in the record and in the history -----------------------------
@@ -425,6 +511,16 @@ def test_the_history_delta_names_the_questions_that_flipped_and_the_p_value(tmp_
     assert "0 flipped to fail, 3 to pass (McNemar p=0.250)" in change
     # The README block keeps the headline deltas only.
     assert "flipped" not in records.describe_change(newest, old)
+
+
+def test_the_flips_read_execution_accuracy_too(tmp_path):
+    # Faithfulness alone changes: the rows are right both times, so nothing flipped.
+    [a] = records.write_records(_board(statuses=("pass",), faithful=False), tmp_path,
+                                recorded_at=WHEN, engine_version="1", code=CODE)
+    [b] = records.write_records(_board(statuses=("pass",)), tmp_path,
+                                recorded_at=WHEN.replace(day=22), engine_version="1", code=CODE)
+    old, new = (json.loads(p.read_text(encoding="utf-8")) for p in (a, b))
+    assert records.flips(new, old)["fail_to_pass"] == []
 
 
 def test_a_record_without_per_question_results_has_no_flips(tmp_path):
