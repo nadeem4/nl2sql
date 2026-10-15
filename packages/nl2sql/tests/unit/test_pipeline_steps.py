@@ -39,7 +39,8 @@ def graph_nodes(monkeypatch):
 
     # With curated answers configured, so the optional curated matcher is in the graph too.
     ctx = fake_runtime(curated=CURATED)
-    top = set(control.build_graph(ctx, execute=True).nodes)
+    # And the pinned run's graph, whose entry is a step of its own.
+    top = set(control.build_graph(ctx, execute=True).nodes) | set(control.build_graph(ctx, pinned=True).nodes)
     inner = set(sql_agent.build_sql_agent_graph(ctx, execute=True).nodes)
     # LangGraph adds its own entry node; it is not a step of the pipeline.
     return {name for name in top if not name.startswith("__")}, \

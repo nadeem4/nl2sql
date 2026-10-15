@@ -12,6 +12,10 @@ runner reads no config. The rules (docs/architecture/wave_a.md, section 6):
   exception, a value that is not a decision, or a decision the point does not
   allow. ``on_error: open`` turns an exception, and only an exception, into
   an allow: a disallowed decision is a bug in the hook, not an outage.
+- A ``NeedsApproval`` that one of the run's approvals covers counts as
+  ``Allow``, and the next hook still runs (D24). The runner checks the
+  approval (``approval_problem``) against the hook's configured approver
+  roles, by default ``policies.admin_roles``.
 - Every hook asked publishes ``hook.decision`` on the run's scope.
 """
 from __future__ import annotations
@@ -28,6 +32,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.config.models import HookConfig, HookPoint
 from nl2sql.events import publish
 from nl2sql.hooks import Allow, Deny, HookContext, Modify, NeedsApproval
+from nl2sql.hooks.approval import Approval, approval_problem
 from nl2sql.hooks.points import HOOK_POINTS
 
 if TYPE_CHECKING:
@@ -96,6 +101,7 @@ class HookVerdict:
         elif isinstance(self.decision, NeedsApproval):
             code, message = ErrorCode.NEEDS_APPROVAL, (f"This question needs approval before it runs: "
                                                        f"{self.decision.reason}")
+            details["reason"] = self.decision.reason
         else:
             code, message = ErrorCode.HOOK_DENIED, self.decision.reason
             details["scope"] = self.decision.scope
@@ -104,10 +110,22 @@ class HookVerdict:
 
 
 class HookRunner:
-    """Runs ``bindings``, in order, at each point. Built once per engine by the runtime."""
+    """Runs ``bindings``, in order, at each point. Built once per engine by the runtime.
 
-    def __init__(self, bindings: Sequence[HookBinding]) -> None:
+    ``admin_roles`` (``policies.admin_roles``) approve for a hook configured
+    with no ``approver_roles`` of its own.
+    """
+
+    def __init__(self, bindings: Sequence[HookBinding], admin_roles: Sequence[str] = ()) -> None:
         self.bindings: Tuple[HookBinding, ...] = tuple(bindings)
+        self.admin_roles: Tuple[str, ...] = tuple(admin_roles)
+
+    def approver_roles(self, hook: str) -> Tuple[str, ...]:
+        """The roles that may approve hook ``hook``'s ``NeedsApproval``."""
+        for binding in self.bindings:
+            if binding.name == hook:
+                return binding.approver_roles if binding.approver_roles is not None else self.admin_roles
+        return ()
 
     def attached(self, point: HookPoint) -> bool:
         """Whether any hook runs at ``point``."""
@@ -144,6 +162,12 @@ class HookRunner:
             if problem:
                 _published(binding, ctx, "error", problem, started)
                 return _failed(binding, ctx, problem)
+            if isinstance(decision, NeedsApproval):
+                approval = self._covering(binding, ctx)
+                if approval is not None:
+                    # Approved counts as Allow: the next hook is still asked.
+                    _published(binding, ctx, "approved", decision.reason, started, approver=approval.by.user_id)
+                    continue
             _published(binding, ctx, _EVENT_NAMES[type(decision)], getattr(decision, "reason", None), started)
             if isinstance(decision, Modify):
                 changes = {name: getattr(decision, name) for name in rule.modifies
@@ -154,6 +178,18 @@ class HookRunner:
             elif isinstance(decision, (Deny, NeedsApproval)):
                 return HookVerdict(ctx, decision, binding.name, modified=modified)
         return HookVerdict(ctx, modified=modified)
+
+    def _covering(self, binding: HookBinding, ctx: HookContext) -> Optional[Approval]:
+        """The run's approval that covers ``binding``'s ``NeedsApproval`` here, or None."""
+        roles = self.approver_roles(binding.name)
+        for approval in ctx.approvals:
+            problem = approval_problem(approval, hook=binding.name, roles=roles, question=ctx.question,
+                                       user=ctx.user, datasource_id=ctx.datasource_id, sql=ctx.sql,
+                                       params=ctx.params)
+            if problem is None:
+                return approval
+            logger.warning(f"An approval was not accepted for the hook '{binding.name}': {problem}.")
+        return None
 
 
 NO_HOOKS = HookRunner(())
@@ -190,13 +226,14 @@ def _failed(binding: HookBinding, ctx: HookContext, reason: str) -> HookVerdict:
 
 
 def _published(binding: HookBinding, ctx: HookContext, decision: str, reason: Optional[str],
-               started: float) -> None:
+               started: float, approver: Optional[str] = None) -> None:
     publish("hook.decision", {
         "hook": binding.name,
         "point": ctx.point,
         "decision": decision,
         "reason": reason,
         "sub_query_id": ctx.sub_query.id if ctx.sub_query is not None else None,
+        "approver": approver,
         "seconds": round(time.perf_counter() - started, 6),
     })
 

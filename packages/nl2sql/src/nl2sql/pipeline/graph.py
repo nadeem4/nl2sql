@@ -7,13 +7,15 @@ from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
 from nl2sql.pipeline.nodes.curated_matcher import CuratedMatcherNode, curated_answers_on
 from nl2sql.pipeline.nodes.datasource_resolver import DatasourceResolverNode
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
-from nl2sql.pipeline.routes import aggregator_route, build_scan_layer_router, curated_route, resolver_route
+from nl2sql.pipeline.pinned import PinnedEntryNode
+from nl2sql.pipeline.routes import aggregator_route, build_scan_layer_router, curated_route, pinned_route, resolver_route
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
 
 def build_graph(
     ctx: Runtime,
     execute: bool = True,
+    pinned: bool = False,
 ) -> StateGraph:
     """Builds the main LangGraph pipeline.
 
@@ -27,9 +29,17 @@ def build_graph(
     resolver. Otherwise the matcher is not in the graph at all, so the graph
     is exactly the one without curated answers.
 
+    ``pinned`` builds the graph of a run whose decomposition is pinned
+    (``state.pinned``: a supplied plan, an approval's, or Wave B's chosen
+    one). It enters at ``pinned_entry``, which checks the datasources against
+    the caller's scope and goes to the layer router; there is no curated
+    matcher, resolver or decomposer in it. Any other run's graph has no
+    ``pinned_entry`` at all.
+
     Args:
         ctx (Runtime): The application context containing registries and services.
         execute (bool): Whether to allow execution against real databases.
+        pinned (bool): Build the pinned run's graph.
 
     Returns:
         StateGraph: The compiled LangGraph runnable.
@@ -53,7 +63,11 @@ def build_graph(
     graph.add_node("answer_synthesizer", synthesizer_node)
     graph.add_node("layer_router", lambda state: {})
 
-    if execute and curated_answers_on(ctx):
+    if pinned:
+        graph.add_node("pinned_entry", PinnedEntryNode(ctx))
+        graph.set_entry_point("pinned_entry")
+        graph.add_conditional_edges("pinned_entry", pinned_route, {"continue": "layer_router", "end": END})
+    elif execute and curated_answers_on(ctx):
         graph.add_node("curated_matcher", CuratedMatcherNode(ctx))
         graph.set_entry_point("curated_matcher")
         graph.add_conditional_edges(

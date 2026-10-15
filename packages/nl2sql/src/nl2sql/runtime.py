@@ -185,7 +185,7 @@ class Runtime:
                 bindings.append(build_hook(entry, registry=self.registry, secrets=self.secret_manager))
             except (RegistryError, ValueError) as e:
                 problem(f"hooks[{i}]", str(e))
-        return HookRunner(bindings)
+        return HookRunner(bindings, admin_roles=config.policies.admin_roles)
 
     def _build_embedder(self, config: Config):
         """The embedder, and what it is (``EmbeddingInfo``, its dimension maybe unknown). No model call."""

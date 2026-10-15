@@ -101,6 +101,15 @@ user who produced it is left to a multi-user deployment.
   hook may only stop the run. Hooks **fail closed**: an exception denies
   with `HOOK_FAILED` unless that hook is configured `on_error: open`. See
   [Hooks](../configuration/hooks.md).
+- **Approval** (a hook's `NeedsApproval`): the engine, not the hook, checks
+  an `Approval` on the re-run: the request unedited, the same question and
+  asker, the hash of the SQL generated again, and an approver holding one
+  of the hook's configured roles. An `Approval` is not signed: it is trusted
+  as far as the `user_context` the caller passes. See
+  [Query API → Approval](../api/core/query.md#approval).
+- **A supplied plan** (`run_query(plan=...)`) skips planning, not checking:
+  its datasource is scope-checked, and the plan passes `plan.after` and the
+  logical validator under the caller's role like any other.
 - **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
   (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
   with who made it and each agent's old and new model, never a key. Queries

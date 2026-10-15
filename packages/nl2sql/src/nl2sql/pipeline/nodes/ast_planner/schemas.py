@@ -239,7 +239,8 @@ class ASTPlannerResponse(BaseModel):
     plan: Optional[PlanModel] = None
     planner_plan: Optional[PlanModel] = None
     # "cache" when the plan came from the plan cache and no LLM call was made.
-    plan_source: Literal["llm", "cache"] = "llm"
+    # "supplied", "approved" or "chosen" for a pinned plan (nl2sql.pipeline.pinned).
+    plan_source: Literal["llm", "cache", "supplied", "approved", "chosen"] = "llm"
 
     @model_validator(mode="after")
     def _planner_plan_defaults_to_plan(self) -> "ASTPlannerResponse":

@@ -28,10 +28,13 @@ Fields (exact names and types from code):
 - `warnings: Annotated[List[Dict[str, Any]], operator.add]`
 - `subgraph_id: Optional[str]`
 - `subgraph_name: Optional[str]`
+- `pinned: Optional[PinnedRun]` (a pinned decomposition and plans; `source` is a `PinnedSource`: `supplied`, `approved` or `chosen`)
+- `approvals: List[Approval]` (what the run was asked with)
+- `approvals_needed: Annotated[List[ApprovalRequest], operator.add]`
 
 Reducer behavior in `GraphState`:
 - `update_results(current, new)` merges dicts as `{**current, **new}`.
-- `operator.add` concatenates lists for `errors`, `reasoning`, and `warnings`.
+- `operator.add` concatenates lists for `errors`, `reasoning`, `warnings` and `approvals_needed`.
 
 ### Subgraph state boundary
 - `SubgraphExecutionState` in `packages/nl2sql/src/nl2sql/pipeline/state.py` is the per-subgraph state used by the SQL agent subgraph.
@@ -44,6 +47,8 @@ Fields (exact names and types from code):
 - `subgraph_id: Optional[str]`
 - `subgraph_name: Optional[str]`
 - `relevant_tables: List[Table]`
+- `pinned_plan: Optional[PlanModel]` and `pinned_source: Optional[PinnedSource]` (the sub-query's pinned plan, from `build_scan_payload`; the planner returns it, and the SQL agent never retries it)
+- `approvals: List[Approval]` (the run's, for the `execute.before` hooks)
 - `ast_planner_response: Optional[ASTPlannerResponse]`
 - `logical_validator_response: Optional[LogicalValidatorResponse]`
 - `generator_response: Optional[GeneratorResponse]`
@@ -176,7 +181,9 @@ Ownership is defined by which node returns updates for a field:
 - `errors`, `reasoning`: emitted by many nodes and merged by list reducers
 - `warnings`: emitted by nodes that return `warnings` in the main graph (currently `DatasourceResolverNode`)
 - `subgraph_id`, `subgraph_name`: created in `build_scan_payload`, used only for subgraph execution context
-- `trace_id`, `user_query`, `user_context`, `datasource_id`: owned by the pipeline entrypoint (`run_with_graph`)
+- `trace_id`, `user_query`, `user_context`, `datasource_id`, `pinned`, `approvals`: owned by the pipeline entrypoint (`run_with_graph`); without a supplied plan, `pinned` comes from the first approval that is this run's (`pinned_from_approvals`)
+- `decomposer_response`, `execution_dag` on a pinned run: `PinnedEntryNode`, from `pinned.decomposition`
+- `approvals_needed`: `wrap_subgraph`, and `CuratedMatcherNode` on the verified path
 
 Shared vs private:
 - Shared: `errors`, `reasoning`, `warnings`, `artifact_refs`, `subgraph_outputs` are aggregate fields merged across branches.

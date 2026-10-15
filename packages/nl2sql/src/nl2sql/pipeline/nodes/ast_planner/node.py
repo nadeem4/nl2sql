@@ -135,6 +135,14 @@ class ASTPlannerNode:
                 and any 'errors' encountered.
         """
         try:
+            pinned = getattr(state, "pinned_plan", None)
+            if pinned is not None:
+                # A supplied, approved or chosen plan: no model call, and never the cache's.
+                source = state.pinned_source.value if state.pinned_source is not None else "supplied"
+                return self.after_plan(state, pinned, source, [
+                    f"The plan is pinned ({source}); no planner LLM call. It is validated like any other.",
+                    f"Tables: {', '.join(t.name for t in pinned.tables)}",
+                ])
             cached = self._cached(state)
             if cached is not None:
                 return cached

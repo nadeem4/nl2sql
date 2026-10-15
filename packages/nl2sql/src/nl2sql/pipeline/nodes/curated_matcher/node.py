@@ -14,10 +14,11 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from nl2sql.common.errors import PipelineError
+from nl2sql.common.errors import ErrorCode, PipelineError
 from nl2sql.common.logger import get_logger
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.hooks import hooks_of
+from nl2sql.hooks.approval import ApprovalRequest, VerifiedRef
 from nl2sql.policies import UserContext
 from nl2sql.policies.scope import default_schema
 from nl2sql.config.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
@@ -32,6 +33,7 @@ from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql_sdk.capabilities import DatasourceCapability
 
 from .params import ParamError, resolve_params
+from .schemas import ParamValue
 from .prompts import CURATED_MATCHER_PROMPT
 from .schemas import NONE_OF_THESE, VerifiedMatch, VerifiedQueryChoice
 
@@ -78,6 +80,10 @@ class CuratedMatcherNode:
     The ``execute.before`` and ``execute.after`` hooks run on the verified
     query as on generated SQL. A hook's deny is not a fallback: the run ends
     with its error (``hook_denied`` on the record), because a deny means no.
+    A ``NeedsApproval`` ends it the same way, with an ``ApprovalRequest`` for
+    the query and its values. An approved re-run pins them
+    (``state.pinned.verified``): the query runs with no search and no model
+    call, and the hooks ask again.
     """
 
     def __init__(self, ctx: Runtime):
@@ -179,6 +185,9 @@ class CuratedMatcherNode:
 
     def _match(self, state: GraphState, record: Dict[str, Any],
                searches: List[Dict[str, Any]]) -> Dict[str, Any]:
+        pinned = getattr(state, "pinned", None)
+        if pinned is not None and pinned.verified is not None:
+            return self._run_pinned(state, pinned.verified_datasource_id, pinned.verified, record)
         # 1. Candidates, from the datasources this caller may read only.
         datasource_ids = self._searchable(state)
         if not datasource_ids:
@@ -214,7 +223,23 @@ class CuratedMatcherNode:
         except ParamError as exc:
             raise _Fallback(exc.reason, str(exc)) from None
         record["params"] = params
+        return self._checked_run(state, ds_id, query, params)
 
+    def _run_pinned(self, state: GraphState, ds_id: Optional[str], verified: VerifiedRef,
+                    record: Dict[str, Any]) -> Dict[str, Any]:
+        """An approved verified query, with its values: no search and no model call; checked as a match is."""
+        if ds_id not in self._searchable(state) or verified.id not in self._queries(ds_id):
+            raise _Fallback("unknown_query", f"The approved verified query '{ds_id}.{verified.id}' is not available.")
+        query = self._queries(ds_id)[verified.id]
+        try:
+            params = resolve_params(query, [ParamValue(name=k, value=str(v)) for k, v in verified.params.items()])
+        except ParamError as exc:
+            raise _Fallback(exc.reason, str(exc)) from None
+        record["choice"], record["params"] = {"query_id": f"{ds_id}.{verified.id}", "pinned": True}, params
+        return self._checked_run(state, ds_id, query, params)
+
+    def _checked_run(self, state: GraphState, ds_id: str, query: VerifiedQuery,
+                     params: Dict[str, Any]) -> Dict[str, Any]:
         # 5. Access to every table the SQL reads, and read-only once more.
         try:
             parsed = inspect_verified_sql(query.sql, self.ds_registry.get_dialect(ds_id))
@@ -235,14 +260,21 @@ class CuratedMatcherNode:
         """What ``execute.before`` and ``execute.after`` see of the verified query."""
         return dict(trace_id=state.trace_id, question=state.user_query, user=state.user_context or UserContext(),
                     datasource_id=sub_query.datasource_id, sub_query=sub_query, sql=query.sql.strip(),
-                    params=params, tables=tables)
+                    params=params, tables=tables, approvals=list(getattr(state, "approvals", None) or []))
 
     def _stop_if_denied(self, verdict, state: GraphState, sub_query: SubQuery, query: VerifiedQuery,
                         params: Dict[str, Any]) -> None:
         """Raises ``_Denied`` when a hook stopped the verified query."""
         if not verdict.allowed:
             error = verdict.error(self.node_name)
-            raise _Denied(error, self._ended(state, sub_query, query, params, error))
+            ended = self._ended(state, sub_query, query, params, error)
+            if error.error_code == ErrorCode.NEEDS_APPROVAL:
+                ended["approvals_needed"] = [ApprovalRequest.build(
+                    question=state.user_query, asker=state.user_context or UserContext(), hook=verdict.hook,
+                    datasource_id=sub_query.datasource_id, sql=query.sql.strip(), reason=verdict.decision.reason,
+                    approver_roles=self.hooks.approver_roles(verdict.hook),
+                    verified=VerifiedRef(id=query.id, params=params))]
+            raise _Denied(error, ended)
 
     def _ended(self, state: GraphState, sub_query: SubQuery, query: VerifiedQuery, params: Dict[str, Any],
                error: PipelineError) -> Dict[str, Any]:

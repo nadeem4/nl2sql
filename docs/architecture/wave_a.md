@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1, E2 and V2 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2 and V2 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -940,6 +940,74 @@ request until someone acts on it. An `Approval` is not signed and does not
 expire (D24): it is trusted as far as the `user_context` a caller passes is
 trusted today, which is the application's responsibility (`nl2sql-api`
 resolves both from its auth). The REST shape is Wave D.
+
+### Addendum: the pinned-plan entry is public
+
+Decided after this design merged, with the Wave B to D reviews: the entry
+the approved re-run uses is built once and is public.
+`run_query(question, plan=SuppliedPlan(datasource_id, sub_query, plan))`
+(and `stream_query`) runs a plan the caller holds. It skips the curated
+matcher, the resolver, the decomposer and the planner's model call; checks
+the datasource against the caller's scope; sets `plan_source="supplied"`;
+runs `plan.after`, the validator, the generator and the executor; is never
+cached; and never asks the refiner on a validator failure (the sub-query
+fails with the validator's error). The run's state carries the pin as a
+`PinnedRun` whose `source` is a `PinnedSource`: `supplied`, `approved` (this
+section's re-run) or `chosen` (Wave B's clarification re-ask, which may not
+be combined with approvals). `SuppliedPlan` is exported from `nl2sql`.
+
+!!! note "Built: approval and the pinned-plan entry (H2)"
+    - **The entry.** `nl2sql/pipeline/pinned.py`: `PinnedSource`,
+      `SuppliedPlan`, `PinnedRun` (`source`, `decomposition`, `plans` keyed
+      by sub-query id, or `verified` with `verified_datasource_id`),
+      `PinnedRun.supplied(plan)`, `pinned_from_approvals(approvals,
+      question=, user=)` and `PinnedEntryNode`. `build_graph(ctx,
+      execute, pinned=True)` builds a pinned run's graph, whose entry is
+      `pinned_entry` (with no curated matcher); every other run's graph is
+      unchanged and has no such node. `run_with_graph` builds the pinned
+      graph for a supplied pin, or, for an approval's pin (known only after
+      `run.before`), inside the worker. The
+      `pinned_entry` node scope-checks every datasource of the decomposition
+      (`SECURITY_VIOLATION` otherwise, `routes.pinned_route` ends the run)
+      and goes to the layer router. `build_scan_payload` hands each
+      sub-query its `pinned_plan` and `pinned_source`; the planner returns
+      it through `after_plan(state, plan, source)`. The SQL agent reads a
+      pinned sub-query's retries as spent, so neither a validator nor a
+      database error is retried, and the executor's value check never asks
+      for a retry on it. The schema retriever gives a pinned plan every
+      table the caller may read, with no search, for the validator.
+      `run_with_graph(..., pinned=, approvals=)` refuses a `chosen` pin with
+      approvals (`ValueError`).
+    - **The request.** `ApprovalRequest.build(...)` computes `sql_sha256`
+      and `id`; `expected_id()` recomputes it (SHA-256 of the canonical JSON
+      of every field but `id`, `reason` and `approver_roles`, so it is
+      stable for Wave D's store). `wrap_subgraph` builds the request for a
+      sub-query that ended `NEEDS_APPROVAL` (the error's `details` now carry
+      the `reason`) into `GraphState.approvals_needed`; the curated matcher
+      does the same with a `VerifiedRef`. **One difference from the sketch
+      above:** the request pins the plan as `plan.after` received it
+      (`planner_plan`), not the plan the hooks let through, because the
+      re-run passes it through `plan.after` again; pinning the hooked plan
+      would apply a hook's `Modify` twice and the SQL would never match the
+      hash. What the approver approves is the SQL, and it is the same.
+    - **The check.** `HookRunner(bindings, admin_roles=)` (the runtime
+      passes `policies.admin_roles`), `HookRunner.approver_roles(hook)`. On a
+      `NeedsApproval` the runner looks for an approval in `ctx.approvals`
+      with no `approval_problem(...)`: unedited, this run's question (after
+      `run.before`) and asker, this hook and datasource, the hash of the SQL
+      just generated, the same verified values, and an approver holding one
+      of the hook's configured roles. A match publishes `hook.decision` with
+      `decision: "approved"` and the `approver`, and the next hook runs.
+      `request_problem` (unedited, question, asker) decides what pins. A
+      forged approval pins nothing and covers nothing: the run asks again.
+    - **The verified path.** A pinned `verified` request takes the default
+      entry; the curated matcher runs that query with its values
+      (`_run_pinned`), with no search and no model call, through the same
+      access checks and hooks. If it is no longer available, the matcher
+      falls back as usual.
+    - **Not done:** the result's `final_answer` stays None on a
+      `needs_approval` run (the error's message is the answer text), as on
+      every run a hook ended; nothing is stored (Wave D).
 
 ## 8. Evals as a product
 

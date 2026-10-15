@@ -19,7 +19,7 @@ class SubgraphOutput(BaseModel):
     plan: Optional[PlanModel] = None
     # "cache" when the final plan came from the plan cache, not the planner LLM;
     # "verified" when there was no plan: the SQL is a verified query's.
-    plan_source: Literal["llm", "cache", "verified"] = "llm"
+    plan_source: Literal["llm", "cache", "verified", "supplied", "approved", "chosen"] = "llm"
     sql_draft: Optional[str] = None
     # The adapter row cap bounding the SQL, when the plan set no smaller LIMIT.
     row_cap: Optional[int] = None

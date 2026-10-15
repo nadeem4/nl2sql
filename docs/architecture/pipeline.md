@@ -17,6 +17,7 @@ flowchart TD
 ### Control graph nodes
 
 - [CuratedMatcherNode](nodes/curated_matcher_node.md): the entry point when [curated answers](../configuration/curated.md) are configured; a verified answer goes straight to the aggregator
+- `pinned_entry` (`PinnedEntryNode` in `nl2sql.pipeline.pinned`): the entry point of a pinned run's graph (`build_graph(ctx, pinned=True)`: a plan passed as `run_query(plan=...)`, or an approval's); it checks each datasource against the caller's scope and goes to the layer router, so no curated matcher, resolver or decomposer runs
 - [DatasourceResolverNode](nodes/datasource_resolver_node.md)
 - [DecomposerNode](nodes/decomposer_node.md)
 - `layer_router` (routing function, not a node class)
@@ -139,6 +140,14 @@ hook dropped (`scope="sub_query"`) reports `status: "dropped"` from
 still sends the run to the aggregator, which drops a `join` or `compare`
 group that needs it. `SubgraphExecutionState.user_query` carries the run's
 question (after `run.before`) into each sub-query for the hooks there.
+
+A `NEEDS_APPROVAL` ending also puts an `ApprovalRequest` in the state's
+`approvals_needed` (built by `wrap_subgraph()`, or by the curated matcher on
+the verified path), so the result's `status` is `needs_approval`. The
+approved re-run pins the request's decomposition and plan through the pinned
+entry (`plan_source="approved"`); the hooks at `execute.before` see the run's
+approvals and the runner checks them. See
+[Query API → Approval](../api/core/query.md#approval).
 
 ## Observability hooks (current)
 
