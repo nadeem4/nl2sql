@@ -124,7 +124,8 @@ the plan cache, the playground's feedback, and the lock that lets one index
 build run at a time. The engine applies the store's pending migrations when it
 starts; the built-in `sqlite` store adopts a 0.5 `state.db` as it is, and
 applies them in one `BEGIN IMMEDIATE` transaction, so engines or CLI runs
-opening a new `state.db` at the same moment apply each one exactly once. See
+opening a new `state.db` at the same moment apply each one exactly once. A
+store with nothing pending takes no lock, so a read-only `state.db` opens. See
 [The state store](../schema/store.md#the-state-store).
 
 ## The index

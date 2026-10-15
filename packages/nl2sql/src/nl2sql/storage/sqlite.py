@@ -50,7 +50,10 @@ class LockHeld(RuntimeError):
 def _script(connection: sqlite3.Connection, script: str) -> None:
     """Runs ``script`` one statement at a time, inside the caller's transaction.
 
-    ``executescript`` would commit that transaction first.
+    ``executescript`` would commit that transaction first. Statements are cut
+    at the line where one completes, so a migration writes at most one
+    statement per line (a trigger may span several); two on one line raise
+    ``ProgrammingError``.
     """
     statement = ""
     for line in script.splitlines(keepends=True):
@@ -203,8 +206,13 @@ class SqliteState:
         if self._connection is None:
             if isinstance(self.path, Path):
                 self.path.parent.mkdir(parents=True, exist_ok=True)
-            self._connection = sqlite3.connect(str(self.path), check_same_thread=False)
-            _write_ahead_log(self._connection)
+            connection = sqlite3.connect(str(self.path), check_same_thread=False)
+            try:
+                _write_ahead_log(connection)
+            except BaseException:
+                connection.close()
+                raise
+            self._connection = connection
         return self._connection
 
     @_locked
@@ -217,11 +225,15 @@ class SqliteState:
     def migrate(self) -> List[str]:
         """Applies the migrations not yet recorded in ``nl2sql_meta``, in order; returns their names.
 
-        All in one ``BEGIN IMMEDIATE`` transaction, which takes the write lock
-        before ``nl2sql_meta`` is read: another store migrating the same file
+        A store with nothing pending (every start after the first) learns so
+        from a plain read and takes no lock. Otherwise all of them run in one
+        ``BEGIN IMMEDIATE`` transaction, which takes the write lock before
+        ``nl2sql_meta`` is read again: another store migrating the same file
         waits for it, then finds every migration applied.
         """
         connection = self._conn()
+        if not self._pending(connection):
+            return []
         connection.execute("BEGIN IMMEDIATE;")
         try:
             connection.execute("CREATE TABLE IF NOT EXISTS nl2sql_meta ("
@@ -242,6 +254,17 @@ class SqliteState:
         for name in applied:
             logger.info(f"Applied state migration {name}")
         return applied
+
+    @staticmethod
+    def _pending(connection: sqlite3.Connection) -> bool:
+        """Whether any migration is missing from ``nl2sql_meta``, read without a transaction."""
+        try:
+            done = {row[0] for row in connection.execute("SELECT migration FROM nl2sql_meta;")}
+        except sqlite3.OperationalError as exc:
+            if "no such table" not in str(exc):
+                raise
+            return True
+        return any(name not in done for name, _ in MIGRATIONS)
 
     # -- snapshots ---------------------------------------------------------------
 
