@@ -1,15 +1,17 @@
 """``nl2sql run`` shows the run from ``engine.stream_query``'s events, through the public API only.
 
-It exits 1 when the run cannot finish (an ``error`` event) or finishes with a
-blocking error (an ERROR or CRITICAL error makes the status "error"); warnings
-alone exit 0. ``--show-perf`` is each step's time from its ``node_finished``
-event.
+It exits 1 when the run cannot finish (a ``run.failed`` event) or finishes with
+a blocking error (an ERROR or CRITICAL error makes the status "error");
+warnings alone exit 0. ``--show-perf`` is each step's time from its
+``node.finished`` event.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pytest
 
-from nl2sql import QueryEvent, QueryResult
+from nl2sql import Event, QueryResult
 from nl2sql.cli.commands import run as run_module
 from nl2sql.cli.types import RunConfig
 from nl2sql.testing.config import make_config
@@ -28,13 +30,18 @@ class StreamEngine:
         yield from self.events
 
 
+def _event(name, **data) -> Event:
+    return Event(name=name, at=datetime.now(timezone.utc), trace_id="t-1", data=data)
+
+
 def _steps():
-    return [QueryEvent(type="node_started", data={"node": "decomposer"}),
-            QueryEvent(type="node_finished", data={"node": "decomposer", "seconds": 0.25, "ok": True})]
+    return [_event("run.started", question="How many customers?"),
+            _event("node.started", node="decomposer", sub_query_id=None),
+            _event("node.finished", node="decomposer", sub_query_id=None, seconds=0.25, ok=True)]
 
 
-def _final(**fields) -> QueryEvent:
-    return QueryEvent(type="final", data=QueryResult(**fields).model_dump(mode="json"))
+def _final(**fields) -> Event:
+    return _event("run.finished", status=fields.get("status"), result=QueryResult(**fields).model_dump(mode="json"))
 
 
 def _error(severity: str) -> dict:
@@ -65,7 +72,7 @@ def test_run_asks_the_engine_with_the_role_and_the_options(engine_with):
 
 
 def test_a_run_that_cannot_finish_prints_the_error_and_exits_1(engine_with, capsys):
-    engine = engine_with(QueryEvent(type="error", data={"message": "The run failed: no key"}))
+    engine = engine_with(_event("run.failed", message="The run failed: no key", error_code="UNKNOWN_ERROR"))
 
     with pytest.raises(SystemExit) as exc:
         run_module.run_pipeline(RunConfig(query="How many customers?"), engine)

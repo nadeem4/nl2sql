@@ -123,6 +123,7 @@ nav:
     - Artifact Store: storage/artifact-store.md
   - Observability:
     - Observability Stack: observability/stack.md
+    - Events: observability/events.md
     - Debugging a Run (Traces): observability/debugging.md
     - Feedback and Signals: observability/feedback.md
     - Error Handling + Circuit Breaker: observability/error-handling.md

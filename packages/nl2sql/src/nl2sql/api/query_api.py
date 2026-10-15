@@ -9,7 +9,8 @@ from __future__ import annotations
 import contextvars
 import queue
 import threading
-from typing import Optional, List, Dict, Any, Iterator, Literal
+from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
@@ -17,12 +18,13 @@ from nl2sql.pipeline.runtime import run_with_graph, usage_prices
 from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
-from nl2sql.events import RunScope, RunStatus
+from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
+from nl2sql_sdk.events import Event
 from nl2sql.hooks.approval import ApprovalRequest
 from nl2sql.limits import RunStop
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
-from nl2sql.pipeline.events import QueryEvent, RunEvents
+from nl2sql.pipeline.events import RunEvents
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
 
@@ -363,25 +365,27 @@ class QueryAPI:
         """
         scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                          user_context=user_context)
-        try:
-            state = run_with_graph(
-                self._ctx,
-                question,
-                datasource_id=datasource_id,
-                execute=execute,
-                user_context=user_context,
-                cancellation_token=cancellation_token,
-                scope=scope,
-            )
-            result = result_from_state(
-                state,
-                artifact_store=getattr(self._ctx, "artifact_store", None),
-            )
-        except BaseException as exc:
-            # A KeyboardInterrupt too: every scope ends with a terminal event.
-            scope.fail(f"The run failed: {exc or type(exc).__name__}", ErrorCode.UNKNOWN_ERROR)
-            raise
-        self.close_scope(scope, result)
+        # Entered here too, not only in the graph's worker, so every log line of the run carries its trace_id.
+        with scope.entered():
+            try:
+                state = run_with_graph(
+                    self._ctx,
+                    question,
+                    datasource_id=datasource_id,
+                    execute=execute,
+                    user_context=user_context,
+                    cancellation_token=cancellation_token,
+                    scope=scope,
+                )
+                result = result_from_state(
+                    state,
+                    artifact_store=getattr(self._ctx, "artifact_store", None),
+                )
+            except BaseException as exc:
+                # A KeyboardInterrupt too: every scope ends with a terminal event.
+                scope.fail(f"The run failed: {exc or type(exc).__name__}", ErrorCode.UNKNOWN_ERROR)
+                raise
+            self.close_scope(scope, result)
         return result
 
     def open_scope(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
@@ -393,21 +397,27 @@ class QueryAPI:
         here, makes its model calls with ``scope.callbacks()`` inside
         ``scope.entered()``, then passes it as ``scope=``, or closes it with
         :meth:`close_scope` and a result built without a graph run.
+
+        The scope carries a :class:`~nl2sql.pipeline.events.RunEvents`, so the
+        graph publishes the run's steps (``node.*``, ``result.manifest``,
+        ``answer.delta``) through it.
         """
         scope = RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
                          execute=execute, tenant_id=self._ctx.tenant_id,
                          usage=TokenUsageCallback(prices=usage_prices(self._ctx)))
+        scope.attach(RunEvents(scope.publish))
         scope.start()
         return scope
 
-    def close_scope(self, scope: RunScope, result: QueryResult) -> None:
+    def close_scope(self, scope: RunScope, result: QueryResult) -> Optional[Event]:
         """Close ``scope`` with ``run.finished``, the result's summary; ``run.failed`` if that cannot be built.
 
         ``result`` may be one built without a graph run (Wave C's failed
-        rewrite). A scope closes once; closing it again does nothing.
+        rewrite). A scope closes once; closing it again does nothing and
+        returns None. Returns the ``run.finished`` event published.
         """
         try:
-            scope.finish(result, tables=tables_read(result, getattr(self._ctx, "ds_registry", None)))
+            return scope.finish(result, tables=tables_read(result, getattr(self._ctx, "ds_registry", None)))
         except Exception as exc:
             scope.fail(f"The run's summary could not be built: {exc}", ErrorCode.UNKNOWN_ERROR)
             raise
@@ -421,27 +431,36 @@ class QueryAPI:
         user_context: Optional[UserContext] = None,
         cancellation_token: Optional[CancellationToken] = None,
         scope: Optional[RunScope] = None,
-    ) -> Iterator[QueryEvent]:
+        names: Iterable[str] = STREAM_EVENTS,
+    ) -> Iterator[Event]:
         """
-        Run a question as :meth:`run_query` does, yielding the run as it happens.
+        Run a question as :meth:`run_query` does, yielding its events as they are published.
 
-        Yields ``node_started`` and ``node_finished`` per pipeline step,
-        ``result_manifest`` once the aggregator has saved the results,
-        ``answer_delta`` per piece of the answer as the model writes it, and
-        then exactly one of ``final`` (the :class:`QueryResult`
-        ``run_query`` would have returned, as JSON) or ``error`` (the run
-        could not start, or crashed outside the pipeline). A run that fails
-        inside the pipeline -- a refusal, a provider error -- ends in
-        ``final`` with ``status: "error"``, as ``run_query`` returns it. See
-        :mod:`nl2sql.pipeline.events`.
+        Yields this run's bus events from the caller-safe allow-list (D17,
+        ``nl2sql.events.STREAM_EVENTS``), in publish order: ``run.started``,
+        ``node.started`` and ``node.finished`` per pipeline step,
+        ``result.manifest`` once the aggregator has saved the results,
+        ``answer.delta`` per piece of the answer as the model writes it,
+        ``sanity.flagged`` and ``run.limit_reached``, and then exactly one of
+        ``run.finished`` or ``run.failed``. The stream's ``run.finished`` is
+        the bus event's summary plus ``data.result``, the :class:`QueryResult`
+        ``run_query`` would have returned, as JSON; the event published on the
+        bus never holds it (D15). ``run.failed`` means the run could not start,
+        or crashed outside the pipeline. A run that fails inside the pipeline
+        -- a refusal, a provider error -- ends in ``run.finished`` with
+        ``status: "error"``, as ``run_query`` returns it.
 
         The run goes on in a thread of its own; the caller's context (a
         request's keys) goes with it. Closing the iterator early -- a client
         that went away -- cancels the run before its next step or model call.
-        ``scope`` is as for :meth:`run_query`.
+        ``scope`` is as for :meth:`run_query`: the stream starts with what the
+        open scope already published (its ``run.started``). ``names``
+        (internal) is the allow-list; Wave C's conversation stream adds its
+        own events to it.
         """
         token = cancellation_token or CancellationToken()
-        events: "queue.Queue[Optional[QueryEvent]]" = queue.Queue()
+        allowed = frozenset(names)
+        events: "queue.Queue[Optional[Event]]" = queue.Queue()
         opened = scope
 
         def run() -> None:
@@ -449,26 +468,38 @@ class QueryAPI:
             try:
                 scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                                  user_context=user_context)
-                state = run_with_graph(
-                    self._ctx,
-                    question,
-                    datasource_id=datasource_id,
-                    execute=execute,
-                    callbacks=[RunEvents(events.put)],
-                    user_context=user_context,
-                    cancellation_token=token,
-                    stream_answer=True,
-                    scope=scope,
-                )
-                result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
-                self.close_scope(scope, result)
-                events.put(QueryEvent(type="final", data=result.model_dump(mode="json")))
+                # What the scope published before the stream joined it, then the rest as it comes. The
+                # stream's own run.finished, with the result, is put below.
+                for event in list(scope.events):
+                    if event.name in allowed:
+                        events.put(event)
+                scope.attach(events.put, names=allowed - {"run.finished"})
+                with scope.entered():
+                    state = run_with_graph(
+                        self._ctx,
+                        question,
+                        datasource_id=datasource_id,
+                        execute=execute,
+                        user_context=user_context,
+                        cancellation_token=token,
+                        stream_answer=True,
+                        scope=scope,
+                    )
+                    result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
+                    finished = self.close_scope(scope, result)
+                if finished is not None and "run.finished" in allowed:
+                    events.put(finished.model_copy(update={
+                        "data": {**finished.data, "result": result.model_dump(mode="json")}}))
             except BaseException as exc:
                 # A KeyboardInterrupt too: every scope ends with a terminal event.
                 message = f"The run failed: {exc or type(exc).__name__}"
                 if scope is not None:
                     scope.fail(message, ErrorCode.UNKNOWN_ERROR)
-                events.put(QueryEvent(type="error", data={"message": message, "error_code": "UNKNOWN_ERROR"}))
+                else:
+                    # The scope could not open: the caller still hears how the run ended.
+                    events.put(Event(name="run.failed", at=datetime.now(timezone.utc),
+                                     tenant_id=getattr(self._ctx, "tenant_id", None),
+                                     data={"message": message, "error_code": ErrorCode.UNKNOWN_ERROR.value}))
                 if not isinstance(exc, Exception):
                     raise
             finally:
@@ -483,7 +514,7 @@ class QueryAPI:
                 yield event
                 # A timed-out run's graph winds down in the background; whatever
                 # it reports after the terminal event is not this run's any more.
-                if event.type in ("final", "error"):
+                if event.name in ("run.finished", "run.failed"):
                     finished = True
                     return
         finally:

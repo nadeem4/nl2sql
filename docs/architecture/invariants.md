@@ -207,6 +207,24 @@ Prevents execution against unauthorized datasources.
 
 ---
 
+## Events Carry No Rows, and the Stream Carries No Operator Data
+
+### Definition
+No event on the engine's bus carries result rows, sample values, keys or header values; the question and the answer text are carried and may hold values from the data. Every published name is in the event catalog, whose model for it forbids extra keys. A caller's own stream (`stream_query`) yields only its run's events on the caller-safe allow-list (`STREAM_EVENTS`, the catalog entries marked `stream`); the full `QueryResult` is only on the stream's copy of `run.finished`, never on the bus.
+
+### Enforcement Points
+- `EventBus.publish` and the catalog in `nl2sql.events` (`CATALOG`, `STREAM_EVENTS`)
+- `QueryAPI.stream_query` in `nl2sql.api.query_api` (subscribes to its scope with the allow-list only)
+- `test_no_bus_event_carries_rows` in `packages/nl2sql/tests/e2e/test_run_events_fake_llm.py`, `test_stream_never_yields_policy_or_hook_or_llm_call_events` in `packages/nl2sql/tests/unit/test_stream_query.py`, and `test_every_published_event_is_in_the_catalog` in `packages/nl2sql/tests/architecture/test_event_catalog.py`
+
+### Failure Behavior
+An uncatalogued name, or data its model refuses, is a `ValueError` or a validation error from `publish`: an engine bug a test sees. An event off the allow-list never reaches the stream; an operator reads it with `engine.events.subscribe`.
+
+### Why It Exists
+Observers write events to logs, files and collectors outside the engine's access control, so rows must never reach them; and a stream is the caller's, so a policy denial (which would tell a denied user that a table exists), a hook's reasons or a model's cost must not reach it.
+
+---
+
 ## SQL Execution Requires SQL, Datasource, and Capability
 
 ### Definition
@@ -369,7 +387,7 @@ The playground once read `engine.context.ds_registry`, `engine.context.schema_st
 
 Concretely:
 
-- `nl2sql/__init__.py` imports only the `NL2SQL` class. Every other public name (`QueryResult`, `QueryEvent`, `CancellationToken`, the API classes, the benchmark) is imported the first time it is asked for, through the module's `__getattr__`. `from nl2sql import QueryResult` works as it always did.
+- `nl2sql/__init__.py` imports only the `NL2SQL` class. Every other public name (`QueryResult`, `Event`, `CancellationToken`, the API classes, the benchmark) is imported the first time it is asked for, through the module's `__getattr__`. `from nl2sql import QueryResult` works as it always did.
 - `nl2sql/public_api.py` imports the runtime (`Runtime` and the API classes) inside `NL2SQL.__init__`, not at the top of the module.
 - Runtime modules import their heavy libraries where they are used, as the adapters already do.
 

@@ -1142,7 +1142,7 @@ noisy than wall-clock time. The rule is added to `invariants.md`.
       runtime behind it. `nl2sql run` shows its live progress from
       `stream_query`'s events (the `PipelineRunner` and the monitor callback
       are deleted; `--show-perf` is each step's time from its
-      `node_finished` event, and the CLI records `nl2sql.node.duration` from
+      `node_finished` event (`node.finished` from Wave A), and the CLI records `nl2sql.node.duration` from
       them). `index.build` gains `on_datasource`, called with an
       `IndexProgress` (`datasource_id`, `state`: `started`, `done` with
       `counts`, or `failed` with `reason`) that a console line and a Phase 4

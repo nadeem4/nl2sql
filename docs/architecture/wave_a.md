@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0, the foundation, is built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0, the foundation, and E1 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -378,6 +378,47 @@ names in the same PR.
     query's SQL, as `datasource.schema.table`. `engine.events` and
     `engine.evals` are empty namespaces; E1 adds `subscribe` and `catalog`.
 
+!!! note "Built: run events, the stream and `engine.events` (E1)"
+    `pipeline/events.py`'s `RunEvents(publish)` is a LangChain callback that
+    publishes `node.started`, `node.finished` (each with its
+    `sub_query_id`, from the sub-query subgraph's `subgraph_id` and inherited
+    by the runs inside it), `result.manifest` (`results` only; the event's
+    `trace_id` is the `request_id`) and `answer.delta`. `QueryAPI.open_scope`
+    attaches one to every scope (`scope.attach(RunEvents(scope.publish))`),
+    so every run publishes its steps, streamed or not, and
+    `scope.callbacks()` is now the usage collector, the `RunEvents`, then
+    whatever was attached. `QueryEvent` is deleted, with its export.
+    **The allow-list is one definition:** each catalog entry (`EventSpec`)
+    has `stream` and `audit` flags, and `nl2sql.events.STREAM_EVENTS` (D17)
+    and `AUDIT_EVENTS` (D19, which E2's `audit` observer reads; of
+    `hook.decision` it keeps the decisions the entry's description names)
+    are derived from them; `EventInfo` reports both. A later event joins a
+    list by its own catalog entry (Wave B's events stay off the stream). The
+    stream: `QueryAPI.stream_query(..., scope=None, names=STREAM_EVENTS)`
+    yields `Event`s. It replays what its scope already published
+    (`RunScope.events`, a new list of every event the scope published, in
+    order), then attaches `queue.put` to the scope with `names` minus
+    `run.finished`, and puts its own `run.finished`: the summary
+    `close_scope` (which now returns the published event) returned, plus
+    `data.result`. So a scope opened before the stream (Wave C's turn, need
+    A2) still gives the stream its `run.started` and anything the turn
+    published in it, and `names` (internal) is where Wave C's
+    `conversations.stream` adds `conversation.rewritten` (need A4); it
+    appends `conversation.turn` after the stream's `run.finished` itself.
+    A scope that could not open ends the stream with a `run.failed` built
+    in place (no `trace_id`). `scope=` is kept on `run_query` and
+    `stream_query`. `engine.events.subscribe(fn, names=None)` subscribes to
+    `Runtime.bus` (fail open) and `catalog()` returns `catalog()`. The trace
+    document has `events` (the scope's events but `answer.delta`); since
+    `run_with_graph` writes the trace before `run.finished` is published,
+    the list ends before it. That reads `scope.events` in
+    `pipeline/runtime.py` (one argument to `write_run_trace`), not
+    `tracing/recorder.py`, a small difference from the file list above.
+    `nl2sql run`, the playground (`app.py` and `web/playground/src/stream.js`,
+    rebuilt) and `nl2sql-api`'s stream route read the new names; each SSE
+    `data` line is the whole event. The invariant *Events Carry No Rows, and
+    the Stream Carries No Operator Data* is in `invariants.md`.
+
 ## 4. Observers
 
 ### The registry kind and the config
@@ -469,6 +510,15 @@ result depends on them:
 - `cli/common/engine.py` stops switching to JSON logs when OpenTelemetry is
   configured; `--log-format json` (and `NL2SQL_LOG_FORMAT`) chooses it for
   any command. `NL2SQL_LOG_FORMAT` joins `READS_THE_ENVIRONMENT`.
+
+!!! note "Built: log correlation (E1)"
+    `run_query` and `stream_query`'s thread run inside `scope.entered()` as
+    well as the graph's worker, so every log line written during a run, on
+    the caller's thread or a LangGraph worker thread, carries its `trace_id`
+    and `tenant_id` (`test_every_log_line_in_a_run_has_its_trace_id`,
+    `test_log_lines_on_worker_threads_have_the_trace_id`).
+    `docs/observability/events.md` shows a library caller adding
+    `TraceContextFilter`.
 
 ## 5. Cost, the price table and per-question caps
 

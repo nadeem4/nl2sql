@@ -73,7 +73,8 @@ def _get(source: Any, name: str) -> Any:
     return getattr(source, name, None)
 
 
-def _sub_query_from(inputs: Any) -> Optional[str]:
+def sub_query_from(inputs: Any) -> Optional[str]:
+    """The sub-query a sub-query subgraph's input names in its ``subgraph_id``, or None."""
     subgraph_id = _get(inputs, "subgraph_id")
     if isinstance(subgraph_id, str) and subgraph_id.count(":") >= 2:
         return subgraph_id.split(":")[1]
@@ -208,7 +209,7 @@ class TraceRecorder(BaseCallbackHandler):
             execution = parent.execution if parent else None
             sub_query_id = parent.sub_query_id if parent else None
             if node and name == node and (execution is None or execution.node != node):
-                sub_query_id = _sub_query_from(inputs) or sub_query_id
+                sub_query_id = sub_query_from(inputs) or sub_query_id
                 key = (node, sub_query_id)
                 self._attempts[key] = self._attempts.get(key, 0) + 1
                 self._seq += 1

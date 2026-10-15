@@ -235,10 +235,12 @@ with `record: clips` runs the same script in CI and opens a pull request.
   several it does not, because the resolver picks. An empty box with a key
   leaves **Ask** looking ready; pressing it puts the keyboard in the box.
 - **Streaming**: Ask posts to `/api/ask/stream` (`streamAsk` in
-  `src/stream.js`) and reads its Server-Sent Events as they arrive:
-  `node_started` / `node_finished` per step, `result_manifest` once the
-  results are saved, `answer_delta` as the answer is written, then `final`
-  (exactly the `/api/ask` reply) or `error`. `progressOf` folds them into
+  `src/stream.js`) and reads its Server-Sent Events as they arrive, the
+  engine's run events (each `data` line is the whole event; `parseSse` hands
+  on its `data` and `trace_id`): `run.started`, `node.started` /
+  `node.finished` per step, `result.manifest` once the results are saved,
+  `answer.delta` as the answer is written, then `run.finished` (its
+  `data.result` is exactly the `/api/ask` reply) or `run.failed`. `progressOf` folds them into
   `progress` in `App`; `liveStations` lights each station as its step
   finishes (the next unfinished one is live, Cost & time goes live once the
   rows are in) and `liveTimings` gives the done ones their time; the Rows
@@ -246,11 +248,12 @@ with `record: clips` runs the same script in CI and opens a pull request.
   answer exists, and the same table stays when the run is back; the answer
   sentence grows as the summary streams (`liveAnswer`, `#answer-live`, in
   `--ink-2` until the result is back). The stations hold their body (plan,
-  checks, SQL) until `final`, and say nothing about it being missing while the
+  checks, SQL) until `run.finished`, and say nothing about it being missing while the
   run is live. `StreamUnavailable` -- no fetch streaming in the browser, a
   404 or 405 from an older server, a network failure before the reply, or a
-  stream that ends without `final` or `error` -- falls back to `/api/ask`; a
-  refusal (4xx with a `detail`), an `error` event and Stop are not fallbacks.
+  stream that ends without `run.finished` or `run.failed` -- falls back to
+  `/api/ask`; a refusal (4xx with a `detail`), a `run.failed` event and Stop
+  are not fallbacks.
   A browser that cannot read the body as it arrives reads it whole, without
   asking twice.
 - **Busy and Stop**: while a run is out without a stream (the `/api/ask`
@@ -442,7 +445,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   non-loopback `--host` without `--allow-settings`) the page shows the reason
   (`#settings-unavailable`) instead of a form, and the nav marks it.
 
-Every run station renders the `/api/ask` response (the `final` event of
+Every run station renders the `/api/ask` response (the `run.finished` event's `result` on
 `/api/ask/stream`), and while a streamed run is live, the events before it; the Rows station the
 saved result that response names, read through the engine's result routes;
 nothing is computed server-side for the page.

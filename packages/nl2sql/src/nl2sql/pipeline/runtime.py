@@ -253,6 +253,7 @@ def run_with_graph(
             ctx=ctx,
             state=out,
             error=error,
+            events=list(scope.events) if scope is not None else [],
         )
         if path:
             out["trace_path"] = path

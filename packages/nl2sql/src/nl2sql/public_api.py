@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from nl2sql.check import CheckReport
     from nl2sql.common.cancellation import CancellationToken
     from nl2sql.config import LLM, Config
-    from nl2sql.pipeline.events import QueryEvent
+    from nl2sql_sdk.events import Event
     from nl2sql.registry import Registry
     from nl2sql.runtime import Runtime
 
@@ -159,7 +159,7 @@ class NL2SQL:
 
     @cached_property
     def events(self) -> "EventsAPI":
-        """The engine's events: every run's and the engine's own (filled from Wave A's E1)."""
+        """The engine's events, every run's and the engine's own: ``subscribe``, ``catalog``."""
         from nl2sql.api.events_api import EventsAPI
 
         return EventsAPI(self._runtime)
@@ -277,14 +277,18 @@ class NL2SQL:
 
     def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                      user_context: Optional["UserContext"] = None,
-                     cancellation_token: Optional["CancellationToken"] = None) -> Iterator["QueryEvent"]:
+                     cancellation_token: Optional["CancellationToken"] = None) -> Iterator["Event"]:
         """
-        Run a question as ``run_query`` does, yielding :class:`~nl2sql.QueryEvent`
-        values as it goes: ``node_started`` / ``node_finished`` per step,
-        ``result_manifest`` when the results are saved, ``answer_delta`` as the
-        answer is written, then ``final`` (``run_query``'s result, as JSON) or
-        ``error``. ``event.sse()`` is the event as one Server-Sent Event.
-        Closing the iterator early cancels the run.
+        Run a question as ``run_query`` does, yielding its :class:`~nl2sql.Event`
+        values as they are published, from the caller-safe allow-list:
+        ``run.started``, ``node.started`` / ``node.finished`` per step,
+        ``result.manifest`` when the results are saved, ``answer.delta`` as the
+        answer is written, ``sanity.flagged`` and ``run.limit_reached``, then
+        exactly one of ``run.finished`` (whose ``data.result`` is
+        ``run_query``'s result, as JSON) or ``run.failed``. Operator events
+        (``policy.decision``, ``hook.decision``, ``llm.call``) are never on
+        it: subscribe to ``events`` for those. ``event.sse()`` is the event as
+        one Server-Sent Event. Closing the iterator early cancels the run.
         """
         self._ensure_open()
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,

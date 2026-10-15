@@ -20,7 +20,6 @@ _EXPORTS = {
     "nl2sql.execution.artifacts.results": ("MAX_RESULT_PAGE_SIZE", "ResultManifest", "ResultNotFound",
                                            "ResultPage", "ResultSummary"),
     "nl2sql.services.callbacks.token_handler": ("QuestionUsage",),
-    "nl2sql.pipeline.events": ("QueryEvent",),
     "nl2sql.common.logger": ("configure_logging", "TraceContextFilter"),
     # Wave A: events, the run's stop and approval shapes.
     "nl2sql_sdk.events": ("Event", "Observer"),
@@ -72,7 +71,6 @@ __all__ = [
     "ResultNotFound",
     "MAX_RESULT_PAGE_SIZE",
     "QuestionUsage",
-    "QueryEvent",
     "configure_logging",
     "TraceContextFilter",
     "Event",

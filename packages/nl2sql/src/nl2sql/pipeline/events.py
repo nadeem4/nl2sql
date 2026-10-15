@@ -1,50 +1,42 @@
-"""A run as it happens: the events ``stream_query`` yields.
+"""A run as it happens: the step events ``RunEvents`` publishes on the run's scope.
 
-:class:`RunEvents` is a LangChain callback handler, passed to the graph like
-the timing and usage callbacks. It turns what the graph reports into
-:class:`QueryEvent` values:
+:class:`RunEvents` is a LangChain callback handler. ``QueryAPI.open_scope``
+attaches one to every run's :class:`~nl2sql.events.RunScope`, so the graph
+gets it with the scope's callbacks, and it publishes, through the scope:
 
-``node_started``    ``{"node"}``: a pipeline step began (an SQL agent step
-                    once per sub-query and again on a retry)
-``node_finished``   ``{"node", "seconds", "ok"}``: it ended; ``ok`` is False
-                    when it raised
-``result_manifest`` ``{"trace_id", "results"}``: the aggregator saved the
-                    run's results; ``trace_id`` is the ``request_id`` the
-                    paging and CSV routes take
-``answer_delta``    ``{"field", "text"}``: the next piece of the answer's
+``node.started``    ``{"node", "sub_query_id"}``: a pipeline step began (an
+                    SQL agent step once per sub-query and again on a retry)
+``node.finished``   ``{"node", "sub_query_id", "seconds", "ok"}``: it ended;
+                    ``ok`` is False when it raised
+``result.manifest`` ``{"results"}``: the aggregator saved the run's results;
+                    the event's ``trace_id`` is the ``request_id`` the paging
+                    and CSV routes take
+``answer.delta``    ``{"field", "text"}``: the next piece of the answer's
                     ``summary`` or ``content``, as the answer model writes it
+                    (only a streamed run's answer model streams)
 
-``stream_query`` adds the terminal event, exactly one of ``final`` (the
-``QueryResult``, as ``run_query`` returns it) or ``error``.
+``sub_query_id`` is None for a step outside a sub-query. ``stream_query``
+yields these, with the scope's own ``run.*`` events, from the caller-safe
+allow-list (``nl2sql.events.STREAM_EVENTS``). See docs/architecture/wave_a.md,
+section 3.
 """
 from __future__ import annotations
 
-import json
 import time
-from typing import Any, Callable, Dict, Literal, Optional, Tuple
+from typing import Any, Callable, Dict, Mapping, Optional, Tuple
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.utils.json import parse_partial_json
-from pydantic import BaseModel, Field
 
-EventType = Literal["node_started", "node_finished", "result_manifest", "answer_delta", "final", "error"]
+from nl2sql.tracing.recorder import sub_query_from
 
 # The graph node whose model call writes the answer, and the answer fields a
 # reader sees grow.
 ANSWER_NODE = "answer_synthesizer"
 ANSWER_FIELDS = ("summary", "content")
 
-
-class QueryEvent(BaseModel):
-    """One step of a streamed run: its ``type`` and a JSON-ready ``data`` dict."""
-
-    type: EventType
-    data: Dict[str, Any] = Field(default_factory=dict)
-
-    def sse(self) -> str:
-        """The event as one Server-Sent Event: its type as ``event``, its data as JSON."""
-        return f"event: {self.type}\ndata: {json.dumps(self.data, default=str)}\n\n"
+Publish = Callable[[str, Mapping[str, Any]], Any]
 
 
 def _get(source: Any, name: str) -> Any:
@@ -96,43 +88,45 @@ def _pieces(chunk: Any, token: str) -> str:
 
 
 class RunEvents(BaseCallbackHandler):
-    """Turns a run's callbacks into :class:`QueryEvent` values, handed to ``emit``.
+    """Publishes a run's steps, its result manifest and its answer as it is written, through ``publish``.
 
-    A node's own run is the one whose name is its ``langgraph_node``; the
+    ``publish(name, data)`` is the run scope's (``RunScope.publish``). A
+    node's own run is the one whose name is its ``langgraph_node``; the
     runnables inside it (prompts, models, parsers, routers) carry the same tag
-    under other names and are not events. ``emit`` is called on the graph's
-    worker threads.
+    under other names and are not events. A run inherits its parent's
+    sub-query, and a sub-query's subgraph names it in its ``subgraph_id``.
+    Called on the graph's worker threads.
     """
 
-    def __init__(self, emit: Callable[[QueryEvent], None]) -> None:
-        self._emit = emit
-        self._nodes: Dict[UUID, Tuple[str, float]] = {}
+    def __init__(self, publish: Publish) -> None:
+        self._publish = publish
+        self._nodes: Dict[UUID, Tuple[str, Optional[str], float]] = {}
+        self._sub_queries: Dict[UUID, Optional[str]] = {}
         self._answers: Dict[UUID, _AnswerText] = {}
-        self.trace_id: Optional[str] = None
 
     def on_chain_start(self, serialized: Optional[Dict[str, Any]], inputs: Any, *, run_id: UUID,
                        parent_run_id: Optional[UUID] = None, **kwargs: Any) -> None:
-        if parent_run_id is None and self.trace_id is None and isinstance(inputs, dict):
-            self.trace_id = inputs.get("trace_id")
+        inherited = self._sub_queries.get(parent_run_id) if parent_run_id is not None else None
+        sub_query_id = sub_query_from(inputs) or inherited
+        self._sub_queries[run_id] = sub_query_id
         node = (kwargs.get("metadata") or {}).get("langgraph_node")
         if node and kwargs.get("name") == node:
-            self._nodes[run_id] = (node, time.perf_counter())
-            self._emit(QueryEvent(type="node_started", data={"node": node}))
+            self._nodes[run_id] = (node, sub_query_id, time.perf_counter())
+            self._publish("node.started", {"node": node, "sub_query_id": sub_query_id})
 
     def _finish(self, run_id: UUID, ok: bool, outputs: Any = None) -> None:
+        self._sub_queries.pop(run_id, None)
         started = self._nodes.pop(run_id, None)
         if started is None:
             return
-        node, t0 = started
-        self._emit(QueryEvent(type="node_finished", data={
-            "node": node, "seconds": round(time.perf_counter() - t0, 4), "ok": ok}))
+        node, sub_query_id, t0 = started
+        self._publish("node.finished", {"node": node, "sub_query_id": sub_query_id,
+                                        "seconds": round(time.perf_counter() - t0, 4), "ok": ok})
         if node == "aggregator":
             results = _get(_get(outputs, "aggregator_response"), "results")
             if results is not None:
-                self._emit(QueryEvent(type="result_manifest", data={
-                    "trace_id": self.trace_id or "",
-                    "results": [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in results],
-                }))
+                self._publish("result.manifest", {
+                    "results": [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in results]})
 
     def on_chain_end(self, outputs: Any, *, run_id: UUID, **kwargs: Any) -> None:
         self._finish(run_id, True, outputs)
@@ -149,7 +143,7 @@ class RunEvents(BaseCallbackHandler):
         if answer is None:
             return
         for field, text in answer.add(_pieces(chunk, token)):
-            self._emit(QueryEvent(type="answer_delta", data={"field": field, "text": text}))
+            self._publish("answer.delta", {"field": field, "text": text})
 
     def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
         self._answers.pop(run_id, None)

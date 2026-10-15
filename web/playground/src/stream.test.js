@@ -7,30 +7,33 @@ import {
 
 // ---------- parsing ----------
 
+// What the server sends: the engine's Event, whole, as each SSE data line.
+const sse = (name, data, traceId = "t-1") =>
+  `event: ${name}\ndata: ${JSON.stringify({ name, at: "2026-10-15T00:00:00Z", trace_id: traceId, tenant_id: null, data })}\n\n`;
+
 test("parseSse reads whole events and keeps a half-sent one for later", () => {
-  const { events, rest } = parseSse(
-    'event: node_started\ndata: {"node":"decomposer"}\n\nevent: answer_delta\ndata: {"field":"summ',
-  );
-  assert.deepEqual(events, [{ event: "node_started", data: { node: "decomposer" } }]);
-  const next = parseSse(`${rest}ary","text":"Rock"}\n\n`);
-  assert.deepEqual(next.events, [{ event: "answer_delta", data: { field: "summary", text: "Rock" } }]);
+  const delta = sse("answer.delta", { field: "summary", text: "Rock" });
+  const { events, rest } = parseSse(sse("node.started", { node: "decomposer" }) + delta.slice(0, 40));
+  assert.deepEqual(events, [{ event: "node.started", data: { node: "decomposer" }, traceId: "t-1" }]);
+  const next = parseSse(rest + delta.slice(40));
+  assert.deepEqual(next.events, [{ event: "answer.delta", data: { field: "summary", text: "Rock" }, traceId: "t-1" }]);
   assert.equal(next.rest, "");
 });
 
 test("parseSse takes CRLF line ends, joins data lines, and skips comments and broken JSON", () => {
-  const { events } = parseSse(': keep-alive\r\n\r\nevent: final\r\ndata: {"a":\r\ndata: 1}\r\n\r\nevent: x\ndata: {nope\n\n');
-  assert.deepEqual(events, [{ event: "final", data: { a: 1 } }]);
+  const { events } = parseSse(': keep-alive\r\n\r\nevent: run.finished\r\ndata: {"data":\r\ndata: {"a": 1}}\r\n\r\nevent: x\ndata: {nope\n\n');
+  assert.deepEqual(events, [{ event: "run.finished", data: { a: 1 }, traceId: null }]);
 });
 
 test("an event with no name is a message", () => {
-  assert.deepEqual(parseSse('data: {"n":1}\n\n').events, [{ event: "message", data: { n: 1 } }]);
+  assert.deepEqual(parseSse('data: {"data":{"n":1}}\n\n').events, [{ event: "message", data: { n: 1 }, traceId: null }]);
 });
 
 // ---------- progress ----------
 
 const run = (...events) => events.reduce(progressOf, EMPTY_PROGRESS);
-const started = (node) => ({ event: "node_started", data: { node } });
-const finished = (node, seconds = 0.5) => ({ event: "node_finished", data: { node, seconds, ok: true } });
+const started = (node) => ({ event: "node.started", data: { node } });
+const finished = (node, seconds = 0.5) => ({ event: "node.finished", data: { node, seconds, ok: true } });
 
 test("progress follows the steps as they start and finish", () => {
   const p = run(started("decomposer"), finished("decomposer", 1.2), started("ast_planner"));
@@ -46,14 +49,14 @@ test("a step run twice (a retry) keeps its longest time", () => {
 });
 
 test("the answer grows field by field as it is written", () => {
-  const delta = (field, text) => ({ event: "answer_delta", data: { field, text } });
+  const delta = (field, text) => ({ event: "answer.delta", data: { field, text } });
   const p = run(delta("summary", "Rock "), delta("summary", "leads."), delta("content", "Rock has 1,297."));
   assert.deepEqual(p.answer, { summary: "Rock leads.", content: "Rock has 1,297." });
 });
 
 test("the manifest gives the rows station what it pages from", () => {
   const results = [{ node_id: "sq_1", columns: ["genre"], row_count: 25, truncated: false }];
-  const p = run({ event: "result_manifest", data: { trace_id: "t-1", results } });
+  const p = run({ event: "result.manifest", data: { results }, traceId: "t-1" });
   assert.deepEqual(liveResult(p), { trace_id: "t-1", result_manifest: results, status: "running" });
   assert.equal(liveResult(EMPTY_PROGRESS), null);
 });
@@ -97,16 +100,16 @@ test("streamAsk hands over every event and resolves with the final result", asyn
   const fetchImpl = async (url, init) => {
     assert.equal(url, "/api/ask/stream");
     assert.equal(init.method, "POST");
-    return sseResponse(['event: node_started\ndata: {"node":"decomposer"}\n\nevent: fi',
-      'nal\ndata: {"status":"success"}\n\n']);
+    const finished = sse("run.finished", { status: "success", result: { status: "success" } });
+    return sseResponse([sse("node.started", { node: "decomposer" }) + finished.slice(0, 9), finished.slice(9)]);
   };
   const final = await streamAsk(fetchImpl, "/api/ask/stream", { method: "POST" }, (e) => seen.push(e.event));
   assert.deepEqual(final, { status: "success" });
-  assert.deepEqual(seen, ["node_started", "final"]);
+  assert.deepEqual(seen, ["node.started", "run.finished"]);
 });
 
-test("an error event is the run's error, in its own words", async () => {
-  const fetchImpl = async () => sseResponse(['event: error\ndata: {"message":"The run failed: no graph"}\n\n']);
+test("a run.failed event is the run's error, in its own words", async () => {
+  const fetchImpl = async () => sseResponse([sse("run.failed", { message: "The run failed: no graph", error_code: "UNKNOWN_ERROR" })]);
   await assert.rejects(streamAsk(fetchImpl, "/u", {}, () => {}), (e) =>
     !(e instanceof StreamUnavailable) && e.message === "The run failed: no graph");
 });
@@ -120,18 +123,18 @@ test("a refusal before the stream is the server's sentence, not a fallback", asy
 test("a server without the stream route, or a stream cut short, falls back", async () => {
   const missing = async () => new Response("{}", { status: 404 });
   await assert.rejects(streamAsk(missing, "/u", {}, () => {}), StreamUnavailable);
-  const cut = async () => sseResponse(['event: node_started\ndata: {"node":"decomposer"}\n\n']);
+  const cut = async () => sseResponse([sse("node.started", { node: "decomposer" })]);
   await assert.rejects(streamAsk(cut, "/u", {}, () => {}), StreamUnavailable);
   const broken = async () => { throw new TypeError("Failed to fetch"); };
   await assert.rejects(streamAsk(broken, "/u", {}, () => {}), StreamUnavailable);
 });
 
 test("a browser that cannot read a body as it arrives reads it whole", async () => {
-  const text = 'event: node_started\ndata: {"node":"decomposer"}\n\nevent: final\ndata: {"status":"success"}\n\n';
+  const text = sse("node.started", { node: "decomposer" }) + sse("run.finished", { result: { status: "success" } });
   const fetchImpl = async () => ({ ok: true, status: 200, body: null, text: async () => text });
   const seen = [];
   assert.deepEqual(await streamAsk(fetchImpl, "/u", {}, (e) => seen.push(e.event)), { status: "success" });
-  assert.deepEqual(seen, ["node_started", "final"]);
+  assert.deepEqual(seen, ["node.started", "run.finished"]);
 });
 
 test("Stop is an abort, never a fallback that asks again", async () => {

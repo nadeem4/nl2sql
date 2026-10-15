@@ -100,8 +100,14 @@ def _failed(outcome: str, result: Dict[str, Any], nodes: Iterable[Dict[str, Any]
 
 def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, finished_at: str,
                 duration_s: float, outcome: str, recorder, usage, ctx: Any, state: Dict[str, Any],
-                error: Optional[str] = None) -> Dict[str, Any]:
-    """The whole trace document, capped and redacted."""
+                error: Optional[str] = None, events: Iterable[Any] = ()) -> Dict[str, Any]:
+    """The whole trace document, capped and redacted.
+
+    ``events`` are the run's bus events so far (its ``RunScope.events``); the
+    document lists every one but ``answer.delta``, whose text the result
+    holds whole. ``run.finished`` is published after the trace is written,
+    so the list ends before it.
+    """
     from nl2sql.api.query_api import result_from_state  # query_api imports the runtime
 
     traces = ctx.settings.traces
@@ -148,6 +154,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
                      "LLM messages and raw responses are kept whole."),
         },
         "nodes": nodes,
+        "events": [event.model_dump(mode="json") for event in events if event.name != "answer.delta"],
         "result": result,
     }
     return Redactor(collect_secrets(ctx)).redact(jsonable(doc))

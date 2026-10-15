@@ -12,6 +12,15 @@ data. Each model forbids extra keys, so nothing rides along unlisted.
 Run events have the run's ``trace_id``; engine events have none, except
 where a run caused them. Each event names, in its description, who publishes
 it; most publishers arrive with the Wave A PR named there.
+
+Each entry also says who else reads it, so each list has one definition and a
+later event joins it by its own entry, not by an edit elsewhere:
+
+- ``stream``: the caller's own stream (``stream_query``) carries it: the
+  caller-safe allow-list, D17 (``STREAM_EVENTS``). Operator data (a policy
+  denial names a table, a hook decision its reasons, a model call its cost)
+  stays off it and reaches an operator through ``engine.events.subscribe``.
+- ``audit``: the ``audit`` observer writes it (``AUDIT_EVENTS``, D19).
 """
 from __future__ import annotations
 
@@ -256,6 +265,8 @@ class EventSpec(BaseModel):
     model: Type[EventData]
     description: str
     run: bool
+    stream: bool = False  # on the caller's stream (D17)
+    audit: bool = False   # written by the audit observer (D19)
 
 
 class EventInfo(BaseModel):
@@ -264,56 +275,73 @@ class EventInfo(BaseModel):
     name: str
     description: str
     run: bool
+    stream: bool = False
+    audit: bool = False
     data_schema: Dict[str, Any]
 
 
-def _spec(model: Type[EventData], description: str, *, run: bool) -> EventSpec:
-    return EventSpec(model=model, description=description, run=run)
+def _spec(model: Type[EventData], description: str, *, run: bool, stream: bool = False,
+          audit: bool = False) -> EventSpec:
+    return EventSpec(model=model, description=description, run=run, stream=stream, audit=audit)
 
 
 CATALOG: Dict[str, EventSpec] = {
     # Run events
-    "run.started": _spec(RunStarted, "A question began. Published by RunScope when it opens.", run=True),
+    "run.started": _spec(RunStarted, "A question began. Published by RunScope when it opens.", run=True,
+                         stream=True),
     "run.finished": _spec(RunFinished, "A question ended with a result: its summary, never rows. Published "
-                                       "once, last, by RunScope.", run=True),
+                                       "once, last, by RunScope.", run=True, stream=True, audit=True),
     "run.failed": _spec(RunFailed, "A question could not start, or crashed outside the pipeline. Published "
-                                   "once, last, by RunScope.", run=True),
-    "node.started": _spec(NodeStarted, "A pipeline step began (E1).", run=True),
-    "node.finished": _spec(NodeFinished, "A pipeline step ended; ok is False when it raised (E1).", run=True),
+                                   "once, last, by RunScope.", run=True, stream=True, audit=True),
+    "node.started": _spec(NodeStarted, "A pipeline step began.", run=True, stream=True),
+    "node.finished": _spec(NodeFinished, "A pipeline step ended; ok is False when it raised.", run=True,
+                           stream=True),
     "answer.delta": _spec(AnswerDelta, "The next piece of the answer's summary or content, as the model "
-                                       "writes it (E1).", run=True),
+                                       "writes it. Only a streamed run's answer model streams.", run=True,
+                         stream=True),
     "result.manifest": _spec(ResultManifestData, "The run's results were saved: what they are, never their "
-                                                 "rows (E1).", run=True),
+                                                 "rows.", run=True, stream=True),
     "llm.call": _spec(LLMCall, "A model call finished: tokens, latency and cost (E2).", run=True),
     "llm.parse_retry": _spec(LLMParseRetry, "A structured answer did not parse and is asked for again (E4).",
                              run=True),
     "plan_cache.lookup": _spec(PlanCacheLookup, "The plan cache was asked for a plan (E2).", run=True),
     "policy.decision": _spec(PolicyDecision, "A denial at an enforcement point: the validator, the curated "
-                                             "matcher or the resolver (E4).", run=True),
-    "hook.decision": _spec(HookDecision, "A hook answered at one of the six points (H1).", run=True),
-    "run.limit_reached": _spec(RunLimitReached, "The question reached its cost or call cap (E3).", run=True),
-    "sanity.flagged": _spec(SanityFlagged, "An answer sanity check found something (S1).", run=True),
+                                             "matcher or the resolver (E4).", run=True, audit=True),
+    "hook.decision": _spec(HookDecision, "A hook answered at one of the six points (H1). The audit "
+                                         "observer writes deny, needs_approval, approved and error.",
+                           run=True, audit=True),
+    "run.limit_reached": _spec(RunLimitReached, "The question reached its cost or call cap (E3).", run=True,
+                               stream=True, audit=True),
+    "sanity.flagged": _spec(SanityFlagged, "An answer sanity check found something (S1).", run=True,
+                            stream=True),
     # Engine events
     "datasource.failed": _spec(DatasourceFailed, "A datasource check failed (E4).", run=False),
     "index.started": _spec(IndexStarted, "An index build began (E4).", run=False),
     "index.column_failed": _spec(IndexColumnFailed, "An index build could not index a column (E4).", run=False),
-    "index.swapped": _spec(IndexSwapped, "An index build went live (E4).", run=False),
+    "index.swapped": _spec(IndexSwapped, "An index build went live (E4).", run=False, audit=True),
     "index.failed": _spec(IndexFailed, "An index build failed (E4).", run=False),
-    "schema.drifted": _spec(SchemaDrifted, "A datasource's structure differs from its build (D1).", run=False),
+    "schema.drifted": _spec(SchemaDrifted, "A datasource's structure differs from its build (D1).", run=False,
+                            audit=True),
     "retention.purged": _spec(RetentionPurged, "Old traces, results and audit files were deleted (E4).",
-                              run=False),
-    "llm.changed": _spec(LLMChanged, "The LLM configuration was replaced; never a key (E2).", run=False),
+                              run=False, audit=True),
+    "llm.changed": _spec(LLMChanged, "The LLM configuration was replaced; never a key (E2).", run=False,
+                         audit=True),
     "eval.case": _spec(EvalCase, "An eval case finished (V1).", run=False),
     "eval.finished": _spec(EvalFinished, "An eval run finished (V1).", run=False),
 }
 
 RUN_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.run)
+# The caller-safe allow-list (D17): what ``stream_query`` yields of its own run.
+STREAM_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.stream)
+# What the ``audit`` observer writes (D19); of ``hook.decision`` it keeps only the decisions its entry names.
+AUDIT_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.audit)
 
 
 def catalog() -> List[EventInfo]:
-    """Every catalogued event: name, description, whether a run has it, and its data's JSON Schema."""
-    return [EventInfo(name=name, description=spec.description, run=spec.run,
-                      data_schema=spec.model.model_json_schema(by_alias=True))
+    """Every catalogued event: name, description, whether a run has it, whether the caller's stream
+    carries it and the audit observer writes it, and its data's JSON Schema."""
+    return [EventInfo(name=name, description=spec.description, run=spec.run, stream=spec.stream,
+                      audit=spec.audit, data_schema=spec.model.model_json_schema(by_alias=True))
             for name, spec in CATALOG.items()]
 
 

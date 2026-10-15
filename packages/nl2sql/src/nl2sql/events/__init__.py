@@ -8,9 +8,10 @@ inside a run publishes. ``Event`` and ``Observer`` themselves live in the SDK
 design is docs/architecture/wave_a.md, section 3.
 """
 from nl2sql.events.bus import EventBus, Subscription
-from nl2sql.events.catalog import CATALOG, RUN_EVENTS, EventInfo, RunStatus, catalog
+from nl2sql.events.catalog import (AUDIT_EVENTS, CATALOG, RUN_EVENTS, STREAM_EVENTS, EventInfo, RunStatus,
+                                   catalog)
 from nl2sql.events.run import RunScope, current_scope, publish
 from nl2sql_sdk.events import Event, Observer
 
-__all__ = ["CATALOG", "RUN_EVENTS", "Event", "EventBus", "EventInfo", "Observer", "RunScope", "RunStatus",
-           "Subscription", "catalog", "current_scope", "publish"]
+__all__ = ["AUDIT_EVENTS", "CATALOG", "RUN_EVENTS", "STREAM_EVENTS", "Event", "EventBus", "EventInfo", "Observer",
+           "RunScope", "RunStatus", "Subscription", "catalog", "current_scope", "publish"]
