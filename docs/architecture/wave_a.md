@@ -762,7 +762,9 @@ not declare is a `ConfigError` at build.
       message names only the hook and the point). With no hook at a point,
       nothing is validated. `HookRunner.attached(point)` says whether any
       hook runs there: while one runs at `answer.after` the answer is not
-      streamed, and `result_from_state` drops the rows, `artifact_refs` and
+      streamed (no `answer.delta`), `RunEvents(..., hold_manifest=True)`
+      holds `result.manifest` until the answer is allowed (dropped on a
+      deny), and `result_from_state` drops the rows, `artifact_refs` and
       `result_manifest` of a run a hook ended.
     - `HookContext` adds `conversation_id: str | None` (Wave C's A3),
       `execute` (`run.before`) and `results` (the run's `ResultSummary`s at

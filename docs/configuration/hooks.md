@@ -65,8 +65,9 @@ the run; it does not fall back to the generated path. **A plan-only run**
   message is the hook's `reason`. A run a hook ended carries none of its
   data: no answer, no rows, no artifact references, no result manifest.
   While any hook is attached at `answer.after`, `stream_query` does not
-  stream the answer as it is written; it arrives whole, once the hooks
-  allowed it. At a per-sub-query point (`plan.after`,
+  stream the answer as it is written (no `answer.delta` events), and holds
+  the `result.manifest` event until the hooks allowed the answer; on a deny
+  it is never sent. The answer arrives whole in `run.finished`. At a per-sub-query point (`plan.after`,
   `execute.before`, `execute.after`), `Deny(reason, scope="sub_query")` drops
   only that sub-query: the run goes on without it and the answer's warnings
   say what went unanswered. A sub-query that feeds a `join` or `compare`

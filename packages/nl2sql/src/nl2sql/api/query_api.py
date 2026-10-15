@@ -20,6 +20,7 @@ from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
 from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
 from nl2sql_sdk.events import Event
+from nl2sql.hooks import hooks_of
 from nl2sql.hooks.approval import ApprovalRequest
 from nl2sql.limits import RunStop
 from nl2sql.execution.artifacts.results import ResultSummary
@@ -414,7 +415,9 @@ class QueryAPI:
         scope = RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
                          execute=execute, tenant_id=self._ctx.tenant_id,
                          usage=TokenUsageCallback(prices=usage_prices(self._ctx)))
-        scope.attach(RunEvents(scope.publish))
+        # While a hook may withhold the answer at answer.after, the manifest waits for it.
+        hooks = hooks_of(self._ctx)
+        scope.attach(RunEvents(scope.publish, hold_manifest=hooks.attached("answer.after")))
         scope.start()
         return scope
 

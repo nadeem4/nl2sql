@@ -64,9 +64,12 @@ def _graph(denied):
     return graph.compile()
 
 
-def _api(monkeypatch, denied):
+def _api(monkeypatch, denied, hooks=None):
     monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _graph(denied))
-    return QueryAPI(fake_runtime(artifact_store=_Store()))
+    return QueryAPI(fake_runtime(artifact_store=_Store(), **({"hooks": hooks} if hooks is not None else {})))
+
+
+ANSWER_HOOK = HookRunner([_bind(lambda ctx: Allow(), ["answer.after"])])
 
 
 @pytest.mark.parametrize("how", ["run_query", "stream_query"])
@@ -76,12 +79,38 @@ def test_a_deny_at_answer_after_withholds_the_rows_and_the_results(monkeypatch, 
     if how == "run_query":
         result = api.run_query("How many?").model_dump(mode="json")
     else:
-        result = list(api.stream_query("How many?"))[-1].data
+        result = list(api.stream_query("How many?"))[-1].data["result"]
 
     assert result["final_answer"] is None
     assert result["errors"][0]["error_code"] == "HOOK_DENIED"
     assert all(sq["rows"] is None for sq in result["sub_queries"])
     assert result["artifact_refs"] == {} and result["result_manifest"] == []
+
+
+def _names(events):
+    return [(e.name, e.data.get("node")) for e in events]
+
+
+def test_the_manifest_waits_for_answer_after_and_is_sent_once_it_allows(monkeypatch):
+    events = list(_api(monkeypatch, denied=False, hooks=ANSWER_HOOK).stream_query("How many?"))
+
+    names = _names(events)
+    assert [n for n, _ in names].count("result.manifest") == 1
+    assert names.index(("result.manifest", None)) > names.index(("node.finished", "answer_synthesizer"))
+    assert events[-1].name == "run.finished"
+
+
+def test_a_deny_at_answer_after_drops_the_streamed_manifest(monkeypatch):
+    events = list(_api(monkeypatch, denied=True, hooks=ANSWER_HOOK).stream_query("How many?"))
+
+    assert "result.manifest" not in [e.name for e in events]
+    assert events[-1].name == "run.finished" and events[-1].data["result"]["result_manifest"] == []
+
+
+def test_without_an_answer_after_hook_the_manifest_comes_before_the_answer(monkeypatch):
+    names = _names(list(_api(monkeypatch, denied=False).stream_query("How many?")))
+
+    assert names.index(("result.manifest", None)) < names.index(("node.started", "answer_synthesizer"))
 
 
 def test_an_allowed_run_keeps_its_rows(monkeypatch):
