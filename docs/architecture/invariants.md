@@ -225,6 +225,24 @@ Observers write events to logs, files and collectors outside the engine's access
 
 ---
 
+## Observers Fail Open and Never Block
+
+### Definition
+An observer (the `observers` section, or `engine.events.subscribe`) can never fail a run or an engine call: what it raises is logged once per observer and event name and skipped. It never blocks either: the bus delivers a run's events one at a time under the run's lock, so an observer that writes to disk or the network hands that work to a thread of its own (the `audit` observer queues its lines; the `otel` observer records in memory and its SDK exports in the background). Hooks are the opposite: they fail closed (*Hooks Modify Before the Validator, Deny After*).
+
+### Enforcement Points
+- `EventBus.publish` in `nl2sql.events.bus` (subscribers made with `fail="open"`, the default for observers)
+- `AuditObserver` in `nl2sql.observers.audit` (a queue and a writer thread; a failed write is logged)
+- `test_observer_exception_is_logged_once_and_skipped` and `test_audit_never_blocks_the_publisher` in `packages/nl2sql/tests/unit/test_observers.py`, and `test_a_raising_subscriber_never_fails_the_run` in `packages/nl2sql/tests/unit/test_events_api.py`
+
+### Failure Behavior
+A WARNING on logger `nl2sql.events`, once per observer and event name, and `EventBus.failures` counts it. The run goes on.
+
+### Why It Exists
+Observing must not change the answer. A full disk, a collector that is down or a plugin bug would otherwise fail every question, and a slow write would hold every run's lock.
+
+---
+
 ## SQL Execution Requires SQL, Datasource, and Capability
 
 ### Definition
@@ -281,8 +299,9 @@ Guarantees aggregation operates on complete, correctly wired inputs.
 ### Definition
 `storage` is a required section of the config. An engine keeps its vector
 index in `<storage.path>/index/`, its schema snapshots, plan cache and
-feedback in `<storage.path>/state.db`, its traces in `<storage.path>/traces/`
-and its result files in `<storage.path>/results/`. The index collection name
+feedback in `<storage.path>/state.db`, its traces in `<storage.path>/traces/`,
+its result files in `<storage.path>/results/` and, with the `audit` observer,
+its audit log in `<storage.path>/audit/`. The index collection name
 is an internal constant.
 
 ### Enforcement Points
@@ -521,6 +540,7 @@ A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook 
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter
 - **Retryability**: The Validator Rejects Everything the Generator Can; Plan Functions Are Known Functions
+- **Observability**: Events Carry No Rows, and the Stream Carries No Operator Data; Observers Fail Open and Never Block
 
 ---
 
@@ -540,6 +560,7 @@ A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py`
 - `packages/nl2sql/src/nl2sql/config/curated.py`
 - `packages/nl2sql/src/nl2sql/hooks/`
+- `packages/nl2sql/src/nl2sql/observers/`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`
