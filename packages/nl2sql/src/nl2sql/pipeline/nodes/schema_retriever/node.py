@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
+from nl2sql.common.errors import ErrorCode, RunWarning
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
 from nl2sql.datasources.models import matches_table
@@ -339,10 +340,11 @@ class SchemaRetrieverNode:
                         }
                     ],
                     "warnings": [
-                        {
-                            "node": self.node_name,
-                            "content": "Vector retrieval produced no candidates. Using full schema snapshot.",
-                        }
+                        RunWarning(
+                            code=ErrorCode.SCHEMA_RETRIEVAL_FAILED.value,
+                            node=self.node_name,
+                            message="Vector retrieval produced no candidates. Using full schema snapshot.",
+                        )
                     ],
                 }
 

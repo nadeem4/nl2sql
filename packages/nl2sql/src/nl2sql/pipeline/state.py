@@ -6,7 +6,7 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nl2sql.common.errors import PipelineError
+from nl2sql.common.errors import PipelineError, RunWarning
 from nl2sql.hooks.approval import Approval, ApprovalRequest
 from nl2sql.policies import UserContext
 from nl2sql.pipeline.nodes.curated_matcher.schemas import VerifiedMatch
@@ -50,7 +50,7 @@ class GraphState(BaseModel):
         subgraph_outputs (Dict[str, SubgraphOutput]): Per-subgraph diagnostic outputs.
         errors (List[PipelineError]): List of errors encountered during execution.
         reasoning (List[Dict[str, Any]]): Log of reasoning steps from nodes.
-        warnings (List[Dict[str, Any]]): Warning messages emitted by nodes.
+        warnings (List[RunWarning]): Warnings emitted by nodes; the result's ``warnings``.
         subgraph_id (Optional[str]): ID of the subgraph execution.
         subgraph_name (Optional[str]): Name of the subgraph execution.
         pinned (Optional[PinnedRun]): A pinned decomposition and plans (supplied, approved or chosen); the
@@ -75,7 +75,7 @@ class GraphState(BaseModel):
     subgraph_outputs: Annotated[Dict[str, SubgraphOutput], update_results] = Field(default_factory=dict)
     errors: Annotated[List[PipelineError], operator.add] = Field(default_factory=list)
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
-    warnings: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
+    warnings: Annotated[List[RunWarning], operator.add] = Field(default_factory=list)
     subgraph_id: Optional[str] = Field(default=None)
     subgraph_name: Optional[str] = Field(default=None)
     pinned: Optional[PinnedRun] = Field(default=None)
@@ -108,4 +108,4 @@ class SubgraphExecutionState(BaseModel):
     retry_count: int = 0
     errors: Annotated[List[PipelineError], operator.add] = Field(default_factory=list)
     reasoning: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
-    warnings: Annotated[List[Dict[str, Any]], operator.add] = Field(default_factory=list)
+    warnings: Annotated[List[RunWarning], operator.add] = Field(default_factory=list)

@@ -17,7 +17,7 @@ from nl2sql.runtime import Runtime
 from nl2sql.pipeline.runtime import run_with_graph, usage_prices
 from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
-from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, RunWarning
 from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
 from nl2sql_sdk.events import Event
 from nl2sql.hooks import hooks_of
@@ -99,7 +99,9 @@ class QueryResult(BaseModel):
     errors: List[Dict[str, Any]] = Field(default_factory=list)
     trace_id: str = Field(default="")
     reasoning: List[Dict[str, Any]] = Field(default_factory=list)
-    warnings: List[Dict[str, Any]] = Field(default_factory=list)
+    # What the answer should say without failing the run (D34): a missing filter value, a join
+    # fan-out, an all-null column, a cut or unconverted result, an earlier attempt a retry replaced.
+    warnings: List[RunWarning] = Field(default_factory=list)
     artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
     # How the run ended: success, plan_only, error, needs_approval (see
     # approvals_needed), stopped (see stop), or needs_clarification (reserved
@@ -180,7 +182,7 @@ def _sub_query_results(
     state: Dict[str, Any],
     artifact_store: Any = None,
     sample_rows: int = DEFAULT_SAMPLE_ROWS,
-    warnings: Optional[List[Dict[str, Any]]] = None,
+    warnings: Optional[List[RunWarning]] = None,
 ) -> List[SubQueryResult]:
     """Build the per-sub-query view from ``subgraph_outputs``."""
     results: List[SubQueryResult] = []
@@ -196,13 +198,13 @@ def _sub_query_results(
                 rows = _row_sample(artifact_store.read_result_frame(artifact), sample_rows)
             except Exception as exc:  # the result is still useful without its rows
                 if warnings is not None:
-                    warnings.append(
-                        {
-                            "node": "query_api",
-                            "message": f"Could not read result rows for sub-query "
-                            f"'{_field(sub_query, 'id', '') or ''}': {exc}",
-                        }
-                    )
+                    sub_query_id = _field(sub_query, "id", "") or ""
+                    warnings.append(RunWarning(
+                        code=ErrorCode.UNKNOWN_ERROR.value,
+                        node="query_api",
+                        message=f"Could not read result rows for sub-query '{sub_query_id}': {exc}",
+                        sub_query_id=sub_query_id or None,
+                    ))
 
         results.append(
             SubQueryResult(
@@ -268,12 +270,13 @@ def result_from_state(
     """Build a typed :class:`QueryResult` from a raw pipeline graph state."""
     state = state or {}
 
-    warnings: List[Dict[str, Any]] = list(state.get("warnings") or [])
+    warnings: List[RunWarning] = [RunWarning.model_validate(w) for w in state.get("warnings") or []]
     errors: List[Dict[str, Any]] = []
     for error in state.get("errors") or []:
         summary = _error_summary(error)
         if summary["severity"] == ErrorSeverity.WARNING.value:
-            warnings.append(summary)
+            warnings.append(RunWarning(code=summary["error_code"] or "", node=summary["node"],
+                                       message=summary["message"]))
         else:
             errors.append(summary)
 

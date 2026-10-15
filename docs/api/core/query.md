@@ -133,7 +133,7 @@ Fields:
 | `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `provider_response`). `provider` and `provider_response` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
-| `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
+| `warnings` | `List[RunWarning]` | no | What the answer should say without failing the run. See [Warnings](#warnings). |
 | `artifact_refs` | `Dict[str, ArtifactRef]` | no | Result artifact references keyed by execution node id. |
 | `status` | `Optional[RunStatus]` | no | `"success"`, `"plan_only"`, `"error"`, `"needs_approval"`, `"stopped"`, `"needs_clarification"`, or `None` when nothing ran and nothing failed. See below. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node, plus `LangGraph` for the whole run. |
@@ -146,11 +146,11 @@ Fields:
 | `approvals_needed` | `List[ApprovalRequest]` | no | Set when `status` is `"needs_approval"`: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an `Approval` for each. |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
-errors are appended to `warnings` as the same summary dict.
+errors are appended to `warnings` as `RunWarning`s.
 
 A sub-query that succeeded contributes nothing to `errors`: the errors of the
-attempts it recovered from, and its warnings, are in `warnings` with their
-original `severity` and a `sub_query_id`. The run trace and
+attempts it recovered from are in `warnings` with `detail.recovered` true, and
+its warnings with an empty `detail`, each with its `sub_query_id`. The run trace and
 `subgraph_outputs[<id>].errors` keep every attempt's errors for debugging. A
 sub-query that failed without a blocking error of its own (it ended with no SQL
 on warnings alone) adds a `MISSING_SQL` error, so the run reports `"error"`.
@@ -169,6 +169,24 @@ Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set lives in artifact storage, addressed through `artifact_refs`; each
 combined result is listed in `result_manifest` and read back by the run's
 `trace_id` with the methods below.
+
+### Warnings
+
+`QueryResult.warnings` is a list of `RunWarning` (`from nl2sql import RunWarning`):
+
+| name | type | meaning |
+| --- | --- | --- |
+| `code` | `str` | An `ErrorCode` value, such as `VALUE_NOT_FOUND`, `JOIN_FAN_OUT`, `ALL_NULL_COLUMN`, `JOIN_KEY_UNCONVERTED`, `RESULT_TRUNCATED` or `HOOK_DENIED`; `CURATED_FALLBACK` when a verified query failed and the question was generated instead. |
+| `node` | `str` | The node that found it. |
+| `message` | `str` | What the answer says. |
+| `sub_query_id` | `Optional[str]` | The sub-query it is about, when it is about one. |
+| `detail` | `Dict[str, Any]` | What a program may branch on: `recovered: true` for an earlier attempt's error a retry replaced; the column, counts and type of a `JOIN_KEY_UNCONVERTED`. Never result rows or sample values. |
+
+The answer sanity checks (a missing filter value, a join that repeated the rows
+an aggregate counted, a column with no value) add theirs, and the answer
+synthesizer says them; see the
+[executor's sanity checks](../../architecture/nodes/executor_node.md#answer-sanity-checks).
+`settings.pipeline.sanity_checks: false` turns those checks off.
 
 ## Streaming a run
 

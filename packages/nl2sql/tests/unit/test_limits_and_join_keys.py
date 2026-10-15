@@ -233,10 +233,10 @@ def test_the_aggregator_node_reports_unconverted_values_with_the_datasource(tmp_
                           execution_dag=build_execution_dag(response), artifact_refs=refs))
 
     assert not out.get("errors"), out.get("errors")
-    [warning] = [w for w in out["warnings"] if w["error_code"] == ErrorCode.JOIN_KEY_UNCONVERTED.value]
-    assert warning["message"] == "1 of 3 support.customer_id values are not whole numbers and joined nothing."
-    assert warning["severity"] == ErrorSeverity.WARNING.value
-    assert warning["sub_query_id"] == "sq_tickets"
+    [warning] = [w for w in out["warnings"] if w.code == ErrorCode.JOIN_KEY_UNCONVERTED.value]
+    assert warning.message == "1 of 3 support.customer_id values are not whole numbers and joined nothing."
+    assert warning.sub_query_id == "sq_tickets"
+    assert warning.detail == {"column": "customer_id", "failed": 1, "total": 3, "dtype": "int"}
 
 
 # --- D30, part 3: the validator rejects only what cannot be coerced ---------

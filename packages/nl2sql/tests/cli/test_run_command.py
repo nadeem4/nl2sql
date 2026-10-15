@@ -94,7 +94,8 @@ def test_a_blocking_error_exits_1(engine_with, capsys, severity):
 
 
 def test_warnings_alone_exit_0(engine_with, capsys):
-    engine = engine_with(*_steps(), _final(status="success", warnings=[_error("WARNING")]))
+    engine = engine_with(*_steps(), _final(status="success", warnings=[{"code": "ORCHESTRATOR_CRASH", "node": "decomposer",
+                                                                       "message": "Decomposition failed: boom"}]))
 
     run_module.run_pipeline(RunConfig(query="How many customers?"), engine)
 

@@ -5,8 +5,9 @@ on exist. ``Genre.Name = 'Metal'`` returns nothing because Chinook's genre is
 'Heavy Metal', and the answer used to say no customer bought any. For each
 string literal the plan's WHERE compares a column to (``=``, ``IN``, ``LIKE``),
 a read-only probe asks whether the column has it. One that is missing gets the
-closest existing values: a case-insensitive match first, then the most similar
-of a bounded ``DISTINCT``. Every probe is built with sqlglot, rendered by the
+closest existing values: from the column's sample values in the snapshot when
+they hold one (no query), else a case-insensitive match first, then the most
+similar of a bounded ``DISTINCT``. Every probe is built with sqlglot, rendered by the
 adapter and capped by its row limit; a table the role may not read is never
 probed.
 """
@@ -24,7 +25,10 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, PlanModel, TableRef
 from nl2sql.pipeline.nodes.generator.node import _table
 from nl2sql_sdk.contracts import AdapterRequest
 
-logger = get_logger("value_check")
+logger = get_logger("sanity.values")
+
+# The snapshot's sample values of a column, by table and column name; None when it has none.
+Samples = Callable[[str, str], Optional[List[Any]]]
 
 # At most this many literals are probed per sub-query, and this many distinct
 # values read to find a similar one (fewer if the adapter's row cap is lower).
@@ -124,6 +128,9 @@ class _Probe:
         )
         return bool(self._rows(query.limit(1)))
 
+    def target(self) -> str:
+        return self.literal.value.strip("%_").lower() if self.literal.like else self.literal.value.lower()
+
     def closest(self) -> List[str]:
         value = exp.Literal.string(self.literal.value)
         same = self._select(self.column.copy(), distinct=True).where(
@@ -136,10 +143,16 @@ class _Probe:
             exp.Not(this=exp.Is(this=self.column.copy(), expression=exp.Null()))
         )
         values = [str(r[0]) for r in self._rows(sample.limit(self.cap)) if r[0] is not None]
-        target = self.literal.value.strip("%_").lower() if self.literal.like else self.literal.value.lower()
-        by_lower = {v.lower(): v for v in values}
-        close = difflib.get_close_matches(target, list(by_lower), n=MAX_SUGGESTIONS, cutoff=SIMILARITY_CUTOFF)
-        return [by_lower[c] for c in close]
+        return _similar(self.target(), values)
+
+
+def _similar(target: str, values: List[str]) -> List[str]:
+    """The values most like ``target``, case-insensitively: an exact match first, then by similarity."""
+    by_lower = {v.lower(): v for v in values}
+    if target in by_lower:
+        return [by_lower[target]]
+    close = difflib.get_close_matches(target, list(by_lower), n=MAX_SUGGESTIONS, cutoff=SIMILARITY_CUTOFF)
+    return [by_lower[c] for c in close]
 
 
 def _quoted(values: List[str]) -> str:
@@ -152,6 +165,7 @@ def check_values(
     allowed: Callable[[TableRef], bool],
     can_retry: bool,
     row_limit: Optional[int] = None,
+    samples: Optional[Samples] = None,
 ) -> List[PipelineError]:
     """A ``VALUE_NOT_FOUND`` per filter value the column does not have.
 
@@ -160,6 +174,8 @@ def check_values(
     "There is no Genre with Name 'Polka'." A literal whose probe fails, or
     whose table ``allowed`` refuses, is not reported: nothing is claimed
     without having looked. ``row_limit`` is the datasource's, and bounds each probe.
+    ``samples`` gives the snapshot's sample values of a column: a close value
+    found among them needs no query beyond the existence probe.
     """
     errors: List[PipelineError] = []
     for literal in filter_literals(plan)[:MAX_LITERALS]:
@@ -169,7 +185,8 @@ def check_values(
         try:
             if probe.exists():
                 continue
-            suggestions = probe.closest()
+            known = (samples(literal.table.name, literal.column) if samples else None) or []
+            suggestions = _similar(probe.target(), [str(v) for v in known if v is not None]) or probe.closest()
         except LookupError as exc:
             logger.info("Value probe skipped for %s.%s: %s", literal.table.name, literal.column, exc)
             continue

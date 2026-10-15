@@ -100,7 +100,7 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
    - `end` when errors are non-retryable or retries exhausted.
 6. `generator` converts the plan to SQL for the target datasource dialect.
 7. `executor` runs SQL via the datasource adapter and returns artifacts/errors.
-   `check_execution` routes `retry` when every executor error is a retryable `EXECUTION_FAILED` and retry budget remains, otherwise `end`. It also routes `retry` when the query returned no rows on a filter value the column does not have but a close one exists (`VALUE_NOT_FOUND` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#an-empty-results-filter-values)).
+   `check_execution` routes `retry` when every executor error is a retryable `EXECUTION_FAILED` and retry budget remains, otherwise `end`. It also routes `retry` when the query returned no rows on a filter value the column does not have but a close one exists (`VALUE_NOT_FOUND` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#an-empty-results-filter-values)), and when a `COUNT` counted rows a join repeated (`JOIN_FAN_OUT` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#join-fan-out)). Only a finding of this attempt (its `details.attempt`) routes `retry`.
 8. If routed to retry: `retry_handler` waits with exponential backoff and jitter, then increments `retry_count`.
 9. `refiner` uses LLM feedback to enrich error context, then loops back to `ast_planner`. Both are told about the latest attempt only, as `{node, error_code, message}` (`nl2sql.pipeline.retry_feedback`): never an earlier attempt's errors again, never a stack trace or `details`.
 10. Subgraph terminates at `END`.

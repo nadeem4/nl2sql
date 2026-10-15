@@ -19,7 +19,7 @@ from langgraph.graph import END
 from test_curated_matcher import CHOOSE_TOP, COUNT, QUESTION, TOP, _Registry, _ctx, _server, db  # noqa: F401
 from test_plan_cache import _artifact, _executed, _plan, _sq, _wrapper_state, store  # noqa: F401
 
-from nl2sql.common.errors import ErrorCode, ErrorSeverity
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, RunWarning
 from nl2sql.hooks import HOOK_POINTS, Allow, Deny, HookBinding, HookRunner, Modify
 from nl2sql.pipeline.graph_utils import wrap_subgraph
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
@@ -486,8 +486,8 @@ def test_sub_query_deny_drops_only_that_sub_query(store):
     assert out["subgraph_outputs"]["sql_agent:sq1:t1"].status == "dropped"
     assert not out.get("errors")
     [warning] = out["warnings"]
-    assert warning["error_code"] == "HOOK_DENIED" and warning["severity"] == "WARNING"
-    assert "No payroll" in warning["message"]
+    assert warning.code == "HOOK_DENIED" and not warning.detail.get("recovered")
+    assert "No payroll" in warning.message
 
 
 def test_a_run_scoped_deny_ends_the_run_after_its_layer():
@@ -547,8 +547,8 @@ def test_sub_query_deny_in_a_join_group_drops_the_group():
     response = out["aggregator_response"]
     assert not response.errors
     assert list(response.terminal_results) == ["combine_count"]
-    [warning] = [w for w in out["warnings"] if w["error_code"] == "HOOK_DENIED"]
-    assert "pair" in warning["message"] and "b" in warning["message"]
+    [warning] = [w for w in out["warnings"] if w.code == "HOOK_DENIED"]
+    assert "pair" in warning.message and "b" in warning.message
 
 
 def test_every_part_dropped_is_an_error_of_the_run():
@@ -590,8 +590,8 @@ def _synthesizer(hooks):
         summary="Three customers.", format_type="text", content="There are three customers.", warnings=[]))
     state = GraphState(user_query="How many customers?", aggregator_response=AggregatorResponse(
         terminal_results={"combine_g": [{"n": 3}]}),
-        warnings=[{"node": "sql_agent", "message": "Sub-query 'b' (salaries) was not run: No payroll",
-                   "error_code": "HOOK_DENIED", "severity": "WARNING", "sub_query_id": "b"}])
+        warnings=[RunWarning(node="sql_agent", message="Sub-query 'b' (salaries) was not run: No payroll",
+                             code="HOOK_DENIED", sub_query_id="b")])
     return node(state)
 
 

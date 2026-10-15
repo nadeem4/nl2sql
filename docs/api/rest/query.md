@@ -44,7 +44,7 @@ Derives from `nl2sql.QueryResult` (only `sub_queries` is narrowed to
 | `errors` | `List[Dict[str, Any]]` | no | Pipeline errors (`node`, `message`, `error_code`, `severity`, `provider`, `provider_response`). `provider` and `provider_response` are set for a `PROVIDER_*` code and `null` otherwise; see [provider failures](../../observability/error-handling.md#provider-failures). |
 | `trace_id` | `str` | no | Trace identifier. |
 | `reasoning` | `List[Dict[str, Any]]` | no | Reasoning events/logs. |
-| `warnings` | `List[Dict[str, Any]]` | no | Warning events/logs. |
+| `warnings` | `List[RunWarning]` | no | What the answer should say without failing the run: `code`, `node`, `message`, `sub_query_id`, `detail`. See [Warnings](../core/query.md#warnings). |
 | `artifact_refs` | `Dict[str, ArtifactRef]` | no | Result artifact references keyed by execution node id. |
 | `status` | `str` | no | `"success"`, `"error"` or `"plan_only"` for the run. |
 | `timings` | `Dict[str, float]` | no | Wall-clock seconds per graph node. |

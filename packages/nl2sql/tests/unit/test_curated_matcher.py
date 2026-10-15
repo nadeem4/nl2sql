@@ -379,7 +379,7 @@ def test_execution_failed(db):
 
     _fell_back(out, "execution_failed")
     # Execution failing is worth a warning; it is not an error of the run.
-    assert out["warnings"] and "customer_count" in out["warnings"][0]["message"]
+    assert out["warnings"] and "customer_count" in out["warnings"][0].message
 
 
 # -- in the graph ---------------------------------------------------------------

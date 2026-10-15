@@ -16,7 +16,7 @@ PUBLIC_SURFACE = {
     # What the namespaces return
     "DatasourceInfo", "DatasourceType", "IndexProgress", "LLMChange",
     # Errors
-    "ErrorSeverity", "ErrorCode", "PipelineError",
+    "ErrorSeverity", "ErrorCode", "PipelineError", "RunWarning",
     # The config, and building an engine from it
     "Config", "load_config", "load_env_file", "ConfigError", "Registry", "Datasource", "Limits", "LLM",
     "AgentLLM", "Embeddings", "Policies", "Role", "Storage", "StoreConfig", "Secrets", "Curated", "Settings",

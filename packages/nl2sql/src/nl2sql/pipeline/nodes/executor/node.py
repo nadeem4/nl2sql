@@ -11,7 +11,8 @@ from nl2sql.policies.scope import default_schema
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
-from nl2sql.pipeline.nodes.executor.value_check import check_values
+from nl2sql.events import publish
+from nl2sql.pipeline.nodes.executor.sanity import run_checks
 from nl2sql_sdk.capabilities import DatasourceCapability
 
 if TYPE_CHECKING:
@@ -32,6 +33,8 @@ class ExecutorNode:
         self.tenant_id = ctx.tenant_id
         self.policy_engine = ctx.policy_engine
         self.hooks = hooks_of(ctx)
+        self.artifact_store = ctx.artifact_store
+        self.sanity_checks = ctx.settings.pipeline.sanity_checks
 
     def _supports_sql(self, ds_id: str) -> bool:
         """Reports whether a datasource may be executed as SQL.
@@ -43,14 +46,18 @@ class ExecutorNode:
         """
         return self.ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_SQL)
 
-    def _check_values(self, state: SubgraphExecutionState, ds_id: str, response) -> List[PipelineError]:
-        """``VALUE_NOT_FOUND`` for an empty result filtered on a value that does not exist.
+    def _sanity(self, state: SubgraphExecutionState, ds_id: str, response) -> List[PipelineError]:
+        """The answer sanity checks on this attempt's result (``executor/sanity/``).
 
-        Runs only when the query succeeded with no rows. One retry is spent on
-        it: a later empty result reports the value as missing instead. Only tables the caller's scope allows are probed. A failure here never
-        fails the run.
+        An empty result gets the value check (``VALUE_NOT_FOUND``); a result
+        with rows the fan-out and null checks (``JOIN_FAN_OUT``,
+        ``ALL_NULL_COLUMN``). Each check retries at most once per sub-query,
+        within ``settings.pipeline.retries.max``; a pinned plan is never
+        retried, so its findings are warnings. Only tables the caller's scope
+        allows are probed. ``sanity.flagged`` is published for each finding.
+        A failure here never fails the run.
         """
-        if response.errors or response.metrics.get("row_count") != 0:
+        if not self.sanity_checks or response.errors:
             return []
         planner_response = getattr(state, "ast_planner_response", None)
         plan = planner_response.plan if planner_response else None
@@ -58,22 +65,28 @@ class ExecutorNode:
             return []
         try:
             scope = self.policy_engine.scope(state.user_context, ds_id)
-            already_retried = any(e.error_code == ErrorCode.VALUE_NOT_FOUND for e in state.errors)
-            # A pinned plan is never retried (nl2sql.pipeline.pinned), so its missing value is a warning.
-            can_retry = (not already_retried and state.retry_count < self.max_retries
-                         and getattr(state, "pinned_plan", None) is None)
-            errors = check_values(
+            # A pinned plan is never retried (nl2sql.pipeline.pinned), so its findings are warnings.
+            retries_left = (state.retry_count < self.max_retries and getattr(state, "pinned_plan", None) is None)
+            retried = {e.error_code for e in state.errors}
+            artifact = response.artifact
+            errors = run_checks(
                 plan,
-                self.ds_registry.get_adapter(ds_id),
-                lambda ref: scope.allows(ref.schema_name, ref.name),
-                can_retry,
-                self.ds_registry.get_datasource(ds_id).limits.row_limit,
+                adapter=self.ds_registry.get_adapter(ds_id),
+                allowed=lambda ref: scope.allows(ref.schema_name, ref.name),
+                tables=list(getattr(state, "relevant_tables", None) or []),
+                row_limit=self.ds_registry.get_datasource(ds_id).limits.row_limit,
+                row_count=response.metrics.get("row_count"),
+                frame=lambda: self.artifact_store.scan_parquet(artifact) if artifact is not None else None,
+                can_retry=lambda code: retries_left and code not in retried,
             )
-            # The SQL agent retries only on this attempt's own finding.
-            return [e.model_copy(update={"details": {"attempt": state.retry_count}}) for e in errors]
         except Exception as exc:
-            logger.warning(f"Value check skipped: {exc}")
+            logger.warning(f"Sanity checks skipped: {exc}")
             return []
+        for error in errors:
+            publish("sanity.flagged", {"code": error.error_code.value, "sub_query_id": state.sub_query.id,
+                                       "retry": error.severity == ErrorSeverity.ERROR})
+        # The SQL agent retries only on this attempt's own finding.
+        return [e.model_copy(update={"details": {"attempt": state.retry_count}}) for e in errors]
 
     def _hook_fields(self, state: SubgraphExecutionState, ds_id: str, sql: str) -> Dict[str, Any]:
         """What ``execute.before`` and ``execute.after`` see of this sub-query's SQL."""
@@ -145,10 +158,11 @@ class ExecutorNode:
                 verdict = self.hooks.call("execute.after", **fields, result=summary)
                 if not verdict.allowed:
                     return {"executor_response": None, "errors": [verdict.error(self.node_name)]}
-            value_errors = self._check_values(state, ds_id, response)
+            # After execute.after: a result a hook stopped is never checked.
+            sanity_errors = self._sanity(state, ds_id, response)
             return {
                 "executor_response": response,
-                "errors": response.errors + value_errors,
+                "errors": response.errors + sanity_errors,
                 "reasoning": response.reasoning,
             }
         except Exception as exc:

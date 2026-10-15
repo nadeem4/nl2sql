@@ -19,6 +19,9 @@ from nl2sql.runtime import Runtime
 import random
 import time
 
+# The sanity checks' findings the SQL agent retries (executor/sanity/).
+_SANITY_RETRIES = {ErrorCode.VALUE_NOT_FOUND, ErrorCode.JOIN_FAN_OUT}
+
 
 def build_sql_agent_graph(
     ctx: Runtime,
@@ -155,10 +158,11 @@ def build_sql_agent_graph(
         timeout, connection) or any other executor error ends the sub-query,
         as does running out of retries.
 
-        An empty result filtered on a value its column does not have, with a
-        close value to suggest, is retried the same way: a ``VALUE_NOT_FOUND``
-        ERROR raised on this attempt (its ``details`` carry the attempt). The
-        executor raises it at most once per sub-query.
+        A sanity check's finding is retried the same way: an empty result
+        filtered on a value its column does not have, with a close value to
+        suggest (``VALUE_NOT_FOUND``), or a ``COUNT`` over rows a join repeated
+        (``JOIN_FAN_OUT``), raised as an ERROR on this attempt (its ``details``
+        carry the attempt). The executor raises each at most once per sub-query.
         """
         if _is_cancelled(config):
             return "end"
@@ -169,13 +173,13 @@ def build_sql_agent_graph(
         if errors:
             retryable = all(e.error_code == ErrorCode.EXECUTION_FAILED and e.is_retryable for e in errors)
             return "retry" if retryable else "end"
-        missing_value = any(
-            e.error_code == ErrorCode.VALUE_NOT_FOUND
+        finding = any(
+            e.error_code in _SANITY_RETRIES
             and e.severity == ErrorSeverity.ERROR
             and (e.details or {}).get("attempt") == count
             for e in state.errors
         )
-        return "retry" if missing_value else "end"
+        return "retry" if finding else "end"
 
     graph.add_node("schema_retriever", schema_retriever)
     graph.add_node("ast_planner", ast_planner)

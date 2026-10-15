@@ -9,27 +9,32 @@ import pytest
 pytest.importorskip("fastapi")
 pytest.importorskip("nl2sql_api")
 
-from .conftest import fake_llm_section, project_config  # noqa: E402
+from .conftest import fake_llm_section, private_storage, project_config  # noqa: E402
 from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS  # noqa: E402
 
 
-def _serve_api(demo_project, server, env, monkeypatch, settings=None):
-    """Point ``nl2sql-api`` at a config on ``server``; the role comes from a proxy header, as a deployment would."""
+def _serve_api(demo_project, server, env, monkeypatch, store, settings=None):
+    """Point ``nl2sql-api`` at a config on ``server``; the role comes from a proxy header, as a deployment would.
+
+    ``store`` (the test's ``tmp_path``) gets a private copy of the demo's index
+    and state store: tests sharing the demo's ``state.db`` raced on it.
+    """
     config = project_config(demo_project, "api-fake.yaml", llm=fake_llm_section(server.base_url),
-                            api={"role_header": "X-NL2SQL-Role"}, settings=settings)
+                            api={"role_header": "X-NL2SQL-Role"}, settings=settings,
+                            storage=private_storage(demo_project, store))
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     monkeypatch.setenv("NL2SQL_CONFIG", str(config))
 
 
 @pytest.mark.e2e
-def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
+def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
     from nl2sql_api.main import app
 
     server, env = fake_llm(RULES_COUNT_CUSTOMERS)
-    _serve_api(demo_project, server, env, monkeypatch)
+    _serve_api(demo_project, server, env, monkeypatch, tmp_path)
 
     # The context manager runs the lifespan, which constructs the real engine.
     with TestClient(app) as client:
@@ -52,7 +57,7 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch):
 
 
 @pytest.mark.e2e
-def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeypatch):
+def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeypatch, tmp_path):
     """A refused query ends at the refusal: status ``error``, denial first.
 
     The aggregator and answer synthesizer used to run after a denial, adding
@@ -64,7 +69,7 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
     from nl2sql_api.main import app
 
     server, env = fake_llm(RULES_TOP_CUSTOMERS)
-    _serve_api(demo_project, server, env, monkeypatch)
+    _serve_api(demo_project, server, env, monkeypatch, tmp_path)
 
     with TestClient(app) as client:
         response = client.post(
@@ -84,7 +89,7 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
 
 
 @pytest.mark.e2e
-def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, fake_llm, monkeypatch):
+def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, fake_llm, monkeypatch, tmp_path):
     """No datasource holds the weather: the resolver refuses, and nothing else runs."""
     from fastapi.testclient import TestClient
 
@@ -94,7 +99,7 @@ def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, 
     unanswerable = Rule("AnswerabilityResponse",
                         {"answerable_datasource_ids": [], "reason": "Chinook holds no weather data."})
     server, env = fake_llm([unanswerable] + RULES_COUNT_CUSTOMERS)
-    _serve_api(demo_project, server, env, monkeypatch)
+    _serve_api(demo_project, server, env, monkeypatch, tmp_path)
 
     with TestClient(app) as client:
         response = client.post(
@@ -176,7 +181,7 @@ def _assert_usage(usage):
 
 
 @pytest.mark.e2e
-def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm, monkeypatch):
+def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm, monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
     from nl2sql.api.query_api import QueryResult
@@ -184,7 +189,7 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
     from nl2sql_api.main import app
 
     server, env = fake_llm(_rules_with_one_retry())
-    _serve_api(demo_project, server, env, monkeypatch,
+    _serve_api(demo_project, server, env, monkeypatch, tmp_path,
                settings={"pipeline": {"retries": {"base_delay_s": 0, "jitter_s": 0}}})
 
     with TestClient(app) as client:
@@ -206,7 +211,7 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
     assert result.sub_queries[0].status == "success"
     assert result.status == "success"
     assert result.errors == []
-    assert any(w.get("error_code") == "TABLE_NOT_FOUND" for w in result.warnings)
+    assert any(w.code == "TABLE_NOT_FOUND" for w in result.warnings)
     _assert_usage(result.usage.model_dump(mode="json"))
 
     assert response.status_code == 200, response.text

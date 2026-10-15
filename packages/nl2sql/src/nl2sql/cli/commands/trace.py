@@ -49,7 +49,8 @@ def _first_error(node: Dict[str, Any]) -> str:
         return node["exception"]
     for item in (node.get("errors") or []) + (node.get("warnings") or []):
         if isinstance(item, dict):
-            code = item.get("error_code")
+            # A node's errors carry ``error_code``; its warnings (RunWarning) carry ``code``.
+            code = item.get("error_code") or item.get("code")
             return f"{code}: {item.get('message', '')}" if code else str(item.get("message", item))
         return str(item)
     for call in node.get("llm_calls") or []:

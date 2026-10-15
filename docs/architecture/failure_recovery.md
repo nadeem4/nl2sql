@@ -80,7 +80,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
   `success` when the sub-query ended with SQL and, when executing, a result artifact; otherwise `error`.
 - `SubgraphExecutionState.errors` is an additive reducer, so it keeps every attempt's errors (the planner
   reads them as retry feedback). `SubgraphOutput.errors` keeps them too.
-- A successful sub-query sends those errors to the run's `warnings` (original severity, plus `sub_query_id`)
+- A successful sub-query sends those errors to the run's `warnings` as `RunWarning`s with its `sub_query_id` (a recovered `ERROR` marked `detail.recovered`)
   rather than its `errors`. A failed one sends them to `errors`, adding a `MISSING_SQL` error if none of them
   was blocking.
 
@@ -111,7 +111,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 ## Retry Architecture
 
 ### Retry scope
-- Only the SQL agent subgraph retries: planner failures, validation errors, queries the database rejected as wrong (`EXECUTION_FAILED`), and, once, an empty result filtered on a value that does not exist when a close one does (`VALUE_NOT_FOUND`) go back through the refiner.
+- Only the SQL agent subgraph retries: planner failures, validation errors, queries the database rejected as wrong (`EXECUTION_FAILED`), and, once each, an empty result filtered on a value that does not exist when a close one does (`VALUE_NOT_FOUND`) and a `COUNT` over rows a join repeated (`JOIN_FAN_OUT`) go back through the refiner.
 - Other nodes (resolver, decomposer, generator, aggregator, answer synthesizer) do not retry.
 - A retry tells the planner and refiner about the latest attempt only, as `{node, error_code, message}`.
 

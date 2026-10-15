@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2 and E4 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2, E4 and S1 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -1676,11 +1676,10 @@ is B30's test.
       `PolarsDuckdbEngine.unconverted_join_keys(inputs, join_keys)` counts the
       values that became null (it collects the key columns only), and
       `AggregationService.execute(..., warnings=[...])` gathers them; the node
-      turns each into a `JOIN_KEY_UNCONVERTED` warning dict on the state's
-      `warnings` (`node`, `message`, `error_code`, `severity`, `sub_query_id`),
-      naming the datasource: "1 of 3 support.customer_id values are not
-      whole numbers and joined nothing." S1's typed `RunWarning` is not on main yet,
-      so this uses the existing warnings mechanism; S1 moves it.
+      turns each into a `JOIN_KEY_UNCONVERTED` warning on the state's
+      `warnings`, naming the datasource: "1 of 3 support.customer_id values are not
+      whole numbers and joined nothing." S1 made it a `RunWarning` whose
+      `detail` holds `column`, `failed`, `total` and `dtype`.
     - **The validator.** `pipeline/nodes/validator/join_keys.py`,
       `join_key_type_errors(plan, sub_query, relevant_tables, dialect)`, called
       from `_validate_static` before the buildability check. The column type is
@@ -1845,6 +1844,64 @@ class RunWarning(BaseModel):         # not Warning, which is a Python builtin
 
 The answer synthesizer is given the warnings, as it is given
 `VALUE_NOT_FOUND` warnings today, and `sanity.flagged` is published for each.
+
+!!! note "Built: sanity checks and typed warnings (S1)"
+    - **Where.** `pipeline/nodes/executor/sanity/`: `values.py` (moved from
+      `executor/value_check.py`), `fanout.py`, `nulls.py`, and `__init__.py`'s
+      `run_checks(plan, *, adapter, allowed, tables, row_limit, row_count,
+      frame, can_retry)`. `ExecutorNode._sanity` calls it after
+      `execute.after` (H1's order is kept: a result a hook stopped is never
+      checked), when `settings.pipeline.sanity_checks` is on and the
+      execution succeeded. An empty result gets the value check; a result
+      with rows the fan-out and null checks. Each check is wrapped: one that
+      raises reports nothing.
+    - **Retries.** `can_retry(code)` is true while retries remain, the plan is
+      not pinned, and no earlier attempt of the sub-query raised that code, so
+      each check retries at most once. Findings carry `details.attempt`;
+      `sql_agent.check_execution` retries a `VALUE_NOT_FOUND` or
+      `JOIN_FAN_OUT` `ERROR` of the current attempt (`_SANITY_RETRIES`).
+    - **Fan-out.** A table is repeated when a join reaches, on its far side,
+      columns that are not the far table's whole primary key (from
+      `relevant_tables[].primary_key`; an unknown key counts as unique);
+      every table on the near side of that join in the plan's join tree is
+      repeated, which covers the many-to-many sum. A `COUNT`, `SUM` or `AVG`
+      (not `DISTINCT`) of a plain column of a repeated table is confirmed by
+      `SELECT COUNT(*), COUNT(DISTINCT alias.pk) FROM <the plan's FROM and
+      joins> WHERE <the plan's WHERE> LIMIT 1`, built with the generator's
+      `GeneratorNode.attach_joins` (now a static method) and rendered by the
+      adapter. No probe without a single-column primary key or with a table
+      the scope denies. The check lives in the executor, per sub-query, not
+      in the aggregator beside `unconverted_join_keys`: the repeated rows are
+      inside one sub-query's SQL, which the aggregator never sees.
+    - **All-null.** `check_nulls(frame)` reads the saved result's null counts
+      through `ArtifactStore.scan_parquet`, never its values.
+    - **Sample values.** `check_values(..., samples=)` takes a column's
+      snapshot sample values (from `relevant_tables[].columns[].stats`)
+      before the `DISTINCT` probe; the existence probe still runs, since
+      samples are partial.
+    - **`RunWarning`** lives in `nl2sql/common/errors.py`, beside
+      `PipelineError`, not in `api/query_api.py` as planned: the nodes that
+      produce warnings must not import the API layer. It is exported as
+      `nl2sql.RunWarning`. `RunWarning.of(error, sub_query_id)` turns an
+      error into a warning, its `details` left behind; an `ERROR` or
+      `CRITICAL` one (an attempt a retry replaced) gets `detail={"recovered":
+      True}` in place of the old `severity` field, and the answer
+      synthesizer skips those. `GraphState.warnings` and
+      `SubgraphExecutionState.warnings` are `List[RunWarning]`; every
+      producer builds one (the aggregator's `RESULT_TRUNCATED`,
+      `HOOK_DENIED` and R2's `JOIN_KEY_UNCONVERTED`, the curated matcher's
+      `CURATED_FALLBACK`, the schema retriever's fallback as
+      `SCHEMA_RETRIEVAL_FAILED`, `result_from_state`'s row-read failure as
+      `UNKNOWN_ERROR`). `extra="forbid"`, so a stray dict fails loudly.
+    - **The answer.** The synthesizer's *Data Notes* now carry
+      `VALUE_NOT_FOUND`, `JOIN_FAN_OUT` and `ALL_NULL_COLUMN` warnings, and
+      each is appended to the answer's `warnings`.
+    - **`sanity.flagged`** is published through `nl2sql.events.publish` for
+      each finding: `code`, `sub_query_id`, `retry` (true for a retried
+      `ERROR`).
+    - **Not done.** The playground's node inspector still reads a warning's
+      `error_code` and so shows a typed warning's message without its code;
+      its bundle is left for the web app's next rebuild.
 
 ## 12. MCP server (stdio)
 

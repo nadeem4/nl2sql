@@ -66,8 +66,8 @@ def test_a_query_the_database_rejects_is_refined_and_the_second_plan_answers(dem
     assert "There are 59 customers." in result["final_answer"]["summary"]
 
     # The first attempt's database error is kept, as a warning the retry recovered from.
-    [warning] = [w for w in result["warnings"] if w["error_code"] == "EXECUTION_FAILED"]
-    assert "wrong number of arguments" in warning["message"]
+    [warning] = [w for w in result["warnings"] if w["code"] == "EXECUTION_FAILED"]
+    assert "wrong number of arguments" in warning["message"] and warning["detail"] == {"recovered": True}
     assert "EXECUTOR_CRASH" not in json.dumps(result)
 
     # The refiner ran once, and the planner was told the database's words, not a trace.

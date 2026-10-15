@@ -105,7 +105,7 @@ def _print_result(presenter: ConsolePresenter, config: RunConfig, result: QueryR
 
     presenter.print_pipeline_errors(result.errors)
     for warning in result.warnings:
-        presenter.print_warning(json.dumps(warning, default=str))
+        presenter.print_warning(f"{warning.code}: {warning.message}")
 
     if result.final_answer:
         presenter.print_answer_synthesizer_output(result.final_answer)

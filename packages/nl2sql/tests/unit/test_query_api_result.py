@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from nl2sql.api import query_api
 from nl2sql.api.query_api import QueryAPI, QueryResult, result_from_state
-from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AnswerSynthesizerResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.execution.contracts import ArtifactRef
@@ -33,7 +33,7 @@ def _dict_state():
         },
         "answer_synthesizer_response": {"final_answer": {"summary": "one row"}},
         "reasoning": [{"node": "decomposer"}],
-        "warnings": [{"node": "executor"}],
+        "warnings": [{"code": "RESULT_TRUNCATED", "node": "executor", "message": "cut"}],
         "errors": [
             {
                 "node": "generator",
@@ -66,7 +66,7 @@ def _object_state():
             final_answer={"summary": "one row"}
         ),
         "reasoning": [{"node": "decomposer"}],
-        "warnings": [{"node": "executor"}],
+        "warnings": [{"code": "RESULT_TRUNCATED", "node": "executor", "message": "cut"}],
         "errors": [
             PipelineError(
                 node="generator",
@@ -90,7 +90,7 @@ def _assert_mapped(result: QueryResult):
     assert sub_query.schema_version == "v2"
     assert result.final_answer == {"summary": "one row"}
     assert result.reasoning == [{"node": "decomposer"}]
-    assert result.warnings == [{"node": "executor"}]
+    assert result.warnings == [RunWarning(code="RESULT_TRUNCATED", node="executor", message="cut")]
     assert result.errors == [
         {
             "node": "generator",
@@ -155,7 +155,7 @@ def test_result_carries_plan_validation_rows_status_and_timings():
     assert sq.rows.total_rows == 120 and len(sq.rows.rows) == 50
     assert sq.status == "success" and sq.retry_count == 1
     assert result.status == "success"
-    assert result.errors == [] and result.warnings[0]["message"] == "hint"
+    assert result.errors == [] and result.warnings[0].message == "hint"
     assert result.timings == {"ast_planner": 0.12}
 
 

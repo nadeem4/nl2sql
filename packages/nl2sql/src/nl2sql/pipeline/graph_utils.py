@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, FrozenSet, List, Optional
 
 from langchain_core.runnables import Runnable, RunnableConfig
 
-from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.hooks import hooks_of
 from nl2sql.hooks.approval import ApprovalRequest
 from nl2sql.policies import UserContext
@@ -88,19 +88,13 @@ def build_scan_payload(
         "approvals": list(getattr(state, "approvals", None) or []),
     }
 
-def _as_warning(error: PipelineError, sub_query_id: str) -> Dict[str, Any]:
+def _as_warning(error: PipelineError, sub_query_id: str) -> RunWarning:
     """An error from a sub-query that succeeded, as a run warning.
 
-    Either an earlier attempt's error that a retry recovered from, or a
-    non-blocking warning. The original severity is kept.
+    Either an earlier attempt's error that a retry recovered from (marked
+    ``detail["recovered"]``), or a non-blocking warning.
     """
-    return {
-        "node": error.node,
-        "message": error.message,
-        "error_code": getattr(error.error_code, "value", error.error_code),
-        "severity": getattr(error.severity, "value", error.severity),
-        "sub_query_id": sub_query_id,
-    }
+    return RunWarning.of(error, sub_query_id)
 
 
 def _approval_requests(ctx: Runtime, errors: List[PipelineError], state_dict: Dict[str, Any], sub_query: Any,

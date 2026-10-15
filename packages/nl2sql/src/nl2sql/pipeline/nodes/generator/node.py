@@ -368,8 +368,8 @@ class GeneratorNode:
                 "errors": [error],
             }
 
-    def _attach_joins(
-        self,
+    @staticmethod
+    def attach_joins(
         query: exp.Select,
         plan: PlanModel,
         declared: Dict[str, Any],
@@ -377,6 +377,9 @@ class GeneratorNode:
         visitor: SqlVisitor,
     ) -> exp.Select:
         """Adds every joined table to the FROM clause exactly once.
+
+        Also builds the FROM of the executor's sanity probes
+        (``executor/sanity/fanout.py``), so a probe joins exactly as the query did.
 
         ``left_alias``/``right_alias`` name the two sides of a join; they do not
         say which one is new. Each join attaches whichever side is not yet in
@@ -479,7 +482,7 @@ class GeneratorNode:
         declared = {t.alias: t for t in tables}
         primary = tables[0]
         query = query.from_(_table(primary))
-        query = self._attach_joins(query, plan, declared, primary.alias, visitor)
+        query = self.attach_joins(query, plan, declared, primary.alias, visitor)
 
         if plan.where:
             query = query.where(visitor.visit(plan.where))
