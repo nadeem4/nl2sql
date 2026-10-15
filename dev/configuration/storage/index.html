@@ -5333,7 +5333,10 @@ is its folder or file, or <code>None</code> for a store that does not have one.<
 <p>The state store keeps the schema snapshots (immutable, one row per version),
 the plan cache, the playground's feedback, and the lock that lets one index
 build run at a time. The engine applies the store's pending migrations when it
-starts; the built-in <code>sqlite</code> store adopts a 0.5 <code>state.db</code> as it is. See
+starts; the built-in <code>sqlite</code> store adopts a 0.5 <code>state.db</code> as it is, and
+applies them in one <code>BEGIN IMMEDIATE</code> transaction, so engines or CLI runs
+opening a new <code>state.db</code> at the same moment apply each one exactly once. A
+store with nothing pending takes no lock, so a read-only <code>state.db</code> opens. See
 <a href="../../schema/store/#the-state-store">The state store</a>.</p>
 <h2 id="the-index">The index</h2>
 <p>The engine embeds; the index store keeps entries and vectors in a

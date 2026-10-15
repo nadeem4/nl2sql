@@ -2455,6 +2455,15 @@ up only at call time - which is the point of running the key-free subset in CI
 rather than gating on <code>--collect-only</code>. The subset is worth keeping wide: every
 test that can run without a key should, because the ones that cannot are never
 run by CI at all.</p>
+<p><code>tests/e2e</code> builds one demo project per session (<code>demo_project</code>), indexes it,
+then moves its <code>.nl2sql</code> aside and leaves a file of that name, so no test can
+open the shared index or state store. Each test runs on its own copy:
+<code>private_storage(demo_project, tmp_path / "store")</code> as <code>project_config</code>'s
+<code>storage</code>, or <code>copy_demo(demo_project, tmp_path / "demo")</code> for a whole
+project. When tests shared the one <code>state.db</code>, engines left open by one test,
+copies taken while it was open and CLI runs writing it all met in the same
+file, and CI failed with <code>disk I/O error</code> in whichever test pytest-randomly
+ran next.</p>
 <h2 id="randomised-test-order">Randomised test order</h2>
 <p><code>pytest-randomly</code> shuffles the order of tests on every run, which turns
 order-dependent tests - shared class-level caches, leaked globals, fixtures that
