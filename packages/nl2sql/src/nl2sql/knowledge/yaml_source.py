@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, ClassVar, Dict, Optional
@@ -22,6 +23,9 @@ import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from nl2sql_sdk.knowledge import ITEM_MAX_CHARS, Glossary
+
+GLOSSARY_MAX_BYTES = 5 * 1024 * 1024
+"""The largest glossary file the ``yaml`` source reads; a larger one is a load error."""
 
 HEADER = """\
 # glossary.yaml: what people know about the data, read by the yaml knowledge source.
@@ -66,6 +70,10 @@ class YamlKnowledgeSource:
         if not self.path.is_file():
             raise ValueError(f"The glossary file {self.path.as_posix()} does not exist. `nl2sql init` writes "
                              f"one; or fix the source's `path`.")
+        size = self.path.stat().st_size
+        if size > GLOSSARY_MAX_BYTES:
+            raise ValueError(f"{self.path.as_posix()} is {size} bytes; a glossary file is at most "
+                             f"{GLOSSARY_MAX_BYTES} bytes. Split it into several knowledge sources.")
         data = self.path.read_bytes()
         try:
             document = yaml.safe_load(data)
@@ -142,11 +150,16 @@ def write_glossary(path: Path, glossary: Glossary, expected_sha256: Optional[str
     Engine-internal: only the review queue's accept calls it, under its lock
     (D42). The real path is resolved first, so a symlinked file is written
     through and the link kept; the text goes to a temporary file beside it,
-    which is renamed over it.
+    flushed to disk and given the file's mode, which is renamed over it. The
+    hash check and the rename are check-then-act against an editor outside
+    the engine: the lock orders the engine's own writers, not a person's
+    editor.
 
     Raises:
         ReviewError: ``FILE_CHANGED`` when the file's hash is no longer
-            ``expected_sha256`` (the hash when it was loaded). Nothing is written.
+            ``expected_sha256`` (the hash when it was loaded); ``NOT_WRITABLE``
+            when the file cannot be replaced (on Windows, while another program
+            holds it open). Nothing is written either way.
     """
     from nl2sql.review.models import ReviewError, ReviewErrorCode
 
@@ -160,7 +173,16 @@ def write_glossary(path: Path, glossary: Glossary, expected_sha256: Optional[str
     try:
         with os.fdopen(handle, "wb") as out:
             out.write(text)
+            out.flush()
+            os.fsync(out.fileno())
+        if real.exists():
+            shutil.copymode(real, temporary)
         os.replace(temporary, real)
+    except PermissionError as e:
+        Path(temporary).unlink(missing_ok=True)
+        raise ReviewError(ReviewErrorCode.NOT_WRITABLE,
+                          f"{Path(path).as_posix()} cannot be replaced: {e.strerror or e}.",
+                          fix="Close the program that holds the file open, then accept again.") from None
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
         raise

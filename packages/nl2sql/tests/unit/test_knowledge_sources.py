@@ -103,7 +103,7 @@ def _engine(tmp_path: Path, knowledge=None, **sections) -> NL2SQL:
         _write_glossary(tmp_path)
     knowledge = [{"type": "yaml", "path": "glossary.yaml"}] if knowledge is None else knowledge
     cfg = make_config(tmp_path, datasources=[{"id": "shop", "type": "sqlite", "connection": {"database": "shop.db"}}],
-                      policies={"roles": ROLES}, knowledge=knowledge, **sections)
+                      policies=sections.pop("policies", {"roles": ROLES}), knowledge=knowledge, **sections)
     return NL2SQL(cfg.model_copy(update={"embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8),
                                                                     dimension=8)}))
 
@@ -606,3 +606,95 @@ def test_the_demo_glossary_is_canonical_and_resolves_against_chinook(tmp_path):
 
 def test_registry_default_finds_the_yaml_source():
     assert "yaml" in Registry.default().names("knowledge_source")
+
+
+# ---------------------------------------------------------------- review fixes (PR #333)
+
+
+def test_a_reload_error_is_shown_only_to_a_caller_who_may_reload(engine, tmp_path):
+    bad = {"version": 1, "datasources": {"shop": {"tables": {"salaries": {"bogus": "Pay"}}}}}
+    _write_glossary(tmp_path, bad)
+    assert "salaries" in engine.knowledge.reload(user_context=ADMIN)[0].error, "the admin sees why"
+
+    error = engine.knowledge.sources(user_context=ANALYST)[0].error
+    assert error and "salaries" not in error.lower() and "glossary.yaml" not in error
+    assert "admin" in error
+
+
+def test_a_rule_id_and_an_enum_code_are_checked_for_denied_names():
+    knowledge = DatasourceKnowledge.model_validate({
+        "rules": [{"id": "salaries", "text": "Private."}, {"id": "ok", "text": "Fine."}],
+        "columns": {"orders.total": {"role": "enum", "values": {"salaries": "Pay", "1": "One"}},
+                    "orders.id": {"role": "enum", "values": {"1": "One"}}}})
+    allows = lambda schema, table: table.lower() != "salaries"  # noqa: E731
+
+    shown = visible(knowledge, SHOP_SNAPSHOT, allows)
+    assert [r.id for r in shown.rules] == ["ok"]
+    assert list(shown.columns) == ["orders.id"]
+
+
+def test_a_roles_explicit_deny_is_a_denied_name_even_when_not_indexed():
+    snapshot = _snapshot({"orders": {"id": "INTEGER pk"}})  # payroll is excluded from the index
+    knowledge = DatasourceKnowledge.model_validate({"rules": [{"id": "a", "text": "Never read payroll."},
+                                                              {"id": "b", "text": "Fine."}]})
+
+    shown = visible(knowledge, snapshot, lambda schema, table: table != "payroll", also_denied={"payroll"})
+    assert [r.id for r in shown.rules] == ["b"]
+
+
+def test_show_uses_the_roles_explicit_deny_names(tmp_path):
+    data = {"version": 1, "datasources": {"shop": {"rules": [{"id": "a", "text": "Never read payroll."}]}}}
+    _write_glossary(tmp_path, data)
+    roles = {**ROLES, "analyst": {"description": "All but pay", "allow": ["shop"],
+                                  "deny": ["shop.main.salaries", "shop.main.payroll"]}}
+    with _engine(tmp_path, policies={"roles": roles}) as engine:
+        assert engine.index.build().ok
+        assert engine.knowledge.show("shop", user_context=ANALYST)[0].knowledge.rules == []
+        assert [r.id for r in engine.knowledge.show("shop", user_context=ADMIN)[0].knowledge.rules] == ["a"]
+
+
+def test_names_and_codes_are_capped():
+    from nl2sql_sdk.knowledge import NAME_MAX_CHARS
+
+    long = "x" * (NAME_MAX_CHARS + 1)
+    for data in ({"tables": {long: {}}}, {"columns": {f"t.{long}": {}}},
+                 {"columns": {"t.c": {"role": "enum", "values": {long: "x"}}}},
+                 {"rules": [{"id": long, "text": "x"}]}, {"terms": [{"term": "t", "tables": [long]}]},
+                 {"joins": [{"from": f"t.{long}", "to": "u.id"}]}):
+        with pytest.raises(ValueError):
+            Glossary.model_validate({"version": 1, "datasources": {"shop": data}}, context={"item_max_chars": 10**6})
+
+
+def test_a_glossary_file_over_the_size_limit_is_refused(tmp_path, monkeypatch):
+    from nl2sql.knowledge import yaml_source
+
+    path = _write_glossary(tmp_path)
+    monkeypatch.setattr(yaml_source, "GLOSSARY_MAX_BYTES", 100)
+    with pytest.raises(ValueError, match="bytes"):
+        YamlKnowledgeSource(path).load()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="file modes are POSIX")
+def test_write_keeps_the_file_mode(tmp_path):
+    path = _write_glossary(tmp_path)
+    path.chmod(0o644)
+
+    write_glossary(path, Glossary(version=1), file_sha256(path))
+    assert path.stat().st_mode & 0o777 == 0o644
+
+
+def test_write_maps_a_file_held_open_elsewhere_to_a_review_error(tmp_path, monkeypatch):
+    from nl2sql.knowledge import yaml_source
+
+    path = _write_glossary(tmp_path)
+    before = path.read_text(encoding="utf-8")
+
+    def held(src, dst):
+        raise PermissionError(13, "The process cannot access the file because it is being used by another process")
+
+    monkeypatch.setattr(yaml_source.os, "replace", held)
+    with pytest.raises(ReviewError) as caught:
+        write_glossary(path, Glossary(version=1), file_sha256(path))
+    assert caught.value.code is ReviewErrorCode.NOT_WRITABLE
+    assert path.read_text(encoding="utf-8") == before
+    assert [p.name for p in tmp_path.iterdir() if p.suffix == ".tmp"] == [], "the temporary file is removed"

@@ -23,6 +23,9 @@ def _not_built(pr: str) -> NotImplementedError:
     return NotImplementedError(f"Not built yet: Wave B's {pr} builds it (docs/architecture/wave_b.md, section 16).")
 
 
+HIDDEN_ERROR = "The last reload failed; the previous knowledge is still in use. An admin can see why."
+
+
 def _caller(user_context: Any) -> "UserContext":
     """The caller, required: there is no default view (D60)."""
     from nl2sql.policies import UserContext
@@ -42,17 +45,20 @@ class KnowledgeAPI:
     def sources(self, *, user_context: "UserContext") -> List["KnowledgeSourceInfo"]:
         """Each knowledge source, in config order: its type, how many items of each kind it holds per
         datasource the caller reaches (counting only what the caller may see), the SHA-256 of the file it
-        read, when it loaded, and the last reload's error.
+        read, when it loaded, and the last reload's error. The error itself is
+        shown only to a caller who may reload (an admin role, or ``allow_all``):
+        it quotes the file. Anyone else is told only that the reload failed.
 
         Raises:
             TypeError: ``user_context`` is not a ``UserContext``.
         """
         from nl2sql.knowledge.merge import counts
         from nl2sql.knowledge.models import KnowledgeSourceInfo
-        from nl2sql.knowledge.scope import visible
+        from nl2sql.knowledge.scope import deny_names, visible
 
         caller = _caller(user_context)
         knowledge = self._ctx.knowledge
+        may_reload = self._may_reload(caller)
         reached: Dict[str, Any] = {}
         infos = []
         for source in knowledge.sources:
@@ -62,9 +68,13 @@ class KnowledgeAPI:
                     reached[ds_id] = self._reach(ds_id, caller)
                 if reached[ds_id] is not None:
                     scope, snapshot = reached[ds_id]
-                    per_datasource[ds_id] = counts(visible(block, snapshot, scope.allows))
+                    per_datasource[ds_id] = counts(visible(block, snapshot, scope.allows, deny_names(scope)))
+            error = knowledge.errors.get(source.type)
+            if error is not None and not may_reload:
+                # The error quotes the file: its path, its lines and any table it names (D60).
+                error = HIDDEN_ERROR
             infos.append(KnowledgeSourceInfo(type=source.type, counts=per_datasource, sha256=source.sha256,
-                                             loaded_at=source.loaded_at, error=knowledge.errors.get(source.type)))
+                                             loaded_at=source.loaded_at, error=error))
         return infos
 
     def show(self, datasource_id: Optional[str] = None, *,
@@ -106,7 +116,7 @@ class KnowledgeAPI:
             ValueError: a datasource is not configured, or ``path`` is a config
                 file or a knowledge source's own file, which export never overwrites.
         """
-        from nl2sql.knowledge.scope import visible
+        from nl2sql.knowledge.scope import deny_names, visible
         from nl2sql.knowledge.yaml_source import canonical_yaml
         from nl2sql_sdk.knowledge import Glossary
 
@@ -117,7 +127,7 @@ class KnowledgeAPI:
             reach = self._reach(ds_id, caller) if ds_id in knowledge.datasources else None
             if reach is not None:
                 scope, snapshot = reach
-                datasources[ds_id] = visible(knowledge.get(ds_id), snapshot, scope.allows)
+                datasources[ds_id] = visible(knowledge.get(ds_id), snapshot, scope.allows, deny_names(scope))
         # Each item was checked against the cap when its source loaded.
         text = canonical_yaml(Glossary.model_validate({"version": 1, "datasources": datasources},
                                                       context={"item_max_chars": 1 << 30}))
@@ -143,7 +153,7 @@ class KnowledgeAPI:
         """
         caller = _caller(user_context)
         policies = self._ctx.config.policies
-        if not policies.allow_all and not set(caller.roles) & set(policies.admin_roles):
+        if not self._may_reload(caller):
             raise PermissionError(f"Reloading the knowledge needs one of the admin roles "
                                   f"({', '.join(policies.admin_roles) or 'none defined'}).")
         self._ctx.reload_knowledge()
@@ -163,6 +173,10 @@ class KnowledgeAPI:
         raise _not_built("L2")
 
     # ------------------------------------------------------------ helpers
+
+    def _may_reload(self, caller: "UserContext") -> bool:
+        policies = self._ctx.config.policies
+        return policies.allow_all or bool(set(caller.roles) & set(policies.admin_roles))
 
     def _ids(self, datasource_ids: Optional[Sequence[str]]) -> List[str]:
         configured = [d.id for d in self._ctx.config.datasources]
@@ -185,7 +199,7 @@ class KnowledgeAPI:
     def _view(self, datasource_id: str, caller: "UserContext") -> Optional["DatasourceKnowledgeView"]:
         from nl2sql.knowledge.models import DatasourceKnowledgeView
         from nl2sql.knowledge.resolve import problems
-        from nl2sql.knowledge.scope import visible, with_schema_facts
+        from nl2sql.knowledge.scope import deny_names, visible, with_schema_facts
 
         scope = self._ctx.policy_engine.scope(caller, datasource_id)
         if not scope.reaches_datasource():
@@ -201,9 +215,10 @@ class KnowledgeAPI:
             dialect = self._ctx.ds_registry.get_dialect(datasource_id)
         except ValueError:  # unavailable: join types are not compared
             dialect = None
-        shown = visible(knowledge.get(datasource_id), snapshot, scope.allows)
+        denied = deny_names(scope)
+        shown = visible(knowledge.get(datasource_id), snapshot, scope.allows, denied)
         full, origins, sources = with_schema_facts(shown, knowledge.provenance.get(datasource_id, {}), snapshot,
-                                                   scope.allows, dialect=dialect)
+                                                   scope.allows, dialect=dialect, also_denied=denied)
         return DatasourceKnowledgeView(datasource_id=datasource_id, digest=digest, knowledge=full, origins=origins,
                                        sources=sources, problems=problems(shown, snapshot, dialect=dialect))
 
