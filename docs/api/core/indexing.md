@@ -130,8 +130,8 @@ catalog only, no profiling) with the snapshot its live build was made from.
 Each `DriftReport` has `datasource_id`, `status` (`unchanged`, `drifted`,
 `not_indexed`, `failed`), `live_version`, `checked_at`, and for `drifted` the
 `diff` (a `SchemaDiff`, `to_version` `None`) and its `impact` (a
-`DriftImpact`: verified queries, policy rules and preferred tables it
-breaks); `error` (redacted) for `failed`. Drift publishes `schema.drifted`,
+`DriftImpact`: verified queries, policy rules, preferred tables and
+glossary items it breaks); `error` (redacted) for `failed`. Drift publishes `schema.drifted`,
 once per drift and engine.
 Nothing is stored and nothing is rebuilt. `user_context` is required: the
 caller sees drift only in tables its scope may read, a datasource it cannot

@@ -354,3 +354,50 @@ def test_verified_query_impact_reads_columns_by_their_table():
     assert reasons["this_table"] == ["reads dropped column main.orders.note"]
     assert reasons["single"] == ["reads dropped column main.orders.note"]
     assert reasons["ambiguous"] == ["may read dropped column main.orders.note"]
+
+
+def test_drift_impact_lists_glossary_items():
+    """Wave B's K1: glossary items that named a dropped table or column, by one more finder and one more field."""
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from nl2sql.knowledge.merge import LoadedSource, merge
+    from nl2sql.schema.impact import DriftImpact, drift_impact
+    from nl2sql_sdk.knowledge import Glossary
+    from nl2sql_sdk.schema import (ColumnRef, SchemaContract, SchemaDiff, SchemaMetadata, SchemaSnapshot,
+                                   TableContract, TableRef)
+
+    glossary = Glossary.model_validate({"version": 1, "datasources": {"shop": {
+        "tables": {"salaries": {"description": "Pay."}, "orders": {"description": "Orders."}},
+        "columns": {"orders.note": {"description": "Gone."}, "orders.total": {"description": "Kept."},
+                    "main.salaries.amount": {"description": "Gone with its table."}},
+        "joins": [{"from": "salaries.id", "to": "orders.id"}, {"from": "orders.id", "to": "customers.id"}],
+        "terms": [{"term": "payroll", "tables": ["Salaries"]}, {"term": "notes", "columns": ["orders.note"]},
+                  {"term": "revenue", "columns": ["orders.total"]},
+                  {"term": "audit", "definition": "Joins secrets to orders.", "columns": ["orders.note"]}],
+        "rules": [{"id": "pay_private", "text": "Private.", "tables": ["salaries"]}]}}})
+    knowledge = merge([LoadedSource(type="yaml", glossary=glossary, sha256=None, path=None,
+                                    loaded_at=datetime.now(timezone.utc))])
+    orders, salaries = TableRef(schema_name="main", table_name="orders"), TableRef(schema_name="main",
+                                                                                     table_name="salaries")
+    stored = SchemaSnapshot(
+        contract=SchemaContract(datasource_id="shop", engine_type="sqlite", tables={
+            name: TableContract(table=TableRef(schema_name="main", table_name=name))
+            for name in ("orders", "salaries", "customers", "secrets")}),
+        metadata=SchemaMetadata(datasource_id="shop", engine_type="sqlite"))
+    ctx = SimpleNamespace(curated=None, knowledge=knowledge, config=SimpleNamespace(policies=SimpleNamespace(roles={})),
+                          ds_registry=SimpleNamespace(get_preferred_tables=lambda ds: []),
+                          vector_store=SimpleNamespace(snapshot=lambda ds: stored))
+    diff = SchemaDiff(datasource_id="shop", from_version="v1", tables_dropped=[salaries],
+                      columns_dropped=[ColumnRef(table=orders, column_name="note")])
+
+    impact = drift_impact(ctx, diff, [orders])  # the caller reads orders; customers and secrets are not theirs
+
+    assert impact.glossary_items == ["tables.salaries", "columns.orders.note", "columns.main.salaries.amount",
+                                     "joins.salaries.id->orders.id", "terms.payroll", "terms.notes",
+                                     "rules.pay_private"]
+    assert "terms.audit" not in impact.glossary_items, "its text names a table the caller cannot read"
+    assert not impact.is_empty()
+    assert DriftImpact(glossary_items=["terms.x"]).is_empty() is False
+    other = SchemaDiff(datasource_id="other", from_version="v1", tables_dropped=[salaries])
+    assert drift_impact(ctx, other, []).glossary_items == []

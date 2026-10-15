@@ -42,6 +42,8 @@ llm.yaml               # provider and model; no key
 embeddings.yaml        # provider: local
 policies.yaml          # allow_all: true      (--demo: admin, analyst and viewer roles)
 storage.yaml           # path: .nl2sql
+knowledge.yaml         # one yaml knowledge source: glossary.yaml
+glossary.yaml          # what people know about the data (--demo: the Chinook glossary)
 curated.yaml           # --demo only: the demo's verified queries
 settings.yaml          # --demo only: a 300 s timeout and a trace for every run
 data/                  # --demo only: the three sample SQLite files

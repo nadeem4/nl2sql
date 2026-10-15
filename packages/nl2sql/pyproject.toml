@@ -149,6 +149,10 @@ log = "nl2sql.observers.log:LogObserver"
 audit = "nl2sql.observers.audit:AuditObserver"
 otel = "nl2sql.observers.otel:OtelObserver"
 
+# The built-in knowledge source (docs/architecture/wave_b.md, section 3).
+[project.entry-points."nl2sql.knowledge_sources"]
+yaml = "nl2sql.knowledge.yaml_source:YamlKnowledgeSource"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["nl2sql*"]
@@ -156,7 +160,7 @@ include = ["nl2sql*"]
 [tool.setuptools.package-data]
 "*" = ["configs/*.yaml", ".env"]
 "nl2sql.cli.demo" = ["recordings/*.json"]
-"nl2sql.datasets" = ["*.sqlite", "README.md"]
+"nl2sql.datasets" = ["*.sqlite", "*.yaml", "README.md"]
 "nl2sql.evaluation" = ["suites/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed Vite build of web/playground: the wheel must carry the finished

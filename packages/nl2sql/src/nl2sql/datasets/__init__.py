@@ -10,7 +10,9 @@ them.
 ``nl2sql demo`` and ``nl2sql init --demo`` copy all three into the demo project,
 and the gold evaluation dataset reads Chinook directly. The demo's datasources,
 roles, sample questions and verified queries are in ``chinook``, ``support``,
-``webanalytics`` and ``demo`` here.
+``webanalytics`` and ``demo`` here. ``glossary.yaml`` is the demo's glossary
+(Chinook's descriptions, roles, terms and a rule), in the canonical form the
+engine writes; ``nl2sql init --demo`` copies it next to ``nl2sql.yaml``.
 """
 from pathlib import Path
 
@@ -19,5 +21,6 @@ _HERE = Path(__file__).resolve().parent
 CHINOOK_DB_PATH = _HERE / "chinook.sqlite"
 SUPPORT_DB_PATH = _HERE / "support.sqlite"
 WEBANALYTICS_DB_PATH = _HERE / "webanalytics.sqlite"
+DEMO_GLOSSARY_PATH = _HERE / "glossary.yaml"
 
-__all__ = ["CHINOOK_DB_PATH", "SUPPORT_DB_PATH", "WEBANALYTICS_DB_PATH"]
+__all__ = ["CHINOOK_DB_PATH", "SUPPORT_DB_PATH", "WEBANALYTICS_DB_PATH", "DEMO_GLOSSARY_PATH"]
