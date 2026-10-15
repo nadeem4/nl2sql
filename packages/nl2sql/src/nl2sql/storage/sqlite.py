@@ -147,7 +147,7 @@ def _schema_diffs(connection: sqlite3.Connection) -> None:
 
 def _proposals(connection: sqlite3.Connection) -> None:
     """The review queue (D41): one row per proposal, its fields as JSON, the filtered ones as columns too."""
-    connection.executescript("""
+    _script(connection, """
         CREATE TABLE IF NOT EXISTS proposals (
             id TEXT PRIMARY KEY,
             kind TEXT NOT NULL,

@@ -416,3 +416,12 @@ def test_a_migration_script_takes_one_statement_per_line():
     with pytest.raises(sqlite3.ProgrammingError):
         _script(connection, "CREATE TABLE b (x); CREATE TABLE c (x);\n")
     connection.close()
+
+
+def test_no_migration_commits_the_migrate_transaction():
+    """``executescript`` commits a pending transaction first, which would let another store migrate the same
+    file between two migrations; every migration runs its statements through ``_script`` instead."""
+    import inspect
+
+    for name, migration in MIGRATIONS:
+        assert ".executescript(" not in inspect.getsource(migration), name
