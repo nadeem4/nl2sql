@@ -81,7 +81,7 @@ into the section it affects.
 | `deny_columns`, row filters, user attributes | Step 2 and 3 of the policy ladder | Later (owner) |
 | JWT and identity-provider groups mapped to roles | They belong to the API's role resolver | Phase 4 (apps), JWT later (owner) |
 | dbt as a knowledge source | Needs the knowledge-source interface | Later (owner) |
-| Async hooks; any event bus or hook | Nothing in Phase 2 consumes events | Phase 3 |
+| Async hooks; any event bus or hook | Nothing in Phase 2 consumes events | Phase 3, designed as [Wave A](wave_a.md) |
 | Snowflake and BigQuery adapters | The conformance kit comes first; a community package passes it, then is adopted | Later (owner) |
 | S3 or ADLS result stores | The results interface ships with a docs example; remote stores come as plugins (owner decision 6) | Later |
 | The runtime price table owned by `llm/` | It belongs with the cost observer | Phase 3 |
