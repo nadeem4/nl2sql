@@ -253,3 +253,98 @@ def test_two_scopes_in_flight_keep_their_own_trace_ids(monkeypatch):
         t.join(5)
 
     assert len(seen) == 2 and all(a == b for a, b in seen) and seen[0][0] != seen[1][0]
+
+
+# ---------------------------------------------------------------- a scope opened before the run (Wave C's turn)
+
+def _model_call(handlers, node="conversation_rewriter"):
+    """What LangChain does around one chat-model call made with ``callbacks=handlers``."""
+    import uuid
+
+    from langchain_core.messages import AIMessage
+    from langchain_core.outputs import ChatGeneration, LLMResult
+
+    run_id = uuid.uuid4()
+    message = AIMessage(content="ok", usage_metadata={"input_tokens": 10, "output_tokens": 2, "total_tokens": 12},
+                        response_metadata={"model_name": "gpt-4o"})
+    for handler in handlers:
+        handler.on_chat_model_start({"name": "ChatOpenAI"}, [[]], run_id=run_id,
+                                    metadata={"langgraph_node": node, "ls_model_name": "gpt-4o"})
+    for handler in handlers:
+        handler.on_llm_end(LLMResult(generations=[[ChatGeneration(message=message)]]), run_id=run_id)
+
+
+def test_open_scope_publishes_run_started_and_run_query_runs_in_it(monkeypatch):
+    _use_graph(monkeypatch, _FakeGraph(lambda state, config: {}))
+    ctx = _ctx()
+    events = _capture(ctx.bus)
+    api = QueryAPI(ctx)
+
+    scope = api.open_scope("and by month?", user_context=_USER, datasource_id="shop")
+    assert [e.name for e in events] == ["run.started"]
+    assert events[0].data["question"] == "and by month?"
+
+    result = api.run_query("Revenue by month?", datasource_id="shop", user_context=_USER, scope=scope)
+
+    assert [e.name for e in events] == ["run.started", "run.finished"]
+    assert result.trace_id == scope.trace_id == events[1].trace_id
+    assert scope.closed
+
+
+def test_stream_query_runs_in_an_open_scope(monkeypatch):
+    _use_graph(monkeypatch, _FakeGraph(lambda state, config: {}))
+    ctx = _ctx()
+    events = _capture(ctx.bus)
+    api = QueryAPI(ctx)
+
+    scope = api.open_scope("and by month?", user_context=_USER)
+    list(api.stream_query("Revenue by month?", user_context=_USER, scope=scope))
+
+    assert [e.name for e in events] == ["run.started", "run.finished"]
+    assert {e.trace_id for e in events} == {scope.trace_id}
+
+
+def test_a_model_call_made_with_the_scopes_callbacks_counts_in_the_runs_usage(monkeypatch):
+    _use_graph(monkeypatch, _FakeGraph(lambda state, config: {}))
+    ctx = _ctx()
+    api = QueryAPI(ctx)
+
+    scope = api.open_scope("and by month?", user_context=_USER)
+    _model_call(scope.callbacks())
+    result = api.run_query("Revenue by month?", user_context=_USER, scope=scope)
+
+    assert [call.node for call in result.usage.calls] == ["conversation_rewriter"]
+    assert result.usage.total.input_tokens == 10
+
+
+def test_scope_callbacks_hold_the_usage_collector_and_the_attached_handlers():
+    from langchain_core.callbacks import BaseCallbackHandler
+
+    from nl2sql.services.callbacks.token_handler import TokenUsageCallback
+
+    class Budget(BaseCallbackHandler):
+        pass
+
+    budget = Budget()
+    scope = QueryAPI(_ctx()).open_scope("q", user_context=_USER)
+    scope.attach(budget)
+
+    handlers = scope.callbacks()
+    assert isinstance(handlers[0], TokenUsageCallback) and handlers[1:] == [budget]
+
+
+def test_close_scope_with_a_result_built_without_a_graph_run():
+    ctx = _ctx()
+    events = _capture(ctx.bus)
+    api = QueryAPI(ctx)
+
+    scope = api.open_scope("what about that?", user_context=_USER)
+    result = QueryResult(trace_id=scope.trace_id, status="error",
+                         errors=[{"node": "conversation", "message": "Ask it as a full question.",
+                                  "error_code": "UNKNOWN_ERROR", "severity": "ERROR"}])
+    api.close_scope(scope, result)
+    api.close_scope(scope, result)
+
+    assert [e.name for e in events] == ["run.started", "run.finished"]
+    assert events[1].data["status"] == "error"
+    assert events[1].data["error_codes"] == ["UNKNOWN_ERROR"]

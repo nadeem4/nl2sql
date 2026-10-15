@@ -152,6 +152,11 @@ def _pin_index(ctx: Runtime):
     return pin() if callable(pin) else ctx
 
 
+def usage_prices(ctx: Runtime) -> Dict:
+    """The price table a run's ``TokenUsageCallback`` costs its calls with."""
+    return {model: price.model_dump(exclude_none=True) for model, price in ctx.config.llm.prices.items()}
+
+
 def run_with_graph(
     ctx: Runtime,
     user_query: str,
@@ -176,7 +181,8 @@ def run_with_graph(
     ``scope`` is the run's :class:`~nl2sql.events.RunScope`, opened and closed
     by the caller: the run takes its ``trace_id``, enters its context in the
     worker (so the run's events and log lines carry it, on LangGraph's
-    threads too) and adds the callbacks attached to it.
+    threads too) and adds its ``callbacks()``: its usage collector, when it
+    has one, is the run's.
     """
     token = cancellation_token or CancellationToken()
     run_done = threading.Event()
@@ -209,8 +215,10 @@ def run_with_graph(
     settings = ctx.settings
     timeout_sec = settings.pipeline.timeout_s
     timing = NodeTimingCallback()
-    usage = TokenUsageCallback(prices={model: price.model_dump(exclude_none=True)
-                                       for model, price in ctx.config.llm.prices.items()})
+    # The scope's collector, when it has one, so a model call made in the run
+    # before the graph (Wave C's rewrite) counts in the run's usage.
+    usage = (scope.usage if scope is not None and scope.usage is not None
+             else TokenUsageCallback(prices=usage_prices(ctx)))
     recorder = TraceRecorder()
     started_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     # The date the prompts were told; a trace replay pins it, or every planner
@@ -263,7 +271,7 @@ def run_with_graph(
             **_telemetry(),
         }, "cancelled")
 
-    attached = list(scope.callbacks) if scope is not None else []
+    attached = [cb for cb in scope.callbacks() if cb is not usage] if scope is not None else []
 
     def _invoke():
         # The run's scopes are pinned in the worker's context: each

@@ -21,8 +21,9 @@ the run's scope":
    down) and counts it in ``late_events``.
 
 ``attach`` is where a later PR plugs in a run-scoped piece (the stream's
-queue, the usage collector, the budget, the trace's event list) without
-editing ``run_with_graph`` or ``QueryAPI``.
+queue, the budget, the trace's event list) without editing ``run_with_graph``
+or ``QueryAPI``. ``callbacks()`` is the usage collector and the handlers
+attached, for a model call made outside the graph but inside the run.
 """
 from __future__ import annotations
 
@@ -70,7 +71,7 @@ class RunScope:
 
     def __init__(self, bus: EventBus, *, question: str, user_context: Any = None,
                  datasource_id: Optional[str] = None, execute: bool = True, tenant_id: Optional[str] = None,
-                 trace_id: Optional[str] = None) -> None:
+                 trace_id: Optional[str] = None, usage: Any = None) -> None:
         self.bus = bus
         self.trace_id = trace_id or str(uuid.uuid4())
         self.question = question
@@ -79,8 +80,10 @@ class RunScope:
         self.tenant_id = getattr(user_context, "tenant_id", None) or tenant_id
         self.datasource_id = datasource_id
         self.execute = execute
-        # LangChain callbacks a piece attached; run_with_graph adds them to the graph's.
-        self.callbacks: List[Any] = []
+        # The run's usage collector (a ``TokenUsageCallback``), when the caller made one: every
+        # model call made with ``callbacks()`` counts in the run's ``QueryResult.usage``.
+        self.usage = usage
+        self._handlers: List[Any] = []
         self.late_events = 0
         self._lock = threading.RLock()
         self._closed = False
@@ -108,7 +111,7 @@ class RunScope:
         """
         handler = _is_callback_handler(piece)
         if handler:
-            self.callbacks.append(piece)
+            self._handlers.append(piece)
         receive = getattr(piece, "on_event", None) or (piece if callable(piece) and not handler else None)
         if receive is not None:
             trace_id = self.trace_id
@@ -123,6 +126,16 @@ class RunScope:
         if callable(close):
             self._closers.append(close)
         return piece
+
+    def callbacks(self) -> List[Any]:
+        """The LangChain callbacks a model call in this run is made with: the usage collector, then
+        the handlers attached (the budget).
+
+        ``run_with_graph`` adds them to the graph's; a call made outside the
+        graph (Wave C's rewrite) passes them itself, inside ``entered()``, so
+        it counts in the run's usage and limits and carries its ``trace_id``.
+        """
+        return ([self.usage] if self.usage is not None else []) + list(self._handlers)
 
     # ------------------------------------------------------------ the run's life
 

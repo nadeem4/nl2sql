@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any, Iterator, Literal
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
-from nl2sql.pipeline.runtime import run_with_graph
+from nl2sql.pipeline.runtime import run_with_graph, usage_prices
 from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import ErrorCode, ErrorSeverity
@@ -24,7 +24,7 @@ from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import QueryEvent, RunEvents
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
-from nl2sql.services.callbacks.token_handler import QuestionUsage
+from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
 
 DEFAULT_SAMPLE_ROWS = 50
 
@@ -342,6 +342,7 @@ class QueryAPI:
         execute: bool = True,
         user_context: Optional[UserContext] = None,
         cancellation_token: Optional[CancellationToken] = None,
+        scope: Optional[RunScope] = None,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -354,12 +355,14 @@ class QueryAPI:
             cancellation_token: Optional token the caller cancels to stop the
                 run. It stops before the next step or model call; the one in
                 flight finishes, and the result carries a ``CANCELLED`` error.
+            scope: A scope :meth:`open_scope` opened (Wave C's turn); the run
+                goes on in it and closes it, instead of opening its own.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
         """
-        scope = self._scope(question, datasource_id, execute, user_context)
-        scope.start()
+        scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
+                                         user_context=user_context)
         try:
             state = run_with_graph(
                 self._ctx,
@@ -377,17 +380,31 @@ class QueryAPI:
         except Exception as exc:
             scope.fail(f"The run failed: {exc}", ErrorCode.UNKNOWN_ERROR)
             raise
-        self._finish(scope, result)
+        self.close_scope(scope, result)
         return result
 
-    def _scope(self, question: str, datasource_id: Optional[str], execute: bool,
-               user_context: Optional[UserContext]) -> RunScope:
-        """The run's scope on the engine's bus (docs/architecture/wave_a.md, section 3)."""
-        return RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
-                        execute=execute, tenant_id=self._ctx.tenant_id)
+    def open_scope(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
+                   user_context: Optional[UserContext] = None) -> RunScope:
+        """Open a run's scope on the engine's bus and publish ``run.started`` (wave_a.md, section 3).
 
-    def _finish(self, scope: RunScope, result: QueryResult) -> None:
-        """Close ``scope`` with the result's summary; ``run.failed`` if the summary cannot be built."""
+        ``run_query`` and ``stream_query`` open one themselves. A caller that
+        works in the run before the question runs (Wave C's rewrite) opens it
+        here, makes its model calls with ``scope.callbacks()`` inside
+        ``scope.entered()``, then passes it as ``scope=``, or closes it with
+        :meth:`close_scope` and a result built without a graph run.
+        """
+        scope = RunScope(self._ctx.bus, question=question, user_context=user_context, datasource_id=datasource_id,
+                         execute=execute, tenant_id=self._ctx.tenant_id,
+                         usage=TokenUsageCallback(prices=usage_prices(self._ctx)))
+        scope.start()
+        return scope
+
+    def close_scope(self, scope: RunScope, result: QueryResult) -> None:
+        """Close ``scope`` with ``run.finished``, the result's summary; ``run.failed`` if that cannot be built.
+
+        ``result`` may be one built without a graph run (Wave C's failed
+        rewrite). A scope closes once; closing it again does nothing.
+        """
         try:
             scope.finish(result, tables=tables_read(result, getattr(self._ctx, "ds_registry", None)))
         except Exception as exc:
@@ -402,6 +419,7 @@ class QueryAPI:
         execute: bool = True,
         user_context: Optional[UserContext] = None,
         cancellation_token: Optional[CancellationToken] = None,
+        scope: Optional[RunScope] = None,
     ) -> Iterator[QueryEvent]:
         """
         Run a question as :meth:`run_query` does, yielding the run as it happens.
@@ -419,15 +437,17 @@ class QueryAPI:
         The run goes on in a thread of its own; the caller's context (a
         request's keys) goes with it. Closing the iterator early -- a client
         that went away -- cancels the run before its next step or model call.
+        ``scope`` is as for :meth:`run_query`.
         """
         token = cancellation_token or CancellationToken()
         events: "queue.Queue[Optional[QueryEvent]]" = queue.Queue()
+        opened = scope
 
         def run() -> None:
-            scope: Optional[RunScope] = None
+            scope: Optional[RunScope] = opened
             try:
-                scope = self._scope(question, datasource_id, execute, user_context)
-                scope.start()
+                scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
+                                                 user_context=user_context)
                 state = run_with_graph(
                     self._ctx,
                     question,
@@ -440,7 +460,7 @@ class QueryAPI:
                     scope=scope,
                 )
                 result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
-                self._finish(scope, result)
+                self.close_scope(scope, result)
                 events.put(QueryEvent(type="final", data=result.model_dump(mode="json")))
             except Exception as exc:
                 if scope is not None:
