@@ -125,8 +125,8 @@ What `inspect` searches with when not told otherwise, which is what the
 pipeline's own retrieval uses: `k` (8 picks), `lambda_mult` (1 is relevance
 only, 0 is difference only), `fetch_multiplier` (the candidate pool is `k`
 times it) and `types`, every entry type the index holds
-(`schema.datasource`, `schema.table`, `schema.column`, `schema.relationship`,
-`schema.metric`). The playground's Retrieval inspector starts from it.
+(`schema.datasource`, `schema.datasource_example`, `schema.table`,
+`schema.column`, `schema.relationship`, `schema.metric`). The playground's Retrieval inspector starts from it.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.

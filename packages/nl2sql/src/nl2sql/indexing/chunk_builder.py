@@ -1,8 +1,10 @@
-from typing import List
+import hashlib
+from typing import List, Sequence
 
 from .models import (
     BaseChunk,
     DatasourceChunk,
+    DatasourceExampleChunk,
     TableChunk,
     ColumnChunk,
     RelationshipChunk,
@@ -10,6 +12,31 @@ from .models import (
 )
 from nl2sql.schema import SchemaSnapshot
 from nl2sql_sdk.schema import TableRef, ColumnRef
+
+
+def build_example_chunks(datasource_id: str, questions: Sequence[str],
+                         schema_version: str) -> List[DatasourceExampleChunk]:
+    """One ``schema.datasource_example`` entry per example question, in the caller's order.
+
+    The caller assembles ``questions``: today the datasource's
+    ``sample_questions`` (or enrichment's), and from Wave B the glossary's
+    ``examples`` too, with no change here. A blank question is skipped and a
+    repeated one kept once. The id hashes the question, so the same question
+    keeps its id from build to build.
+    """
+    chunks: List[DatasourceExampleChunk] = []
+    seen = set()
+    for question in questions:
+        text = (question or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+        chunks.append(DatasourceExampleChunk(
+            id=f"schema.datasource_example:{datasource_id}:{digest}:{schema_version}",
+            datasource_id=datasource_id, question=text, schema_version=schema_version,
+        ))
+    return chunks
 
 
 class SchemaChunkBuilder:
@@ -36,7 +63,8 @@ class SchemaChunkBuilder:
             ds_id: Datasource identifier.
             schema_snapshot: Snapshot containing schema contract and metadata.
             schema_version: Version identifier for the schema snapshot.
-            questions: Example user questions for grounding the datasource.
+            questions: Example questions the datasource answers, each indexed
+                as its own entry (:func:`build_example_chunks`).
         """
         self.ds_id = ds_id
         self.schema_snapshot = schema_snapshot
@@ -53,6 +81,7 @@ class SchemaChunkBuilder:
         chunks: List[BaseChunk] = []
 
         chunks.extend(self._build_datasource_chunks())
+        chunks.extend(build_example_chunks(self.ds_id, self.questions, self.schema_version))
         chunks.extend(self._build_table_chunks())
         chunks.extend(self._build_column_chunks())
         chunks.extend(self._build_relationship_chunks())
@@ -65,7 +94,8 @@ class SchemaChunkBuilder:
         Builds datasource-level chunks.
 
         Returns:
-            List containing a single DatasourceChunk.
+            List containing a single DatasourceChunk: the description and
+            domains. The example questions are entries of their own.
         """
         md = self.schema_snapshot.metadata
 
@@ -76,7 +106,6 @@ class SchemaChunkBuilder:
                 description=md.description or "",
                 domains=md.domains,
                 schema_version=self.schema_version,
-                examples=self.questions,
             )
         ]
 

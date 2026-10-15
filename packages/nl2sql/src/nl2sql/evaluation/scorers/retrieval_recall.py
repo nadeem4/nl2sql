@@ -9,13 +9,14 @@ mode ``retrieval`` no model runs: :func:`sent` runs the retriever the way the
 pipeline does, with the vector search forced on (Chinook's 11 tables are
 under the full-snapshot limit that would skip it), and the retriever's query
 is the question alone, since the decomposer that would add to it is a model.
-:func:`routed` ranks the datasources for the ``routing`` scorer, without the
-resolver's model check.
+:func:`routed` ranks the datasources for the ``routing`` scorer with the
+resolver's routing (``Retriever.route`` and ``settings.routing``), without its
+model check.
 """
 from __future__ import annotations
 
 import uuid
-from typing import Any, ClassVar, Dict, FrozenSet, List, Optional
+from typing import Any, ClassVar, Dict, FrozenSet, List
 
 from nl2sql.evaluation.scorers import NOT_APPLICABLE, BuiltinScorer, CaseRun, Score
 from nl2sql.evaluation.suite import EvalCase
@@ -70,22 +71,18 @@ def sent(ctx: Any, case: EvalCase, role: str) -> Dict[str, List[str]]:
 
 
 def routed(ctx: Any, question: str, limit: int) -> List[str]:
-    """The datasources the resolver's vector search ranks for ``question``, best first, at most ``limit``."""
+    """The datasources the resolver's routing ranks for ``question``, best first, at most ``limit``."""
     ids = ctx.ds_registry.list_ids()
     if len(ids) == 1:
         return list(ids)
-    ranked: List[str] = []
-    for doc in ctx.vector_store.retrieve_datasource_candidates(question, k=5):
-        ds_id: Optional[str] = doc.metadata.get("datasource_id")
-        if ds_id and ds_id not in ranked:
-            ranked.append(ds_id)
-    return ranked[:limit]
+    routing = ctx.settings.routing
+    ranked = ctx.vector_store.route(question, ids, limit=routing.candidates, floor_ratio=routing.floor_ratio)
+    return [c.datasource_id for c in ranked][:limit]
 
 
 def retrieval_settings(ctx: Any) -> Dict[str, Any]:
     """The retrieval settings a mode retrieval report was measured with."""
-    from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
-
-    return {"table_k": SchemaRetrieverNode.TABLE_K, "planning_k": SchemaRetrieverNode.PLANNING_K,
+    retrieval = ctx.settings.retrieval
+    return {"table_k": retrieval.table_k, "planning_k": retrieval.planning_k,
             "fetch_multiplier": ctx.vector_store.FETCH_MULTIPLIER, "lambda_mult": ctx.vector_store.LAMBDA_MULT,
             "full_snapshot_max_tables": 0, "query": "question"}

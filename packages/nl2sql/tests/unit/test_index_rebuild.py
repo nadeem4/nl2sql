@@ -92,8 +92,8 @@ def test_a_reindex_that_fails_midway_leaves_the_previous_build_live(tmp_path, mo
     assert index.index.pointers(index.namespace)["ds_a"] == pointer
     assert _live(index, "ds_a") == before_a
     assert _live(index, "ds_b") == before_b
-    docs = index.retriever().retrieve_datasource_candidates("anything", k=5)
-    assert sorted(d.metadata["datasource_id"] for d in docs) == ["ds_a", "ds_b"]
+    routed = index.retriever().route("anything", ["ds_a", "ds_b"], floor_ratio=0.0)
+    assert sorted(c.datasource_id for c in routed) == ["ds_a", "ds_b"]
     assert len(_stored(index, "ds_a")) == 2  # the partial build, named by no pointer
 
     # The next build of the datasource deletes it.
@@ -112,7 +112,7 @@ def test_readers_never_see_both_builds_while_they_coexist(tmp_path):
         """Just before the switch: the new build is written, not yet live."""
         seen["stored"] = len(index.index.get(namespace, Filter(eq={"datasource_id": "ds_a"})))
         reader = index.retriever()
-        seen["resolver"] = reader.retrieve_datasource_candidates("q", k=5)
+        seen["resolver"] = _routing_pools(reader)
         seen["tables"] = reader.retrieve_schema_context("q", "ds_a", k=8)
         set_pointers(namespace, updates)
 
@@ -120,12 +120,20 @@ def test_readers_never_see_both_builds_while_they_coexist(tmp_path):
     index.write("ds_a", _chunks("ds_a", "v2"), schema_version="v2")
 
     assert seen["stored"] == 8  # old and new are both on disk at this moment
-    assert [d.metadata["schema_version"] for d in seen["resolver"]] == ["v1"]
+    # Routing reads one build: one description entry and three tables, not two and six.
+    assert seen["resolver"] == {"route.description": 1, "route.tables": 3}
     assert {d.metadata["schema_version"] for d in seen["tables"]} == {"v1"}
     assert len(seen["tables"]) == 3
     # After the switch only v2 is visible.
-    assert [d.metadata["schema_version"] for d in index.retriever().retrieve_datasource_candidates("q", k=5)] \
-        == ["v2"]
+    assert {d.metadata["schema_version"] for d in index.retriever().retrieve_schema_context("q", "ds_a")} == {"v2"}
+    assert _routing_pools(index.retriever()) == {"route.description": 1, "route.tables": 3}
+
+
+def _routing_pools(reader) -> dict:
+    """How many entries each routing search of ds_a saw, for the searches that saw any."""
+    explain: list = []
+    reader.route("q", ["ds_a"], explain=explain)
+    return {r["search"]: len(r["pool"]) for r in explain if r.get("pool") and r["search"] != "routing"}
 
 
 def test_a_build_keeps_the_one_it_replaced_and_deletes_older_ones(tmp_path):
@@ -141,14 +149,13 @@ def test_a_build_keeps_the_one_it_replaced_and_deletes_older_ones(tmp_path):
 
 
 def test_retrieved_entries_do_not_carry_the_build_id(tmp_path):
-    """The resolver prints a datasource entry's metadata into the decomposer
-    prompt; a build id there would change every prompt on every rebuild, and
-    the plan cache keys on the prompt."""
+    """Retrieved metadata is printed into prompts; a build id there would change
+    every prompt on every rebuild, and the plan cache keys on the prompt."""
     index = TestIndex(tmp_path, FakeEmbeddings(size=8))
     index.write("ds_a", _chunks("ds_a"))
     reader = index.retriever()
 
-    docs = reader.retrieve_datasource_candidates("q", k=5) + reader.retrieve_schema_context("q", "ds_a")
+    docs = reader.retrieve_schema_context("q", "ds_a")
 
     assert docs and all("build_id" not in d.metadata for d in docs)
 

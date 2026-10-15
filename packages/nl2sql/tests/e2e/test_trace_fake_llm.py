@@ -108,17 +108,16 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
     assert doc["failed"] is False
 
     # Retrieval: the demo registers three datasources, so the single-datasource
-    # shortcut no longer applies and the resolver's vector search runs for real.
-    # Chinook ranks first for a question about customers.
+    # shortcut no longer applies and routing runs for real: one search per
+    # signal, then the fused ranking. Chinook ranks first for a question about customers.
     [resolver] = [n for n in doc["nodes"] if n["node"] == "datasource_resolver"]
     resolver_retrieval = resolver["outputs"]["retrieval"]
     assert resolver_retrieval["skipped"] is False
     assert resolver_retrieval["query"] == QUESTION
-    [search] = resolver_retrieval["searches"]
-    assert {entry["datasource_id"] for entry in search["pool"]} == {
+    searches = {s["search"]: s for s in resolver_retrieval["searches"]}
+    assert {entry["datasource_id"] for entry in searches["route.description"]["pool"]} == {
         "chinook", "support", "webanalytics"}
-    picked = sorted((e for e in search["pool"] if e["picked"]), key=lambda e: e["pick_order"])
-    assert picked[0]["datasource_id"] == "chinook"
+    assert searches["routing"]["picks"][0] == "chinook"
 
     # The schema retriever still skips: Chinook alone is 11 tables, under its threshold.
     [retriever] = [n for n in doc["nodes"] if n["node"] == "schema_retriever"]

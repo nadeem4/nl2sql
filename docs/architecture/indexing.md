@@ -39,7 +39,16 @@ catalog in the current implementation.
 
 Chunk types are defined in `nl2sql.indexing.models`:
 
-- **DatasourceChunk** (`schema.datasource`): datasource description, domains, and example questions. The description is the one the datasource was registered with (`description:` in the datasources config, or the `description` of a `Datasource` passed to `engine.datasources.add`); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced. Example questions come from the `SAMPLE_QUESTIONS` file.
+- **DatasourceChunk** (`schema.datasource`): datasource description and domains. The description is the one the datasource was registered with (`description:` in the datasources config, or the `description` of a `Datasource` passed to `engine.datasources.add`); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced.
+- **DatasourceExampleChunk** (`schema.datasource_example`): one example question
+  the datasource answers, one entry per question, so the fifth question moves
+  routing as much as the first (in the datasource entry's one text it barely
+  moved the vector). `build_example_chunks(datasource_id, questions,
+  schema_version)` builds them from a list the caller assembles: today the
+  datasource's `sample_questions` (or enrichment's), and from Wave B the
+  glossary's `examples` too. A blank or repeated question is skipped. Ids:
+  `schema.datasource_example:<datasource_id>:<12 hex of the question's
+  SHA-256>:<schema_version>`.
 - **TableChunk** (`schema.table`): table name, PKs, column list, FK summaries, row counts.
 - **ColumnChunk** (`schema.column`): column type, stats, synonyms, PII flags.
 - **RelationshipChunk** (`schema.relationship`): FK relationships, columns, cardinality.
@@ -102,8 +111,8 @@ The engine embeds each chunk with its own embedder and hands the index store an
   and `to_columns` are stored comma-joined; the retriever splits them again.
 
 The store never embeds and never depends on LangChain. `build_id` is stripped
-from retrieved entries, because the resolver prints a datasource entry's
-metadata into the decomposer prompt.
+from retrieved entries, because retrieved metadata reaches the planner's
+prompt and a build id would change it on every rebuild.
 
 ## One namespace per embedding model
 
@@ -194,7 +203,8 @@ playground and `GET /api/v1/index/status` show it (through
 
 Chunking is aligned to planning intent:
 
-- **Routing** uses datasource-level chunks.
+- **Routing** uses the datasource and example entries, the verified queries,
+  and the table and column entries as votes (see [Routing](#routing-five-signals-fused)).
 - **Schema context** uses table/metric chunks.
 - **Planning context** uses columns and relationships for specific tables.
 
@@ -266,10 +276,13 @@ The documents come back in pool order (nearest first), not pick order.
 
 | Caller | Search | Entry types | k | Pool |
 | --- | --- | --- | --- | --- |
-| `DatasourceResolverNode` | `datasources` | datasource | 5 | 20 |
-| `SchemaRetrieverNode` | `tables` | table, metric | 8 | 32 |
-| `SchemaRetrieverNode`, when `tables` finds nothing | `columns` | column | 8 | 32 |
-| `SchemaRetrieverNode`, over the tables found | `planning` | column, relationship | 12 | 48 |
+| `SchemaRetrieverNode` | `tables` | table, metric | `table_k` (8) | 32 |
+| `SchemaRetrieverNode`, when `tables` finds nothing | `columns` | column | `table_k` (8) | 32 |
+| `SchemaRetrieverNode`, over the tables found | `planning` | column, relationship | `planning_k` (12) | 48 |
+
+`table_k` and `planning_k` are `settings.retrieval` settings (see
+[Settings](../configuration/settings.md)). The resolver's routing searches are
+not MMR; they are described [below](#routing-five-signals-fused).
 
 The schema retriever runs none of these when the schema has
 `SCHEMA_RETRIEVAL_FULL_SNAPSHOT_MAX_TABLES` tables or fewer (15 by default, so
@@ -295,12 +308,91 @@ search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
 search the same text, and diff the **Copy as text** output.
 
-The resolver's `datasources` search is exact: instead of the store's nearest-neighbour
-query it reads every live `schema.datasource` entry (`IndexStore.get`), scores it by cosine similarity and
-takes the nearest. There is one such entry per datasource among hundreds of
-others, and an approximate (HNSW) search under a filter that selective can
-return fewer entries than exist, which dropped a datasource from a question's
-candidates now and then. The other searches stay approximate.
+## Routing: five signals, fused
+
+`Retriever.route(question, datasource_ids, explain, *, limit, floor_ratio, allows)`
+ranks the datasources a question most likely needs, as a list of
+`RouteCandidate`:
+
+- `datasource_id`;
+- `score`, its fused score;
+- `ranks`, its rank in each signal that ranked it;
+- `similarity`, its best entry's cosine similarity to the question.
+
+The resolver calls it with the datasources the caller's scope reaches, and
+only those: a datasource the role may not read is never searched, so it never
+ranks. It also passes `allows`, its entry check:
+
+- A table or column entry votes only when its table is one of that
+  datasource's visible tables in the live snapshot. The check is on the
+  (datasource, table) pair, because two datasources can hold a table of the
+  same name.
+- A verified query votes only when every table its SQL reads is visible. A
+  query whose SQL does not parse never votes.
+
+An entry `allows` refuses is dropped before anything is ranked or recorded, so
+a denied table never votes and never appears in the trace. The searches fetch
+more until they hold `VOTE_K` allowed entries or the index runs out.
+
+`route` embeds the question once and runs five searches over the reachable
+datasources' live builds (`ROUTE_SIGNALS`). Each ranks datasources by their
+best entry:
+
+| Signal | Entries | Search |
+| --- | --- | --- |
+| `description` | `schema.datasource` | every entry, exactly |
+| `examples` | `schema.datasource_example` | the nearest `VOTE_K` (20) |
+| `curated` | `curated.verified_query` | the nearest `VOTE_K` |
+| `tables` | `schema.table` | the nearest `VOTE_K` |
+| `columns` | `schema.column` | the nearest `VOTE_K` |
+
+**Fusion.** The ranks are fused with reciprocal rank fusion (`fuse`):
+`score(ds) = sum over the signals of 1 / (RRF_K + rank)`, with `RRF_K = 60`.
+
+- A datasource a signal did not rank gets the rank after the last one it did
+  rank (`len(ranked) + 1`). It has no entry of that type, or none among the
+  nearest. Having entries of a type is therefore not a vote: only ranking well
+  in a signal is.
+- Without that penalty, the one datasource with verified queries would collect
+  a curated vote on every question and win nearly all of them.
+- A signal that ranked nothing is skipped.
+- A datasource with no example questions is still routed by its description,
+  tables and columns.
+
+**Shortlist.** `shortlist` then keeps the top `limit`
+(`settings.routing.candidates`, 3). It also drops any datasource whose best
+similarity is under `floor_ratio` (`settings.routing.floor_ratio`, 0.5) times
+the most similar candidate's.
+
+- The floor is on similarity, not on the fused score. With a handful of
+  datasources every reciprocal-rank score is within a few percent of the best,
+  so a floor on the score would never fire.
+- `VOTE_K` and `RRF_K` are constants on `Retriever` until the routing suite
+  shows a reason to tune them.
+
+The `description` search is exact: instead of the store's nearest-neighbour
+query it reads every live `schema.datasource` entry (`IndexStore.get`) and
+scores each by cosine similarity. There is one such entry per datasource among
+hundreds of others. An approximate (HNSW) search under a filter that selective
+can return fewer entries than exist, which would cost a datasource its vote.
+So every datasource the caller reaches is ranked at least once. The other four
+searches are approximate.
+
+Given an `explain` list, `route` appends:
+
+- One record per signal: `route.description`, `route.examples`,
+  `route.curated`, `route.tables` and `route.columns`. Each holds the pool by
+  similarity, with each datasource's best entry marked picked, and is recorded
+  as a search with `lambda_mult` 1.
+- Then a `routing` record:
+  - `rrf_k`, `vote_k`, `candidates` and `floor_ratio`;
+  - each signal's datasource ranking (`signals`);
+  - the fused datasources (`fused`: score, ranks, best similarity), also given
+    as a `pool` so a search view can draw it;
+  - the datasources kept (`picks`);
+  - those dropped and why (`dropped`: `floor` or `limit`).
+
+The records name datasources and the ids of allowed entries, never entry text.
 
 ## Tenant isolation (current state)
 

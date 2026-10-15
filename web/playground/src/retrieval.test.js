@@ -62,3 +62,24 @@ test("the text form is one fixed-width line per entry, for diffing", () => {
   assert.equal(text[5], "  1  pick 1    0.610   0.610  table       Genre");
   assert.equal(text[6], "  2  drop      0.580       -  table       Track");
 });
+
+test("routing's searches and its example entries have names", () => {
+  assert.equal(shortType("schema.datasource_example"), "example");
+  assert.equal(searchTitle({ search: "route.description" }), "Routing: datasource descriptions");
+  assert.equal(searchTitle({ search: "route.examples" }), "Routing: example questions");
+  assert.equal(searchTitle({ search: "route.curated" }), "Routing: verified queries");
+  assert.equal(searchTitle({ search: "route.tables" }), "Routing: tables");
+  assert.equal(searchTitle({ search: "route.columns" }), "Routing: columns");
+  assert.equal(searchTitle({ search: "routing" }), "Routing: the fused ranking");
+});
+
+test("the routing record says how the datasources were fused and cut", () => {
+  const routing = {
+    search: "routing", rrf_k: 60, candidates: 3, floor_ratio: 0.5,
+    pool: [{ rank: 1, picked: true }, { rank: 2, picked: true }, { rank: 3, picked: false }],
+    picks: ["support", "chinook"],
+  };
+  assert.equal(mmrLine(routing),
+    "Fused 3 datasources with reciprocal rank fusion (k 60) and kept 2: at most 3, " +
+    "none less similar than 0.5 of the most similar.");
+});

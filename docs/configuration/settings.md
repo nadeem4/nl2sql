@@ -23,7 +23,7 @@ retrieval:
   planning_k: 12
   decomposer_tables: 30
 routing:
-  candidates: 5
+  candidates: 3
   max_datasources: 3
   max_sub_queries: 6
   floor_ratio: 0.5
@@ -87,26 +87,28 @@ The tenant id for requests that name none. Result files are kept per tenant.
 | Key | Default | Description |
 | --- | --- | --- |
 | `full_snapshot_max_tables` | `15` | When a datasource's schema has at most this many tables, the schema retriever skips vector retrieval and passes the full schema snapshot (every table, every column) to the planner. `0` always uses vector retrieval. |
-| `table_k` | `8` | Tables the schema retriever keeps for a sub-query. |
-| `planning_k` | `12` | Schema entries the planner is shown for a sub-query. |
-| `decomposer_tables` | `30` | Tables the decomposer is shown per datasource. |
+| `table_k` | `8` | Table entries the schema retriever's search keeps for a sub-query (and column entries, when no table matches). |
+| `planning_k` | `12` | Column and relationship entries of those tables the planner is shown for a sub-query. |
+| `decomposer_tables` | `30` | Table names the decomposer is shown per datasource; the rest are counted. |
 
-`table_k`, `planning_k` and `decomposer_tables` replace constants in the
-schema retriever and the resolver; the nodes read them from release 0.7's
-routing work ([Wave A](../architecture/wave_a.md#limits)).
+`table_k`, `planning_k` and `decomposer_tables` replace the constants the
+schema retriever and the resolver had before 0.7 (`TABLE_K`, `PLANNING_K`,
+`MAX_DECOMPOSER_TABLES`).
 
 ## `routing`
 
 Cross-database routing: which datasources a question goes to, and how far it
-may spread. Read from release 0.7's routing work
-([Wave A](../architecture/wave_a.md#9-phase-r-cross-database-routing)).
+may spread. The resolver reads `candidates`, `max_datasources` and
+`floor_ratio` ([Routing](../architecture/indexing.md#routing-five-signals-fused));
+`max_sub_queries` is read from release 0.7's limits work
+([Wave A](../architecture/wave_a.md#limits)).
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `candidates` | `5` | Datasources shown to the answerability check. |
-| `max_datasources` | `3` | Datasources one question may use. |
+| `candidates` | `3` | Datasources routing keeps for the answerability check, best by fused score first. |
+| `max_datasources` | `3` | Datasources one question may use: of those the answerability check accepts, the resolver forwards at most this many, best first. |
 | `max_sub_queries` | `6` | Sub-queries one question may have. A decomposition over it ends the run with `QUESTION_TOO_BROAD`. |
-| `floor_ratio` | `0.5` | A candidate scoring under this share of the best is dropped, between 0 and 1. |
+| `floor_ratio` | `0.5` | A candidate whose best index-entry similarity to the question is under this share of the most similar candidate's is dropped, between 0 and 1. It is on similarity, not on the fused score: with a handful of datasources every reciprocal-rank score is within a few percent of the best. `0` keeps every candidate up to `candidates`. |
 
 ## `results`
 

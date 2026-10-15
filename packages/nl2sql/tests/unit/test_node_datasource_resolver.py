@@ -6,6 +6,7 @@ from nl2sql.pipeline.nodes.datasource_resolver.node import DatasourceResolverNod
 from nl2sql.pipeline.state import GraphState
 from nl2sql.policies import UserContext
 from nl2sql.common.errors import ErrorCode
+from nl2sql.indexing.models import RouteCandidate
 from nl2sql.llm import LLMRegistry
 from nl2sql.llm.models import AgentConfig
 from nl2sql.secrets import SecretManager
@@ -31,12 +32,9 @@ def llm_registry():
     server.stop()
 
 
-def _doc(datasource_id: str | None = "ds1", schema_version: str = "v1"):
-    doc = SimpleNamespace()
-    doc.metadata = {"schema_version": schema_version}
-    if datasource_id is not None:
-        doc.metadata["datasource_id"] = datasource_id
-    return doc
+def _routes(*datasource_ids):
+    """A ``route`` that ranks ``datasource_ids``, best first."""
+    return lambda *_a, **_k: [RouteCandidate(datasource_id=d, score=1.0) for d in datasource_ids]
 
 
 def _ctx(llm_registry, vector_store, allowed, ds_ids=TWO, version="v1"):
@@ -70,7 +68,7 @@ def test_datasource_resolver_handles_missing_vector_store(llm_registry):
 
 def test_datasource_resolver_allows_wildcard_datasource(llm_registry):
     # Validates wildcard because demo policy uses '*' to allow all datasources.
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [_doc()])
+    vector_store = SimpleNamespace(route=_routes("ds1"))
     node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["*"]))
 
     result = node(GraphState(user_query="q", user_context=UserContext()))
@@ -81,7 +79,7 @@ def test_datasource_resolver_allows_wildcard_datasource(llm_registry):
 
 def test_datasource_resolver_no_candidates_returns_error(llm_registry):
     # Validates error path because resolver must fail when no candidates exist.
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [])
+    vector_store = SimpleNamespace(route=_routes())
     node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"]))
 
     result = node(GraphState(user_query="q", user_context=UserContext()))
@@ -91,7 +89,7 @@ def test_datasource_resolver_no_candidates_returns_error(llm_registry):
 
 def test_datasource_resolver_rbac_denies_all(llm_registry):
     # Validates RBAC because resolver must block unauthorized access.
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [_doc()])
+    vector_store = SimpleNamespace(route=_routes("ds1"))
     node = DatasourceResolverNode(_ctx(llm_registry, vector_store, []))
 
     result = node(GraphState(user_query="q", user_context=UserContext()))
@@ -101,7 +99,7 @@ def test_datasource_resolver_rbac_denies_all(llm_registry):
 
 def test_datasource_resolver_unsupported_datasource(llm_registry):
     # Validates the registry filter because unsupported datasources must be rejected.
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [_doc()])
+    vector_store = SimpleNamespace(route=_routes("ds1"))
     # "ds1" is not registered, so the registry does not list it.
     node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"], ds_ids=[]))
 
@@ -114,33 +112,12 @@ def test_datasource_resolver_unsupported_datasource(llm_registry):
     assert response.unsupported_datasource_ids == ["ds1"]
 
 
-def test_datasource_resolver_dedupes_candidate_docs(llm_registry):
-    # Validates dedupe because multiple docs for same datasource should collapse.
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [_doc(), _doc()])
-    node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["*"]))
-
-    result = node(GraphState(user_query="q", user_context=UserContext()))
-
-    response = result["datasource_resolver_response"]
-    assert len(response.resolved_datasources) == 1
-
-
-def test_datasource_resolver_missing_datasource_id(llm_registry):
-    # Validates missing metadata because docs without datasource_id are ignored.
-    vector_store = SimpleNamespace(
-        retrieve_datasource_candidates=lambda *_a, **_k: [_doc(datasource_id=None)]
-    )
-    node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"]))
-
-    result = node(GraphState(user_query="q", user_context=UserContext()))
-
-    assert result["errors"][0].error_code == ErrorCode.SCHEMA_RETRIEVAL_FAILED
 
 
 def test_datasource_resolver_explicit_datasource_override(llm_registry):
     # Validates the explicit override path because --ds-id / API datasource_id must
     # resolve a registered, allowed datasource and populate schema_version.
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [])
+    vector_store = SimpleNamespace(route=_routes())
     # The live build's schema version, from the index pointer.
     node = DatasourceResolverNode(_ctx(llm_registry, vector_store, ["ds1"], version="v7"))
 
@@ -157,24 +134,12 @@ def test_datasource_resolver_explicit_datasource_override(llm_registry):
     assert resolved.schema_version == "v7"
 
 
-def test_resolved_metadata_has_a_stable_key_order(llm_registry):
-    """The vector store hands metadata back in no fixed key order, and the
-    decomposer prints it into its prompt. Two runs of the same question then sent
-    different prompts, which a trace replay reports as a divergence."""
-    doc = SimpleNamespace(metadata={"type": "schema.datasource", "schema_version": "v1",
-                                    "id": "schema.datasource:ds1:v1", "datasource_id": "ds1"})
-    vector_store = SimpleNamespace(retrieve_datasource_candidates=lambda *_a, **_k: [doc])
-    ctx = _ctx(llm_registry, vector_store, ["ds1"])
-    result = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext()))
-    [resolved] = result["datasource_resolver_response"].resolved_datasources
-    assert list(resolved.metadata) == ["datasource_id", "id", "schema_version", "type"]
-
 
 def test_an_empty_index_gets_an_actionable_error(llm_registry):
     # The owner's demo: 0 entries, and every question said only
     # "No datasource candidates resolved." with nothing to do about it.
     vector_store = SimpleNamespace(
-        retrieve_datasource_candidates=lambda *_a, **_k: [],
+        route=_routes(),
         is_empty=lambda: True,
     )
 
@@ -190,7 +155,7 @@ def test_an_empty_index_gets_an_actionable_error(llm_registry):
 
 def test_no_match_in_a_populated_index_keeps_the_original_message(llm_registry):
     vector_store = SimpleNamespace(
-        retrieve_datasource_candidates=lambda *_a, **_k: [],
+        route=_routes(),
         is_empty=lambda: False,
     )
 

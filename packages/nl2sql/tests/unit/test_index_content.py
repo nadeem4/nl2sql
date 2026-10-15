@@ -91,13 +91,16 @@ def test_the_datasource_chunk_contains_the_configured_description(tmp_path):
     assert DESCRIPTION in _datasource_text(ctx)
 
 
-def test_the_datasource_chunk_contains_the_example_questions(tmp_path):
+def test_each_example_question_is_an_entry_of_its_own(tmp_path):
+    """One entry per phrasing (Phase R): in the datasource entry the fifth question barely moved the vector."""
     ctx = _ctx(tmp_path)
 
     IndexingOrchestrator(ctx).index_datasource(_Adapter())
 
-    text = _datasource_text(ctx)
-    assert all(q in text for q in QUESTIONS)
+    build_id = ctx.index.pointers(ctx.namespace)["chinook"].build_id
+    examples = ctx.index.get(ctx.namespace, Filter(eq={"type": "schema.datasource_example", "build_id": build_id}))
+    assert sorted(e.text for e in examples) == sorted(QUESTIONS)
+    assert not any(q in _datasource_text(ctx) for q in QUESTIONS)
 
 
 def test_the_snapshot_stores_the_configured_description_too(tmp_path):

@@ -9,7 +9,7 @@ class ResolvedDatasource(BaseModel):
     datasource_id: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
     # What the decomposer routes on: the description and up to
-    # MAX_DECOMPOSER_TABLES table names (sorted), with the rest counted.
+    # settings.retrieval.decomposer_tables table names (sorted), with the rest counted.
     description: str = ""
     tables: List[str] = Field(default_factory=list)
     more_tables: int = 0

@@ -35,12 +35,21 @@ def test_names_match_whatever_their_case():
     assert scored["table_recall"] == 1.0 and scored["column_recall"] == 1.0 and scored["missed_columns"] == []
 
 
-def test_routing_ranks_datasources_best_first_without_repeats_up_to_the_limit():
+def test_routing_ranks_datasources_best_first_up_to_the_limit_with_the_routing_settings():
+    from nl2sql.config.models import Settings
+    from nl2sql.indexing.models import RouteCandidate
+
+    asked = []
+
+    def route(question, ids, explain=None, *, limit, floor_ratio):
+        asked.append((list(ids), limit, floor_ratio))
+        return [RouteCandidate(datasource_id=d, score=1.0) for d in ("support", "chinook", "webanalytics")]
+
     ctx = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook", "support", "webanalytics"]),
-                          vector_store=SimpleNamespace(retrieve_datasource_candidates=lambda q, k: [
-                              SimpleNamespace(metadata={"datasource_id": d})
-                              for d in ("support", "support", "chinook", "webanalytics")]))
+                          settings=Settings.model_validate({"routing": {"candidates": 4, "floor_ratio": 0.2}}),
+                          vector_store=SimpleNamespace(route=route))
     assert rr.routed(ctx, "q", 2) == ["support", "chinook"]
+    assert asked == [(["chinook", "support", "webanalytics"], 4, 0.2)]
     one = SimpleNamespace(ds_registry=SimpleNamespace(list_ids=lambda: ["chinook"]))
     assert rr.routed(one, "q", 3) == ["chinook"]
 

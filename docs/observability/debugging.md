@@ -173,17 +173,25 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
 }
 ```
 
-- **`query`** is the text actually embedded: the question for the resolver, and
+- **`query`** is the text actually embedded: the question for the resolver's routing, and
   for the schema retriever the sub-query's intent, filters, group-by, expected
   columns and metrics, one per line.
 - **`pool`** is every candidate, nearest first. `similarity` is the cosine
-  similarity MMR uses; `distance` is Chroma's (squared L2), and `null` for the
-  resolver's `datasources` search, which scores every datasource entry itself
-  rather than asking Chroma's approximate search. `pick_order` is the
+  similarity MMR uses; `distance` is Chroma's (squared L2). The resolver's
+  routing searches record no distance: each ranks its pool by similarity
+  alone (recorded as `lambda_mult` 1), and its picks are each datasource's
+  best entry. `pick_order` is the
   order MMR picked in, `mmr_score` the score the pick won with, and
   `redundancy` its similarity to the closest earlier pick.
 - **`searches`** lists each search in order; the schema retriever runs `tables`
   (or `columns` when that finds nothing), then `planning` over the tables found.
+  The resolver runs one search per routing signal (`route.description`,
+  `route.examples`, `route.curated`, `route.tables`, `route.columns`) and ends
+  with a `routing` record: each signal's datasource ranking (`signals`), the
+  fused reciprocal-rank scores with each datasource's ranks (`fused`), the
+  datasources kept (`picks`) and those dropped (`dropped`, with `floor` or
+  `limit`), and the `rrf_k`, `vote_k`, `candidates` and `floor_ratio` used. See
+  [Routing](../architecture/indexing.md#routing-five-signals-fused).
 - **`tables`** (schema retriever) is what survived: the tables and columns sent
   to the planner.
 - **`skipped: true`** with a `reason` means no search ran: the schema is small

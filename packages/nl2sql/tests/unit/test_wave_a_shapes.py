@@ -29,7 +29,7 @@ def test_new_settings_have_the_designed_defaults():
     s = Settings()
     assert (s.pipeline.max_llm_calls, s.pipeline.max_cost_usd, s.pipeline.sanity_checks) == (60, None, True)
     assert (s.routing.candidates, s.routing.max_datasources, s.routing.max_sub_queries,
-            s.routing.floor_ratio) == (5, 3, 6, 0.5)
+            s.routing.floor_ratio) == (3, 3, 6, 0.5)
     assert (s.retrieval.full_snapshot_max_tables, s.retrieval.table_k, s.retrieval.planning_k,
             s.retrieval.decomposer_tables) == (15, 8, 12, 30)
 

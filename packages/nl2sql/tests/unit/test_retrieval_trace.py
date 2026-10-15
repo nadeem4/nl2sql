@@ -224,11 +224,13 @@ def test_the_resolver_records_its_search(tmp_path):
     retrieval = out["retrieval"]
     assert retrieval["skipped"] is False
     assert retrieval["query"] == QUESTION
-    [search] = retrieval["searches"]
-    assert search["search"] == "datasources"
-    assert (search["k"], search["fetch_k"], search["lambda_mult"]) == (5, 20, 0.7)
+    searches = {s["search"]: s for s in retrieval["searches"]}
+    assert list(searches) == ["route.description", "route.examples", "route.curated", "route.tables",
+                              "route.columns", "routing"]
+    search = searches["route.description"]
     assert {e["label"] for e in search["pool"]} == {"chinook", "sales"}
     assert all(e["picked"] and isinstance(e["similarity"], float) for e in search["pool"])
+    assert searches["routing"]["picks"][0] in {"chinook", "sales"}
     assert "answerab" not in str(retrieval)  # the LLM check is traced as an LLM call, not here
 
 

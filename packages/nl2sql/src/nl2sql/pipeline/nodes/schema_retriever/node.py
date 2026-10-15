@@ -20,10 +20,6 @@ logger = get_logger("schema_retriever")
 class SchemaRetrieverNode:
     """Retrieves relevant schema chunks for planning context."""
 
-    # Entries MMR picks: tables (or columns, when no table matches), then the
-    # columns and relationships of the picked tables.
-    TABLE_K = 8
-    PLANNING_K = 12
     # A preferred table the table search scored but did not pick is added when
     # its similarity is at most this far below the least similar pick.
     PREFERRED_MARGIN = 0.05
@@ -35,6 +31,10 @@ class SchemaRetrieverNode:
         self.policy_engine = ctx.policy_engine
         self.ds_registry = getattr(ctx, "ds_registry", None)
         self.full_snapshot_max_tables = ctx.settings.retrieval.full_snapshot_max_tables
+        # Entries MMR picks: table_k tables (or columns, when no table
+        # matches), then planning_k columns and relationships of those tables.
+        self.table_k = ctx.settings.retrieval.table_k
+        self.planning_k = ctx.settings.retrieval.planning_k
 
     def _preferred(self, datasource_id: str) -> Callable[[TableRef], bool]:
         """Whether a table is one of the datasource's ``preferred_tables``."""
@@ -270,7 +270,7 @@ class SchemaRetrieverNode:
             searchable = [contract.table.full_name for contract in visible.values()]
             if self.vector_store and searchable:
                 schema_docs = self.vector_store.retrieve_schema_context(
-                    query, datasource_id, k=self.TABLE_K, explain=searches, tables=searchable
+                    query, datasource_id, k=self.table_k, explain=searches, tables=searchable
                 )
                 if schema_docs:
                     for doc in schema_docs:
@@ -281,7 +281,7 @@ class SchemaRetrieverNode:
                         tables[table].update([])
                 else:
                     column_docs = self.vector_store.retrieve_column_candidates(
-                        query, datasource_id, k=self.TABLE_K, explain=searches, tables=searchable
+                        query, datasource_id, k=self.table_k, explain=searches, tables=searchable
                     )
                     for doc in column_docs:
                         table = doc.metadata.get("table")
@@ -295,7 +295,7 @@ class SchemaRetrieverNode:
             planning_docs = []
             if self.vector_store and tables:
                 planning_docs = self.vector_store.retrieve_planning_context(
-                    query, datasource_id, list(tables.keys()), k=self.PLANNING_K, explain=searches
+                    query, datasource_id, list(tables.keys()), k=self.planning_k, explain=searches
                 )
 
             for doc in planning_docs:

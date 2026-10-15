@@ -45,7 +45,7 @@ The section can also be a file holding the list
 | `limits` | none | `row_limit`, `timeout_ms`, `max_bytes`; see [Limits](#limits). |
 | `index` | everything | What of the database is indexed; see [Index](#index). |
 | `preferred_tables` | `[]` | Tables or views the planner should reach for first. See [Preferred tables](#preferred-tables). |
-| `sample_questions` | `[]` | Questions the datasource answers. They are indexed into its `schema.datasource` entry, which routing reads. |
+| `sample_questions` | `[]` | Questions the datasource answers. Each is indexed as an entry of its own (`schema.datasource_example`), one of the signals routing votes with. |
 | `domains` | `[]` | A routing hint written by people. Routing does not read it yet. |
 | `required` | `false` | `engine.check()` fails (`EngineNotReady`) when this datasource cannot connect, and the CLI, `nl2sql-api` and the demo refuse to start. See [Startup](system.md#startup-check-and-required). |
 

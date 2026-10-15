@@ -4,6 +4,7 @@
 
 const TYPE_NAMES = {
   "schema.datasource": "datasource",
+  "schema.datasource_example": "example",
   "schema.table": "table",
   "schema.column": "column",
   "schema.relationship": "join",
@@ -20,6 +21,12 @@ const SEARCH_NAMES = {
   tables: "Table search",
   columns: "Column search",
   planning: "Columns and joins of the picked tables",
+  "route.description": "Routing: datasource descriptions",
+  "route.examples": "Routing: example questions",
+  "route.curated": "Routing: verified queries",
+  "route.tables": "Routing: tables",
+  "route.columns": "Routing: columns",
+  routing: "Routing: the fused ranking",
 };
 
 export function searchTitle(search) {
@@ -49,6 +56,12 @@ export function passedOver(search) {
 // One sentence on how the picks were made, with this search's numbers.
 export function mmrLine(search) {
   if (!search) return "";
+  if (search.search === "routing") {
+    const fused = (search.pool || []).length;
+    const kept = (search.picks || []).length;
+    return `Fused ${fused} datasource${fused === 1 ? "" : "s"} with reciprocal rank fusion (k ${search.rrf_k}) ` +
+      `and kept ${kept}: at most ${search.candidates}, none less similar than ${search.floor_ratio} of the most similar.`;
+  }
   const pool = (search.pool || []).length;
   const picks = (search.picks || []).length;
   const lam = Number(search.lambda_mult);

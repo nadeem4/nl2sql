@@ -64,7 +64,7 @@ the first draft (PR #308) changed several of them; those are marked
 | D25 | **`engine.evals` only.** No top-level `engine.evaluate` (the top level stays questions only). `engine.benchmark`, `BenchmarkAPI`, `BenchmarkConfig` and `nl2sql benchmark` are deleted. | decided overnight, owner to confirm | [The facade](#the-facade) |
 | D26 | **Seeding asks the model for questions and typed plans,** never SQL, five per call, under a cost cap (`max_cost_usd`, by default `evals.yaml`'s). The engine's validator and generator turn each plan into SQL, the adapter runs it read-only, and the case is written with `status: draft`. | decided overnight, amended after review, owner to confirm | [Seeding](#seeding-benchmark-your-own-database) |
 | D27 | **`regenerate` runs gold SQL through the datasource's adapter.** `evaluation/gold.py`'s direct `sqlite3` use and its boundary exemption go. | decided overnight, owner to confirm | [Regenerating expected rows](#regenerating-expected-rows) |
-| D28 | **Routing fuses five signals with reciprocal rank fusion** (`k = 60`), keeps the top 3, and drops a datasource scoring under half the best. `candidates`, `max_datasources`, `max_sub_queries` and `floor_ratio` are settings; the vote depth and the fusion constant stay constants until a measurement asks for a knob. | decided overnight, amended after review, owner to confirm | [Phase R](#9-phase-r-cross-database-routing) |
+| D28 | **Routing fuses five signals with reciprocal rank fusion** (`k = 60`), keeps the top 3 (`candidates` defaults to 3), and drops a datasource whose best entry similarity is under half the most similar datasource's: the floor is on similarity, not on the fused score, because the fused scores of a handful of datasources are always within a few percent of each other. A datasource a signal did not rank gets the rank after the last one it did, so having entries of a type (only one datasource with verified queries, say) is not a vote. Only entries the caller's scope allows vote: a hidden table or column, or a verified query that reads a hidden table, never votes or reaches the trace. `candidates`, `max_datasources`, `max_sub_queries` and `floor_ratio` are settings; the vote depth and the fusion constant stay constants until a measurement asks for a knob. | decided overnight, amended after review (twice: the floor on similarity, the absent rank, table scope, after the review of PR #316), owner to confirm | [Phase R](#9-phase-r-cross-database-routing) |
 | D29 | **A decomposition over `max_sub_queries` ends the run** with `QUESTION_TOO_BROAD`, whose message asks for a narrower question. It is not retried. | decided overnight, owner to confirm | [Limits](#limits) |
 | D30 | **Join keys are coerced, not just checked.** The engine's aggregator casts both sides of a join key to the declared `dtype` (in polars, so no dialect is involved), and a value that does not convert is a warning. The validator rejects only categories that cannot be coerced (temporal against number or boolean); an unknown type is not checked. The plan has no `CAST`, so the validator never asks the model for one. | decided overnight, amended after review, owner to confirm | [The join-key type check](#the-join-key-type-check) |
 | D31 | **Structural diffs are stored with the new version** in the state store (store interface version 2). A rename is reported as a drop and an add. `index.check()` never re-indexes. | decided overnight, owner to confirm | [Schema drift](#10-schema-drift-measure-first) |
@@ -1266,15 +1266,23 @@ search ranks datasources by their best entry:
 The ranks are fused with reciprocal rank fusion (D28):
 
 ```text
-score(ds) = sum over signals s where ds ranks:  1 / (RRF_K + rank_s(ds))
+score(ds) = sum over signals s:  1 / (RRF_K + rank_s(ds))
 ```
+
+where `rank_s(ds)` is `len(ranked_s) + 1` for a datasource signal `s` did not
+rank (amended after review: otherwise merely having entries of a type is a
+vote).
 
 `VOTE_K = 20` and `RRF_K = 60` (the value the RRF literature uses) are
 constants on `Retriever`, beside `FETCH_MULTIPLIER` and `LAMBDA_MULT`, until
 the routing suite shows a reason to tune them.
 
-Then the candidates are the top `candidates` by score, dropping any whose
-score is under `floor_ratio` times the best. The trace records each signal's
+Then the candidates are the top `candidates` by score, dropping any whose best
+entry similarity is under `floor_ratio` times the most similar candidate's
+(amended after review: a floor on the fused score never fires). The searches
+see only the entries the caller's scope allows: a table or column of a hidden
+table, or a verified query that reads one, is dropped before it can vote or be
+recorded. The trace records each signal's
 ranking and the fused scores (`retrieval.searches`, with a new
 `routing` record), so the playground's inspector and an eval can show why a
 datasource was or was not chosen.
@@ -1283,15 +1291,74 @@ The answerability verdict is unchanged in shape (it already returns a list):
 it may pick several of the candidates, and the resolver forwards at most
 `max_datasources` of them, in fused order.
 
+!!! note "Built: entries, votes, fusion and the retrieval settings (R1)"
+    - **Entries.** `DatasourceExampleChunk` (`schema.datasource_example`) in
+      `indexing/models.py`; `build_example_chunks(datasource_id, questions,
+      schema_version)` in `indexing/chunk_builder.py` takes the question list
+      from its caller (`SchemaChunkBuilder` passes the orchestrator's
+      `sample_questions`, or enrichment's), so Wave B adds the glossary's
+      `examples` to that list without changing it. Blank and repeated
+      questions are skipped; ids hash the question. `DatasourceChunk` lost
+      `examples`. `ENTRY_TYPES` lists the new type.
+    - **Routing.** `Retriever.route(question, datasource_ids, explain=None, *,
+      limit=3, floor_ratio=0.5, allows=None) -> list[RouteCandidate]` replaces
+      `retrieve_datasource_candidates`, which is deleted. `limit`,
+      `floor_ratio` and `allows` (an entry check) are keyword arguments the
+      resolver fills from `settings.routing.candidates`, `floor_ratio` and the
+      caller's scope (the retriever reads no settings and no policy).
+      `RouteCandidate` (`datasource_id`, `score`, `ranks`, `similarity`) is in
+      `indexing/models.py`; `ROUTE_SIGNALS`, `fuse(rankings, rrf_k,
+      datasource_ids, similarity=None)` (an unranked datasource gets rank
+      `len(ranked) + 1`) and `shortlist(fused, limit, floor_ratio)` (the floor
+      on best similarity) are module functions in `indexing/retrieval.py`;
+      `VOTE_K = 20` and `RRF_K = 60` are on `Retriever`. The trace gets one
+      `route.<signal>` record per signal and a `routing` record (`signals`,
+      `fused` with each similarity, a `pool` of the fused datasources, `picks`,
+      `dropped` with `floor` or `limit`, `rrf_k`, `vote_k`, `candidates`,
+      `floor_ratio`).
+    - **Table scope (after the review of PR #316).** The resolver's
+      `_route_filter` passes `allows`: a table or column entry votes only when
+      its (datasource, table) is visible in the live snapshot, a verified query
+      only when every table its SQL reads is. Refused entries are dropped
+      before ranking or recording, over-fetching so `VOTE_K` counts allowed
+      entries. `routing.candidates` now defaults to 3, as D28 says.
+    - **The resolver.** The scope filter runs before routing: no reachable
+      datasource is a `SECURITY_VIOLATION` with no search. It forwards at most
+      `max_datasources` of the accepted candidates, best by fused score; the
+      forwarded list stays sorted by id, so the decomposer's prompt does not
+      depend on the fused order. `ResolvedDatasource.metadata` is empty on
+      every path now (it held the datasource entry's metadata, which nothing
+      read). `MAX_DECOMPOSER_TABLES` is `settings.retrieval.decomposer_tables`.
+    - **The schema retriever** reads `settings.retrieval.table_k` and
+      `planning_k`; `TABLE_K` and `PLANNING_K` are deleted.
+    - **The retrieval scorers** (`evaluation/scorers/retrieval_recall.py`,
+      after V1): `routed()` ranks with `route` under `settings.routing`
+      (then cut at the caller's limit, `max_datasources` in mode
+      `retrieval`), and `retrieval_settings()` reads `settings.retrieval`.
+    - **Baseline.** The 0.6 retrieval baseline, recorded on `main` before any
+      of this changed, is
+      `benchmarks/retrieval/chinook/2026-10-15_653fa73_retrieval.json`:
+      table recall 0.9767, column recall 0.7185 and
+      `datasource_top1_accuracy` 0.9535 (41 of 43 Chinook questions; the two
+      misses went to `support`), over the demo's three datasources with the
+      local embeddings.
+    - **Measured after the review (key-free, local embeddings).** Routing
+      top-1 over 79 questions across the demo's three datasources (the 43
+      Chinook gold questions, the 20 sample questions and 16 paraphrases
+      written for this check): 0.6 75/79; R1 before the review 62/79 (the
+      curated free vote sent 17 of the 20 support and webanalytics questions
+      to chinook); R1 after it 77/79. The expected datasource was among the
+      shortlisted candidates for all 79 in every version.
+
 ### Limits
 
 ```yaml
 # settings.yaml
 routing:
-  candidates: 5          # datasources shown to the answerability check
+  candidates: 3          # datasources shown to the answerability check
   max_datasources: 3     # datasources one question may use
   max_sub_queries: 6     # sub-queries one question may have
-  floor_ratio: 0.5       # drop a candidate scoring under this share of the best
+  floor_ratio: 0.5       # drop a candidate less similar than this share of the most similar
 retrieval:
   full_snapshot_max_tables: 15     # exists
   table_k: 8                       # was SchemaRetrieverNode.TABLE_K

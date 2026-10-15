@@ -683,10 +683,12 @@ is answered from one database, and joining across them is planned. Clicking a
 question from another pile moves the switcher to that database, so the schema
 on the left is the one the question is about.
 
-They are also indexed, per datasource: the `schema.datasource` entry the
-resolver matches every question against carries that datasource's configured
-description and its own questions (`sample_questions` in its datasource
-file), which is how the resolver tells the three apart. Re-index
+They are also indexed, per datasource, each question as an entry of its own
+(`schema.datasource_example`, from `sample_questions` in its datasource file),
+beside the `schema.datasource` entry with the configured description. Routing
+votes with both, and with each datasource's tables and columns, which is how
+the resolver tells the three apart (see
+[Routing](../architecture/indexing.md#routing-five-signals-fused)). Re-index
 (`nl2sql index`) after editing them.
 
 Whether a given question is answered correctly depends on the model; see

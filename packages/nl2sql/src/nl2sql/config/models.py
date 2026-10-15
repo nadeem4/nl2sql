@@ -458,10 +458,10 @@ class RetrievalSettings(_Model):
 class RoutingSettings(_Model):
     """Cross-database routing (read from R1 and R2)."""
 
-    candidates: PositiveInt = 5  # datasources shown to the answerability check
+    candidates: PositiveInt = 3  # datasources shown to the answerability check (D28)
     max_datasources: PositiveInt = 3  # datasources one question may use
     max_sub_queries: PositiveInt = 6  # sub-queries one question may have
-    floor_ratio: float = Field(0.5, ge=0.0, le=1.0)  # drop a candidate scoring under this share of the best
+    floor_ratio: float = Field(0.5, ge=0.0, le=1.0)  # drop a candidate less similar than this share of the best
 
 
 class ResultSettings(_Model):

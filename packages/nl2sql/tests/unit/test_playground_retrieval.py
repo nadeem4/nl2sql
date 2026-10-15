@@ -66,7 +66,8 @@ def test_options_say_it_is_on_and_list_the_choices(tmp_path):
 
     assert body["available"] is True and body["reason"] is None
     assert body["datasource_id"] == "chinook"
-    assert body["types"][:4] == ["schema.datasource", "schema.table", "schema.column", "schema.relationship"]
+    assert body["types"][:5] == ["schema.datasource", "schema.datasource_example", "schema.table", "schema.column",
+                                 "schema.relationship"]
     assert body["defaults"] == {"k": 8, "lambda_mult": 0.7, "fetch_multiplier": 4}
 
 

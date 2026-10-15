@@ -31,16 +31,13 @@ class DatasourceChunk(BaseChunk):
     description: str
     domains: Optional[List[str]] = None
     schema_version: str
-    examples: Optional[List[str]] = None
 
     def get_page_content(self) -> str:
         domains = ", ".join(self.domains) if self.domains else "N/A"
-        examples = ", ".join(self.examples) if self.examples else "N/A"
         return (
             f"Datasource: {self.datasource_id}\n"
             f"{self.description}\n"
-            f"Domains: {domains}\n"
-            f"Examples: {examples}"
+            f"Domains: {domains}"
         )
 
     def get_metadata(self) -> Dict[str, Any]:
@@ -49,6 +46,49 @@ class DatasourceChunk(BaseChunk):
             "datasource_id": self.datasource_id,
             "schema_version": self.schema_version,
         }
+
+
+class DatasourceExampleChunk(BaseChunk):
+    """One example question a datasource answers, as an entry of its own.
+
+    One entry per phrasing, so the fifth example moves routing as much as the
+    first; in one shared text it barely moved the vector. See
+    docs/architecture/wave_a.md, section 9.
+    """
+
+    type: Literal["schema.datasource_example"] = Field(
+        default="schema.datasource_example", frozen=True
+    )
+
+    datasource_id: str
+    question: str
+    schema_version: str
+
+    def get_page_content(self) -> str:
+        return self.question
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            **super().get_metadata(),
+            "datasource_id": self.datasource_id,
+            "schema_version": self.schema_version,
+        }
+
+
+class RouteCandidate(BaseModel):
+    """A datasource routing ranked: its fused score, its rank in each signal that ranked it, its best similarity.
+
+    ``ranks`` maps a signal (``description``, ``examples``, ``curated``,
+    ``tables``, ``columns``) to the datasource's 1-based rank in it; a signal
+    in which the datasource had no entry is absent. ``similarity`` is the
+    cosine similarity of its best entry across the signals, which the floor
+    compares.
+    """
+
+    datasource_id: str
+    score: float
+    ranks: Dict[str, int] = Field(default_factory=dict)
+    similarity: float = 0.0
 
 
 class TableChunk(BaseChunk):
