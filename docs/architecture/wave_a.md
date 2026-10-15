@@ -1764,7 +1764,8 @@ Phase R's change rather than asserting a number.
       Chinook suite and its digest are unchanged. The three cross-database
       cases are tagged with both their datasources; the suite's header names the
       cases with two defensible answers. Both changed the suite's digest, so
-      the routing baseline was recorded again from CI.
+      the routing baseline was recorded again from CI (run 38788733052,
+      `2026-10-15_baaae0c_retrieval.json`: the same 97.4% top-1 and 98.7% shortlist).
     - **Measured (key-free, local embeddings).** On the routing suite, routing
       top-1 is 76/78 and shortlist recall 77/78. The misses: "Which customers
       complained most about refunds?" and "How many purchases were there per

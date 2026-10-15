@@ -55,7 +55,7 @@ def test_routing_on_the_wide_schema(server, tmp_path):
     suite = tmp_path / "routing_wide.yaml"
     write_suite(suite, {"version": 1, "cases": [
         {"id": f"wide_{i:02d}", "question": question, "datasources": [sources[name].id], "status": "approved",
-         "outcome": {"admin": "allowed"}, "tags": ["routing", name]}
+         "kind": "routing", "outcome": {"admin": "allowed"}, "tags": ["routing", name]}
         for i, (question, name) in enumerate(CASES, 1)]})
 
     with NL2SQL(config) as engine:

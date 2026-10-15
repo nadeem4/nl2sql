@@ -87,7 +87,8 @@ def test_an_eval_runs_without_touching_another_engine(tmp_path, monkeypatch):
 
     monkeypatch.setattr(run_module, "_ask", ask)
     cfg = LLMFileConfig(default=AgentConfig(provider="openai", model="gpt-5.4", **KEY))
-    suite = EvalSuite(cases=[{"id": "q0", "question": "?", "status": "approved", "outcome": {"admin": "allowed"}}])
+    suite = EvalSuite(cases=[{"id": "q0", "question": "?", "status": "approved", "sql": "SELECT 1",
+                                    "outcome": {"admin": "allowed"}}])
     run_module.run_evals(a, [suite], mode="full", llm={"x": cfg}, scorers=["outcome"], curated=False,
                          max_cost_usd=1.0)
 
