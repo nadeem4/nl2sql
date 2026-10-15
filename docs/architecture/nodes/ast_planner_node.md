@@ -15,7 +15,8 @@
 - Serve a pinned plan from the plan cache on a first attempt, without an LLM call.
 - Serialize `relevant_tables` into the planning prompt.
 - Pass user intent, expected schema, and error feedback to the LLM.
-- Return `ASTPlannerResponse` with the `PlanModel` and its `plan_source` (`"llm"` or `"cache"`).
+- Run the `plan.after` hooks on the plan (the planner's or the cached one) in `after_plan()`, the one place every plan the validator gets passes through.
+- Return `ASTPlannerResponse` with the `PlanModel` the hooks let through, the planner's own plan (`planner_plan`, which the plan cache stores) and its `plan_source` (`"llm"` or `"cache"`).
 
 ---
 
@@ -99,7 +100,9 @@ validation and executed is reused
   cached plan exactly as on a fresh one, so RBAC and policy changes apply.
 - **Written** by `wrap_subgraph` (`pipeline/graph_utils.py`) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
-  and plan-only runs are not stored.
+  and plan-only runs are not stored. What is stored is `planner_plan`, the
+  plan before any `plan.after` hook changed it; the hooks run again on every
+  hit.
 - **Controls:** `settings.pipeline.plan_cache` (default `true`) and `nl2sql cache clear`.
 
 See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinism-from-the-architecture).
@@ -108,13 +111,16 @@ See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinis
 
 ## Internal Flow (Step-by-Step)
 
-0. On a first attempt, look up the plan cache; on a hit, return the cached plan
-   with `plan_source="cache"` and stop.
+0. On a first attempt, look up the plan cache; on a hit, pass the cached plan
+   through `plan.after` (step 5) with `plan_source="cache"` and stop.
 1. Render `relevant_tables` with `render_schema_for_prompt` (see below).
 2. Build the feedback string from the latest attempt's errors only, one JSON object per line with `node`, `error_code` and `message` (`nl2sql.pipeline.retry_feedback`): an earlier attempt's errors, stack traces and `details` are never sent.
 3. Build `expected_schema` payload from sub‑query.
 4. Invoke the LLM chain with prompt + structured output (`PlanModel`).
-5. Return `ASTPlannerResponse` with plan and reasoning.
+5. Run `plan.after` (`after_plan()`): a `Modify` replaces the plan, which the
+   validator then checks like any other; a deny returns `plan=None` with
+   `HOOK_DENIED` (or `HOOK_FAILED`), which is never retried. Return
+   `ASTPlannerResponse` with the plan, `planner_plan` and reasoning.
 6. On exception, emit `PLANNING_FAILURE` error and return `plan=None`.
 
 ---

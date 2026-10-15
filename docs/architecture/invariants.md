@@ -262,13 +262,14 @@ Ensures deterministic and well-ordered aggregation execution.
 ## Aggregation Requires Scan Artifacts and Single-Input Post Nodes
 
 ### Definition
-Scan nodes must have corresponding artifacts, and post-combine nodes must have exactly one input.
+Scan nodes must have corresponding artifacts, and post-combine nodes must have exactly one input. The one exception is a scan a hook dropped (a deny scoped to its sub-query): it has no artifact, a `join` or `compare` group it feeds is dropped whole with its post-combine nodes, and another group goes on without it.
 
 ### Enforcement Points
-- `AggregationService.execute()` in `nl2sql.aggregation.aggregator`
+- `AggregationService.execute()` in `nl2sql.aggregation.aggregator` (its `dropped` argument)
+- `EngineAggregatorNode` in `nl2sql.pipeline.nodes.aggregator.node`, which passes the sub-queries whose output is `dropped`
 
 ### Failure Behavior
-Raises `ValueError` when artifacts are missing or post nodes have invalid inputs.
+Raises `ValueError` when artifacts are missing or post nodes have invalid inputs. A dropped group is a `HOOK_DENIED` warning; when hooks dropped every part of the question, the aggregator ends the run with `HOOK_DENIED`.
 
 ### Why It Exists
 Guarantees aggregation operates on complete, correctly wired inputs.
@@ -482,10 +483,29 @@ A verified query's SQL is written, reviewed and committed by a person in `curate
 - `packages/nl2sql/tests/sqlalchemy_base/test_bound_parameters.py`: a value `1; DROP TABLE x` is compared as a value and the table survives
 
 ### Failure Behavior
-A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run.
+A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run. A hook's deny at `execute.before` or `execute.after` is different: it ends the run with `HOOK_DENIED` and does not fall back, because a deny means no.
 
 ### Why It Exists
 *The model emits a typed plan, never SQL* holds on this path too: no model wrote the SQL, and a value cannot change what the query does.
+
+---
+
+## Hooks Modify Before the Validator, Deny After
+
+### Definition
+A hook may change what a run carries only at the three points before the logical validator: the question at `run.before`, the datasources at `datasources.after` (a subset only, checked against the caller's scope again) and the plan at `plan.after`. A plan a hook changed is validated like any other. At `execute.before`, `execute.after` and `answer.after` a hook may only allow or stop the run (or, at `execute.before`, ask for approval). Hooks fail closed: an exception, a value that is not a decision, or a decision the point does not allow denies with `HOOK_FAILED`; `on_error: open` lets an exception through as an allow, never a disallowed decision. The plan cache stores the planner's plan, never a hook's change of it.
+
+### Enforcement Points
+- `HOOK_POINTS` in `nl2sql.hooks.points` (what each point allows) and `HookRunner.call()` in `nl2sql.hooks.runner`
+- `ASTPlannerNode.after_plan()` in `nl2sql.pipeline.nodes.ast_planner.node`: every plan the validator gets (the planner's, a cached one, a supplied one) passes `plan.after` there
+- `wrap_subgraph()` in `nl2sql.pipeline.graph_utils` caches `ASTPlannerResponse.planner_plan`
+- `test_hooks_modify_only_before_the_validator` in `packages/nl2sql/tests/architecture/test_hooks_boundary.py`: the point table, an AST scan of every call site, and the SQL agent graph, in which every path from the planner to the generator passes the validator
+
+### Failure Behavior
+A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED`, an approval request `NEEDS_APPROVAL`; none is retried. A run-scoped one ends the run once the step in flight is done. A deny scoped to a sub-query drops it (and a `join` or `compare` group it feeds), and the answer says what went unanswered.
+
+### Why It Exists
+*The validator rejects everything the generator can* would mean nothing if code could change the plan or the SQL after the validator: a hook could otherwise route around the policies, including a table the role may not read.
 
 ---
 
@@ -493,7 +513,7 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 
 - **State**: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
-- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
+- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter
@@ -516,6 +536,7 @@ A broken file fails startup. At question time a bad value, a denied table, a mis
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py`
 - `packages/nl2sql/src/nl2sql/config/curated.py`
+- `packages/nl2sql/src/nl2sql/hooks/`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
 - `packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py`

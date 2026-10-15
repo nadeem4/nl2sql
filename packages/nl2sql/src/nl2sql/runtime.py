@@ -65,7 +65,7 @@ class Runtime:
         """Step 2b of loading without opening the stores: what ``nl2sql config check`` builds.
 
         Loads every name ``config`` uses through the registry and builds the
-        secret manager, the policy engine (with its policy check), the adapters (not connected), the
+        secret manager, the policy engine (with its policy check), the hooks, the adapters (not connected), the
         LLM clients (no model call), the embedder and the four stores
         named in ``storage`` (they open nothing yet). Nothing is written
         under ``storage.path`` and no process global is touched. The result
@@ -147,6 +147,7 @@ class Runtime:
                                                 secrets=self.secret_manager)
             except (RegistryError, ValueError) as e:
                 problem("policies.check", str(e))
+        self.hooks = self._build_hooks(config, problem)
         if problems:
             self.llm_registry.close()
             raise ConfigError(problems, source=source)
@@ -157,6 +158,22 @@ class Runtime:
         return self
 
     # ------------------------------------------------------------ building
+
+    def _build_hooks(self, config: Config, problem):
+        """The engine's ``HookRunner``: the ``hooks`` section's hooks, in config order.
+
+        The runner takes the list as given, so a built-in hook (Wave B's
+        ``policy.cost``) goes first here, ahead of the configured ones.
+        """
+        from nl2sql.hooks import HookRunner, build_hook
+
+        bindings = []
+        for i, entry in enumerate(config.hooks):
+            try:
+                bindings.append(build_hook(entry, registry=self.registry, secrets=self.secret_manager))
+            except (RegistryError, ValueError) as e:
+                problem(f"hooks[{i}]", str(e))
+        return HookRunner(bindings)
 
     def _build_embedder(self, config: Config):
         """The embedder, and what it is (``EmbeddingInfo``, its dimension maybe unknown). No model call."""

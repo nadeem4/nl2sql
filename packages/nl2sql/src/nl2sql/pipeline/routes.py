@@ -17,6 +17,9 @@ from nl2sql.common.logger import get_logger
 
 logger = get_logger("router")
 
+# What a hook ends a run with.
+_HOOK_ENDINGS = {ErrorCode.HOOK_DENIED, ErrorCode.HOOK_FAILED, ErrorCode.NEEDS_APPROVAL}
+
 
 def resolver_route(state: GraphState) -> str:
     resolver_response = state.datasource_resolver_response
@@ -62,9 +65,16 @@ def build_scan_layer_router(ctx: Runtime, execute: bool = True):
     Aggregating would only fail on the missing artifact, and synthesizing
     would spend an LLM call explaining nothing, so the run's errors stay the
     sub-queries' own, led by the real cause.
+
+    A hook that stopped the run (a run-scoped deny, a hook error, a request
+    for approval) ends it once the layer in flight is done. A sub-query a hook
+    dropped is done without a result; the aggregator answers from the rest,
+    and says what is missing.
     """
 
     def route_scan_layers(state: GraphState):
+        if any(e.error_code in _HOOK_ENDINGS for e in getattr(state, "errors", None) or []):
+            return END
         dag = state.execution_dag
         decomposer_response = state.decomposer_response
         sub_queries = decomposer_response.sub_queries if decomposer_response else []
@@ -77,7 +87,9 @@ def build_scan_layer_router(ctx: Runtime, execute: bool = True):
             dag, artifact_refs, completed_scan_ids(state.subgraph_outputs)
         )
         if not target_ids:
-            if not execute or not artifact_refs:
+            dropped = any(getattr(output, "status", None) == "dropped"
+                          for output in (state.subgraph_outputs or {}).values())
+            if not execute or not (artifact_refs or dropped):
                 return END
             return [Send("aggregator", state)]
 

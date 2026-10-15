@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import AbstractSet, Dict, List, Tuple
 
 import polars as pl
 from nl2sql.execution.contracts import ArtifactRef
@@ -8,6 +8,9 @@ from nl2sql.execution.dag import ExecutionDAG, LogicalNode, LogicalEdge
 
 from .columns import input_order
 from .engines.polars_duckdb import PolarsDuckdbEngine
+
+# A group of these with one side dropped is not that group: it is dropped whole.
+_TWO_SIDED = {"join", "compare"}
 
 
 class AggregationService:
@@ -18,12 +21,18 @@ class AggregationService:
         self,
         dag: ExecutionDAG,
         artifact_refs: Dict[str, ArtifactRef],
+        dropped: AbstractSet[str] = frozenset(),
     ) -> Dict[str, pl.LazyFrame]:
         """Each terminal node of the DAG as a lazy polars frame, keyed by node id.
 
         Scans read their artifacts lazily, and combines and post-combine ops
         only add to the plan: nothing is loaded until the caller writes or
         collects a frame.
+
+        ``dropped`` are scans a hook dropped (a deny scoped to the sub-query).
+        A combine group goes on without them, except a ``join`` or ``compare``,
+        which would have one side: it is dropped whole, with its post-combine
+        ops. A dropped node has no frame, so it is missing from the result.
         """
         if not dag:
             raise ValueError("No ExecutionDAG found for aggregation.")
@@ -40,11 +49,19 @@ class AggregationService:
             outgoing_edges.setdefault(edge.from_id, []).append(edge)
 
         computed: Dict[str, pl.LazyFrame] = {}
+        skipped = set(dropped)
 
         for layer in dag.layers:
             for node_id in layer:
                 node = node_index.get(node_id)
                 if not node:
+                    continue
+                if node.inputs and skipped & set(node.inputs):
+                    left = [i for i in node.inputs if i not in skipped]
+                    if node.kind != "combine" or node.attributes.get("operation") in _TWO_SIDED or not left:
+                        skipped.add(node_id)
+                        continue
+                if node_id in skipped:
                     continue
                 if node.kind == "scan":
                     artifact = artifact_refs.get(node_id)

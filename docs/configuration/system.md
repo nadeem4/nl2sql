@@ -131,8 +131,8 @@ reads a secret from the provider whose `id` is `vault` (see
 ### Observers, hooks and evals
 
 Three sections added in release 0.7 ([Wave A](../architecture/wave_a.md)).
-They are accepted and validated now; the engine reads each from the Wave A
-change named below.
+They are accepted and validated now; the engine runs the hooks, and reads
+the other two from the Wave A change named below.
 
 ```yaml
 # observers.yaml: where the engine's events go (read from E2)
@@ -145,7 +145,7 @@ change named below.
 - type: corp_siem                 # a plugin; its config_model checks the rest
   url: "${env:SIEM_URL}"
 
-# hooks.yaml: code that sees every run at fixed points, in this order (read from H1)
+# hooks.yaml: code that sees every run at fixed points, in this order (see Hooks)
 - type: corp_sql_review
   points: [execute.before]        # a subset of the hook's own points; all of them by default
   on_error: closed                # closed (the default) | open
@@ -166,7 +166,7 @@ gate:
 | Section | Item | Rule |
 | --- | --- | --- |
 | `observers` | `{type: <name>, ...}` (`ObserverConfig`) or an observer object in code | `type` names a registered observer (`nl2sql.observers`); its `config_model` checks the other keys, and keeps their `${...}` references until it is built. Without the section the engine runs `log` and `audit`; `observers: []` runs none. |
-| `hooks` | `{type: <name>, points, on_error, approver_roles, ...}` (`HookConfig`) or a hook object in code | `points` takes `run.before`, `datasources.after`, `plan.after`, `execute.before`, `execute.after` and `answer.after`; any other is an error. `on_error` is `closed` or `open`. The hook's `config_model` checks its own keys. |
+| `hooks` | `{type: <name>, points, on_error, approver_roles, ...}` (`HookConfig`) or a hook object in code | `points` takes `run.before`, `datasources.after`, `plan.after`, `execute.before`, `execute.after` and `answer.after`; any other is an error. `on_error` is `closed` or `open`. The hook's `config_model` checks its own keys. A point the hook does not declare is an error. See [Hooks](hooks.md). |
 | `evals` | `EvalsConfig` | Strict keys. `suites` are files of cases, read when a run asks for them, not when the engine starts. `gate.alpha` is between 0 and 1. |
 
 ```python

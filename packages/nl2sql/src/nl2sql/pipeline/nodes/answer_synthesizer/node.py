@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import streaming_structured, structured
@@ -20,18 +21,23 @@ from .prompts import ANSWER_SYNTHESIZER_PROMPT, VERIFIED_QUERY_SECTION
 logger = get_logger("answer_synthesizer")
 
 
-def _missing_values(warnings: List[Dict[str, Any]]) -> List[str]:
-    """The run's "there is no Genre with Name 'Polka'" notes.
+def _notes(warnings: List[Dict[str, Any]], code: str) -> List[str]:
+    """The messages of the run's ``code`` warnings, each once.
 
-    Only ``VALUE_NOT_FOUND`` warnings: an ERROR one belonged to an attempt a
-    retry has since replaced.
+    Only WARNING ones: an ERROR one belonged to an attempt a retry has since
+    replaced, or ended the run.
     """
     notes: List[str] = []
     for w in warnings or []:
-        if w.get("error_code") == "VALUE_NOT_FOUND" and w.get("severity") == "WARNING":
+        if w.get("error_code") == code and w.get("severity") == "WARNING":
             if w.get("message") and w["message"] not in notes:
                 notes.append(w["message"])
     return notes
+
+
+def _missing_values(warnings: List[Dict[str, Any]]) -> List[str]:
+    """The run's "there is no Genre with Name 'Polka'" notes (``VALUE_NOT_FOUND``)."""
+    return _notes(warnings, "VALUE_NOT_FOUND")
 
 
 def result_preview(result: Dict[str, Any], preview_rows: int,
@@ -79,6 +85,7 @@ class AnswerSynthesizerNode:
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.preview_rows = ctx.settings.results.preview_rows
+        self.hooks = hooks_of(ctx)
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.prompt = ChatPromptTemplate.from_template(ANSWER_SYNTHESIZER_PROMPT)
         self.chain = self.prompt | structured(self.llm, AggregatedResponse)
@@ -159,10 +166,21 @@ class AnswerSynthesizerNode:
             # Said whatever the model wrote: an empty result on a value that
             # does not exist is not a finding about the data.
             # Likewise a cut result is said to be cut, whatever the model wrote.
+            # And a part of the question a hook stopped is said to be missing.
             said = list(response.warnings or [])
-            response.warnings = said + [n for n in notes + cut if n not in said]
+            dropped = _notes(state.warnings, "HOOK_DENIED")
+            response.warnings = said + [n for n in notes + cut + dropped if n not in said]
             final_answer = response.model_dump()
             final_answer["truncated"] = bool(cut)
+
+            # answer.after: the answer is written; a hook may only withhold it.
+            results = state.aggregator_response.results if state.aggregator_response else None
+            verdict = self.hooks.call("answer.after", trace_id=state.trace_id, question=state.user_query,
+                                      user=state.user_context, datasource_id=state.datasource_id,
+                                      final_answer=final_answer, results=results)
+            if not verdict.allowed:
+                return {"answer_synthesizer_response": AnswerSynthesizerResponse(),
+                        "errors": [verdict.error(self.node_name)]}
 
             return {
                 "answer_synthesizer_response": AnswerSynthesizerResponse(

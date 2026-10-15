@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import traceback
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from langchain_core.runnables import Runnable
 
 from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
@@ -10,6 +10,8 @@ from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prom
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.dates import run_date
+from nl2sql.hooks import HookVerdict, hooks_of
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
@@ -63,6 +65,7 @@ class ASTPlannerNode:
         # Plans are read here and written by the sub-query wrapper once one has
         # validated and executed (nl2sql.pipeline.graph_utils).
         self.plan_cache = plan_cache_for(ctx)
+        self.hooks = hooks_of(ctx)
         self.llm = ctx.llm_registry.get_llm(self.node_name)
 
         self.prompt = PLANNER_PROMPT
@@ -80,17 +83,44 @@ class ASTPlannerNode:
         if plan is None:
             return None
         logger.info("Plan served from the plan cache; it is validated again before use.")
+        return self.after_plan(state, plan, "cache", [
+            "Plan served from the plan cache (no planner LLM call); it is validated again.",
+            f"Tables: {', '.join(t.name for t in plan.tables)}",
+        ])
+
+    def check_plan(self, state: SubgraphExecutionState, plan: PlanModel) -> HookVerdict:
+        """``plan.after`` on one plan of this sub-query: what the hooks let through, or what stopped it."""
+        sub_query = state.sub_query
+        return self.hooks.call(
+            "plan.after", trace_id=state.trace_id, question=getattr(state, "user_query", "") or "",
+            user=state.user_context or UserContext(), datasource_id=sub_query.datasource_id if sub_query else None,
+            sub_query=sub_query, plan=plan)
+
+    def after_plan(self, state: SubgraphExecutionState, plan: PlanModel, plan_source: str,
+                   reasoning: Optional[List[str]] = None) -> Dict[str, Any]:
+        """The node's update for ``plan``, once ``plan.after`` has seen it.
+
+        Every plan the validator gets passes here: the planner's, a cached
+        one, and a plan a caller supplies (an approved or chosen plan). The
+        response keeps ``plan`` as it came (``planner_plan``, which the plan
+        cache stores) beside what the hooks let through. A deny leaves no plan
+        and an error that is never retried.
+        """
+        verdict = self.check_plan(state, plan)
+        notes = list(reasoning or [])
+        if not verdict.allowed:
+            return {
+                "ast_planner_response": ASTPlannerResponse(plan=None, planner_plan=plan, plan_source=plan_source),
+                "errors": [verdict.error(self.node_name)],
+                "reasoning": [{"node": self.node_name, "content": notes + [
+                    f"The plan.after hook '{verdict.hook}' stopped the plan."]}],
+            }
+        if verdict.ctx.plan is not plan:
+            notes.append("A plan.after hook changed the plan; the changed plan is validated.")
         return {
-            "ast_planner_response": ASTPlannerResponse(plan=plan, plan_source="cache"),
-            "reasoning": [
-                {
-                    "node": self.node_name,
-                    "content": [
-                        "Plan served from the plan cache (no planner LLM call); it is validated again.",
-                        f"Tables: {', '.join(t.name for t in plan.tables)}",
-                    ],
-                }
-            ],
+            "ast_planner_response": ASTPlannerResponse(plan=verdict.ctx.plan, planner_plan=plan,
+                                                       plan_source=plan_source),
+            "reasoning": [{"node": self.node_name, "content": notes}],
         }
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
@@ -144,18 +174,10 @@ class ASTPlannerNode:
                     ],
                 }
 
-            return {
-                "ast_planner_response": ASTPlannerResponse(plan=plan),
-                "reasoning": [
-                    {
-                        "node": self.node_name,
-                        "content": [
-                            f"Reasoning: {plan.reasoning or 'None'}",
-                            f"Tables: {', '.join(t.name for t in plan.tables)}",
-                        ],
-                    }
-                ],
-            }
+            return self.after_plan(state, plan, "llm", [
+                f"Reasoning: {plan.reasoning or 'None'}",
+                f"Tables: {', '.join(t.name for t in plan.tables)}",
+            ])
 
         except Exception as exc:
             logger.exception("Planner failed")

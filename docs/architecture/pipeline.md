@@ -118,6 +118,28 @@ Determinism guarantees and non-determinism sources are centralized in `determini
 - There is no execution sandbox; the SQL executor runs in-process on the pipeline thread pool (see `../execution/isolation.md`).
 - `VECTOR_BREAKER` is the only circuit breaker. LLM calls and SQL execution are not breaker-guarded.
 
+## Hooks
+
+The engine's `HookRunner` (`ctx.hooks`, built by the runtime from the
+`hooks` section) is called at six points of every run; see
+[Hooks](../configuration/hooks.md).
+
+| Point | Called from |
+| --- | --- |
+| `run.before` | `run_with_graph`'s worker, before `graph.invoke`; a `Modify` rewrites `user_query`, a deny returns before the graph runs |
+| `datasources.after` | `DatasourceResolverNode`, on the datasources it forwards |
+| `plan.after` | `ASTPlannerNode.after_plan()`, on the planner's or the cache's plan, before the validator |
+| `execute.before`, `execute.after` | `ExecutorNode`, and `CuratedMatcherNode` for a verified query |
+| `answer.after` | `AnswerSynthesizerNode`, once the answer is written |
+
+A hook that stops the run (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`)
+ends it at the layer router once the layer in flight is done. A sub-query a
+hook dropped (`scope="sub_query"`) reports `status: "dropped"` from
+`wrap_subgraph()`, with its reason as a `HOOK_DENIED` warning; the router
+still sends the run to the aggregator, which drops a `join` or `compare`
+group that needs it. `SubgraphExecutionState.user_query` carries the run's
+question (after `run.before`) into each sub-query for the hooks there.
+
 ## Observability hooks (current)
 
 Observability stack and callback behavior are documented in `../observability/stack.md`.
@@ -131,3 +153,4 @@ Observability stack and callback behavior are documented in `../observability/st
 - SQL agent graph: `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py`
 - Execution DAG models: `packages/nl2sql/src/nl2sql/execution/dag.py`
 - Aggregation service: `packages/nl2sql/src/nl2sql/aggregation/aggregator.py`
+- Hooks: `packages/nl2sql/src/nl2sql/hooks/`

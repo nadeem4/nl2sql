@@ -74,6 +74,7 @@ def build_scan_payload(
         "subgraph_id": f"{subgraph_name}:{node_id}:{trace_id}",
         "subgraph_name": subgraph_name,
         "trace_id": trace_id,
+        "user_query": getattr(state, "user_query", ""),
         "user_context": state.user_context,
         "decomposer_response": state.decomposer_response,
         "datasource_resolver_response": state.datasource_resolver_response,
@@ -125,6 +126,7 @@ def wrap_subgraph(
 
         sub_state = SubgraphExecutionState(
             trace_id=trace_id,
+            user_query=state_dict.get("user_query") or "",
             user_context=state_dict.get("user_context"),
             sub_query=sub_query,
             subgraph_id=subgraph_id,
@@ -164,12 +166,21 @@ def wrap_subgraph(
         plan = planner_response.plan if planner_response else None
         plan_source = planner_response.plan_source if planner_response else "llm"
         # Only a plan that passed validation and executed is cached; a refused,
-        # failed or plan-only one never is. A cache hit is already stored.
+        # failed or plan-only one never is. A cache hit is already stored. The
+        # planner's plan is cached, never a plan.after hook's change of it,
+        # which is applied afresh on every run.
         executed_cleanly = executor_response is not None and not any(
             e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
         )
-        if succeeded and execute and executed_cleanly and plan is not None and plan_source == "llm":
-            plan_cache_for(ctx, planner).put(sub_query, plan)
+        planner_plan = planner_response.planner_plan if planner_response else None
+        if succeeded and execute and executed_cleanly and planner_plan is not None and plan_source == "llm":
+            plan_cache_for(ctx, planner).put(sub_query, planner_plan)
+        # A hook's deny scoped to this sub-query drops it: the run goes on
+        # without it, and the answer says what went unanswered.
+        dropped = [e for e in errors if e.error_code == ErrorCode.HOOK_DENIED
+                   and (e.details or {}).get("scope") == "sub_query"]
+        if dropped and not succeeded:
+            status = "dropped"
 
         row_cap = generator_response.row_cap if generator_response else None
         subgraph_output = SubgraphOutput(
@@ -193,6 +204,15 @@ def wrap_subgraph(
             status=status,
         )
 
+        if status == "dropped":
+            return {
+                "subgraph_outputs": {subgraph_id: subgraph_output},
+                "warnings": [_as_warning(e.model_copy(update={
+                    "severity": ErrorSeverity.WARNING,
+                    "message": f"Sub-query '{sub_query.id}' ({sub_query.intent}) was not run: {e.message}",
+                }), sub_query.id) for e in dropped],
+                "reasoning": returned_state.reasoning,
+            }
         return {
             "artifact_refs": artifact_refs,
             "subgraph_outputs": {subgraph_id: subgraph_output},

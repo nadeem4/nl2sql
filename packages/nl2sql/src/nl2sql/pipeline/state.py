@@ -78,6 +78,8 @@ class SubgraphExecutionState(BaseModel):
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     trace_id: str
+    # The run's question (after run.before), for the hooks a sub-query calls.
+    user_query: str = ""
     sub_query: Optional[SubQuery] = None
     user_context: Optional[UserContext] = None
     subgraph_id: Optional[str] = None
