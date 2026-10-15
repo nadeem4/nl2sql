@@ -47,8 +47,9 @@ def test_the_route_lists_every_step_in_order_with_the_model_steps_marked():
     body = _client().get("/api/pipeline").json()
 
     steps = body["steps"]
-    # The curated matcher first: it runs only when curated answers are configured.
-    assert [s["node"] for s in steps][:2] == ["curated_matcher", "datasource_resolver"]
+    # The curated matcher first: it runs only when curated answers are configured; then the pinned
+    # plan's entry, which runs only when a run is given its plan.
+    assert [s["node"] for s in steps][:3] == ["curated_matcher", "pinned_entry", "datasource_resolver"]
     assert [s["node"] for s in steps][-1] == "answer_synthesizer"
     model_steps = [s["node"] for s in steps if s["kind"] == "model"]
     assert model_steps == list(LLM_AGENTS)
@@ -80,7 +81,7 @@ def test_the_route_answers_on_the_hosted_demo_too():
 def test_an_engine_that_cannot_report_its_models_still_lists_the_steps():
     body = _client(_Broken()).get("/api/pipeline").json()
 
-    assert len(body["steps"]) == 14
+    assert len(body["steps"]) == 15
     assert all(s["model"] is None for s in body["steps"])
 
 
