@@ -5710,7 +5710,7 @@
 - <code>subgraph_outputs: Annotated[Dict[str, SubgraphOutput], update_results]</code>
 - <code>errors: Annotated[List[PipelineError], operator.add]</code>
 - <code>reasoning: Annotated[List[Dict[str, Any]], operator.add]</code>
-- <code>warnings: Annotated[List[Dict[str, Any]], operator.add]</code>
+- <code>warnings: Annotated[List[RunWarning], operator.add]</code>
 - <code>subgraph_id: Optional[str]</code>
 - <code>subgraph_name: Optional[str]</code>
 - <code>pinned: Optional[PinnedRun]</code> (a pinned decomposition and plans; <code>source</code> is a <code>PinnedSource</code>: <code>supplied</code>, <code>approved</code> or <code>chosen</code>)
@@ -5741,7 +5741,7 @@
 - <code>retry_count: int</code>
 - <code>errors: Annotated[List[PipelineError], operator.add]</code>
 - <code>reasoning: Annotated[List[Dict[str, Any]], operator.add]</code>
-- <code>warnings: Annotated[List[Dict[str, Any]], operator.add]</code></p>
+- <code>warnings: Annotated[List[RunWarning], operator.add]</code></p>
 <h3 id="subgraph-output-structure">Subgraph output structure</h3>
 <ul>
 <li><code>SubgraphOutput</code> in <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/schemas.py</code></li>

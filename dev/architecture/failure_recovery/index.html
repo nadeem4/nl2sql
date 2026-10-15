@@ -5942,7 +5942,7 @@
   <code>success</code> when the sub-query ended with SQL and, when executing, a result artifact; otherwise <code>error</code>.</li>
 <li><code>SubgraphExecutionState.errors</code> is an additive reducer, so it keeps every attempt's errors (the planner
   reads them as retry feedback). <code>SubgraphOutput.errors</code> keeps them too.</li>
-<li>A successful sub-query sends those errors to the run's <code>warnings</code> (original severity, plus <code>sub_query_id</code>)
+<li>A successful sub-query sends those errors to the run's <code>warnings</code> as <code>RunWarning</code>s with its <code>sub_query_id</code> (a recovered <code>ERROR</code> marked <code>detail.recovered</code>)
   rather than its <code>errors</code>. A failed one sends them to <code>errors</code>, adding a <code>MISSING_SQL</code> error if none of them
   was blocking.</li>
 </ul>
@@ -5974,7 +5974,7 @@
 <h2 id="retry-architecture">Retry Architecture</h2>
 <h3 id="retry-scope">Retry scope</h3>
 <ul>
-<li>Only the SQL agent subgraph retries: planner failures, validation errors, queries the database rejected as wrong (<code>EXECUTION_FAILED</code>), and, once, an empty result filtered on a value that does not exist when a close one does (<code>VALUE_NOT_FOUND</code>) go back through the refiner.</li>
+<li>Only the SQL agent subgraph retries: planner failures, validation errors, queries the database rejected as wrong (<code>EXECUTION_FAILED</code>), and, once each, an empty result filtered on a value that does not exist when a close one does (<code>VALUE_NOT_FOUND</code>) and a <code>COUNT</code> over rows a join repeated (<code>JOIN_FAN_OUT</code>) go back through the refiner.</li>
 <li>Other nodes (resolver, decomposer, generator, aggregator, answer synthesizer) do not retry.</li>
 <li>A retry tells the planner and refiner about the latest attempt only, as <code>{node, error_code, message}</code>.</li>
 </ul>

@@ -719,8 +719,35 @@
       
     </span>
 </a>
-<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#answer-sanity-checks">
+<span class="md-ellipsis">
+      
+        Answer sanity checks
+      
+    </span>
+</a>
+<nav aria-label="Answer sanity checks" class="md-nav">
 <ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#join-fan-out">
+<span class="md-ellipsis">
+      
+        Join fan-out
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#all-null-columns">
+<span class="md-ellipsis">
+      
+        All-null columns
+      
+    </span>
+</a>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#an-empty-results-filter-values">
 <span class="md-ellipsis">
@@ -2359,8 +2386,35 @@
       
     </span>
 </a>
-<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#answer-sanity-checks">
+<span class="md-ellipsis">
+      
+        Answer sanity checks
+      
+    </span>
+</a>
+<nav aria-label="Answer sanity checks" class="md-nav">
 <ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#join-fan-out">
+<span class="md-ellipsis">
+      
+        Join fan-out
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#all-null-columns">
+<span class="md-ellipsis">
+      
+        All-null columns
+      
+    </span>
+</a>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#an-empty-results-filter-values">
 <span class="md-ellipsis">
@@ -2537,22 +2591,117 @@
 <li>Validate SQL and datasource ID.</li>
 <li>Check the adapter declares <code>supports_sql</code>; otherwise return <code>INVALID_STATE</code>.</li>
 <li>Build <code>ExecutorRequest</code> with trace/subgraph identifiers and schema version.</li>
-<li>Execute request and return <code>ExecutorResponse</code>.</li>
-<li>If the query succeeded with no rows, check the filter values (below).</li>
+<li>Run <code>execute.before</code>, execute the request, and run <code>execute.after</code> on the result's summary.</li>
+<li>After <code>execute.after</code>, run the answer sanity checks on the result (below),
+   unless <code>settings.pipeline.sanity_checks</code> is <code>false</code>; a result a hook stopped
+   is never checked.</li>
 <li>On exception, emit <code>EXECUTOR_CRASH</code>.</li>
 </ol>
+<h2 id="answer-sanity-checks">Answer sanity checks</h2>
+<p>Cheap checks on each sub-query's result, before the aggregator, in
+<code>pipeline/nodes/executor/sanity/</code>: the filter values of an empty result
+(<code>values.py</code>), join fan-out (<code>fanout.py</code>) and all-null columns (<code>nulls.py</code>).
+Every probe is a sqlglot tree built from the plan and rendered by the adapter
+(<code>render_sql</code>), bounded, and never run on a table the caller's scope denies; a
+check that fails to run reports nothing, and a failure in the checks never
+fails the run. A verified query is not checked: it runs in the
+<a href="../curated_matcher_node/">curated matcher</a>, not through this node.</p>
+<p><strong>Probes and hooks.</strong> A probe (the value check's and the fan-out check's) is
+SQL the <a href="../../../configuration/hooks/">hooks</a> never see: it runs outside
+<code>execute.before</code> and <code>execute.after</code>, and nothing publishes it. So when any
+hook is attached at <code>execute.before</code> (an operator gating the SQL that reaches
+the database), no probe runs: only the all-null check, which reads the saved
+result and sends nothing to the database. <code>settings.pipeline.sanity_checks:
+false</code> turns every check off. A probe is bounded by the datasource's timeout;
+one that times out is skipped silently.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Runs on</th>
+<th>Code</th>
+<th>Then</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Missing filter value</td>
+<td>an empty result</td>
+<td><code>VALUE_NOT_FOUND</code></td>
+<td>A close value and a retry left: an <code>ERROR</code>, retried once. Otherwise a <code>WARNING</code>.</td>
+</tr>
+<tr>
+<td>Join fan-out</td>
+<td>a result with rows</td>
+<td><code>JOIN_FAN_OUT</code></td>
+<td>Under <code>COUNT</code>, confirmed, with a retry left: an <code>ERROR</code>, retried once. Under <code>SUM</code> or <code>AVG</code>, or with no retry left: a <code>WARNING</code>.</td>
+</tr>
+<tr>
+<td>All-null column</td>
+<td>a result with rows</td>
+<td><code>ALL_NULL_COLUMN</code></td>
+<td>Always a <code>WARNING</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Each check retries at most once per sub-query, within
+<code>settings.pipeline.retries.max</code>, and a pinned plan (supplied, approved or
+chosen) is never retried, so its findings are warnings. Each finding carries
+<code>details.attempt</code>, which the <a href="../../subgraphs/sql_agent/">SQL agent</a> routes on,
+and publishes <code>sanity.flagged</code> (<code>code</code>, <code>sub_query_id</code>, <code>retry</code>; see
+<a href="../../../observability/events/">Events</a>). A warning reaches the result's
+<code>warnings</code> as a <code>RunWarning</code>, and the answer synthesizer says it (see
+<a href="../answer_synthesizer_node/">AnswerSynthesizerNode</a>).</p>
+<h3 id="join-fan-out">Join fan-out</h3>
+<p>Joining Customer to Invoice on <code>Invoice.CustomerId</code> repeats each customer once
+per invoice, so <code>COUNT(c.CustomerId)</code> counts invoices and <code>SUM(c.Credit)</code> adds
+each customer's credit several times. A table's rows are repeated when a join
+in the plan reaches, on its far side, a key that is not the far table's whole
+primary key (from the snapshot, through the sub-query's <code>relevant_tables</code>);
+every table on the near side of that join is repeated. One table joined to two
+others on their many side (a many-to-many sum: invoices and tickets of one
+customer) is the same case. A table with no known primary key is taken as
+unique, so it is never suspected: a warehouse that declares no keys
+(Snowflake or BigQuery often do not, nor do views) gets no fan-out check.</p>
+<p>A suspected <code>COUNT</code>, <code>SUM</code> or <code>AVG</code> over a column of a repeated table (not
+already <code>DISTINCT</code>) is confirmed by one probe over the plan's own <code>FROM</code>,
+joins, <code>WHERE</code> and <code>GROUP BY</code>: does any group hold one row of that table more
+than once?</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="k">SELECT</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="o">&lt;</span><span class="n">the</span><span class="w"> </span><span class="n">plan</span><span class="s1">'s FROM and joins&gt;</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="s1">WHERE &lt;the plan'</span><span class="n">s</span><span class="w"> </span><span class="k">WHERE</span><span class="o">&gt;</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="o">&lt;</span><span class="k">alias</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">primary</span><span class="w"> </span><span class="k">key</span><span class="o">&gt;</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="o">&lt;</span><span class="n">the</span><span class="w"> </span><span class="n">plan</span><span class="err">'</span><span class="n">s</span><span class="w"> </span><span class="n">groups</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">&lt;</span><span class="k">alias</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">primary</span><span class="w"> </span><span class="k">key</span><span class="o">&gt;</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="k">HAVING</span><span class="w"> </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="k">LIMIT</span><span class="w"> </span><span class="mi">1</span>
+</code></pre></div>
+<p>A row confirms it. The rows an outer join null-extends have no key, so they
+never count, and a row that appears once in each of several groups (which a
+grouped aggregate counts rightly) never counts either. The probe needs a
+single-column primary key and every table of the plan readable by the caller.
+The key keeps its case as reflected and is spelled as the generator spells a
+column, rendered by the adapter in its dialect.</p>
+<p>Under <code>COUNT</code> the planner is told to count distinct values, which the plan can
+say (<code>Expr.distinct</code>). Under <code>SUM</code> or <code>AVG</code> the repair (aggregate the many
+side first) needs a derived table the plan cannot express, so it is a warning:
+"SUM(Customer.Credit) may count some Customer rows more than once: joining
+Invoice repeats them." Messages name tables and columns, never values.</p>
+<h3 id="all-null-columns">All-null columns</h3>
+<p>A result with rows whose column holds only nulls (usually an outer join that
+matched nothing, or the wrong column) is a warning. It reads the saved
+result's null counts, never its values; there is no probe and no fix to
+suggest.</p>
 <h3 id="an-empty-results-filter-values">An empty result's filter values</h3>
 <p>"Which customers bought Metal?" planned as <code>Genre.Name = 'Metal'</code> returns no
 rows because Chinook's genre is 'Heavy Metal'. Reported as is, the answer says
 nobody bought any. So when a query succeeds with <strong>zero rows</strong>,
-<code>value_check.check_values()</code> looks at every string literal the plan's <code>WHERE</code>
+<code>sanity/values.py</code>'s <code>check_values()</code> looks at every string literal the plan's <code>WHERE</code>
 compares a bare column to with <code>=</code>, <code>IN</code> or <code>LIKE</code>, through <code>AND</code> and <code>OR</code>
 only (a negated or <code>!=</code> comparison, a column inside a function, and a number
 are left alone), at most five per sub-query:</p>
 <ol>
 <li><strong>Does it exist?</strong> <code>SELECT 1 FROM &lt;table&gt; WHERE &lt;column&gt; = '&lt;value&gt;' LIMIT 1</code>
    (<code>LIKE</code> for a pattern). If yes, nothing is said: the empty result stands.</li>
-<li><strong>The closest values.</strong> A case-insensitive match first
+<li><strong>The closest values.</strong> From the column's sample values in the snapshot
+   when one of them is close (a case-insensitive match, then by similarity),
+   with no query. Otherwise a case-insensitive match first
    (<code>LOWER(column) = LOWER('value')</code>, <code>DISTINCT</code>, <code>LIMIT 3</code>); failing that, a
    bounded <code>SELECT DISTINCT column ... LIMIT n</code> (n is 500, or the adapter's
    <code>row_limit</code> if lower) and the three most similar by <code>difflib</code> (cutoff 0.6).</li>
@@ -2576,7 +2725,7 @@ nothing, and a failure in the check never fails the run.</p>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
 <p>Implements a LangGraph node callable:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>def __call__(self, state: SubgraphExecutionState) -&gt; Dict[str, Any]
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>def __call__(self, state: SubgraphExecutionState) -&gt; Dict[str, Any]
 </code></pre></div>
 <p>Key contracts:</p>
 <ul>
@@ -2600,11 +2749,13 @@ nothing, and a failure in the check never fails the run.</p>
 <li><code>DB_EXECUTION_ERROR</code>: the database refused or could not run the query (permission, timeout, connection); fatal</li>
 <li><code>EXECUTOR_CRASH</code>: an exception escaped the adapter</li>
 <li><code>VALUE_NOT_FOUND</code>: an empty result filtered on a value its column does not have; an <code>ERROR</code> (retried once) when a close value exists, a <code>WARNING</code> otherwise</li>
+<li><code>JOIN_FAN_OUT</code>: an aggregate over rows a join repeated, confirmed by the probe; an <code>ERROR</code> (retried once) under <code>COUNT</code>, a <code>WARNING</code> under <code>SUM</code> or <code>AVG</code></li>
+<li><code>ALL_NULL_COLUMN</code>: a result column with no value; a <code>WARNING</code></li>
 </ul>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>
 <ul>
-<li>No internal retry logic. The SQL agent's <code>check_execution</code> routes a retryable <code>EXECUTION_FAILED</code> back to the refiner (see <a href="../../subgraphs/sql_agent/">SQL agent</a>).</li>
+<li>No internal retry logic. The SQL agent's <code>check_execution</code> routes a retryable <code>EXECUTION_FAILED</code>, and this attempt's <code>VALUE_NOT_FOUND</code> or <code>JOIN_FAN_OUT</code> <code>ERROR</code>, back to the refiner (see <a href="../../subgraphs/sql_agent/">SQL agent</a>).</li>
 <li>Idempotency depends on datasource and query semantics.</li>
 </ul>
 <hr/>
@@ -2616,13 +2767,15 @@ nothing, and a failure in the check never fails the run.</p>
 <hr/>
 <h2 id="observability">Observability</h2>
 <ul>
-<li>Logger: <code>executor</code></li>
+<li>Logger: <code>executor</code> (and <code>sanity</code>, <code>sanity.values</code>, <code>sanity.fanout</code> for skipped checks)</li>
+<li><code>sanity.flagged</code> for each sanity finding</li>
 <li>Propagates executor response reasoning and errors.</li>
 </ul>
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
 <li><code>tenant_id</code> from settings.</li>
+<li><code>settings.pipeline.sanity_checks</code> (default <code>true</code>): <code>false</code> turns the sanity checks off.</li>
 <li>Executor selection based on adapter capabilities.</li>
 </ul>
 <hr/>
@@ -2636,6 +2789,7 @@ nothing, and a failure in the check never fails the run.</p>
 <ul>
 <li>Executes in‑process on the pipeline thread pool; there is no process sandbox (see <code>../../execution/isolation.md</code>).</li>
 <li>No built‑in retries on transient execution failures.</li>
+<li>The fan-out check reads only the select list's <code>COUNT</code>, <code>SUM</code> and <code>AVG</code> of a plain column, and confirms with the plan's whole <code>WHERE</code> but no <code>GROUP BY</code>; a <code>SUM</code> or <code>AVG</code> fan-out is reported, not repaired.</li>
 <li>The filter-value check covers string literals in <code>WHERE</code> only, not <code>HAVING</code>, and reads at most 500 distinct values to find a similar one, so on a high-cardinality column a near miss can go unsuggested (the value is then reported as missing).</li>
 </ul>
 <hr/>
@@ -2643,7 +2797,7 @@ nothing, and a failure in the check never fails the run.</p>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/value_check.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/sanity/</code> (<code>values.py</code>, <code>fanout.py</code>, <code>nulls.py</code>)</li>
 </ul>
 </article>
 </div>

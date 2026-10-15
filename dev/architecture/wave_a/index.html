@@ -3242,7 +3242,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2 and E4 are built. Phase 1 is
+as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2, V2, E4 and S1 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -5708,11 +5708,10 @@ is B30's test.</p>
   <code>PolarsDuckdbEngine.unconverted_join_keys(inputs, join_keys)</code> counts the
   values that became null (it collects the key columns only), and
   <code>AggregationService.execute(..., warnings=[...])</code> gathers them; the node
-  turns each into a <code>JOIN_KEY_UNCONVERTED</code> warning dict on the state's
-  <code>warnings</code> (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>, <code>sub_query_id</code>),
-  naming the datasource: "1 of 3 support.customer_id values are not
-  whole numbers and joined nothing." S1's typed <code>RunWarning</code> is not on main yet,
-  so this uses the existing warnings mechanism; S1 moves it.</li>
+  turns each into a <code>JOIN_KEY_UNCONVERTED</code> warning on the state's
+  <code>warnings</code>, naming the datasource: "1 of 3 support.customer_id values are not
+  whole numbers and joined nothing." S1 made it a <code>RunWarning</code> whose
+  <code>detail</code> holds <code>column</code>, <code>failed</code>, <code>total</code> and <code>dtype</code>.</li>
 <li><strong>The validator.</strong> <code>pipeline/nodes/validator/join_keys.py</code>,
   <code>join_key_type_errors(plan, sub_query, relevant_tables, dialect)</code>, called
   from <code>_validate_static</code> before the buildability check. The column type is
@@ -5908,6 +5907,80 @@ answer synthesizer):</p>
 </code></pre></div>
 <p>The answer synthesizer is given the warnings, as it is given
 <code>VALUE_NOT_FOUND</code> warnings today, and <code>sanity.flagged</code> is published for each.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: sanity checks and typed warnings (S1)</p>
+<ul>
+<li><strong>Where.</strong> <code>pipeline/nodes/executor/sanity/</code>: <code>values.py</code> (moved from
+  <code>executor/value_check.py</code>), <code>fanout.py</code>, <code>nulls.py</code>, and <code>__init__.py</code>'s
+  <code>run_checks(plan, *, adapter, allowed, tables, row_limit, row_count,
+  frame, can_retry)</code>. <code>ExecutorNode._sanity</code> calls it after
+  <code>execute.after</code> (H1's order is kept: a result a hook stopped is never
+  checked), when <code>settings.pipeline.sanity_checks</code> is on and the
+  execution succeeded. An empty result gets the value check; a result
+  with rows the fan-out and null checks. Each check is wrapped: one that
+  raises reports nothing.</li>
+<li><strong>Retries.</strong> <code>can_retry(code)</code> is true while retries remain, the plan is
+  not pinned, and no earlier attempt of the sub-query raised that code, so
+  each check retries at most once. Findings carry <code>details.attempt</code>;
+  <code>sql_agent.check_execution</code> retries a <code>VALUE_NOT_FOUND</code> or
+  <code>JOIN_FAN_OUT</code> <code>ERROR</code> of the current attempt (<code>_SANITY_RETRIES</code>).</li>
+<li><strong>Fan-out.</strong> A table is repeated when a join reaches, on its far side,
+  columns that are not the far table's whole primary key (from
+  <code>relevant_tables[].primary_key</code>; an unknown key counts as unique);
+  every table on the near side of that join in the plan's join tree is
+  repeated, which covers the many-to-many sum. A <code>COUNT</code>, <code>SUM</code> or <code>AVG</code>
+  (not <code>DISTINCT</code>) of a plain column of a repeated table is confirmed by
+  <code>SELECT 1 FROM &lt;the plan's FROM and joins&gt; WHERE &lt;the plan's WHERE&gt;
+  AND NOT alias.pk IS NULL GROUP BY &lt;the plan's groups&gt;, alias.pk HAVING
+  COUNT(*) &gt; 1 LIMIT 1</code> (after review: a <code>COUNT(*)</code> against
+  <code>COUNT(DISTINCT pk)</code> over the whole join gave false findings on outer
+  joins and grouped plans), built with the generator's
+  <code>GeneratorNode.attach_joins</code> (now a static method) and rendered by the
+  adapter; the key keeps its reflected case. No probe without a
+  single-column primary key or with a table the scope denies.</li>
+<li><strong>Probes and hooks</strong> (owner's decision after review). A probe, the
+  value check's or the fan-out check's, runs outside <code>execute.before</code> and
+  <code>execute.after</code>. So no probe runs when any hook is attached at
+  <code>execute.before</code> (<code>run_checks(..., probes=False)</code>): only the null check
+  does. <code>settings.pipeline.sanity_checks: false</code> stays the off switch. The check lives in the executor, per sub-query, not
+  in the aggregator beside <code>unconverted_join_keys</code>: the repeated rows are
+  inside one sub-query's SQL, which the aggregator never sees.</li>
+<li><strong>All-null.</strong> <code>check_nulls(frame)</code> reads the saved result's null counts
+  through <code>ArtifactStore.scan_parquet</code>, never its values.</li>
+<li><strong>Sample values.</strong> <code>check_values(..., samples=)</code> takes a column's
+  snapshot sample values (from <code>relevant_tables[].columns[].stats</code>)
+  before the <code>DISTINCT</code> probe; the existence probe still runs, since
+  samples are partial.</li>
+<li><strong><code>RunWarning</code></strong> lives in <code>nl2sql/common/errors.py</code>, beside
+  <code>PipelineError</code>, not in <code>api/query_api.py</code> as planned: the nodes that
+  produce warnings must not import the API layer. It is exported as
+  <code>nl2sql.RunWarning</code>. <code>RunWarning.of(error, sub_query_id)</code> turns an
+  error into a warning, its <code>details</code> left behind; an <code>ERROR</code> or
+  <code>CRITICAL</code> one (an attempt a retry replaced) gets <code>detail={"recovered":
+  True}</code> in place of the old <code>severity</code> field, and the answer
+  synthesizer skips those. <code>GraphState.warnings</code> and
+  <code>SubgraphExecutionState.warnings</code> are <code>List[RunWarning]</code>; every
+  producer builds one (the aggregator's <code>RESULT_TRUNCATED</code>,
+  <code>HOOK_DENIED</code> and R2's <code>JOIN_KEY_UNCONVERTED</code>, the curated matcher's
+  <code>CURATED_FALLBACK</code>, the schema retriever's fallback as
+  <code>SCHEMA_RETRIEVAL_FAILED</code>, <code>result_from_state</code>'s row-read failure as
+  <code>UNKNOWN_ERROR</code>). <code>extra="forbid"</code>, so a stray dict fails loudly.</li>
+<li><strong>The answer.</strong> The synthesizer's <em>Data Notes</em> now carry
+  <code>VALUE_NOT_FOUND</code>, <code>JOIN_FAN_OUT</code> and <code>ALL_NULL_COLUMN</code> warnings, and
+  each is appended to the answer's <code>warnings</code>.</li>
+<li><strong><code>sanity.flagged</code></strong> is published through <code>nl2sql.events.publish</code> for
+  each finding: <code>code</code>, <code>sub_query_id</code>, <code>retry</code> (true for a retried
+  <code>ERROR</code>).</li>
+<li><strong>The playground.</strong> <code>NodeInspector.jsx</code> reads a warning's <code>code</code> only,
+  with no fallback to <code>error_code</code>; the bundle is rebuilt.</li>
+<li><strong>Breaking for REST clients.</strong> <code>QueryResult.warnings[]</code> items lost
+  <code>error_code</code> and <code>severity</code> for <code>code</code> and <code>detail.recovered</code>. Runs are
+  not stored across an upgrade, so no older warning is read back.</li>
+<li><strong>Tests.</strong> Every e2e test that opened the session demo's shared
+  <code>state.db</code> (the <code>fake_llm</code> fixture, the RBAC API test, both evals
+  tests, the temperature test) now gets a private copy.</li>
+</ul>
+</div>
 <h2 id="12-mcp-server-stdio">12. MCP server (stdio)</h2>
 <p><code>nl2sql mcp</code> serves the engine to an MCP client (a desktop assistant, an IDE)
 over stdio, using the official <code>mcp</code> Python SDK.</p>

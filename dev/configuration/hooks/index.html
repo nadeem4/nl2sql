@@ -2311,6 +2311,14 @@ validated like any other, so a hook can never slip in what the policies or
 the validator refuse. <code>datasources.after</code> may only remove datasources; the
 resolver checks what is left against the caller's role again. After the
 validator nothing may change the SQL, the plan or the result.</p>
+<p><strong>The answer sanity checks' probes are not hooked.</strong> After a sub-query runs,
+the executor may send small checking queries of its own (does a filter value
+exist, did a join repeat rows; see the
+<a href="../../architecture/nodes/executor_node/#answer-sanity-checks">executor's sanity checks</a>).
+They run outside <code>execute.before</code> and <code>execute.after</code>. So when any hook is
+attached at <code>execute.before</code>, no probe runs at all: SQL a hook gates never has
+unseen SQL beside it. <code>settings.pipeline.sanity_checks: false</code> turns the checks
+off entirely.</p>
 <p><strong>The verified path</strong> has no routing and no plan, so only <code>run.before</code>,
 <code>execute.before</code>, <code>execute.after</code> and <code>answer.after</code> apply. A deny there ends
 the run; it does not fall back to the generated path. <strong>A plan-only run</strong>

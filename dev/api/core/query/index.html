@@ -4312,6 +4312,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5281,6 +5292,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5508,7 +5530,7 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>errors</code> | <code>List[Dict[str, Any]]</code> | no | Pipeline errors (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>, <code>provider</code>, <code>provider_response</code>). <code>provider</code> and <code>provider_response</code> are set for a <code>PROVIDER_*</code> code and <code>null</code> otherwise; see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>. |
 | <code>trace_id</code> | <code>str</code> | no | Trace identifier. |
 | <code>reasoning</code> | <code>List[Dict[str, Any]]</code> | no | Reasoning events/logs. |
-| <code>warnings</code> | <code>List[Dict[str, Any]]</code> | no | Warning events/logs. |
+| <code>warnings</code> | <code>List[RunWarning]</code> | no | What the answer should say without failing the run. See <a href="#warnings">Warnings</a>. |
 | <code>artifact_refs</code> | <code>Dict[str, ArtifactRef]</code> | no | Result artifact references keyed by execution node id. |
 | <code>status</code> | <code>Optional[RunStatus]</code> | no | <code>"success"</code>, <code>"plan_only"</code>, <code>"error"</code>, <code>"needs_approval"</code>, <code>"stopped"</code>, <code>"needs_clarification"</code>, or <code>None</code> when nothing ran and nothing failed. See below. |
 | <code>timings</code> | <code>Dict[str, float]</code> | no | Wall-clock seconds per graph node, plus <code>LangGraph</code> for the whole run. |
@@ -5520,10 +5542,10 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>stop</code> | <code>Optional[RunStop]</code> | no | Set when <code>status</code> is <code>"stopped"</code>: the <code>limit</code> the run reached (<code>max_llm_calls</code> or <code>max_cost_usd</code>), its configured <code>value</code>, and what was <code>spent</code>. |
 | <code>approvals_needed</code> | <code>List[ApprovalRequest]</code> | no | Set when <code>status</code> is <code>"needs_approval"</code>: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an <code>Approval</code> for each. |</p>
 <p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
-errors are appended to <code>warnings</code> as the same summary dict.</p>
+errors are appended to <code>warnings</code> as <code>RunWarning</code>s.</p>
 <p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
-attempts it recovered from, and its warnings, are in <code>warnings</code> with their
-original <code>severity</code> and a <code>sub_query_id</code>. The run trace and
+attempts it recovered from are in <code>warnings</code> with <code>detail.recovered</code> true, and
+its warnings with an empty <code>detail</code>, each with its <code>sub_query_id</code>. The run trace and
 <code>subgraph_outputs[&lt;id&gt;].errors</code> keep every attempt's errors for debugging. A
 sub-query that failed without a blocking error of its own (it ended with no SQL
 on warnings alone) adds a <code>MISSING_SQL</code> error, so the run reports <code>"error"</code>.</p>
@@ -5540,6 +5562,55 @@ that produce <code>"needs_approval"</code> and <code>"stopped"</code> arrive wit
 result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
 combined result is listed in <code>result_manifest</code> and read back by the run's
 <code>trace_id</code> with the methods below.</p>
+<h3 id="warnings">Warnings</h3>
+<p><code>QueryResult.warnings</code> is a list of <code>RunWarning</code> (<code>from nl2sql import RunWarning</code>):</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>code</code></td>
+<td><code>str</code></td>
+<td>An <code>ErrorCode</code> value, such as <code>VALUE_NOT_FOUND</code>, <code>JOIN_FAN_OUT</code>, <code>ALL_NULL_COLUMN</code>, <code>JOIN_KEY_UNCONVERTED</code>, <code>RESULT_TRUNCATED</code> or <code>HOOK_DENIED</code>; <code>CURATED_FALLBACK</code> when a verified query failed and the question was generated instead.</td>
+</tr>
+<tr>
+<td><code>node</code></td>
+<td><code>str</code></td>
+<td>The node that found it.</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>str</code></td>
+<td>What the answer says.</td>
+</tr>
+<tr>
+<td><code>sub_query_id</code></td>
+<td><code>Optional[str]</code></td>
+<td>The sub-query it is about, when it is about one.</td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td><code>Dict[str, Any]</code></td>
+<td>What a program may branch on: <code>recovered: true</code> for an earlier attempt's error a retry replaced; the column, counts and type of a <code>JOIN_KEY_UNCONVERTED</code>. Never result rows or sample values.</td>
+</tr>
+</tbody>
+</table>
+<p>The answer sanity checks (a missing filter value, a join that repeated the rows
+an aggregate counted, a column with no value) add theirs, and the answer
+synthesizer says them; see the
+<a href="../../../architecture/nodes/executor_node/#answer-sanity-checks">executor's sanity checks</a>.
+<code>settings.pipeline.sanity_checks: false</code> turns those checks off.</p>
+<p>0.7 changed this shape: a warning was a dict with <code>error_code</code> and <code>severity</code>,
+and is now a <code>RunWarning</code> with <code>code</code>, and <code>detail.recovered</code> where <code>severity</code>
+said <code>ERROR</code>. A run's state is never kept across an upgrade (a run that ended
+<code>needs_approval</code> is asked again, not resumed; see
+<a href="../../../architecture/wave_a/#7-approval">Wave A, D10</a>), so no older warning is
+ever read back.</p>
 <h2 id="streaming-a-run">Streaming a run</h2>
 <h3 id="nl2sqlstream_query">NL2SQL.stream_query</h3>
 <p>Source:
