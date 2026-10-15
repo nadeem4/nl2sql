@@ -150,6 +150,7 @@ class Runtime:
             except (RegistryError, ValueError) as e:
                 problem("policies.check", str(e))
         self.hooks = self._build_hooks(config, problem)
+        self.knowledge = self._load_knowledge(config, problem)
         from nl2sql.observers import build_observers
 
         # Subscribed in config order once nothing else is wrong; closed again when something is.
@@ -169,6 +170,8 @@ class Runtime:
         self._config = config
         self.policy_engine = PolicyEngine(config.policies, self.ds_registry, self.policy_check)
         self.index, self.state, self.traces, self.results = stores
+        if config.knowledge:  # no section: no knowledge, and nothing to report
+            self._publish_knowledge(None)
         return self
 
     # ------------------------------------------------------------ building
@@ -188,6 +191,21 @@ class Runtime:
             except (RegistryError, ValueError) as e:
                 problem(f"hooks[{i}]", str(e))
         return HookRunner(bindings, admin_roles=config.policies.admin_roles)
+
+    def _load_knowledge(self, config: Config, problem):
+        """The ``knowledge`` section's sources, loaded and merged; a source that fails is a problem (fails closed)."""
+        from nl2sql.knowledge.merge import Knowledge, KnowledgeLoadError, load_knowledge
+
+        try:
+            return load_knowledge(config, registry=self.registry, secrets=self.secret_manager)
+        except KnowledgeLoadError as e:
+            problem(f"knowledge[{e.index}]", str(e))
+            return Knowledge()
+
+    def _publish_knowledge(self, error: Optional[str]) -> None:
+        from nl2sql.knowledge.merge import loaded_event
+
+        self.bus.publish("knowledge.loaded", loaded_event(self.knowledge, error), tenant_id=self.tenant_id)
 
     def _build_embedder(self, config: Config):
         """The embedder, and what it is (``EmbeddingInfo``, its dimension maybe unknown). No model call."""
@@ -281,11 +299,14 @@ class Runtime:
 
         Every step of the run then uses the same build and schema version of
         each datasource, even if a rebuild switches a pointer meanwhile; a
-        rebuild keeps the build it replaces, so the run's entries stay. It
-        shares everything else with this runtime and is never closed.
+        rebuild keeps the build it replaces, so the run's entries stay. The
+        run also keeps the knowledge it started with: a reload swaps this
+        runtime's, not the run's. It shares everything else with this
+        runtime and is never closed.
         """
         run = copy.copy(self)
         run._pinned_retriever = self._retriever()
+        run.knowledge = self.knowledge
         return run
 
     # ------------------------------------------------------------ reading
@@ -377,6 +398,25 @@ class Runtime:
         self.bus.publish("llm.changed", {"by": dict(change.by), "changes": dict(change.changes)},
                          tenant_id=self.tenant_id)
         return change
+
+    def reload_knowledge(self) -> Optional[str]:
+        """Load every knowledge source again and swap the result in atomically; publish ``knowledge.loaded``.
+
+        Runs in flight keep the knowledge they pinned. On a failure the
+        previous knowledge stays live, carrying the error, which is returned.
+        """
+        from nl2sql.knowledge.merge import KnowledgeLoadError, load_knowledge
+
+        error = None
+        try:
+            knowledge = load_knowledge(self.config, registry=self.registry, secrets=self.secret_manager)
+        except KnowledgeLoadError as e:
+            error = str(e)
+            knowledge = self.knowledge.failed(e.label, error)
+        with self._lock:
+            self.knowledge = knowledge
+        self._publish_knowledge(error)
+        return error
 
     def derive(self, changes: Dict[str, Any]) -> "Runtime":
         """A run-scoped runtime whose config is this one's with ``changes`` (dotted paths) set.

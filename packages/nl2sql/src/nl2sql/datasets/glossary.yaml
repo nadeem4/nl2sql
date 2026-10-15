@@ -1,0 +1,63 @@
+# glossary.yaml: what people know about the data, read by the yaml knowledge source.
+# The engine rewrites this file in a canonical form when a reviewer accepts a
+# proposal: comments are not kept, so write remarks in a `notes:` field.
+# See docs/configuration/knowledge.md.
+version: 1
+datasources:
+  chinook:
+    tables:
+      Invoice:
+        description: One row per customer invoice. Total includes tax.
+      InvoiceLine:
+        description: One row per track sold on an invoice.
+        notes: Refunds are not recorded anywhere.
+    columns:
+      Invoice.InvoiceDate:
+        grain: day
+      Invoice.Total:
+        description: Invoice total in US dollars, tax included.
+        synonyms:
+        - invoice amount
+        - bill total
+        role: money
+        unit: USD
+      InvoiceLine.UnitPrice:
+        role: money
+        unit: USD
+      Track.MediaTypeId:
+        role: enum
+        values:
+          '1': MPEG audio file
+          '2': Protected AAC audio file
+          '3': Protected MPEG-4 video file
+          '4': Purchased AAC audio file
+          '5': AAC audio file
+    joins:
+    - from: Track.MediaTypeId
+      to: MediaType.MediaTypeId
+      cardinality: many-to-one
+      notes: Also a declared foreign key; written here to record its cardinality.
+    terms:
+    - term: revenue
+      synonyms:
+      - sales
+      - turnover
+      definition: Sum of InvoiceLine.UnitPrice times InvoiceLine.Quantity. Excludes tax.
+      columns:
+      - InvoiceLine.UnitPrice
+      - InvoiceLine.Quantity
+    - term: invoiced total
+      synonyms:
+      - sales
+      - billings
+      definition: Sum of Invoice.Total. Includes tax.
+      columns:
+      - Invoice.Total
+    rules:
+    - id: no_test_customers
+      text: Customers whose email ends in @example.com are test accounts; leave them out of counts and
+        sums.
+      tables:
+      - Customer
+    examples:
+    - Which genres sell best in Germany?

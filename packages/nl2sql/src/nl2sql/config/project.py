@@ -25,6 +25,7 @@ from nl2sql.config.models import (
     Datasource,
     Embeddings,
     EvalsConfig,
+    KnowledgeSourceConfig,
     PipelineSettings,
     Policies,
     Role,
@@ -42,6 +43,7 @@ EVALS_FOLDER = "evals"
 # The suites the package ships; found by path, so building the demo's config loads no evaluation code.
 PACKAGED_SUITES = Path(__file__).resolve().parents[1] / "evaluation" / "suites"
 GITIGNORE_LINES = (f"{STORAGE_PATH}/", ".env")
+GLOSSARY_FILE = "glossary.yaml"
 
 
 def default_llm(provider: str) -> LLM:
@@ -61,21 +63,24 @@ def demo_config(
     path: PathLike = DEMO_STORAGE_PATH,
     data_dir: Optional[PathLike] = None,
     evals_dir: Optional[PathLike] = None,
+    glossary: Optional[PathLike] = None,
 ) -> Config:
-    """The demo: three linked SQLite databases, their roles and verified queries.
+    """The demo: three linked SQLite databases, their roles, verified queries and glossary.
 
     The databases are opened read-only from ``data_dir``, by default the
     folder the package installed them in. Each datasource carries its sample
     questions and indexes its text columns' values (``index.sample_values``).
     Without ``llm``, the default OpenAI model is used. Its eval suite is
     the Chinook suite in ``evals_dir``, by default the one the package ships.
+    Its knowledge is one ``yaml`` source reading ``glossary``, by default the
+    demo glossary the package ships.
 
     Its settings are the demo's own: a live run walks six model calls (one
     OpenAI run took 136 s), so a question may take 300 s; every run writes a
     trace, which the playground's Debug drill-down reads; and a refusal names
     the table, since showing one is the demo's point.
     """
-    from nl2sql.datasets import CHINOOK_DB_PATH
+    from nl2sql.datasets import CHINOOK_DB_PATH, DEMO_GLOSSARY_PATH
     from nl2sql.datasets.demo import DEMO_CURATED, DEMO_DATASOURCES, DEMO_POLICIES, DEMO_QUESTIONS_BY_DATASOURCE
 
     folder = Path(data_dir) if data_dir is not None else CHINOOK_DB_PATH.parent
@@ -100,6 +105,8 @@ def demo_config(
         curated=Curated(**DEMO_CURATED),
         settings=Settings(pipeline=PipelineSettings(timeout_s=300), traces=TraceSettings(mode="always")),
         evals=EvalsConfig(suites=[(Path(evals_dir) if evals_dir is not None else PACKAGED_SUITES) / "chinook.yaml"]),
+        knowledge=[KnowledgeSourceConfig(
+            type="yaml", path=Path(glossary if glossary is not None else DEMO_GLOSSARY_PATH).as_posix())],
     )
 
 
@@ -114,8 +121,10 @@ def init_project(
 
     ``nl2sql.yaml`` is the table of contents, and each section is in its own
     file. With ``demo``, the config is ``demo_config`` and the three databases
-    are copied into ``data/`` and the eval suites into ``evals/``. A file that already exists is an error naming
-    it, and nothing is written, unless ``force`` is set. ``.gitignore`` is
+    are copied into ``data/``, the eval suites into ``evals/`` and the demo glossary into ``glossary.yaml``;
+    otherwise ``glossary.yaml`` holds one empty block for the example datasource. Either way
+    ``knowledge.yaml`` names it as the one ``yaml`` knowledge source. A file that already exists is an error
+    naming it, and nothing is written, unless ``force`` is set. ``.gitignore`` is
     never overwritten: the lines it is missing are added.
     """
     folder = Path(folder)
@@ -123,14 +132,20 @@ def init_project(
     files: Dict[str, str] = {}
     copies: Dict[str, Path] = {}
 
-    sections = ["datasources", "llm", "embeddings", "policies", "storage", *(["curated", "settings", "evals"] if demo else [])]
+    sections = ["datasources", "llm", "embeddings", "policies", "storage", "knowledge",
+                *(["curated", "settings", "evals"] if demo else [])]
     files["nl2sql.yaml"] = TOC_HEADER + "version: 2\n" + "".join(
         f"{section + ':':<13}{{ file: {_section_file(section)} }}\n" for section in sections)
     files["llm.yaml"] = _llm_file(llm)
     files["embeddings.yaml"] = EMBEDDINGS_HEADER + _dump({"provider": "local"})
     files["storage.yaml"] = STORAGE_HEADER + _dump({"path": STORAGE_PATH})
+    files["knowledge.yaml"] = KNOWLEDGE_HEADER + _dump([{"type": "yaml", "path": GLOSSARY_FILE}])
     if demo:
-        config = demo_config(llm=llm, path=STORAGE_PATH, data_dir=DATA_FOLDER, evals_dir=EVALS_FOLDER)
+        from nl2sql.datasets import DEMO_GLOSSARY_PATH
+
+        config = demo_config(llm=llm, path=STORAGE_PATH, data_dir=DATA_FOLDER, evals_dir=EVALS_FOLDER,
+                             glossary=GLOSSARY_FILE)
+        copies[GLOSSARY_FILE] = DEMO_GLOSSARY_PATH
         for datasource in config.datasources:
             files[f"datasources/{datasource.id}.yaml"] = _datasource_file(datasource)
         for source in _packaged_databases():
@@ -144,6 +159,7 @@ def init_project(
             config.settings.model_dump(mode="json", by_alias=True, exclude_defaults=True))
     else:
         files["datasources/example.yaml"] = EXAMPLE_DATASOURCE
+        files[GLOSSARY_FILE] = _empty_glossary(["example"])
         files["policies.yaml"] = POLICIES_HEADER + _dump({"allow_all": True})
 
     if not force:
@@ -236,6 +252,12 @@ EVALS_HEADER = """\
 # nl2sql eval run --mode retrieval --suite evals/routing.yaml. See the Evals docs.
 """
 
+KNOWLEDGE_HEADER = """\
+# The knowledge sources, in precedence order: the first that sets a description
+# or a role wins. glossary.yaml is where people describe tables, columns, joins,
+# business terms and rules. See docs/configuration/knowledge.md.
+"""
+
 DEMO_SETTINGS_HEADER = """\
 # The demo's tuning knobs; every other setting keeps its default. A live run
 # makes six model calls, so a question may take 300 s, and every run writes a
@@ -258,6 +280,14 @@ def _llm_file(llm: LLM) -> str:
 def _datasource_file(datasource: Datasource) -> str:
     """One datasource file: the datasource without its id, which is the file name."""
     return _dump(datasource.model_dump(mode="json", exclude_defaults=True, exclude={"id"}))
+
+
+def _empty_glossary(datasource_ids: List[str]) -> str:
+    """A glossary with one empty block per datasource, in the canonical form the engine writes."""
+    from nl2sql.knowledge.yaml_source import canonical_yaml
+    from nl2sql_sdk.knowledge import Glossary
+
+    return canonical_yaml(Glossary(version=1, datasources={ds_id: {} for ds_id in datasource_ids}))
 
 
 def _section_file(section: str) -> str:

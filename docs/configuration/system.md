@@ -29,6 +29,8 @@ llm.yaml               # provider + model; no key, the provider's standard varia
 embeddings.yaml        # provider: local
 policies.yaml          # allow_all: true            (--demo: admin, analyst, viewer roles)
 storage.yaml           # path: .nl2sql
+knowledge.yaml         # one yaml knowledge source: glossary.yaml
+glossary.yaml          # one empty block per datasource (--demo: the Chinook glossary)
 curated.yaml           # --demo only: the demo's verified queries
 settings.yaml          # --demo only: the demo's tuning knobs
 data/                  # --demo only: the three SQLite files, copied
@@ -181,9 +183,10 @@ Config(..., observers=[ObserverConfig(type="log"), MyObserver()],
 
 ### Knowledge
 
-A section added for release 0.8 ([Wave B](../architecture/wave_b.md)): the
-knowledge sources the glossary comes from, in precedence order. It is
-accepted and validated now; the engine loads the sources from Wave B's K1.
+The knowledge sources the glossary comes from, in precedence order (release
+0.8, [Wave B](../architecture/wave_b.md)). The engine loads them when it is
+built and on `engine.knowledge.reload()`; see [Knowledge](knowledge.md) for
+the glossary, precedence and who sees what.
 
 ```yaml
 # knowledge.yaml: a list, in precedence order

@@ -297,7 +297,9 @@ command has `--help`.
 | `nl2sql curated validate` | Check the `curated` section (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | |
 | `nl2sql curated test` | Run every verified query once against its database, read-only, with each param's default or example bound; reports pass/fail per query and exits 1 on any failure | |
 | `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in the `curated` section's shape, for review; never writes a file of the config | `--out PATH` (default: print to stdout) |
-| `nl2sql knowledge` | The glossary as the engine uses it. Its commands (`show`, `export`, `sources`) arrive in 0.8 | |
+| `nl2sql knowledge show` | The glossary as the engine uses it, each item with its origin (`knowledge`, `database`, `derived`); what the role cannot read is left out; problems last, exit 1 when there are any | `--datasource ID`, `--as ROLE` (repeatable), `--user` |
+| `nl2sql knowledge export` | The glossary items the role may see as one canonical `glossary.yaml`; never over a config or source file | `--datasource ID` (repeatable), `--out FILE` (default: stdout), `--as ROLE`, `--user` |
+| `nl2sql knowledge sources` | Each knowledge source: type, item counts, hash, when it loaded, its last reload error | `--as ROLE`, `--user` |
 | `nl2sql review` | The review queue of proposed knowledge and verified queries. Its commands (`list`, `show`, `accept`, `reject`, `export`, `apply`) arrive in 0.8 | |
 | `nl2sql profile` | Profile the indexed schema and file what it finds for review; arrives in 0.8 | |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
