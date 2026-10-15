@@ -8,6 +8,7 @@ from nl2sql.api.types import DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
 from nl2sql.config import Datasource
 from nl2sql.datasources.registry import mask_connection_args
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
 
 
@@ -55,17 +56,24 @@ class DatasourcesAPI:
         """
         self._ctx.remove_datasource(datasource_id)
 
-    def schema(self, datasource_id: str) -> Dict[str, Any]:
-        """The datasource's indexed schema, exactly as the planner is given it.
+    def schema(self, datasource_id: str, *, user_context: UserContext) -> Dict[str, Any]:
+        """The datasource's indexed schema as ``user_context`` may see it, exactly as the planner is given it.
 
         Tables sorted by name, each with its columns (type, nullable, primary
         key, description), foreign keys, row count and description. Read from
         the snapshot the datasource's live index build was made from, not the
         database; before the first index ``tables`` is empty.
+
+        A table the caller's scope denies is left out, and so is a foreign key
+        that refers to one; a caller whose roles do not reach the datasource
+        sees no tables. ``user_context`` is required: there is no default
+        view, so a caller that forgot it fails rather than seeing everything.
+        Pass an admin's ``UserContext`` for the whole schema.
         """
         from nl2sql.schema.view import schema_view
 
-        return schema_view(datasource_id, self._ctx.vector_store.snapshot(datasource_id))
+        scope = self._ctx.policy_engine.scope(user_context, datasource_id)
+        return schema_view(datasource_id, self._ctx.vector_store.snapshot(datasource_id), allows=scope.allows)
 
     def types(self) -> List[DatasourceType]:
         """Every adapter the engine's registry can name, installed or not, with its connection form.

@@ -270,7 +270,7 @@ def check_playground(base: str, version: str) -> List[str]:
     problems = page_problems(*_get(base + "/"))
     problems += health_problems(_json(base + "/api/health"), version)
     problems += meta_problems(_json(base + "/api/meta"))
-    problems += schema_problems(_json(base + "/api/schema"))
+    problems += schema_problems(_json(base + "/api/schema?role=admin"))
     problems += index_problems(_json(base + "/api/index"))
     return problems
 

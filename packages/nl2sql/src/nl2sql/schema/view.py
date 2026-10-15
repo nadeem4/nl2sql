@@ -5,7 +5,10 @@ is exactly what the planner is given.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+
+# Whether a caller may read ``(schema, table)``: a ``Scope``'s ``allows``.
+Allows = Callable[[Optional[str], str], bool]
 
 
 def _columns(table_contract, table_metadata) -> List[Dict[str, Any]]:
@@ -22,7 +25,7 @@ def _columns(table_contract, table_metadata) -> List[Dict[str, Any]]:
     return out
 
 
-def _foreign_keys(table_contract) -> List[Dict[str, Any]]:
+def _foreign_keys(table_contract, allows: Allows) -> List[Dict[str, Any]]:
     return [
         {
             "columns": list(fk.constrained_columns),
@@ -30,19 +33,23 @@ def _foreign_keys(table_contract) -> List[Dict[str, Any]]:
             "references_columns": list(fk.referred_columns),
         }
         for fk in table_contract.foreign_keys
+        if allows(fk.referred_table.schema_name, fk.referred_table.table_name)
     ]
 
 
-def schema_view(datasource_id: str, snapshot: Optional[Any]) -> Dict[str, Any]:
+def schema_view(datasource_id: str, snapshot: Optional[Any], *, allows: Allows) -> Dict[str, Any]:
     """Tables sorted by name, each with its columns, foreign keys, row count and description.
 
     ``snapshot`` is a ``SchemaSnapshot``, or None before the first index, which
-    gives no tables.
+    gives no tables. Only the tables ``allows`` lets the caller read are
+    listed, and only the foreign keys that refer to one of those.
     """
     if snapshot is None:
         return {"datasource_id": datasource_id, "tables": []}
     tables: List[Dict[str, Any]] = []
     for table_key, table_contract in snapshot.contract.tables.items():
+        if not allows(table_contract.table.schema_name, table_contract.table.table_name):
+            continue
         table_metadata = snapshot.metadata.tables.get(table_key)
         tables.append({
             "name": table_contract.table.table_name,
@@ -50,7 +57,7 @@ def schema_view(datasource_id: str, snapshot: Optional[Any]) -> Dict[str, Any]:
             "row_count": table_metadata.row_count if table_metadata else None,
             "description": (table_metadata.description if table_metadata else None) or "",
             "columns": _columns(table_contract, table_metadata),
-            "foreign_keys": _foreign_keys(table_contract),
+            "foreign_keys": _foreign_keys(table_contract, allows),
         })
     tables.sort(key=lambda t: t["name"])
     return {"datasource_id": datasource_id, "tables": tables}

@@ -8,8 +8,9 @@ import yaml
 from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, Policies, UserContext
 from nl2sql.llm.registry import LLMRegistry
+from nl2sql.policies import PolicyEngine
 from nl2sql.secrets import SecretManager
 from nl2sql_sdk.schema import (
     ColumnContract,
@@ -61,6 +62,11 @@ class _Context:
             self.test_index.write("chinook", [Chunk("Datasource: chinook", type="schema.datasource",
                                                     datasource_id="chinook")])
         self.ds_registry = _Registry()
+        # admin reads everything; viewer reads chinook but not Artist.
+        self.policy_engine = PolicyEngine(Policies(roles={
+            "admin": {"description": "Everything", "allow": ["*"]},
+            "viewer": {"description": "No artists", "allow": ["chinook"], "deny": ["chinook.*.Artist"]},
+        }))
         self.llm_registry = llm_registry
         self.curated = None
 
@@ -108,8 +114,11 @@ def _snapshot() -> SchemaSnapshot:
     return SchemaSnapshot(contract=contract, metadata=metadata)
 
 
+ADMIN = UserContext(roles=["admin"])
+
+
 def test_datasources_schema_projects_the_indexed_snapshot(tmp_path):
-    schema = _engine(_Context(tmp_path, snapshot=_snapshot())).datasources.schema("chinook")
+    schema = _engine(_Context(tmp_path, snapshot=_snapshot())).datasources.schema("chinook", user_context=ADMIN)
 
     assert schema["datasource_id"] == "chinook"
     assert [t["name"] for t in schema["tables"]] == ["Album", "Artist"]
@@ -122,7 +131,32 @@ def test_datasources_schema_projects_the_indexed_snapshot(tmp_path):
 
 
 def test_datasources_schema_before_the_first_index_has_no_tables(tmp_path):
-    assert _engine(_Context(tmp_path)).datasources.schema("chinook") == {"datasource_id": "chinook", "tables": []}
+    assert _engine(_Context(tmp_path)).datasources.schema("chinook", user_context=ADMIN) == {
+        "datasource_id": "chinook", "tables": []}
+
+
+def test_schema_requires_a_caller(tmp_path):
+    """No default view (B29, D33): an app that forgot the caller fails rather than seeing everything."""
+    with pytest.raises(TypeError):
+        _engine(_Context(tmp_path, snapshot=_snapshot())).datasources.schema("chinook")
+
+
+def test_schema_with_a_caller_drops_denied_tables(tmp_path):
+    """A denied table is left out, and so is a foreign key that names it."""
+    engine = _engine(_Context(tmp_path, snapshot=_snapshot()))
+
+    schema = engine.datasources.schema("chinook", user_context=UserContext(roles=["viewer"]))
+
+    assert [t["name"] for t in schema["tables"]] == ["Album"]
+    assert schema["tables"][0]["foreign_keys"] == []
+    assert "'Artist'" not in str(schema)
+
+
+@pytest.mark.parametrize("caller", [UserContext(), UserContext(roles=["nobody"])])
+def test_schema_for_a_caller_with_no_known_role_has_no_tables(tmp_path, caller):
+    engine = _engine(_Context(tmp_path, snapshot=_snapshot()))
+
+    assert engine.datasources.schema("chinook", user_context=caller)["tables"] == []
 
 
 def test_index_health_before_the_first_index_is_missing(tmp_path):

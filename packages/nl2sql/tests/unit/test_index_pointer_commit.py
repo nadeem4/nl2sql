@@ -20,7 +20,7 @@ from typing import List
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
 
-from nl2sql import NL2SQL, Embeddings
+from nl2sql import NL2SQL, Embeddings, UserContext
 from nl2sql.testing.config import make_config
 
 SHOP = {"id": "shop", "type": "sqlite", "description": "Orders and customers",
@@ -55,7 +55,7 @@ def _engine(tmp_path: Path, embedder=None, max_versions: int = 3) -> NL2SQL:
 
 
 def _tables(engine: NL2SQL) -> List[str]:
-    return [t["name"] for t in engine.datasources.schema("shop")["tables"]]
+    return [t["name"] for t in engine.datasources.schema("shop", user_context=UserContext())["tables"]]
 
 
 @pytest.fixture

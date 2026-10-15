@@ -15,7 +15,8 @@ Twenty-one routes:
                                and the provider and model those were recorded with
 ``GET  /api/schema``           the indexed schema of one datasource (``?datasource=``,
                                default the demo's own), so a visitor sees the database
-                               first and can look at each of them
+                               first and can look at each of them; only the tables
+                               ``?role=`` may read (required: 400 without it)
 ``POST /api/ask``              one ``QueryResult``, plus ``replay_miss`` and ``recorded``
                                (answered from recordings, not run live just now); a miss
                                carries one plain error instead of the raw ones; a client
@@ -458,8 +459,12 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
                 **hosted.describe()}
 
     @app.get("/api/schema")
-    def schema(datasource: Optional[str] = None) -> Dict[str, Any]:
-        return engine.datasources.schema(datasource or _default_datasource(engine, dataset))
+    def schema(datasource: Optional[str] = None, role: Optional[str] = None) -> Dict[str, Any]:
+        # No default view (D33): the page always sends its Ask as role.
+        if not role:
+            raise HTTPException(status_code=400, detail="Name the role to show the schema for: ?role=<role>.")
+        return engine.datasources.schema(datasource or _default_datasource(engine, dataset),
+                                         user_context=UserContext(roles=[role]))
 
     def start_question(req: AskRequest, request: Request, response: Response):
         """``(llms, replaying, miss)`` for a question about to run, or a refusal.

@@ -8,7 +8,8 @@ import pytest
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, Policies
+from nl2sql.policies import PolicyEngine
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
@@ -53,6 +54,11 @@ class _Context:
         self.vector_store = _LiveIndex(snapshot)
         self.ds_registry = _Registry(datasources)
         self.traces = None
+        # admin reads everything; viewer reads every database but chinook's Artist.
+        self.policy_engine = PolicyEngine(Policies(roles={
+            "admin": {"description": "Everything", "allow": ["*"]},
+            "viewer": {"description": "No artists", "allow": ["*"], "deny": ["chinook.*.Artist"]},
+        }))
 
 
 class _LiveIndex:
@@ -219,7 +225,7 @@ def test_the_shipped_clips_are_small_and_come_in_pairs():
 def test_schema_route_reads_the_engine_snapshot():
     engine = _Engine(snapshot=_snapshot())
     client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay", dataset="chinook"))
-    body = client.get("/api/schema").json()
+    body = client.get("/api/schema", params={"role": "admin"}).json()
 
     assert body["datasource_id"] == "chinook"
     names = [t["name"] for t in body["tables"]]
@@ -239,6 +245,31 @@ def test_schema_route_reads_the_engine_snapshot():
     assert album["foreign_keys"] == [
         {"columns": ["ArtistId"], "references_table": "Artist", "references_columns": ["ArtistId"]}
     ]
+
+
+def test_schema_route_shows_only_what_the_selected_role_may_read():
+    """The schema panel passes its role, so a denied table is not listed (B29)."""
+    engine = _Engine(snapshot=_snapshot())
+    client = TestClient(build_app(engine, questions=[], roles=["admin", "viewer"], mode="replay",
+                                  dataset="chinook"))
+
+    viewer = client.get("/api/schema", params={"role": "viewer"}).json()
+    admin = client.get("/api/schema", params={"role": "admin"}).json()
+
+    assert [t["name"] for t in viewer["tables"]] == ["Album"]
+    assert viewer["tables"][0]["foreign_keys"] == []
+    assert [t["name"] for t in admin["tables"]] == ["Album", "Artist"]
+
+
+def test_schema_route_without_a_role_is_refused():
+    """No default view (D33): a request that names no role gets no schema."""
+    client = TestClient(build_app(_Engine(snapshot=_snapshot()), questions=[], roles=["admin"], mode="replay",
+                                  dataset="chinook"))
+
+    response = client.get("/api/schema")
+
+    assert response.status_code == 400
+    assert "role" in response.json()["detail"]
 
 
 def test_meta_lists_every_registered_datasource_with_the_demo_s_own_first():
@@ -263,14 +294,15 @@ def test_schema_route_follows_the_datasource_the_panel_asks_for():
     engine = _Engine(snapshot=None, datasources=("chinook", "support"))
     client = TestClient(build_app(engine, questions=[], roles=["admin"], mode="replay",
                                   dataset="chinook"))
-    assert client.get("/api/schema").json()["datasource_id"] == "chinook"
-    assert client.get("/api/schema", params={"datasource": "support"}).json()["datasource_id"] == "support"
+    assert client.get("/api/schema", params={"role": "admin"}).json()["datasource_id"] == "chinook"
+    assert client.get("/api/schema", params={"datasource": "support", "role": "admin"}).json()[
+        "datasource_id"] == "support"
 
 
 def test_schema_route_is_empty_when_nothing_is_indexed():
     client = TestClient(build_app(_Engine(snapshot=None), questions=[], roles=["admin"],
                                   mode="replay", dataset="chinook"))
-    body = client.get("/api/schema").json()
+    body = client.get("/api/schema", params={"role": "admin"}).json()
     assert body["tables"] == []
     assert body["datasource_id"] == "chinook"
 

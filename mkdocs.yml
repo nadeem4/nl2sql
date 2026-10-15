@@ -93,6 +93,7 @@ nav:
     - Docker (REST API): getting_started/docker.md
     - From Source (Development): getting_started/source.md
     - Demo Data (CLI-first): getting_started/demo.md
+    - MCP Server: getting_started/mcp.md
   - Configuration:
     - Configuration System: configuration/system.md
     - Datasources: configuration/datasources.md

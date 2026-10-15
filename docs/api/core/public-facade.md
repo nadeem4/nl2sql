@@ -221,7 +221,8 @@ message names each one and why. `nl2sql trace replay` is built on it (see
 
 ```python
 engine = NL2SQL.demo()
-engine.datasources.schema("chinook")["tables"][0]["name"]   # 'Album'
+admin = UserContext(roles=["admin"])                         # the schema is always one caller's view
+engine.datasources.schema("chinook", user_context=admin)["tables"][0]["name"]   # 'Album'
 engine.index.health()["status"]                              # 'ok'
 engine.index.inspect("top customers", k=4)["picks"]
 ```

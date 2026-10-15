@@ -31,6 +31,7 @@ from nl2sql.cli.commands.demo import _key_from_env_file
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql import NL2SQL, load_config
 from nl2sql.llm import LLMRegistry
+from nl2sql.policies import PolicyEngine
 from nl2sql.registry import Registry
 from nl2sql.storage.files import FilesTraces
 from nl2sql.secrets import SecretManager
@@ -100,6 +101,7 @@ class _Context:
         self.registry = Registry.default()
         self.traces = FilesTraces(project / "traces")
         self.config = load_config(project / "nl2sql.yaml")
+        self.policy_engine = PolicyEngine(self.config.policies)
         self.replace_llm(self.config.llm)
         self.tenant_id = "default_tenant"
         self.artifact_store = ArtifactStore(LocalResults(str(project / "artifacts")), path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet")
@@ -217,7 +219,7 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
         ("GET", "/clips/{name}"): lambda: client.get("/clips/pipeline.jpg"),
         ("GET", "/api/health"): lambda: client.get("/api/health"),
         ("GET", "/api/meta"): lambda: client.get("/api/meta"),
-        ("GET", "/api/schema"): lambda: client.get("/api/schema"),
+        ("GET", "/api/schema"): lambda: client.get("/api/schema", params={"role": "admin"}),
         ("POST", "/api/ask"): lambda: client.post("/api/ask", json={"question": "q1", "role": "admin"}),
         ("POST", "/api/ask/stream"): lambda: client.post("/api/ask/stream", json={"question": "q1", "role": "admin"}),
         ("GET", "/api/trace/{trace_id}"): lambda: client.get(f"/api/trace/{trace_id}"),
