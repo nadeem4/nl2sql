@@ -15,6 +15,7 @@ from nl2sql.embeddings.local import LocalEmbeddings
 from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql.indexing.retrieval import Retriever, namespace_for
 from nl2sql.storage.chroma import ChromaIndex
+from nl2sql.events import EventBus
 
 pytestmark = pytest.mark.integration
 
@@ -49,7 +50,8 @@ def store(tmp_path_factory):
     index = ChromaIndex(tmp_path_factory.mktemp("index"))
     ctx = SimpleNamespace(index=index, namespace=namespace_for(info), embedding_info=info, embedder=embeddings,
                           state=None, ds_registry=None, llm_registry=None, curated=None,
-                          settings=SimpleNamespace(schema_=SimpleNamespace(max_versions=3)))
+                          settings=SimpleNamespace(schema_=SimpleNamespace(max_versions=3)), bus=EventBus(),
+                          tenant_id="default")
     IndexingOrchestrator(ctx)._commit("chinook", "v1", [_Chunk(n, t) for n, t in TABLES.items()], [], None)
     return Retriever(index, ctx.namespace, embeddings, index.pointers(ctx.namespace))
 
