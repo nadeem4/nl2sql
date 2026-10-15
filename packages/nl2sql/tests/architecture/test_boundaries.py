@@ -855,6 +855,12 @@ def test_wave_b_read_methods_require_a_caller():
                 offenders.append(f"{relative}: {class_name}.{method} has no keyword-only user_context")
             elif node.args.kw_defaults[names.index("user_context")] is not None:
                 offenders.append(f"{relative}: {class_name}.{method} gives user_context a default")
+            else:
+                annotation = node.args.kwonlyargs[names.index("user_context")].annotation
+                text = ast.unparse(annotation) if annotation is not None else ""
+                if "UserContext" not in text or re.search(r"\bOptional\b|\bNone\b|\|", text):
+                    offenders.append(f"{relative}: {class_name}.{method} annotates user_context as {text!r}; "
+                                     "it is a UserContext, never Optional or None")
     assert not offenders, _broke(
         "Every Wave B method that shows knowledge, proposals or schema takes the caller as a required "
         "keyword (D60): an app that forgot the caller fails rather than seeing everything.", offenders)

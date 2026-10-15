@@ -70,7 +70,9 @@ class SubQueryResult(BaseModel):
     row_cap: Optional[int] = None
     truncated: bool = False
     # The knowledge this sub-query's prompts carried (glossary terms and rules), and the database's
-    # estimate of the rows it reads, when the cost rule asked for one.
+    # estimate of the rows it reads, when the cost rule asked for one. knowledge_used holds only items
+    # within the caller's scope: nothing on, or mentioning, a table the caller cannot read (D39), so
+    # returning it names no denied table.
     knowledge_used: Optional[KnowledgeUsed] = None
     estimate: Optional[Estimate] = None
 

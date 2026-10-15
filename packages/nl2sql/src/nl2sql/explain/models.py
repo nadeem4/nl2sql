@@ -19,7 +19,7 @@ class ExplainedStep(BaseModel):
 
     sub_query_id: Optional[str] = None
     datasource_id: str
-    source: Literal["generated", "cache", "approved", "chosen", "verified"]
+    source: Literal["generated", "cache", "supplied", "approved", "chosen", "verified"]
     tables: List[str] = Field(default_factory=list)  # "Invoice: one row per customer invoice (glossary)"
     joins: List[str] = Field(default_factory=list)  # "each InvoiceLine to its Invoice, on InvoiceId (declared key)"
     filters: List[str] = Field(default_factory=list)  # "Invoice date is in 2012"
