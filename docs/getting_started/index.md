@@ -13,6 +13,7 @@ to use the platform:
 - [Docker (REST API)](docker.md)
 - [From Source (Development)](source.md)
 - [Demo Data (CLI-first)](demo.md)
+- [MCP server](mcp.md): serve the engine to a desktop assistant or an IDE with `nl2sql mcp`
 
 ## One config: `nl2sql.yaml`
 

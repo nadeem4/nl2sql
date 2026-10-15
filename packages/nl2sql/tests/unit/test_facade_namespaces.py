@@ -129,7 +129,7 @@ def test_datasources_remove_leaves_the_config_and_routing(engine):
 
 
 def test_datasources_schema_is_empty_before_the_first_index(engine):
-    schema = engine.datasources.schema("shop")
+    schema = engine.datasources.schema("shop", user_context=UserContext())
 
     assert schema["tables"] == []
 

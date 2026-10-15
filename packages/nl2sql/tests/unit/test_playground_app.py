@@ -8,7 +8,8 @@ import pytest
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from nl2sql import NL2SQL
+from nl2sql import NL2SQL, Policies
+from nl2sql.policies import PolicyEngine
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import build_app
@@ -53,6 +54,11 @@ class _Context:
         self.vector_store = _LiveIndex(snapshot)
         self.ds_registry = _Registry(datasources)
         self.traces = None
+        # admin reads everything; viewer reads every database but chinook's Artist.
+        self.policy_engine = PolicyEngine(Policies(roles={
+            "admin": {"description": "Everything", "allow": ["*"]},
+            "viewer": {"description": "No artists", "allow": ["*"], "deny": ["chinook.*.Artist"]},
+        }))
 
 
 class _LiveIndex:
@@ -239,6 +245,20 @@ def test_schema_route_reads_the_engine_snapshot():
     assert album["foreign_keys"] == [
         {"columns": ["ArtistId"], "references_table": "Artist", "references_columns": ["ArtistId"]}
     ]
+
+
+def test_schema_route_shows_only_what_the_selected_role_may_read():
+    """The schema panel passes its role, so a denied table is not listed (B29)."""
+    engine = _Engine(snapshot=_snapshot())
+    client = TestClient(build_app(engine, questions=[], roles=["admin", "viewer"], mode="replay",
+                                  dataset="chinook"))
+
+    viewer = client.get("/api/schema", params={"role": "viewer"}).json()
+    admin = client.get("/api/schema", params={"role": "admin"}).json()
+
+    assert [t["name"] for t in viewer["tables"]] == ["Album"]
+    assert viewer["tables"][0]["foreign_keys"] == []
+    assert [t["name"] for t in admin["tables"]] == ["Album", "Artist"]
 
 
 def test_meta_lists_every_registered_datasource_with_the_demo_s_own_first():

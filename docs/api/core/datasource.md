@@ -11,7 +11,7 @@ forms, and a test of a datasource before it is added.
 - List every adapter type the registry can name, installed or not, with its connection model's JSON Schema.
 - Test a configured datasource, as `check()` does, or a `Datasource` that is not added, registering nothing.
 - Add a `Datasource` (validated, built, not connected) and remove one.
-- Return the indexed schema as the planner is given it.
+- Return the indexed schema as the planner is given it, as one caller may see it.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/datasource_api.py` (`DatasourcesAPI`, internal)
@@ -29,7 +29,7 @@ forms, and a test of a datasource before it is added.
 | `test(datasource)` | `DatasourceStatus` | See [Testing a datasource](#testing-a-datasource). |
 | `add(datasource)` | `None` | Validates `connection` against the adapter's connection model and `index` as an `IndexScope`, builds the adapter without connecting, registers it, and adds the `Datasource` to `engine.config`; its description and sample questions are what indexing reads. Raises `ValueError` if the id is taken, the type is unknown, a reference does not resolve, `index` does not validate (naming the `index.` field) or the adapter rejects its connection settings (naming the field, with "did you mean" for an unknown key, and never a value). Index it next: `engine.index.build([datasource.id])`. |
 | `remove(datasource_id)` | `None` | Takes the datasource out of routing and out of `engine.config`, and closes its adapter's pool. Its index entries stay until the next full `index.build` or `index.clear`. Raises `ValueError` for an unknown id. |
-| `schema(datasource_id)` | `dict` | The indexed schema as the planner is given it: `{"datasource_id", "tables": [...]}`, tables sorted by name, each with `name`, `schema`, `row_count`, `description`, `columns` (`name`, `type`, `nullable`, `primary_key`, `description`) and `foreign_keys` (`columns`, `references_table`, `references_columns`). Read from the snapshot the datasource's live index build was made from, not the database; before the first index `tables` is empty. |
+| `schema(datasource_id, *, user_context)` | `dict` | The indexed schema as the planner is given it, as `user_context` may see it: `{"datasource_id", "tables": [...]}`, tables sorted by name, each with `name`, `schema`, `row_count`, `description`, `columns` (`name`, `type`, `nullable`, `primary_key`, `description`) and `foreign_keys` (`columns`, `references_table`, `references_columns`). A table the caller's roles deny is left out, and so is a foreign key that refers to one; a caller whose roles do not reach the datasource gets no tables. `user_context` is required: there is no default view, so code that forgot it fails instead of showing everything. Pass an admin's `UserContext` for the whole schema. Read from the snapshot the datasource's live index build was made from, not the database; before the first index `tables` is empty. |
 
 `DatasourceInfo` is a frozen dataclass, exported from `nl2sql`:
 
@@ -91,12 +91,13 @@ else:
 ```
 
 ```python
-from nl2sql import NL2SQL, Datasource
+from nl2sql import NL2SQL, Datasource, UserContext
 
 engine = NL2SQL.from_config("nl2sql.yaml")
 engine.check()
 [(d.id, d.status) for d in engine.datasources.list()]   # [('shop', 'ready'), ('hr', 'failed')]
 engine.datasources.get("hr").reason
+engine.datasources.schema("shop", user_context=UserContext(roles=["analyst"]))["tables"]
 
 engine.datasources.add(Datasource(id="ledger", type="sqlite", connection={"database": "ledger.db"}))
 engine.datasources.test("ledger").status                 # 'ready'

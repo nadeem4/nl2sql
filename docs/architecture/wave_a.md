@@ -1854,7 +1854,7 @@ over stdio, using the official `mcp` Python SDK.
 | Rule | Detail |
 |---|---|
 | **An extra** | `pip install "nl2sql-engine[mcp]"`. `import nl2sql` never loads `mcp`; the boundary test adds it to `FORBIDDEN_AT_IMPORT`. |
-| **Public facade only** | `nl2sql/mcp/server.py` imports the top-level `nl2sql` and `mcp`, nothing else from the engine, held by the same test that holds the API and the playground. `nl2sql/cli/commands/mcp.py` builds the engine and calls `serve(engine, user_context)`. |
+| **Public facade only** | `nl2sql/mcp/server.py` imports the top-level `nl2sql` and `mcp`, nothing else from the engine, held by the same test that holds the API and the playground. `nl2sql/cli/commands/mcp.py` builds the engine and calls `build_server(engine, identity).run("stdio")`; `identity` is a `UserContext` or a function returning one, asked on every call, so Wave C can name a caller per HTTP request. |
 | **Who is asking (D33)** | stdio has no authentication: the person who started the process is the caller. `--role` (repeatable) and `--user` set the `UserContext`; without them the role is `policies.default_role`. That defaults to none (`config/models.py`), and a caller with no role reads nothing, so `nl2sql mcp` with neither refuses to start, naming both fixes; `getting_started/mcp.md` says so. |
 | **Logs** | To stderr only; stdout is the protocol. |
 | **HTTP and auth** | Wave C |
@@ -1870,6 +1870,39 @@ required, and drops the tables its scope denies (B29). There is no default:
 an app that forgot the argument would fail open. A caller that wants the
 whole schema passes an admin `UserContext` explicitly. The playground's
 schema panel passes the selected role.
+
+!!! note "Built: the MCP server and the caller's schema (M1)"
+    `nl2sql/mcp/server.py` has `build_server(engine, identity) -> FastMCP`
+    (official `mcp` SDK, the `mcp` extra `mcp>=1.10,<2`) and `PREVIEW_ROWS =
+    20`; `nl2sql mcp --role ... --user ...` is `cli/commands/mcp.py`
+    (`caller(policies, roles, user)`, `mcp_command`). Shapes the design did
+    not fix: every tool returns a JSON object (its structured content).
+    `ask` returns `status` (the run's `RunStatus`, so Wave B's
+    `needs_clarification` needs no new field; its `clarification` gets its own
+    key), `answer` (`summary`, `content`), `sub_queries` (`id`,
+    `datasource_id`, `sql`, `columns`, `rows`, `total_rows`, `truncated`),
+    `truncated`, `source`, `warnings` (`code`, `message`), `trace_id`, and
+    `errors` (`code`, `node`, `message`), `approvals_needed` and `stop` when
+    set. An error's or warning's message is kept only for the codes written
+    for the asker (refusals, hooks, limits, providers, the answer checks);
+    any other message is replaced by its code and the trace id, since it may
+    carry an exception's text. An exception out of the engine is
+    `INTERNAL_ERROR`, logged; `ask` with a `datasource_id` the caller cannot
+    reach is `DATASOURCE_NOT_FOUND` without running. `describe_table` answers
+    `status: ok` with the `schema()` table, or `not_found` (a denied table,
+    a missing one and a table in an unreachable datasource alike) with the
+    `tables` the caller may read, or `ambiguous` when a bare name matches
+    tables in two schemas. `nl2sql mcp` also starts without a role under
+    `allow_all`, where every caller reads everything, and refuses a role the
+    policies do not define. `datasources.schema(datasource_id, *,
+    user_context)` filters through `policy_engine.scope(...).allows`
+    (`schema_view(..., allows=)`), drops a foreign key to a denied table, and
+    is in the boundary test's `ACCESS_DECISIONS`. The playground's
+    `/api/schema` takes `?role=` (default `admin`, as `/api/ask` does) and
+    the page sends its **Ask as** role. `mcp` is in `FORBIDDEN_AT_IMPORT`
+    (which is what `test_import_nl2sql_does_not_load_mcp` was to check), and
+    `test_mcp_uses_only_the_public_api` holds `nl2sql/mcp/` to the
+    top-level `nl2sql` and `mcp` to `nl2sql/mcp/`.
 
 ## 13. The registry after Wave A
 

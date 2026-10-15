@@ -72,6 +72,9 @@ azure = ["azure-identity", "azure-keyvault-secrets"]
 demo = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 duckdb = ["duckdb", "duckdb-engine"]
 hashicorp = ["hvac"]
+# `nl2sql mcp`: the engine as an MCP server over stdio, on the official SDK
+# (structured tool results arrived in 1.10).
+mcp = ["mcp>=1.10,<2"]
 mssql = [
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'", # Optional fallback

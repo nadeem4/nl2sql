@@ -175,9 +175,12 @@ export default function App() {
     getJson("/api/feedback").then(setFeedback).catch(() => {});
   }, []);
 
-  // The schema panel follows whichever database is picked; with none picked
-  // the server serves the demo's own.
-  const schemaUrl = datasource ? `/api/schema?datasource=${encodeURIComponent(datasource)}` : "/api/schema";
+  // The schema panel follows whichever database is picked (with none picked
+  // the server serves the demo's own) and the role asked as: it lists only
+  // the tables that role may read.
+  const schemaParams = new URLSearchParams({ role });
+  if (datasource) schemaParams.set("datasource", datasource);
+  const schemaUrl = `/api/schema?${schemaParams}`;
   useEffect(() => {
     // Two databases picked quickly are two requests in flight; only the one
     // the rail is still showing may land.

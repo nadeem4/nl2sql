@@ -19,6 +19,7 @@ from nl2sql.cli.commands.demo import DEFAULT_QUESTIONS_PER_MINUTE, DEFAULT_QUEST
 from nl2sql.cli.commands.doctor import doctor_command
 from nl2sql.cli.commands.init import init_command
 from nl2sql.cli.commands.install import install_command
+from nl2sql.cli.commands.mcp import mcp_command
 from nl2sql.cli.commands.policy import app as policy_app
 from nl2sql.cli.commands.curated import app as curated_app
 from nl2sql.cli.commands.trace import app as trace_app, replay_command
@@ -113,6 +114,22 @@ def run(
         show_perf=show_perf
     )
     run_pipeline(run_config, build_engine(ctx))
+
+
+@app.command()
+def mcp(
+    ctx: typer.Context,
+    role: Annotated[Optional[List[str]], typer.Option(
+        "--role",
+        help="A role the MCP client asks as (repeatable). Without one, policies.default_role; "
+             "with neither, the server refuses to start.",
+    )] = None,
+    user: Annotated[Optional[str], typer.Option("--user", help="The user id the runs are recorded under.")] = None,
+):
+    """
+    Serve the engine to an MCP client over stdio: ask, list_datasources, describe_table (the mcp extra).
+    """
+    mcp_command(ctx, role or [], user)
 
 
 @trace_app.command("replay")

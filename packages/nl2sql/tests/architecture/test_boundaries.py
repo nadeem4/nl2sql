@@ -519,8 +519,11 @@ def test_cli_demo_never_imports_cli_commands():
         "share lives in cli/demo/ or cli/common/.", offenders)
 
 
+MCP_SERVER = ENGINE / "mcp"
+
+
 def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
-    """The CLI, the playground and nl2sql-api are clients of the facade, like any SDK caller.
+    """The CLI, the playground, the MCP server and nl2sql-api are clients of the facade, like any SDK caller.
 
     None of them reaches the runtime behind it (``engine._runtime``, the
     removed ``engine.context``, a namespace's ``_ctx``): what one of them needs
@@ -528,7 +531,7 @@ def test_the_cli_the_playground_and_the_api_use_only_the_public_api():
     """
     hidden = {"context", "_ctx", "_runtime"}
     offenders = []
-    for path in python_files(ENGINE / "cli", PACKAGES / "api" / "src" / "nl2sql_api"):
+    for path in python_files(ENGINE / "cli", MCP_SERVER, PACKAGES / "api" / "src" / "nl2sql_api"):
         for node in ast.walk(_tree(path)):
             if isinstance(node, ast.Attribute) and node.attr in hidden:
                 offenders.append(f"{_where(path)}:{node.lineno} .{node.attr}")
@@ -593,6 +596,23 @@ def test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2s
         "the engine is a facade method every caller can use.", offenders)
 
 
+def test_mcp_uses_only_the_public_api():
+    """The MCP server is a client of the facade (wave_a.md, section 12), and the only user of ``mcp``.
+
+    ``nl2sql/mcp/`` imports the top-level ``nl2sql`` and nothing else of the
+    engine; ``mcp`` is the ``mcp`` extra, imported nowhere else.
+    """
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(MCP_SERVER)
+                 for lineno, name in _engine_imports(path) if name != "nl2sql"]
+    offenders += [f"{_where(path)}:{lineno} {name}"
+                  for path in python_files(*SOURCES) if not path.is_relative_to(MCP_SERVER)
+                  for lineno, name, _ in imports(path) if name.partition(".")[0] == "mcp"]
+    assert not offenders, _broke(
+        "nl2sql/mcp/ imports only the top-level nl2sql: what the server needs is a facade method "
+        "every caller can use. Nothing outside it imports mcp, the mcp extra.", offenders)
+
+
 # --------------------------------------------------------------------------
 # 9. The runtime does not pay for evals (moved from
 #    tests/unit/test_import_hygiene.py)
@@ -629,7 +649,7 @@ def test_import_nl2sql_does_not_load_evaluation():
 
 
 FORBIDDEN_AT_IMPORT = ("chromadb", "onnxruntime", "sqlalchemy", "psycopg2", "psycopg", "pymysql",
-                       "pyodbc", "pymssql", "duckdb", "duckdb_engine", "textual", "opentelemetry")
+                       "pyodbc", "pymssql", "duckdb", "duckdb_engine", "textual", "opentelemetry", "mcp")
 
 IMPORT_BUDGET_US = 500_000
 
@@ -757,6 +777,7 @@ ACCESS_DECISIONS = [
     "pipeline/nodes/validator/node.py",
     "pipeline/nodes/executor/node.py",
     "api/policy_api.py",
+    "api/datasource_api.py",
 ]
 # The 0.5 access helpers. A second way to decide is how two nodes come to disagree.
 OLD_ACCESS_NAMES = {"table_allowed", "get_allowed_tables", "get_allowed_datasources", "RBAC", "RolePolicy"}

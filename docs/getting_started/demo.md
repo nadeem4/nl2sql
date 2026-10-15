@@ -163,6 +163,8 @@ true`, so the demo's refusal names the role and table; outside the demo the
 message is the generic "You do not have permission to see the data this
 question requires." See
 [Security Model](../security/model.md#hidden-tables-and-strict-refusal).
+The playground's schema panel follows the **Ask as** role too: it lists only
+the tables that role may read (`engine.datasources.schema(..., user_context=)`).
 
 ### API keys in the demo
 
