@@ -95,6 +95,18 @@ jobs:
       - name: Run key-free integration tests
         run: pytest -m "integration and not llm"
 
+      # The key-free eval gate (docs/evals/index.md, "In CI"): mode plans
+      # (every gold plan through the validator, generator and executor, for
+      # every role) and mode retrieval on the demo's Chinook suite, each
+      # against the newest record of its mode in benchmarks/. Exits 1 on a
+      # regression and 2 when the suite changed and the baseline was not
+      # re-recorded (`nl2sql eval publish`). Mode full needs a key and refuses
+      # to run in CI.
+      - name: Eval gate (plans and retrieval)
+        run: |
+          nl2sql --config demo-ci/nl2sql.yaml eval run --mode plans --baseline benchmarks
+          nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchmarks
+
   # Strict mode fails on broken internal links and bad references, which
   # catches the deterministic half of documentation drift. Claims that code
   # changes contradict are not checked by any workflow.

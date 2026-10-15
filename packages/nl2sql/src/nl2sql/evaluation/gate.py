@@ -19,7 +19,8 @@ A case passes on **execution accuracy** (``result_match`` and ``outcome``,
 published and gated on, so a run compares with the records published before
 0.7, and a faithfulness verdict alone is never a regression. It is checked
 twice: as users see it, and on the generated path (a case a verified query
-answered is read by its second run, with curated answers off). Mode
+answered is read by its second run, with curated answers off), when the
+run had curated answers on. Mode
 retrieval has no execution, so its cases are read by their status
 (``retrieval_recall`` and ``routing``).
 """
@@ -50,7 +51,7 @@ class GateResult(BaseModel):
     ``series_break`` says why nothing (or not every config) was compared: another
     suite, another mode, or no config in common. ``compared`` holds, per config,
     the flips and accuracies of each measure (``accuracy``, and ``generated``
-    unless the mode is retrieval) and both costs per case.
+    when the run had curated answers on) and both costs per case.
     """
 
     ok: bool
@@ -193,6 +194,8 @@ def gate(report: Union[EvalReport, Dict[str, Any]], baseline: Baseline, *,
     problems: List[str] = []
     compared: Dict[str, Dict[str, Any]] = {}
     base_sides = {side.name: side for side in _sides(baseline)}
+    # With curated answers off every case is on the generated path: one measure says it all.
+    curated = bool((report.curated if isinstance(report, EvalReport) else report.get("curated")))
     for now in _sides(report):
         base = base_sides.get(now.name)
         if base is None:
@@ -204,8 +207,9 @@ def gate(report: Union[EvalReport, Dict[str, Any]], baseline: Baseline, *,
             breaks.append(f"{now.name}: the baseline ran another suite (@{base.digest[:8]}, "
                           f"this run @{now.digest[:8]})")
             continue
-        measures: Dict[str, Passed] = ({"accuracy": _status} if now.mode == "retrieval"
-                                       else {"accuracy": execution_passed, "generated": _generated})
+        measures: Dict[str, Passed] = {"accuracy": _status if now.mode == "retrieval" else execution_passed}
+        if curated:
+            measures["generated"] = _generated
         compared[now.name] = {}
         for measure, passed in measures.items():
             [diff] = compare_with_baseline({"configs": {now.name: now.board}},

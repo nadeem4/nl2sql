@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1 and E2 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1, E2 and V2 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -1182,6 +1182,29 @@ series_break)`.
 | CI, every pull request | `mode: plans` on Chinook (today's tier 1 test) and `mode: retrieval` on Chinook and routing, against `benchmarks/` baselines. Free. |
 | Before a release, by the owner | `mode: full` with a key, against the last published record. Asked for explicitly: it spends the owner's key. |
 
+!!! note "Built: the gate (V2)"
+    `engine.evals.gate(report, baseline) -> GateResult(ok, regressions,
+    series_break, compared)`, with `evals.yaml`'s `gate` settings, built on
+    V1's statistics in `nl2sql/evaluation/gate.py` (`gate`, `load_baseline`).
+    Where the code differs from the section above, after the owner's
+    decision of 2026-10-15:
+
+    - **It reads execution accuracy, not `overall`.** A case passes the gate
+      on `result_match` and `outcome` only
+      (`nl2sql.evaluation.report.execution_passed`), the measure 0.6's tier 2
+      published, so a faithfulness miss is never a regression and a 0.7 run
+      compares with the 0.6 history. "Both accuracies" are that measure as
+      users see it and on the generated path (each case's `generated` run),
+      the second only when the run had curated answers on. Mode retrieval
+      has no execution and is read by status.
+    - **A baseline is a report, a record or a `benchmarks/` folder** (the
+      newest record of the run's mode, database and config). A record 0.6
+      wrote has no scores; its status was execution accuracy and is read so.
+    - **A series break is not `ok`.** Another suite digest, another mode or
+      no config in common compares nothing; `nl2sql eval run` exits 2.
+    - **Routing has no suite yet** (Phase R adds it), so CI gates mode
+      retrieval on Chinook only.
+
 ### The CLI
 
 | Command | Calls |
@@ -1192,6 +1215,38 @@ series_break)`.
 | `nl2sql eval publish` | Writes the report as a record under `benchmarks/` and refreshes the README block (today's `benchmark publish`) |
 
 `nl2sql benchmark` and all its subcommands are deleted.
+
+!!! note "Built: the CLI and the records (V2)"
+    `nl2sql eval run`, `regenerate` and `publish` are in
+    `cli/commands/eval.py`. Where they differ from the table:
+
+    - **`run`** also takes `--passes`. `--llm` takes `PRESET`, `FILE.yaml`,
+      `NAME=PRESET` or `NAME=FILE`. The report goes to `--out`, by default
+      `eval_<mode>.json` next to `nl2sql.yaml`, with a `run` stamp (when, and
+      which engine version and commit) for `publish`. Exit codes: 0, 1 on a
+      regression, 2 on a usage error or a baseline that cannot be compared,
+      3 at the cost cap. Mode full refuses to start with `CI` set (the one
+      `CI` read, in `READS_THE_ENVIRONMENT`).
+    - **`publish [REPORT ...] [--note] [--from DIR ...]`** writes one record
+      per config of each report, then rebuilds `docs/benchmarks.md` and the
+      README block from every record. With no report it only rebuilds the
+      pages, as `benchmark publish` did.
+    - **Records are keyed by mode and suite digest:**
+      `benchmarks/<mode>/<database>/...json`, `kind` the mode and `dataset`
+      the suite's name and digest (several suites: their digests joined and
+      hashed, `report.suite_identity`). Every mode is recorded; a record keeps
+      the config's whole board.
+    - **The headline accuracy is execution accuracy** (`metrics.accuracy` is
+      `accuracy.execution`), so the published series reads the same as 0.6's;
+      `accuracy_all_scorers` and `accuracy_generated` sit beside it.
+    - **0.6's records stay readable.** Kind `tier2` is read as mode full
+      (`records.mode_of`), so the history shows those runs in the mode full
+      table, as a new series (the suite changed).
+    - **CI's baselines are committed**: `benchmarks/plans/chinook/` and
+      `benchmarks/retrieval/chinook/`, recorded on 2026-10-15 from a fresh
+      `nl2sql init --demo`. A change to the Chinook suite needs both
+      re-recorded (`nl2sql eval run --mode plans`, `--mode retrieval`, then
+      `nl2sql eval publish`), or the gate exits 2.
 
 ### Seeding: benchmark your own database
 

@@ -593,7 +593,7 @@ def _plans_section(group: List[Dict[str, Any]], previous) -> str:
 
 def _retrieval_section(group: List[Dict[str, Any]], previous) -> str:
     runs = _table(
-        ["Date (UTC)", "Commit", "Note", "Dataset", "Schema", "Search", "Embedding", "Questions", "Table recall",
+        ["Date (UTC)", "Commit", "Note", "Dataset", "Schema", "Search", "Embedding", "Cases scored", "Table recall",
          "Column recall", "Δ vs previous", "Tables / columns sent"],
         [[_when(r), _commit(r), r.get("note") or "-", _dataset(r), _schema(r),
           f"k {r['settings']['table_k']} tables / {r['settings']['planning_k']} planning",

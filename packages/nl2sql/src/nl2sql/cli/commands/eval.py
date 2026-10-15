@@ -83,11 +83,15 @@ def _print_report(report) -> None:
     for name, board in report.configs.items():
         total = board["summary"]["total"]
         accuracy = board["accuracy"]
-        console.print(
-            escape(f"[{name}] {board['completed_cases']} case runs: {total['pass']} pass, {total['fail']} fail, "
-                   f"{total['error']} error, {total['skip']} skip; execution accuracy "
-                   f"{_pct(accuracy['execution'])}, all scorers {_pct(accuracy['overall'])}, "
-                   f"generated {_pct(accuracy['generated'])}"), soft_wrap=True)
+        line = (f"[{name}] {board['completed_cases']} case runs: {total['pass']} pass, {total['fail']} fail, "
+                f"{total['error']} error, {total['skip']} skip; ")
+        if report.mode == "retrieval":
+            line += f"passed {_pct(accuracy['overall'])}"
+        else:
+            line += f"execution accuracy {_pct(accuracy['execution'])}, all scorers {_pct(accuracy['overall'])}"
+            if report.curated:
+                line += f", generated {_pct(accuracy['generated'])}"
+        console.print(escape(line), soft_wrap=True)
         if board.get("retrieval"):
             r = board["retrieval"]
             console.print(escape(f"[{name}] table recall {_pct(r['table_recall'])}, column recall "

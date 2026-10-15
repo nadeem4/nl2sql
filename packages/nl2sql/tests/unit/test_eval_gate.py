@@ -117,3 +117,21 @@ def test_a_0_6_tier_2_record_is_read_by_its_status_which_was_execution_accuracy(
     assert report.execution_passed(old) is True
     assert report.execution_passed({**old, "status": "fail", "lenient_status": "pass"}) is False
     assert report.execution_passed({**old, "status": "fail", "lenient_status": "pass"}, lenient=True) is True
+
+
+def test_engine_evals_gate_reads_the_gate_settings_and_takes_a_path(tmp_path):
+    from types import SimpleNamespace
+
+    from nl2sql.api.evals_api import EvalsAPI
+    from nl2sql.config.models import EvalGate, EvalsConfig
+
+    def evals(**gate_settings):
+        config = SimpleNamespace(folder=tmp_path, evals=EvalsConfig(gate=EvalGate(**gate_settings)))
+        return EvalsAPI(SimpleNamespace(config=config))
+
+    base, worse = _report(_passing(20)), _report([_case(f"q{i}", rows=i >= 3) for i in range(20)])
+    path = tmp_path / "baseline.json"
+    path.write_text(json.dumps(base.model_dump(mode="json")), encoding="utf-8")
+
+    assert not evals().gate(worse, path).ok  # three lost, two allowed
+    assert evals(max_regressions=3, alpha=0.01).gate(worse, str(path)).ok
