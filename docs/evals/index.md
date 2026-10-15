@@ -219,9 +219,18 @@ their status.
 
 For each config both runs have, the gate fails when:
 
-- more than `max_regressions` cases passed in the baseline and fail now;
-- the flips are one-sided enough that McNemar's exact p is under `alpha`; or
+- more cases passed in the baseline and fail now than are allowed. Mode
+  full allows `max_regressions` (2 by default), because the model is noisy.
+  Modes plans and retrieval run no model, so they allow **none**: any flip is
+  a real break;
+- in mode full, more cases were lost than gained and McNemar's exact
+  **two-sided** p-value on the flips is under `alpha`; or
 - cost per case rose by more than `max_cost_increase`.
+
+Comparable means what the history page means by it (`records.series_key`):
+the same mode, suite digest and schema fingerprint and, in mode full, the
+same roles and curated answers. Both runs must also have run the same roles,
+so a role left out cannot quietly shrink the comparison.
 
 The statistics are in
 [the Chinook suite](../testing/evaluation-dataset.md#reading-a-run-intervals-flips-and-passk).
@@ -252,7 +261,7 @@ not the time it publishes.
 | --- | --- |
 | 0 | The run finished, and nothing regressed against `--baseline` |
 | 1 | A regression against `--baseline` |
-| 2 | A usage error: a bad `--llm`, a run the engine refuses (no cost cap, an unpriced model), mode full with `CI` set, or a baseline of another suite or mode |
+| 2 | A usage error: a bad `--llm`, a run the engine refuses (no cost cap, an unpriced model), mode full with `CI` set (whatever its value, `CI=false` included), a missing or unreadable baseline, or one that cannot be compared |
 | 3 | The cost cap stopped mode full early: the report is partial |
 
 ```bash
@@ -275,11 +284,31 @@ nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchma
 ```
 
 Each run is gated against the newest record of its mode in `benchmarks/`
-(`plans/chinook/` and `retrieval/chinook/`). A changed suite has another
-digest, so the gate exits 2 until both baselines are recorded again: run the
-two modes on a fresh `nl2sql init --demo` project and `nl2sql eval publish`
-both reports. The same job also runs `tests/e2e/test_evals_plans.py`, where
+(`plans/chinook/` and `retrieval/chinook/`), and both reports are uploaded
+as the `eval-reports` artifact whether the gate passed or not. A changed suite
+or schema starts a new series, so the gate exits 2 until both baselines are
+recorded again. The same job also runs `tests/e2e/test_evals_plans.py`, where
 every case must pass for every role.
+
+### Re-recording CI's baselines
+
+CI's plans and retrieval baselines are recorded **on CI's own runner**
+(`ubuntu-latest`, Python 3.12), never on a laptop: retrieval recall passes a
+case only at 100% column recall, which near-tie rankings of the local ONNX
+embedder can move between platforms.
+
+1. Push the change. The integration job's "Eval gate" step runs both modes and
+   uploads `eval_plans.json` and `eval_retrieval.json` as the `eval-reports`
+   artifact, pass or fail.
+2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.
+3. From the repo root, record them, naming where they came from:
+   `nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
+4. Commit the two records and the regenerated pages in the same PR, and push.
+   The next run gates against them.
+
+Never edit a record by hand, `engine_version` included. A change that moves
+the gate on purpose (a suite change, routing or retrieval work) re-records
+both baselines this way, in the PR that makes the change.
 
 Mode `full` spends a key: `nl2sql eval run --mode full` refuses to start when
 `CI` is set. The owner runs it before a release

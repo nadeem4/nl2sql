@@ -135,3 +135,65 @@ def test_engine_evals_gate_reads_the_gate_settings_and_takes_a_path(tmp_path):
 
     assert not evals().gate(worse, path).ok  # three lost, two allowed
     assert evals(max_regressions=3, alpha=0.01).gate(worse, str(path)).ok
+
+
+# --- the review of #320 ---------------------------------------------------------
+
+def test_one_flipped_case_fails_the_gate_in_the_deterministic_modes():
+    """Modes plans and retrieval run no model: any flip is a real break, so none is allowed."""
+    for mode in ("plans", "retrieval"):
+        base = _report(_passing(), mode=mode, name=mode)
+        one = [_case("q0", rows=False, outcome=False), *_passing(10)[1:]]
+        if mode == "retrieval":  # read by status: fail the case outright
+            one[0]["status"] = "fail"
+        result = gate.gate(_report(one, mode=mode, name=mode), base)
+        assert not result.ok and "allowed 0" in result.regressions[0], mode
+
+
+def test_mode_full_keeps_its_allowance_for_model_noise():
+    base = _report(_passing(20))
+    two = _report([_case(f"q{i}", rows=i >= 2) for i in range(20)])
+    assert gate.gate(two, base).ok
+    assert not gate.gate(two, base, max_regressions=1).ok
+
+
+def test_a_changed_schema_fingerprint_is_a_series_break():
+    other = _report(_passing()).model_copy(update={"database": {**CHINOOK, "schema_fingerprint": "0" * 16}})
+    result = gate.gate(_report([_case(f"q{i}", rows=False) for i in range(10)]), other)
+    assert not result.ok and result.regressions == [] and "schema" in result.series_break
+
+
+def test_mode_full_with_curated_answers_switched_is_a_series_break():
+    result = gate.gate(_report(_passing(), curated=True), _report(_passing(), curated=False))
+    assert not result.ok and "curated" in result.series_break
+
+
+def test_a_dropped_role_is_a_series_break_not_a_smaller_comparison():
+    def roles(*names):
+        cases = []
+        for name in names:
+            cases += [{**_case(f"q{i}"), "role": name} for i in range(5)]
+        return cases
+
+    result = gate.gate(_report(roles("admin")), _report(roles("admin", "viewer")))
+    assert not result.ok and "roles" in result.series_break
+
+
+def test_a_baseline_record_without_case_results_is_a_series_break_not_a_crash():
+    record = {"kind": "full", "dataset": {"sha256": DIGEST}, "database": CHINOOK, "roles": None, "curated": False,
+              "config": {"name": "gpt-5.4"}, "scoreboard": {}}
+    result = gate.gate(_report(_passing()), record)
+    assert not result.ok and "no per-case results" in result.series_break
+
+
+def test_a_series_break_on_one_config_keeps_the_others_regressions():
+    good, bad = _report(_passing()), _report([_case(f"q{i}", rows=False) for i in range(10)])
+    now = bad.model_copy(update={"configs": {"gpt-5.4": bad.configs["gpt-5.4"], "mini": bad.configs["gpt-5.4"]}})
+    base = good.model_copy(update={"configs": {"gpt-5.4": good.configs["gpt-5.4"]}})
+    base_records = [{"kind": "full", "dataset": {"sha256": DIGEST}, "database": CHINOOK, "roles": None,
+                     "curated": False, "config": {"name": "gpt-5.4"}, "scoreboard": good.configs["gpt-5.4"]},
+                    {"kind": "full", "dataset": {"sha256": "c" * 64}, "database": CHINOOK, "roles": None,
+                     "curated": False, "config": {"name": "mini"}, "scoreboard": good.configs["gpt-5.4"]}]
+    result = gate.gate(now, base_records)
+    assert result.series_break.startswith("mini:") and result.regressions[0].startswith("gpt-5.4:")
+    assert base.configs  # the report form compares the same way

@@ -10,8 +10,11 @@
 
 ``run`` exits 0 when it ran and nothing regressed, 1 on a regression against
 ``--baseline``, 2 on a usage error (a bad ``--llm``, a run the engine refuses,
-mode full with ``CI`` set, or a baseline of another suite or mode, which
-cannot be compared) and 3 when the cost cap stopped mode full early.
+mode full with ``CI`` set, a baseline that is missing or unreadable, or one
+that cannot be compared) and 3 when the cost cap stopped mode full early.
+
+``CI`` counts as set whatever its value, ``CI=false`` included: refusing a
+paid run by mistake is cheap, spending a key in CI by mistake is not.
 """
 from __future__ import annotations
 
@@ -173,15 +176,20 @@ def run_command(
         target.write_text(json.dumps({**report.model_dump(mode="json"), "run": run_stamp()}, indent=2,
                                      ensure_ascii=False, default=str) + "\n", encoding="utf-8")
         console.print(f"Report: {escape(str(target))}", soft_wrap=True)
-        result = engine.evals.gate(report, baseline) if baseline is not None else None
+        result = None
+        if baseline is not None:
+            try:
+                result = engine.evals.gate(report, baseline)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                _usage(f"Cannot read the baseline {baseline}: {type(error).__name__}: {error}")
 
     if result is not None:
         _print_gate(result)
+        for problem in result.regressions:
+            console.print(f"[bold red]Regression:[/bold red] {escape(problem)}", soft_wrap=True)
         if result.series_break:
             console.print(f"[bold red]Not compared:[/bold red] {escape(result.series_break)}", soft_wrap=True)
             raise typer.Exit(EXIT_USAGE)
-        for problem in result.regressions:
-            console.print(f"[bold red]Regression:[/bold red] {escape(problem)}", soft_wrap=True)
         if result.regressions:
             raise typer.Exit(EXIT_REGRESSION)
         console.print(f"[green]No regression against {escape(str(baseline))}.[/green]", soft_wrap=True)

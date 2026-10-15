@@ -439,7 +439,8 @@ A case counts as passed only when **every** pass passed, so over three passes
 a case that has become flaky reads as a regression.
 
 The regression gate (`engine.evals.gate`, `nl2sql eval run --baseline`)
-compares only runs of the same suite digest and mode, and a case passes on
+compares only comparable runs (the same mode, suite digest, schema and, in
+mode full, roles and curated answers), and a case passes on
 **execution accuracy** (`result_match` and `outcome`), the measure 0.6's tier
 2 published: a faithfulness miss alone is not a regression. With curated
 answers on it checks that accuracy as users see it and on the generated path.
@@ -447,8 +448,8 @@ It fails a run when, for any config both runs name:
 
 | Check | Default (`evals.yaml` `gate`) | Why |
 | --- | --- | --- |
-| More than `max_regressions` cases flipped from pass to fail | 2 | A handful of named cases is something a person can go and read |
-| The flips are one-sided enough that McNemar's exact p < `alpha` | 0.05 | A small but real drop should not pass because it is under the count |
+| More than `max_regressions` cases flipped from pass to fail | 2 in mode full; always 0 in modes plans and retrieval | A handful of named cases is something a person can go and read; with no model, any flip is a bug |
+| Mode full: more cases lost than gained, and McNemar's exact two-sided p < `alpha` | 0.05 | A small but real drop should not pass because it is under the count |
 | Cost per case rose by more than `max_cost_increase` | 0.2 | Unchanged |
 
 With `passes` above one the board also reports **pass^k**: the share of

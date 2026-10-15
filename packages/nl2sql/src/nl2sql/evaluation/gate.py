@@ -3,15 +3,19 @@
 :func:`gate` is what ``engine.evals.gate`` and ``nl2sql eval run --baseline``
 call. A baseline is another report, or a record from ``benchmarks/``
 (:mod:`nl2sql.evaluation.records`), or the newest records in a
-``benchmarks/`` folder (:func:`load_baseline`). Only runs of the **same
-suite digest and mode** are compared; anything else is a series break and
-nothing is compared.
+``benchmarks/`` folder (:func:`load_baseline`). Only **comparable** runs are
+compared, by the history's own rule (``records.series_key``): the same mode,
+suite digest and schema fingerprint, and in mode full the same roles and
+curated answers; both must also have run the same roles. Anything else is a
+series break and that config is not compared.
 
 For each config both runs have, the gate fails when:
 
-* more than ``max_regressions`` cases passed in the baseline and fail now, or
-  the flips are one-sided enough for McNemar's exact test to put them below
-  ``alpha``; or
+* more cases passed in the baseline and fail now than are allowed: in mode
+  full ``max_regressions`` (the model is noisy), in modes plans and
+  retrieval none (no model runs, so any flip is a real break); or
+* in mode full, more cases were lost than gained and McNemar's exact
+  **two-sided** p-value on the flips is below ``alpha``; or
 * cost per case rose by more than ``max_cost_increase``.
 
 A case passes on **execution accuracy** (``result_match`` and ``outcome``,
@@ -157,28 +161,55 @@ def check_baseline(scoreboard: Dict[str, Any], baseline: Dict[str, Any], *,
 # ---------------------------------------------------------------- the gate
 
 class _Side(BaseModel):
-    """One config's board, with the mode and suite digest it ran."""
+    """One config's board, with what decides whether two runs are comparable (``records.series_key``)."""
 
-    mode: str
-    digest: str
     name: str
+    key: Dict[str, Any]  # a record's comparability fields: kind, dataset, database, roles, curated
     board: Dict[str, Any]
+
+    @property
+    def mode(self) -> str:
+        return self.key["kind"]
 
 
 def _sides(run: Baseline) -> List[_Side]:
     """Each config of a report, or each record, as a side the gate can compare."""
-    from nl2sql.evaluation.records import mode_of
+    from nl2sql.evaluation.records import UNKNOWN_DATABASE, mode_of
 
     if isinstance(run, EvalReport):
         run = run.model_dump(mode="json")
     if isinstance(run, dict) and "kind" in run:
         run = [run]
     if isinstance(run, dict):
-        digest = suite_identity(run)["sha256"]
-        return [_Side(mode=run["mode"], digest=digest, name=name, board=board)
-                for name, board in run.get("configs", {}).items()]
-    return [_Side(mode=mode_of(r), digest=r["dataset"]["sha256"], name=r["config"]["name"],
-                  board=r.get("scoreboard") or {}) for r in run]
+        key = {"kind": run["mode"], "dataset": suite_identity(run), "roles": run.get("roles"),
+               "database": run.get("database") or dict(UNKNOWN_DATABASE), "curated": bool(run.get("curated"))}
+        return [_Side(name=name, key=key, board=board) for name, board in run.get("configs", {}).items()]
+    return [_Side(name=r["config"]["name"], board=r.get("scoreboard") or {},
+                  key={"kind": mode_of(r), "dataset": r["dataset"], "roles": r.get("roles"),
+                       "database": r.get("database") or dict(UNKNOWN_DATABASE),
+                       "curated": bool(r.get("curated", False))})
+            for r in run]
+
+
+def _roles(board: Dict[str, Any]) -> List[str]:
+    return sorted({r["role"] for r in board.get("results") or []})
+
+
+def _series_break(now: _Side, base: _Side) -> Optional[str]:
+    """Why ``now`` cannot be compared with ``base``, or None: the history's rule, plus the roles each one ran."""
+    from nl2sql.evaluation.records import _series_break as why, comparable
+
+    if base.mode != now.mode:
+        return f"{now.name}: the baseline ran mode {base.mode}, this run mode {now.mode}"
+    if not base.board.get("results"):
+        return f"{now.name}: the baseline has no per-case results to compare"
+    if not comparable(now.key, base.key):
+        return f"{now.name}: {why(now.key, base.key)}"
+    # A role one run left out would silently shrink the comparison to the cases both ran.
+    if _roles(now.board) != _roles(base.board):
+        return (f"{now.name}: new series (roles changed: the baseline ran {', '.join(_roles(base.board))}, "
+                f"this run {', '.join(_roles(now.board))})")
+    return None
 
 
 def gate(report: Union[EvalReport, Dict[str, Any]], baseline: Baseline, *,
@@ -187,8 +218,10 @@ def gate(report: Union[EvalReport, Dict[str, Any]], baseline: Baseline, *,
     """``report`` against ``baseline``: a report, one record, or a list of records (one per config).
 
     See the module docstring for the rules. Every config of ``report`` that the
-    baseline also has is compared, provided both ran the same suite digest in
-    the same mode.
+    baseline also has is compared, provided the two are comparable as the
+    history counts it (``records.series_key``) and ran the same roles.
+    ``max_regressions`` and ``alpha`` apply to mode full; modes plans and
+    retrieval run no model, so they allow no flip at all.
     """
     breaks: List[str] = []
     problems: List[str] = []
@@ -200,23 +233,21 @@ def gate(report: Union[EvalReport, Dict[str, Any]], baseline: Baseline, *,
         base = base_sides.get(now.name)
         if base is None:
             continue
-        if base.mode != now.mode:
-            breaks.append(f"{now.name}: the baseline ran mode {base.mode}, this run mode {now.mode}")
+        reason = _series_break(now, base)
+        if reason:
+            breaks.append(reason)
             continue
-        if base.digest != now.digest:
-            breaks.append(f"{now.name}: the baseline ran another suite (@{base.digest[:8]}, "
-                          f"this run @{now.digest[:8]})")
-            continue
+        allowed = max_regressions if now.mode == "full" else 0
         measures: Dict[str, Passed] = {"accuracy": _status if now.mode == "retrieval" else execution_passed}
         if curated:
             measures["generated"] = _generated
         compared[now.name] = {}
         for measure, passed in measures.items():
-            [diff] = compare_with_baseline({"configs": {now.name: now.board}},
-                                           {"configs": {now.name: base.board}}, passed).values()
+            diff = compare_with_baseline({"configs": {now.name: now.board}},
+                                         {"configs": {now.name: base.board}}, passed)[now.name]
             compared[now.name][measure] = diff
             label = now.name if measure == "accuracy" else f"{now.name} (generated)"
-            problems += _flip_problems(label, diff, max_regressions, alpha)
+            problems += _flip_problems(label, diff, allowed, alpha)
         problems += _cost_problem(now.name, compared[now.name]["accuracy"], max_cost_increase)
     if not compared and not breaks:
         mine = ", ".join(s.name for s in _sides(report)) or "none"

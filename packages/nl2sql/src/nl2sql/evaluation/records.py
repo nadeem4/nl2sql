@@ -12,8 +12,14 @@ used (``-2``, ``-3``... when the name is taken). A record holds when the run
 was, the code (``git_commit`` and ``git_dirty``, resolved from the installed
 package's own checkout), the suite (``dataset``: its name and digest), the
 database (datasource id, engine and a schema fingerprint), an optional
-``note``, the headline metrics and the config's whole board. Records are
-never edited: writing and ``publish --from`` both refuse to overwrite one.
+``note``, the headline metrics and the config's board. Records are never
+edited: writing and ``publish --from`` both refuse to overwrite one.
+
+A record is committed for good, so it is kept small: the board's case
+results keep only what the gate and the pages read (:func:`slim_result`), and
+the file is one line of compact JSON. The full report (SQL, plans, tokens,
+timings) is ``eval_<mode>.json``, which ``nl2sql eval run`` writes and CI
+keeps as an artifact. The 0.6 records are kept as they were written.
 
 The records 0.6's ``nl2sql benchmark`` wrote stay as they are: kind
 ``tier2`` is a mode full run (:func:`mode_of`) on the 0.6 gold file, and
@@ -237,6 +243,32 @@ def _retrieval_metrics(board: Dict[str, Any]) -> Dict[str, Any]:
                                            "tables_sent", "columns_sent")}}
 
 
+_RESULT_FIELDS = ("id", "role", "pass", "status", "lenient_status", "cost")
+_SCORE_DETAIL = ("lenient", "error")  # what execution_passed and case_status read
+
+
+def _slim_scores(scores: Dict[str, Any]) -> Dict[str, Any]:
+    out = {}
+    for name, score in (scores or {}).items():
+        slim = {"passed": score.get("passed"), "value": score.get("value")}
+        detail = {k: v for k, v in (score.get("detail") or {}).items() if k in _SCORE_DETAIL}
+        if detail:
+            slim["detail"] = detail
+        out[name] = slim
+    return out
+
+
+def slim_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """One case run as a record keeps it: its verdicts and cost, enough to gate on and to render the pages."""
+    slim = {k: result[k] for k in _RESULT_FIELDS if k in result}
+    slim["scores"] = _slim_scores(result.get("scores"))
+    generated = result.get("generated")
+    slim["generated"] = None if not generated else {
+        "status": generated.get("status"), "lenient_status": generated.get("lenient_status"),
+        "scores": _slim_scores(generated.get("scores"))}
+    return slim
+
+
 def make_record(report: Any, name: str, *, recorded_at: dt.datetime, engine_version: str,
                 code: Dict[str, Any], note: Optional[str] = None) -> Dict[str, Any]:
     """The record for config ``name`` of an eval report (an ``EvalReport`` or its JSON)."""
@@ -259,7 +291,7 @@ def make_record(report: Any, name: str, *, recorded_at: dt.datetime, engine_vers
         "metrics": _retrieval_metrics(board) if mode == "retrieval" else _execution_metrics(board, passes),
         "stopped": rep.get("stopped"),
         "partial": bool(rep.get("stopped")) or board.get("completed_cases", 0) < board.get("planned_cases", 0),
-        "scoreboard": board,
+        "scoreboard": {**board, "results": [slim_result(r) for r in board.get("results") or []]},
     }
     if mode == "retrieval":
         record["settings"] = (rep.get("settings") or {}).get("retrieval") or {}
@@ -278,7 +310,7 @@ def record_relpath(record: Dict[str, Any]) -> pathlib.Path:
 
 
 def _dump(record: Dict[str, Any]) -> str:
-    return json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n"
+    return json.dumps(record, separators=(",", ":"), ensure_ascii=False, default=str) + "\n"
 
 
 def _write_new(benchmarks_dir: pathlib.Path, record: Dict[str, Any]) -> pathlib.Path:
@@ -615,8 +647,8 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
             "newest first; the runs 0.6's tier 2 recorded are mode full runs. Accuracy is execution\n"
             "accuracy (`result_match` and `outcome`, the measure 0.6 published), with its 95% Wilson\n"
             "interval. \"Δ vs previous\" is the change against the previous run of the same config, and\n"
-            "how many cases flipped each way with McNemar's exact p-value on them: at 47 cases a few\n"
-            "points either way is noise, so read the flips and the p-value rather than the headline.\n"
+            "how many cases flipped each way with McNemar's exact p-value on them: with a suite this\n"
+            "size a few points either way is noise, so read the flips and the p-value, not the headline.\n"
             "Runs on another suite (`@digest`), another schema or, for mode full, other roles or curated\n"
             "answers on are not comparable and start a new series. See\n"
             "[the Chinook suite](testing/evaluation-dataset.md).\n")

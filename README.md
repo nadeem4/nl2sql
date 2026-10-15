@@ -115,7 +115,7 @@ The share of each answerable case's needed tables and columns that schema retrie
 
 | Database | Date (UTC) | Commit | Table recall | Column recall | Δ vs previous |
 | --- | --- | --- | --- | --- | --- |
-| chinook | 2026-10-15 | 653fa73 | 97.7% | 71.9% | new series (dataset changed) |
+| chinook | 2026-10-15 | 653fa73 | 97.7% | 71.9% | new series (suite changed) |
 
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->
@@ -303,8 +303,13 @@ command has `--help`.
 | `nl2sql feedback stats` | Ratings plus guardrail rates: refusals, refiner retries, validator rejections, errors, plan-cache hits | `--json`, `--traces DIR` |
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft eval cases to a separate suite file for review | `--out` (default `feedback_gold_drafts.yaml`) |
 | `nl2sql feedback clear` | Delete every rating | `--yes` |
+| `nl2sql eval run` | Run the eval suites in one mode (`full`: the model, priced and capped; `plans`: the gold plans on a fake LLM; `retrieval`: no model) and, with `--baseline`, gate the run against a report, a record or a `benchmarks/` folder. Exits 1 on a regression, 2 on a usage error or a baseline it cannot compare, 3 at the cost cap; mode full refuses to run when `CI` is set | `--mode`, `--suite`, `--llm` (preset, file or `NAME=`), `--cases`, `--passes`, `--max-cost`, `--baseline`, `--out` (default `eval_<mode>.json` next to `nl2sql.yaml`) |
+| `nl2sql eval regenerate PATH` | Write a suite's expected rows: each approved case's SQL through its datasource's adapter; exits 1 when a case's SQL failed | |
+| `nl2sql eval publish [REPORT ...]` | Record each report `eval run` wrote under `benchmarks/`, then rebuild `docs/benchmarks.md` and the results block above; run from the repo root | `--note`, `--from DIR` |
 
-Evals run from Python, with `engine.evals.run` ([Evals](docs/evals/index.md)).
+The `nl2sql eval` group is the whole command; `nl2sql eval --help` lists its
+subcommands. Evals also run from Python, with `engine.evals`
+([Evals](docs/evals/index.md)).
 
 Examples, from the demo folder (`cd nl2sql-demo`, so `./nl2sql.yaml` is the
 config; from anywhere else, add `--config nl2sql-demo/nl2sql.yaml`):

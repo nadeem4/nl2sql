@@ -223,3 +223,34 @@ def test_publish_writes_a_record(tmp_path):
     again = runner.invoke(app, ["eval", "publish", "--results-dir", str(tmp_path / "benchmarks"),
                                 "--history-path", str(history), "--readme-path", str(readme)])
     assert again.exit_code == 0 and len(list((tmp_path / "benchmarks").glob("*/*/*.json"))) == 1
+
+
+def test_a_missing_or_unreadable_baseline_is_a_usage_error_not_a_traceback(engine, tmp_path):
+    missing = runner.invoke(app, ["eval", "run", "--baseline", str(tmp_path / "nope.json")])
+    assert missing.exit_code == 2, _out(missing)
+    assert "Traceback" not in _out(missing) and "baseline" in _out(missing).lower()
+
+    garbage = tmp_path / "garbage.json"
+    garbage.write_text("{not json", encoding="utf-8")
+    assert runner.invoke(app, ["eval", "run", "--baseline", str(garbage)]).exit_code == 2
+
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text(json.dumps({"kind": "full"}), encoding="utf-8")
+    assert runner.invoke(app, ["eval", "run", "--baseline", str(malformed)]).exit_code == 2
+
+
+def test_a_series_break_still_prints_the_regressions_of_the_configs_it_compared(engine, tmp_path):
+    good, bad = _report(), _report(failing=5)
+    engine.evals.result = bad.model_copy(update={"configs": {"default": bad.configs["default"],
+                                                             "mini": bad.configs["default"]}})
+    def record(name, digest):
+        return {"kind": "full", "dataset": {"sha256": digest}, "database": CHINOOK, "roles": None,
+                "curated": False, "config": {"name": name}, "scoreboard": good.configs["default"]}
+    path = tmp_path / "records.json"
+    path.write_text(json.dumps([record("default", DIGEST), record("mini", "c" * 64)]), encoding="utf-8")
+
+    result = runner.invoke(app, ["eval", "run", "--baseline", str(path)])
+
+    out = _out(result)
+    assert result.exit_code == 2, out
+    assert out.index("Regression: default") < out.index("Not compared")

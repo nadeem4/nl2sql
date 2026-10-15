@@ -41,12 +41,36 @@ Records are immutable: never edit or rename one. A new run writes a new file;
 `publish --from` never overwrites a record here and reports a clash as a
 conflict.
 
+A record is one compact JSON line, and its case results keep only each
+case's verdicts and cost: enough for the gate and the pages. The full report
+(SQL, plans, tokens, timings) is the `eval_<mode>.json` that `nl2sql eval run`
+writes; CI keeps it as an artifact and it is never committed. The 0.6 records
+are kept as they were written.
+
 ## Workflow
 
-Run the eval with `engine.evals.run` (mode `full` or `retrieval`), write its
-records with `nl2sql.evaluation.records`, then from the repo root:
-
 ```bash
-python -c "from nl2sql.evaluation.records import publish; publish()"
+nl2sql eval run --mode full --llm gpt-5.4 --max-cost 5     # from a demo folder
+nl2sql eval publish <demo folder>/eval_full.json --note "what changed"   # from the repo root
 git add benchmarks README.md docs/benchmarks.md
 ```
+
+## The recording rule: CI's baselines come from CI
+
+CI's plans and retrieval baselines are recorded **on CI's own runner**
+(`ubuntu-latest`, Python 3.12), never on a laptop: retrieval recall passes a
+case only at 100% column recall, which near-tie rankings of the local ONNX
+embedder can move between platforms. To record or re-record them:
+
+1. Push the change. The integration job's "Eval gate" step runs both modes and
+   uploads `eval_plans.json` and `eval_retrieval.json` as the `eval-reports`
+   artifact, pass or fail.
+2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.
+3. From the repo root, record them, naming where they came from:
+   `nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
+4. Commit the two records and the regenerated pages in the same PR, and push.
+   The next run gates against them.
+
+Never edit a record by hand, `engine_version` included. A change that moves
+the gate on purpose (a suite change, routing or retrieval work) re-records
+both baselines this way, in the PR that makes the change.

@@ -106,6 +106,10 @@ class EvalsAPI:
             curated=cfg.curated if curated is None else curated, passes=passes,
             max_cost_usd=max_cost_usd if max_cost_usd is not None else cfg.max_cost_usd,
             on_case=on_case, clarify=clarify)
+        if mode == "retrieval" and getattr(self._ctx, "embedding_info", None) is not None:
+            # Recall depends on the embedder: a record names the one that measured it.
+            info = self._ctx.embedding_info
+            report.settings.setdefault("retrieval", {})["embedding"] = f"{info.provider}/{info.model}"
         datasources = sorted({d for s in loaded for c in s.approved() for d in c.datasources})
         if hasattr(self._ctx, "vector_store"):
             report.database = database_identity(self._ctx, datasources)

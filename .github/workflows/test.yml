@@ -99,13 +99,30 @@ jobs:
       # (every gold plan through the validator, generator and executor, for
       # every role) and mode retrieval on the demo's Chinook suite, each
       # against the newest record of its mode in benchmarks/. Exits 1 on a
-      # regression and 2 when the suite changed and the baseline was not
-      # re-recorded (`nl2sql eval publish`). Mode full needs a key and refuses
-      # to run in CI.
-      - name: Eval gate (plans and retrieval)
-        run: |
-          nl2sql --config demo-ci/nl2sql.yaml eval run --mode plans --baseline benchmarks
-          nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchmarks
+      # regression and 2 when there is no comparable baseline (a suite, schema
+      # or routing change not yet re-recorded). Each mode runs whatever the
+      # other did. Mode full needs a key and refuses to run in CI.
+      - name: Eval gate (plans)
+        if: ${{ !cancelled() }}
+        run: nl2sql --config demo-ci/nl2sql.yaml eval run --mode plans --baseline benchmarks
+
+      - name: Eval gate (retrieval)
+        if: ${{ !cancelled() }}
+        run: nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchmarks
+
+      # The full reports, pass or fail. CI's baselines are recorded from this
+      # artifact, never on a laptop (benchmarks/README.md, "The recording
+      # rule"): gh run download <run id> -n eval-reports, then
+      # nl2sql eval publish.
+      - name: Upload the eval reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports
+          path: |
+            demo-ci/eval_plans.json
+            demo-ci/eval_retrieval.json
+          if-no-files-found: warn
 
   # Strict mode fails on broken internal links and bad references, which
   # catches the deterministic half of documentation drift. Claims that code

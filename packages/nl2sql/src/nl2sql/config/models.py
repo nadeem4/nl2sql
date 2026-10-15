@@ -564,8 +564,8 @@ DEFAULT_SCORERS = ("result_match", "outcome", "faithfulness", "retrieval_recall"
 class EvalGate(_Model):
     """The regression gate (from V2): regressions, accuracy and cost against a baseline."""
 
-    max_regressions: NonNegativeInt = 2  # cases that passed in the baseline and fail now
-    alpha: float = Field(0.05, gt=0.0, lt=1.0)  # the one-sided test on the accuracy difference
+    max_regressions: NonNegativeInt = 2  # mode full: cases that passed in the baseline and fail now
+    alpha: float = Field(0.05, gt=0.0, lt=1.0)  # mode full: McNemar's exact two-sided p, when more were lost
     max_cost_increase: float = Field(0.20, ge=0.0)  # more cost per case, as a share
 
 

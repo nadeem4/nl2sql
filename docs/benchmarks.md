@@ -5,8 +5,8 @@ from the records in `benchmarks/`; do not edit by hand. Grouped by mode and data
 newest first; the runs 0.6's tier 2 recorded are mode full runs. Accuracy is execution
 accuracy (`result_match` and `outcome`, the measure 0.6 published), with its 95% Wilson
 interval. "Δ vs previous" is the change against the previous run of the same config, and
-how many cases flipped each way with McNemar's exact p-value on them: at 47 cases a few
-points either way is noise, so read the flips and the p-value rather than the headline.
+how many cases flipped each way with McNemar's exact p-value on them: with a suite this
+size a few points either way is noise, so read the flips and the p-value, not the headline.
 Runs on another suite (`@digest`), another schema or, for mode full, other roles or curated
 answers on are not comparable and start a new series. See
 [the Chinook suite](testing/evaluation-dataset.md).
@@ -31,16 +31,6 @@ before and after 0.7 read the same; faithfulness is its own column.
 | 2026-09-22 14:18:51 | 27cad30 | after baseline fixes | gpt-5.4 | openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner) | chinook_gold.yaml @7d104084 | @ceed80fe | admin | 1 | 58.1% | - | 87.5% | $0.0202 | accuracy +16.3 pp, faithfulness -6.9 pp, $/question -$0.0034, 0 flipped to fail, 7 to pass (McNemar p=0.016) | 100.0% / 75.0% | 10,655 / 7,082 / 633 | 8.54s | 10.99s | - | complete |
 | 2026-09-22 04:41:56 | 1a8101d | first gpt-5.4 baseline run | gpt-5.4 | openai:gpt-5.4 (answersynthesizer, astplanner, datasourceresolver, decomposer, refiner) | chinook_gold.yaml @7d104084 | @ceed80fe | admin | 1 | 41.9% | - | 94.4% | $0.0236 | first run | 100.0% / 75.0% | 11,222 / 6,153 / 627 | 6.62s | 8.96s | - | complete |
 
-## Mode plans: chinook (sqlite, 11 tables / 64 columns)
-
-`nl2sql eval run --mode plans`: each case's hand-written plan through the validator,
-generator and executor, on a fake LLM, once per role. No key; every case should pass.
-CI's integration job gates on the newest run here.
-
-| Date (UTC) | Commit | Note | Dataset | Schema | Roles | Cases | Accuracy (execution, 95% CI) | Δ vs previous | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-10-15 15:46:43 | b01aefd | first 0.7 baseline: CI's key-free gate | chinook @dc1e8456 | @ceed80fe | all | 141 | 100.0% [97.4-100.0] | first run | complete |
-
 ## Retrieval recall: chinook (sqlite, 11 tables / 64 columns)
 
 `nl2sql eval run --mode retrieval`: the share of each answerable case's needed tables and
@@ -50,5 +40,5 @@ the newest run here.
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 2026-10-15 13:05:04 | 653fa73 | 0.6 baseline before Phase R (R1) | chinook_gold.yaml @8be35a10 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 43 | 97.7% | 71.9% | new series (dataset changed) | 8.2 / 24.1 |
+| 2026-10-15 13:05:04 | 653fa73 | 0.6 baseline before Phase R (R1) | chinook_gold.yaml @8be35a10 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 43 | 97.7% | 71.9% | new series (suite changed) | 8.2 / 24.1 |
 | 2026-09-22 03:39:36 | 571cd16 | first retrieval baseline | chinook_gold.yaml @7d104084 | @ceed80fe | k 8 tables / 12 planning | all-MiniLM-L6-v2 | 39 | 98.5% | 72.6% | first run | 8.3 / 24.2 |

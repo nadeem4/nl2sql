@@ -464,6 +464,12 @@ def test_the_ci_baselines_are_on_the_chinook_suite_as_it_is_now():
         assert newest["dataset"]["sha256"] == SUITE["digest"], mode
     plans = next(r for r in committed if records.mode_of(r) == "plans")
     assert plans["metrics"]["accuracy"] == 1.0
+    # The recording rule (benchmarks/README.md): CI's baselines come from CI's own runner.
+    for mode in ("plans", "retrieval"):
+        newest = next(r for r in committed if records.mode_of(r) == mode)
+        assert "ubuntu-latest" in newest["note"] and "actions/runs/" in newest["note"], mode
+    retrieval = next(r for r in committed if records.mode_of(r) == "retrieval")
+    assert retrieval["settings"]["embedding"]
 
 
 def test_the_migrated_retrieval_baseline():
@@ -529,3 +535,22 @@ def test_a_record_without_per_question_results_has_no_flips(tmp_path):
     recs = records.load_records(tmp_path)
     stripped = {**recs[0], "scoreboard": {}}
     assert records.flips(stripped, recs[1]) is None
+
+
+def test_a_record_keeps_only_what_the_gate_and_the_pages_read(tmp_path):
+    """The full report stays in eval_<mode>.json (a CI artifact); a committed record is slim and compact."""
+    full = _board(passes=2)
+    [path] = records.write_records(full, tmp_path, recorded_at=WHEN, engine_version="1", code=CODE)
+    text = path.read_text(encoding="utf-8")
+    assert text.count("\n") == 1 and '": ' not in text  # one compact line
+    record = json.loads(text)
+    for case in record["scoreboard"]["results"]:
+        assert set(case) <= {"id", "role", "pass", "status", "lenient_status", "scores", "generated", "cost"}
+        for score in case["scores"].values():
+            assert set(score) <= {"passed", "value", "detail"}
+            assert set(score.get("detail", {})) <= {"lenient", "error"}
+    # Built from the full board, so the headline is unchanged, and the slim cases still gate.
+    assert record["metrics"] == records.make_record(full, "gpt-5.4", recorded_at=WHEN, engine_version="1",
+                                                    code=CODE)["metrics"]
+    from nl2sql.evaluation import gate
+    assert gate.gate(full, record).ok

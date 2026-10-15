@@ -1200,8 +1200,15 @@ series_break)`.
     - **A baseline is a report, a record or a `benchmarks/` folder** (the
       newest record of the run's mode, database and config). A record 0.6
       wrote has no scores; its status was execution accuracy and is read so.
-    - **A series break is not `ok`.** Another suite digest, another mode or
-      no config in common compares nothing; `nl2sql eval run` exits 2.
+    - **A series break is not `ok`.** The gate uses the history's own rule,
+      `records.series_key` (mode, suite digest, schema fingerprint and, in
+      mode full, roles and curated answers), plus the roles each run actually
+      ran. A series break compares nothing for that config, and
+      `nl2sql eval run` exits 2 after printing the other configs' regressions.
+    - **The allowance is per mode.** `max_regressions` and McNemar (two-sided,
+      counted only when more cases were lost than gained) apply to mode full.
+      Modes plans and retrieval run no model and allow no flip.
+    - **A missing or unreadable baseline exits 2** with a one-line error.
     - **Routing has no suite yet** (Phase R adds it), so CI gates mode
       retrieval on Chinook only.
 
@@ -1242,11 +1249,14 @@ series_break)`.
     - **0.6's records stay readable.** Kind `tier2` is read as mode full
       (`records.mode_of`), so the history shows those runs in the mode full
       table, as a new series (the suite changed).
-    - **CI's baselines are committed**: `benchmarks/plans/chinook/` and
-      `benchmarks/retrieval/chinook/`, recorded on 2026-10-15 from a fresh
-      `nl2sql init --demo`. A change to the Chinook suite needs both
-      re-recorded (`nl2sql eval run --mode plans`, `--mode retrieval`, then
-      `nl2sql eval publish`), or the gate exits 2.
+    - **Records are slim**: one compact JSON line, each case's verdicts and
+      cost only (`records.slim_result`). The full report is CI's
+      `eval-reports` artifact. A retrieval record names its embedder.
+    - **CI's baselines are recorded on CI** (ubuntu-latest, Python 3.12):
+      the integration job uploads `eval_plans.json` and `eval_retrieval.json`,
+      and `nl2sql eval publish` records them from that artifact, the run's URL
+      in the note. The steps are in `benchmarks/README.md`; a suite, schema or
+      routing change re-records both the same way.
 
 ### Seeding: benchmark your own database
 

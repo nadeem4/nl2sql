@@ -176,7 +176,8 @@ nl2sql eval publish <demo folder>/eval_full.json --note "0.X.0 release"
 Exit 1 is a regression to look at before releasing; exit 2 means the
 baseline is on another suite (the first run after a suite change starts a
 new series, and its record becomes the next baseline); exit 3 means the cap
-stopped the run. The gate reads execution accuracy, the measure the history
+stopped the run. Mode full allows two flipped cases plus McNemar's
+two-sided test, because the model is noisy. The gate reads execution accuracy, the measure the history
 has always published ([The regression gate](../evals/index.md#the-regression-gate)).
 Commit the record and the regenerated pages in their own PR.
 
