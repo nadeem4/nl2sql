@@ -5382,7 +5382,8 @@ decision of 2026-10-15:</p>
   Modes plans and retrieval run no model and allow no flip.</li>
 <li><strong>A missing or unreadable baseline exits 2</strong> with a one-line error.</li>
 <li><strong>Routing has no suite yet</strong> (Phase R adds it), so CI gates mode
-  retrieval on Chinook only.</li>
+  retrieval on Chinook only. R3 added it: see
+  <a href="#the-routing-gate">the routing gate</a>.</li>
 </ul>
 </div>
 <h3 id="the-cli">The CLI</h3>
@@ -5822,6 +5823,82 @@ cross-database, each with its <code>datasources</code>, plus cases over the test
 in <code>retrieval</code> mode is the CI gate (free); the same suite in <code>full</code> mode is
 the release check. R1 records the 0.6 baseline first, so the gate measures
 Phase R's change rather than asserting a number.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the routing suite and gate (R3)</p>
+<ul>
+<li><strong>The suite.</strong> <code>suites/routing.yaml</code> (<code>ROUTING_SUITE_PATH</code> in
+  <code>evaluation/suite.py</code>): 78 approved, hand-written cases asked as
+  <code>admin</code>, tagged by origin and datasource. They are R1's 79-question
+  measurement (the 43 Chinook gold questions, the demo's 20 sample
+  questions, 12 of which are gold questions too, and 16 paraphrases) plus
+  8 more support and webanalytics questions and 3 cross-database ones:
+  47 name chinook, 14 support, 14 webanalytics, 3 two of them. Every
+  expected datasource was read against the schema. No case names <code>tables</code>,
+  so the routing scorer alone decides a case and a recall miss cannot hide
+  a routing one (the Chinook suite's retrieval status needs both). Ten
+  support and webanalytics cases carry reviewed SQL, with rows written by
+  <code>regenerate</code>; the others are routing only, with no <code>sql</code>.</li>
+<li><strong>The scorer, after the owner's extra requirement.</strong> In mode retrieval
+  <code>routing</code> passes a case only when routing ranks one of its datasources
+  first (<code>detail.top1</code>) <strong>and</strong> shortlists all of them (<code>detail.shortlist</code>,
+  as the section above said). Mode retrieval allows no flip, so the gate
+  fails when either drops. The board gains <code>routing</code> (<code>cases</code>, <code>top1</code>,
+  <code>shortlist</code>), and a retrieval record's <code>metrics</code> gain <code>routing_top1</code>,
+  <code>routing_shortlist</code> and <code>routing_cases</code>, shown on the history page and
+  the README beside recall. <code>result_match</code> no longer scores a case
+  without <code>sql</code>: such a case says where a question goes, not what it
+  returns.</li>
+<li><strong>Where it runs.</strong> The demo's <code>evals.yaml</code> still names only
+  <code>chinook.yaml</code>: mode plans needs a plan for every case with SQL, and a
+  combined run would also move the Chinook records to a new database id.
+  <code>nl2sql init --demo</code> copies <code>routing.yaml</code> with the other suites, and it
+  is run by name. CI's integration job adds an "Eval gate (routing)" step
+  (<code>eval run --mode retrieval --suite evals/routing.yaml --baseline
+  benchmarks --out demo-ci/eval_routing.json</code>) and uploads
+  <code>eval_routing.json</code> in <code>eval-reports</code>; its records live under
+  <code>benchmarks/retrieval/chinook-support-webanalytics/</code>.</li>
+<li><strong>Tests.</strong> <code>tests/integration/test_routing_gate.py</code>:
+  <code>test_routing_suite_cases_are_approved_and_regenerated</code> and
+  <code>test_routing_recall_does_not_regress</code> (the gate against <code>benchmarks/</code>).</li>
+<li><strong>The wide schema.</strong> Its cases are in <code>tests/realdb/test_routing_wide.py</code>
+  (<code>test_routing_on_the_wide_schema</code>), not in <code>routing.yaml</code>: they name the
+  test bed's datasources, which the demo does not have. Pagila and the
+  whole wide schema are indexed side by side on PostgreSQL only, since
+  indexing 1,200 tables takes about 17 minutes on CI's runner; four
+  questions about films must go to Pagila and four about payroll runs,
+  ledger entries, vendor contacts and campaign clicks to the wide schema.
+  After review it runs only when the realdb workflow sets
+  <code>REALDB_WIDE_ROUTING</code> (nightly, on demand, and on pull requests that
+  change <code>indexing/</code>), and the realdb job's timeout is 60 minutes.</li>
+<li><strong>Routing cases are a kind (after review).</strong> <code>EvalCase.kind</code> is <code>answer</code>
+  (the default, left out of a suite file) or <code>routing</code>. A routing case has
+  no <code>sql</code>, gets no <code>result_match</code> verdict, and is left out of execution
+  accuracy in every mode: the board's <code>accuracy.execution</code>, the record's
+  headline metrics and flips, and the gate's execution measures. Mode
+  retrieval still gates it by status. The loader rejects an approved
+  <code>answer</code> case with an <code>allowed</code> role and no <code>sql</code>, so a missing answer can
+  no longer pass as "any answer". Records keep each case's <code>kind</code>. The
+  Chinook suite and its digest are unchanged. The three cross-database
+  cases are tagged with both their datasources; the suite's header names the
+  cases with two defensible answers. Both changed the suite's digest, so
+  the routing baseline was recorded again from CI (run 38788733052,
+  <code>2026-10-15_baaae0c_retrieval.json</code>: the same 97.4% top-1 and 98.7% shortlist).</li>
+<li><strong>Measured (key-free, local embeddings).</strong> On the routing suite, routing
+  top-1 is 76/78 and shortlist recall 77/78. The misses: "Which customers
+  complained most about refunds?" and "How many purchases were there per
+  month in 2013?" rank chinook first; "Which customers both raised support
+  tickets and made a purchase on the website?" drops webanalytics at the
+  floor. The Chinook suite's retrieval gate is unchanged by the stricter
+  scorer (all 43 Chinook cases rank chinook first).</li>
+<li><strong>Baselines, recorded on CI</strong> (run 38778183715, ubuntu-latest, Python
+  3.12, the same numbers as on Windows):
+  <code>benchmarks/retrieval/chinook-support-webanalytics/2026-10-15_a33c8ce_retrieval.json</code>
+  (routing top-1 97.4%, shortlist 98.7%) and a new Chinook retrieval record,
+  <code>benchmarks/retrieval/chinook/2026-10-15_a33c8ce_retrieval.json</code>, which
+  carries the routing metrics (100% / 100%) with no flip against the last.
+  The realdb wide-schema test passed on that run too.</li>
+</ul>
+</div>
 <h2 id="10-schema-drift-measure-first">10. Schema drift: measure first</h2>
 <p>The owner wants drift captured and measured before anything acts on it.
 Nothing here re-indexes or schedules (D31).</p>

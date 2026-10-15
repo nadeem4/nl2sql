@@ -3725,6 +3725,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-routing-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The routing suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#regenerating-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5030,6 +5041,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-routing-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The routing suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#regenerating-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5122,6 +5144,10 @@ rows that SQL returns. <code>nl2sql.evaluation.suite</code> holds the model
 <td><code>draft</code>, <code>approved</code> or <code>retired</code>. Only <code>approved</code> cases run</td>
 </tr>
 <tr>
+<td><code>kind</code></td>
+<td><code>answer</code> (the default, left out of the file) or <code>routing</code>: a case that says only where a question goes. A routing case has no <code>sql</code>, gets no <code>result_match</code> verdict and is left out of execution accuracy in every mode. An approved <code>answer</code> case that a role may answer must have <code>sql</code>; the loader rejects it otherwise</td>
+</tr>
+<tr>
 <td><code>origin</code></td>
 <td><code>hand</code> (written by a person), <code>seeded</code> (drafted from a datasource's schema) or <code>feedback</code> (exported from a thumbs-up run)</td>
 </tr>
@@ -5151,7 +5177,7 @@ rows that SQL returns. <code>nl2sql.evaluation.suite</code> holds the model
 </tr>
 <tr>
 <td><code>sql</code></td>
-<td>The reviewed SQL, in the datasource's dialect; <code>null</code> for an unanswerable case</td>
+<td>The reviewed SQL, in the datasource's dialect; <code>null</code> for an unanswerable case and for a <code>kind: routing</code> case</td>
 </tr>
 <tr>
 <td><code>rows</code></td>
@@ -5238,10 +5264,57 @@ nothing else changed:</p>
 case's question, SQL, rows, alternatives, outcomes, tables, columns and plan,
 taken from the old files with the old loader. <a href="../../testing/evaluation-dataset/">The Chinook
 suite</a> describes it.</p>
+<h2 id="the-routing-suite">The routing suite</h2>
+<p><code>suites/routing.yaml</code> asks which of the demo's three databases (<code>chinook</code>,
+<code>support</code>, <code>webanalytics</code>) a question belongs to. Every case is <code>approved</code>,
+<code>origin: hand</code>, asked as <code>admin</code>, and names the datasources a right answer
+needs. None names <code>tables</code>, so in mode retrieval the <code>routing</code> scorer alone
+decides it. Its tags say where each case came from:</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Cases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gold</code></td>
+<td>The Chinook suite's 43 answerable questions. Their answers are checked in <code>chinook.yaml</code>; here a recall miss cannot hide a routing one</td>
+</tr>
+<tr>
+<td><code>sample</code></td>
+<td>Each demo datasource's sample questions, as <code>nl2sql init --demo</code> writes them</td>
+</tr>
+<tr>
+<td><code>paraphrase</code>, <code>hand</code></td>
+<td>Questions written for routing and read against each datasource's schema, most about <code>support</code> and <code>webanalytics</code>. Ten carry reviewed SQL, with rows written by <code>regenerate</code>, so mode full checks those answers too</td>
+</tr>
+</tbody>
+</table>
+<p>Every case without SQL is <code>kind: routing</code>, so mode full's execution accuracy
+is over the ten answered cases only. The suite's header names the cases with
+two defensible answers (support holds the same customers as Chinook), which a
+routing change may flip on purpose.
+| <code>cross-database</code> | Three questions that need two databases |</p>
+<p>Every case also carries the names of the datasources it needs as tags, so
+<code>--cases support</code> runs every case about support, cross-database ones included. Mode plans cannot run the suite, since its
+cases have no plans. So the demo's <code>evals.yaml</code> names only <code>chinook.yaml</code>, and
+the routing suite is run by name:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--suite<span class="w"> </span>evals/routing.yaml<span class="w"> </span>--out<span class="w"> </span>eval_routing.json<span class="w">   </span><span class="c1"># no key: CI's gate</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--suite<span class="w"> </span>evals/routing.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">                   </span><span class="c1"># the release check</span>
+</code></pre></div>
+<p>In mode retrieval a case passes when routing ranks one of its datasources
+first and shortlists all of them (<code>settings.routing.candidates</code>, cut at
+<code>max_datasources</code>). A few cases fail today; the baseline records where
+routing misses, and the gate allows no other case to start failing. The test
+bed's 1,200-table wide schema has routing cases of its own in the <code>realdb</code>
+job (<code>tests/realdb/test_routing_wide.py</code>), since they need the test bed's
+databases.</p>
 <h2 id="regenerating-rows">Regenerating rows</h2>
 <p><code>rows</code> and <code>alt_rows</code> are never typed by hand. After you add or edit a case,
 an alternative or any SQL, run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"evals/mine.yaml"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"evals/mine.yaml"</span><span class="p">)</span>
 </code></pre></div>
 <p>For each approved case with SQL, <code>regenerate</code> asks the case's datasource
 adapter to run <code>sql</code> and every <code>alt_sql</code>. It goes through the engine's

@@ -2827,6 +2827,11 @@ stopped the run. Mode full allows two flipped cases plus McNemar's
 two-sided test, because the model is noisy. The gate reads execution accuracy, the measure the history
 has always published (<a href="../../evals/#the-regression-gate">The regression gate</a>).
 Commit the record and the regenerated pages in their own PR.</p>
+<p>The routing suite is the release check for cross-database routing, on the
+same key and cap. Its board's <code>routing</code> scorer says whether each question
+went to the right databases:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--suite<span class="w"> </span>evals/routing.yaml<span class="w"> </span>--llm<span class="w"> </span>gpt-5.4<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w"> </span>--out<span class="w"> </span>eval_routing_full.json
+</code></pre></div>
 <h3 id="4-merging-the-release-pr-is-the-gate">4. Merging the release PR is the gate</h3>
 <p><strong>This is the only manual step in a release</strong>, after the release page.
 Merging the pull request makes release-please create the <code>vX.Y.Z</code> tag and
@@ -2958,16 +2963,16 @@ tags with <code>GITHUB_TOKEN</code>, so a <code>v*</code> tag it pushes never fi
 is chained to release-please's own outputs instead. <code>release_please.yml</code> gives
 the action step an <code>id</code>, re-exports <code>releases_created</code> and <code>tag_name</code> as job
 outputs, and calls <code>publish_pypi.yaml</code> as a <strong>reusable workflow</strong>:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="nt">publish</span><span class="p">:</span>
-<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-please</span>
-<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a><span class="w">  </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ needs.release-please.outputs.releases_created == 'true' }}</span>
-<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./.github/workflows/publish_pypi.yaml</span>
-<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a><span class="w">  </span><span class="nt">with</span><span class="p">:</span>
-<a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a><span class="w">    </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ needs.release-please.outputs.tag_name }}</span>
-<a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a><span class="w">  </span><span class="nt">permissions</span><span class="p">:</span>
-<a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a><span class="w">    </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-<a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a><span class="w">    </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
-<a href="#__codelineno-2-10" id="__codelineno-2-10" name="__codelineno-2-10"></a><span class="w">    </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="nt">publish</span><span class="p">:</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">release-please</span>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="w">  </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ needs.release-please.outputs.releases_created == 'true' }}</span>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./.github/workflows/publish_pypi.yaml</span>
+<a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a><span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<a href="#__codelineno-3-6" id="__codelineno-3-6" name="__codelineno-3-6"></a><span class="w">    </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ needs.release-please.outputs.tag_name }}</span>
+<a href="#__codelineno-3-7" id="__codelineno-3-7" name="__codelineno-3-7"></a><span class="w">  </span><span class="nt">permissions</span><span class="p">:</span>
+<a href="#__codelineno-3-8" id="__codelineno-3-8" name="__codelineno-3-8"></a><span class="w">    </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<a href="#__codelineno-3-9" id="__codelineno-3-9" name="__codelineno-3-9"></a><span class="w">    </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<a href="#__codelineno-3-10" id="__codelineno-3-10" name="__codelineno-3-10"></a><span class="w">    </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
 </code></pre></div>
 <p>A called workflow's jobs can never hold more than the calling job grants, so
 <code>id-token: write</code> has to appear on the caller for OIDC to reach the <code>pypi</code>
@@ -2980,7 +2985,7 @@ nothing and still covers a tag a human pushes by hand.</p>
 <p><code>publish_pypi.yaml</code> also accepts <code>workflow_dispatch</code> with a required <code>tag</code>
 input. Use it when a release was tagged but never published — <code>v0.1.0</code>, or any
 tag pushed before the chaining above existed:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.0
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.0
 </code></pre></div>
 <p>or <strong>Actions → Publish Release → Run workflow</strong> and type the tag.</p>
 <p>The same dispatch is how you recover a release that <strong>tagged but never
@@ -2989,7 +2994,7 @@ the previous version and no image reached GHCR. That is what happened to
 <code>v0.1.1</code>: the <code>pypi</code> matrix failed and took <code>ghcr</code> and <code>docs</code> down with it.
 Nothing needs to be re-tagged; fix the cause on <code>main</code>, then dispatch the same
 tag:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.1
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_pypi.yaml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.1.1
 </code></pre></div>
 <p>The dispatch checks out the tag, so it publishes the tagged commit, not <code>main</code>.
 Only legs that never uploaded can be re-run — PyPI rejects a re-upload of a
@@ -2998,7 +3003,7 @@ or a manual publish of just the missing packages, in the
 <a href="#package-order">dependency order below</a>.</p>
 <p>To redeploy only the hosted demo at a release that is already on PyPI, without
 touching PyPI, GHCR or the docs, dispatch the Space workflow with the tag:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="gp">$ </span>gh<span class="w"> </span>workflow<span class="w"> </span>run<span class="w"> </span>publish_space.yml<span class="w"> </span>-f<span class="w"> </span><span class="nv">tag</span><span class="o">=</span>v0.2.0
 </code></pre></div>
 <p>When the Space root for that tag is already on the Space there is nothing to
 push, so a run by hand asks the Hub for a factory rebuild instead and waits for
@@ -3023,7 +3028,7 @@ phase of work.</p>
 manifest-releaser documentation describes it as a key that <em>"will cause
 release-please to stop there for collecting changelog commits (so choose one
 commit earlier than the first commit you want to include)"</em>. Ours is:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="nt">"bootstrap-sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"39d488ae9f9943ea5d9879bf2dd503c34370b24a"</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="nt">"bootstrap-sha"</span><span class="p">:</span><span class="w"> </span><span class="s2">"39d488ae9f9943ea5d9879bf2dd503c34370b24a"</span>
 </code></pre></div>
 <p>That is the <strong>parent</strong> of <code>28687fe</code>, the merge of the first pull request in
 this phase of work, so the changelog begins at that pull request and covers
@@ -3042,9 +3047,9 @@ change.</p>
 <h3 id="release-as-choosing-an-exact-version"><code>Release-As:</code> — choosing an exact version</h3>
 <p>To publish a specific version rather than the one conventional commits imply,
 put a <code>Release-As:</code> footer in the <strong>body</strong> of a commit that lands on <code>main</code>:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a>ci: pin the first release to 0.1.0 and scope its changelog
-<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>
-<a href="#__codelineno-7-3" id="__codelineno-7-3" name="__codelineno-7-3"></a>Release-As: 0.1.0
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>ci: pin the first release to 0.1.0 and scope its changelog
+<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>
+<a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a>Release-As: 0.1.0
 </code></pre></div>
 <p>Release-please reads <code>Release-As: x.x.x</code> (case insensitive) from the commit
 body and opens its next release pull request for exactly that version. This is
@@ -3075,13 +3080,13 @@ not persist.</p>
 <p>Both traps below fail the same way. <code>release_please.yml</code> reports success, no tag
 appears, and the merged release pull request keeps its <code>autorelease: pending</code>
 label — so every later run refuses to open a new release PR:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a>There are untagged, merged release PRs outstanding - aborting
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a>There are untagged, merged release PRs outstanding - aborting
 </code></pre></div>
 <p>That line is a <em>consequence</em>, not a diagnosis. The cause is earlier in the same
 run, in the <code>Building releases</code> phase.</p>
 <h3 id="the-component-mismatch">The component mismatch</h3>
 <p>Symptom, in the <code>Building releases</code> phase of the run log:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a>PR component: undefined does not match configured component: nl2sql-engine
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-10-1" id="__codelineno-10-1" name="__codelineno-10-1"></a>PR component: undefined does not match configured component: nl2sql-engine
 </code></pre></div>
 <p>With <code>separate-pull-requests: false</code> the Merge plugin names the grouped release
 branch <code>release-please--branches--main</code>, with no component in it. When the
@@ -3089,8 +3094,8 @@ release is built back out of that merged PR, release-please compares the
 branch's component against <code>getBranchComponent()</code> — which returns the configured
 component <strong>regardless of <code>include-component-in-tag</code></strong>, unlike <code>getComponent()</code>,
 which honours it:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-10-1" id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getComponent</span><span class="p">()</span><span class="w">       </span><span class="p">{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="p">.</span><span class="nx">includeComponentInTag</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// ""</span>
-<a href="#__codelineno-10-2" id="__codelineno-10-2" name="__codelineno-10-2"></a><span class="k">async</span><span class="w"> </span><span class="nx">getBranchComponent</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">component</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="p">}</span><span class="w">                    </span><span class="c1">// "nl2sql-engine"</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="k">async</span><span class="w"> </span><span class="nx">getComponent</span><span class="p">()</span><span class="w">       </span><span class="p">{</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="p">.</span><span class="nx">includeComponentInTag</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s1">''</span><span class="p">;</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// ""</span>
+<a href="#__codelineno-11-2" id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="k">async</span><span class="w"> </span><span class="nx">getBranchComponent</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">component</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="p">}</span><span class="w">                    </span><span class="c1">// "nl2sql-engine"</span>
 </code></pre></div>
 <p>A <code>package-name</code> on the <code>packages</code> entry is what supplies that component. The
 two disagree, the release is skipped, and no tag is created.</p>
@@ -3101,9 +3106,9 @@ of files release-please updates is unchanged.</p>
 <div class="admonition danger">
 <p class="admonition-title">The <code>pullRequestTitlePattern</code> warnings are noise, not the cause</p>
 <p>The same run also logs, repeatedly:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a>pullRequestTitlePattern miss the part of '${scope}'
-<a href="#__codelineno-11-2" id="__codelineno-11-2" name="__codelineno-11-2"></a>pullRequestTitlePattern miss the part of '${component}'
-<a href="#__codelineno-11-3" id="__codelineno-11-3" name="__codelineno-11-3"></a>pullRequestTitlePattern miss the part of '${version}'
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-12-1" id="__codelineno-12-1" name="__codelineno-12-1"></a>pullRequestTitlePattern miss the part of '${scope}'
+<a href="#__codelineno-12-2" id="__codelineno-12-2" name="__codelineno-12-2"></a>pullRequestTitlePattern miss the part of '${component}'
+<a href="#__codelineno-12-3" id="__codelineno-12-3" name="__codelineno-12-3"></a>pullRequestTitlePattern miss the part of '${version}'
 </code></pre></div>
 <p>These fire unconditionally whenever a title pattern omits a placeholder, and
 the built-in grouped-PR default — <code>chore: release ${branch}</code>, which renders
@@ -3121,7 +3126,7 @@ cause cost a release cycle.</p>
 <h3 id="manifest-seeding">Manifest seeding</h3>
 <p><code>.release-please-manifest.json</code> records the <strong>last released</strong> version, not the
 next one, so it must be seeded <em>below</em> the first version to be shipped:</p>
-<div class="highlight"><pre><span></span><code><a href="#__codelineno-12-1" id="__codelineno-12-1" name="__codelineno-12-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"."</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.0.0"</span><span class="w"> </span><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-13-1" id="__codelineno-13-1" name="__codelineno-13-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">"."</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.0.0"</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <p>Seeding it at the target instead — <code>{".": "0.1.0"}</code> while a <code>Release-As: 0.1.0</code>
 footer pins the same value — makes the first release a no-op: release-please

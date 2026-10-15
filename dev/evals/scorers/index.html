@@ -5106,7 +5106,7 @@ built-ins and any plugin's are listed the same way and named in
 <tr>
 <td><code>result_match</code></td>
 <td>The rows match the case's <code>rows</code> or any <code>alt_rows</code></td>
-<td>an <code>allowed</code> role</td>
+<td>an <code>allowed</code> role on a case with <code>sql</code></td>
 <td>full, plans</td>
 </tr>
 <tr>
@@ -5129,12 +5129,18 @@ built-ins and any plugin's are listed the same way and named in
 </tr>
 <tr>
 <td><code>routing</code></td>
-<td>Mode full: the run used exactly the case's <code>datasources</code>. Mode retrieval: all of them are among the datasources routing ranked, up to <code>settings.routing.max_datasources</code></td>
+<td>Mode full: the run used exactly the case's <code>datasources</code>. Mode retrieval: routing ranked one of them first (<code>top1</code>), and all of them are among the datasources it ranked, up to <code>settings.routing.max_datasources</code> (<code>shortlist</code>)</td>
 <td>an <code>allowed</code> role</td>
 <td>full, retrieval</td>
 </tr>
 </tbody>
 </table>
+<p>In mode retrieval, <code>routing</code> passes a case only on both <code>top1</code> and
+<code>shortlist</code>. Its <code>detail</code> keeps each, with the ranking (<code>routed</code>) and the
+datasources it <code>missed</code>, and the board's <code>routing</code> gives the share of cases
+for each. The gate allows no flip in mode retrieval, so it fails when either
+drops. A <code>kind: routing</code> case (which says where a question goes, not what it
+returns) gets no <code>result_match</code> verdict and is left out of execution accuracy.</p>
 <p>A scorer that does not apply to a case returns no verdict. A scorer that
 cannot score the run's mode is left out of that run.</p>
 <p><strong>A case passes when every scorer that applies to it passes.</strong> A scorer that

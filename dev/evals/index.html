@@ -5584,7 +5584,8 @@ break: <code>ok</code> is false and nothing is compared.</p>
 <p><strong>The gate reads execution accuracy.</strong> A case passes when <code>result_match</code> and
 <code>outcome</code> pass; no other scorer counts. That is <code>accuracy.execution</code>, the
 measure 0.6's tier 2 published, so a run compares with the history published
-before 0.7 and a faithfulness verdict alone is never a regression. With
+before 0.7 and a faithfulness verdict alone is never a regression. A
+<code>kind: routing</code> case has no rows to check and is left out of it. With
 curated answers on, it is checked twice: as users see it, and on the
 generated path. Mode retrieval has no execution, so its cases are read by
 their status.</p>
@@ -5673,16 +5674,20 @@ not the time it publishes.</p>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>publish<span class="w"> </span>demo/eval_full.json<span class="w"> </span>--note<span class="w"> </span><span class="s2">"slim prompts"</span>
 </code></pre></div>
 <h2 id="in-ci">In CI</h2>
-<p>The key-free integration job runs the eval gate on the demo's Chinook suite,
-after indexing it:</p>
+<p>The key-free integration job runs the eval gate on the demo's Chinook suite
+and on <a href="cases/#the-routing-suite">the routing suite</a>, after indexing them:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>plans<span class="w"> </span>--baseline<span class="w"> </span>benchmarks
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>benchmarks
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--suite<span class="w"> </span>evals/routing.yaml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--baseline<span class="w"> </span>benchmarks<span class="w"> </span>--out<span class="w"> </span>demo-ci/eval_routing.json
 </code></pre></div>
-<p>Each run is gated against the newest record of its mode in <code>benchmarks/</code>
-(<code>plans/chinook/</code> and <code>retrieval/chinook/</code>), and both reports are uploaded
-as the <code>eval-reports</code> artifact whether the gate passed or not. A changed suite
-or schema starts a new series, so the gate exits 2 until both baselines are
-recorded again. The same job also runs <code>tests/e2e/test_evals_plans.py</code>, where
+<p>Each run is gated against the newest record of its mode and database in
+<code>benchmarks/</code> (<code>plans/chinook/</code>, <code>retrieval/chinook/</code> and
+<code>retrieval/chinook-support-webanalytics/</code>). The three reports are uploaded
+as the <code>eval-reports</code> artifact whether the gate passed or not. On the routing
+suite, a case that loses its routing top-1 or a shortlisted datasource is a
+flip, and mode retrieval allows none. A changed suite or schema starts a new
+series, so the gate exits 2 until the baselines are recorded again. The same job also runs <code>tests/e2e/test_evals_plans.py</code>, where
 every case must pass for every role.</p>
 <h3 id="re-recording-cis-baselines">Re-recording CI's baselines</h3>
 <p>CI's plans and retrieval baselines are recorded <strong>on CI's own runner</strong>
@@ -5690,18 +5695,19 @@ every case must pass for every role.</p>
 case only at 100% column recall, which near-tie rankings of the local ONNX
 embedder can move between platforms.</p>
 <ol>
-<li>Push the change. The integration job's "Eval gate" step runs both modes and
-   uploads <code>eval_plans.json</code> and <code>eval_retrieval.json</code> as the <code>eval-reports</code>
-   artifact, pass or fail.</li>
+<li>Push the change. The integration job's "Eval gate" steps run the three
+   gates and upload <code>eval_plans.json</code>, <code>eval_retrieval.json</code> and
+   <code>eval_routing.json</code> as the <code>eval-reports</code> artifact, pass or fail.</li>
 <li>Download them: <code>gh run download &lt;run id&gt; -n eval-reports -D eval-reports</code>.</li>
-<li>From the repo root, record them, naming where they came from:
-   <code>nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/&lt;run id&gt;"</code>.</li>
-<li>Commit the two records and the regenerated pages in the same PR, and push.
+<li>From the repo root, record the ones the change moved, naming where they
+   came from:
+   <code>nl2sql eval publish eval-reports/eval_retrieval.json eval-reports/eval_routing.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/&lt;run id&gt;"</code>.</li>
+<li>Commit the records and the regenerated pages in the same PR, and push.
    The next run gates against them.</li>
 </ol>
 <p>Never edit a record by hand, <code>engine_version</code> included. A change that moves
 the gate on purpose (a suite change, routing or retrieval work) re-records
-both baselines this way, in the PR that makes the change.</p>
+the baselines it moves this way, in the PR that makes the change.</p>
 <p>Mode <code>full</code> spends a key: <code>nl2sql eval run --mode full</code> refuses to start when
 <code>CI</code> is set. The owner runs it before a release
 (<a href="../development/releasing/#the-pre-release-eval">Releasing</a>).</p>
