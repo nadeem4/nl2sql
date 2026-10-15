@@ -1086,7 +1086,7 @@ about 2 seconds warm.
 How Phase 1 gets there:
 - `nl2sql/__init__.py` imports only `nl2sql.config` (pydantic models),
   `nl2sql.registry` and the `NL2SQL` class. Everything else that it exports
-  (result types, `QueryEvent`, `CancellationToken`) goes through the module's
+  (result types, `Event`, `CancellationToken`) goes through the module's
   `__getattr__`, which is the pattern it already uses for `BenchmarkAPI`.
 - The facade module imports the runtime inside `NL2SQL.__init__`, not at the
   top of the module.

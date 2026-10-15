@@ -395,19 +395,25 @@ names in the same PR.
     are derived from them; `EventInfo` reports both. A later event joins a
     list by its own catalog entry (Wave B's events stay off the stream). The
     stream: `QueryAPI.stream_query(..., scope=None, names=STREAM_EVENTS)`
-    yields `Event`s. It replays what its scope already published
-    (`RunScope.events`, a new list of every event the scope published, in
-    order), then attaches `queue.put` to the scope with `names` minus
-    `run.finished`, and puts its own `run.finished`: the summary
+    yields `Event`s. `RunScope.follow(fn, names)` replays what the scope
+    already published (`RunScope.events`, a new list of every event the
+    scope published, in order) and attaches `fn`, both under the scope's
+    lock, so an event published meanwhile is neither lost nor doubled; the
+    stream follows its scope with `names` minus `run.finished`, and puts its
+    own `run.finished`: the summary
     `close_scope` (which now returns the published event) returned, plus
     `data.result`. So a scope opened before the stream (Wave C's turn, need
     A2) still gives the stream its `run.started` and anything the turn
     published in it, and `names` (internal) is where Wave C's
     `conversations.stream` adds `conversation.rewritten` (need A4); it
     appends `conversation.turn` after the stream's `run.finished` itself.
-    A scope that could not open ends the stream with a `run.failed` built
-    in place (no `trace_id`). `scope=` is kept on `run_query` and
-    `stream_query`. `engine.events.subscribe(fn, names=None)` subscribes to
+    The stream ends with exactly one terminal event whatever breaks: when
+    no `run.failed` reached it (the scope could not open, was already
+    closed, or a collector raised on its terminal event), it ends with a
+    `run.failed` built in place, with the scope's `trace_id` when there is
+    a scope. A `KeyboardInterrupt` ends it the same way. `scope=` is kept on
+    `run_query` and `stream_query`; a closed `scope=` is a `ValueError` at
+    the call. `engine.events.subscribe(fn, names=None)` subscribes to
     `Runtime.bus` (fail open) and `catalog()` returns `catalog()`. The trace
     document has `events` (the scope's events but `answer.delta`); since
     `run_with_graph` writes the trace before `run.finished` is published,

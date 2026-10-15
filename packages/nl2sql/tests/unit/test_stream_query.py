@@ -227,3 +227,116 @@ def test_the_facade_streams_through_the_query_api():
     assert list(engine.stream_query("q", datasource_id="chinook", execute=False)) == ["e"]
     assert calls[0]["question"] == "q" and calls[0]["datasource_id"] == "chinook"
     assert calls[0]["execute"] is False
+
+
+# ---------------------------------------------------------------- the terminal event, whatever happens (review of #314)
+
+def _ctx_with_timeout(timeout_s):
+    ctx = fake_runtime(artifact_store=None)
+    pipeline = ctx.config.settings.pipeline.model_copy(update={"timeout_s": timeout_s})
+    settings = ctx.config.settings.model_copy(update={"pipeline": pipeline})
+    ctx.config = ctx.config.model_copy(update={"settings": settings})
+    return ctx
+
+
+class _Graph:
+    def __init__(self, on_invoke):
+        self.invoke = on_invoke
+
+
+def _terminals(events):
+    return [e for e in events if e.name in TERMINAL]
+
+
+def test_a_failure_after_the_scope_closed_still_ends_the_stream_in_run_failed(api, monkeypatch):
+    original = QueryAPI.close_scope
+
+    def close_then_break(self, scope, result):
+        original(self, scope, result)
+        raise RuntimeError("broke after closing")
+
+    monkeypatch.setattr(QueryAPI, "close_scope", close_then_break)
+    events = list(api.stream_query("q"))
+
+    [terminal] = _terminals(events)
+    assert events[-1] is terminal and terminal.name == "run.failed"
+    assert terminal.trace_id == events[0].trace_id
+    assert "broke after closing" in terminal.data["message"]
+
+
+def test_a_collector_that_raises_on_the_terminal_event_still_ends_the_stream(api):
+    scope = api.open_scope("q")
+
+    def broken(event):
+        raise RuntimeError("collector bug")
+
+    scope.attach(broken, names=["run.finished"])
+    events = list(api.stream_query("q", scope=scope))
+
+    [terminal] = _terminals(events)
+    assert events[-1] is terminal and terminal.name == "run.failed"
+    assert terminal.trace_id == scope.trace_id
+
+
+def test_an_event_published_while_the_stream_joins_an_open_scope_is_not_lost(api, monkeypatch):
+    """Another thread publishes in the scope while the stream replays its events and subscribes."""
+    from nl2sql.events import RunScope
+
+    scope = api.open_scope("and by month?")
+    original = RunScope.attach
+
+    def attach_late(self, piece, *, names=None):
+        if piece.__class__.__name__ != "RunEvents" and self is scope:
+            other = threading.Thread(target=lambda: scope.publish(
+                "node.started", {"node": "from_another_thread", "sub_query_id": None}))
+            other.start()
+            other.join(timeout=0.2)  # blocked on the scope's lock while it joins, if the join holds it
+        return original(self, piece, names=names)
+
+    monkeypatch.setattr(RunScope, "attach", attach_late)
+    events = list(api.stream_query("Revenue by month?", scope=scope))
+
+    assert "from_another_thread" in [e.data.get("node") for e in events]
+
+
+def test_follow_replays_then_subscribes(api):
+    scope = api.open_scope("q")
+    seen = []
+    scope.follow(seen.append, names={"run.started", "node.started"})
+    scope.publish("node.started", {"node": "decomposer", "sub_query_id": None})
+    scope.publish("plan_cache.lookup", {"datasource_id": "shop", "hit": True})
+
+    assert [e.name for e in seen] == ["run.started", "node.started"]
+
+
+def test_a_closed_scope_is_refused(api):
+    scope = api.open_scope("q")
+    api.close_scope(scope, api.run_query("q", scope=api.open_scope("q")))
+
+    with pytest.raises(ValueError, match="closed"):
+        api.stream_query("q", scope=scope)
+
+
+def _slow(state, config):
+    config["configurable"]["cancellation_token"].wait(timeout=2)
+    return {}
+
+
+def _interrupt(state, config):
+    raise KeyboardInterrupt()
+
+
+@pytest.mark.parametrize("graph, timeout_s, ending", [
+    (_slow, 0.05, "run.finished"),        # the pipeline timed out: a result with PIPELINE_TIMEOUT
+    (_interrupt, 60, "run.failed"),       # a KeyboardInterrupt on the stream's thread
+], ids=["timeout", "keyboard_interrupt"])
+def test_the_stream_ends_with_exactly_one_terminal_event_on_timeout_and_interrupt(monkeypatch, graph, timeout_s,
+                                                                                  ending):
+    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _Graph(graph))
+    monkeypatch.setattr(threading, "excepthook", lambda args: None)
+    events = list(QueryAPI(_ctx_with_timeout(timeout_s)).stream_query("q"))
+
+    [terminal] = _terminals(events)
+    assert events[-1] is terminal and terminal.name == ending
+    if ending == "run.finished":
+        assert [e["error_code"] for e in terminal.data["result"]["errors"]] == ["PIPELINE_TIMEOUT"]

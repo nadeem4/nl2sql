@@ -102,6 +102,10 @@ then exactly one of `run.finished` or `run.failed`.
   provider error, a timeout or a cancel ends in `run.finished` with
   `status: "error"`, exactly as `run_query` returns it. `run.failed` means the
   run could not start or crashed outside the pipeline.
+- **Exactly one terminal event, whatever breaks.** A failure the run's own
+  `run.failed` could not report (an interrupt, a crash after the run's
+  summary was published) still ends the stream with a `run.failed` carrying
+  the run's `trace_id`.
 - Closing the iterator early cancels the run before its next step or model
   call.
 

@@ -146,6 +146,20 @@ class RunScope:
             self._closers.append(close)
         return piece
 
+    def follow(self, fn: Callable[[Event], None], names: Iterable[str]) -> None:
+        """Hand ``fn`` this run's events in ``names``: those already published, then each one as it comes.
+
+        The replay and the attach happen under the scope's lock, so an event
+        published meanwhile on another thread is neither lost nor seen twice.
+        For a stream joining a scope opened before it (Wave C's turn).
+        """
+        wanted = frozenset(names)
+        with self._lock:
+            for event in self.events:
+                if event.name in wanted:
+                    fn(event)
+            self.attach(fn, names=wanted)
+
     def callbacks(self) -> List[Any]:
         """The LangChain callbacks a model call in this run is made with: the usage collector, then
         the handlers attached (the budget).

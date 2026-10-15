@@ -29,6 +29,8 @@ from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
 
 DEFAULT_SAMPLE_ROWS = 50
+# A run's stream ends with exactly one of these.
+TERMINAL_EVENTS = frozenset({"run.finished", "run.failed"})
 
 
 class RowSample(BaseModel):
@@ -454,14 +456,28 @@ class QueryAPI:
         request's keys) goes with it. Closing the iterator early -- a client
         that went away -- cancels the run before its next step or model call.
         ``scope`` is as for :meth:`run_query`: the stream starts with what the
-        open scope already published (its ``run.started``). ``names``
+        open scope already published (its ``run.started``); a closed one is a
+        ``ValueError``, raised at the call. Whatever breaks, the stream ends
+        with exactly one terminal event. ``names``
         (internal) is the allow-list; Wave C's conversation stream adds its
         own events to it.
         """
-        token = cancellation_token or CancellationToken()
-        allowed = frozenset(names)
+        if scope is not None and scope.closed:
+            raise ValueError("This run's scope is already closed; a stream needs an open one.")
+        return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
+                            token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names))
+
+    def _stream(self, question: str, *, datasource_id: Optional[str], execute: bool,
+                user_context: Optional[UserContext], token: CancellationToken, opened: Optional[RunScope],
+                allowed: frozenset) -> Iterator[Event]:
+        """:meth:`stream_query`'s run, on a thread of its own, and the events it hands over."""
         events: "queue.Queue[Optional[Event]]" = queue.Queue()
-        opened = scope
+        terminal_sent = threading.Event()
+
+        def deliver(event: Event) -> None:
+            if event.name in TERMINAL_EVENTS:
+                terminal_sent.set()
+            events.put(event)
 
         def run() -> None:
             scope: Optional[RunScope] = opened
@@ -469,11 +485,8 @@ class QueryAPI:
                 scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                                  user_context=user_context)
                 # What the scope published before the stream joined it, then the rest as it comes. The
-                # stream's own run.finished, with the result, is put below.
-                for event in list(scope.events):
-                    if event.name in allowed:
-                        events.put(event)
-                scope.attach(events.put, names=allowed - {"run.finished"})
+                # stream's own run.finished, with the result, is delivered below.
+                scope.follow(deliver, allowed - {"run.finished"})
                 with scope.entered():
                     state = run_with_graph(
                         self._ctx,
@@ -488,18 +501,21 @@ class QueryAPI:
                     result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
                     finished = self.close_scope(scope, result)
                 if finished is not None and "run.finished" in allowed:
-                    events.put(finished.model_copy(update={
+                    deliver(finished.model_copy(update={
                         "data": {**finished.data, "result": result.model_dump(mode="json")}}))
             except BaseException as exc:
-                # A KeyboardInterrupt too: every scope ends with a terminal event.
+                # A KeyboardInterrupt too: every scope, and every stream, ends with a terminal event.
                 message = f"The run failed: {exc or type(exc).__name__}"
                 if scope is not None:
-                    scope.fail(message, ErrorCode.UNKNOWN_ERROR)
-                else:
-                    # The scope could not open: the caller still hears how the run ended.
-                    events.put(Event(name="run.failed", at=datetime.now(timezone.utc),
-                                     tenant_id=getattr(self._ctx, "tenant_id", None),
-                                     data={"message": message, "error_code": ErrorCode.UNKNOWN_ERROR.value}))
+                    scope.fail(message, ErrorCode.UNKNOWN_ERROR)  # reaches the stream while it is attached
+                if not terminal_sent.is_set():
+                    # The scope could not open, was already closed, or broke on its terminal event: the
+                    # caller still hears how the run ended.
+                    deliver(Event(name="run.failed", at=datetime.now(timezone.utc),
+                                  trace_id=scope.trace_id if scope is not None else None,
+                                  tenant_id=scope.tenant_id if scope is not None
+                                  else getattr(self._ctx, "tenant_id", None),
+                                  data={"message": message, "error_code": ErrorCode.UNKNOWN_ERROR.value}))
                 if not isinstance(exc, Exception):
                     raise
             finally:
@@ -514,7 +530,7 @@ class QueryAPI:
                 yield event
                 # A timed-out run's graph winds down in the background; whatever
                 # it reports after the terminal event is not this run's any more.
-                if event.name in ("run.finished", "run.failed"):
+                if event.name in TERMINAL_EVENTS:
                     finished = True
                     return
         finally:
