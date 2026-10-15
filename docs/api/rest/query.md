@@ -26,7 +26,7 @@ Derives from `nl2sql.SubQueryResult`, so it has exactly the engine's fields.
 | `plan` | `Optional[Dict[str, Any]]` | no | The validated plan, dumped. |
 | `validation` | `List[ValidationCheck]` | no | Validation checks (`name`, `passed`, `message`). |
 | `rows` | `Optional[RowSample]` | no | Capped row sample (`columns`, `rows`, `total_rows`). |
-| `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
+| `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. `"dropped"` when a [hook](../../configuration/hooks.md) denied it with `scope="sub_query"`: the run went on without it. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 | `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner call; still validated and executed), `"verified"` when a [verified query](../../configuration/curated.md#what-happens-at-question-time) answered (there is no plan; `sql` is the verified query's own, with its `:name` placeholders), otherwise `"llm"`. |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL, or `null` when the plan's own `LIMIT` was smaller. |

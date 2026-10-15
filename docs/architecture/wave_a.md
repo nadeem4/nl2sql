@@ -741,6 +741,64 @@ not declare is a `ConfigError` at build.
 3. The SQL agent graph, built with fakes, has exactly one path from
    `ast_planner` to `generator`, and it passes `logical_validator`.
 
+!!! note "Built: the runner, the six points and the boundary test (H1)"
+    `nl2sql/hooks/`: the interface in `__init__.py` (`HookContext`, `Allow`,
+    `Modify`, `Deny`, `NeedsApproval`, `Decision`, `Hook`; `HookPoint` is
+    re-exported from `nl2sql.config.models`), `points.py` (`HOOK_POINTS`, a
+    `PointRule` per point: `decisions`, `modifies`, `per_sub_query`) and
+    `runner.py`. The shapes differ from the sketch above in four places:
+
+    - `HookRunner(bindings)` takes a list of `HookBinding(name, hook, points,
+      on_error, approver_roles)` from the runtime (`Runtime._build_hooks`,
+      `build_hook` per entry, in config order) and reads no config, so a
+      built-in hook (Wave B's `policy.cost`) goes first with its own
+      `approver_roles`. `ctx.hooks` is the engine's runner; `hooks_of(ctx)`
+      gives `NO_HOOKS` for a stand-in runtime.
+    - `HookRunner.call(point, **fields)` builds the context from deep copies
+      of `fields` (a hook changing the plan or the caller in place changes
+      nothing) and returns a `HookVerdict`: `ctx` after every `Modify`,
+      `modified`, and the `decision` and `hook` that stopped the point
+      (`allowed`, `scope`, `error(node)`, the `PipelineError`; a hook error's
+      message names only the hook and the point). With no hook at a point,
+      nothing is validated. `HookRunner.attached(point)` says whether any
+      hook runs there: while one runs at `answer.after` the answer is not
+      streamed (no `answer.delta`), `RunEvents(..., hold_manifest=True)`
+      holds `result.manifest` until the answer is allowed (dropped on a
+      deny), and `result_from_state` drops the rows, `artifact_refs` and
+      `result_manifest` of a run a hook ended.
+    - `HookContext` adds `conversation_id: str | None` (Wave C's A3),
+      `execute` (`run.before`) and `results` (the run's `ResultSummary`s at
+      `answer.after`, the "sub-query summaries" of the table).
+    - `NeedsApproval` at `execute.before` stops the SQL with
+      `NEEDS_APPROVAL` (status `error`) until H2 adds the request and the
+      re-run; so `NEEDS_APPROVAL` left `DECLARED_AHEAD` here with
+      `HOOK_DENIED` and `HOOK_FAILED`.
+
+    The call sites: `run.before` in `run_with_graph`'s worker;
+    `datasources.after` in `DatasourceResolverNode._after_hooks` (the one
+    addition to the resolver; R1 rebases on it); `plan.after` in
+    `ASTPlannerNode.after_plan(state, plan, plan_source)`, which the
+    planner's and the cache's plan go through and which a supplied plan (H2's
+    approved, Wave B's chosen, Wave C's supplied) calls the same way;
+    `ASTPlannerNode.check_plan(state, plan)` is one plan's verdict, for Wave
+    B's alternatives. `ASTPlannerResponse.planner_plan` is the plan before
+    the hooks, and `wrap_subgraph` caches it. `execute.before` and
+    `execute.after` in `ExecutorNode` and `CuratedMatcherNode` (each a
+    `self.hooks.call("<point>", **self._hook_fields(...))`; a deny on the
+    verified path ends the run, as `_ended`, never a fallback); `answer.after` in `AnswerSynthesizerNode`. A sub-query a hook
+    dropped has `SubgraphOutput.status == "dropped"` and a `HOOK_DENIED`
+    warning; `build_scan_layer_router` (in `pipeline/routes.py`, a small
+    addition the file list missed) ends the run on a hook's error and still
+    aggregates when a sub-query was dropped; `AggregationService.execute(...,
+    dropped=)` drops a `join` or `compare` group whole; the answer's
+    warnings name what was dropped. `SubgraphExecutionState.user_query` (in
+    `pipeline/state.py`, also not in the file list) carries the question to
+    the sub-query's hooks. The architecture test is
+    `tests/architecture/test_hooks_boundary.py`: every runner call names its
+    point as a literal; its graph check asks that
+    every path from `ast_planner` to `generator` pass `logical_validator`, so
+    Wave B's clarifier may sit between the validator and the generator.
+
 ## 7. Approval
 
 A hook at `execute.before` answers `NeedsApproval("Reads payroll.salaries")`.

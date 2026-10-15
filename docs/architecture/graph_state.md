@@ -38,6 +38,7 @@ Reducer behavior in `GraphState`:
 
 Fields (exact names and types from code):
 - `trace_id: str`
+- `user_query: str` (the run's question after `run.before`, for the hooks a sub-query calls)
 - `sub_query: Optional[SubQuery]`
 - `user_context: Optional[UserContext]`
 - `subgraph_id: Optional[str]`
@@ -67,7 +68,7 @@ Fields:
 - `errors: List[PipelineError]`
 - `validation: List[ValidationCheck]` (copied from `logical_validator_response.checks`)
 - `reasoning: List[Dict[str, Any]]`
-- `status: Optional[str]`
+- `status: Optional[str]` (`success`, `error`, or `dropped` when a hook's deny scoped to the sub-query stopped it)
 
 ---
 

@@ -93,6 +93,14 @@ user who produced it is left to a multi-user deployment.
   run and is logged with the check's name. See
   [A policy check](../configuration/policies.md#a-policy-check).
 - **Logical validation** enforces schema constraints and policy-based table access.
+- **Hooks** (optional): your code at six points of every run, on the
+  generated and the verified path. A hook may change the question, narrow
+  the datasources or change the plan only before the validator, so a changed
+  plan is validated (policies included) like any other, and a narrowed list
+  of datasources is checked against the role again. After the validator a
+  hook may only stop the run. Hooks **fail closed**: an exception denies
+  with `HOOK_FAILED` unless that hook is configured `on_error: open`. See
+  [Hooks](../configuration/hooks.md).
 - **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
   (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
   with who made it and each agent's old and new model, never a key. Queries

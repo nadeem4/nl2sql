@@ -19,6 +19,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.common.dates import run_date
 from nl2sql.runtime import Runtime
+from nl2sql.hooks import hooks_of
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
 from nl2sql.pipeline.state import GraphState
@@ -273,6 +274,7 @@ def run_with_graph(
         }, "cancelled")
 
     attached = [cb for cb in scope.callbacks() if cb is not usage] if scope is not None else []
+    hooks = hooks_of(ctx)
 
     def _invoke():
         # The run's scopes are pinned in the worker's context: each
@@ -280,8 +282,16 @@ def run_with_graph(
         # The run's RunScope is entered beside them, so LangGraph's own worker
         # threads inherit its trace_id and events reach it.
         with ctx.policy_engine.run(), (scope.entered() if scope is not None else contextlib.nullcontext()):
+            state = initial_state.model_dump()
+            # run.before: once, before the first step. It may rewrite the
+            # question or end the run before anything else runs.
+            verdict = hooks.call("run.before", trace_id=initial_state.trace_id, question=user_query,
+                                 user=initial_state.user_context, datasource_id=datasource_id, execute=execute)
+            if not verdict.allowed:
+                return {**state, "errors": [verdict.error("orchestrator")]}
+            state["user_query"] = verdict.ctx.question
             return graph.invoke(
-                initial_state.model_dump(),
+                state,
                 config={
                     "configurable": {"cancellation_token": token, "stream_answer": stream_answer},
                     "callbacks": [_StopWhenCancelled(token), *(callbacks or []), *attached, timing, usage,

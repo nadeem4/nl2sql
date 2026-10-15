@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, Literal, Union
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CaseWhen(BaseModel):
@@ -228,9 +228,24 @@ class PlanModel(BaseModel):
 
 
 class ASTPlannerResponse(BaseModel):
+    """The planner's answer: the plan to validate, and the plan the planner (or the cache) produced.
+
+    ``plan`` is what ``plan.after`` let through, possibly changed by a hook;
+    None when no plan came or a hook stopped it. ``planner_plan`` is the plan
+    before any hook saw it, the one the plan cache stores, so a hook's change
+    is never cached. Built without it, it is ``plan``.
+    """
+
     plan: Optional[PlanModel] = None
+    planner_plan: Optional[PlanModel] = None
     # "cache" when the plan came from the plan cache and no LLM call was made.
     plan_source: Literal["llm", "cache"] = "llm"
+
+    @model_validator(mode="after")
+    def _planner_plan_defaults_to_plan(self) -> "ASTPlannerResponse":
+        if "planner_plan" not in self.model_fields_set:
+            self.planner_plan = self.plan
+        return self
 
 
 # Fix forward references

@@ -14,7 +14,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from nl2sql.common.errors import PipelineError
 from nl2sql.common.logger import get_logger
+from nl2sql.execution.artifacts.results import ResultSummary
+from nl2sql.hooks import hooks_of
+from nl2sql.policies import UserContext
+from nl2sql.policies.scope import default_schema
 from nl2sql.config.curated import CuratedSqlError, VerifiedQuery, inspect_verified_sql
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
@@ -39,6 +44,15 @@ logger = get_logger("curated_matcher")
 NODE = "curated_matcher"
 
 
+class _Denied(Exception):
+    """A hook stopped the verified query: the run ends here, it does not fall back (a deny means no)."""
+
+    def __init__(self, error: PipelineError, update: Dict[str, Any]):
+        super().__init__(error.message)
+        self.error = error
+        self.update = update
+
+
 class _Fallback(Exception):
     def __init__(self, reason: str, detail: str = ""):
         super().__init__(detail or reason)
@@ -60,6 +74,10 @@ class CuratedMatcherNode:
     ``none_of_these``, ``model_failed``, ``unknown_query``, ``param_invalid``,
     ``param_missing``, ``policy_denied``, ``capability_missing``,
     ``execution_failed``. A fallback is never an error of the run.
+
+    The ``execute.before`` and ``execute.after`` hooks run on the verified
+    query as on generated SQL. A hook's deny is not a fallback: the run ends
+    with its error (``hook_denied`` on the record), because a deny means no.
     """
 
     def __init__(self, ctx: Runtime):
@@ -71,6 +89,7 @@ class CuratedMatcherNode:
         self.tenant_id = ctx.tenant_id
         self.row_limit = ctx.settings.results.row_limit
         self.match = ctx.settings.curated
+        self.hooks = hooks_of(ctx)
         # Registered as agent "curatedmatcher"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.chain = CURATED_MATCHER_PROMPT | structured(self.llm, VerifiedQueryChoice)
@@ -138,6 +157,9 @@ class CuratedMatcherNode:
         try:
             out = self._match(state, record, searches)
             record["matched"] = True
+        except _Denied as denied:
+            record["reason"], record["detail"] = "hook_denied", denied.error.message
+            out = denied.update
         except _Fallback as fallback:
             record["reason"] = fallback.reason
             record["detail"] = fallback.detail
@@ -199,13 +221,55 @@ class CuratedMatcherNode:
         except CuratedSqlError as exc:
             raise _Fallback("execution_failed", f"Verified query '{ds_id}.{query.id}': {exc}") from None
         self._check_access(state, ds_id, parsed.tables)
+        tables = [f"{ds_id}.{schema or default_schema(self.ds_registry, ds_id)}.{table}"
+                  for schema, table in parsed.tables]
         if query.params and not self.ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_BOUND_PARAMETERS):
             raise _Fallback("capability_missing", f"The adapter for '{ds_id}' cannot bind parameters.")
 
         # 6. Run it, under the row ceiling, with the values bound.
-        return self._run(state, ds_id, query, params)
+        return self._run(state, ds_id, query, params, tables)
 
-    def _run(self, state: GraphState, ds_id: str, query: VerifiedQuery, params: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _hook_fields(state: GraphState, sub_query: SubQuery, query: VerifiedQuery, params: Dict[str, Any],
+                     tables: List[str]) -> Dict[str, Any]:
+        """What ``execute.before`` and ``execute.after`` see of the verified query."""
+        return dict(trace_id=state.trace_id, question=state.user_query, user=state.user_context or UserContext(),
+                    datasource_id=sub_query.datasource_id, sub_query=sub_query, sql=query.sql.strip(),
+                    params=params, tables=tables)
+
+    def _stop_if_denied(self, verdict, state: GraphState, sub_query: SubQuery, query: VerifiedQuery,
+                        params: Dict[str, Any]) -> None:
+        """Raises ``_Denied`` when a hook stopped the verified query."""
+        if not verdict.allowed:
+            error = verdict.error(self.node_name)
+            raise _Denied(error, self._ended(state, sub_query, query, params, error))
+
+    def _ended(self, state: GraphState, sub_query: SubQuery, query: VerifiedQuery, params: Dict[str, Any],
+               error: PipelineError) -> Dict[str, Any]:
+        """The state of a verified run a hook stopped: its one sub-query done, with no result, and the error.
+
+        The run takes the verified route and ends at the layer router, which
+        finds the scan done and nothing to aggregate.
+        """
+        decomposition = DecomposerResponse(
+            sub_queries=[sub_query],
+            combine_groups=[CombineGroup(group_id="verified", operation="standalone",
+                                         inputs=[CombineInput(subquery_id=sub_query.id)])],
+        )
+        output = SubgraphOutput(sub_query=sub_query, subgraph_id=f"{NODE}:{sub_query.id}:{state.trace_id}",
+                                subgraph_name=NODE, plan_source="verified", sql_draft=query.sql.strip(),
+                                errors=[error], status="error")
+        return {
+            "verified_match": VerifiedMatch(datasource_id=sub_query.datasource_id, query_id=query.id,
+                                            description=query.description, params=params),
+            "decomposer_response": decomposition,
+            "execution_dag": build_execution_dag(decomposition),
+            "subgraph_outputs": {output.subgraph_id: output},
+            "errors": [error],
+        }
+
+    def _run(self, state: GraphState, ds_id: str, query: VerifiedQuery, params: Dict[str, Any],
+             tables: List[str]) -> Dict[str, Any]:
         sub_query = SubQuery(
             id=f"verified_{query.id}",
             datasource_id=ds_id,
@@ -213,6 +277,9 @@ class CuratedMatcherNode:
             schema_version=self.vector_store.schema_version(ds_id),
         )
         row_cap = self._row_ceiling(ds_id)
+        # The verified path has no plan: only the execute points apply to it.
+        fields = self._hook_fields(state, sub_query, query, params, tables)
+        self._stop_if_denied(self.hooks.call("execute.before", **fields), state, sub_query, query, params)
         response = self.executor.execute(ExecutorRequest(
             node_id=sub_query.id,
             trace_id=state.trace_id,
@@ -229,6 +296,10 @@ class CuratedMatcherNode:
         if response.errors or artifact is None:
             reasons = "; ".join(e.message for e in response.errors) or "no result"
             raise _Fallback("execution_failed", f"Verified query '{ds_id}.{query.id}' failed: {reasons}")
+        summary = ResultSummary(node_id=sub_query.id, columns=list(artifact.columns),
+                                row_count=artifact.row_count, truncated=artifact.row_count >= row_cap)
+        self._stop_if_denied(self.hooks.call("execute.after", **fields, result=summary),
+                             state, sub_query, query, params)
 
         decomposition = DecomposerResponse(
             sub_queries=[sub_query],

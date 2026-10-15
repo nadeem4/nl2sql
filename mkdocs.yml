@@ -98,6 +98,7 @@ nav:
     - Datasources: configuration/datasources.md
     - LLMs: configuration/llm.md
     - Policies: configuration/policies.md
+    - Hooks: configuration/hooks.md
     - Embeddings: configuration/embeddings.md
     - Storage: configuration/storage.md
     - Secrets: configuration/secrets.md

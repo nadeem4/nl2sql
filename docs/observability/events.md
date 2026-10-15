@@ -66,7 +66,9 @@ Engine events (`datasource.failed`, `index.started`, `index.column_failed`,
 `llm.changed`, `eval.case`, `eval.finished`) carry no `trace_id`. Which PR
 of Wave A starts publishing each one is in its description; `node.*`,
 `answer.delta`, `result.manifest` and the three `run.*` events are published
-today.
+today. While a [hook](../configuration/hooks.md) is attached at
+`answer.after`, a run publishes no `answer.delta` and sends `result.manifest`
+only after the hooks allowed the answer (never, on a deny).
 
 ## The run's stream
 

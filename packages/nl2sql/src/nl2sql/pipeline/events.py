@@ -10,7 +10,9 @@ gets it with the scope's callbacks, and it publishes, through the scope:
                     ``ok`` is False when it raised
 ``result.manifest`` ``{"results"}``: the aggregator saved the run's results;
                     the event's ``trace_id`` is the ``request_id`` the paging
-                    and CSV routes take
+                    and CSV routes take. With ``hold_manifest`` (a hook is
+                    attached at ``answer.after``) it waits for the answer
+                    and is dropped when a hook stopped the run there
 ``answer.delta``    ``{"field", "text"}``: the next piece of the answer's
                     ``summary`` or ``content``, as the answer model writes it
                     (only a streamed run's answer model streams)
@@ -35,6 +37,8 @@ from nl2sql.tracing.recorder import sub_query_from
 # reader sees grow.
 ANSWER_NODE = "answer_synthesizer"
 ANSWER_FIELDS = ("summary", "content")
+# What a hook ends a run with: a held manifest is then never sent.
+_HOOK_ENDINGS = {"HOOK_DENIED", "HOOK_FAILED", "NEEDS_APPROVAL"}
 
 Publish = Callable[[str, Mapping[str, Any]], Any]
 
@@ -98,8 +102,11 @@ class RunEvents(BaseCallbackHandler):
     Called on the graph's worker threads.
     """
 
-    def __init__(self, publish: Publish) -> None:
+    def __init__(self, publish: Publish, *, hold_manifest: bool = False) -> None:
         self._publish = publish
+        # While a hook may still withhold the answer, the results it summarises wait with it.
+        self._hold_manifest = hold_manifest
+        self._held: Optional[Dict[str, Any]] = None
         self._nodes: Dict[UUID, Tuple[str, Optional[str], float]] = {}
         self._sub_queries: Dict[UUID, Optional[str]] = {}
         self._answers: Dict[UUID, _AnswerText] = {}
@@ -125,8 +132,18 @@ class RunEvents(BaseCallbackHandler):
         if node == "aggregator":
             results = _get(_get(outputs, "aggregator_response"), "results")
             if results is not None:
-                self._publish("result.manifest", {
-                    "results": [r.model_dump(mode="json") if hasattr(r, "model_dump") else r for r in results]})
+                manifest = {"results": [r.model_dump(mode="json") if hasattr(r, "model_dump") else r
+                                        for r in results]}
+                if self._hold_manifest:
+                    self._held = manifest
+                else:
+                    self._publish("result.manifest", manifest)
+        elif node == ANSWER_NODE and self._held is not None:
+            manifest, self._held = self._held, None
+            stopped = any(str(getattr(_get(e, "error_code"), "value", _get(e, "error_code"))) in _HOOK_ENDINGS
+                          for e in (_get(outputs, "errors") or []))
+            if ok and not stopped:
+                self._publish("result.manifest", manifest)
 
     def on_chain_end(self, outputs: Any, *, run_id: UUID, **kwargs: Any) -> None:
         self._finish(run_id, True, outputs)

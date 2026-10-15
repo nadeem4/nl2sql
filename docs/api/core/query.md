@@ -247,7 +247,7 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `plan` | `Optional[Dict[str, Any]]` | no | The validated `PlanModel`, dumped. |
 | `validation` | `List[ValidationCheck]` | no | `name`, `passed`, `message` per validation gate. |
 | `rows` | `Optional[RowSample]` | no | Capped row sample; `None` when nothing executed or the artifact could not be read. |
-| `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. |
+| `status` | `str` | no | `"success"` or `"error"` for this sub-query, from its final attempt: `"success"` when it ended with SQL and, if executed, a result; otherwise `"error"`. A retry that recovers reports `"success"`. `"dropped"` when a [hook](../../configuration/hooks.md) denied it with `scope="sub_query"`: the run went on without it. |
 | `retry_count` | `int` | no | Plan/SQL refinement attempts made. |
 | `plan_source` | `str` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), otherwise `"llm"`. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |

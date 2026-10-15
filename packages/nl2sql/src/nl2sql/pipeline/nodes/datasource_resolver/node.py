@@ -10,6 +10,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from langchain_core.documents import Document
 from nl2sql.policies import UserContext
 from nl2sql.common.logger import get_logger
+from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import structured
@@ -51,6 +52,7 @@ class DatasourceResolverNode:
         self.vector_store = ctx.vector_store
         self.policy_engine = ctx.policy_engine
         self.ds_registry = ctx.ds_registry
+        self.hooks = hooks_of(ctx)
         # Registered as agent "datasourceresolver"; falls back to "default".
         self.llm = ctx.llm_registry.get_llm(self.node_name)
         self.answerability_chain = ANSWERABILITY_PROMPT | structured(self.llm, AnswerabilityResponse)
@@ -174,8 +176,38 @@ class DatasourceResolverNode:
     def __call__(self, state: GraphState) -> Dict[str, Any]:
         searches: list[Dict[str, Any]] = []
         out = self._resolve(state, searches)
+        out = self._after_hooks(state, out)
         out["retrieval"] = self._retrieval(state, searches)
         return out
+
+    def _after_hooks(self, state: GraphState, out: Dict[str, Any]) -> Dict[str, Any]:
+        """``datasources.after`` on the datasources chosen: a hook may remove some, or end the run.
+
+        What a hook returns is checked against the caller's scope again, so a
+        hook can never route to a datasource the role may not read.
+        """
+        response = out.get("datasource_resolver_response")
+        if out.get("errors") or response is None or not response.allowed_datasource_ids:
+            return out
+        verdict = self.hooks.call("datasources.after", trace_id=state.trace_id, question=state.user_query,
+                                  user=state.user_context, datasource_id=state.datasource_id,
+                                  datasource_ids=list(response.allowed_datasource_ids))
+        if not verdict.allowed:
+            return {**out, "datasource_resolver_response": response.model_copy(update={"allowed_datasource_ids": []}),
+                    "errors": [verdict.error(self.node_name)]}
+        kept = self._get_allowed_datasource_ids(state.user_context, list(verdict.ctx.datasource_ids))
+        if kept == list(response.allowed_datasource_ids):
+            return out
+        if not kept:
+            return {**out, **self._error_response(
+                resolved_datasources=list(response.resolved_datasources), allowed_ids=[],
+                unsupported_ids=list(response.unsupported_datasource_ids),
+                message="The datasources.after hooks left no datasource this role may read.",
+                severity=ErrorSeverity.CRITICAL, error_code=ErrorCode.SECURITY_VIOLATION)}
+        return {**out, "datasource_resolver_response": response.model_copy(update={
+            "resolved_datasources": [d for d in response.resolved_datasources if d.datasource_id in kept],
+            "allowed_datasource_ids": kept,
+        })}
 
     def _retrieval(self, state: GraphState, searches: list[Dict[str, Any]]) -> Dict[str, Any]:
         """What the vector search retrieved, for the run trace, or why it did not run.

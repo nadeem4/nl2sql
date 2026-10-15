@@ -4,6 +4,10 @@ from typing import TYPE_CHECKING, Dict, Any, List
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
+from nl2sql.execution.artifacts.results import ResultSummary
+from nl2sql.hooks import hooks_of
+from nl2sql.policies import UserContext
+from nl2sql.policies.scope import default_schema
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
 from nl2sql.execution.executor import SqlExecutorService
@@ -27,6 +31,7 @@ class ExecutorNode:
         self.max_retries = ctx.settings.pipeline.retries.max
         self.tenant_id = ctx.tenant_id
         self.policy_engine = ctx.policy_engine
+        self.hooks = hooks_of(ctx)
 
     def _supports_sql(self, ds_id: str) -> bool:
         """Reports whether a datasource may be executed as SQL.
@@ -67,6 +72,18 @@ class ExecutorNode:
         except Exception as exc:
             logger.warning(f"Value check skipped: {exc}")
             return []
+
+    def _hook_fields(self, state: SubgraphExecutionState, ds_id: str, sql: str) -> Dict[str, Any]:
+        """What ``execute.before`` and ``execute.after`` see of this sub-query's SQL."""
+        planner_response = getattr(state, "ast_planner_response", None)
+        plan = planner_response.plan if planner_response else None
+        tables = None
+        if plan is not None:
+            tables = [f"{ds_id}.{t.schema_name or default_schema(self.ds_registry, ds_id)}.{t.name}"
+                      for t in plan.tables]
+        return dict(trace_id=state.trace_id, question=getattr(state, "user_query", "") or "",
+                    user=state.user_context or UserContext(), datasource_id=ds_id, sub_query=state.sub_query,
+                    plan=plan, sql=sql, tables=tables)
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         try:
@@ -111,7 +128,21 @@ class ExecutorNode:
                 user_context=state.user_context,
                 tenant_id=self.tenant_id,
             )
+            # execute.before: after the validator, a hook may only stop the SQL.
+            fields = self._hook_fields(state, ds_id, sql)
+            verdict = self.hooks.call("execute.before", **fields)
+            if not verdict.allowed:
+                return {"executor_response": None, "errors": [verdict.error(self.node_name)]}
             response = executor.execute(request)
+            if not response.errors and response.artifact is not None:
+                generator_response = getattr(state, "generator_response", None)
+                row_cap = getattr(generator_response, "row_cap", None)
+                summary = ResultSummary(node_id=state.sub_query.id, columns=list(response.artifact.columns),
+                                        row_count=response.artifact.row_count,
+                                        truncated=bool(row_cap and response.artifact.row_count >= row_cap))
+                verdict = self.hooks.call("execute.after", **fields, result=summary)
+                if not verdict.allowed:
+                    return {"executor_response": None, "errors": [verdict.error(self.node_name)]}
             value_errors = self._check_values(state, ds_id, response)
             return {
                 "executor_response": response,

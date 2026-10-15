@@ -61,7 +61,12 @@ class EngineAggregatorNode:
             refused = [c for c in capped if c[0] in _TWO_SIDED]
             if refused:
                 return self._truncated(refused)
-            frames = self.service.execute(dag, state.artifact_refs)
+            dropped = {output.sub_query.id for output in (state.subgraph_outputs or {}).values()
+                       if output.status == "dropped" and output.sub_query}
+            frames = self.service.execute(dag, state.artifact_refs, dropped)
+            gone = self._dropped_groups(dag, dropped)
+            if dropped and not frames:
+                return self._all_dropped(dropped)
             saved = {node_id: self._save(state, node_id, frame) for node_id, frame in frames.items()}
             results = self._write_manifest(state, saved)
             aggregator_response = AggregatorResponse(
@@ -84,7 +89,7 @@ class EngineAggregatorNode:
                         "sub_query_id": sq_id,
                     }
                     for operation, sq_id, cap in capped
-                ],
+                ] + gone,
             }
         except Exception as exc:
             logger.error(f"Node {self.node_name} failed: {exc}")
@@ -100,6 +105,42 @@ class EngineAggregatorNode:
                 "reasoning": [{"node": self.node_name, "content": f"Error: {str(exc)}", "type": "error"}],
                 "errors": [error],
             }
+
+    def _dropped_groups(self, dag, dropped: Set[str]) -> List[Dict[str, Any]]:
+        """A warning for each combine group a hook's dropped sub-query left unanswered.
+
+        A ``join`` or ``compare`` with one input dropped is dropped whole (it
+        would have one side), as is a group whose every input was dropped.
+        """
+        warnings = []
+        for node in dag.nodes if dropped else []:
+            inputs = set(node.inputs or [])
+            operation = node.attributes.get("operation")
+            if node.kind != "combine" or not inputs & dropped:
+                continue
+            if operation in _TWO_SIDED or inputs <= dropped:
+                missing = ", ".join(f"'{i}'" for i in sorted(inputs & dropped))
+                warnings.append({
+                    "node": self.node_name,
+                    "message": (f"The {operation} '{node.attributes.get('group_id')}' was not answered: it needs "
+                                f"sub-query {missing}, which a hook stopped."),
+                    "error_code": ErrorCode.HOOK_DENIED.value,
+                    "severity": ErrorSeverity.WARNING.value,
+                })
+        return warnings
+
+    def _all_dropped(self, dropped: Set[str]) -> Dict[str, Any]:
+        """Hooks dropped every part of the question: the run ends with that, not an empty answer."""
+        message = (f"No part of the question could be answered: hooks stopped sub-query "
+                   f"{', '.join(repr(i) for i in sorted(dropped))}, and nothing else was left to answer from.")
+        error = PipelineError(node=self.node_name, message=message, severity=ErrorSeverity.CRITICAL,
+                              error_code=ErrorCode.HOOK_DENIED, details={"scope": "run"})
+        # The error on the response is what `aggregator_route` ends the run on.
+        return {
+            "aggregator_response": AggregatorResponse(errors=[error]),
+            "reasoning": [{"node": self.node_name, "content": message, "type": "error"}],
+            "errors": [error],
+        }
 
     def _save(self, state: GraphState, node_id: str, frame: pl.LazyFrame) -> ArtifactRef:
         """Writes a terminal result to its own artifact, beside the run's sub-query results.

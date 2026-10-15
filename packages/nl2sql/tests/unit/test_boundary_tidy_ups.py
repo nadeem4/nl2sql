@@ -99,7 +99,7 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # parallel PRs never edit errors.py (docs/architecture/wave_a.md, D35), each
 # with the PR that raises it.
 DECLARED_AHEAD = {
-    "HOOK_DENIED": "H1", "HOOK_FAILED": "H1", "NEEDS_APPROVAL": "H2", "RUN_LIMIT_REACHED": "E3",
+    "RUN_LIMIT_REACHED": "E3",
     "QUESTION_TOO_BROAD": "R2", "JOIN_KEY_TYPE_MISMATCH": "R2", "JOIN_KEY_UNCONVERTED": "R2",
     "JOIN_FAN_OUT": "S1", "ALL_NULL_COLUMN": "S1",
 }
