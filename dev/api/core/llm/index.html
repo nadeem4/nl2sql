@@ -4217,6 +4217,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmprices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.prices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5202,6 +5213,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#llmprices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        llm.prices
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#llmreplace" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5262,6 +5284,7 @@
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>List each agent and the provider and model it runs on (<code>list</code>, <code>get</code>).</li>
+<li>Report the prices every call is costed with (<code>prices</code>).</li>
 <li>Replace the engine's whole <code>llm</code> section at runtime (<code>replace</code>).</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
@@ -5271,6 +5294,7 @@
 <li><code>packages/nl2sql/src/nl2sql/llm/llm_set.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/client_cache.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/llm/models.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/llm/prices.py</code> (the dated price table, <code>price_for</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>LLM</code>, <code>AgentLLM</code>: the <code>llm</code> section)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
@@ -5331,6 +5355,21 @@ that variable is set). Never the key.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">providers</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False}</span>
 </code></pre></div>
+<h3 id="llmprices">llm.prices</h3>
+<p>Signature:
+<code>prices() -&gt; dict</code></p>
+<p>The prices every model call is costed with: the engine's dated table with
+<code>llm.prices</code> applied (<a href="../../../configuration/llm/#prices">Prices</a>).
+<code>checked_on</code> is the day the table was checked against the providers' pages;
+<code>models</code> maps each model name to its <code>input</code>, <code>cached_input</code>, <code>cache_write</code>
+and <code>output</code> rates (USD per million tokens; a config row's cache rates may be
+<code>None</code>, priced as the Prices section says), <code>verified</code>, <code>source</code> (<code>table</code> or
+<code>config</code>) and <code>citation</code> (where a table row's numbers came from; <code>None</code> for a
+config row). A model not listed is not priced: its calls' cost is <code>null</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">prices</span><span class="p">()[</span><span class="s2">"models"</span><span class="p">][</span><span class="s2">"claude-opus-5"</span><span class="p">]</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># {'input': 5.0, 'cached_input': 0.5, 'cache_write': 6.25, 'output': 25.0, 'verified': True,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1">#  'source': 'table', 'citation': 'Anthropic model table in the claude-api skill (cached 2026-06-24); ...'}</span>
+</code></pre></div>
 <h3 id="llmreplace">llm.replace</h3>
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/api/llm_api.py</code> (<code>Runtime.replace_llm</code> in
@@ -5350,7 +5389,8 @@ model changed as <code>{"old": "provider/model", "new": "provider/model"}</code>
 no key.</p>
 <p>Raises:
 - <code>ConfigError</code> for a section that does not validate, a provider that is not
-  registered or not installed, or an agent whose API key does not resolve.
+  registered or not installed, an agent whose API key does not resolve, or,
+  with <code>settings.pipeline.max_cost_usd</code> set, a model with no price.
   Nothing changes. <code>nl2sql-api</code> answers it as HTTP 422 with the same text
   (<a href="../../rest/llm/"><code>PUT /api/v1/settings/llm</code></a>).</p>
 <p>Side Effects:

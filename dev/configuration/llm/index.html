@@ -5731,10 +5731,10 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   refuses a non-streaming call whose <code>max_tokens</code> could outlast its timeout.</li>
 <li><strong>Usage.</strong> Cache reads and writes are reported as <code>cached_input_tokens</code> and
   <code>cache_write_input_tokens</code>, with each input token counted once (see
-  <a href="../../api/core/query/">Query API → usage</a>). With a price in <code>llm.prices</code>, a cache
-  write costs 1.25x the model's <code>input</code> rate (Anthropic's price for a 5-minute
-  write, the only kind the engine asks for) unless the price gives its own
-  <code>cache_write</code>.</li>
+  <a href="../../api/core/query/">Query API → usage</a>). A cache write costs 1.25x the
+  model's <code>input</code> rate (Anthropic's price for a 5-minute write, the only kind
+  the engine asks for): the price table's Claude rows say so, and an
+  <code>llm.prices</code> row without its own <code>cache_write</code> gets it from the wire.</li>
 </ul>
 <p><code>nl2sql demo --record</code> records Claude too: with an Anthropic key the recording
 proxy speaks Anthropic's Messages API to <code>https://api.anthropic.com</code>, and stores
@@ -6148,17 +6148,92 @@ key-free ONNX <code>all-MiniLM-L6-v2</code> model bundled with chromadb, and
 <code>{provider: openai}</code> reads <code>OPENAI_API_KEY</code> (or <code>embeddings.api_key</code>).
 Switching embedding providers requires a re-index.</p>
 <h2 id="prices">Prices</h2>
-<p><code>prices</code> gives per-model prices per million tokens, so <code>QueryResult.usage</code>
-reports a <code>cost</code>:</p>
+<p>Every model call is priced, so <code>QueryResult.usage</code> reports a <code>cost</code>, from a
+dated price table the engine ships (<code>nl2sql/llm/prices.py</code>, USD per million
+tokens, each row with its source), with <code>prices</code> in the config adding a model
+or replacing a row (a negotiated rate, a fine-tune):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">prices</span><span class="p">:</span>
 <a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">gpt-4o</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> input</span><span class="p">:</span><span class="w"> </span><span class="nv">2.5</span><span class="p p-Indicator">,</span><span class="nt"> cached_input</span><span class="p">:</span><span class="w"> </span><span class="nv">1.25</span><span class="p p-Indicator">,</span><span class="nt"> output</span><span class="p">:</span><span class="w"> </span><span class="nv">10</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
-<p>Optional <code>cached_input</code> (cache reads) defaults to <code>input</code>; optional
-<code>cache_write</code> (cache writes) defaults to <code>input</code> times the wire's write
-premium: 1.25 for Claude (<code>provider: anthropic</code>, whose 5-minute cache write
-Anthropic bills at 1.25x input) and 1 for the OpenAI wire. The rest of the
-prompt is billed at <code>input</code>. With no price for a model, <code>QueryResult.usage</code>
-reports tokens only and <code>cost</code> is <code>null</code>. No prices are built in.</p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Input</th>
+<th>Cached input</th>
+<th>Cache write</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gpt-5.4</td>
+<td>2.50</td>
+<td>0.25</td>
+<td>2.50</td>
+<td>15.00</td>
+</tr>
+<tr>
+<td>gpt-5.4-mini</td>
+<td>0.75</td>
+<td>0.075</td>
+<td>0.75</td>
+<td>4.50</td>
+</tr>
+<tr>
+<td>claude-opus-5</td>
+<td>5.00</td>
+<td>0.50</td>
+<td>6.25</td>
+<td>25.00</td>
+</tr>
+<tr>
+<td>claude-sonnet-5</td>
+<td>2.00</td>
+<td>0.20</td>
+<td>2.50</td>
+<td>10.00</td>
+</tr>
+<tr>
+<td>claude-haiku-4-5</td>
+<td>1.00</td>
+<td>0.10</td>
+<td>1.25</td>
+<td>5.00</td>
+</tr>
+</tbody>
+</table>
+<p>The Claude rows match Anthropic's first-party prices, with the 5-minute
+cache write (1.25x input; the engine never asks for the 1-hour cache, which
+costs 2x). The OpenAI rows still need verifying against OpenAI's published
+prices (owner to confirm); put a row in <code>llm.prices</code> if yours differ.</p>
+<p>The table was checked on 2026-09-21; <code>engine.llm.prices()</code> returns it as the
+engine uses it, <code>llm.prices</code> applied: <code>checked_on</code>, and per model the four
+rates, <code>verified</code>, <code>source</code> (<code>table</code> or <code>config</code>) and <code>citation</code>.</p>
+<ul>
+<li><strong>Exact names, overrides first.</strong> A call is priced from <code>llm.prices</code> by the
+  model name the provider reports, then by the name configured, and only then
+  from the table, by either name. So a negotiated rate for a deployment alias
+  (<code>acme-gpt</code>) holds even when the provider reports a table model
+  (<code>gpt-5.4</code>), and a dated snapshot the provider reports
+  (<code>gpt-5.4-2026-03-05</code>) is priced by its configured name. Matches are exact:
+  <code>gpt-5.4</code> never prices <code>gpt-5.4-mini</code>. A rate is never negative.</li>
+<li><strong>Unknown is null, never zero.</strong> A model neither lists has a <code>null</code> cost,
+  and so does any total that includes one of its calls. A token count the
+  provider did not report (a cache read, reasoning tokens) is <code>null</code> too.</li>
+<li><strong>Each part at its own rate.</strong> Cache reads at <code>cached_input</code>, cache writes
+  at <code>cache_write</code>, the rest of the prompt at <code>input</code>, and the output,
+  reasoning tokens included, at <code>output</code>. In a <code>prices</code> row, <code>cached_input</code>
+  defaults to <code>input</code>, and <code>cache_write</code> to <code>input</code> times the wire's write
+  premium: 1.25 for Claude (<code>provider: anthropic</code>, whose 5-minute cache write
+  Anthropic bills at 1.25x input) and 1 for the OpenAI wire.</li>
+<li><strong>A cost cap needs prices.</strong> With
+  <a href="../settings/#per-question-caps"><code>settings.pipeline.max_cost_usd</code></a> set, every
+  model the <code>llm</code> section names must have a price, or the engine does not
+  build (a <code>ConfigError</code> naming each model, with the fix
+  <code>add llm.prices.&lt;model&gt;</code>); <code>engine.llm.replace</code> refuses such a model the
+  same way.</li>
+</ul>
 <h2 id="notes">Notes</h2>
 <ul>
 <li><code>agents</code> overrides give individual nodes, or indexing enrichment, their own

@@ -2204,6 +2204,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-question-caps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-question caps
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5076,6 +5093,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-question-caps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-question caps
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5185,8 +5219,8 @@ different settings.</p>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">strict_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">today</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">                 </span><span class="c1"># pin the run date: 2013-12-31</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">retries</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="nt"> base_delay_s</span><span class="p">:</span><span class="w"> </span><span class="nv">1.0</span><span class="p p-Indicator">,</span><span class="nt"> max_delay_s</span><span class="p">:</span><span class="w"> </span><span class="nv">10.0</span><span class="p p-Indicator">,</span><span class="nt"> jitter_s</span><span class="p">:</span><span class="w"> </span><span class="nv">0.5</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">max_llm_calls</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span><span class="w">           </span><span class="c1"># model calls per question; null: no cap</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># dollars per question; null: no cap</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">max_llm_calls</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span><span class="w">           </span><span class="c1"># model calls per question, parse retries included; null: no cap</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># dollars per question; null (the default): no cap</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">sanity_checks</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">retrieval</span><span class="p">:</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">full_snapshot_max_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span>
@@ -5284,12 +5318,12 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 <tr>
 <td><code>max_llm_calls</code></td>
 <td><code>60</code></td>
-<td>The most model calls one question may make, parse retries included; <code>null</code> turns the cap off. 60 covers the largest legitimate run. A run that reaches it ends with <code>status: "stopped"</code> and <code>QueryResult.stop</code>. Enforced from release 0.7's cost and caps work (<a href="../../architecture/wave_a/#5-cost-the-price-table-and-per-question-caps">Wave A</a>).</td>
+<td>The most model calls one question may make, parse retries included; <code>null</code> turns the cap off. 60 covers the largest legitimate run: the resolver, the decomposer, six sub-queries each with a planner call and three refiner and planner retries, the answer, and parse retries. See <a href="#per-question-caps">Per-question caps</a>.</td>
 </tr>
 <tr>
 <td><code>max_cost_usd</code></td>
 <td>none</td>
-<td>The most one question may spend, in dollars; <code>null</code> (the default) is no cap. With a cap set, every model the config names must have a price. Enforced as <code>max_llm_calls</code> is.</td>
+<td>The most one question may spend, in dollars; <code>null</code> (the default) is no cap. With a cap set, every model the <code>llm</code> section names must have a <a href="../llm/#prices">price</a>, or the engine does not build. See <a href="#per-question-caps">Per-question caps</a>.</td>
 </tr>
 <tr>
 <td><code>sanity_checks</code></td>
@@ -5298,6 +5332,23 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="per-question-caps">Per-question caps</h3>
+<p>Both caps are checked <strong>before each model call</strong>, by the question's budget:
+a call that would be the 61st, or that would start once the question has
+spent <code>max_cost_usd</code>, is never sent. The calls already in flight finish, so a
+question can pass the cost cap by the calls in flight: at most one per
+running sub-query.</p>
+<p>A question that reaches a cap ends with <code>status: "stopped"</code>, never as a
+planner error to retry: <code>QueryResult.stop</code> is <code>{limit, value, spent}</code>
+(<code>limit</code> is <code>max_llm_calls</code> or <code>max_cost_usd</code>), the one error is
+<code>RUN_LIMIT_REACHED</code> (not retryable) naming the limit and the setting, and the
+answer says so: "This question reached its limit of 60 model calls
+(settings.pipeline.max_llm_calls)." The run publishes <code>run.limit_reached</code>,
+which the caller's stream carries and the <a href="../observers/">audit log</a> records.</p>
+<p><code>nl2sql.limits.Budget(max_llm_calls=..., max_cost_usd=...)</code> is the same
+check for work that is not a question: make the model calls with
+<code>budget.callbacks()</code>, and a call over a cap raises <code>LimitReached</code> (with the
+<code>RunStop</code> in <code>.stop</code>) before it is sent.</p>
 <h2 id="retrieval"><code>retrieval</code></h2>
 <table>
 <thead>

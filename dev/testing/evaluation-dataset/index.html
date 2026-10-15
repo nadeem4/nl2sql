@@ -5373,8 +5373,8 @@ and runs through <a href="../../evals/"><code>engine.evals</code></a>.</p>
 <td>The regression gate's statistics: flips, McNemar's test, the checks</td>
 </tr>
 <tr>
-<td><code>packages/nl2sql/src/nl2sql/evaluation/prices.py</code></td>
-<td>The dated price table mode full bills every call from</td>
+<td><code>packages/nl2sql/src/nl2sql/llm/prices.py</code></td>
+<td>The dated price table every call, mode full's included, is billed from</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/records.py</code></td>
@@ -5739,8 +5739,9 @@ package:</p>
 </tbody>
 </table>
 <h3 id="cost-and-the-cap">Cost and the cap</h3>
-<p>Every LLM call is billed from <code>nl2sql/evaluation/prices.py</code>, a committed table
-of USD per 1M tokens, dated with the day it was checked:</p>
+<p>Every LLM call is billed from <code>nl2sql/llm/prices.py</code>, a committed table
+of USD per 1M tokens, dated with the day it was checked (an <code>llm.prices</code> row
+replaces a model's):</p>
 <table>
 <thead>
 <tr>

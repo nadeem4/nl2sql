@@ -4431,6 +4431,79 @@ model it would call has no price.</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built: the price table, cost and caps (E3)</p>
+<p><code>nl2sql/llm/prices.py</code> holds <code>PRICES_CHECKED_ON</code>, <code>PRICES</code> (the five
+rows moved unchanged), <code>ModelPrice</code> (a <code>NamedTuple</code>: <code>input</code>,
+<code>cached_input</code>, <code>cache_write</code>, <code>output</code>, <code>verified</code>, <code>source</code>; a config
+row has <code>source="config"</code> and may leave the two cache rates <code>None</code>),
+<code>price_for(model, overrides)</code> (the <code>llm.prices</code> row, else the table's, by
+exact name), <code>call_cost(price, *, input_tokens, output_tokens,
+cached_input_tokens=None, cache_write_input_tokens=None,
+cache_write_multiplier=1.0)</code> (None when the input or output count is
+unknown; a cache count not reported is not split out of input; a config
+row's missing <code>cache_write</code> is input times the wire's multiplier, so
+Anthropic's 1.25x from #193 holds) and <code>effective_prices(overrides)</code>.
+<code>evaluation/prices.py</code> is deleted with no alias; <code>evaluation/run.py</code>'s
+<code>check_prices(configs, prices=None)</code> and <code>question_cost(usage, cfg,
+prices=None)</code> take <code>llm.prices</code> as overrides (<code>run_evals</code> passes the
+engine's), and the <code>UnknownPriceError</code> fix names <code>llm.prices</code>.
+<code>TokenUsageCallback(prices=llm.prices)</code> prices every call with
+<code>price_for</code> by the served name, then the configured one, and gained
+<code>spent()</code> (the dollars of the calls with a known cost). <strong>Unknown counts
+are None, never 0</strong> (an owner requirement after the design): the wires'
+<code>usage()</code> takes <code>Optional</code> counts (<code>opt_int</code>, <code>sum_known</code> in
+<code>wires/base.py</code>; <code>as_int</code> is gone), so an unreported cache read, cache
+write (OpenAI reports none) or reasoning count is None, and a call with no
+usage (a failed call) has every count None and a null cost.
+<code>LLMCallUsage</code>, <code>UsageTotals</code> and the catalog's <code>LLMCall</code> and
+<code>UsageTotalsData</code> have <code>Optional[int]</code> token fields; a total is the sum
+of what was reported, None when nothing was; the otel observer skips a
+None count. <code>engine.llm.prices()</code> returns <code>{"checked_on", "models": {name:
+{input, cached_input, cache_write, output, verified, source, citation}}}</code>
+(<code>source</code> is <code>table</code> or <code>config</code>; <code>citation</code> the table row's source).
+<code>nl2sql/limits.py</code> holds <code>Budget</code>, <code>LimitReached</code>, <code>describe</code> and
+<code>stop_answer</code> beside <code>RunStop</code>. <code>Budget(max_llm_calls=None,
+max_cost_usd=None, usage=None, token=None, setting="settings.pipeline")</code>
+is a LangChain callback (<code>raise_error = True</code>): on <code>on_chat_model_start</code>
+and <code>on_llm_start</code> it refuses the call when the calls it let start have
+reached <code>max_llm_calls</code> or <code>usage.spent()</code> has reached <code>max_cost_usd</code>;
+on the first refusal it sets <code>budget.stop</code>, cancels every bound token
+with the <code>RunStop</code> (<code>CancellationToken.cancel(reason=None)</code> keeps the
+first reason in <code>token.reason</code>), publishes <code>run.limit_reached</code> through
+the module <code>publish</code> (nothing outside a run), and raises
+<code>LimitReached(stop, setting)</code> (not a <code>ValueError</code>, so the parse-retry
+loop never swallows it); every later call is refused with the same stop.
+<strong>Work that is not a question</strong> (Wave B's profiler, V3's seeding) opens
+its own <code>Budget(..., setting="evals")</code>, makes its calls with
+<code>budget.callbacks()</code> (the budget, then its usage collector), and reads
+<code>budget.stop</code> or catches <code>LimitReached</code>. <code>Budget.for_question(pipeline,
+usage)</code> is None when both caps are off. The budget reads the usage
+collector directly, not the <code>llm.call</code> events, because a budget outside
+a question has no scope to read events from (a difference from the file
+list's "usage collector on <code>llm.call</code>"). <code>QueryAPI.open_scope</code> attaches
+the question's budget after the <code>RunEvents</code>, so <code>scope.callbacks()</code> is
+the usage collector, the <code>RunEvents</code>, the budget, then anything attached
+later; <code>run_with_graph</code> binds every attached <code>Budget</code> to the run's token
+(<code>budget.bind(token)</code>), and a token cancelled with a <code>RunStop</code> maps to
+<code>_stopped</code>: <code>stop</code>, the one error <code>RUN_LIMIT_REACHED</code> ("The question
+reached its limit of 60 model calls (settings.pipeline.max_llm_calls)."),
+the answer "This question reached its limit of 60 model calls
+(settings.pipeline.max_llm_calls)." (or "its cost limit of $0.50
+(settings.pipeline.max_cost_usd)"), and the trace outcome <code>stopped</code>.
+<code>Runtime.components</code> and <code>Runtime.replace_llm</code> raise a <code>ConfigError</code> per
+unpriced model (<code>llm.model</code>, <code>llm.agents.&lt;agent&gt;.model</code>; a model object
+by its <code>model_name</code>) when <code>max_cost_usd</code> is set, with the fix
+<code>add llm.prices.&lt;model&gt; ...</code>. Tests: <code>tests/unit/test_cost_and_caps.py</code>.
+After review (PR #326): a call is priced by <code>price_for_call(served,
+configured, overrides)</code>, every <code>llm.prices</code> override (served name, then
+configured name) before the table for either name; <code>Price</code>'s four rates
+are <code>NonNegativeFloat</code>; a timeout that fires while a budget stop unwinds
+reports <code>stopped</code>; mode full counts a call with no token counts in
+<code>EvalReport.unknown_cost_calls</code> (new <code>unknown_cost_calls(usage)</code>, one
+warning per run) instead of adding 0; the OpenAI rows are marked for the
+owner to re-verify.</p>
+</div>
 <h2 id="6-hooks">6. Hooks</h2>
 <p>A hook is code the operator registers that sees a run at fixed points and
 may let it continue, change what it carries, stop it, or ask for approval.
