@@ -168,6 +168,9 @@ def test_shortlist_cuts_on_similarity_then_limit():
 
     assert [c.datasource_id for c in kept] == ["a"]
     assert dropped == [{"datasource_id": "b", "reason": "limit"}, {"datasource_id": "c", "reason": "floor"}]
+    # floor_ratio 0 keeps every candidate, even one with a negative similarity.
+    fused = fuse({"description": ["a", "b"]}, rrf_k=60, datasource_ids=["a", "b"], similarity={"a": 0.4, "b": -0.1})
+    assert [c.datasource_id for c in shortlist(fused, limit=5, floor_ratio=0.0)[0]] == ["a", "b"]
 
 
 # ------------------------------------------------------------ the retriever's five signals

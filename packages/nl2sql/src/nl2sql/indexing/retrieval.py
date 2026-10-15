@@ -93,14 +93,15 @@ def shortlist(fused: Sequence[RouteCandidate], limit: int,
     datasources every RRF score is within a few percent of the best, so a
     floor on it would never drop anything. A datasource whose best entry
     similarity is under ``floor_ratio`` times the most similar datasource's is
-    dropped (no floor when that similarity is not positive). Returns the kept
+    dropped (no floor when that similarity is not positive, or with
+    ``floor_ratio`` 0). Returns the kept
     candidates and, for the trace, each dropped datasource with why:
     ``floor`` or ``limit``.
     """
     if not fused:
         return [], []
     top = max(c.similarity for c in fused)
-    floor = floor_ratio * top if top > 0 else float("-inf")
+    floor = floor_ratio * top if top > 0 and floor_ratio > 0 else float("-inf")
     kept: List[RouteCandidate] = []
     dropped: List[Dict[str, str]] = []
     for candidate in fused:

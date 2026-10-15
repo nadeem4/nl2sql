@@ -1342,6 +1342,13 @@ it may pick several of the candidates, and the resolver forwards at most
       `datasource_top1_accuracy` 0.9535 (41 of 43 Chinook questions; the two
       misses went to `support`), over the demo's three datasources with the
       local embeddings.
+    - **Measured after the review (key-free, local embeddings).** Routing
+      top-1 over 79 questions across the demo's three datasources (the 43
+      Chinook gold questions, the 20 sample questions and 16 paraphrases
+      written for this check): 0.6 75/79; R1 before the review 62/79 (the
+      curated free vote sent 17 of the 20 support and webanalytics questions
+      to chinook); R1 after it 77/79. The expected datasource was among the
+      shortlisted candidates for all 79 in every version.
 
 ### Limits
 
