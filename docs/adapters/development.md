@@ -105,7 +105,8 @@ before it runs it. Reading a plan is the database's own, so the base has no
    driver's first line, `driver_message`) and a plan you cannot read
    alike: the engine's cost rule reads a `RuntimeError` as "no estimate",
    and the kit checks it. Never fall back to the operator's filtered
-   estimate.
+   estimate, and never report a statement the database gives no plan for
+   as zero rows: no plan is no estimate, so raise.
 5. Leave no session setting behind. A setting that changes what a query
    returns (SQL Server's `SHOWPLAN_XML`) must be turned off before the
    connection is closed: a driver's own pool can hand the session on.
@@ -272,7 +273,7 @@ seed. Without it, the two checks that need it are skipped.
 | Timeout | If `ENFORCES_TIMEOUT` is declared, `sleep_sql(5)` with a one-second limit fails within three seconds as `QUERY_TIMEOUT` |
 | Errors | A missing column is `retryable`; a permission error is not |
 | Streaming | If the adapter has `execute_batches`, its frames match `execute`'s result |
-| Estimates | If `ESTIMATES_COST` is declared: `estimate` returns `rows >= 0` and a `source`; an estimate of `sleep_sql(5)` returns within two seconds (it does not run the statement); a filter on an unindexed column of `kit_orders` that matches no row reports at least half the table's rows; a missing table raises `RuntimeError` |
+| Estimates | If `ESTIMATES_COST` is declared: `estimate` returns `rows >= 0` and a `source`; an estimate of `sleep_sql(5)` returns or raises `RuntimeError` within two seconds (it does not run the statement; a statement with no plan, such as SQL Server's `WAITFOR`, raises); a filter on an unindexed column of `kit_orders` that matches no row reports at least half the table's rows; a missing table raises `RuntimeError` |
 | Overlap | If the adapter has `probe_overlap`: `kit_orders.person_id` against `kit_people.id` samples 2 distinct values and matches 2; `kit_people.name` against `KitMixedCase.DisplayName` matches none |
 
 A capability you do not declare is not checked: its test is reported as

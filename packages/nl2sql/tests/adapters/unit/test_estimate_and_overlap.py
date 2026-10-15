@@ -262,3 +262,20 @@ def test_mssql_estimate_writes_parameters_as_literals():
     assert ":d" not in sql and ":name" not in sql and ":n" not in sql
     assert "'1900-01-01'" in sql and "'O''Brien; SET SHOWPLAN_XML OFF'" in sql and "n = 3" in sql
     assert adapter.inline_parameters("SELECT 1 AS one", {}) == "SELECT 1 AS one"
+
+
+def test_mssql_no_plan_is_an_error_not_zero_rows():
+    """No plan is no estimate: zero rows would let a cost rule treat the query as free."""
+    for empty in (None, "", _showplan("", cost="").replace("<StmtSimple><QueryPlan></QueryPlan></StmtSimple>", "")):
+        with pytest.raises(ValueError, match="no plan"):
+            read_showplan(empty)
+
+
+def test_duckdb_no_plan_raises(duck):
+    class NoRows:
+        def all(self):
+            return []
+
+    duck._run = lambda conn, sql, parameters: NoRows()
+    with pytest.raises(RuntimeError, match="could not estimate"):
+        duck.estimate("SELECT 1", {})

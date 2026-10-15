@@ -401,8 +401,13 @@ class AdapterConformance:
         assert estimate.rows is not None and estimate.rows >= 0, estimate
         assert estimate.source
 
+        # A statement the database gives no plan for (SQL Server's WAITFOR) raises: no plan is
+        # no estimate, never zero rows. Either way it must not run.
         start = time.perf_counter()
-        adapter.estimate(sleep_sql(5), {})
+        try:
+            adapter.estimate(sleep_sql(5), {})
+        except RuntimeError:
+            pass
         elapsed = time.perf_counter() - start
         assert elapsed < 2, f"the estimate took {elapsed:.1f}s: it ran the statement"
 

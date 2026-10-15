@@ -91,6 +91,8 @@ class DuckdbAdapter(SQLAlchemyAdapter):
             with self.engine.connect() as conn:
                 explained = self._run(conn, f"EXPLAIN (FORMAT JSON) {sql}", parameters).all()
                 nodes = [node for _, plan in explained for node in _nodes(json.loads(plan))]
+                if not nodes:
+                    raise ValueError("DuckDB returned no plan")
                 sizes = {(database, schema, table): rows for database, schema, table, rows in conn.execute(text(
                     "SELECT database_name, schema_name, table_name, estimated_size FROM duckdb_tables()"))}
             rows = 0

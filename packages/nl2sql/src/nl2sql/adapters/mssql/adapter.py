@@ -142,7 +142,7 @@ class MssqlAdapter(SQLAlchemyAdapter):
                         conn.exec_driver_sql("SET SHOWPLAN_XML OFF")
                     finally:
                         conn.invalidate()
-            rows, cost, uncounted = read_showplan(plan) if plan else (0, None, [])
+            rows, cost, uncounted = read_showplan(plan)
             if uncounted:
                 with self.engine.connect() as conn:
                     for schema in {schema for schema, _, _ in uncounted}:
@@ -212,9 +212,14 @@ class MssqlAdapter(SQLAlchemyAdapter):
 def read_showplan(plan: str) -> Tuple[int, Optional[float], List[Tuple[str, str, float]]]:
     """``(rows read, cost, (schema, table, executions) of each scan whose rows the plan does not give)`` of a showplan.
 
-    Raises ``ElementTree.ParseError``, ``KeyError`` or ``AttributeError`` on a plan it cannot read.
+    Raises ``ValueError`` when there is no plan (no estimate is never zero rows), and
+    ``ElementTree.ParseError``, ``KeyError`` or ``AttributeError`` on a plan it cannot read.
     """
+    if not plan:
+        raise ValueError("SQL Server returned no plan")
     root = ElementTree.fromstring(plan)
+    if next(root.iter(f"{_SHOWPLAN}StmtSimple"), None) is None:
+        raise ValueError("SQL Server returned no plan for a statement")
     costs = []
     for statement in root.iter(f"{_SHOWPLAN}StmtSimple"):
         cost = statement.get("StatementSubtreeCost")

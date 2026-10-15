@@ -1082,7 +1082,10 @@ missing table raises.
     `timeout_ms`), with `parameters` bound as `execute` binds them. Every
     failure raises `RuntimeError`: the database's, with the driver's first
     line, and a plan the adapter cannot read, with the error's class. None
-    falls back to an operator's filtered estimate. The table above holds,
+    falls back to an operator's filtered estimate, and none reports a
+    statement with no plan (SQL Server's `WAITFOR`, a parameterized RPC) as
+    zero rows: no plan is no estimate, which the cost rule's `unknown`
+    decides. The kit's `sleep_sql` check accepts that `RuntimeError`. The table above holds,
     with these details:
 
     - **Per execution.** Scan rows are per execution, so the inner side of a
