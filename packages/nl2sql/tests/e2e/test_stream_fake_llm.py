@@ -20,11 +20,13 @@ from .test_result_paging_fake_llm import _env  # noqa: E402
 
 
 def parse_sse(text):
+    """Each event's name and its ``data``; the SSE ``data`` line is the whole event."""
     events = []
     for block in text.replace("\r\n", "\n").split("\n\n"):
         fields = dict(line.split(": ", 1) for line in block.split("\n") if ": " in line)
         if "data" in fields:
-            events.append((fields.get("event", "message"), json.loads(fields["data"])))
+            event = json.loads(fields["data"])
+            events.append((event["name"], event["data"]))
     return events
 
 
@@ -44,23 +46,26 @@ def _comparable(body):
 def _check_progress(events):
     """What a streamed run reports, in the order it must report it."""
     names = [name for name, _ in events]
-    started = [d["node"] for n, d in events if n == "node_started"]
-    finished = [d["node"] for n, d in events if n == "node_finished"]
+    assert names[0] == "run.started"
+    started = [d["node"] for n, d in events if n == "node.started"]
+    finished = [d["node"] for n, d in events if n == "node.finished"]
     assert started[0] == "datasource_resolver"
     for step in ("decomposer", "ast_planner", "logical_validator", "generator", "executor", "aggregator",
                  "answer_synthesizer"):
         assert step in started and step in finished, step
-    manifest = names.index("result_manifest")
+    manifest = names.index("result.manifest")
     # The rows can load before the answer is written.
-    answer_starts = [i for i, (n, d) in enumerate(events) if n == "node_started" and d["node"] == "answer_synthesizer"]
+    answer_starts = [i for i, (n, d) in enumerate(events) if n == "node.started" and d["node"] == "answer_synthesizer"]
     assert manifest < answer_starts[0]
-    deltas = [d for n, d in events if n == "answer_delta"]
+    deltas = [d for n, d in events if n == "answer.delta"]
     assert len([d for d in deltas if d["field"] == "summary"]) > 2
     assert "".join(d["text"] for d in deltas if d["field"] == "summary") == ANSWER["summary"]
     assert "".join(d["text"] for d in deltas if d["field"] == "content") == ANSWER["content"]
-    assert names[-1] == "final" and names.count("final") == 1 and "error" not in names
-    final = events[-1][1]
-    assert events[manifest][1]["trace_id"] == final["trace_id"]
+    assert names[-1] == "run.finished" and names.count("run.finished") == 1 and "run.failed" not in names
+    # Never operator data on the caller's stream (D17).
+    assert not set(names) & {"policy.decision", "hook.decision", "llm.call", "plan_cache.lookup"}
+    final = events[-1][1]["result"]
+    assert events[-1][1]["status"] == final["status"]
     assert events[manifest][1]["results"] == final["result_manifest"]
     return final
 
@@ -73,10 +78,12 @@ def test_the_engine_streams_a_run_that_ends_as_run_query_ends(demo_project, fake
     _env(monkeypatch, demo_project, env)
     admin = UserContext(roles=["admin"])
     engine = NL2SQL.from_config()
-    events = [(e.type, e.data) for e in engine.stream_query(QUESTION, user_context=admin)]
+    streamed = list(engine.stream_query(QUESTION, user_context=admin))
     plain = engine.run_query(QUESTION, user_context=admin).model_dump(mode="json")
 
-    final = _check_progress(events)
+    final = _check_progress([(e.name, e.data) for e in streamed])
+    # Every event is this run's; the manifest's trace_id is the request_id the result routes take.
+    assert {e.trace_id for e in streamed} == {final["trace_id"]}
     assert final["status"] == "success", final["errors"]
     assert _comparable(final) == _comparable(plain)
     # Only the answer model was asked to stream.
@@ -156,11 +163,12 @@ def test_every_guided_question_replays_when_streamed_with_no_key(demo_project, t
         client = TestClient(app, base_url="http://demo.example:7860")
         for question in DEMO_QUESTIONS:
             events = parse_sse(client.post("/api/ask/stream", json={"question": question, "role": "admin"}).text)
-            finals[question] = (events[-1], [n for n, _ in events].count("answer_delta"))
+            name, data = events[-1]
+            finals[question] = ((name, data.get("result", data)), [n for n, _ in events].count("answer.delta"))
     finally:
         replay.stop()
 
-    missed = [q for q, ((name, body), _) in finals.items() if name != "final" or body["replay_miss"]]
+    missed = [q for q, ((name, body), _) in finals.items() if name != "run.finished" or body["replay_miss"]]
     assert not missed, missed
     failed = {q: body["errors"] for q, ((_, body), _) in finals.items() if body["status"] != "success"}
     assert not failed, failed

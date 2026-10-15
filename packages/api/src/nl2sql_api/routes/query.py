@@ -1,10 +1,11 @@
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import iterate_in_threadpool
 from typing import Annotated
-from nl2sql import CancellationToken, QueryEvent, ResultNotFound, ResultPage, UserContext
+from nl2sql import CancellationToken, Event, ResultNotFound, ResultPage, UserContext
 from nl2sql_api import auth
 from nl2sql_api.models.query import QueryRequest, QueryResponse
 from nl2sql_api.dependencies import get_query_service
@@ -54,8 +55,11 @@ def execute_query(
 # hold every event back until the run ends.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
-_STREAM_FAILED = QueryEvent(type="error", data={"message": "Failed to execute query.",
-                                                "error_code": "UNKNOWN_ERROR"})
+
+
+def _stream_failed() -> Event:
+    return Event(name="run.failed", at=datetime.now(timezone.utc),
+                 data={"message": "Failed to execute query.", "error_code": "UNKNOWN_ERROR"})
 
 
 @router.post(
@@ -64,23 +68,28 @@ _STREAM_FAILED = QueryEvent(type="error", data={"message": "Failed to execute qu
     response_class=StreamingResponse,
     responses={
         200: {"content": {"text/event-stream": {}},
-              "description": "Server-Sent Events: `node_started`, `node_finished`, `result_manifest`, "
-                             "`answer_delta`, then one `final` (the `/query` response) or `error`."},
+              "description": "Server-Sent Events, the engine's run events: `run.started`, "
+                             "`node.started`, `node.finished`, `result.manifest`, `answer.delta`, "
+                             "`sanity.flagged`, `run.limit_reached`, then one `run.finished` (its "
+                             "`data.result` is the `/query` response) or `run.failed`."},
         401: {"description": "No role for this request (see the auth settings)."},
     },
 )
 def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller):
     """The same run as `POST /query`, reported as it happens, as Server-Sent Events.
 
-    Each event's `data` is one JSON object: `node_started` (`node`) and
-    `node_finished` (`node`, `seconds`, `ok`) per pipeline step;
-    `result_manifest` (`trace_id`, `results`) as soon as the results are saved,
-    so a client can start paging them; `answer_delta` (`field`: `summary` or
-    `content`, `text`) as the answer model writes; then exactly one of `final`,
-    whose data is the `/query` response, or `error` (`message`, `error_code`)
-    when the run could not finish. A refusal or a provider error is a `final`
-    with `status: "error"`, as `/query` returns it. Same body and auth as
-    `/query`; closing the connection cancels the run before its next step.
+    Each SSE `event` is the event's name and its `data` line the whole event as
+    JSON (`name`, `at`, `trace_id`, `tenant_id`, `data`): `run.started`;
+    `node.started` (`node`, `sub_query_id`) and `node.finished` (plus `seconds`,
+    `ok`) per pipeline step; `result.manifest` (`results`) as soon as the results
+    are saved, so a client can start paging them with the event's `trace_id`;
+    `answer.delta` (`field`: `summary` or `content`, `text`) as the answer model
+    writes; `sanity.flagged` and `run.limit_reached`; then exactly one of
+    `run.finished`, the run's summary whose `data.result` is the `/query`
+    response, or `run.failed` (`message`, `error_code`) when the run could not
+    finish. A refusal or a provider error is a `run.finished` with
+    `status: "error"`, as `/query` returns it. Same body and auth as `/query`;
+    closing the connection cancels the run before its next step.
     """
     token = CancellationToken()
 
@@ -90,7 +99,7 @@ def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller)
                 yield event.sse()
         except Exception:
             logger.exception("Unexpected failure while streaming a query")
-            yield _STREAM_FAILED.sse()
+            yield _stream_failed().sse()
 
     async def body():
         try:

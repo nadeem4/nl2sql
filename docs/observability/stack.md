@@ -13,7 +13,7 @@ Read the scope literally, because it is narrow:
   the demo playground. See [the query API](../api/core/query.md#usage-tokens-calls-and-model-time).
 - **The token counter is recorded on every run; the node-duration histogram is
   CLI-only.** `TokenUsageCallback` records `nl2sql.token.usage` for every
-  caller. `nl2sql run` records `nl2sql.node.duration` from the `node_finished`
+  caller. `nl2sql run` records `nl2sql.node.duration` from the `node.finished`
   events of `engine.stream_query`, the same events any caller can read.
 - **Metrics are off by default.** `OBSERVABILITY_EXPORTER` defaults to `none`,
   which installs no meter provider, so every recording is discarded. The
@@ -39,7 +39,7 @@ sequenceDiagram
     Pipeline->>Usage: always attached
     Usage->>Metrics: nl2sql.token.usage
     Usage->>Result: usage
-    Pipeline->>Stream: node_started, node_finished
+    Pipeline->>Stream: node.started, node.finished
     Stream->>Run: each event
     Run->>Metrics: configure_metrics(), nl2sql.node.duration
 ```

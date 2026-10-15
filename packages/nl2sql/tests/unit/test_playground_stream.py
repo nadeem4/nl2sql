@@ -2,9 +2,11 @@
 
 The same rules as ``/api/ask`` -- the hosted key and limits, replay, the
 replay-miss rewrite, feedback's record of the run -- with the run reported as
-it happens. The ``final`` event's data is exactly what ``/api/ask`` returns.
+it happens, as the engine's ``Event``\ s. The ``run.finished`` event's
+``data.result`` is exactly what ``/api/ask`` returns.
 """
 import json
+from datetime import datetime, timezone
 
 import pytest
 import yaml
@@ -12,7 +14,7 @@ import yaml
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
-from nl2sql import NL2SQL, QueryEvent
+from nl2sql import NL2SQL, Event
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.api.query_api import QueryResult, SubQueryResult
 from nl2sql.cli.demo.playground.app import REPLAY_MISS_MESSAGE, build_app
@@ -23,12 +25,19 @@ VISITOR_KEY = "-".join(["sk", "proj", "streamvisitor" + "c" * 24 + "2e8a"])
 
 
 def parse_sse(text):
+    """Each event's name and its ``data`` (the SSE ``data`` line is the whole event)."""
     events = []
     for block in text.replace("\r\n", "\n").split("\n\n"):
         fields = dict(line.split(": ", 1) for line in block.split("\n") if ": " in line)
         if "data" in fields:
-            events.append((fields.get("event", "message"), json.loads(fields["data"])))
+            event = json.loads(fields["data"])
+            assert event["name"] == fields.get("event")
+            events.append((event["name"], event["data"]))
     return events
+
+
+def _event(name, **data):
+    return Event(name=name, at=datetime.now(timezone.utc), trace_id="t-1", data=data)
 
 
 class _Engine(NL2SQL):
@@ -57,10 +66,11 @@ class _Engine(NL2SQL):
     def stream_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                      cancellation_token=None):
         self.seen.append(("stream", current_api_key(), user_context.roles))
-        yield QueryEvent(type="node_started", data={"node": "decomposer"})
-        yield QueryEvent(type="node_finished", data={"node": "decomposer", "seconds": 0.01, "ok": True})
-        yield QueryEvent(type="answer_delta", data={"field": "summary", "text": "One "})
-        yield QueryEvent(type="final", data=self.result.model_dump(mode="json"))
+        yield _event("run.started", question=natural_language)
+        yield _event("node.started", node="decomposer", sub_query_id=None)
+        yield _event("node.finished", node="decomposer", sub_query_id=None, seconds=0.01, ok=True)
+        yield _event("answer.delta", field="summary", text="One ")
+        yield _event("run.finished", status=self.result.status, result=self.result.model_dump(mode="json"))
 
 
 def _app(engine, **kwargs):
@@ -84,8 +94,9 @@ def test_the_stream_reports_the_run_and_ends_in_what_ask_returns():
     assert reply.headers["content-type"].startswith("text/event-stream")
     assert reply.headers["cache-control"] == "no-cache"
     events = parse_sse(reply.text)
-    assert [name for name, _ in events] == ["node_started", "node_finished", "answer_delta", "final"]
-    final = events[-1][1]
+    assert [name for name, _ in events] == ["run.started", "node.started", "node.finished", "answer.delta",
+                                            "run.finished"]
+    final = events[-1][1]["result"]
     asked = client.post("/api/ask", json={"question": "q1", "role": "viewer"}).json()
     assert final == asked
     assert final["replay_miss"] is False and final["recorded"] is False
@@ -98,15 +109,15 @@ def test_a_streamed_replay_miss_is_rewritten_as_ask_rewrites_it():
         "error_code": "ORCHESTRATOR_CRASH", "severity": "ERROR"}])
     client = _app(_Engine(missing), mode="replay")
 
-    final = parse_sse(_stream(client).text)[-1]
+    name, final = parse_sse(_stream(client).text)[-1]
 
-    assert final[0] == "final"
-    assert final[1]["replay_miss"] is True
-    assert [e["message"] for e in final[1]["errors"]] == [REPLAY_MISS_MESSAGE]
-    assert "fake llm" not in json.dumps(final[1])
+    assert name == "run.finished"
+    assert final["result"]["replay_miss"] is True
+    assert [e["message"] for e in final["result"]["errors"]] == [REPLAY_MISS_MESSAGE]
+    assert "fake llm" not in json.dumps(final)
 
 
-def test_a_run_that_breaks_ends_in_an_error_event():
+def test_a_run_that_breaks_ends_in_a_run_failed_event():
     class _Broken(_Engine):
         def stream_query(self, *args, **kwargs):
             raise RuntimeError("boom")
@@ -114,8 +125,8 @@ def test_a_run_that_breaks_ends_in_an_error_event():
 
     events = parse_sse(_stream(_app(_Broken())).text)
 
-    assert events == [("error", {"message": "The question could not be answered: boom",
-                                 "error_code": "UNKNOWN_ERROR"})]
+    assert events == [("run.failed", {"message": "The question could not be answered: boom",
+                                      "error_code": "UNKNOWN_ERROR"})]
 
 
 @pytest.fixture
@@ -167,9 +178,9 @@ def test_hosted_without_a_key_an_unrecorded_question_misses_without_running(proj
 
     events = parse_sse(_stream(client, question="Something nobody recorded").text)
 
-    assert [name for name, _ in events] == ["final"]
-    assert events[0][1]["replay_miss"] is True
-    assert [e["message"] for e in events[0][1]["errors"]] == [REPLAY_MISS_MESSAGE]
+    assert [name for name, _ in events] == ["run.finished"]
+    assert events[0][1]["result"]["replay_miss"] is True
+    assert [e["message"] for e in events[0][1]["result"]["errors"]] == [REPLAY_MISS_MESSAGE]
     assert engine.seen == []
 
 
@@ -177,7 +188,7 @@ def test_hosted_without_a_key_a_recorded_question_streams_its_recording(project)
     engine = _Engine()
     client = _hosted(engine, project, recorded=["q1"])
 
-    final = parse_sse(_stream(client, question="q1").text)[-1][1]
+    final = parse_sse(_stream(client, question="q1").text)[-1][1]["result"]
 
     assert final["recorded"] is True and final["replay_miss"] is False
     assert engine.seen[0][0] == "stream"

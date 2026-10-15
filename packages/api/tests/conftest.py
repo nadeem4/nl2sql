@@ -35,19 +35,26 @@ class StubEngine:
 
     def stream_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                      cancellation_token=None):
-        """The run as events: one per node, then ``final`` with ``run_query``'s result."""
-        from nl2sql import QueryEvent
+        """The run as events: one per node, then ``run.finished`` with ``run_query``'s result."""
+        from datetime import datetime, timezone
+
+        from nl2sql import Event
+
+        def event(name, **data):
+            return Event(name=name, at=datetime.now(timezone.utc), trace_id="trace-123", data=data)
 
         self.calls.append({"natural_language": natural_language, "datasource_id": datasource_id,
                            "execute": execute, "user_context": user_context, "stream": True,
                            "cancellation_token": cancellation_token})
         if isinstance(self.run_query_result, Exception):
             raise self.run_query_result
-        yield QueryEvent(type="node_started", data={"node": "decomposer"})
-        yield QueryEvent(type="node_finished", data={"node": "decomposer", "seconds": 0.1, "ok": True})
-        yield QueryEvent(type="answer_delta", data={"field": "summary", "text": "Revenue "})
-        yield QueryEvent(type="final", data=(self.run_query_result.model_dump(mode="json")
-                                             if self.run_query_result is not None else {}))
+        yield event("run.started", question=natural_language)
+        yield event("node.started", node="decomposer", sub_query_id=None)
+        yield event("node.finished", node="decomposer", sub_query_id=None, seconds=0.1, ok=True)
+        yield event("answer.delta", field="summary", text="Revenue ")
+        result = self.run_query_result
+        yield event("run.finished", status=getattr(result, "status", None),
+                    result=result.model_dump(mode="json") if result is not None else {})
 
 
 @pytest.fixture

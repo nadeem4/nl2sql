@@ -43,9 +43,10 @@ def _claude(server):
 
 def _ask(chain):
     seen, usage = [], TokenUsageCallback()
+    run_events = RunEvents(lambda name, data: seen.append((name, data)))
     answer = chain.invoke({"q": "Which genre sells the most tracks?"},
-                          config={"callbacks": [RunEvents(seen.append), usage], "metadata": ANSWER_NODE})
-    return answer, [e.data for e in seen if e.type == "answer_delta"], usage.usage()
+                          config={"callbacks": [run_events, usage], "metadata": ANSWER_NODE})
+    return answer, [data for name, data in seen if name == "answer.delta"], usage.usage()
 
 
 @pytest.mark.parametrize("client", [_openai, _claude], ids=["openai", "anthropic"])

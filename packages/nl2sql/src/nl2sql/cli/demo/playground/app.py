@@ -76,6 +76,7 @@ import asyncio
 import pathlib
 import re
 import threading
+from datetime import datetime, timezone
 from collections import OrderedDict
 from importlib.resources import files
 from typing import Any, Dict, List, Literal, Optional, Union
@@ -87,7 +88,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken, QueryEvent, QueryResult, ResultNotFound, UserContext
+from nl2sql import CancellationToken, Event, QueryResult, ResultNotFound, UserContext
 
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted, Replay
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
@@ -117,6 +118,11 @@ def _replay_miss() -> Dict[str, Any]:
     body = QueryResult(status="error", errors=[dict(REPLAY_MISS_ERROR)]).model_dump(mode="json")
     body.update(replay_miss=True, recorded=False)
     return body
+
+
+def _run_event(name: str, data: Dict[str, Any]) -> Event:
+    """A run's terminal event the page makes itself: a replay miss that never ran, or a broken run."""
+    return Event(name=name, at=datetime.now(timezone.utc), data=data)
 
 
 # A proxy (the Space's) buffers a response unless told not to, which would hold
@@ -539,22 +545,24 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
 
     @app.post("/api/ask/stream")
     async def ask_stream(req: AskRequest, request: Request, response: Response) -> StreamingResponse:
-        # `/api/ask`, reported as it runs (``engine.stream_query``): each step
-        # as it starts and ends, the result manifest, the answer as it is
-        # written, then `final` with exactly what `/api/ask` returns, or
-        # `error`. A refusal comes before the stream, with the same status
-        # and sentence as `/api/ask`. The run's thread hands each event to
+        # `/api/ask`, reported as it runs (``engine.stream_query``'s events):
+        # each step as it starts and ends, the result manifest, the answer as
+        # it is written, then `run.finished`, whose `data.result` is exactly
+        # what `/api/ask` returns, or `run.failed`. A refusal comes before
+        # the stream, with the same status and sentence as `/api/ask`. The
+        # run's thread hands each event to
         # the event loop; a client that goes away (the page's Stop) ends the
         # response, which cancels the run.
         llms, replaying, miss = start_question(req, request, response)
         cookies = [(k, v) for k, v in response.headers.raw if k.lower() == b"set-cookie"]
         if miss is not None:
-            return _event_stream(iter([QueryEvent(type="final", data=miss).sse()]), cookies)
+            return _event_stream(iter([_run_event("run.finished", {"status": "error", "result": miss}).sse()]),
+                                 cookies)
         token = CancellationToken()
         loop = asyncio.get_running_loop()
-        events: "asyncio.Queue[Optional[QueryEvent]]" = asyncio.Queue()
+        events: "asyncio.Queue[Optional[Event]]" = asyncio.Queue()
 
-        def hand_over(event: Optional[QueryEvent]) -> None:
+        def hand_over(event: Optional[Event]) -> None:
             try:
                 loop.call_soon_threadsafe(events.put_nowait, event)
             except RuntimeError:  # the server is shutting down; nobody is reading
@@ -569,7 +577,7 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
                     ):
                         hand_over(event)
             except Exception as exc:
-                hand_over(QueryEvent(type="error", data={
+                hand_over(_run_event("run.failed", {
                     "message": f"The question could not be answered: {exc}", "error_code": "UNKNOWN_ERROR"}))
             finally:
                 hand_over(None)
@@ -578,8 +586,9 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             asyncio.ensure_future(run_in_threadpool(run))
             try:
                 while (event := await events.get()) is not None:
-                    if event.type == "final":
-                        event = QueryEvent(type="final", data=finish_question(req, event.data, replaying))
+                    if event.name == "run.finished":
+                        event = event.model_copy(update={"data": {
+                            **event.data, "result": finish_question(req, event.data["result"], replaying)}})
                     yield event.sse()
             finally:
                 # The client went away, or the run is over: stop it before its next step.

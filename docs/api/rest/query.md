@@ -197,44 +197,49 @@ The same run as `POST /api/v1/query`, reported as it happens, as
 are exactly those of `/query`. Delegates to `engine.stream_query(...)` (see
 [the core query API](../core/query.md#streaming-a-run)).
 
-Each event is an `event:` line naming its type and one `data:` line of JSON:
+The events are the engine's own run events
+([Events](../../observability/events.md)), from the caller-safe allow-list. Each
+is an `event:` line naming it and one `data:` line holding the whole event as
+JSON: `name`, `at` (UTC), `trace_id` (the run's, its `request_id` for the result
+routes), `tenant_id` and `data`. The table lists each event's `data`:
 
 | event | data | when |
 | --- | --- | --- |
-| `node_started` | `node` | A pipeline step began. The SQL agent's steps (`ast_planner`, `logical_validator`, `generator`, `executor`) come once per sub-query, and again on a retry. |
-| `node_finished` | `node`, `seconds`, `ok` | The step ended; `ok` is `false` when it raised. |
-| `result_manifest` | `trace_id`, `results` | The aggregator saved the run's results. `results` is the `result_manifest` the final response will carry, so a client can start paging the rows (with `trace_id` as `request_id`) before the answer is written. |
-| `answer_delta` | `field`, `text` | The next piece of the answer's `summary` or `content`, as the answer model writes it. Joined in order, the pieces of a field are that field of `final_answer`. |
-| `final` | the `QueryResponse` | The last event of a run that finished: exactly what `/query` returns for it. A refusal or a provider failure is a `final` with `status: "error"`, as `/query` returns it. |
-| `error` | `message`, `error_code` | The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server). |
+| `run.started` | `question`, `user_id`, `tenant_id`, `roles`, `datasource_id`, `execute` | The run began. Always first. |
+| `node.started` | `node`, `sub_query_id` | A pipeline step began. The SQL agent's steps (`ast_planner`, `logical_validator`, `generator`, `executor`) come once per sub-query, and again on a retry. |
+| `node.finished` | `node`, `sub_query_id`, `seconds`, `ok` | The step ended; `ok` is `false` when it raised. |
+| `result.manifest` | `results` | The aggregator saved the run's results. `results` is the `result_manifest` the final response will carry, so a client can start paging the rows (with the event's `trace_id` as `request_id`) before the answer is written. |
+| `answer.delta` | `field`, `text` | The next piece of the answer's `summary` or `content`, as the answer model writes it. Joined in order, the pieces of a field are that field of `final_answer`. |
+| `sanity.flagged`, `run.limit_reached` | see [Events](../../observability/events.md) | A sanity check's finding; a cost or call cap reached. |
+| `run.finished` | the run's summary, plus `result`: the `QueryResponse` | The last event of a run that finished: `result` is exactly what `/query` returns for it. A refusal or a provider failure is a `run.finished` with `status: "error"`, as `/query` returns it. |
+| `run.failed` | `message`, `error_code` | The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server). |
 
-Every stream ends in exactly one `final` or one `error`.
+Every stream ends in exactly one `run.finished` or one `run.failed`. Policy
+denials, hook decisions and model calls are never on it; they are an
+operator's, through `engine.events.subscribe`.
 
 ```text
-event: node_started
-data: {"node": "datasource_resolver"}
+event: run.started
+data: {"name": "run.started", "at": "2026-10-15T09:12:03.120Z", "trace_id": "0f1c...", "tenant_id": null, "data": {"question": "Who are the top 5 customers by revenue?", ...}}
 
-event: node_finished
-data: {"node": "datasource_resolver", "seconds": 0.41, "ok": true}
+event: node.started
+data: {"name": "node.started", ..., "data": {"node": "datasource_resolver", "sub_query_id": null}}
 
-...
-
-event: result_manifest
-data: {"trace_id": "0f1c...", "results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false}]}
-
-event: node_started
-data: {"node": "answer_synthesizer"}
-
-event: answer_delta
-data: {"field": "summary", "text": "Acme leads "}
-
-event: answer_delta
-data: {"field": "summary", "text": "the top 5 customers"}
+event: node.finished
+data: {"name": "node.finished", ..., "data": {"node": "datasource_resolver", "sub_query_id": null, "seconds": 0.41, "ok": true}}
 
 ...
 
-event: final
-data: {"sub_queries": [...], "final_answer": {...}, "status": "success", ...}
+event: result.manifest
+data: {"name": "result.manifest", ..., "trace_id": "0f1c...", "data": {"results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false}]}}
+
+event: answer.delta
+data: {"name": "answer.delta", ..., "data": {"field": "summary", "text": "Acme leads "}}
+
+...
+
+event: run.finished
+data: {"name": "run.finished", ..., "data": {"status": "success", "duration_s": 6.2, ..., "result": {"sub_queries": [...], "final_answer": {...}, "status": "success", ...}}}
 ```
 
 ```bash
@@ -249,10 +254,10 @@ OpenAI's (OpenAI, OpenRouter, Ollama and any OpenAI-compatible endpoint) streams
 the answer's tool call as argument pieces, Anthropic's as `input_json_delta`
 pieces, and the engine reads `summary` and `content` out of them as they grow.
 How finely the text arrives is the provider's choice: a provider or a local
-server that sends the whole answer in one piece gives one `answer_delta` per
+server that sends the whole answer in one piece gives one `answer.delta` per
 field. The other model steps (resolver, decomposer, planner, refiner) return a
 typed object the next step needs whole, so they are not streamed; their progress
-is their `node_started` and `node_finished`. A streamed answer reports the same
+is their `node.started` and `node.finished`. A streamed answer reports the same
 token usage as an unstreamed one (`stream_options.include_usage` is sent on the
 OpenAI wire).
 
@@ -319,6 +324,6 @@ network access is required. `packages/api/tests/test_auth.py` covers the role
 sources and the 401.
 
 `packages/api/tests/test_query_stream_route.py` covers the stream route the same
-way: the content type, the events in order, a `final` equal to the `/query`
-response, the 401 and the `error` event. `packages/nl2sql/tests/e2e/test_stream_fake_llm.py`
+way: the content type, the events in order, a `run.finished` whose `result` equals
+the `/query` response, the 401 and the `run.failed` event. `packages/nl2sql/tests/e2e/test_stream_fake_llm.py`
 streams a question on the demo databases through this route with no key.

@@ -19,9 +19,10 @@ def run_pipeline(
 ) -> None:
     """Runs one question through ``engine`` and prints what it did.
 
-    The live status follows the run's ``node_started`` events; ``--show-perf``
-    is the time of each step from its ``node_finished`` event. Exits 1 when the
-    run could not finish, or finished with a blocking error.
+    The live status follows the run's ``node.started`` events; ``--show-perf``
+    is the time of each step from its ``node.finished`` event; the result is
+    ``run.finished``'s ``data.result``. Exits 1 when the run could not finish
+    (``run.failed``), or finished with a blocking error.
     """
     if not config.query:
         return
@@ -41,15 +42,15 @@ def run_pipeline(
     try:
         for event in engine.stream_query(config.query, datasource_id=config.ds_id,
                                          execute=not config.no_exec, user_context=user_context):
-            if event.type == "node_started":
+            if event.name == "node.started":
                 presenter.update_interactive_status(f"Running {event.data.get('node')}...")
-            elif event.type == "node_finished":
+            elif event.name == "node.finished":
                 step = (str(event.data.get("node")), float(event.data.get("seconds") or 0.0),
                         bool(event.data.get("ok", True)))
                 steps.append(step)
-            elif event.type == "final":
-                result = QueryResult.model_validate(event.data)
-            elif event.type == "error":
+            elif event.name == "run.finished":
+                result = QueryResult.model_validate(event.data["result"])
+            elif event.name == "run.failed":
                 failure = event.data.get("message")
     finally:
         presenter.stop_interactive_status()

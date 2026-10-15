@@ -113,14 +113,16 @@ combined result is listed in `result_manifest` and read back by the run's
 ### NL2SQL.stream_query
 
 Source:
-`packages/nl2sql/src/nl2sql/api/query_api.py`, events in
-`packages/nl2sql/src/nl2sql/pipeline/events.py`
+`packages/nl2sql/src/nl2sql/api/query_api.py`, step events in
+`packages/nl2sql/src/nl2sql/pipeline/events.py`, the allow-list in
+`packages/nl2sql/src/nl2sql/events/catalog.py`
 
 Signature:
-`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> Iterator[QueryEvent]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None) -> Iterator[Event]`
 
-The same run as `run_query`, with the same parameters, yielded as it happens.
-`nl2sql run` shows its live progress from these events.
+The same run as `run_query`, with the same parameters, yielded as it happens:
+the run's own events on the engine's bus ([Events](../../observability/events.md)),
+from the caller-safe allow-list. `nl2sql run` shows its live progress from them.
 
 ```python
 from nl2sql import NL2SQL, UserContext
@@ -128,43 +130,54 @@ from nl2sql import NL2SQL, UserContext
 engine = NL2SQL.from_config("nl2sql.yaml")
 for event in engine.stream_query("Which genre sells the most tracks?",
                                  user_context=UserContext(roles=["admin"])):
-    if event.type == "node_finished":
+    if event.name == "node.finished":
         print(f"{event.data['node']} took {event.data['seconds']} s")
-    elif event.type == "answer_delta" and event.data["field"] == "summary":
+    elif event.name == "answer.delta" and event.data["field"] == "summary":
         print(event.data["text"], end="", flush=True)
-    elif event.type == "final":
-        result = event.data          # run_query's QueryResult, as JSON
+    elif event.name == "run.finished":
+        result = event.data["result"]   # run_query's QueryResult, as JSON
 ```
 
-A `QueryEvent` has a `type` and a JSON-ready `data` dict; `event.sse()` is the
-event as one Server-Sent Event (`event: <type>` and `data: <json>`), which is how
-`nl2sql-api` and the playground send it.
+An `Event` (`nl2sql.Event`, from `nl2sql_sdk.events`) has a `name`, `at` (UTC),
+the run's `trace_id`, its `tenant_id` and a JSON-ready `data` dict;
+`event.sse()` is the event as one Server-Sent Event (`event: <name>`, and the
+whole event as JSON on the `data` line), which is how `nl2sql-api` and the
+playground send it.
 
-| type | data | when |
+| name | data | when |
 | --- | --- | --- |
-| `node_started` | `node` | A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry). |
-| `node_finished` | `node`, `seconds`, `ok` | The step ended; `ok` is False when it raised. |
-| `result_manifest` | `trace_id`, `results` | The aggregator saved the results: `results` is the run's `result_manifest` and `trace_id` its `request_id`, so `engine.results.page` can be called before the answer is written. |
-| `answer_delta` | `field`, `text` | The next piece of `final_answer.summary` or `final_answer.content`, as the answer model writes it. |
-| `final` | `QueryResult.model_dump(mode="json")` | The run finished: exactly what `run_query` returns. A refusal, a provider failure, a timeout or a cancel is a `final` with `status: "error"`, as `run_query` returns it. |
-| `error` | `message`, `error_code` | The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built). |
+| `run.started` | `question`, `user_id`, `tenant_id`, `roles`, `datasource_id`, `execute` | The run began. Always first. |
+| `node.started` | `node`, `sub_query_id` | A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry). `sub_query_id` is None outside a sub-query. |
+| `node.finished` | `node`, `sub_query_id`, `seconds`, `ok` | The step ended; `ok` is False when it raised. |
+| `result.manifest` | `results` | The aggregator saved the results: `results` is the run's `result_manifest` and the event's `trace_id` its `request_id`, so `engine.results.page` can be called before the answer is written. |
+| `answer.delta` | `field`, `text` | The next piece of `final_answer.summary` or `final_answer.content`, as the answer model writes it. |
+| `sanity.flagged`, `run.limit_reached` | see [Events](../../observability/events.md) | Published by the sanity checks and the caps when they arrive (Wave A's S1 and E3). |
+| `run.finished` | the run's summary (`status`, `duration_s`, `usage`, `error_codes`, `source`, `datasources`, `tables`, `result_manifest`, `user_id`, `roles`) plus `result` | The run finished. `result` is exactly what `run_query` returns, as JSON; it is on the stream's copy only, never on the bus. A refusal, a provider failure, a timeout or a cancel is a `run.finished` with `status: "error"`, as `run_query` returns it. |
+| `run.failed` | `message`, `error_code` | The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built). |
 
-Every stream ends in exactly one `final` or `error`.
+Every stream ends in exactly one `run.finished` or `run.failed`. Operator
+events (`policy.decision`, `hook.decision`, `llm.call`, `plan_cache.lookup`)
+are never on it: a denial would tell a denied caller which table exists, and the
+rest are operator data. An operator reads them with `engine.events.subscribe`.
 
 How it works:
 
 - The run goes on a thread of its own, started on the first `next()`; the caller's
   context goes with it, so request-scoped keys (`nl2sql.llm.request_key`) reach the
   graph as they do in `run_query`.
-- `run_with_graph` is given a `RunEvents` callback, the same kind of LangChain
-  callback as the timing and usage ones. A node's own run (its name is its
-  `langgraph_node`) is a `node_started` / `node_finished`; the runnables inside a
-  node are not events. The aggregator's end carries the manifest.
+- Every run (streamed or not) has a `RunScope`, and `QueryAPI.open_scope` attaches
+  a `RunEvents` to it: a LangChain callback the graph gets with the scope's
+  callbacks, which publishes through the scope. A node's own run (its name is its
+  `langgraph_node`) is a `node.started` / `node.finished`; the runnables inside a
+  node are not events. The aggregator's end publishes `result.manifest`. The
+  stream subscribes to its scope's events from the allow-list
+  (`nl2sql.events.STREAM_EVENTS`), so it yields exactly what the bus carries, in
+  publish order, and then its own `run.finished` with the result.
 - `run_with_graph(stream_answer=True)` asks the answer synthesizer to stream: its
   chain is `streaming_structured` (`nl2sql.llm.wires`) instead of `structured`, the
   same request with `stream` on. Each piece of the answer's tool call reaches
   `on_llm_new_token`; `RunEvents` parses the arguments so far as partial JSON and
-  emits what `summary` and `content` gained. The pieces are joined into one message
+  publishes what `summary` and `content` gained as `answer.delta`. The pieces are joined into one message
   before the parser sees it, so the answer, and the token usage the call reports,
   are the unstreamed call's. On the Anthropic wire the joined message gets the same
   tool-call repair as an unstreamed one.
@@ -174,7 +187,7 @@ How it works:
 Token by token, per wire: both the OpenAI wire (OpenAI, OpenRouter, Ollama, any
 OpenAI-compatible endpoint) and the Anthropic wire stream the answer's forced tool
 call, so the answer streams on every provider; how finely is the provider's choice,
-and one that sends the whole answer at once gives one `answer_delta` per field. The
+and one that sends the whole answer at once gives one `answer.delta` per field. The
 other model steps return a typed object the next step needs whole, and are not
 streamed. `FakeLLMServer` streams both wires, a word at a time, so replay mode and
 the keyless tests stream too.

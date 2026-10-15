@@ -97,6 +97,9 @@ class RunScope:
         # model call made with ``callbacks()`` counts in the run's ``QueryResult.usage``.
         self.usage = usage
         self._handlers: List[Any] = []
+        # Every event this run published, in order: the trace lists them, and a stream that
+        # joins an open scope (Wave C's turn) starts from them.
+        self.events: List[Event] = []
         self.late_events = 0
         self._lock = threading.RLock()
         self._closed = False
@@ -143,6 +146,20 @@ class RunScope:
             self._closers.append(close)
         return piece
 
+    def follow(self, fn: Callable[[Event], None], names: Iterable[str]) -> None:
+        """Hand ``fn`` this run's events in ``names``: those already published, then each one as it comes.
+
+        The replay and the attach happen under the scope's lock, so an event
+        published meanwhile on another thread is neither lost nor seen twice.
+        For a stream joining a scope opened before it (Wave C's turn).
+        """
+        wanted = frozenset(names)
+        with self._lock:
+            for event in self.events:
+                if event.name in wanted:
+                    fn(event)
+            self.attach(fn, names=wanted)
+
     def callbacks(self) -> List[Any]:
         """The LangChain callbacks a model call in this run is made with: the usage collector, then
         the handlers attached (the budget).
@@ -168,7 +185,9 @@ class RunScope:
             if self._closed:
                 self.late_events += 1
                 return None
-            return self.bus.publish(name, data, trace_id=self.trace_id, tenant_id=self.tenant_id)
+            event = self.bus.publish(name, data, trace_id=self.trace_id, tenant_id=self.tenant_id)
+            self.events.append(event)
+            return event
 
     @contextmanager
     def entered(self) -> Iterator["RunScope"]:
@@ -217,7 +236,9 @@ class RunScope:
             subscriptions, self._subscriptions = self._subscriptions, []
             closers, self._closers = self._closers, []
             try:
-                return self.bus.publish(name, data, trace_id=self.trace_id, tenant_id=self.tenant_id)
+                event = self.bus.publish(name, data, trace_id=self.trace_id, tenant_id=self.tenant_id)
+                self.events.append(event)
+                return event
             finally:
                 for subscription in subscriptions:
                     subscription.close()

@@ -78,9 +78,22 @@ by time.
   "settings": {"...": "the run's settings section: pipeline, retrieval, results, traces, schema, ..."},
   "limits": {"sample_rows": 50, "max_field_chars": 20000, "max_list_items": 200, "note": "..."},
   "nodes": ["... one entry per node execution, below ..."],
+  "events": ["... the run's bus events, below ..."],
   "result": {"...": "the QueryResult, rows capped"}
 }
 ```
+
+`events` lists the run's own [events](events.md) in the order they were
+published (`run.started`, each `node.started` and `node.finished` with its
+`sub_query_id`, `result.manifest`, `llm.call` and the rest), every one but
+`answer.delta`, whose text the result holds whole. Each is the event as JSON:
+`name`, `at`, `trace_id`, `tenant_id` and `data`. The trace is written before
+the run's `run.finished` is published, so the list ends just before it; the
+trace's `result` is what that event summarises.
+
+A log line written while the run was in flight carries the same `trace_id`,
+on the caller's thread and on every graph worker thread, so grepping the
+logs for a trace's id finds its lines ([Events](events.md#logs-carry-the-runs-trace_id)).
 
 One entry of `nodes` (the planner's second attempt, from a run whose first plan
 named a column that does not exist; long values shortened here):

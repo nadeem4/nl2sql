@@ -3,12 +3,16 @@
 // states while the run is live, and the request itself. No React here, so
 // `npm test` covers it with node's own test runner.
 //
-// The server sends `node_started` / `node_finished` per step, `result_manifest`
-// once the results are saved, `answer_delta` as the answer is written, and then
-// one `final` (exactly what `/api/ask` returns) or `error`.
+// The server sends the engine's run events (`engine.stream_query`): `run.started`,
+// `node.started` / `node.finished` per step, `result.manifest` once the results
+// are saved, `answer.delta` as the answer is written, and then one
+// `run.finished` (its `data.result` is exactly what `/api/ask` returns) or
+// `run.failed`. Each SSE data line is the whole event as JSON: `name`, `at`,
+// `trace_id`, `tenant_id` and `data`.
 
 // Splits what has arrived into whole events, keeping a half-sent one for the
-// next read. Each event's data is JSON; a comment or an unreadable one is skipped.
+// next read: `{ event, data, traceId }`, `data` being the event's own data. A
+// comment or an unreadable event is skipped.
 export function parseSse(buffer) {
   const text = buffer.replace(/\r\n/g, "\n");
   const blocks = text.split("\n\n");
@@ -27,7 +31,8 @@ export function parseSse(buffer) {
     }
     if (!data.length) continue;
     try {
-      events.push({ event, data: JSON.parse(data.join("\n")) });
+      const whole = JSON.parse(data.join("\n"));
+      events.push({ event, data: (whole && whole.data) || {}, traceId: (whole && whole.trace_id) || null });
     } catch {
       /* not JSON: nothing this page can read */
     }
@@ -46,12 +51,12 @@ export const EMPTY_PROGRESS = Object.freeze({
 
 // What the events so far add up to. A step that runs twice (a retry, a
 // second sub-query) keeps its longest time, as the run's own timings do.
-export function progressOf(progress, { event, data }) {
+export function progressOf(progress, { event, data, traceId }) {
   const d = data || {};
   switch (event) {
-    case "node_started":
+    case "node.started":
       return { ...progress, live: d.node };
-    case "node_finished": {
+    case "node.finished": {
       const prior = progress.timings[d.node];
       const seconds = Number(d.seconds) || 0;
       return {
@@ -61,9 +66,9 @@ export function progressOf(progress, { event, data }) {
         timings: { ...progress.timings, [d.node]: prior === undefined ? seconds : Math.max(prior, seconds) },
       };
     }
-    case "result_manifest":
-      return { ...progress, manifest: d.results || [], traceId: d.trace_id || null };
-    case "answer_delta":
+    case "result.manifest":
+      return { ...progress, manifest: d.results || [], traceId: traceId || null };
+    case "answer.delta":
       if (!(d.field in progress.answer)) return progress;
       return { ...progress, answer: { ...progress.answer, [d.field]: progress.answer[d.field] + (d.text || "") } };
     default:
@@ -143,8 +148,8 @@ export async function streamAsk(fetchImpl, url, init, onEvent) {
     for (const e of events) {
       if (outcome) return;
       onEvent(e);
-      if (e.event === "final") outcome = { final: e.data };
-      else if (e.event === "error") outcome = { error: (e.data && e.data.message) || "The run failed." };
+      if (e.event === "run.finished") outcome = { final: e.data.result };
+      else if (e.event === "run.failed") outcome = { error: e.data.message || "The run failed." };
     }
   };
 

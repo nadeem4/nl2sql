@@ -119,7 +119,7 @@ engine.results       # manifest, page, csv
 engine.feedback      # record, list, stats, export, clear
 engine.traces        # get, replay
 engine.storage       # info, purge
-engine.events        # the engine's events (filled in release 0.7)
+engine.events        # subscribe, catalog
 engine.evals         # evaluation (filled in release 0.7)
 engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2
 ```
@@ -135,7 +135,8 @@ engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_
 | `feedback` | below, and [Feedback and signals](../../observability/feedback.md) |
 | `traces`, `about()` | below |
 | `benchmark` | [Benchmarks](../../benchmarks.md) |
-| `events`, `evals` | Empty in this release; [Wave A](../../architecture/wave_a.md) fills them |
+| `events` | [Events](../../observability/events.md) |
+| `evals` | Empty in this release; [Wave A](../../architecture/wave_a.md) fills it |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.
@@ -230,7 +231,7 @@ engine.index.inspect("top customers", k=4)["picks"]
 Clients import everything they need from `nl2sql` itself, never from an engine
 submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `AnswerSource`, `ResultSummary`, `ResultManifest`, `ResultPage`,
-`ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`, `QueryEvent`,
+`ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`,
 `UserContext`, `CancellationToken`, `configure_logging`,
 `TraceContextFilter`, the event types (`Event`, `Observer`), a run's ending
 (`RunStop`, `ApprovalRequest`, `Approval`, `VerifiedRef`), what the namespaces

@@ -329,8 +329,12 @@ def test_scope_callbacks_hold_the_usage_collector_and_the_attached_handlers():
     scope = QueryAPI(_ctx()).open_scope("q", user_context=_USER)
     scope.attach(budget)
 
+    from nl2sql.pipeline.events import RunEvents
+
     handlers = scope.callbacks()
-    assert isinstance(handlers[0], TokenUsageCallback) and handlers[1:] == [budget]
+    # The usage collector, the run's step events (E1), then what was attached.
+    assert isinstance(handlers[0], TokenUsageCallback) and isinstance(handlers[1], RunEvents)
+    assert handlers[2:] == [budget]
 
 
 def test_close_scope_with_a_result_built_without_a_graph_run():

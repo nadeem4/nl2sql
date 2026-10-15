@@ -1,6 +1,6 @@
 from typing import Iterator
 
-from nl2sql import NL2SQL, CancellationToken, QueryEvent, ResultPage, UserContext
+from nl2sql import NL2SQL, CancellationToken, Event, ResultPage, UserContext
 from nl2sql_api.models.query import QueryRequest, QueryResponse
 
 
@@ -19,8 +19,8 @@ class QueryService:
         return QueryResponse.model_validate(result.model_dump())
 
     def stream_query(self, request: QueryRequest, user_context: UserContext,
-                     cancellation_token: CancellationToken) -> Iterator[QueryEvent]:
-        """The run as events; the ``final`` one carries exactly what :meth:`execute_query` returns."""
+                     cancellation_token: CancellationToken) -> Iterator[Event]:
+        """The run as events; ``run.finished``'s ``data.result`` is exactly what :meth:`execute_query` returns."""
         for event in self.engine.stream_query(
             request.natural_language,
             datasource_id=request.datasource_id,
@@ -28,9 +28,9 @@ class QueryService:
             user_context=user_context,
             cancellation_token=cancellation_token,
         ):
-            if event.type == "final":
-                event = QueryEvent(type="final",
-                                   data=QueryResponse.model_validate(event.data).model_dump(mode="json"))
+            if event.name == "run.finished":
+                response = QueryResponse.model_validate(event.data["result"]).model_dump(mode="json")
+                event = event.model_copy(update={"data": {**event.data, "result": response}})
             yield event
 
     def get_result_page(self, request_id: str, result_id: str, offset: int, limit: int) -> ResultPage:
