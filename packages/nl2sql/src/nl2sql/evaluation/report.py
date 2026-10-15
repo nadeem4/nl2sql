@@ -159,6 +159,15 @@ def _pass_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 EXECUTION_SCORERS = ("result_match", "outcome")
 
 
+def counts_for_execution(record: Dict[str, Any]) -> bool:
+    """Whether a case record counts toward execution accuracy: every case but a routing case (``kind: routing``)."""
+    return record.get("kind") != "routing"
+
+
+def execution_records(records: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [r for r in records if counts_for_execution(r)]
+
+
 def execution_passed(record: Dict[str, Any], lenient: bool = False) -> bool:
     """Execution accuracy, the measure 0.6's tier 2 published: ``result_match`` and ``outcome`` passed.
 
@@ -268,6 +277,16 @@ def _retrieval(records: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             "columns_sent": _mean([d["columns_sent"] for d in details])}
 
 
+def _routing(records: Sequence[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Mode retrieval: the share of cases routing ranked right first (``top1``) and fully shortlisted."""
+    details = [s["detail"] for r in records for n, s in (r.get("scores") or {}).items()
+               if n == "routing" and s.get("passed") is not None and "top1" in (s.get("detail") or {})]
+    if not details:
+        return None
+    return {"cases": len(details), "top1": _share(sum(d["top1"] for d in details), len(details)),
+            "shortlist": _share(sum(d["shortlist"] for d in details), len(details))}
+
+
 def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     """The board for one config's runs (every pass, every case and role)."""
     by_tag: Dict[str, List] = {}
@@ -325,7 +344,9 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     total_cost = sum(r.get("cost") or 0.0 for r in records)
     overall = _pass_rate(records)
     generated = _generated_rate(records)
-    executed = sum(execution_passed(r) for r in records)
+    # Routing cases have no rows to check: execution accuracy is over the other cases.
+    answer_records = execution_records(records)
+    executed = sum(execution_passed(r) for r in answer_records)
     latencies = [r["latency_s"] for r in records if r.get("latency_s") is not None]
     return {
         "summary": summarize(records),
@@ -337,14 +358,14 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
             "generated": generated["accuracy"],
             # Execution accuracy alone: rows and outcome, as the 0.6 tier 2
             # scored it, so the published series stays comparable.
-            "execution": _share(executed, len(records)),
+            "execution": _share(executed, len(answer_records)),
             # A 95% Wilson interval on each: at n = 47 it is about +-14 points.
             # Over several passes the runs of one case are not independent, so
             # it reads narrower than it is; pass^k counts cases and does not.
             "interval": _interval(overall["pass"], overall["total"]),
             "lenient_interval": _interval(overall["lenient_pass"], overall["total"]),
             "generated_interval": _interval(generated["pass"], generated["total"]),
-            "execution_interval": _interval(executed, len(records)),
+            "execution_interval": _interval(executed, len(answer_records)),
             "pass_k": _pass_k(records, passes),
             "by_tag": {t: _pass_rate(rs) for t, rs in sorted(by_tag.items())},
             "by_difficulty": {d: _pass_rate(rs) for d, rs in sorted(by_difficulty.items())},
@@ -359,6 +380,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
         },
         "scores": _scorer_counts(records),
         "retrieval": _retrieval(records),
+        "routing": _routing(records),
         "tokens_by_node": tokens,
         "cost": {"total": round(total_cost, 6),
                  "per_question": round(total_cost / len(records), 6) if records else None},

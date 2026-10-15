@@ -14,7 +14,9 @@ benchmarks/<mode>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
   `retrieval` (schema retrieval recall). The records 0.6 wrote as `tier2` are mode full runs.
 - `database`: the datasource id the suite's cases name, e.g. `chinook` - not
   every datasource the project has registered, so the demo's `support` and
-  `webanalytics` leave a Chinook run's file, identity and series alone.
+  `webanalytics` leave a Chinook run's file, identity and series alone. The
+  routing suite names all three, so its records are under
+  `retrieval/chinook-support-webanalytics/`.
 - `shortsha`: the engine commit the run used; `unknown` for a wheel install.
 - `config`: the config name (`gpt-5.4`, `gpt-5.4-mini-helpers`, ...), or `plans` / `retrieval`.
 - `-2`, `-3`... when the name is taken.
@@ -28,7 +30,8 @@ when there is none), `note`, `dataset` (the suite file's name and sha256),
 `columns`), `config` and `metrics`. `dataset` is the suite's name and digest;
 `metrics.accuracy` is execution accuracy, the measure 0.6 published. Tier 2 records add `roles`, `passes`,
 `stopped`, `partial` and the full `scoreboard`; retrieval records add
-`settings` and the full `report`. A record moved in from an older layout
+`settings` and the full `report`; their `metrics` add `routing_top1`,
+`routing_shortlist` and `routing_cases` (the routing scorer's shares). A record moved in from an older layout
 lists what was filled in afterwards in `backfilled`.
 
 Two runs are comparable when they share the mode, the suite digest, the schema
@@ -57,20 +60,21 @@ git add benchmarks README.md docs/benchmarks.md
 
 ## The recording rule: CI's baselines come from CI
 
-CI's plans and retrieval baselines are recorded **on CI's own runner**
+CI's plans, retrieval and routing baselines are recorded **on CI's own runner**
 (`ubuntu-latest`, Python 3.12), never on a laptop: retrieval recall passes a
 case only at 100% column recall, which near-tie rankings of the local ONNX
 embedder can move between platforms. To record or re-record them:
 
-1. Push the change. The integration job's "Eval gate" step runs both modes and
-   uploads `eval_plans.json` and `eval_retrieval.json` as the `eval-reports`
-   artifact, pass or fail.
+1. Push the change. The integration job's "Eval gate" steps run the three
+   gates and upload `eval_plans.json`, `eval_retrieval.json` and
+   `eval_routing.json` as the `eval-reports` artifact, pass or fail.
 2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.
-3. From the repo root, record them, naming where they came from:
-   `nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
-4. Commit the two records and the regenerated pages in the same PR, and push.
+3. From the repo root, record the ones the change moved, naming where they
+   came from:
+   `nl2sql eval publish eval-reports/eval_retrieval.json eval-reports/eval_routing.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
+4. Commit the records and the regenerated pages in the same PR, and push.
    The next run gates against them.
 
 Never edit a record by hand, `engine_version` included. A change that moves
 the gate on purpose (a suite change, routing or retrieval work) re-records
-both baselines this way, in the PR that makes the change.
+the baselines it moves this way, in the PR that makes the change.

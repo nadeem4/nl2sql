@@ -121,6 +121,24 @@ def _scored(qid, status, scores):
     return rec
 
 
+def _routed(qid, top1, shortlist):
+    rec = _rec(qid, "pass" if top1 and shortlist else "fail")
+    rec["scores"] = {"routing": {"passed": top1 and shortlist, "value": None,
+                                 "detail": {"top1": top1, "shortlist": shortlist}},
+                     "retrieval_recall": {"passed": None, "value": None, "detail": {}}}
+    return rec
+
+
+def test_a_retrieval_board_reports_routing_top1_and_shortlist_recall():
+    records = [_routed("a", True, True), _routed("b", False, True), _routed("c", True, True),
+               _routed("d", False, False)]
+    board = report.score_config(records, passes=1)
+    assert board["routing"] == {"cases": 4, "top1": 0.5, "shortlist": 0.75}
+    # A mode full board has no ranking to read: the routing scorer's detail there is what the run used.
+    full = [_scored("a", "pass", {"routing": True})]
+    assert report.score_config(full, passes=1)["routing"] is None
+
+
 def test_execution_accuracy_counts_only_rows_and_outcome_as_0_6s_tier_2_did():
     records = [_scored("a", "pass", {"result_match": True, "outcome": True, "faithfulness": True}),
                _scored("b", "fail", {"result_match": True, "outcome": True, "faithfulness": False}),

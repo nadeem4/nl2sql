@@ -1,6 +1,8 @@
 """``result_match``: the rows match the case's ``rows`` or one of its ``alt_rows``.
 
-Applies to a role whose outcome is ``allowed``. Strict: column names are
+Applies to a role whose outcome is ``allowed``, on a case of kind
+``answer``: a routing case says where a question goes, not what it returns,
+and is left out of execution accuracy. Strict: column names are
 ignored, column order is kept, numbers match within half a cent, and row
 order counts only when the case's ``order_matters``
 (:meth:`ModelEvaluator.compare_results`). The lenient reading, which also
@@ -20,7 +22,7 @@ class ResultMatch(BuiltinScorer):
     modes: ClassVar[FrozenSet[str]] = frozenset({"full", "plans"})
 
     def score(self, run: CaseRun) -> Score:
-        if run.expected != "allowed":
+        if run.expected != "allowed" or run.case.kind == "routing":
             return NOT_APPLICABLE
         if run.rows is None:
             return Score(value=0.0, passed=False, detail={"reason": f"no rows (status '{run.result.status}')",

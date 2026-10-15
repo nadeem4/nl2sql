@@ -73,7 +73,8 @@ FULL_EMPTY = ("No mode full run recorded yet. Run one from a demo folder with "
               "then `nl2sql eval publish <demo folder>/eval_full.json` from the repo.")
 README_RETRIEVAL_HEADING = "### Retrieval recall"
 README_RETRIEVAL_INTRO = ("The share of each answerable case's needed tables and columns that schema "
-                          "retrieval sends the planner, with no LLM involved.")
+                          "retrieval sends the planner, and the share of cases routing ranks the right "
+                          "datasource first and shortlists every one the case needs, with no LLM involved.")
 RETRIEVAL_EMPTY = ("No retrieval run recorded yet: `nl2sql eval run --mode retrieval`, "
                    "then `nl2sql eval publish`.")
 SCHEMA_VERSION = 2
@@ -87,7 +88,8 @@ _MODE_OF_KIND = {"tier2": "full"}
 HEADLINE = {"full": [("accuracy", "accuracy", "pp"), ("lenient_accuracy", "lenient", "pp"),
                      ("faithfulness", "faithfulness", "pp"), ("cost_per_question", "$/question", "usd")],
             "plans": [("accuracy", "accuracy", "pp")],
-            "retrieval": [("table_recall", "tables", "pp"), ("column_recall", "columns", "pp")]}
+            "retrieval": [("table_recall", "tables", "pp"), ("column_recall", "columns", "pp"),
+                          ("routing_top1", "top-1", "pp"), ("routing_shortlist", "shortlist", "pp")]}
 
 
 def mode_of(record: Dict[str, Any]) -> str:
@@ -196,9 +198,9 @@ def _share(num: int, den: int) -> Optional[float]:
 
 def _execution_metrics(board: Dict[str, Any], passes: int) -> Dict[str, Any]:
     """The headline numbers of a mode full or plans board: execution accuracy first (0.6's measure)."""
-    from nl2sql.evaluation.report import execution_passed, reliable, wilson_interval
+    from nl2sql.evaluation.report import execution_passed, execution_records, reliable, wilson_interval
 
-    results = board.get("results") or []
+    results = execution_records(board.get("results") or [])  # a routing case has no execution verdict
     cases = board["completed_cases"]
     tokens = board["tokens_by_node"].values()
     lenient = sum(execution_passed(r, lenient=True) for r in results)
@@ -236,14 +238,22 @@ def _execution_metrics(board: Dict[str, Any], passes: int) -> Dict[str, Any]:
 
 
 def _retrieval_metrics(board: Dict[str, Any]) -> Dict[str, Any]:
-    """The recall summary of a mode retrieval board, as 0.6's retrieval records held it."""
+    """The recall summary of a mode retrieval board, as 0.6's retrieval records held it, and routing's.
+
+    ``routing_top1`` is the share of cases routing ranked one of their
+    datasources first, ``routing_shortlist`` the share whose datasources were
+    all shortlisted; ``routing_cases`` how many the ``routing`` scorer scored.
+    """
     summary = board.get("retrieval") or {}
+    routing = board.get("routing") or {}
     return {"questions": summary.get("cases", 0),
             **{k: summary.get(k) for k in ("table_recall", "column_recall", "perfect_tables", "perfect_columns",
-                                           "tables_sent", "columns_sent")}}
+                                           "tables_sent", "columns_sent")},
+            "routing_cases": routing.get("cases", 0), "routing_top1": routing.get("top1"),
+            "routing_shortlist": routing.get("shortlist")}
 
 
-_RESULT_FIELDS = ("id", "role", "pass", "status", "lenient_status", "cost")
+_RESULT_FIELDS = ("id", "role", "pass", "status", "lenient_status", "cost", "kind")
 _SCORE_DETAIL = ("lenient", "error")  # what execution_passed and case_status read
 
 
@@ -454,7 +464,7 @@ def flips(new: Dict[str, Any], old: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     run, or one written before they were kept).
     """
     from nl2sql.evaluation.gate import question_flips
-    from nl2sql.evaluation.report import execution_passed
+    from nl2sql.evaluation.report import execution_passed, execution_records
 
     now = (new.get("scoreboard") or {}).get("results")
     before = (old.get("scoreboard") or {}).get("results")
@@ -462,7 +472,7 @@ def flips(new: Dict[str, Any], old: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     if mode_of(new) == "retrieval":
         return question_flips(now, before, passed=lambda r: r["status"] == "pass")
-    return question_flips(now, before, passed=execution_passed)
+    return question_flips(execution_records(now), execution_records(before), passed=execution_passed)
 
 
 def describe_change(new: Dict[str, Any], old: Optional[Dict[str, Any]], *, show_flips: bool = False) -> str:
@@ -623,27 +633,44 @@ def _plans_section(group: List[Dict[str, Any]], previous) -> str:
             f"{runs}\n")
 
 
+def _routing_cell(r: Dict[str, Any]) -> str:
+    """``95.0% / 100.0%``: routing top-1, then shortlist recall; ``-`` for a record from before routing was scored."""
+    m = r["metrics"]
+    if m.get("routing_top1") is None:
+        return "-"
+    return f"{_pct(m['routing_top1'])} / {_pct(m.get('routing_shortlist'))}"
+
+
+def _sent(m: Dict[str, Any]) -> str:
+    if m.get("tables_sent") is None:
+        return "-"
+    return f"{m['tables_sent']:.1f} / {m['columns_sent']:.1f}"
+
+
 def _retrieval_section(group: List[Dict[str, Any]], previous) -> str:
     runs = _table(
         ["Date (UTC)", "Commit", "Note", "Dataset", "Schema", "Search", "Embedding", "Cases scored", "Table recall",
-         "Column recall", "Δ vs previous", "Tables / columns sent"],
+         "Column recall", "Routing top-1 / shortlist", "Δ vs previous", "Tables / columns sent"],
         [[_when(r), _commit(r), r.get("note") or "-", _dataset(r), _schema(r),
           f"k {r['settings']['table_k']} tables / {r['settings']['planning_k']} planning",
-          r["settings"].get("embedding", "-"), r["metrics"]["questions"], _pct(r["metrics"]["table_recall"]),
-          _pct(r["metrics"]["column_recall"]), describe_change(r, previous[id(r)]),
-          f"{r['metrics']['tables_sent']:.1f} / {r['metrics']['columns_sent']:.1f}"] for r in group])
+          r["settings"].get("embedding", "-"), r["metrics"]["questions"] or r["metrics"].get("routing_cases") or 0,
+          _pct(r["metrics"]["table_recall"]),
+          _pct(r["metrics"]["column_recall"]), _routing_cell(r), describe_change(r, previous[id(r)]),
+          _sent(r["metrics"])] for r in group])
     return ("`nl2sql eval run --mode retrieval`: the share of each answerable case's needed tables and\n"
             "columns that schema retrieval sends the planner, with the vector search forced on and no\n"
-            "LLM. Mean over cases; tables and columns sent are means too. CI's integration job gates on\n"
-            "the newest run here.\n\n"
+            "LLM. Mean over cases; tables and columns sent are means too. Routing top-1 is the share of\n"
+            "cases routing ranks one of their datasources first, shortlist the share whose datasources\n"
+            "are all among those it keeps. CI's integration job gates on the newest run of each suite here.\n\n"
             f"{runs}\n")
 
 
 def render_history(recs: Sequence[Dict[str, Any]]) -> str:
     """``docs/benchmarks.md``: per mode and database, the latest runs and every run newest first."""
     head = ("# Benchmark Results\n\n"
-            "Recorded eval runs of the engine on the Chinook suite. Generated by `nl2sql eval publish`\n"
-            "from the records in `benchmarks/`; do not edit by hand. Grouped by mode and database,\n"
+            "Recorded eval runs of the engine on the Chinook and routing suites. Generated by\n"
+            "`nl2sql eval publish` from the records in `benchmarks/`; do not edit by hand. Grouped by\n"
+            "mode and database,\n"
             "newest first; the runs 0.6's tier 2 recorded are mode full runs. Accuracy is execution\n"
             "accuracy (`result_match` and `outcome`, the measure 0.6 published), with its 95% Wilson\n"
             "interval. \"Δ vs previous\" is the change against the previous run of the same config, and\n"
@@ -651,7 +678,8 @@ def render_history(recs: Sequence[Dict[str, Any]]) -> str:
             "size a few points either way is noise, so read the flips and the p-value, not the headline.\n"
             "Runs on another suite (`@digest`), another schema or, for mode full, other roles or curated\n"
             "answers on are not comparable and start a new series. See\n"
-            "[the Chinook suite](testing/evaluation-dataset.md).\n")
+            "[the Chinook suite](testing/evaluation-dataset.md) and\n"
+            "[the routing suite](evals/cases.md#the-routing-suite).\n")
     if not recs:
         return f"{head}\n{EMPTY}\n"
     previous = previous_runs(recs)
@@ -682,9 +710,11 @@ def render_readme_block(recs: Sequence[Dict[str, Any]]) -> str:
           _usd(r["metrics"]["cost_per_question"]), describe_change(r, previous[id(r)])] for r in full],
     ) if full else FULL_EMPTY
     retrieval_body = _table(
-        ["Database", "Date (UTC)", "Commit", "Table recall", "Column recall", "Δ vs previous"],
+        ["Database", "Date (UTC)", "Commit", "Table recall", "Column recall", "Routing top-1 / shortlist",
+         "Δ vs previous"],
         [[r["database"]["datasource_id"], r["recorded_at"][:10], _commit(r), _pct(r["metrics"]["table_recall"]),
-          _pct(r["metrics"]["column_recall"]), describe_change(r, previous[id(r)])] for r in retrieval],
+          _pct(r["metrics"]["column_recall"]), _routing_cell(r), describe_change(r, previous[id(r)])]
+         for r in retrieval],
     ) if retrieval else RETRIEVAL_EMPTY
     parts = [README_FULL_HEADING, README_FULL_INTRO, full_body,
              README_RETRIEVAL_HEADING, README_RETRIEVAL_INTRO, retrieval_body,

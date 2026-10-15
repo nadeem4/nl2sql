@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       realdb: ${{ steps.filter.outputs.realdb || 'true' }}
+      # The wide-schema routing test indexes 1,200 tables (about 17 minutes):
+      # nightly, on demand, and on pull requests that change indexing.
+      wide: ${{ steps.filter.outputs.wide || 'true' }}
     steps:
       - uses: actions/checkout@v4
         if: github.event_name == 'pull_request'
@@ -40,15 +43,19 @@ jobs:
               - 'packages/nl2sql/tests/realdb/**'
               - 'testbed/**'
               - '.github/workflows/realdb.yml'
+            wide:
+              - 'packages/nl2sql/src/nl2sql/indexing/**'
+              - 'packages/nl2sql/tests/realdb/test_routing_wide.py'
 
   realdb:
     needs: changes
     if: needs.changes.outputs.realdb == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       REALDB: compose
       REALDB_REQUIRED: "1"
+      REALDB_WIDE_ROUTING: ${{ needs.changes.outputs.wide }}
     steps:
       - uses: actions/checkout@v4
 

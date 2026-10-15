@@ -98,11 +98,13 @@ jobs:
 
       # The key-free eval gate (docs/evals/index.md, "In CI"): mode plans
       # (every gold plan through the validator, generator and executor, for
-      # every role) and mode retrieval on the demo's Chinook suite, each
-      # against the newest record of its mode in benchmarks/. Exits 1 on a
-      # regression and 2 when there is no comparable baseline (a suite, schema
-      # or routing change not yet re-recorded). Each mode runs whatever the
-      # other did. Mode full needs a key and refuses to run in CI.
+      # every role) and mode retrieval on the demo's Chinook suite, and mode
+      # retrieval on the routing suite (which demo database each question
+      # goes to), each against the newest record of its mode and database in
+      # benchmarks/. Exits 1 on a regression and 2 when there is no comparable
+      # baseline (a suite, schema or routing change not yet re-recorded). Each
+      # step runs whatever the others did. Mode full needs a key and refuses
+      # to run in CI.
       - name: Eval gate (plans)
         if: ${{ !cancelled() }}
         run: nl2sql --config demo-ci/nl2sql.yaml eval run --mode plans --baseline benchmarks
@@ -110,6 +112,10 @@ jobs:
       - name: Eval gate (retrieval)
         if: ${{ !cancelled() }}
         run: nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchmarks
+
+      - name: Eval gate (routing)
+        if: ${{ !cancelled() }}
+        run: nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --suite evals/routing.yaml --baseline benchmarks --out demo-ci/eval_routing.json
 
       # The full reports, pass or fail. CI's baselines are recorded from this
       # artifact, never on a laptop (benchmarks/README.md, "The recording
@@ -123,6 +129,7 @@ jobs:
           path: |
             demo-ci/eval_plans.json
             demo-ci/eval_retrieval.json
+            demo-ci/eval_routing.json
           if-no-files-found: warn
 
   # Strict mode fails on broken internal links and bad references, which

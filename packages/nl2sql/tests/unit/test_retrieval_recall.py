@@ -76,7 +76,10 @@ def test_mode_retrieval_asks_the_retriever_about_the_cases_datasource_with_the_s
     assert asked == [("chinook_002", "chinook", "admin", 0)]
     assert ctx.settings.retrieval.full_snapshot_max_tables == 15
     board = report.configs["retrieval"]
-    assert board["retrieval"]["column_recall"] == 1.0 and board["scores"]["routing"]["passed"] == 1
+    assert board["retrieval"]["column_recall"] == 1.0
+    # Shortlisted, but ranked second: routing's top-1 is part of the verdict.
+    assert board["scores"]["routing"]["failed"] == 1
+    assert board["routing"] == {"cases": 1, "top1": 0.0, "shortlist": 1.0}
 
 
 def _report(table=0.9, column=0.6):

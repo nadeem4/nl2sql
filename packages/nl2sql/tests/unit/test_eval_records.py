@@ -16,7 +16,7 @@ import pytest
 
 from nl2sql.evaluation import records, report
 from nl2sql.evaluation.report import EvalReport
-from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
+from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, ROUTING_SUITE_PATH, load_suite
 
 REPO = pathlib.Path(__file__).resolve().parents[4]
 WHEN = dt.datetime(2026, 9, 21, 14, 5, 6, tzinfo=dt.timezone.utc)
@@ -151,7 +151,8 @@ def test_records_live_under_mode_database_date_sha_config_and_are_never_overwrit
     assert body["database"] == CHINOOK and body["note"] == "baseline"
     assert body["settings"]["table_k"] == 8
     assert body["metrics"] == {"questions": 3, "table_recall": 0.9, "column_recall": 0.7, "perfect_tables": 0,
-                               "perfect_columns": 0, "tables_sent": 8.0, "columns_sent": 24.0}
+                               "perfect_columns": 0, "tables_sent": 8.0, "columns_sent": 24.0,
+                               "routing_cases": 0, "routing_top1": None, "routing_shortlist": None}
 
 
 def test_a_mode_plans_run_is_a_record_too(tmp_path):
@@ -363,7 +364,58 @@ def test_history_groups_by_mode_then_database_newest_first(tmp_path):
     assert records.README_FULL_HEADING in full_part
     assert "| gpt-5.4 | chinook | 2026-09-20 |" in full_part and "| gpt-5.4 | northwind | 2026-09-21 |" in full_part
     assert "| mini | chinook | 2026-09-21 |" in full_part and "table_recall" not in full_part
-    assert "| chinook | 2026-09-20 | abcdef1 | 95.0% | 70.0% |" in retrieval_part
+    assert "| chinook | 2026-09-20 | abcdef1 | 95.0% | 70.0% | - |" in retrieval_part
+
+
+DEMO = {"datasource_id": "chinook+support+webanalytics", "engine": "sqlite", "schema_fingerprint": "5" * 16,
+        "tables": 20, "columns": 121}
+
+
+def _routing_report(verdicts=((True, True), (False, True))):
+    """A mode retrieval ``EvalReport`` on a routing suite: routing scored, no recall (the cases name no tables)."""
+    runs = []
+    for i, (top1, shortlist) in enumerate(verdicts):
+        scores = {"routing": {"passed": top1 and shortlist, "value": None,
+                              "detail": {"top1": top1, "shortlist": shortlist}}}
+        status, _ = report.case_status(scores)
+        runs.append({"id": f"r{i}", "role": "admin", "pass": 1, "expected": "allowed", "status": status,
+                     "lenient_status": status, "scores": scores, "cost": 0.0, "latency_s": 0.1})
+    board = report.score_config(runs, passes=1)
+    board.update(planned_cases=len(runs), completed_cases=len(runs))
+    suite = {"name": "routing", "path": "routing.yaml", "digest": "7" * 64}
+    return EvalReport(mode="retrieval", suites=[suite], configs={"retrieval": board}, database=DEMO,
+                      settings={"retrieval": {"table_k": 8, "planning_k": 12, "fetch_multiplier": 4,
+                                              "lambda_mult": 0.7, "full_snapshot_max_tables": 0,
+                                              "query": "question"}})
+
+
+def test_a_routing_record_holds_routing_top1_and_shortlist_and_renders_without_recall(tmp_path):
+    record = records.make_record(_routing_report(), "retrieval", recorded_at=WHEN, engine_version="1", code=CODE)
+    m = record["metrics"]
+    assert (m["routing_cases"], m["routing_top1"], m["routing_shortlist"]) == (2, 0.5, 1.0)
+    assert m["questions"] == 0 and m["table_recall"] is None
+    records.write_records(_routing_report(), tmp_path, recorded_at=WHEN.replace(day=19), engine_version="1",
+                          code=CODE)
+    records.write_records(_routing_report(((True, True), (True, True))), tmp_path, recorded_at=WHEN,
+                          engine_version="1", code=CODE)
+    recs = records.load_records(tmp_path)
+    page = records.render_history(recs)
+    assert "## Retrieval recall: chinook+support+webanalytics" in page
+    assert "| 100.0% / 100.0% |" in page and "| 50.0% / 100.0% |" in page
+    assert "top-1 +50.0 pp, shortlist +0.0 pp" in page
+    block = records.render_readme_block(recs)
+    assert "| chinook+support+webanalytics | 2026-09-21 | abcdef1 | - | - | 100.0% / 100.0% |" in block
+
+
+def test_a_routing_records_case_count_is_its_routing_cases(tmp_path):
+    records.write_records(_routing_report(), tmp_path, recorded_at=WHEN, engine_version="1", code=CODE)
+    page = records.render_history(records.load_records(tmp_path))
+    row = next(line for line in page.splitlines() if "routing @" in line)
+    assert "| 2 |" in row  # "Cases scored": the two routing cases, not the 0 recall cases
+
+
+def test_a_slim_record_keeps_a_routing_cases_kind():
+    assert records.slim_result({"id": "r", "role": "admin", "kind": "routing", "scores": {}})["kind"] == "routing"
 
 
 def test_the_pages_name_nl2sql_eval_not_nl2sql_benchmark(tmp_path):
@@ -403,7 +455,7 @@ def test_the_readme_block_says_when_one_mode_has_no_run_yet(tmp_path):
     records.write_records(_retrieval_report(), tmp_path, recorded_at=WHEN, engine_version="0.9.0", code=CODE)
     block = records.render_readme_block(records.load_records(tmp_path))
     assert records.FULL_EMPTY in block and records.RETRIEVAL_EMPTY not in block
-    assert "| chinook | 2026-09-21 | abcdef1 | 90.0% | 70.0% | first run |" in block
+    assert "| chinook | 2026-09-21 | abcdef1 | 90.0% | 70.0% | - | first run |" in block
 
 
 def test_publish_replaces_only_the_readme_block_and_never_touches_a_record(tmp_path):
@@ -456,20 +508,23 @@ def test_every_committed_record_is_in_the_current_layout_and_where_its_fields_sa
         assert r["_file"].rsplit("/", 1)[1].startswith(expected.stem)
 
 
-def test_the_ci_baselines_are_on_the_chinook_suite_as_it_is_now():
+def test_the_ci_baselines_are_on_the_suites_as_they_are_now():
     """CI's key-free gate compares against these: a changed suite needs a new baseline (`nl2sql eval publish`)."""
     committed = records.load_records(REPO / records.BENCHMARKS_DIR)
-    for mode in ("plans", "retrieval"):
-        newest = next(r for r in committed if records.mode_of(r) == mode)
-        assert newest["dataset"]["sha256"] == SUITE["digest"], mode
-    plans = next(r for r in committed if records.mode_of(r) == "plans")
-    assert plans["metrics"]["accuracy"] == 1.0
-    # The recording rule (benchmarks/README.md): CI's baselines come from CI's own runner.
-    for mode in ("plans", "retrieval"):
-        newest = next(r for r in committed if records.mode_of(r) == mode)
-        assert "ubuntu-latest" in newest["note"] and "actions/runs/" in newest["note"], mode
-    retrieval = next(r for r in committed if records.mode_of(r) == "retrieval")
-    assert retrieval["settings"]["embedding"]
+    routing = {"digest": load_suite(ROUTING_SUITE_PATH).digest(), "database": "chinook+support+webanalytics"}
+    baselines = {"plans": (SUITE["digest"], "chinook"), "retrieval": (SUITE["digest"], "chinook"),
+                 "routing": (routing["digest"], routing["database"])}
+    newest = {}
+    for name, (digest, database) in baselines.items():
+        mode = "retrieval" if name == "routing" else name
+        newest[name] = next(r for r in committed
+                            if records.mode_of(r) == mode and r["database"]["datasource_id"] == database)
+        assert newest[name]["dataset"]["sha256"] == digest, name
+        # The recording rule (benchmarks/README.md): CI's baselines come from CI's own runner.
+        assert "ubuntu-latest" in newest[name]["note"] and "actions/runs/" in newest[name]["note"], name
+    assert newest["plans"]["metrics"]["accuracy"] == 1.0
+    assert newest["retrieval"]["settings"]["embedding"] and newest["routing"]["settings"]["embedding"]
+    assert newest["routing"]["metrics"]["routing_cases"] == len(load_suite(ROUTING_SUITE_PATH).cases)
 
 
 def test_the_migrated_retrieval_baseline():

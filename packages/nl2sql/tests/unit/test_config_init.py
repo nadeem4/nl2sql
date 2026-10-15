@@ -196,7 +196,7 @@ def test_demo_writes_one_file_per_datasource_and_the_curated_section(tmp_path):
 
 
 def test_init_demo_copies_the_suites(tmp_path):
-    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH
+    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, ROUTING_SUITE_PATH
 
     init_project(tmp_path, demo=True)
 
@@ -205,6 +205,9 @@ def test_init_demo_copies_the_suites(tmp_path):
     config = load_config(tmp_path / "nl2sql.yaml")
     assert config.evals.suites == [Path("evals/chinook.yaml")]
     assert (tmp_path / "evals" / "chinook.yaml").read_bytes() == CHINOOK_SUITE_PATH.read_bytes()
+    # The routing suite is copied too, and run by name (--suite evals/routing.yaml): it has no gold plans.
+    assert (tmp_path / "evals" / "routing.yaml").read_bytes() == ROUTING_SUITE_PATH.read_bytes()
+    assert "evals/routing.yaml" in (tmp_path / "evals.yaml").read_text(encoding="utf-8")
 
 
 def test_the_demo_config_built_in_code_runs_the_packaged_suite():

@@ -216,7 +216,8 @@ break: `ok` is false and nothing is compared.
 **The gate reads execution accuracy.** A case passes when `result_match` and
 `outcome` pass; no other scorer counts. That is `accuracy.execution`, the
 measure 0.6's tier 2 published, so a run compares with the history published
-before 0.7 and a faithfulness verdict alone is never a regression. With
+before 0.7 and a faithfulness verdict alone is never a regression. A
+`kind: routing` case has no rows to check and is left out of it. With
 curated answers on, it is checked twice: as users see it, and on the
 generated path. Mode retrieval has no execution, so its cases are read by
 their status.
@@ -279,19 +280,23 @@ nl2sql eval publish demo/eval_full.json --note "slim prompts"
 
 ## In CI
 
-The key-free integration job runs the eval gate on the demo's Chinook suite,
-after indexing it:
+The key-free integration job runs the eval gate on the demo's Chinook suite
+and on [the routing suite](cases.md#the-routing-suite), after indexing them:
 
 ```bash
 nl2sql --config demo-ci/nl2sql.yaml eval run --mode plans --baseline benchmarks
 nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --baseline benchmarks
+nl2sql --config demo-ci/nl2sql.yaml eval run --mode retrieval --suite evals/routing.yaml \
+  --baseline benchmarks --out demo-ci/eval_routing.json
 ```
 
-Each run is gated against the newest record of its mode in `benchmarks/`
-(`plans/chinook/` and `retrieval/chinook/`), and both reports are uploaded
-as the `eval-reports` artifact whether the gate passed or not. A changed suite
-or schema starts a new series, so the gate exits 2 until both baselines are
-recorded again. The same job also runs `tests/e2e/test_evals_plans.py`, where
+Each run is gated against the newest record of its mode and database in
+`benchmarks/` (`plans/chinook/`, `retrieval/chinook/` and
+`retrieval/chinook-support-webanalytics/`). The three reports are uploaded
+as the `eval-reports` artifact whether the gate passed or not. On the routing
+suite, a case that loses its routing top-1 or a shortlisted datasource is a
+flip, and mode retrieval allows none. A changed suite or schema starts a new
+series, so the gate exits 2 until the baselines are recorded again. The same job also runs `tests/e2e/test_evals_plans.py`, where
 every case must pass for every role.
 
 ### Re-recording CI's baselines
@@ -301,18 +306,19 @@ CI's plans and retrieval baselines are recorded **on CI's own runner**
 case only at 100% column recall, which near-tie rankings of the local ONNX
 embedder can move between platforms.
 
-1. Push the change. The integration job's "Eval gate" step runs both modes and
-   uploads `eval_plans.json` and `eval_retrieval.json` as the `eval-reports`
-   artifact, pass or fail.
+1. Push the change. The integration job's "Eval gate" steps run the three
+   gates and upload `eval_plans.json`, `eval_retrieval.json` and
+   `eval_routing.json` as the `eval-reports` artifact, pass or fail.
 2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.
-3. From the repo root, record them, naming where they came from:
-   `nl2sql eval publish eval-reports/eval_plans.json eval-reports/eval_retrieval.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
-4. Commit the two records and the regenerated pages in the same PR, and push.
+3. From the repo root, record the ones the change moved, naming where they
+   came from:
+   `nl2sql eval publish eval-reports/eval_retrieval.json eval-reports/eval_routing.json --note "CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/<run id>"`.
+4. Commit the records and the regenerated pages in the same PR, and push.
    The next run gates against them.
 
 Never edit a record by hand, `engine_version` included. A change that moves
 the gate on purpose (a suite change, routing or retrieval work) re-records
-both baselines this way, in the PR that makes the change.
+the baselines it moves this way, in the PR that makes the change.
 
 Mode `full` spends a key: `nl2sql eval run --mode full` refuses to start when
 `CI` is set. The owner runs it before a release

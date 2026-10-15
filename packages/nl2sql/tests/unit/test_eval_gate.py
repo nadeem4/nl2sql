@@ -61,6 +61,25 @@ def test_gate_compares_only_the_same_suite_and_mode():
     assert not unrelated.ok and "no config" in unrelated.series_break
 
 
+def _routing_only(qid, *, outcome=True):
+    """A routing case (``kind: routing``) run in mode full: no reviewed rows, so no ``result_match`` verdict."""
+    rec = _case(qid, outcome=outcome)
+    rec["scores"]["result_match"] = {"passed": None, "value": None, "detail": {}}
+    rec["kind"] = "routing"
+    return rec
+
+
+def test_routing_only_cases_are_left_out_of_execution_accuracy_and_the_gate():
+    board = report.score_config([_case("q0"), _case("q1", rows=False), _routing_only("r0"), _routing_only("r1")],
+                                passes=1)
+    assert board["accuracy"]["execution"] == 0.5  # q0 of q0 and q1: the routing cases count for nothing
+    # A routing case that stops answering is not an execution regression; its routing scorer says where it went.
+    base = _report([*_passing(), _routing_only("r0")])
+    now = _report([*_passing(), _routing_only("r0", outcome=False)])
+    result = gate.gate(now, base)
+    assert result.ok and result.compared["gpt-5.4"]["accuracy"]["questions"] == 10
+
+
 def test_gate_checks_both_accuracies():
     # What users see is unchanged (a verified query answers), but the model alone lost three cases.
     base = _report([_case(f"q{i}", generated=True) for i in range(10)], curated=True)

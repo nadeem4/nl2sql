@@ -112,6 +112,27 @@ def test_result_match_does_not_apply_to_a_refusal_or_an_unanswerable_case():
     assert result_match.score(_run(_case({"a": "unanswerable"}, rows=None), "a", NOT_ANSWERABLE)).passed is None
 
 
+def test_an_approved_answerable_case_without_sql_is_refused_unless_it_is_a_routing_case():
+    with pytest.raises(ValueError, match="no sql.*kind: routing"):
+        EvalCase(id="q9", question="?", datasources=["chinook"], status="approved", outcome={"admin": "allowed"})
+    routing = EvalCase(id="q9", question="?", datasources=["chinook"], status="approved", kind="routing",
+                       outcome={"admin": "allowed"})
+    assert routing.kind == "routing"
+    # A draft may still lack its SQL, and an unanswerable case never has one.
+    EvalCase(id="d", question="?", status="draft", outcome={"admin": "allowed"})
+    EvalCase(id="u", question="?", status="approved", outcome={"admin": "unanswerable"})
+    with pytest.raises(ValueError, match="routing case.*sql"):
+        EvalCase(id="r", question="?", datasources=["chinook"], kind="routing", sql="SELECT 1",
+                 outcome={"admin": "allowed"})
+
+
+def test_result_match_does_not_apply_to_a_routing_case():
+    # A routing case says where the question goes, not what it returns.
+    case = EvalCase(id="r", question="?", datasources=["chinook"], status="approved", kind="routing",
+                    outcome={"admin": "allowed"})
+    assert result_match.score(_run(case, "admin", _rows_result([["USA", 13]]))).passed is None
+
+
 def test_result_match_fails_an_allowed_case_that_returned_no_rows():
     score = result_match.score(_run(_case({"a": "allowed"}), "a", QueryResult(status="error")))
     assert score.passed is False and "no rows" in score.detail["reason"]
@@ -216,6 +237,21 @@ def test_routing_in_retrieval_mode_needs_every_datasource_among_the_ranked():
     assert Routing().score(run).passed
     missed = _run(case, "admin", QueryResult(), mode="retrieval", routed=["support", "web"])
     assert Routing().score(missed).passed is False
+
+
+def test_routing_in_retrieval_mode_needs_the_top_ranked_datasource_to_be_one_of_the_cases():
+    case = _case({"admin": "allowed"})
+    second = Routing().score(_run(case, "admin", QueryResult(), mode="retrieval", routed=["support", "chinook"]))
+    assert second.passed is False and second.value == 0.0
+    assert second.detail["top1"] is False and second.detail["shortlist"] is True
+    assert "ranked support first" in second.detail["reason"]
+    first = Routing().score(_run(case, "admin", QueryResult(), mode="retrieval", routed=["chinook", "support"]))
+    assert first.passed and first.detail["top1"] is True and first.detail["shortlist"] is True
+
+
+def test_routing_in_retrieval_mode_with_nothing_ranked_misses_both():
+    score = Routing().score(_run(_case({"admin": "allowed"}), "admin", QueryResult(), mode="retrieval", routed=[]))
+    assert score.passed is False and score.detail["top1"] is False and score.detail["shortlist"] is False
 
 
 def test_routing_does_not_apply_to_a_refused_role():

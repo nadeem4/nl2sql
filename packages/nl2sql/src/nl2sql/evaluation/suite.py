@@ -14,7 +14,8 @@ Only ``status: approved`` cases run. A seeded or exported case is a
 
 The suites the package ships are in ``suites/``: ``chinook.yaml`` is the
 Chinook gold set, moved here unchanged from ``chinook_gold.yaml`` and
-``chinook_gold_plans.yaml``.
+``chinook_gold_plans.yaml``; ``routing.yaml`` asks which of the demo's three
+databases a question belongs to (Phase R).
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SUITES_DIR = pathlib.Path(__file__).parent / "suites"
 CHINOOK_SUITE_PATH = SUITES_DIR / "chinook.yaml"
+ROUTING_SUITE_PATH = SUITES_DIR / "routing.yaml"
 
 # What a role should get. ``clarify``: the engine should ask the caller to
 # narrow the question (Wave B); evals run such a case only with ``clarify=True``.
@@ -34,6 +36,9 @@ Outcome = Literal["allowed", "refused", "unanswerable", "clarify"]
 Difficulty = Literal["easy", "medium", "hard"]
 CaseStatus = Literal["draft", "approved", "retired"]
 Origin = Literal["hand", "seeded", "feedback"]
+# ``answer``: the case checks what the question returns. ``routing``: only where
+# it goes (its ``datasources``); it has no ``sql`` and no execution verdict.
+CaseKind = Literal["answer", "routing"]
 
 Rows = List[Dict[str, Any]]
 
@@ -47,6 +52,7 @@ class EvalCase(BaseModel):
     question: str
     datasources: List[str] = Field(default_factory=list)
     status: CaseStatus = "draft"
+    kind: CaseKind = "answer"
     origin: Origin = "hand"
     difficulty: Optional[Difficulty] = None
     tags: List[str] = Field(default_factory=list)
@@ -66,6 +72,13 @@ class EvalCase(BaseModel):
 
     @model_validator(mode="after")
     def _alternatives_are_answerable(self) -> "EvalCase":
+        if self.kind == "routing" and (self.sql is not None or self.alt_sql):
+            raise ValueError(f"{self.id}: a routing case says where a question goes and has no sql; "
+                             "give the case kind: answer to check its rows")
+        if (self.kind == "answer" and self.status == "approved" and self.sql is None
+                and "allowed" in self.outcome.values()):
+            raise ValueError(f"{self.id}: an approved case a role is allowed to answer has no sql. Add the "
+                             "reviewed sql, or mark it kind: routing if it only says where the question goes")
         if self.alt_sql and self.sql is None:
             raise ValueError(f"{self.id}: an unanswerable case cannot have an alternative answer")
         if self.status == "approved" and len(self.alt_rows) != len(self.alt_sql):
@@ -165,7 +178,7 @@ def _str_representer(dumper: yaml.SafeDumper, value: str) -> yaml.ScalarNode:
 _Dumper.add_representer(str, _str_representer)
 
 # Written only when they say something.
-_OPTIONAL = {"paraphrase_group": None, "difficulty": None, "plan": None}
+_OPTIONAL = {"paraphrase_group": None, "difficulty": None, "plan": None, "kind": "answer"}
 
 
 def case_document(case: EvalCase) -> Dict[str, Any]:

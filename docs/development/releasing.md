@@ -181,6 +181,14 @@ two-sided test, because the model is noisy. The gate reads execution accuracy, t
 has always published ([The regression gate](../evals/index.md#the-regression-gate)).
 Commit the record and the regenerated pages in their own PR.
 
+The routing suite is the release check for cross-database routing, on the
+same key and cap. Its board's `routing` scorer says whether each question
+went to the right databases:
+
+```bash
+nl2sql eval run --mode full --suite evals/routing.yaml --llm gpt-5.4 --max-cost 5 --out eval_routing_full.json
+```
+
 ### 4. Merging the release PR is the gate
 
 **This is the only manual step in a release**, after the release page.
