@@ -9,7 +9,7 @@ import yaml
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
-from nl2sql.evaluation.gold import GOLD_DATASET_PATH, GoldQuestion
+from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 from nl2sql.feedback import rated_row
 from nl2sql.storage.sqlite import SqliteState
 from nl2sql.tracing.document import TRACE_FORMAT_VERSION
@@ -77,35 +77,34 @@ def test_list_prints_the_ratings(tmp_path, project_stores):
     assert "How many customers are there?" in out and "wrong table" in out
 
 
-def test_export_good_writes_draft_gold_entries_and_never_touches_the_gold_set(tmp_path, project_stores):
+def test_export_good_writes_draft_cases_and_never_touches_a_packaged_suite(tmp_path, project_stores):
     _seed(project_stores)
-    before = hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest()
+    before = hashlib.sha256(CHINOOK_SUITE_PATH.read_bytes()).hexdigest()
     target = tmp_path / "drafts.yaml"
 
     result = runner.invoke(app, ["feedback", "export", "--good", "--out", str(target)])
 
     out = _out(result)
     assert result.exit_code == 0, out
-    assert hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest() == before
-    drafts = yaml.safe_load(target.read_text(encoding="utf-8"))
-    # One draft: the other thumbs-up run has two statements, and gold_sql is one.
-    assert len(drafts) == 1
-    entry = GoldQuestion.model_validate(drafts[0])
-    assert entry.question == "How many customers are there?"
-    assert entry.gold_sql.strip() == "SELECT COUNT(*) AS n FROM Customer"
-    assert entry.tags == [] and entry.gold_result is None
+    assert hashlib.sha256(CHINOOK_SUITE_PATH.read_bytes()).hexdigest() == before
+    # One draft: the other thumbs-up run has two statements, and a case's sql is one.
+    [case] = load_suite(target).cases
+    assert case.question == "How many customers are there?"
+    assert case.sql.strip() == "SELECT COUNT(*) AS n FROM Customer"
+    assert (case.status, case.origin, case.tags, case.rows) == ("draft", "feedback", [], None)
     assert "review" in target.read_text(encoding="utf-8").lower()
     assert "1 draft" in out and "skipped 1" in out.lower()
+    assert "status: approved" in out and "engine.evals.regenerate" in out
 
 
-def test_export_refuses_to_write_over_the_gold_set(tmp_path, project_stores):
+def test_export_refuses_to_write_over_a_packaged_suite(tmp_path, project_stores):
     _seed(project_stores)
-    before = hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest()
+    before = hashlib.sha256(CHINOOK_SUITE_PATH.read_bytes()).hexdigest()
 
-    result = runner.invoke(app, ["feedback", "export", "--good", "--out", str(GOLD_DATASET_PATH)])
+    result = runner.invoke(app, ["feedback", "export", "--good", "--out", str(CHINOOK_SUITE_PATH)])
 
     assert result.exit_code != 0
-    assert hashlib.sha256(GOLD_DATASET_PATH.read_bytes()).hexdigest() == before
+    assert hashlib.sha256(CHINOOK_SUITE_PATH.read_bytes()).hexdigest() == before
 
 
 def test_export_needs_good(tmp_path, project_stores):

@@ -1,7 +1,8 @@
-"""Benchmark result records, and the pages ``nl2sql benchmark publish`` builds from them.
+"""Eval result records, and the pages :func:`publish` builds from them.
 
-Every tier 2 run writes one record per config and ``benchmark retrieval
---record`` writes one record, under a ``benchmarks/`` folder::
+A mode full run is recorded as one record per config (kind ``tier2``) and a
+mode retrieval run as one record (kind ``retrieval``), under a
+``benchmarks/`` folder::
 
     benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 
@@ -116,9 +117,9 @@ def database_identity(ctx, datasource_ids: Optional[Sequence[str]] = None) -> Di
     columns, types, keys), so re-indexing an unchanged database keeps it.
     Several datasources are joined with ``+``.
 
-    ``datasource_ids`` are the ones the run actually used -- the gold
-    dataset's, from :func:`nl2sql.evaluation.gold.dataset_datasources` -- and
-    every caller passes them. Registering another database beside Chinook
+    ``datasource_ids`` are the ones the run actually used -- the suites'
+    cases' ``datasources`` (``engine.evals.run`` passes them) -- and every
+    caller passes them. Registering another database beside Chinook
     must not rename the run or move its fingerprint, or the history would
     split into a new series. Without them every registered datasource is
     described, which is right only when the run really used all of them.
@@ -379,7 +380,7 @@ def flips(new: Dict[str, Any], old: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     None for a record with no per-question results (a retrieval run, or one
     written before they were kept).
     """
-    from nl2sql.evaluation.tier2 import question_flips
+    from nl2sql.evaluation.gate import question_flips
 
     now = (new.get("scoreboard") or {}).get("results")
     before = (old.get("scoreboard") or {}).get("results")

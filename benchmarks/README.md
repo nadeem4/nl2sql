@@ -1,8 +1,8 @@
 # Benchmark records
 
-One JSON file per recorded benchmark run. `nl2sql benchmark publish` builds
+One JSON file per recorded eval run. `nl2sql.evaluation.records.publish()` builds
 [docs/benchmarks.md](../docs/benchmarks.md) and the README's results block from
-them. Full detail: [the evaluation dataset](../docs/testing/evaluation-dataset.md#results-over-time).
+them. Full detail: [the Chinook suite](../docs/testing/evaluation-dataset.md#results-over-time).
 
 ## Layout
 
@@ -10,8 +10,8 @@ them. Full detail: [the evaluation dataset](../docs/testing/evaluation-dataset.m
 benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 ```
 
-- `kind`: `tier2` (the real model, one file per config) or `retrieval` (schema retrieval recall).
-- `database`: the datasource id the gold dataset names, e.g. `chinook` - not
+- `kind`: `tier2` (mode full: the real model, one file per config) or `retrieval` (schema retrieval recall).
+- `database`: the datasource id the suite's cases name, e.g. `chinook` - not
   every datasource the project has registered, so the demo's `support` and
   `webanalytics` leave a Chinook run's file, identity and series alone.
 - `shortsha`: the engine commit the run used; `unknown` for a wheel install.
@@ -22,7 +22,7 @@ benchmarks/<kind>/<database>/<YYYY-MM-DD>_<shortsha>_<config>.json
 
 Every record has `schema` (2), `kind`, `recorded_at` (UTC), `engine_version`,
 `git_commit` and `git_dirty` (of the installed engine's checkout, `"unknown"`
-when there is none), `note` (`--note`), `dataset` (gold file name and sha256),
+when there is none), `note`, `dataset` (the suite file's name and sha256),
 `database` (`datasource_id`, `engine`, `schema_fingerprint`, `tables`,
 `columns`), `config` and `metrics`. Tier 2 records add `roles`, `passes`,
 `stopped`, `partial` and the full `scoreboard`; retrieval records add
@@ -41,12 +41,10 @@ conflict.
 
 ## Workflow
 
-```bash
-# from the demo folder (./nl2sql.yaml is the config; elsewhere add --config PATH)
-nl2sql benchmark --tier 2 --model gpt-5.4 --max-cost 5 --note "what changed"
-nl2sql benchmark retrieval --record --note "what changed"
+Run the eval with `engine.evals.run` (mode `full` or `retrieval`), write its
+records with `nl2sql.evaluation.records`, then from the repo root:
 
-# from the repo root
-nl2sql benchmark publish --from <demo folder>
+```bash
+python -c "from nl2sql.evaluation.records import publish; publish()"
 git add benchmarks README.md docs/benchmarks.md
 ```

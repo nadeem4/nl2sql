@@ -1,4 +1,4 @@
-"""The LLM configs tier 2 can compare without a file path.
+"""The LLM configs an eval in mode full can compare without a file path.
 
 ``--model MODEL`` builds a config with that model on every LLM node
 (:func:`model_config`). ``--llm NAME`` picks one of the preset YAML files in

@@ -24,6 +24,7 @@ from nl2sql.config.models import (
     Curated,
     Datasource,
     Embeddings,
+    EvalsConfig,
     PipelineSettings,
     Policies,
     Role,
@@ -37,6 +38,9 @@ PathLike = Union[str, "os.PathLike[str]"]
 DEMO_STORAGE_PATH = Path(".nl2sql-demo")
 STORAGE_PATH = ".nl2sql"
 DATA_FOLDER = "data"
+EVALS_FOLDER = "evals"
+# The suites the package ships; found by path, so building the demo's config loads no evaluation code.
+PACKAGED_SUITES = Path(__file__).resolve().parents[1] / "evaluation" / "suites"
 GITIGNORE_LINES = (f"{STORAGE_PATH}/", ".env")
 
 
@@ -56,13 +60,15 @@ def demo_config(
     llm: Optional[LLM] = None,
     path: PathLike = DEMO_STORAGE_PATH,
     data_dir: Optional[PathLike] = None,
+    evals_dir: Optional[PathLike] = None,
 ) -> Config:
     """The demo: three linked SQLite databases, their roles and verified queries.
 
     The databases are opened read-only from ``data_dir``, by default the
     folder the package installed them in. Each datasource carries its sample
     questions and indexes its text columns' values (``index.sample_values``).
-    Without ``llm``, the default OpenAI model is used.
+    Without ``llm``, the default OpenAI model is used. Its eval suite is
+    the Chinook suite in ``evals_dir``, by default the one the package ships.
 
     Its settings are the demo's own: a live run walks six model calls (one
     OpenAI run took 136 s), so a question may take 300 s; every run writes a
@@ -93,6 +99,7 @@ def demo_config(
         storage=Storage(path=Path(path)),
         curated=Curated(**DEMO_CURATED),
         settings=Settings(pipeline=PipelineSettings(timeout_s=300), traces=TraceSettings(mode="always")),
+        evals=EvalsConfig(suites=[(Path(evals_dir) if evals_dir is not None else PACKAGED_SUITES) / "chinook.yaml"]),
     )
 
 
@@ -107,7 +114,7 @@ def init_project(
 
     ``nl2sql.yaml`` is the table of contents, and each section is in its own
     file. With ``demo``, the config is ``demo_config`` and the three databases
-    are copied into ``data/``. A file that already exists is an error naming
+    are copied into ``data/`` and the eval suites into ``evals/``. A file that already exists is an error naming
     it, and nothing is written, unless ``force`` is set. ``.gitignore`` is
     never overwritten: the lines it is missing are added.
     """
@@ -116,18 +123,21 @@ def init_project(
     files: Dict[str, str] = {}
     copies: Dict[str, Path] = {}
 
-    sections = ["datasources", "llm", "embeddings", "policies", "storage", *(["curated", "settings"] if demo else [])]
+    sections = ["datasources", "llm", "embeddings", "policies", "storage", *(["curated", "settings", "evals"] if demo else [])]
     files["nl2sql.yaml"] = TOC_HEADER + "version: 2\n" + "".join(
         f"{section + ':':<13}{{ file: {_section_file(section)} }}\n" for section in sections)
     files["llm.yaml"] = _llm_file(llm)
     files["embeddings.yaml"] = EMBEDDINGS_HEADER + _dump({"provider": "local"})
     files["storage.yaml"] = STORAGE_HEADER + _dump({"path": STORAGE_PATH})
     if demo:
-        config = demo_config(llm=llm, path=STORAGE_PATH, data_dir=DATA_FOLDER)
+        config = demo_config(llm=llm, path=STORAGE_PATH, data_dir=DATA_FOLDER, evals_dir=EVALS_FOLDER)
         for datasource in config.datasources:
             files[f"datasources/{datasource.id}.yaml"] = _datasource_file(datasource)
         for source in _packaged_databases():
             copies[f"{DATA_FOLDER}/{source.name}"] = source
+        for suite in sorted(PACKAGED_SUITES.glob("*.yaml")):
+            copies[f"{EVALS_FOLDER}/{suite.name}"] = suite
+        files["evals.yaml"] = EVALS_HEADER + _dump(config.evals.model_dump(mode="json", exclude_defaults=True))
         files["policies.yaml"] = _dump(config.policies.model_dump(mode="json", exclude_defaults=True))
         files["curated.yaml"] = CURATED_HEADER + _dump(config.curated.model_dump(mode="json", exclude_defaults=True))
         files["settings.yaml"] = DEMO_SETTINGS_HEADER + _dump(
@@ -217,6 +227,11 @@ CURATED_HEADER = """\
 # Verified queries: SQL a person wrote and reviewed, with typed params, and the
 # questions each one answers. While this section is present, curated answers
 # are on. See docs/configuration/curated.md.
+"""
+
+EVALS_HEADER = """\
+# The eval suites engine.evals.run runs, relative to nl2sql.yaml, and how they are
+# scored. evals/chinook.yaml is the Chinook gold suite. See the Evals docs.
 """
 
 DEMO_SETTINGS_HEADER = """\

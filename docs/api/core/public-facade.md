@@ -120,8 +120,7 @@ engine.feedback      # record, list, stats, export, clear
 engine.traces        # get, replay
 engine.storage       # info, purge
 engine.events        # subscribe, catalog
-engine.evals         # evaluation (filled in release 0.7)
-engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_tier2
+engine.evals         # load, run, regenerate, scorers
 ```
 
 | namespace | reference |
@@ -134,9 +133,8 @@ engine.benchmark     # run_matrix, run_tier1, run_retrieval, tier2_configs, run_
 | `curated` | [Curated answers → Checking them](../../configuration/curated.md) |
 | `feedback` | below, and [Feedback and signals](../../observability/feedback.md) |
 | `traces`, `about()` | below |
-| `benchmark` | [Benchmarks](../../benchmarks.md) |
 | `events` | [Events](../../observability/events.md) |
-| `evals` | Empty in this release; [Wave A](../../architecture/wave_a.md) fills it |
+| `evals` | [Evals](../../evals/index.md) |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.
@@ -241,8 +239,9 @@ classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
 `Role`, `Storage`, `StoreConfig`, `Secrets`, `Curated`, `Settings`,
 `ObserverConfig`, `HookConfig`, `EvalsConfig`), what `check()` reports
 (`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
-(`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the benchmark's
-`BenchmarkAPI` and `BenchmarkConfig`. The list is fixed by
+(`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the evals' shapes
+(`EvalSuite`, `EvalCase`, `EvalReport`, `RegenerateReport`) and scorer
+interface (`Scorer`, `Score`, `CaseRun`). The list is fixed by
 `tests/unit/test_public_surface.py`: adding or removing a name is a semver
 decision. The REST API (`nl2sql-api`) is held to importing only from `nl2sql`
 by an architecture test.

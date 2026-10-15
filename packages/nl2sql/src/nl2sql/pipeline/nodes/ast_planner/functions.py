@@ -28,7 +28,7 @@ ALLOWED_FUNCTIONS = AGGREGATE_FUNCTIONS | frozenset({
 })
 
 # Accepted so plans written before the portable date operations still validate
-# (a recorded demo answer and hand-written tier 1 gold plans call STRFTIME), but
+# (a recorded demo answer and the Chinook suite's hand-written plans call STRFTIME), but
 # never offered: the planner prompt names only DATE_PART and DATE_TRUNC, and the
 # validator's UNSUPPORTED_FUNCTION message leaves these out of its list.
 LEGACY_FUNCTIONS = frozenset({"STRFTIME"})

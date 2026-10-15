@@ -349,17 +349,14 @@ def test_only_storage_imports_chromadb():
         "way as the built-in one.", offenders)
 
 
-# The SQLite adapter's driver is sqlite3, and the gold set's SQL runs on the
-# demo's Chinook file to score a benchmark: both read a datasource, not the
-# engine's own state.
-STATE_LIBRARY_EXCEPTIONS = {"nl2sql/src/nl2sql/evaluation/gold.py"}
-
-
+# The SQLite adapter's driver is sqlite3: it reads a datasource, not the
+# engine's own state. Nothing else is excepted: an eval suite's expected rows
+# come through the datasource's adapter (D27).
 def test_only_storage_imports_sqlite3():
     """The engine keeps its state through ``StateStore``; SQLite is one state store among any."""
     offenders = []
     for path in python_files(*SOURCES):
-        if path.is_relative_to(STORAGE) or path.is_relative_to(ADAPTERS) or _where(path) in STATE_LIBRARY_EXCEPTIONS:
+        if path.is_relative_to(STORAGE) or path.is_relative_to(ADAPTERS):
             continue
         offenders += [f"{_where(path)}:{lineno} {name}"
                       for lineno, name, _ in imports(path)
@@ -597,7 +594,7 @@ def test_the_playground_the_demo_command_and_the_api_import_only_the_public_nl2s
 
 
 # --------------------------------------------------------------------------
-# 9. The runtime does not pay for the benchmark (moved from
+# 9. The runtime does not pay for evals (moved from
 #    tests/unit/test_import_hygiene.py)
 # --------------------------------------------------------------------------
 
@@ -606,7 +603,7 @@ RUNTIME = ["pipeline", "execution", "indexing", "datasources", "llm", "policies"
 
 
 def test_the_runtime_never_imports_evaluation_or_feedback_at_module_scope():
-    """Answering a question must not load the benchmark or the feedback store."""
+    """Answering a question must not load the evals or the feedback store."""
     offenders = []
     for name in RUNTIME:
         target = ENGINE / name
@@ -617,7 +614,7 @@ def test_the_runtime_never_imports_evaluation_or_feedback_at_module_scope():
     assert not offenders, _broke(
         "The runtime never imports nl2sql.evaluation or nl2sql.feedback at module scope. "
         "Both are opt-in tools; importing one costs every SDK user the YAML loaders, the "
-        "gold dataset and the fake LLM. A deferred import inside a function is fine.",
+        "eval suites and the fake LLM. A deferred import inside a function is fine.",
         offenders)
 
 
@@ -669,16 +666,20 @@ def test_import_nl2sql_stays_within_its_time_budget():
         f"pulls in the runtime at module scope. The rule is in {RULES}.")
 
 
-def test_building_the_benchmark_api_loads_evaluation_on_demand():
-    code = ("import sys, nl2sql; from nl2sql import BenchmarkAPI, BenchmarkConfig; "
-            "print('nl2sql.evaluation' in sys.modules, BenchmarkConfig.__module__)")
-    assert _run(code) == "True nl2sql.evaluation.types"
+def test_an_eval_name_loads_evaluation_on_demand():
+    code = ("import sys, nl2sql; before = 'nl2sql.evaluation' in sys.modules; from nl2sql import EvalReport; "
+            "print(before, 'nl2sql.evaluation' in sys.modules, EvalReport.__module__)")
+    assert _run(code) == "False True nl2sql.evaluation.report"
 
 
-def test_the_engine_builds_its_benchmark_api_lazily():
-    from nl2sql.public_api import NL2SQL
-
-    assert isinstance(NL2SQL.__dict__["benchmark"], property)
+def test_gold_does_not_import_sqlite3():
+    """D27: no evaluation module runs SQL with a driver of its own; regenerate goes through the adapter."""
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(ENGINE / "evaluation")
+                 for lineno, name, _ in imports(path) if name.partition(".")[0] == "sqlite3"]
+    assert not offenders, _broke(
+        "nl2sql.evaluation never imports sqlite3: engine.evals.regenerate runs a suite's SQL "
+        "through the datasource's adapter, the same one questions run on.", offenders)
 
 
 def test_the_plan_cache_imports_without_the_nodes_package_importing_it_back():
@@ -803,7 +804,6 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/secrets/providers/env.py": "the env secret provider: ${env:...}",
     "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
-    "nl2sql/src/nl2sql/cli/commands/benchmark.py": "CI detection, not configuration",
 }
 
 # The one function that loads a .env file, and the entry points that call it.

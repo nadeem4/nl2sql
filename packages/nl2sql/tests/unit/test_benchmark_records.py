@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from nl2sql.evaluation import records, tier2
-from nl2sql.evaluation.gold import GOLD_DATASET_PATH, dataset_datasources, load_gold_dataset
+from nl2sql.evaluation import records, report
+from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 
 REPO = pathlib.Path(__file__).resolve().parents[4]
 WHEN = dt.datetime(2026, 9, 21, 14, 5, 6, tzinfo=dt.timezone.utc)
@@ -36,20 +36,20 @@ def _board(names=("gpt-5.4",), passes=1, stopped=None, statuses=("pass", "fail")
     configs = {}
     for name in names:
         runs = [_rec(f"q{i}", s, p, cost) for p in range(1, passes + 1) for i, s in enumerate(statuses)]
-        board = tier2.score_config(runs, passes=passes)
+        board = report.score_config(runs, passes=passes)
         board.update(models={"astplanner": "openai:gpt-5.4", "decomposer": "openai:gpt-5.4-mini"},
                      planned_cases=len(runs), completed_cases=len(runs))
         configs[name] = board
-    return {"tier": 2, "dataset": str(GOLD_DATASET_PATH), "roles": list(roles), "passes": passes,
+    return {"tier": 2, "dataset": str(CHINOOK_SUITE_PATH), "roles": list(roles), "passes": passes,
             "questions": ["q0", "q1"], "max_cost": 5.0, "spent": 0.1, "stopped": stopped,
-            "prices_checked_on": "2026-09-21", "configs": configs, "comparison": tier2.compare(configs),
+            "prices_checked_on": "2026-09-21", "configs": configs, "comparison": report.compare(configs),
             "database": database}
 
 
 def _retrieval_report(table=0.9, column=0.7, database=CHINOOK):
     summary = {"questions": 3, "table_recall": table, "column_recall": column, "perfect_tables": 2,
                "perfect_columns": 1, "tables_sent": 8.0, "columns_sent": 24.0}
-    return {"kind": "retrieval", "dataset": str(GOLD_DATASET_PATH), "database": database,
+    return {"kind": "retrieval", "dataset": str(CHINOOK_SUITE_PATH), "database": database,
             "settings": {"table_k": 8, "planning_k": 12, "embedding": "local"}, "summary": summary, "results": []}
 
 
@@ -62,8 +62,8 @@ def test_a_record_holds_when_what_on_which_code_data_and_database_and_the_headli
     assert (record["git_commit"], record["git_dirty"]) == ("abcdef1234567890", False)
     assert record["note"] == "slim prompts"
     assert record["database"] == CHINOOK
-    assert record["dataset"] == {"name": "chinook_gold.yaml",
-                                 "sha256": hashlib.sha256(GOLD_DATASET_PATH.read_bytes().replace(b"\r\n", b"\n"))
+    assert record["dataset"] == {"name": "chinook.yaml",
+                                 "sha256": hashlib.sha256(CHINOOK_SUITE_PATH.read_bytes().replace(b"\r\n", b"\n"))
                                  .hexdigest()}
     assert record["config"] == {"name": "gpt-5.4", "models": {"astplanner": "openai:gpt-5.4",
                                                               "decomposer": "openai:gpt-5.4-mini"}}
@@ -186,7 +186,7 @@ def test_the_identity_is_the_datasets_own_datasources_not_every_registered_one(m
     """With the demo's three databases registered, a Chinook gold run is still `chinook`."""
     _fingerprinted_per_datasource(monkeypatch)
     ctx = _demo_ctx()
-    identity = records.database_identity(ctx, dataset_datasources(load_gold_dataset()))
+    identity = records.database_identity(ctx, _suite_datasources())
     # Byte for byte what the two committed tier 2 runs and the retrieval run recorded.
     assert identity == CHINOOK
     for path in sorted((REPO / "benchmarks").glob("*/chinook/*.json")):
@@ -200,9 +200,12 @@ def test_the_identity_is_the_datasets_own_datasources_not_every_registered_one(m
     assert records.database_identity(ctx)["datasource_id"] == "chinook+support+webanalytics"
 
 
-def test_the_gold_set_names_one_datasource():
-    assert dataset_datasources(load_gold_dataset()) == ["chinook"]
-    assert {q.datasource for q in load_gold_dataset()} == {"chinook"}
+def _suite_datasources():
+    return sorted({d for c in load_suite(CHINOOK_SUITE_PATH).cases for d in c.datasources})
+
+
+def test_the_chinook_suite_names_one_datasource():
+    assert _suite_datasources() == ["chinook"]
 
 
 def _write(root, day, name="gpt-5.4", statuses=("pass", "fail"), database=CHINOOK, roles=("admin",), cost=0.02,
@@ -389,9 +392,9 @@ def test_the_committed_pages_match_what_publish_generates_from_the_committed_rec
     committed = records.load_records(REPO / records.BENCHMARKS_DIR)
     history = (REPO / records.HISTORY_PATH).read_text(encoding="utf-8")
     readme = (REPO / records.README_PATH).read_text(encoding="utf-8")
-    assert history == records.render_history(committed), "run `nl2sql benchmark publish` and commit the result"
+    assert history == records.render_history(committed), "run nl2sql.evaluation.records.publish() from the repo root and commit the result"
     assert readme == records.replace_block(readme, records.render_readme_block(committed)), \
-        "run `nl2sql benchmark publish` and commit the result"
+        "run nl2sql.evaluation.records.publish() from the repo root and commit the result"
 
 
 # --- statistics in the record and in the history -----------------------------
@@ -400,7 +403,7 @@ def test_the_committed_pages_match_what_publish_generates_from_the_committed_rec
 def test_a_record_keeps_the_interval_for_both_scores_and_pass_k():
     record = records.make_record(_board(passes=2), "gpt-5.4", recorded_at=WHEN, engine_version="1", code=CODE)
     m = record["metrics"]
-    assert m["accuracy_interval"] == [round(b, 4) for b in tier2.wilson_interval(2, 4)]
+    assert m["accuracy_interval"] == [round(b, 4) for b in report.wilson_interval(2, 4)]
     assert m["lenient_accuracy_interval"] == m["accuracy_interval"]
     # Both passes score the same here, so half the questions pass every pass.
     assert m["pass_k"] == {"k": 2, "questions": 2, "strict": 0.5, "lenient": 0.5}

@@ -166,7 +166,7 @@ flowchart TD
   names (in any namespace), the one just replaced and the newest
   `settings.schema.max_versions` are kept. See
   [The state store](../schema/store.md#which-snapshots-are-kept).
-- `engine.datasources.schema()`, `engine.curated.validate()` and the benchmark's
+- `engine.datasources.schema()`, `engine.curated.validate()` and an eval report's
   database identity read the snapshot the live pointer names too.
 
 ## Index health

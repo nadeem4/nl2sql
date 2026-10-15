@@ -112,30 +112,42 @@ more traces):
 
 `nl2sql feedback list` prints the ratings, newest first, with their notes.
 
-## Growing the gold set: `nl2sql feedback export --good`
+## Growing an eval suite: `nl2sql feedback export --good`
 
 ```bash
 nl2sql feedback export --good                     # feedback_gold_drafts.yaml
 nl2sql feedback export --good --out drafts.yaml
 ```
 
-Each thumbs-up run becomes a draft entry in the shape of
-`chinook_gold.yaml` (`GoldQuestion` in `nl2sql/evaluation/gold.py`): the
-question, the run's SQL as the `gold_sql` candidate, empty `tags`, `needed_tables`
-and `needed_columns`, `difficulty: medium`, `expected` set to `allowed` for the
-role it ran as, and no `gold_result`. A run with no SQL, or with more than one
-statement, is skipped: `gold_sql` is one query. The drafts go to their own file;
-`export` never writes the gold set, and refuses an `--out` that points at it.
+Each thumbs-up run becomes a draft [eval case](../evals/cases.md), written to
+a suite file of its own:
 
-**A person must review every draft before it joins the gold set.** A thumbs up
-says an answer looked right, not that its SQL is the reference answer. Check the
-SQL answers the question, fill in `difficulty`, `tags`, `needed_tables`,
-`needed_columns` and `expected` (add the roles that must be refused), copy the
-entry into `chinook_gold.yaml`, and run the gold generator to write its
-`gold_result`:
+- `status: draft` and `origin: feedback`;
+- the question, the run's SQL as the `sql` candidate, and the datasources it
+  read;
+- `outcome` set to `allowed` for the role it ran as;
+- no `rows`.
 
-```bash
-python -m nl2sql.evaluation.gold
+A run with no SQL, or with more than one statement, is skipped: a case's
+`sql` is one query. Drafts never replace reviewed cases. `export` refuses an
+`--out` that is:
+
+- a suite the package ships;
+- a suite `evals.yaml` names;
+- an existing file that holds an approved case.
+
+**A person must review every draft before it runs.** A thumbs up says an
+answer looked right, not that its SQL is the reference answer. To promote a
+draft:
+
+1. Check that the SQL answers the question.
+2. Fill in `difficulty`, `tags`, `tables`, `columns` and `outcome` (add the
+   roles that must be refused).
+3. Set `status: approved`.
+4. Write its rows:
+
+```python
+engine.evals.regenerate("feedback_gold_drafts.yaml")
 ```
 
 ## Proposing verified queries: `nl2sql curated proposals export`

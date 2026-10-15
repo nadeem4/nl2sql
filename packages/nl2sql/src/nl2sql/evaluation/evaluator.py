@@ -1,22 +1,21 @@
+"""Comparing a result's rows with a case's reviewed rows, strictly and leniently.
+
+The ``result_match`` scorer reads both (``nl2sql.evaluation.scorers.result_match``).
+"""
 from __future__ import annotations
 
 import itertools
 import math
 import re
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import sqlglot
 
-from nl2sql.api.query_api import QueryResult
-from nl2sql.evaluation.gold import GoldQuestion
-from nl2sql.pipeline.nodes.validator.node import REFUSAL_MESSAGE
 
 # Gold values are rounded to two decimals, so an unrounded engine value can sit
 # up to half a cent away from the gold one. The epsilon absorbs float noise at
 # exactly half a cent.
 NUMERIC_TOLERANCE = 0.005 + 1e-9
-
-OUTCOMES = ("pass", "fail", "skip", "xfail")
 
 Row = Union[Dict[str, Any], Sequence[Any]]
 
@@ -257,79 +256,3 @@ class ModelEvaluator:
             if _rows_match([[row[i] for i in picks] for row in got], want, order_matters):
                 return True
         return False
-
-    @staticmethod
-    def score_case(question: GoldQuestion, role: str, result: QueryResult) -> Tuple[str, str]:
-        """Scores one run of ``question`` as ``role`` strictly: ``(status, reason)``.
-
-        ``allowed`` passes when the run succeeds and its rows match
-        ``gold_result`` (respecting ``order_matters``). ``refused`` passes on
-        the RBAC refusal: status ``error``, a ``SECURITY_VIOLATION`` whose
-        message is the generic one, and no rows. ``unanswerable`` passes on the
-        datasource resolver's refusal: status ``error`` with
-        ``QUESTION_NOT_ANSWERABLE`` and no rows.
-        """
-        return ModelEvaluator._score(question, role, result, ModelEvaluator.compare_results)
-
-    @staticmethod
-    def score_case_lenient(question: GoldQuestion, role: str, result: QueryResult) -> Tuple[str, str]:
-        """Scores one run as :meth:`score_case` does, with :meth:`compare_results_lenient`.
-
-        Only the rows of an ``allowed`` question are read differently; a
-        refusal is scored exactly as the strict score reads it.
-        """
-        return ModelEvaluator._score(question, role, result, ModelEvaluator.compare_results_lenient)
-
-    @staticmethod
-    def _score(question: GoldQuestion, role: str, result: QueryResult,
-               compare: Callable[..., bool]) -> Tuple[str, str]:
-        expected = question.expected[role]
-        errors = result.errors
-        first_error = f"{errors[0].get('error_code')}: {errors[0].get('message')}" if errors else ""
-        row_samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
-        returned_rows = any(sample.total_rows or sample.rows for sample in row_samples)
-
-        if expected == "unanswerable":
-            codes = {e.get("error_code") for e in errors}
-            if returned_rows or result.status != "error" or "QUESTION_NOT_ANSWERABLE" not in codes:
-                return "fail", (f"expected QUESTION_NOT_ANSWERABLE, got status '{result.status}': "
-                                f"{first_error or f'rows={returned_rows}'}")
-            return "pass", ""
-
-        if expected == "refused":
-            denials = [e for e in errors if e.get("error_code") == "SECURITY_VIOLATION"]
-            if returned_rows or result.status != "error":
-                return "fail", f"expected a refusal, got status '{result.status}' with rows={returned_rows}"
-            if not denials:
-                return "fail", f"expected a refusal, got {first_error or 'no error'}"
-            if any(e.get("message") != REFUSAL_MESSAGE for e in denials):
-                return "fail", f"refusal is not the generic message: {denials[0].get('message')}"
-            return "pass", ""
-
-        if result.status != "success":
-            return "fail", f"status '{result.status}': {first_error or 'no rows'}"
-        if len(row_samples) != 1:
-            return "fail", f"expected one result set, got {len(row_samples)}"
-        sample = row_samples[0]
-        # The gold answer, then every reviewed alternative: any one matching passes.
-        answers = question.answers()
-        if any(compare(sample.rows, a, order_matters=question.order_matters) for a in answers):
-            return "pass", ""
-        gold = answers[0]
-        extra = len(answers) - 1
-        alternatives = f" and {extra} alternative{'s' if extra != 1 else ''}" if extra else ""
-        return "fail", (f"rows differ from gold_result{alternatives} "
-                        f"({len(sample.rows)} rows, gold has {len(gold)})")
-
-    @staticmethod
-    def summarize(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Counts each outcome per role and in total."""
-        def empty() -> Dict[str, int]:
-            return {outcome: 0 for outcome in OUTCOMES}
-
-        by_role: Dict[str, Dict[str, int]] = {}
-        total = empty()
-        for r in results:
-            by_role.setdefault(r["role"], empty())[r["status"]] += 1
-            total[r["status"]] += 1
-        return {"by_role": by_role, "total": total}

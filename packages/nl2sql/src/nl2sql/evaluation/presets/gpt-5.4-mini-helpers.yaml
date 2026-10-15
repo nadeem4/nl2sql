@@ -1,4 +1,4 @@
-# Tier 2 benchmark config, an llm section: the planner and refiner on gpt-5.4;
+# An llm section for an eval in mode full: the planner and refiner on gpt-5.4;
 # the resolver, decomposer and answer synthesizer on gpt-5.4-mini (the top level).
 provider: openai
 model: gpt-5.4-mini

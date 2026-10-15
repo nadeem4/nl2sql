@@ -1,4 +1,4 @@
-"""``engine.feedback``: answer ratings, the guardrail rates, and draft gold entries.
+"""``engine.feedback``: answer ratings, the guardrail rates, and draft eval cases.
 
 The ratings live in the engine's state store (``storage.state``,
 ``<storage.path>/state.db`` by default); the rates also read the run traces
@@ -75,23 +75,39 @@ class FeedbackAPI:
         return compute_stats(self.list(), load_traces(folder) if folder is not None else [])
 
     def export(self, path: Union[str, Path]) -> Dict[str, int]:
-        """Write the thumbs-up runs to ``path`` as draft gold entries, for a person to review.
+        """Write the thumbs-up runs to ``path`` as draft eval cases (``status: draft``, ``origin: feedback``).
 
-        A run with no SQL, or more than one statement, is skipped: ``gold_sql``
-        is one query. The gold set itself is never written.
+        A person reviews each one, sets ``status: approved`` and runs
+        ``engine.evals.regenerate``. A run with no SQL, or more than one
+        statement, is skipped: a case's ``sql`` is one query. Drafts never
+        replace reviewed cases: a suite the package ships, a suite
+        ``evals.yaml`` names, and any existing file holding an approved case
+        are refused.
 
         Returns:
             ``{"written": <drafts>, "skipped": <runs>}``.
 
         Raises:
-            ValueError: ``path`` is the gold set.
+            ValueError: ``path`` is a suite the package ships, a suite ``evals.yaml``
+                names, or a file holding approved cases.
         """
-        from nl2sql.evaluation.gold import GOLD_DATASET_PATH
+        from nl2sql.evaluation.suite import SUITES_DIR, holds_approved_cases
         from nl2sql.feedback import draft_entries, write_drafts
 
         path = Path(path)
-        if path.resolve() == GOLD_DATASET_PATH.resolve():
-            raise ValueError("Drafts never go into the gold set itself. Write them to another file.")
+        folder = self._ctx.config.folder
+        if not path.is_absolute() and folder is not None:
+            path = Path(folder) / path
+        target = path.resolve()
+        if target.parent == SUITES_DIR.resolve():
+            raise ValueError("Drafts never go into a suite the package ships. Write them to another file.")
+        configured = {(p if p.is_absolute() or folder is None else Path(folder) / p).resolve()
+                      for p in self._ctx.config.evals.suites}
+        if target in configured:
+            raise ValueError(f"{path} is a suite evals.yaml names; drafts never replace it. "
+                             "Write them to another file.")
+        if holds_approved_cases(path):
+            raise ValueError(f"{path} holds approved cases; drafts never replace them. Write them to another file.")
         drafts, skipped = draft_entries(self.list())
         write_drafts(drafts, path)
         return {"written": len(drafts), "skipped": skipped}

@@ -30,7 +30,8 @@ def _without_paths(config: Config) -> Config:
         d.model_copy(update={"connection": {**d.connection, "database": Path(d.connection["database"]).name}})
         for d in config.datasources
     ]
-    return config.model_copy(update={"datasources": datasources,
+    evals = config.evals.model_copy(update={"suites": [Path(p.name) for p in config.evals.suites]})
+    return config.model_copy(update={"datasources": datasources, "evals": evals,
                                      "storage": config.storage.model_copy(update={"path": Path("storage")})})
 
 
@@ -192,6 +193,24 @@ def test_demo_writes_one_file_per_datasource_and_the_curated_section(tmp_path):
     assert not (tmp_path / "datasources" / "example.yaml").exists()
     toc = yaml.safe_load((tmp_path / "nl2sql.yaml").read_text(encoding="utf-8"))
     assert toc["curated"] == {"file": "curated.yaml"}
+
+
+def test_init_demo_copies_the_suites(tmp_path):
+    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH
+
+    init_project(tmp_path, demo=True)
+
+    toc = yaml.safe_load((tmp_path / "nl2sql.yaml").read_text(encoding="utf-8"))
+    assert toc["evals"] == {"file": "evals.yaml"}
+    config = load_config(tmp_path / "nl2sql.yaml")
+    assert config.evals.suites == [Path("evals/chinook.yaml")]
+    assert (tmp_path / "evals" / "chinook.yaml").read_bytes() == CHINOOK_SUITE_PATH.read_bytes()
+
+
+def test_the_demo_config_built_in_code_runs_the_packaged_suite():
+    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH
+
+    assert demo_config().evals.suites == [CHINOOK_SUITE_PATH]
 
 
 def test_demo_curated_sql_reads_as_written(tmp_path):

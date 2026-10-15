@@ -1,4 +1,4 @@
-# Tier 2 benchmark config, an llm section: the planner and refiner on Claude
+# An llm section for an eval in mode full: the planner and refiner on Claude
 # Opus 5 (Anthropic's own API; needs the anthropic extra and ANTHROPIC_API_KEY),
 # the rest on gpt-5.4. Opus 5 rejects sampling parameters, so no temperature is
 # sent to it. No key is named: each provider's standard variable is read.

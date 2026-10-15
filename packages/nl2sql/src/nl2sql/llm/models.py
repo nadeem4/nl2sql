@@ -57,7 +57,7 @@ class AgentConfig(BaseModel):
 class LLMFileConfig(BaseModel):
     """A set of agents to compare: ``default`` and the agents that differ from it.
 
-    What the benchmark's tier 2 and matrix runs swap in, one config at a time.
+    What an eval in mode full swaps in, one config at a time.
     ``from_llm`` builds one from the ``llm`` section.
     """
     default: AgentConfig

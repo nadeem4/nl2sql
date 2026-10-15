@@ -127,6 +127,14 @@ aws = "nl2sql.secrets.providers.aws:AwsSecretProvider"
 azure = "nl2sql.secrets.providers.azure:AzureSecretProvider"
 hashicorp = "nl2sql.secrets.providers.hashi:HashiCorpSecretProvider"
 
+# The built-in scorers engine.evals runs (nl2sql/evaluation/scorers/).
+[project.entry-points."nl2sql.scorers"]
+result_match = "nl2sql.evaluation.scorers.result_match:ResultMatch"
+outcome = "nl2sql.evaluation.scorers.outcome:Outcome"
+faithfulness = "nl2sql.evaluation.scorers.faithfulness:Faithfulness"
+retrieval_recall = "nl2sql.evaluation.scorers.retrieval_recall:RetrievalRecall"
+routing = "nl2sql.evaluation.scorers.routing:Routing"
+
 # One group for the four store slots, so a store's name is unique across them.
 [project.entry-points."nl2sql.stores"]
 chroma = "nl2sql.storage.chroma:ChromaIndex"
@@ -142,7 +150,7 @@ include = ["nl2sql*"]
 "*" = ["configs/*.yaml", ".env"]
 "nl2sql.cli.demo" = ["recordings/*.json"]
 "nl2sql.datasets" = ["*.sqlite", "README.md"]
-"nl2sql.evaluation" = ["datasets/*.yaml"]
+"nl2sql.evaluation" = ["suites/*.yaml"]
 "nl2sql.evaluation.presets" = ["*.yaml"]
 # The committed Vite build of web/playground: the wheel must carry the finished
 # page so `pip install "nl2sql-engine[demo]"` needs no Node toolchain. The card

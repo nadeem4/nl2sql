@@ -51,7 +51,7 @@ of its contract and metadata). A stored snapshot is never changed: in the
 
 The structural fingerprint (`nl2sql.schema.generate_schema_fingerprint`:
 datasource ID, engine type, sorted tables, columns and foreign keys) is still
-stored beside each row, and benchmark records use it to identify a database.
+stored beside each row, and eval reports and records use it to identify a database.
 
 ### Which snapshots are kept
 
