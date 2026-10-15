@@ -235,3 +235,10 @@ def test_the_identity_is_resolved_on_every_call():
 
     first, second = anyio.run(go)
     assert len(first["datasources"]) == 2 and len(second["datasources"]) == 1
+
+
+def test_every_caller_facing_code_is_an_error_code():
+    from nl2sql import ErrorCode
+    from nl2sql.mcp.server import _CALLER_FACING
+
+    assert _CALLER_FACING <= {code.value for code in ErrorCode}

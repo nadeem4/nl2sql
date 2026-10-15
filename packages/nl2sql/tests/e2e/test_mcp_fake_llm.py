@@ -13,25 +13,30 @@ from mcp.shared.memory import create_connected_server_and_client_session  # noqa
 
 from nl2sql import NL2SQL, UserContext  # noqa: E402
 from nl2sql.mcp.server import build_server  # noqa: E402
+from nl2sql.testing.fake_llm import FakeLLMServer  # noqa: E402
 
+from .conftest import fake_llm_section, private_storage, project_config  # noqa: E402
 from .recordings_chinook import RULES_ALBUMS_PER_ARTIST  # noqa: E402
 
 
 @pytest.fixture
-def engine_on(demo_project, fake_llm, monkeypatch):
-    """``engine_on(rules)``: the demo engine with its model answers from ``rules``."""
-    engines = []
+def engine_on(demo_project, tmp_path, monkeypatch):
+    """``engine_on(rules)``: the demo engine, on a private copy of its index and state, answered from ``rules``."""
+    opened = []
 
     def _make(rules):
-        _, env = fake_llm(rules)
-        monkeypatch.setenv("OPENAI_API_KEY", env["OPENAI_API_KEY"])
-        engine = NL2SQL.from_config(demo_project / "fake.yaml")
-        engines.append(engine)
+        server = FakeLLMServer(rules).start()
+        config = project_config(demo_project, "mcp.yaml", llm=fake_llm_section(server.base_url),
+                                storage=private_storage(demo_project, tmp_path / "store"))
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-" + "fake-mcp-test")
+        engine = NL2SQL.from_config(config)
+        opened.append((server, engine))
         return engine
 
     yield _make
-    for engine in engines:
+    for server, engine in opened:
         engine.close()
+        server.stop()
 
 
 def _calls(engine, role, *calls):

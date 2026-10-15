@@ -19,7 +19,7 @@ from typing import Any, Callable, Optional, Union
 import anyio
 from mcp.server.fastmcp import FastMCP
 
-from nl2sql import NL2SQL, ErrorCode, UserContext
+from nl2sql import NL2SQL, UserContext
 
 logger = logging.getLogger(__name__)
 
@@ -40,16 +40,14 @@ INSTRUCTIONS = (
 # The codes whose message the engine writes for the person asking: refusals,
 # limits, provider failures and the answer checks' warnings. Any other error
 # or warning (a crash, or an earlier attempt a retry recovered from) may carry
-# an exception's text, so its message is replaced.
-_CALLER_FACING = frozenset(code.value for code in (
-    ErrorCode.SECURITY_VIOLATION, ErrorCode.QUESTION_NOT_ANSWERABLE, ErrorCode.QUESTION_TOO_BROAD,
-    ErrorCode.HOOK_DENIED, ErrorCode.NEEDS_APPROVAL, ErrorCode.RUN_LIMIT_REACHED, ErrorCode.CANCELLED,
-    ErrorCode.PIPELINE_TIMEOUT, ErrorCode.PROVIDER_AUTH_FAILED, ErrorCode.PROVIDER_RATE_LIMITED,
-    ErrorCode.PROVIDER_QUOTA_EXCEEDED, ErrorCode.PROVIDER_TIMEOUT, ErrorCode.PROVIDER_UNAVAILABLE,
-    ErrorCode.PROVIDER_MODEL_UNAVAILABLE, ErrorCode.VALUE_NOT_FOUND, ErrorCode.RESULT_TRUNCATED,
-    ErrorCode.JOIN_KEY_UNCONVERTED, ErrorCode.JOIN_FAN_OUT, ErrorCode.ALL_NULL_COLUMN,
-))
-
+# an exception's text, so its message is replaced. ``ErrorCode`` values, named
+# as text: the engine's own tests read ``ErrorCode.X`` as the place X is raised.
+_CALLER_FACING = frozenset({
+    "SECURITY_VIOLATION", "QUESTION_NOT_ANSWERABLE", "QUESTION_TOO_BROAD", "HOOK_DENIED", "NEEDS_APPROVAL",
+    "RUN_LIMIT_REACHED", "CANCELLED", "PIPELINE_TIMEOUT", "PROVIDER_AUTH_FAILED", "PROVIDER_RATE_LIMITED",
+    "PROVIDER_QUOTA_EXCEEDED", "PROVIDER_TIMEOUT", "PROVIDER_UNAVAILABLE", "PROVIDER_MODEL_UNAVAILABLE",
+    "VALUE_NOT_FOUND", "RESULT_TRUNCATED", "JOIN_KEY_UNCONVERTED", "JOIN_FAN_OUT", "ALL_NULL_COLUMN",
+})
 
 
 def build_server(engine: NL2SQL, identity: Identity) -> FastMCP:
