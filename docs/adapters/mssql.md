@@ -19,6 +19,7 @@ connection:
   database: my_db
   driver: "ODBC Driver 18 for SQL Server" # Optional: unset picks the newest one installed
   trusted_connection: false               # true: log in as the account the engine runs under
+  encrypt: true                           # false: a local or test server without TLS
   trust_server_certificate: false         # true: accept a self-signed certificate
 ```
 
@@ -32,11 +33,12 @@ other key is an error; see [Connection](../configuration/datasources.md#connecti
   that `pyodbc.drivers()` lists, so a machine with only Driver 17 works without
   configuration. With none installed, `nl2sql check` fails at the `driver` stage
   and says where to download one.
-* **Encryption**: always on (`Encrypt=yes`). Driver 18 encrypts by default and
-  Driver 17 does not, so the adapter asks for it: the connection behaves the same
-  whichever driver is used. A server with a self-signed certificate (a local or
-  test server) needs `trust_server_certificate: true`.
-* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}&Encrypt=yes`, plus
+* **Encryption**: on by default (`Encrypt=yes`). Driver 18 encrypts by default and
+  Driver 17 does not, so the adapter always says which it wants: the connection
+  behaves the same whichever driver is used. A server with a self-signed
+  certificate (a local or test server) needs `trust_server_certificate: true`;
+  one without TLS at all needs `encrypt: false`, which sends `Encrypt=no`.
+* **URI Constructed**: `mssql+pyodbc://{user}:{pass}@{host}:{port}/{db}?driver={driver}&Encrypt=yes` (`no` with `encrypt: false`), plus
   `Trusted_Connection=yes` and `TrustServerCertificate=yes` when set.
   Built with SQLAlchemy's `URL.create`, so the user name and password are
   percent-escaped: a password containing `@ : / # %` works as written.

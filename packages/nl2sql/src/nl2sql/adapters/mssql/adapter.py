@@ -52,6 +52,9 @@ class MssqlConnection(SQLAlchemyConnection):
                                   json_schema_extra={"group": "advanced"})
     trusted_connection: bool = Field(False, title="Windows authentication",
                                      json_schema_extra={"group": "advanced"})
+    encrypt: bool = Field(True, title="Encrypt the connection",
+                          description="Off: a local or test server without TLS",
+                          json_schema_extra={"group": "advanced"})
     trust_server_certificate: bool = Field(False, title="Trust the server certificate",
                                            json_schema_extra={"group": "advanced"})
 
@@ -64,13 +67,15 @@ class MssqlAdapter(SQLAlchemyAdapter):
                     'https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server')
 
     def url(self, connection: MssqlConnection) -> URL:
-        """The connection's ``driver``, else the newest one installed, always encrypting.
+        """The connection's ``driver``, else the newest one installed, encrypting unless ``encrypt`` is off.
 
         Driver 18 encrypts unless told not to and Driver 17 only when told
-        to, so ``Encrypt=yes`` makes both behave alike, and
-        ``trust_server_certificate`` means the same whichever is used.
+        to, so ``Encrypt`` is always sent (``yes`` or ``no``) to make both
+        behave alike, and ``trust_server_certificate`` means the same
+        whichever is used.
         """
-        query = {"driver": connection.driver or newest_sql_server_driver(), "Encrypt": "yes"}
+        query = {"driver": connection.driver or newest_sql_server_driver(),
+                 "Encrypt": "yes" if connection.encrypt else "no"}
         if connection.trusted_connection:
             query["Trusted_Connection"] = "yes"
         if connection.trust_server_certificate:
