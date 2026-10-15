@@ -1667,6 +1667,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/seeding/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../testing/evaluation-dataset/">
 <span class="md-ellipsis">
     
@@ -2331,6 +2343,15 @@ They run outside <code>execute.before</code> and <code>execute.after</code>. So 
 attached at <code>execute.before</code>, no probe runs at all: SQL a hook gates never has
 unseen SQL beside it. <code>settings.pipeline.sanity_checks: false</code> turns the checks
 off entirely.</p>
+<p><strong>Eval seeding is hooked; <code>regenerate</code> is not.</strong> <code>engine.evals.seed</code>
+(<a href="../../evals/seeding/">Benchmark your own database</a>) runs SQL a model
+proposed, so each draft's SQL passes <code>execute.before</code> and <code>execute.after</code> like
+a question's: every hook sees it (an approval hook, a cost guard), and a deny,
+a hook failure or a <code>NeedsApproval</code> drops the draft (<code>dropped_hooked</code>).
+<code>execute.after</code> gets a summary of the first row only (seeding reads one row
+to see that the query returns any), so its <code>row_count</code> is a floor and
+<code>truncated</code> is true. <code>engine.evals.regenerate</code> runs SQL a person reviewed and
+approved (a suite's gold <code>sql</code> and <code>alt_sql</code>) and calls no hook.</p>
 <p><strong>The verified path</strong> has no routing and no plan, so only <code>run.before</code>,
 <code>execute.before</code>, <code>execute.after</code> and <code>answer.after</code> apply. A deny there ends
 the run; it does not fall back to the generated path. <strong>A plan-only run</strong>

@@ -3967,6 +3967,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../evals/seeding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../testing/evaluation-dataset/" class="md-nav__link">
         
   
@@ -5854,8 +5882,8 @@ after the client is constructed, so the config - not the model name -
 decides what is sent.</p>
 </div>
 <h2 id="per-node-models">Per-node models</h2>
-<p>The six pipeline nodes that call a model, and indexing enrichment, each have
-an agent. An agent not under <code>agents</code> runs on the top level:</p>
+<p>The six pipeline nodes that call a model, indexing enrichment and eval
+seeding each have an agent. An agent not under <code>agents</code> runs on the top level:</p>
 <table>
 <thead>
 <tr>
@@ -5891,6 +5919,10 @@ an agent. An agent not under <code>agents</code> runs on the top level:</p>
 <tr>
 <td><code>indexing_enrichment</code></td>
 <td>writes missing schema descriptions during <code>nl2sql index --enrich</code> (optional, off by default)</td>
+</tr>
+<tr>
+<td><code>eval_seeder</code></td>
+<td>drafts eval questions with typed plans during <code>nl2sql eval seed</code> (<a href="../../evals/seeding/">Benchmark your own database</a>)</td>
 </tr>
 </tbody>
 </table>

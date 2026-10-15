@@ -3901,6 +3901,34 @@
   
   
     <li class="md-nav__item">
+      <a href="seeding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../testing/evaluation-dataset/" class="md-nav__link">
         
   
@@ -5298,7 +5326,8 @@ with registered <strong>scorers</strong>, and the result is an <code>EvalReport<
 <p>The package ships one suite, Chinook's 47 gold cases, and
 <code>nl2sql init --demo</code> copies it next to the demo's <code>nl2sql.yaml</code>. The format
 is in <a href="cases/">Cases and suites</a>, and what makes a case pass is in
-<a href="scorers/">Scorers</a>.</p>
+<a href="scorers/">Scorers</a>. To build a suite for your own database, seed draft
+cases from its schema and review them (<a href="seeding/">Benchmark your own database</a>).</p>
 <h2 id="configuring-it">Configuring it</h2>
 <p><code>evals.yaml</code> is a config section, like <code>curated.yaml</code>. Its keys are strict and
 it is loaded with the config:</p>
@@ -5345,6 +5374,10 @@ configures the regression gate, which compares a run with a baseline.</p>
 <tr>
 <td><code>engine.evals.regenerate(path, *, allow_packaged=False)</code></td>
 <td>Runs each approved case's <code>sql</code> and <code>alt_sql</code> through its datasource's adapter and writes <code>rows</code> and <code>alt_rows</code> (<a href="cases/#regenerating-rows">Regenerating rows</a>). A suite the package ships is refused unless <code>allow_packaged</code></td>
+</tr>
+<tr>
+<td><code>engine.evals.seed(datasource_id, *, count=20, out, user_context, max_cost_usd=None)</code></td>
+<td>Drafts up to <code>count</code> cases from the datasource's schema, as <code>user_context</code> sees it, and appends them to <code>out</code> as <code>status: draft</code>. Returns a <code>SeedReport</code> (<a href="seeding/">Benchmark your own database</a>)</td>
 </tr>
 <tr>
 <td><code>engine.evals.scorers()</code></td>
@@ -5621,6 +5654,10 @@ so a role left out cannot quietly shrink the comparison.</p>
 <tr>
 <td><code>nl2sql eval regenerate PATH</code></td>
 <td><code>engine.evals.regenerate</code>; exits 1 when a case's SQL failed</td>
+</tr>
+<tr>
+<td><code>nl2sql eval seed --datasource ID --out PATH [--count N] [--role R] [--max-cost USD]</code></td>
+<td><code>engine.evals.seed</code>, as <code>--role</code> (else <code>policies.default_role</code>); exits 2 on a refusal, 3 at the cost cap or the call limit, and refuses to run when <code>CI</code> is set (<a href="seeding/">Benchmark your own database</a>)</td>
 </tr>
 <tr>
 <td><code>nl2sql eval publish [REPORT ...] [--note TEXT] [--from DIR ...]</code></td>

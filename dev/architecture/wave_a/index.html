@@ -2171,6 +2171,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/seeding/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../testing/evaluation-dataset/">
 <span class="md-ellipsis">
     
@@ -5482,6 +5494,61 @@ decision of 2026-10-15:</p>
    an eval.</li>
 </ol>
 <p><code>SeedReport(written, dropped_invalid, dropped_failed, dropped_empty, dropped_duplicate, stopped_at_cost_cap, usage)</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: seeding (V3)</p>
+<p><code>engine.evals.seed(datasource_id, *, count=20, out, user_context,
+max_cost_usd=None) -&gt; SeedReport</code> and <code>nl2sql eval seed</code>, in
+<code>evaluation/seed.py</code> and <code>evaluation/prompts.py</code> (<code>EVAL_SEEDER_PROMPT</code>).
+The user guide is <a href="../../evals/seeding/">Benchmark your own database</a>.
+Where the code differs from the steps above:</p>
+<ul>
+<li><strong>The caller is required and checked first.</strong> No <code>user_context</code>, no
+  role, or a role whose scope does not reach the datasource (or none of
+  its tables) is a <code>PermissionError</code> before any call. The model is shown
+  the tables through <code>SchemaRetrieverNode.visible_tables(user_context,
+  datasource_id)</code>, new and public: the planner's own rendering for that
+  caller. <code>outcome</code> marks <code>allowed</code> each of the caller's roles whose own
+  scope reads every table of the plan (after review of PR #328); other
+  roles get no entry.</li>
+<li><strong>Plans go through the pinned-plan entry.</strong> Each proposed plan runs as
+  <code>run_query(question, plan=SuppliedPlan(...), execute=False,
+  user_context=...)</code>: <code>plan.after</code>, the validator and the generator under
+  the caller's scope, with no model call, in a run scope of its own
+  (<code>run.started</code> and <code>run.finished</code>). The draft keeps the plan that
+  produced the SQL (<code>result.sub_queries[0].plan</code>), so a <code>plan.after</code>
+  change wins. A question that reads as SQL (the decomposer's <code>SubQuery</code>
+  check) is dropped as invalid.</li>
+<li><strong>The SQL passes <code>execute.before</code> and <code>execute.after</code></strong> (the session
+  lead's decision on the review of PR #328): it is model-proposed, so an
+  approval hook or Wave B's cost guard must see it. A deny, a hook
+  failure or <code>needs_approval</code> drops the case (<code>dropped_hooked</code>).
+  <code>execute.after</code> gets a summary of the first row (<code>truncated: true</code>).
+  <code>regenerate</code> runs human-reviewed gold SQL and stays unhooked; both are
+  documented in <code>configuration/hooks.md</code>. The rows are checked with
+  <code>execute_batches(request, 1)</code> where the adapter streams; no row is kept.</li>
+<li><strong>The structured output is <code>SeedBatch</code></strong> (<code>cases</code>: <code>SeedCase</code> with
+  <code>question</code>, <code>difficulty</code> and a <code>PlanModel</code>), the name a fake LLM rule
+  answers. A call whose answer never parses counts its batch as invalid.</li>
+<li><strong>The budget</strong> is <code>Budget(max_cost_usd, max_llm_calls, setting="evals")</code>
+  with at most three calls per batch of five (<code>CALLS_PER_BATCH</code>), so a
+  model answering nothing usable stops; the report says so
+  (<code>stopped_at_call_limit</code>), and the CLI exits 3 as at the cost cap. Each
+  call is shown the count of questions already written and the newest
+  ten (<code>RECENT_QUESTIONS</code>), not all of them. <code>max_cost_usd</code> is required (the
+  argument, else <code>evals.yaml</code>'s), and an unpriced <code>eval_seeder</code> model is
+  an <code>UnknownPriceError</code> before any call.</li>
+<li><strong>Drafts never go into reviewed cases</strong>: <code>out</code> may not be a packaged
+  suite, a suite <code>evals.yaml</code> names, or a file holding approved cases.
+  The guard is <code>nl2sql.evaluation.suite.check_target(path, configured)</code>,
+  which <code>feedback export</code> calls too. <code>SeedReport</code> also carries <code>path</code>,
+  <code>dropped_hooked</code> and <code>stopped_at_call_limit</code>.</li>
+<li><strong>The CLI</strong> asks as <code>--role</code>, else <code>policies.default_role</code>, and exits 2
+  without one; it exits 2 on any refusal and 3 at the cost cap or the
+  call limit, and
+  refuses to run with <code>CI</code> set, as mode full does. It takes no <code>--llm</code>:
+  <code>llm.agents.eval_seeder</code> picks the model.</li>
+</ul>
+</div>
 <h2 id="9-phase-r-cross-database-routing">9. Phase R: cross-database routing</h2>
 <p>Phase R was never built: 0.6 has <code>domains</code> on a datasource and nothing
 else of it. Everything below is in <code>indexing/</code> and the resolver, decomposer

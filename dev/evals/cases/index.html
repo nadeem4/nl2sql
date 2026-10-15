@@ -3801,6 +3801,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../seeding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../testing/evaluation-dataset/" class="md-nav__link">
         
   
@@ -5338,6 +5366,8 @@ and its layout, and the committed Chinook suite is byte for byte what
 <code>regenerate</code> writes.</p>
 <h2 id="drafts">Drafts</h2>
 <p>A case that a machine wrote starts as a <code>draft</code>, and a draft never runs.
+<code>nl2sql eval seed</code> (<code>engine.evals.seed</code>) drafts cases from a datasource's
+schema, with <code>origin: seeded</code> (<a href="../seeding/">Benchmark your own database</a>).
 <code>nl2sql feedback export --good</code> (<code>engine.feedback.export(path)</code>) writes each
 thumbs-up run as a draft case to a suite file of its own, with
 <code>origin: feedback</code>, the run's SQL, the datasources it read, and the rating
@@ -5350,7 +5380,7 @@ role allowed.</p>
 <li>Set <code>status: approved</code>.</li>
 <li>Run <code>regenerate</code> to write its rows.</li>
 </ol>
-<p>Drafts never replace reviewed cases. Export refuses these paths:</p>
+<p>Drafts never replace reviewed cases. Seeding and export refuse these paths:</p>
 <ul>
 <li>a suite the package ships;</li>
 <li>a suite <code>evals.yaml</code> names;</li>
