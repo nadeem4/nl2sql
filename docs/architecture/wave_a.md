@@ -976,12 +976,20 @@ be combined with approvals). `SuppliedPlan` is exported from `nl2sql`.
       database error is retried, and the executor's value check never asks
       for a retry on it. The schema retriever gives a pinned plan every
       table the caller may read, with no search, for the validator.
-      `run_with_graph(..., pinned=, approvals=)` refuses a `chosen` pin with
-      approvals (`ValueError`).
+      `check_pinned(pinned, approvals, datasource_id)` refuses, with a
+      `ValueError` at the call (`QueryAPI.run_query` and `stream_query`,
+      before the run's scope opens), a `chosen` pin with approvals and a
+      `datasource_id` that is not the pinned plan's datasource.
+      `QueryAPI.run_query(..., pinned=)` (internal) takes a pin of another
+      source; Wave B passes its chosen plan there.
     - **The request.** `ApprovalRequest.build(...)` computes `sql_sha256`
-      and `id`; `expected_id()` recomputes it (SHA-256 of the canonical JSON
-      of every field but `id`, `reason` and `approver_roles`, so it is
-      stable for Wave D's store). `wrap_subgraph` builds the request for a
+      and `id`; `expected_id()` recomputes it: SHA-256 of the canonical
+      JSON of the fields in `REQUEST_ID_FIELDS` only, each dumped without
+      the values it holds at their defaults. **The rule for Wave D's
+      store:** a field added later, to the request or with a default to a
+      nested model, keeps the ids of stored requests; changing a default or
+      the meaning of a listed field changes them, and a test pins one id
+      (`GOLDEN_ID`) so that never happens by accident. `wrap_subgraph` builds the request for a
       sub-query that ended `NEEDS_APPROVAL` (the error's `details` now carry
       the `reason`) into `GraphState.approvals_needed`; the curated matcher
       does the same with a `VerifiedRef`. **One difference from the sketch
@@ -998,8 +1006,16 @@ be combined with approvals). `SuppliedPlan` is exported from `nl2sql`.
       just generated, the same verified values, and an approver holding one
       of the hook's configured roles. A match publishes `hook.decision` with
       `decision: "approved"` and the `approver`, and the next hook runs.
-      `request_problem` (unedited, question, asker) decides what pins. A
-      forged approval pins nothing and covers nothing: the run asks again.
+      `request_problem` refuses an edited request, a request whose `sql` is
+      not the SQL of its `sql_sha256` (so the SQL an approver reads is the
+      SQL whose hash is checked), and another question or asker.
+      `pinned_from_approvals(approvals, question=, user=, hooks=)` pins only
+      an approval with no `request_problem`, for a configured hook, whose
+      `by` holds one of that hook's approver roles; so a forged approval, an
+      approver without the role, or a request the asker built with no
+      approval hook configured, pins nothing and covers nothing: the run
+      plans as usual and asks again, and `plan_source` is never
+      `"approved"` for it.
     - **The verified path.** A pinned `verified` request takes the default
       entry; the curated matcher runs that query with its values
       (`_run_pinned`), with no search and no model call, through the same

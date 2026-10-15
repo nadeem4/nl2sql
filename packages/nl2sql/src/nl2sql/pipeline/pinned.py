@@ -34,6 +34,7 @@ from nl2sql.pipeline.nodes.decomposer.schemas import CombineGroup, CombineInput,
 from nl2sql_sdk.policy import UserContext
 
 if TYPE_CHECKING:
+    from nl2sql.hooks.runner import HookRunner
     from nl2sql.pipeline.state import GraphState
 
 logger = get_logger("pinned")
@@ -96,20 +97,28 @@ class PinnedRun(BaseModel):
         return cls(source=PinnedSource.SUPPLIED, decomposition=decomposition, plans={plan.sub_query.id: plan.plan})
 
 
-def pinned_from_approvals(approvals: Sequence[Approval], *, question: str,
-                          user: Optional[UserContext]) -> Optional[PinnedRun]:
-    """The run the approvals pin, or None when none of them is this run's.
+def pinned_from_approvals(approvals: Sequence[Approval], *, question: str, user: Optional[UserContext],
+                          hooks: "HookRunner") -> Optional[PinnedRun]:
+    """The run the approvals pin, or None when none of them is an approval of this run.
 
-    An approval whose request was edited, or is for another question or
-    another asker, pins nothing (``request_problem``); the run then plans as
-    usual and the hook asks again. The first valid approval decides: its
-    verified query, or its decomposition with the plan of every valid approval
-    made from that same decomposition. Whether the approver may approve is
-    checked at ``execute.before``, against the hook's configured roles.
+    An approval pins only when its request is this run's (``request_problem``:
+    unedited, its SQL its hash, the same question and asker), its hook is one
+    of the engine's (``hooks``), and ``by`` holds one of that hook's approver
+    roles. Anything else pins nothing: the run plans as usual and the hook
+    asks again, so ``plan_source`` is never ``approved`` for a request nobody
+    with the role approved. The first valid approval decides: its verified
+    query, or its decomposition with the plan of every valid approval made
+    from that same decomposition. The SQL is still checked against the hash
+    at ``execute.before``.
     """
     valid = []
     for approval in approvals:
         problem = request_problem(approval, question=question, user=user)
+        roles = hooks.approver_roles(approval.request.hook)
+        if problem is None and not roles:
+            problem = f"no hook named '{approval.request.hook}' that may be approved is configured"
+        elif problem is None and not set(approval.by.roles) & set(roles):
+            problem = "its approver has none of the roles that may approve"
         if problem:
             logger.warning(f"An approval pins nothing: {problem}.")
             continue
@@ -125,6 +134,28 @@ def pinned_from_approvals(approvals: Sequence[Approval], *, question: str,
     plans = {r.sub_query.id: r.plan for r in valid
              if r.decomposition == first.decomposition and r.sub_query is not None and r.plan is not None}
     return PinnedRun(source=PinnedSource.APPROVED, decomposition=first.decomposition, plans=plans)
+
+
+def check_pinned(pinned: Optional[PinnedRun], approvals: Sequence[Approval],
+                 datasource_id: Optional[str] = None) -> None:
+    """Refuse, at the call and before the run's scope opens, a pin the run cannot take.
+
+    A chosen plan (Wave B's clarification re-ask) is a new question, not an
+    approved one, so it cannot come with approvals. A ``datasource_id``
+    passed with a pinned plan must be the plan's own datasource.
+
+    Raises:
+        ValueError: either rule is broken.
+    """
+    if pinned is None:
+        return
+    if pinned.source == PinnedSource.CHOSEN and approvals:
+        raise ValueError("A chosen plan cannot be run with approvals; ask again without them.")
+    if datasource_id is not None and pinned.decomposition is not None:
+        others = sorted({sq.datasource_id for sq in pinned.decomposition.sub_queries} - {datasource_id})
+        if others:
+            raise ValueError(f"The plan reads the datasource '{others[0]}', not datasource_id "
+                             f"'{datasource_id}': pass one or the other, or the same one.")
 
 
 class PinnedEntryNode:

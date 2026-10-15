@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 from test_hook_points import ORDERS, SALARIES, _hooks
 from test_plan_cache import _plan, _sq, store  # noqa: F401
-from test_approval import ANA, DBA, _approval, _request
+from test_approval import ANA, DBA, NEEDS, _approval, _request, _runner
 
 from nl2sql.common.errors import ErrorCode
 from nl2sql.hooks import Allow, Deny, Modify
@@ -203,7 +203,7 @@ def test_only_a_pinned_run_enters_at_the_pinned_entry(monkeypatch):
 
 
 def test_a_valid_approval_pins_its_decomposition_and_plan():
-    pinned = pinned_from_approvals([_approval()], question="How many customers?", user=ANA)
+    pinned = pinned_from_approvals([_approval()], question="How many customers?", user=ANA, hooks=_runner(NEEDS))
 
     assert pinned.source == PinnedSource.APPROVED
     assert pinned.plans == {"sq1": _plan()} and pinned.decomposition.sub_queries[0].id == "sq1"
@@ -215,7 +215,7 @@ def test_a_valid_approval_pins_its_decomposition_and_plan():
     (_approval(_request().model_copy(update={"plan": _plan("tampered")})), "How many customers?", ANA),  # edited
 ])
 def test_a_forged_approval_pins_nothing(approval, question, user):
-    assert pinned_from_approvals([approval], question=question, user=user) is None
+    assert pinned_from_approvals([approval], question=question, user=user, hooks=_runner(NEEDS)) is None
 
 
 def test_chosen_plan_with_approvals_is_refused():
@@ -252,3 +252,60 @@ def test_the_facade_passes_the_plan_and_the_approvals_to_the_run(monkeypatch, ho
         list(api.stream_query("q", plan=supplied, approvals=approvals))
 
     assert seen["pinned"].source == PinnedSource.SUPPLIED and seen["approvals"] == approvals
+
+
+# ---------------------------------------------------------------- the review's attacks (PR #319)
+
+
+def test_an_approver_without_the_role_pins_nothing():
+    viewer = UserContext(user_id="vic", roles=["viewer"])
+
+    assert pinned_from_approvals([_approval(by=viewer)], question="How many customers?", user=ANA,
+                                 hooks=_runner(NEEDS)) is None
+
+
+def test_an_approval_for_a_hook_that_is_not_configured_pins_nothing():
+    from nl2sql.hooks import HookRunner
+
+    # Built by the asker, with no approval hook configured: nobody approved anything.
+    self_built = _approval(by=UserContext(user_id="nobody", roles=["admin"]))
+
+    assert pinned_from_approvals([self_built], question="How many customers?", user=ANA,
+                                 hooks=HookRunner([], admin_roles=("admin",))) is None
+
+
+def test_a_datasource_id_that_disagrees_with_the_supplied_plan_is_refused_at_the_call(monkeypatch):
+    from nl2sql.api.query_api import QueryAPI
+
+    api = QueryAPI(fake_runtime())
+    started = []
+    api._ctx.bus.subscribe(started.append)
+    supplied = SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan())
+
+    with pytest.raises(ValueError, match="datasource"):
+        api.run_query("q", datasource_id="support", plan=supplied)
+    with pytest.raises(ValueError, match="datasource"):
+        api.stream_query("q", datasource_id="support", plan=supplied)
+    assert started == []  # no scope was opened
+
+
+@pytest.mark.parametrize("how", ["run_query", "stream_query"])
+def test_a_chosen_plan_with_approvals_is_refused_before_the_scope_opens(how):
+    from nl2sql.api.query_api import QueryAPI
+
+    api = QueryAPI(fake_runtime())
+    started = []
+    api._ctx.bus.subscribe(started.append)
+    chosen = PinnedRun.supplied(SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan()))
+    chosen = chosen.model_copy(update={"source": PinnedSource.CHOSEN})
+
+    with pytest.raises(ValueError, match="approvals"):
+        getattr(api, how)("q", pinned=chosen, approvals=[_approval()])
+    assert started == []
+
+
+def test_the_rest_schema_lists_the_plan_sources():
+    from nl2sql.api.query_api import SubQueryResult
+
+    schema = SubQueryResult.model_json_schema()["properties"]["plan_source"]
+    assert set(schema["enum"]) == {"llm", "cache", "verified", "supplied", "approved", "chosen"}

@@ -71,9 +71,24 @@ class ApprovalRequest(BaseModel):
         return request.model_copy(update={"id": request.expected_id()})
 
     def expected_id(self) -> str:
-        """The ``id`` this request's content gives: SHA-256 of every field but ``id``, ``reason`` and ``approver_roles``."""
-        content = self.model_dump(mode="json", exclude={"id", "reason", "approver_roles"})
+        """The ``id`` this request's content gives.
+
+        SHA-256, in hex, of the canonical JSON of the fields in
+        ``REQUEST_ID_FIELDS`` only, each dumped without the values it holds at
+        their defaults. So a field added later to this model, or with a
+        default to a nested one (a plan, a sub-query), does not change the id
+        of a request made before: a store keyed by id (Wave D) survives an
+        upgrade. Changing a default, or the meaning of a field in the list,
+        does change ids; do that only on purpose.
+        """
+        content = {name: self.model_dump(mode="json", include={name}, exclude_defaults=True).get(name)
+                   for name in REQUEST_ID_FIELDS}
         return hashlib.sha256(_canonical(content).encode("utf-8")).hexdigest()
+
+
+# What an ApprovalRequest's id hashes (expected_id). Not reason and approver_roles: they are for display.
+REQUEST_ID_FIELDS = ("question", "asker_user_id", "asker_tenant_id", "hook", "point", "datasource_id",
+                     "decomposition", "sub_query", "plan", "verified", "sql", "sql_sha256")
 
 
 class Approval(BaseModel):
@@ -93,10 +108,17 @@ def _canonical(value: Any) -> str:
 
 
 def request_problem(approval: Approval, *, question: str, user: Optional[UserContext]) -> Optional[str]:
-    """Why ``approval`` is not one for this run (edited, another question, another asker), or None."""
+    """Why ``approval`` is not one for this run (edited, SQL not its hash, another question or asker), or None.
+
+    The SQL an approver reads must be the SQL whose hash is checked, so a
+    relay cannot show harmless SQL beside the hash of other SQL (the id alone
+    is an unkeyed hash, which a relay can recompute).
+    """
     request = approval.request
     if request.id != request.expected_id():
         return "its request was edited after it was made"
+    if request.sql_sha256 != sql_sha256(request.sql):
+        return "its SQL does not match its hash"
     if request.question != question:
         return "it is for another question"
     user = user or UserContext()

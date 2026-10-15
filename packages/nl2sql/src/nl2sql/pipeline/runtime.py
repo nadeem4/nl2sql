@@ -22,7 +22,7 @@ from nl2sql.runtime import Runtime
 from nl2sql.hooks import hooks_of
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
-from nl2sql.pipeline.pinned import PinnedRun, PinnedSource, pinned_from_approvals
+from nl2sql.pipeline.pinned import PinnedRun, check_pinned, pinned_from_approvals
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.timing import NodeTimingCallback
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
@@ -192,14 +192,16 @@ def run_with_graph(
     ``pinned`` is a decomposition and plans the run takes as given (a
     supplied plan; Wave B's chosen one): the run enters at the pinned entry.
     ``approvals`` are passed to the ``execute.before`` hooks; without
-    ``pinned``, the first one that is this run's (same question after
-    ``run.before``, same asker, unedited) pins what it approved, as
-    ``approved``. A chosen plan with approvals is refused: a clarification
-    re-ask is a new question, not an approved one.
+    ``pinned``, the first one that is this run's (unedited, its SQL its hash,
+    the same question after ``run.before`` and asker) and whose approver
+    holds one of its hook's approver roles pins what it approved, as
+    ``approved`` (``pinned_from_approvals``). ``check_pinned`` refuses a
+    chosen plan with approvals (a clarification re-ask is a new question,
+    not an approved one) and a ``datasource_id`` that is not the pin's.
     """
     approvals = list(approvals or [])
-    if pinned is not None and pinned.source == PinnedSource.CHOSEN and approvals:
-        raise ValueError("A chosen plan cannot be run with approvals; ask again without them.")
+    # QueryAPI checks this first, before the run's scope opens; a direct caller is held to it here.
+    check_pinned(pinned, approvals, datasource_id)
     token = cancellation_token or CancellationToken()
     run_done = threading.Event()
     restore_signals = _install_signal_handlers(token)
@@ -309,7 +311,8 @@ def run_with_graph(
             state["user_query"] = verdict.ctx.question
             state["approvals"] = approvals
             pin = pinned or (pinned_from_approvals(approvals, question=verdict.ctx.question,
-                                                   user=initial_state.user_context) if approvals else None)
+                                                   user=initial_state.user_context, hooks=hooks)
+                             if approvals else None)
             state["pinned"] = pin
             # An approval's pin is known only now, after run.before: its run takes the pinned graph.
             run_graph = _graph(pin) if pinned is None and pin is not None and pin.enters_pinned else graph

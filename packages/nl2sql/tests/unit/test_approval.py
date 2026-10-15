@@ -291,10 +291,43 @@ def test_approved_verified_query_runs_its_pinned_values_with_no_matching_call(db
     first, _ = _verified(db, _runner(NEEDS))
     [request] = first["approvals_needed"]
     approvals = [Approval(request=request, by=DBA)]
-    pinned = pinned_from_approvals(approvals, question=QUESTION, user=ANA)
+    pinned = pinned_from_approvals(approvals, question=QUESTION, user=ANA, hooks=_runner(NEEDS))
 
     out, server = _verified(db, _runner(NEEDS), pinned=pinned, approvals=approvals)
 
     assert server.calls == []  # no candidates search, no choice call
     assert out["verified_match"].params == {"n": 2, "year": 2012}
     assert next(iter(out["artifact_refs"].values())).row_count == 2
+
+
+# ---------------------------------------------------------------- the review's attacks (PR #319)
+
+
+def test_the_sql_shown_to_the_approver_is_the_sql_whose_hash_is_checked():
+    # A relay swaps the displayed SQL for something harmless, keeps the real hash, recomputes the id.
+    swapped = _request().model_copy(update={"sql": "SELECT 1 -- harmless"})
+    swapped = swapped.model_copy(update={"id": swapped.expected_id()})
+
+    assert not _call(_runner(NEEDS), [_approval(swapped)]).allowed
+    from nl2sql.hooks.approval import request_problem
+    assert request_problem(_approval(swapped), question="How many customers?", user=ANA) == \
+        "its SQL does not match its hash"
+
+
+# A request as it was made by this version of the engine. The id hashes a fixed list of fields, each nested
+# model without the values it holds at their defaults, so a field added later with a default keeps old ids
+# (a store keyed by id survives an upgrade). Change this only when the hashed content changes on purpose.
+GOLDEN_ID = "49dbee7ec7652582c469f3f6e4c78d64b3a90bd65a0c440835b536d4476d6a56"
+
+
+def test_the_request_id_hashes_a_fixed_list_of_fields_without_their_defaults():
+    from nl2sql.hooks.approval import REQUEST_ID_FIELDS
+
+    request = _request()
+    assert REQUEST_ID_FIELDS == ("question", "asker_user_id", "asker_tenant_id", "hook", "point", "datasource_id",
+                                 "decomposition", "sub_query", "plan", "verified", "sql", "sql_sha256")
+    # A nested value set explicitly to its default hashes as if it were left out.
+    explicit = _request(sub_query=_sq().model_copy(update={"limit": None}),
+                        plan=_plan().model_copy(update={"distinct": False}))
+    assert explicit.id == request.id
+    assert request.id == GOLDEN_ID
