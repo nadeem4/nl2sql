@@ -671,6 +671,70 @@ pipeline:
 | **How the run ends** | `run_with_graph` already maps a cancelled token to its `cancelled` outcome; a token cancelled with a `RunStop` reason maps instead to `QueryResult.status = "stopped"`, `QueryResult.stop = RunStop(limit, value, spent)`, an error `RUN_LIMIT_REACHED` (not retryable) whose message names the limit and the setting, and the answer "This question reached its limit of 60 model calls (settings.pipeline.max_llm_calls)." `run.limit_reached` is published, and the audit observer records it. `test_cap_hit_inside_the_planner_ends_stopped_not_planning_failure` holds it. |
 | **Evals** | An eval run's own `max_cost_usd` is across the run, as tier 2's is; the per-question caps apply inside it too. |
 
+!!! note "Built: the price table, cost and caps (E3)"
+    `nl2sql/llm/prices.py` holds `PRICES_CHECKED_ON`, `PRICES` (the five
+    rows moved unchanged), `ModelPrice` (a `NamedTuple`: `input`,
+    `cached_input`, `cache_write`, `output`, `verified`, `source`; a config
+    row has `source="config"` and may leave the two cache rates `None`),
+    `price_for(model, overrides)` (the `llm.prices` row, else the table's, by
+    exact name), `call_cost(price, *, input_tokens, output_tokens,
+    cached_input_tokens=None, cache_write_input_tokens=None,
+    cache_write_multiplier=1.0)` (None when the input or output count is
+    unknown; a cache count not reported is not split out of input; a config
+    row's missing `cache_write` is input times the wire's multiplier, so
+    Anthropic's 1.25x from #193 holds) and `effective_prices(overrides)`.
+    `evaluation/prices.py` is deleted with no alias; `evaluation/run.py`'s
+    `check_prices(configs, prices=None)` and `question_cost(usage, cfg,
+    prices=None)` take `llm.prices` as overrides (`run_evals` passes the
+    engine's), and the `UnknownPriceError` fix names `llm.prices`.
+    `TokenUsageCallback(prices=llm.prices)` prices every call with
+    `price_for` by the served name, then the configured one, and gained
+    `spent()` (the dollars of the calls with a known cost). **Unknown counts
+    are None, never 0** (an owner requirement after the design): the wires'
+    `usage()` takes `Optional` counts (`opt_int`, `sum_known` in
+    `wires/base.py`; `as_int` is gone), so an unreported cache read, cache
+    write (OpenAI reports none) or reasoning count is None, and a call with no
+    usage (a failed call) has every count None and a null cost.
+    `LLMCallUsage`, `UsageTotals` and the catalog's `LLMCall` and
+    `UsageTotalsData` have `Optional[int]` token fields; a total is the sum
+    of what was reported, None when nothing was; the otel observer skips a
+    None count. `engine.llm.prices()` returns `{"checked_on", "models": {name:
+    {input, cached_input, cache_write, output, verified, source, citation}}}`
+    (`source` is `table` or `config`; `citation` the table row's source).
+    `nl2sql/limits.py` holds `Budget`, `LimitReached`, `describe` and
+    `stop_answer` beside `RunStop`. `Budget(max_llm_calls=None,
+    max_cost_usd=None, usage=None, token=None, setting="settings.pipeline")`
+    is a LangChain callback (`raise_error = True`): on `on_chat_model_start`
+    and `on_llm_start` it refuses the call when the calls it let start have
+    reached `max_llm_calls` or `usage.spent()` has reached `max_cost_usd`;
+    on the first refusal it sets `budget.stop`, cancels every bound token
+    with the `RunStop` (`CancellationToken.cancel(reason=None)` keeps the
+    first reason in `token.reason`), publishes `run.limit_reached` through
+    the module `publish` (nothing outside a run), and raises
+    `LimitReached(stop, setting)` (not a `ValueError`, so the parse-retry
+    loop never swallows it); every later call is refused with the same stop.
+    **Work that is not a question** (Wave B's profiler, V3's seeding) opens
+    its own `Budget(..., setting="evals")`, makes its calls with
+    `budget.callbacks()` (the budget, then its usage collector), and reads
+    `budget.stop` or catches `LimitReached`. `Budget.for_question(pipeline,
+    usage)` is None when both caps are off. The budget reads the usage
+    collector directly, not the `llm.call` events, because a budget outside
+    a question has no scope to read events from (a difference from the file
+    list's "usage collector on `llm.call`"). `QueryAPI.open_scope` attaches
+    the question's budget after the `RunEvents`, so `scope.callbacks()` is
+    the usage collector, the `RunEvents`, the budget, then anything attached
+    later; `run_with_graph` binds every attached `Budget` to the run's token
+    (`budget.bind(token)`), and a token cancelled with a `RunStop` maps to
+    `_stopped`: `stop`, the one error `RUN_LIMIT_REACHED` ("The question
+    reached its limit of 60 model calls (settings.pipeline.max_llm_calls)."),
+    the answer "This question reached its limit of 60 model calls
+    (settings.pipeline.max_llm_calls)." (or "its cost limit of $0.50
+    (settings.pipeline.max_cost_usd)"), and the trace outcome `stopped`.
+    `Runtime.components` and `Runtime.replace_llm` raise a `ConfigError` per
+    unpriced model (`llm.model`, `llm.agents.<agent>.model`; a model object
+    by its `model_name`) when `max_cost_usd` is set, with the fix
+    `add llm.prices.<model> ...`. Tests: `tests/unit/test_cost_and_caps.py`.
+
 ## 6. Hooks
 
 A hook is code the operator registers that sees a run at fixed points and

@@ -7,7 +7,7 @@ import pytest
 from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.evaluation import gate, report, run
 from nl2sql.evaluation.suite import EvalCase
-from nl2sql.evaluation.prices import PRICES, ModelPrice, call_cost
+from nl2sql.llm.prices import PRICES, ModelPrice, call_cost
 from nl2sql.services.callbacks.token_handler import LLMCallUsage, QuestionUsage
 
 

@@ -447,7 +447,7 @@ still validated for the caller's role.
 
 Everything else on `NL2SQL` is a namespace: `engine.datasources` (list, get,
 add, remove, schema, test), `engine.index` (build, health, clear, inspect,
-inspect_defaults), `engine.llm` (list, get, providers, replace),
+inspect_defaults), `engine.llm` (list, get, providers, prices, replace),
 `engine.policies` (roles, allows, allowed, validate), `engine.curated`
 (validate, test), `engine.results` (manifest, page, csv), `engine.feedback`
 (record, list, stats, export, clear), `engine.traces` (get, replay) and

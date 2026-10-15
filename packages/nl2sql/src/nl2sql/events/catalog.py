@@ -48,12 +48,12 @@ class UsageTotalsData(EventData):
     """A run's model usage, summed: the shape of ``QuestionUsage.total``."""
 
     calls: int = 0
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
-    cache_write_input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
-    total_tokens: int = 0
+    input_tokens: Optional[int] = None  # None: not reported, never 0
+    cached_input_tokens: Optional[int] = None
+    cache_write_input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    reasoning_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
     latency_s: float = 0.0
     cost: Optional[float] = None  # None when any call ran on a model with no price
 
@@ -125,12 +125,12 @@ class LLMCall(EventData):
     node: Optional[str] = None
     agent: Optional[str] = None
     model: Optional[str] = None
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
-    cache_write_input_tokens: int = 0
-    output_tokens: int = 0
-    reasoning_tokens: int = 0
-    total_tokens: int = 0
+    input_tokens: Optional[int] = None  # None: not reported, never 0
+    cached_input_tokens: Optional[int] = None
+    cache_write_input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    reasoning_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
     latency_s: float = 0.0
     cost: Optional[float] = None
     usage_reported: bool = True

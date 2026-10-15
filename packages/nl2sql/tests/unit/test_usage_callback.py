@@ -83,7 +83,7 @@ def test_anthropic_shaped_usage_reads_cache_writes_too():
     [call] = cb.usage().calls
     assert call.cached_input_tokens == 100
     assert call.cache_write_input_tokens == 200
-    assert call.reasoning_tokens == 0
+    assert call.reasoning_tokens is None  # not reported: unknown, never 0
 
 
 def test_anthropic_cache_writes_split_by_ttl_are_counted_once():
@@ -103,7 +103,7 @@ def test_anthropic_cache_writes_split_by_ttl_are_counted_once():
     assert call.input_tokens == 3540
 
 
-def test_missing_details_are_zero_and_missing_usage_is_flagged():
+def test_missing_details_are_none_and_missing_usage_is_flagged():
     cb = TokenUsageCallback()
     run = uuid.uuid4()
     _start(cb, "refiner", run)
@@ -113,8 +113,8 @@ def test_missing_details_are_zero_and_missing_usage_is_flagged():
     cb.on_llm_end(LLMResult(generations=[[Generation(text="x")]]), run_id=run2)
 
     first, second = cb.usage().calls
-    assert (first.cached_input_tokens, first.reasoning_tokens, first.usage_reported) == (0, 0, True)
-    assert (second.input_tokens, second.output_tokens, second.usage_reported) == (0, 0, False)
+    assert (first.cached_input_tokens, first.reasoning_tokens, first.usage_reported) == (None, None, True)
+    assert (second.input_tokens, second.output_tokens, second.usage_reported) == (None, None, False)
     assert cb.usage().nodes["refiner"].calls == 2
 
 
@@ -153,7 +153,7 @@ def test_a_failed_calls_error_carries_no_key():
     assert key not in call.error and "9d3e" not in call.error
 
 
-def test_cost_only_when_a_price_is_configured():
+def test_cost_from_llm_prices_and_null_for_an_unpriced_model():
     prices = {"gpt-4o": {"input": 2.5, "cached_input": 1.25, "output": 10.0}}
     cb = TokenUsageCallback(prices=prices)
     run = uuid.uuid4()

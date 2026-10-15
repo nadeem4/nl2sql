@@ -99,9 +99,9 @@ Every call costs money, so mode full checks prices before it starts and
 checks the cap before every case:
 
 - **Every model must have a price.** Before any call, every model that any
-  node of any config would use must be in `nl2sql/evaluation/prices.py`. A
-  missing price is an `UnknownPriceError` naming the config, the node and the
-  model.
+  node of any config would use must have a price, in `llm.prices` or the
+  engine's dated table ([Prices](../configuration/llm.md#prices)). A missing
+  price is an `UnknownPriceError` naming the config, the node and the model.
 - **The run stops before it could pass the cap.** Before each case, the run
   adds the most expensive case so far to its running total. If that could
   pass `max_cost_usd`, the run stops and the report says

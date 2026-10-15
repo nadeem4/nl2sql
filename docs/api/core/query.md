@@ -399,14 +399,17 @@ been recorded, on a timed-out or cancelled run.
 | name | type | meaning |
 | --- | --- | --- |
 | `calls` | `int` | LLM calls. The planner and refiner run once per retry, so a sub-query retried once shows `ast_planner.calls == 2`. |
-| `input_tokens` | `int` | Prompt tokens, including cached ones. |
-| `cached_input_tokens` | `int` | Input tokens served from the provider's prompt cache (a subset of `input_tokens`). |
-| `cache_write_input_tokens` | `int` | Input tokens written to the prompt cache (Anthropic reports these; OpenAI does not). |
-| `output_tokens` | `int` | Completion tokens, including reasoning ones. |
-| `reasoning_tokens` | `int` | Reasoning ("thinking") tokens (a subset of `output_tokens`). |
-| `total_tokens` | `int` | As the provider reports it; `input + output` if it does not. |
+| `input_tokens` | `Optional[int]` | Prompt tokens, including cached ones. |
+| `cached_input_tokens` | `Optional[int]` | Input tokens served from the provider's prompt cache (a subset of `input_tokens`). |
+| `cache_write_input_tokens` | `Optional[int]` | Input tokens written to the prompt cache (Anthropic reports these; OpenAI does not, so it is `null` there). |
+| `output_tokens` | `Optional[int]` | Completion tokens, including reasoning ones. |
+| `reasoning_tokens` | `Optional[int]` | Reasoning ("thinking") tokens (a subset of `output_tokens`). |
+| `total_tokens` | `Optional[int]` | As the provider reports it; `input + output` if it does not. |
 | `latency_s` | `float` | Seconds spent waiting on the model, summed over calls. The node's wall-clock time, which includes its non-LLM work, is in `timings`. |
-| `cost` | `Optional[float]` | Only when `LLM_PRICES` prices every call counted here; otherwise `null`. Cache reads are billed at `cached_input`, cache writes at `cache_write` (by default `input` x 1.25 on Claude, `input` on the OpenAI wire), the rest of `input_tokens` at `input` and `output_tokens` at `output`; see [System configuration](../../configuration/system.md). |
+| `cost` | `Optional[float]` | Dollars, when every call counted here has a cost; otherwise `null`. Each call is priced from `llm.prices`, then the dated price table: cache reads at `cached_input`, cache writes at `cache_write` (Claude's are 1.25x `input`), the rest of `input_tokens` at `input` and `output_tokens` at `output`; see [Prices](../../configuration/llm.md#prices). |
+
+A token count in `UsageTotals` is the sum of what the calls reported, and
+`null` when no call reported it: an unknown count is never `0`.
 
 `LLMCallUsage` has the same token fields plus `node`, `model` (the model the
 provider says served the call, e.g. `gpt-4o-2024-08-06`), `latency_s`, `cost`,
@@ -418,16 +421,16 @@ Tokens are read by the adapter of the wire type that served the call
 asks it. Both read LangChain's `AIMessage.usage_metadata`
 (`input_token_details.cache_read`, `input_token_details.cache_creation`,
 `output_token_details.reasoning`) into the same fields, and differ where their
-providers differ, as below. A detail the provider did not report is `0`. A call whose result carried no usage
-at all is recorded with zero tokens and `usage_reported: false`; a failed call is
-recorded with its latency and `error`.
+providers differ, as below. A detail the provider did not report is `null`, never `0`. A call whose result carried no usage
+at all is recorded with every count `null` and `usage_reported: false`; a failed call is
+recorded the same way, with its latency and `error`.
 
 For OpenAI through `langchain-openai` (verified against the pinned 1.6.x by
 `packages/nl2sql/tests/unit/test_fake_llm_server.py`): `prompt_tokens`,
 `completion_tokens`, `total_tokens`, `prompt_tokens_details.cached_tokens` and
 `completion_tokens_details.reasoning_tokens` all arrive. OpenAI's chat
 completions API reports no cache-write count, so `cache_write_input_tokens` is
-`0` there.
+`null` there.
 
 For Claude through `langchain-anthropic` (`provider: anthropic`; verified
 against the fake Anthropic endpoint by
@@ -449,7 +452,10 @@ it. When the write is reported per TTL, `langchain-anthropic` sets the generic
 `cache_creation` detail to `0` and puts the tokens under the TTL keys, which
 are summed here.
 
-Cost is `(input - cached) * input_price + cached * cached_input_price + output * output_price`,
-per million tokens. Prices are looked up by the served model name, then by the
-configured one, by exact match only, so a `gpt-4o` price never prices
-`gpt-4o-mini`. Cache writes are charged at the input price.
+Cost is `(input - cached - cache_write) * input_price + cached * cached_input_price
++ cache_write * cache_write_price + output * output_price`, per million tokens; a
+cache count the provider did not report is not split out of `input`. Prices are
+looked up in `llm.prices`, then in the dated table, by the served model name,
+then by the configured one, by exact match only, so a `gpt-4o` price never
+prices `gpt-4o-mini`. A call with no price, or no input or output count, has a
+`null` cost. See [Prices](../../configuration/llm.md#prices).

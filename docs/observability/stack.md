@@ -9,7 +9,14 @@ telemetry** on every run, and **events** that observers turn into logs, an
   `QueryResult.timings`) and `TokenUsageCallback` (LLM calls, input / cached /
   output / reasoning tokens and model seconds per node and per question, into
   `QueryResult.usage`). That covers the Python API, the REST API, the CLI and
-  the demo playground. See [the query API](../api/core/query.md#usage-tokens-calls-and-model-time).
+  the demo playground. Every call is priced from the dated price table and
+  `llm.prices` ([Prices](../configuration/llm.md#prices)), so `usage.cost` is
+  the question's cost whenever every model it called has a price. See
+  [the query API](../api/core/query.md#usage-tokens-calls-and-model-time).
+- **Every question runs under caps.** `settings.pipeline.max_llm_calls` (60)
+  and `max_cost_usd` (none) are checked before each model call; a question
+  that reaches one ends `stopped` and publishes `run.limit_reached`, which the
+  audit log records ([Per-question caps](../configuration/settings.md#per-question-caps)).
 - **Everything else is an event, and observers decide where it goes.** A run
   publishes its steps (`node.*`), each model call (`llm.call`, from
   `TokenUsageCallback`), each plan cache lookup (`plan_cache.lookup`) and its

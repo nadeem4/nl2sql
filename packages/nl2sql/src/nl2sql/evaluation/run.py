@@ -45,12 +45,12 @@ from nl2sql.events.catalog import EvalCase as EvalCaseEvent
 from nl2sql.events.catalog import EvalFinished
 from nl2sql.evaluation.faithfulness import answer_text
 from nl2sql.evaluation.gold_llm import GoldPlanLLM, gold_plans
-from nl2sql.evaluation.prices import PRICES, PRICES_CHECKED_ON, ModelPrice, call_cost
 from nl2sql.evaluation.report import EvalReport, case_status, compare, score_config
 from nl2sql.evaluation.scorers import CaseRun, MODES, Scorer, build_scorers, run_scorer
 from nl2sql.evaluation.scorers import retrieval_recall
 from nl2sql.evaluation.suite import EvalCase, EvalSuite, select_cases
 from nl2sql.llm.models import AgentConfig, LLMFileConfig
+from nl2sql.llm.prices import PRICES_CHECKED_ON, call_cost, price_for
 from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.pipeline.runtime import run_with_graph
 from nl2sql.policies import UserContext
@@ -75,27 +75,39 @@ def node_agents(cfg: LLMFileConfig) -> Dict[str, AgentConfig]:
     return {node: agents.get(key) or cfg.default for node, key in LLM_AGENTS.items()}
 
 
-def check_prices(llm_configs: Dict[str, LLMFileConfig], prices: Dict[str, ModelPrice] = PRICES) -> None:
-    """Raises before any call if a model some LLM node would call has no price."""
+def check_prices(llm_configs: Dict[str, LLMFileConfig], prices: Optional[Mapping[str, Any]] = None) -> None:
+    """Raises before any call if a model some LLM node would call has no price.
+
+    ``prices`` is ``llm.prices``, read before the dated table in ``nl2sql.llm.prices``.
+    """
     missing = [f"{name}/{LLM_AGENTS[node]}: {agent.model}"
                for name, cfg in llm_configs.items()
-               for node, agent in node_agents(cfg).items() if agent.model not in prices]
+               for node, agent in node_agents(cfg).items() if price_for(agent.model, prices) is None]
     if missing:
         raise UnknownPriceError(
             "No price for: " + ", ".join(missing)
-            + ". Add the model to nl2sql/evaluation/prices.py (USD per 1M tokens) before running mode full.")
+            + ". Add each model to llm.prices (USD per 1M tokens: input, output) before running mode full.")
 
 
-def question_cost(usage: QuestionUsage, cfg: LLMFileConfig, prices: Dict[str, ModelPrice] = PRICES) -> float:
-    """Dollars for one case: each call priced by the model its node is configured with."""
+def question_cost(usage: QuestionUsage, cfg: LLMFileConfig, prices: Optional[Mapping[str, Any]] = None) -> float:
+    """Dollars for one case: each call priced by the model its node is configured with.
+
+    A call that reported no token counts (a failed call) adds nothing it could count.
+    """
+    from nl2sql.llm.wires import wire_named
+
     agents = node_agents(cfg)
     total = 0.0
     for call in usage.calls:
-        model = (agents.get(call.node) or cfg.default).model
-        total += call_cost(prices[model], input_tokens=call.input_tokens,
-                           cached_input_tokens=call.cached_input_tokens,
-                           cache_write_input_tokens=call.cache_write_input_tokens,
-                           output_tokens=call.output_tokens)
+        agent = agents.get(call.node) or cfg.default
+        price = price_for(agent.model, prices)
+        if price is None:  # check_prices refuses such a run before it starts
+            continue
+        cost = call_cost(price, input_tokens=call.input_tokens,
+                         output_tokens=call.output_tokens, cached_input_tokens=call.cached_input_tokens,
+                         cache_write_input_tokens=call.cache_write_input_tokens,
+                         cache_write_multiplier=wire_named(agent.provider).cache_write_multiplier)
+        total += cost or 0.0
     return total
 
 
@@ -267,7 +279,7 @@ def run_evals(
     max_cost_usd: Optional[float] = None,
     on_case: Optional[OnCase] = None,
     clarify: bool = False,
-    prices: Dict[str, ModelPrice] = PRICES,
+    prices: Optional[Mapping[str, Any]] = None,
 ) -> EvalReport:
     """Runs every approved case of ``suites`` once per role in its ``outcome``, ``passes`` times.
 
@@ -280,7 +292,8 @@ def run_evals(
         ValueError: an unknown mode, a ``cases`` selector matching nothing, mode
             full without ``max_cost_usd``, or mode plans with an answerable
             case that has no plan.
-        UnknownPriceError: mode full with a model the price table cannot price.
+        UnknownPriceError: mode full with a model neither ``prices`` (by
+            default the engine's ``llm.prices``) nor the price table can price.
         RegistryError: a scorer name that is not registered.
     """
     if mode not in MODES:
@@ -293,6 +306,8 @@ def run_evals(
                                 for s in suites])
     # Refusals are scored against the generic message; the engine's own config is never changed.
     base: Dict[str, Any] = {"policies.refusal_names_tables": False}
+    if prices is None:
+        prices = ctx.config.llm.prices
     if mode == "full":
         records = _run_full(ctx, jobs, built, report, base, llm, passes, max_cost_usd, on_case, prices)
     elif mode == "plans":
@@ -384,7 +399,7 @@ def _one(run: Any, job: _Case, mode: str, scorers: Dict[str, Scorer], pass_no: i
 
 def _run_full(ctx: Any, jobs: List[_Case], scorers: Dict[str, Scorer], report: EvalReport, base: Dict[str, Any],
               llm: LLMConfigs, passes: int, max_cost_usd: Optional[float], on_case: Optional[OnCase],
-              prices: Dict[str, ModelPrice]) -> Dict[str, List[Dict[str, Any]]]:
+              prices: Mapping[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     if not max_cost_usd or max_cost_usd <= 0:
         raise ValueError("Mode full spends money: it needs a positive max_cost_usd (dollars), "
                          "in evals.yaml or as an argument.")

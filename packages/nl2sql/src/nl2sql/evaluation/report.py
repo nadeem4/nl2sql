@@ -287,7 +287,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
         for node, counts in (r.get("tokens_by_node") or {}).items():
             totals = tokens.setdefault(node, {f: 0 for f in _TOKEN_FIELDS})
             for f in _TOKEN_FIELDS:
-                totals[f] += counts.get(f, 0)
+                totals[f] += counts.get(f) or 0  # a count no call reported adds nothing
 
     node_times: Dict[str, List[float]] = {}
     for r in records:

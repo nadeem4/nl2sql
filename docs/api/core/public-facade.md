@@ -112,7 +112,7 @@ engine.check(); engine.close(); engine.config; engine.about(); engine.clear_plan
 
 engine.datasources   # list, get, types, test, add, remove, schema
 engine.index         # build, health, clear, inspect, inspect_defaults
-engine.llm           # list, get, providers, replace
+engine.llm           # list, get, providers, prices, replace
 engine.policies      # roles, allows, allowed, validate
 engine.curated       # validate, test
 engine.results       # manifest, page, csv

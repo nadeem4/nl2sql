@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_core.outputs import ChatResult, LLMResult
 
-from .base import as_int, usage, usage_metadata_of
+from .base import opt_int, sum_known, usage, usage_metadata_of
 
 EXTRA_HINT = 'Install the anthropic extra: pip install "nl2sql-engine[anthropic]"'
 
@@ -124,10 +124,10 @@ class AnthropicWire:
             return None
         details = metadata.get("input_token_details") or {}
         return usage(
-            as_int(metadata.get("input_tokens")),
-            as_int(details.get("cache_read")),
-            as_int(details.get("cache_creation")) + sum(as_int(details.get(k)) for k in _CACHE_WRITE_BY_TTL),
-            as_int(metadata.get("output_tokens")),
-            as_int((metadata.get("output_token_details") or {}).get("reasoning")),
-            as_int(metadata.get("total_tokens")),
+            opt_int(metadata.get("input_tokens")),
+            opt_int(details.get("cache_read")),
+            sum_known(*(opt_int(details.get(k)) for k in ("cache_creation", *_CACHE_WRITE_BY_TTL))),
+            opt_int(metadata.get("output_tokens")),
+            opt_int((metadata.get("output_token_details") or {}).get("reasoning")),
+            opt_int(metadata.get("total_tokens")),
         )

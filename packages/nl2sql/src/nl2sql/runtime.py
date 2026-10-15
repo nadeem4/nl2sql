@@ -116,6 +116,8 @@ class Runtime:
         llm_problems = _llm_provider_problems(config.llm, self.registry, source)
         for p in llm_problems:
             problem(p.path, p.message)
+        for p in _unpriced_problems(config.llm, config.settings.pipeline, source):
+            problem(p.path, p.message, p.fix)
         if not llm_problems:
             # Clients are built now (no model call); a key that does not
             # resolve is check()'s to report, not the constructor's.
@@ -358,7 +360,8 @@ class Runtime:
             llm = parse_section("llm", dict(llm), source=source)
         if not isinstance(llm, LLM):
             raise TypeError(f"replace takes an LLM or the llm section as a mapping, not {type(llm).__name__}.")
-        problems = _llm_provider_problems(llm, self.registry, source)
+        problems = (_llm_provider_problems(llm, self.registry, source)
+                    + _unpriced_problems(llm, self.settings.pipeline, source))
         if problems:
             raise ConfigError(problems, source=source)
         new = self.llm_registry.build_from(llm)
@@ -565,6 +568,41 @@ def _llm_provider_problems(llm: "LLM", registry: Registry, source: str) -> List[
         except RegistryError as e:
             problems.append(Problem(file=source, path=path, message=str(e)))
     return problems
+
+
+def _unpriced_problems(llm: "LLM", pipeline: Any, source: str) -> List[Problem]:
+    """With ``settings.pipeline.max_cost_usd`` set, a problem for every model ``llm`` names that has no price (D20).
+
+    A call is priced by the name the provider reports, else by its configured
+    name, so an engine whose configured models are all priced prices every
+    call, and the cost cap can always be checked.
+    """
+    if pipeline.max_cost_usd is None:
+        return []
+    from nl2sql.llm.prices import price_for
+
+    problems = []
+    for path, model in _llm_models(llm):
+        name = model if isinstance(model, str) else (getattr(model, "model_name", None)
+                                                     or getattr(model, "model", None))
+        if isinstance(name, str) and price_for(name, llm.prices) is not None:
+            continue
+        shown = name if isinstance(name, str) else type(model).__name__
+        problems.append(Problem(
+            file=source, path=path,
+            message=f"Model '{shown}' has no price in llm.prices or the price table, and "
+                    "settings.pipeline.max_cost_usd caps what a question may cost.",
+            fix=f"add llm.prices.{shown} (USD per million tokens: input, output), "
+                "or set settings.pipeline.max_cost_usd to null"))
+    return problems
+
+
+def _llm_models(llm: "LLM"):
+    """``(path, model)`` for the default model and every agent that sets its own."""
+    yield "llm.model", llm.model
+    for agent, override in llm.agents.items():
+        if "model" in override.model_fields_set and override.model is not None:
+            yield f"llm.agents.{agent}.model", override.model
 
 
 def _config_agent_names() -> Dict[str, str]:

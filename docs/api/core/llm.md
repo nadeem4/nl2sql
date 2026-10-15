@@ -5,6 +5,7 @@
 
 ## Responsibilities
 - List each agent and the provider and model it runs on (`list`, `get`).
+- Report the prices every call is costed with (`prices`).
 - Replace the engine's whole `llm` section at runtime (`replace`).
 
 ## Key Modules
@@ -13,6 +14,7 @@
 - `packages/nl2sql/src/nl2sql/llm/llm_set.py`
 - `packages/nl2sql/src/nl2sql/llm/client_cache.py`
 - `packages/nl2sql/src/nl2sql/llm/models.py`
+- `packages/nl2sql/src/nl2sql/llm/prices.py` (the dated price table, `price_for`)
 - `packages/nl2sql/src/nl2sql/config/models.py` (`LLM`, `AgentLLM`: the `llm` section)
 
 ## Public Surface
@@ -96,6 +98,26 @@ engine.llm.providers()[0]
 # {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False}
 ```
 
+### llm.prices
+
+Signature:
+`prices() -> dict`
+
+The prices every model call is costed with: the engine's dated table with
+`llm.prices` applied ([Prices](../../configuration/llm.md#prices)).
+`checked_on` is the day the table was checked against the providers' pages;
+`models` maps each model name to its `input`, `cached_input`, `cache_write`
+and `output` rates (USD per million tokens; a config row's cache rates may be
+`None`, priced as the Prices section says), `verified`, `source` (`table` or
+`config`) and `citation` (where a table row's numbers came from; `None` for a
+config row). A model not listed is not priced: its calls' cost is `null`.
+
+```python
+engine.llm.prices()["models"]["claude-opus-5"]
+# {'input': 5.0, 'cached_input': 0.5, 'cache_write': 6.25, 'output': 25.0, 'verified': True,
+#  'source': 'table', 'citation': 'Anthropic model table in the claude-api skill (cached 2026-06-24); ...'}
+```
+
 ### llm.replace
 
 Source:
@@ -120,7 +142,8 @@ no key.
 
 Raises:
 - `ConfigError` for a section that does not validate, a provider that is not
-  registered or not installed, or an agent whose API key does not resolve.
+  registered or not installed, an agent whose API key does not resolve, or,
+  with `settings.pipeline.max_cost_usd` set, a model with no price.
   Nothing changes. `nl2sql-api` answers it as HTTP 422 with the same text
   ([`PUT /api/v1/settings/llm`](../rest/llm.md)).
 

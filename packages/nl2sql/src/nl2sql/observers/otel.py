@@ -138,7 +138,8 @@ class OtelObserver:
         elif event.name == "llm.call":
             base = {"node": data.get("node") or "unknown", "model": data.get("model") or "unknown"}
             for kind, field in _TOKEN_TYPES:
-                self._token_usage.add(data.get(field, 0), attributes={**base, "type": kind})
+                if data.get(field) is not None:  # a count the provider did not report is not a zero
+                    self._token_usage.add(data[field], attributes={**base, "type": kind})
         elif event.name == "plan_cache.lookup":
             self._plan_cache.add(1, attributes={"result": "hit" if data["hit"] else "miss",
                                                 "datasource_id": data["datasource_id"]})

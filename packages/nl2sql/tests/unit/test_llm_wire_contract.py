@@ -230,7 +230,9 @@ def test_a_cache_read_is_normalised_and_counted_once(case):
     call = _usage_of(case, case.cache_read_usage)
 
     assert call.usage_reported is True
-    assert (call.input_tokens, call.cached_input_tokens, call.cache_write_input_tokens) == (3540, 3500, 0)
+    # A provider that reports no cache writes leaves the count unknown, never 0.
+    write = 0 if case.cache_write_usage is not None else None
+    assert (call.input_tokens, call.cached_input_tokens, call.cache_write_input_tokens) == (3540, 3500, write)
     assert (call.output_tokens, call.total_tokens) == (120, 3660)
 
 

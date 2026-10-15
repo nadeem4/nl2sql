@@ -14,8 +14,8 @@ pipeline:
   strict_columns: true
   today: null                 # pin the run date: 2013-12-31
   retries: { max: 3, base_delay_s: 1.0, max_delay_s: 10.0, jitter_s: 0.5 }
-  max_llm_calls: 60           # model calls per question; null: no cap
-  max_cost_usd: null          # dollars per question; null: no cap
+  max_llm_calls: 60           # model calls per question, parse retries included; null: no cap
+  max_cost_usd: null          # dollars per question; null (the default): no cap
   sanity_checks: true
 retrieval:
   full_snapshot_max_tables: 15
@@ -78,9 +78,30 @@ The tenant id for requests that name none. Result files are kept per tenant.
 | `retries.base_delay_s` | `1.0` | Base delay between retries, in seconds. |
 | `retries.max_delay_s` | `10.0` | Longest delay between retries. |
 | `retries.jitter_s` | `0.5` | Most jitter added to a delay. |
-| `max_llm_calls` | `60` | The most model calls one question may make, parse retries included; `null` turns the cap off. 60 covers the largest legitimate run. A run that reaches it ends with `status: "stopped"` and `QueryResult.stop`. Enforced from release 0.7's cost and caps work ([Wave A](../architecture/wave_a.md#5-cost-the-price-table-and-per-question-caps)). |
-| `max_cost_usd` | none | The most one question may spend, in dollars; `null` (the default) is no cap. With a cap set, every model the config names must have a price. Enforced as `max_llm_calls` is. |
+| `max_llm_calls` | `60` | The most model calls one question may make, parse retries included; `null` turns the cap off. 60 covers the largest legitimate run: the resolver, the decomposer, six sub-queries each with a planner call and three refiner and planner retries, the answer, and parse retries. See [Per-question caps](#per-question-caps). |
+| `max_cost_usd` | none | The most one question may spend, in dollars; `null` (the default) is no cap. With a cap set, every model the `llm` section names must have a [price](llm.md#prices), or the engine does not build. See [Per-question caps](#per-question-caps). |
 | `sanity_checks` | `true` | The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). `false` turns them all off. Read from release 0.7's sanity checks ([Wave A](../architecture/wave_a.md#11-answer-sanity-checks)). |
+
+### Per-question caps
+
+Both caps are checked **before each model call**, by the question's budget:
+a call that would be the 61st, or that would start once the question has
+spent `max_cost_usd`, is never sent. The calls already in flight finish, so a
+question can pass the cost cap by the calls in flight: at most one per
+running sub-query.
+
+A question that reaches a cap ends with `status: "stopped"`, never as a
+planner error to retry: `QueryResult.stop` is `{limit, value, spent}`
+(`limit` is `max_llm_calls` or `max_cost_usd`), the one error is
+`RUN_LIMIT_REACHED` (not retryable) naming the limit and the setting, and the
+answer says so: "This question reached its limit of 60 model calls
+(settings.pipeline.max_llm_calls)." The run publishes `run.limit_reached`,
+which the caller's stream carries and the [audit log](observers.md) records.
+
+`nl2sql.limits.Budget(max_llm_calls=..., max_cost_usd=...)` is the same
+check for work that is not a question: make the model calls with
+`budget.callbacks()`, and a call over a cap raises `LimitReached` (with the
+`RunStop` in `.stop`) before it is sent.
 
 ## `retrieval`
 

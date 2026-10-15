@@ -18,7 +18,7 @@ and runs through [`engine.evals`](../evals/index.md).
 | `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
 | `packages/nl2sql/src/nl2sql/evaluation/report.py` | The report's boards: accuracy, intervals, pass^k, cost, latency |
 | `packages/nl2sql/src/nl2sql/evaluation/gate.py` | The regression gate's statistics: flips, McNemar's test, the checks |
-| `packages/nl2sql/src/nl2sql/evaluation/prices.py` | The dated price table mode full bills every call from |
+| `packages/nl2sql/src/nl2sql/llm/prices.py` | The dated price table every call, mode full's included, is billed from |
 | `packages/nl2sql/src/nl2sql/evaluation/records.py` | Result records, comparable runs and the published pages |
 | `packages/nl2sql/src/nl2sql/evaluation/presets/` | Named LLM configs to compare (`*.yaml`, shipped in the wheel) |
 | `benchmarks/<kind>/<database>/` | Committed result records ([layout](#results-over-time)) |
@@ -334,8 +334,9 @@ package:
 
 ### Cost and the cap
 
-Every LLM call is billed from `nl2sql/evaluation/prices.py`, a committed table
-of USD per 1M tokens, dated with the day it was checked:
+Every LLM call is billed from `nl2sql/llm/prices.py`, a committed table
+of USD per 1M tokens, dated with the day it was checked (an `llm.prices` row
+replaces a model's):
 
 | Model | Input | Cached input | Cache write | Output | Source |
 | --- | --- | --- | --- | --- | --- |
