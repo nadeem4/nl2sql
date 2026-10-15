@@ -2457,6 +2457,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#hooks-modify-before-the-validator-deny-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hooks Modify Before the Validator, Deny After
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hooks Modify Before the Validator, Deny After">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3633,6 +3694,34 @@
     
   
     Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hooks
   
 
     
@@ -8008,6 +8097,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#hooks-modify-before-the-validator-deny-after" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hooks Modify Before the Validator, Deny After
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hooks Modify Before the Validator, Deny After">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8256,13 +8406,14 @@
 <hr />
 <h2 id="aggregation-requires-scan-artifacts-and-single-input-post-nodes">Aggregation Requires Scan Artifacts and Single-Input Post Nodes</h2>
 <h3 id="definition_15">Definition</h3>
-<p>Scan nodes must have corresponding artifacts, and post-combine nodes must have exactly one input.</p>
+<p>Scan nodes must have corresponding artifacts, and post-combine nodes must have exactly one input. The one exception is a scan a hook dropped (a deny scoped to its sub-query): it has no artifact, a <code>join</code> or <code>compare</code> group it feeds is dropped whole with its post-combine nodes, and another group goes on without it.</p>
 <h3 id="enforcement-points_15">Enforcement Points</h3>
 <ul>
-<li><code>AggregationService.execute()</code> in <code>nl2sql.aggregation.aggregator</code></li>
+<li><code>AggregationService.execute()</code> in <code>nl2sql.aggregation.aggregator</code> (its <code>dropped</code> argument)</li>
+<li><code>EngineAggregatorNode</code> in <code>nl2sql.pipeline.nodes.aggregator.node</code>, which passes the sub-queries whose output is <code>dropped</code></li>
 </ul>
 <h3 id="failure-behavior_15">Failure Behavior</h3>
-<p>Raises <code>ValueError</code> when artifacts are missing or post nodes have invalid inputs.</p>
+<p>Raises <code>ValueError</code> when artifacts are missing or post nodes have invalid inputs. A dropped group is a <code>HOOK_DENIED</code> warning; when hooks dropped every part of the question, the aggregator ends the run with <code>HOOK_DENIED</code>.</p>
 <h3 id="why-it-exists_15">Why It Exists</h3>
 <p>Guarantees aggregation operates on complete, correctly wired inputs.</p>
 <hr />
@@ -8433,15 +8584,31 @@ different <code>storage.path</code> values never share a store.</p>
 <li><code>packages/nl2sql/tests/sqlalchemy_base/test_bound_parameters.py</code>: a value <code>1; DROP TABLE x</code> is compared as a value and the table survives</li>
 </ul>
 <h3 id="failure-behavior_25">Failure Behavior</h3>
-<p>A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run.</p>
+<p>A broken file fails startup. At question time a bad value, a denied table, a missing capability or a failed run falls back to the generated pipeline with a reason code in the matcher's trace record; it is never an error of the run. A hook's deny at <code>execute.before</code> or <code>execute.after</code> is different: it ends the run with <code>HOOK_DENIED</code> and does not fall back, because a deny means no.</p>
 <h3 id="why-it-exists_25">Why It Exists</h3>
 <p><em>The model emits a typed plan, never SQL</em> holds on this path too: no model wrote the SQL, and a value cannot change what the query does.</p>
+<hr />
+<h2 id="hooks-modify-before-the-validator-deny-after">Hooks Modify Before the Validator, Deny After</h2>
+<h3 id="definition_26">Definition</h3>
+<p>A hook may change what a run carries only through a <code>Modify</code>, and only at the three points before the logical validator: the question at <code>run.before</code>, the datasources at <code>datasources.after</code> (a subset only, checked against the caller's scope again) and the plan at <code>plan.after</code>. A plan a hook changed is validated like any other. At <code>execute.before</code>, <code>execute.after</code> and <code>answer.after</code> a hook may only allow or stop the run (or, at <code>execute.before</code>, ask for approval). Hooks fail closed: an exception, a value that is not a decision, or a decision the point does not allow denies with <code>HOOK_FAILED</code>; <code>on_error: open</code> lets an exception through as an allow, never a disallowed decision. The plan cache stores the planner's plan, never a hook's change of it.</p>
+<h3 id="enforcement-points_26">Enforcement Points</h3>
+<ul>
+<li><code>HOOK_POINTS</code> in <code>nl2sql.hooks.points</code> (what each point allows) and <code>HookRunner.call()</code> in <code>nl2sql.hooks.runner</code></li>
+<li><code>ASTPlannerNode.after_plan()</code> in <code>nl2sql.pipeline.nodes.ast_planner.node</code>: every plan the validator gets (the planner's, a cached one, a supplied one) passes <code>plan.after</code> there</li>
+<li><code>wrap_subgraph()</code> in <code>nl2sql.pipeline.graph_utils</code> caches <code>ASTPlannerResponse.planner_plan</code></li>
+<li><code>HookRunner.call()</code> hands hooks deep copies of the plan, the caller, the sub-query and the values, so a hook that changes one in place changes nothing: <code>test_a_hook_changing_the_callers_roles_in_place_changes_nothing</code>, <code>test_a_hook_changing_the_plan_in_place_changes_nothing</code>, <code>test_a_shallow_copy_modify_leaves_the_planners_plan_alone</code> and <code>test_a_hook_changing_the_params_in_place_changes_nothing</code> in <code>packages/nl2sql/tests/unit/test_hook_points.py</code></li>
+<li><code>test_hooks_modify_only_before_the_validator</code> in <code>packages/nl2sql/tests/architecture/test_hooks_boundary.py</code>: the point table, an AST scan of every runner call (each names its point as a literal, and no other call passes a point name along), and the SQL agent graph, in which every path from the planner to the generator passes the validator</li>
+</ul>
+<h3 id="failure-behavior_26">Failure Behavior</h3>
+<p>A deny is <code>HOOK_DENIED</code>, a hook error <code>HOOK_FAILED</code> (its message names the hook and the point only; the exception goes to the log and <code>hook.decision</code>), an approval request <code>NEEDS_APPROVAL</code>; none is retried. A run-scoped one ends the run once the step in flight is done, and its result carries no rows, artifact references or result manifest. A deny scoped to a sub-query drops it (and a <code>join</code> or <code>compare</code> group it feeds), and the answer says what went unanswered.</p>
+<h3 id="why-it-exists_26">Why It Exists</h3>
+<p><em>The validator rejects everything the generator can</em> would mean nothing if code could change the plan or the SQL after the validator: a hook could otherwise route around the policies, including a table the role may not read.</p>
 <hr />
 <h2 id="categories">Categories</h2>
 <ul>
 <li><strong>State</strong>: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Execution</strong>: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded</li>
-<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound</li>
+<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After</li>
 <li><strong>Determinism</strong>: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed</li>
 <li><strong>Resource bounds</strong>: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Boundaries</strong>: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter</li>
@@ -8462,6 +8629,7 @@ different <code>storage.path</code> values never share a store.</p>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/config/curated.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/hooks/</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/execution/executor/sql_executor.py</code></li>

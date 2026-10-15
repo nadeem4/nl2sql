@@ -2343,6 +2343,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/embeddings/" class="md-nav__link">
         
   
@@ -5473,6 +5501,7 @@
 </ul>
 <p>Fields (exact names and types from code):
 - <code>trace_id: str</code>
+- <code>user_query: str</code> (the run's question after <code>run.before</code>, for the hooks a sub-query calls)
 - <code>sub_query: Optional[SubQuery]</code>
 - <code>user_context: Optional[UserContext]</code>
 - <code>subgraph_id: Optional[str]</code>
@@ -5502,7 +5531,7 @@
 - <code>errors: List[PipelineError]</code>
 - <code>validation: List[ValidationCheck]</code> (copied from <code>logical_validator_response.checks</code>)
 - <code>reasoning: List[Dict[str, Any]]</code>
-- <code>status: Optional[str]</code></p>
+- <code>status: Optional[str]</code> (<code>success</code>, <code>error</code>, or <code>dropped</code> when a hook's deny scoped to the sub-query stopped it)</p>
 <hr />
 <h2 id="field-lifecycle">Field Lifecycle</h2>
 <p>The lifecycle below lists creation, mutation, reads, and resets based strictly on code.</p>

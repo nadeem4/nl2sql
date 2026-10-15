@@ -1934,6 +1934,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/embeddings/" class="md-nav__link">
         
   
@@ -5414,7 +5442,7 @@ and <code>.../{result_id}.csv</code>; the playground serves the same two under <
 <td><code>status</code></td>
 <td><code>str</code></td>
 <td>no</td>
-<td><code>"success"</code> or <code>"error"</code> for this sub-query, from its final attempt: <code>"success"</code> when it ended with SQL and, if executed, a result; otherwise <code>"error"</code>. A retry that recovers reports <code>"success"</code>.</td>
+<td><code>"success"</code> or <code>"error"</code> for this sub-query, from its final attempt: <code>"success"</code> when it ended with SQL and, if executed, a result; otherwise <code>"error"</code>. A retry that recovers reports <code>"success"</code>. <code>"dropped"</code> when a <a href="../../../configuration/hooks/">hook</a> denied it with <code>scope="sub_query"</code>: the run went on without it.</td>
 </tr>
 <tr>
 <td><code>retry_count</code></td>

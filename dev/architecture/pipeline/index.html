@@ -452,6 +452,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#hooks">
+<span class="md-ellipsis">
+      
+        Hooks
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#observability-hooks-current">
 <span class="md-ellipsis">
       
@@ -990,6 +999,18 @@
     
   
     Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/hooks/">
+<span class="md-ellipsis">
+    
+  
+    Hooks
   
 
     
@@ -2275,6 +2296,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#hooks">
+<span class="md-ellipsis">
+      
+        Hooks
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#observability-hooks-current">
 <span class="md-ellipsis">
       
@@ -2386,6 +2416,47 @@
 <li>There is no execution sandbox; the SQL executor runs in-process on the pipeline thread pool (see <code>../execution/isolation.md</code>).</li>
 <li><code>VECTOR_BREAKER</code> is the only circuit breaker. LLM calls and SQL execution are not breaker-guarded.</li>
 </ul>
+<h2 id="hooks">Hooks</h2>
+<p>The engine's <code>HookRunner</code> (<code>ctx.hooks</code>, built by the runtime from the
+<code>hooks</code> section) is called at six points of every run; see
+<a href="../../configuration/hooks/">Hooks</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Point</th>
+<th>Called from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run.before</code></td>
+<td><code>run_with_graph</code>'s worker, before <code>graph.invoke</code>; a <code>Modify</code> rewrites <code>user_query</code>, a deny returns before the graph runs</td>
+</tr>
+<tr>
+<td><code>datasources.after</code></td>
+<td><code>DatasourceResolverNode</code>, on the datasources it forwards</td>
+</tr>
+<tr>
+<td><code>plan.after</code></td>
+<td><code>ASTPlannerNode.after_plan()</code>, on the planner's or the cache's plan, before the validator</td>
+</tr>
+<tr>
+<td><code>execute.before</code>, <code>execute.after</code></td>
+<td><code>ExecutorNode</code>, and <code>CuratedMatcherNode</code> for a verified query</td>
+</tr>
+<tr>
+<td><code>answer.after</code></td>
+<td><code>AnswerSynthesizerNode</code>, once the answer is written</td>
+</tr>
+</tbody>
+</table>
+<p>A hook that stops the run (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>)
+ends it at the layer router once the layer in flight is done. A sub-query a
+hook dropped (<code>scope="sub_query"</code>) reports <code>status: "dropped"</code> from
+<code>wrap_subgraph()</code>, with its reason as a <code>HOOK_DENIED</code> warning; the router
+still sends the run to the aggregator, which drops a <code>join</code> or <code>compare</code>
+group that needs it. <code>SubgraphExecutionState.user_query</code> carries the run's
+question (after <code>run.before</code>) into each sub-query for the hooks there.</p>
 <h2 id="observability-hooks-current">Observability hooks (current)</h2>
 <p>Observability stack and callback behavior are documented in <code>../observability/stack.md</code>.</p>
 <h2 id="source-references">Source references</h2>
@@ -2397,6 +2468,7 @@
 <li>SQL agent graph: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py</code></li>
 <li>Execution DAG models: <code>packages/nl2sql/src/nl2sql/execution/dag.py</code></li>
 <li>Aggregation service: <code>packages/nl2sql/src/nl2sql/aggregation/aggregator.py</code></li>
+<li>Hooks: <code>packages/nl2sql/src/nl2sql/hooks/</code></li>
 </ul>
 </article>
 </div>

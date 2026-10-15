@@ -1934,6 +1934,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/embeddings/" class="md-nav__link">
         
   
@@ -4979,7 +5007,9 @@ that is not in it cannot be published.</p>
 <code>llm.changed</code>, <code>eval.case</code>, <code>eval.finished</code>) carry no <code>trace_id</code>. Which PR
 of Wave A starts publishing each one is in its description; <code>node.*</code>,
 <code>answer.delta</code>, <code>result.manifest</code> and the three <code>run.*</code> events are published
-today.</p>
+today. While a <a href="../../configuration/hooks/">hook</a> is attached at
+<code>answer.after</code>, a run publishes no <code>answer.delta</code> and sends <code>result.manifest</code>
+only after the hooks allowed the answer (never, on a deny).</p>
 <h2 id="the-runs-stream">The run's stream</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>

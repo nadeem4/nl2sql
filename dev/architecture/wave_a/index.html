@@ -1399,6 +1399,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/hooks/">
+<span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/embeddings/">
 <span class="md-ellipsis">
     
@@ -4434,6 +4446,65 @@ where H1 imports it.</p>
 <li>The SQL agent graph, built with fakes, has exactly one path from
    <code>ast_planner</code> to <code>generator</code>, and it passes <code>logical_validator</code>.</li>
 </ol>
+<div class="admonition note">
+<p class="admonition-title">Built: the runner, the six points and the boundary test (H1)</p>
+<p><code>nl2sql/hooks/</code>: the interface in <code>__init__.py</code> (<code>HookContext</code>, <code>Allow</code>,
+<code>Modify</code>, <code>Deny</code>, <code>NeedsApproval</code>, <code>Decision</code>, <code>Hook</code>; <code>HookPoint</code> is
+re-exported from <code>nl2sql.config.models</code>), <code>points.py</code> (<code>HOOK_POINTS</code>, a
+<code>PointRule</code> per point: <code>decisions</code>, <code>modifies</code>, <code>per_sub_query</code>) and
+<code>runner.py</code>. The shapes differ from the sketch above in four places:</p>
+<ul>
+<li><code>HookRunner(bindings)</code> takes a list of <code>HookBinding(name, hook, points,
+  on_error, approver_roles)</code> from the runtime (<code>Runtime._build_hooks</code>,
+  <code>build_hook</code> per entry, in config order) and reads no config, so a
+  built-in hook (Wave B's <code>policy.cost</code>) goes first with its own
+  <code>approver_roles</code>. <code>ctx.hooks</code> is the engine's runner; <code>hooks_of(ctx)</code>
+  gives <code>NO_HOOKS</code> for a stand-in runtime.</li>
+<li><code>HookRunner.call(point, **fields)</code> builds the context from deep copies
+  of <code>fields</code> (a hook changing the plan or the caller in place changes
+  nothing) and returns a <code>HookVerdict</code>: <code>ctx</code> after every <code>Modify</code>,
+  <code>modified</code>, and the <code>decision</code> and <code>hook</code> that stopped the point
+  (<code>allowed</code>, <code>scope</code>, <code>error(node)</code>, the <code>PipelineError</code>; a hook error's
+  message names only the hook and the point). With no hook at a point,
+  nothing is validated. <code>HookRunner.attached(point)</code> says whether any
+  hook runs there: while one runs at <code>answer.after</code> the answer is not
+  streamed (no <code>answer.delta</code>), <code>RunEvents(..., hold_manifest=True)</code>
+  holds <code>result.manifest</code> until the answer is allowed (dropped on a
+  deny), and <code>result_from_state</code> drops the rows, <code>artifact_refs</code> and
+  <code>result_manifest</code> of a run a hook ended.</li>
+<li><code>HookContext</code> adds <code>conversation_id: str | None</code> (Wave C's A3),
+  <code>execute</code> (<code>run.before</code>) and <code>results</code> (the run's <code>ResultSummary</code>s at
+  <code>answer.after</code>, the "sub-query summaries" of the table).</li>
+<li><code>NeedsApproval</code> at <code>execute.before</code> stops the SQL with
+  <code>NEEDS_APPROVAL</code> (status <code>error</code>) until H2 adds the request and the
+  re-run; so <code>NEEDS_APPROVAL</code> left <code>DECLARED_AHEAD</code> here with
+  <code>HOOK_DENIED</code> and <code>HOOK_FAILED</code>.</li>
+</ul>
+<p>The call sites: <code>run.before</code> in <code>run_with_graph</code>'s worker;
+<code>datasources.after</code> in <code>DatasourceResolverNode._after_hooks</code> (the one
+addition to the resolver; R1 rebases on it); <code>plan.after</code> in
+<code>ASTPlannerNode.after_plan(state, plan, plan_source)</code>, which the
+planner's and the cache's plan go through and which a supplied plan (H2's
+approved, Wave B's chosen, Wave C's supplied) calls the same way;
+<code>ASTPlannerNode.check_plan(state, plan)</code> is one plan's verdict, for Wave
+B's alternatives. <code>ASTPlannerResponse.planner_plan</code> is the plan before
+the hooks, and <code>wrap_subgraph</code> caches it. <code>execute.before</code> and
+<code>execute.after</code> in <code>ExecutorNode</code> and <code>CuratedMatcherNode</code> (each a
+<code>self.hooks.call("&lt;point&gt;", **self._hook_fields(...))</code>; a deny on the
+verified path ends the run, as <code>_ended</code>, never a fallback); <code>answer.after</code> in <code>AnswerSynthesizerNode</code>. A sub-query a hook
+dropped has <code>SubgraphOutput.status == "dropped"</code> and a <code>HOOK_DENIED</code>
+warning; <code>build_scan_layer_router</code> (in <code>pipeline/routes.py</code>, a small
+addition the file list missed) ends the run on a hook's error and still
+aggregates when a sub-query was dropped; <code>AggregationService.execute(...,
+dropped=)</code> drops a <code>join</code> or <code>compare</code> group whole; the answer's
+warnings name what was dropped. <code>SubgraphExecutionState.user_query</code> (in
+<code>pipeline/state.py</code>, also not in the file list) carries the question to
+the sub-query's hooks. The architecture test is
+<code>tests/architecture/test_hooks_boundary.py</code>: every runner call names its
+point as a literal; its graph check asks that
+every path from <code>ast_planner</code> to <code>generator</code> pass <code>logical_validator</code>, so
+Wave B's clarifier may sit between the validator and the generator.</p>
+</div>
 <h2 id="7-approval">7. Approval</h2>
 <p>A hook at <code>execute.before</code> answers <code>NeedsApproval("Reads payroll.salaries")</code>.
 The minimal shape (D10, D24):</p>

@@ -2178,6 +2178,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../embeddings/" class="md-nav__link">
         
   
@@ -5349,8 +5377,8 @@ reads a secret from the provider whose <code>id</code> is <code>vault</code> (se
 </table>
 <h3 id="observers-hooks-and-evals">Observers, hooks and evals</h3>
 <p>Three sections added in release 0.7 (<a href="../../architecture/wave_a/">Wave A</a>).
-They are accepted and validated now; the engine reads each from the Wave A
-change named below.</p>
+They are accepted and validated now; the engine runs the hooks, and reads
+the other two from the Wave A change named below.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># observers.yaml: where the engine's events go (read from E2)</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">INFO</span>
@@ -5361,7 +5389,7 @@ change named below.</p>
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">corp_siem</span><span class="w">                 </span><span class="c1"># a plugin; its config_model checks the rest</span>
 <a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:SIEM_URL}"</span>
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># hooks.yaml: code that sees every run at fixed points, in this order (read from H1)</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># hooks.yaml: code that sees every run at fixed points, in this order (see Hooks)</span>
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">corp_sql_review</span>
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span><span class="nt">points</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">execute.before</span><span class="p p-Indicator">]</span><span class="w">        </span><span class="c1"># a subset of the hook's own points; all of them by default</span>
 <a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">  </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">closed</span><span class="w">                </span><span class="c1"># closed (the default) | open</span>
@@ -5395,7 +5423,7 @@ change named below.</p>
 <tr>
 <td><code>hooks</code></td>
 <td><code>{type: &lt;name&gt;, points, on_error, approver_roles, ...}</code> (<code>HookConfig</code>) or a hook object in code</td>
-<td><code>points</code> takes <code>run.before</code>, <code>datasources.after</code>, <code>plan.after</code>, <code>execute.before</code>, <code>execute.after</code> and <code>answer.after</code>; any other is an error. <code>on_error</code> is <code>closed</code> or <code>open</code>. The hook's <code>config_model</code> checks its own keys.</td>
+<td><code>points</code> takes <code>run.before</code>, <code>datasources.after</code>, <code>plan.after</code>, <code>execute.before</code>, <code>execute.after</code> and <code>answer.after</code>; any other is an error. <code>on_error</code> is <code>closed</code> or <code>open</code>. The hook's <code>config_model</code> checks its own keys. A point the hook does not declare is an error. See <a href="../hooks/">Hooks</a>.</td>
 </tr>
 <tr>
 <td><code>evals</code></td>
