@@ -1,4 +1,4 @@
-"""``nl2sql eval``: run (with the gate and its exit codes), regenerate and publish.
+"""``nl2sql eval``: run (with the gate and its exit codes), regenerate, seed and publish.
 
 The engine is a stand-in whose ``evals`` is the real ``EvalsAPI`` with
 ``run`` and ``regenerate`` replaced, so the gate and the baseline loading
@@ -21,6 +21,7 @@ from nl2sql.evaluation import report as report_module
 from nl2sql.evaluation.regenerate import RegenerateReport
 from nl2sql.evaluation.report import EvalReport
 from nl2sql.evaluation.run import node_agents
+from nl2sql.evaluation.seed import SeedReport
 from nl2sql.llm.models import LLMFileConfig
 
 runner = CliRunner()
@@ -54,6 +55,7 @@ class _Evals(EvalsAPI):
     def __init__(self, folder, result, regenerated=None):
         super().__init__(SimpleNamespace(config=SimpleNamespace(folder=folder, evals=EvalsConfig())))
         self.result, self.regenerated, self.calls = result, regenerated, []
+        self.seeded = None
 
     def run(self, suites=None, **kwargs):
         self.calls.append({"suites": suites, **kwargs})
@@ -66,10 +68,17 @@ class _Evals(EvalsAPI):
         self.calls.append({"regenerate": path})
         return self.regenerated
 
+    def seed(self, datasource_id, **kwargs):
+        self.calls.append({"seed": datasource_id, **kwargs})
+        if isinstance(self.seeded, Exception):
+            raise self.seeded
+        return self.seeded
+
 
 class _Engine:
     def __init__(self, evals, folder):
-        self.evals, self.config = evals, SimpleNamespace(folder=folder)
+        self.evals = evals
+        self.config = SimpleNamespace(folder=folder, policies=SimpleNamespace(default_role=None))
 
     def __enter__(self):
         return self
@@ -195,6 +204,52 @@ def test_eval_regenerate_calls_the_engine(engine, tmp_path):
                                                 failed=[{"case": "c1", "error": "no such table"}])
     failed = runner.invoke(app, ["eval", "regenerate", "x.yaml"])
     assert failed.exit_code == 1 and "c1" in _out(failed) and "no such table" in _out(failed)
+
+
+def test_eval_seed_asks_as_the_role_and_prints_the_report(engine, tmp_path):
+    engine.evals.seeded = SeedReport(path=tmp_path / "evals" / "sales.yaml", written=4, dropped_invalid=2,
+                                     dropped_empty=1)
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--count", "8", "--role", "analyst",
+                                 "--max-cost", "0.5", "--out", "evals/sales.yaml"])
+    assert result.exit_code == 0, _out(result)
+    [call] = engine.evals.calls
+    assert call["seed"] == "sales" and call["count"] == 8 and call["max_cost_usd"] == 0.5
+    assert call["out"] == "evals/sales.yaml" and call["user_context"].roles == ["analyst"]
+    out = _out(result)
+    assert "Wrote 4 draft" in out and "2 invalid" in out and "1 empty" in out
+
+
+def test_eval_seed_takes_the_default_role_and_refuses_without_one(engine):
+    engine.evals.seeded = SeedReport(path="s.yaml", written=1)
+    refused = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--out", "s.yaml"])
+    assert refused.exit_code == 2 and "--role" in _out(refused)
+    assert engine.evals.calls == []
+
+    engine.config.policies.default_role = "viewer"
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--out", "s.yaml"])
+    assert result.exit_code == 0, _out(result)
+    assert engine.evals.calls[0]["user_context"].roles == ["viewer"] and engine.evals.calls[0]["count"] == 20
+
+
+def test_eval_seed_exits_3_at_the_cost_cap(engine):
+    engine.evals.seeded = SeedReport(path="s.yaml", written=5, stopped_at_cost_cap=True)
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--role", "r", "--out", "s.yaml"])
+    assert result.exit_code == 3 and "cost cap" in _out(result)
+
+
+@pytest.mark.parametrize("error", [PermissionError("The role(s) r may not read the datasource 'sales'."),
+                                   ValueError("s.yaml holds approved cases; drafts never go into it.")])
+def test_eval_seed_reports_a_refusal_as_a_usage_error(engine, error):
+    engine.evals.seeded = error
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--role", "r", "--out", "s.yaml"])
+    assert result.exit_code == 2 and str(error).split(" ")[1] in _out(result)
+
+
+def test_seeding_never_runs_in_ci(engine, monkeypatch):
+    monkeypatch.setenv("CI", "true")
+    result = runner.invoke(app, ["eval", "seed", "--datasource", "sales", "--role", "r", "--out", "s.yaml"])
+    assert result.exit_code == 2 and "CI" in _out(result)
+    assert engine.evals.calls == []
 
 
 def test_publish_writes_a_record(tmp_path):

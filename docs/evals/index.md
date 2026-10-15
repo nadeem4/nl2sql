@@ -8,7 +8,8 @@ with registered **scorers**, and the result is an `EvalReport`.
 The package ships one suite, Chinook's 47 gold cases, and
 `nl2sql init --demo` copies it next to the demo's `nl2sql.yaml`. The format
 is in [Cases and suites](cases.md), and what makes a case pass is in
-[Scorers](scorers.md).
+[Scorers](scorers.md). To build a suite for your own database, seed draft
+cases from its schema and review them ([Benchmark your own database](seeding.md)).
 
 ## Configuring it
 
@@ -47,6 +48,7 @@ print(report.accuracy, report.accuracy_generated)
 | `engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)` | Runs every approved case once per role in its `outcome` map, `passes` times, and returns an `EvalReport` |
 | `engine.evals.gate(report, baseline)` | The regression gate: `report` against a baseline report, record or `benchmarks/` folder, with `evals.yaml`'s `gate` settings. Returns a `GateResult` ([The gate](#the-regression-gate)) |
 | `engine.evals.regenerate(path, *, allow_packaged=False)` | Runs each approved case's `sql` and `alt_sql` through its datasource's adapter and writes `rows` and `alt_rows` ([Regenerating rows](cases.md#regenerating-rows)). A suite the package ships is refused unless `allow_packaged` |
+| `engine.evals.seed(datasource_id, *, count=20, out, user_context, max_cost_usd=None)` | Drafts up to `count` cases from the datasource's schema, as `user_context` sees it, and appends them to `out` as `status: draft`. Returns a `SeedReport` ([Benchmark your own database](seeding.md)) |
 | `engine.evals.scorers()` | The registered scorer names: the five built-ins and any plugin's |
 
 The `run` arguments:
@@ -246,6 +248,7 @@ The statistics are in
 | --- | --- |
 | `nl2sql eval run [--suite PATH ...] [--mode full\|plans\|retrieval] [--llm SPEC ...] [--cases ID/TAG ...] [--passes N] [--max-cost USD] [--baseline PATH] [--out FILE]` | `engine.evals.run`, then `engine.evals.gate` with `--baseline` |
 | `nl2sql eval regenerate PATH` | `engine.evals.regenerate`; exits 1 when a case's SQL failed |
+| `nl2sql eval seed --datasource ID --out PATH [--count N] [--role R] [--max-cost USD]` | `engine.evals.seed`, as `--role` (else `policies.default_role`); exits 2 on a refusal, 3 at the cost cap, and refuses to run when `CI` is set ([Benchmark your own database](seeding.md)) |
 | `nl2sql eval publish [REPORT ...] [--note TEXT] [--from DIR ...]` | Records each report under `benchmarks/`, then rebuilds [the results page](../benchmarks.md) and the README block. Run from the repo root |
 
 `--llm` names an LLM config to compare in mode full, and repeats:

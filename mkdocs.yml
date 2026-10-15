@@ -150,6 +150,7 @@ nav:
     - Overview: evals/index.md
     - Cases and Suites: evals/cases.md
     - Scorers: evals/scorers.md
+    - Benchmark Your Own Database: evals/seeding.md
     - The Chinook Suite: testing/evaluation-dataset.md
     - Benchmark Results: benchmarks.md
   - Testing:

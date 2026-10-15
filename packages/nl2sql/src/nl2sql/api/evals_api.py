@@ -3,9 +3,10 @@
 ``load`` reads the suites ``evals.yaml`` names, ``run`` runs them in one of
 three modes and returns an ``EvalReport``, ``regenerate`` writes a suite's
 expected rows through the datasource's adapter, and ``scorers`` lists the
-registered scorer names, and ``gate`` compares a report with a baseline
-(the regression gate). Seeding (``seed``) arrives with V3. This module never imports ``nl2sql.evaluation``
-at module scope: building an engine never loads it.
+registered scorer names, ``gate`` compares a report with a baseline (the
+regression gate), and ``seed`` drafts cases from a datasource for a person to
+review. This module never imports ``nl2sql.evaluation`` at module scope:
+building an engine never loads it.
 """
 from __future__ import annotations
 
@@ -17,7 +18,9 @@ if TYPE_CHECKING:
     from nl2sql.evaluation.gate import GateResult
     from nl2sql.evaluation.regenerate import RegenerateReport
     from nl2sql.evaluation.report import EvalReport
+    from nl2sql.evaluation.seed import SeedReport
     from nl2sql.evaluation.suite import EvalSuite
+    from nl2sql.policies import UserContext
 
 
 class EvalsAPI:
@@ -143,6 +146,41 @@ class EvalsAPI:
         from nl2sql.evaluation.regenerate import regenerate
 
         return regenerate(self._ctx.ds_registry, self._path(path), allow_packaged=allow_packaged)
+
+    def seed(self, datasource_id: str, *, count: int = 20, out: Union[str, Path],
+             user_context: Optional["UserContext"], max_cost_usd: Optional[float] = None) -> "SeedReport":
+        """Draft cases from ``datasource_id``'s schema, as ``user_context`` sees it, appended to ``out``.
+
+        The ``eval_seeder`` agent is shown the tables the caller may read and
+        asked for questions with typed plans, five per call, never SQL. Each
+        plan passes the logical validator and the generator under the caller's
+        scope, and its SQL runs read-only through the datasource's adapter; a
+        plan that is refused, fails or returns no rows is dropped and counted.
+        Survivors are written as ``status: draft``, ``origin: seeded``, with no
+        rows: a person reviews each one, approves it, and runs ``regenerate``.
+
+        Args:
+            datasource_id: The datasource to seed from; it must have an index build.
+            count: How many drafts to write at most.
+            out: The suite file, relative to ``nl2sql.yaml`` or absolute. Never a
+                suite the package ships, a suite ``evals.yaml`` names, or a file
+                holding approved cases. A question already in it is skipped.
+            user_context: The caller, with a role; required. Seeding fails closed
+                without one, and never shows the model a table the role cannot read.
+            max_cost_usd: The dollar cap on seeding's model calls; ``None`` takes
+                ``evals.yaml``'s, and one is required.
+
+        Raises:
+            PermissionError: no caller, no role, or a role that cannot read the datasource.
+            ValueError: an unknown datasource, no cost cap, a refused ``out``, or no index build.
+            UnknownPriceError: the ``eval_seeder`` model has no price.
+        """
+        from nl2sql.evaluation.seed import seed
+
+        cfg = self._ctx.config.evals
+        return seed(self._ctx, datasource_id, count=count, out=self._path(out), user_context=user_context,
+                    max_cost_usd=max_cost_usd if max_cost_usd is not None else cfg.max_cost_usd,
+                    configured=[self._path(p) for p in cfg.suites])
 
     def scorers(self) -> List[str]:
         """The registered scorer names: the built-ins and every plugin's."""

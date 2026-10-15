@@ -307,6 +307,7 @@ command has `--help`.
 | `nl2sql feedback clear` | Delete every rating | `--yes` |
 | `nl2sql eval run` | Run the eval suites in one mode (`full`: the model, priced and capped; `plans`: the gold plans on a fake LLM; `retrieval`: no model) and, with `--baseline`, gate the run against a report, a record or a `benchmarks/` folder. Exits 1 on a regression, 2 on a usage error or a baseline it cannot compare, 3 at the cost cap; mode full refuses to run when `CI` is set | `--mode`, `--suite`, `--llm` (preset, file or `NAME=`), `--cases`, `--passes`, `--max-cost`, `--baseline`, `--out` (default `eval_<mode>.json` next to `nl2sql.yaml`) |
 | `nl2sql eval regenerate PATH` | Write a suite's expected rows: each approved case's SQL through its datasource's adapter; exits 1 when a case's SQL failed | |
+| `nl2sql eval seed` | Draft eval cases from a datasource's schema, as a role: the model writes questions with typed plans, the engine validates and runs each read-only, and the survivors are appended as `status: draft` for review. Exits 2 on a refusal, 3 at the cost cap; refuses to run when `CI` is set | `--datasource`, `--out`, `--count` (default 20), `--role` (default `policies.default_role`), `--max-cost` (default `evals.yaml`'s) |
 | `nl2sql eval publish [REPORT ...]` | Record each report `eval run` wrote under `benchmarks/`, then rebuild `docs/benchmarks.md` and the results block above; run from the repo root | `--note`, `--from DIR` |
 
 The `nl2sql eval` group is the whole command; `nl2sql eval --help` lists its

@@ -1499,6 +1499,43 @@ series_break)`.
 
 `SeedReport(written, dropped_invalid, dropped_failed, dropped_empty, dropped_duplicate, stopped_at_cost_cap, usage)`.
 
+!!! note "Built: seeding (V3)"
+    `engine.evals.seed(datasource_id, *, count=20, out, user_context,
+    max_cost_usd=None) -> SeedReport` and `nl2sql eval seed`, in
+    `evaluation/seed.py` and `evaluation/prompts.py` (`EVAL_SEEDER_PROMPT`).
+    The user guide is [Benchmark your own database](../evals/seeding.md).
+    Where the code differs from the steps above:
+
+    - **The caller is required and checked first.** No `user_context`, no
+      role, or a role whose scope does not reach the datasource (or none of
+      its tables) is a `PermissionError` before any call. The model is shown
+      the tables through `SchemaRetrieverNode.visible_tables(user_context,
+      datasource_id)`, new and public: the planner's own rendering for that
+      caller. `outcome` names every role of the caller.
+    - **Plans go through the pinned-plan entry.** Each proposed plan runs as
+      `run_query(question, plan=SuppliedPlan(...), execute=False,
+      user_context=...)`: `plan.after`, the validator and the generator under
+      the caller's scope, with no model call, in a run scope of its own
+      (`run.started` and `run.finished`). The SQL then runs through the
+      adapter as `regenerate` runs it, so `execute.before` and
+      `execute.after` do not see it; no row is kept. A question that reads
+      as SQL (the decomposer's `SubQuery` check) is dropped as invalid.
+    - **The structured output is `SeedBatch`** (`cases`: `SeedCase` with
+      `question`, `difficulty` and a `PlanModel`), the name a fake LLM rule
+      answers. A call whose answer never parses counts its batch as invalid.
+    - **The budget** is `Budget(max_cost_usd, max_llm_calls, setting="evals")`
+      with at most three calls per batch of five (`CALLS_PER_BATCH`), so a
+      model answering nothing usable stops. `max_cost_usd` is required (the
+      argument, else `evals.yaml`'s), and an unpriced `eval_seeder` model is
+      an `UnknownPriceError` before any call.
+    - **Drafts never go into reviewed cases**: like `feedback export`, `out`
+      may not be a packaged suite, a suite `evals.yaml` names, or a file
+      holding approved cases. `SeedReport` also carries `path`.
+    - **The CLI** asks as `--role`, else `policies.default_role`, and exits 2
+      without one; it exits 2 on any refusal and 3 at the cost cap, and
+      refuses to run with `CI` set, as mode full does. It takes no `--llm`:
+      `llm.agents.eval_seeder` picks the model.
+
 ## 9. Phase R: cross-database routing
 
 Phase R was never built: 0.6 has `domains` on a datasource and nothing
