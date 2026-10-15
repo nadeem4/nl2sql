@@ -96,14 +96,21 @@ def private_storage(root: Path, target: Path) -> Path:
 
 
 @pytest.fixture
-def fake_llm(demo_project):
-    """``fake_llm(rules)`` serves ``rules``; returns ``(server, env)`` and writes ``fake.yaml``."""
+def fake_llm(demo_project, tmp_path):
+    """``fake_llm(rules)`` serves ``rules``; returns ``(server, env)`` and writes ``fake.yaml``.
+
+    ``fake.yaml`` points at a private copy of the demo's index and state store
+    (``private_storage``): engines of different tests opening the one shared
+    ``state.db`` in turn failed CI with ``disk I/O error`` at ``PRAGMA
+    journal_mode=WAL``, depending on the order pytest-randomly picked.
+    """
     servers = []
+    store = private_storage(demo_project, tmp_path / "fake-llm-store")
 
     def _make(rules):
         server = FakeLLMServer(rules).start()
         servers.append(server)
-        project_config(demo_project, "fake.yaml", llm=fake_llm_section(server.base_url))
+        project_config(demo_project, "fake.yaml", llm=fake_llm_section(server.base_url), storage=store)
         env = _base_env()
         env["OPENAI_API_KEY"] = "sk-fake"
         return server, env
