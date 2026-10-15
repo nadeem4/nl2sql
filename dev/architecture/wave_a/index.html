@@ -5508,6 +5508,17 @@ it may pick several of the candidates, and the resolver forwards at most
   retried: a model that ignored the limit once will usually do so again, and
   the question is the thing to change.</li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Built: the sub-query limit (R2)</p>
+<p><code>DecomposerNode</code> reads <code>settings.routing.max_sub_queries</code> once, in its
+constructor (<code>self.max_sub_queries</code>), and the system prompt states it as
+rule 10 ("Use at most 6 sub_queries"), a <code>{max_sub_queries}</code> template
+variable, so the system message stays the same for one engine. The count
+is of the model's own sub-queries, before any is dropped as unmapped. Over
+it, the node returns an empty <code>DecomposerResponse</code>, no DAG and one
+<code>QUESTION_TOO_BROAD</code> error (<code>ERROR</code>, in <code>FATAL_ERRORS</code>), with the message
+above; the model is called once.</p>
+</div>
 <h3 id="the-join-key-type-check">The join-key type check</h3>
 <p>A <code>join</code> or <code>compare</code> combine group joins two sub-queries' results in the
 aggregator on its <code>join_keys</code> (<code>aggregation/engines/polars_duckdb.py</code>, a
@@ -5592,6 +5603,69 @@ in two parts (D30):</p>
 <p>No dialect name is written in the engine: the dialect comes from the adapter,
 as the generator already does. <code>test_text_and_integer_keys_join_after_coercion</code>
 is B30's test.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: join-key coercion and the check (R2)</p>
+<ul>
+<li><strong>One set of rules.</strong> <code>nl2sql/aggregation/join_keys.py</code> (plain Python)
+  holds the categories, <code>DTYPE_CATEGORY</code>, <code>coercible(a, b)</code> and
+  <code>join_dtype(left, right)</code>, the type both sides are cast to: the shared
+  dtype; text parsed as the other side's type; <code>int</code> and <code>float</code> meet as
+  <code>int</code> (not <code>float</code>: a non-whole value cannot equal a whole one, and a
+  float cannot tell ids above 2^53 apart), <code>date</code> and <code>datetime</code> as
+  <code>datetime</code>, a number and <code>bool</code> as <code>bool</code>. The decomposer's schema, the aggregator and the validator all
+  read it.</li>
+<li><strong>The decomposer.</strong> <code>DecomposerResponse.validate_join_key_types()</code>
+  resolves each key against its side's <code>expected_schema</code> with
+  <code>resolve_key</code> (so <code>right.customer_id</code> is <code>customer_id</code>); the side is the
+  input's place in engine order (<code>input_order</code>). <code>ExpectedColumn.join_key</code>,
+  <code>JoinKeyPair.left_dtype</code> and <code>JoinKeyPair.right_dtype</code> are
+  <code>SkipJsonSchema</code>, set only by <code>mark_join_keys()</code> in
+  <code>decomposer/node.py</code>, which replaces whatever the model sent and
+  leaves a key it cannot find untyped rather than crash. <code>join_key</code> is
+  excluded from the stable sub-query id and from the planner's
+  <code>expected_schema</code>. <code>CombineGroup.validate_roles()</code> refuses two inputs on one side, or a third input,
+  in a <code>join</code>/<code>compare</code>. The DAG
+  carries the pair's dtypes in the combine node's <code>join_keys</code> attributes
+  (<code>dag.py</code> dumps the pair, so it is unchanged).</li>
+<li><strong>The aggregator.</strong> <code>PolarsDuckdbEngine.combine</code> casts each side first
+  to its own declared dtype and then to the joined one, so a value is read
+  the way its sub-query declared it (a number goes straight to the
+  joined number type, and two <code>float</code> keys over integer frames join as
+  <code>int</code>). A cast nulls, never changes, a value: a float or decimal that
+  is not whole is not an <code>int</code>. Timestamps of any unit or zone become
+  naive UTC microseconds (exact dtypes are compared, not the bare
+  <code>pl.Datetime</code> class); text is parsed only by the ISO formats in
+  <code>_DATE_FORMATS</code>, <code>_NAIVE_FORMATS</code> and <code>_OFFSET_FORMATS</code>, never by
+  inference; a <code>Time</code> key declared a date or timestamp is null. Every one
+  of those nulls is counted, so none ends the run as <code>AGGREGATOR_FAILED</code>.
+  Text is stripped on both sides, of a text key too;
+  a text boolean is <code>true</code>/<code>false</code>/<code>t</code>/<code>f</code>/<code>yes</code>/<code>no</code>/<code>1</code>/<code>0</code>; a number
+  cast to a boolean is 1 or 0, anything else null.
+  <code>PolarsDuckdbEngine.unconverted_join_keys(inputs, join_keys)</code> counts the
+  values that became null (it collects the key columns only), and
+  <code>AggregationService.execute(..., warnings=[...])</code> gathers them; the node
+  turns each into a <code>JOIN_KEY_UNCONVERTED</code> warning dict on the state's
+  <code>warnings</code> (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>, <code>sub_query_id</code>),
+  naming the datasource: "1 of 3 support.customer_id values are not
+  whole numbers and joined nothing." S1's typed <code>RunWarning</code> is not on main yet,
+  so this uses the existing warnings mechanism; S1 moves it.</li>
+<li><strong>The validator.</strong> <code>pipeline/nodes/validator/join_keys.py</code>,
+  <code>join_key_type_errors(plan, sub_query, relevant_tables, dialect)</code>, called
+  from <code>_validate_static</code> before the buildability check. The column type is
+  the schema snapshot's <code>Column.type</code>. sqlglot's <code>BOOLEAN</code> is a boolean,
+  its numeric types a number (<code>BIT</code> included), its text types text, its
+  temporal types temporal; anything else, an unparsable type or no type
+  is <code>other</code> and not checked. The message is "The join key order_key is
+  declared a date, but Orders.OrderKey is a number. Select a column that
+  holds a date for this key."</li>
+<li><strong>The demo.</strong> <code>test_a_key_declared_text_on_one_side_joins_after_coercion</code>
+  (<code>tests/e2e/test_multi_sub_query_fake_llm.py</code>) joins Chinook's integer
+  <code>CustomerId</code> to support's <code>customer_id</code> declared as text and gets the
+  SQLite answer. The demo databases store both keys as integers, so the
+  text-against-integer case itself is the unit test above. The design lists
+  no <code>realdb</code> test for R2.</li>
+</ul>
+</div>
 <h3 id="the-routing-gate">The routing gate</h3>
 <p><code>nl2sql/evaluation/suites/routing.yaml</code> holds approved cases over the demo's
 three databases (<code>chinook</code>, <code>support</code>, <code>webanalytics</code>), single and

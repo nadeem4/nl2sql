@@ -2624,6 +2624,19 @@ was validated, not only what failed. The names are fixed and always in this orde
      wrapped in <code>exp.Ordered</code> first (<code>generator.node.ordered()</code>): sqlglot only
      wraps an argument it has to <em>parse</em>, and a bare function node in
      <code>Order.expressions</code> makes <code>qualify()</code> raise.</li>
+<li><code>join_key_type_errors()</code> (<code>validator/join_keys.py</code>) checks each select
+     item that is a join key (its alias names an <code>expected_schema</code> column the
+     decomposer marked <code>join_key</code>) and a plain column reference: the column's
+     type from the schema snapshot is parsed by <code>sqlglot.exp.DataType.build</code>
+     in the datasource's dialect (the adapter's <code>get_dialect()</code>) and put in a
+     category (number, text, temporal, boolean or other). A temporal column
+     declared a number or a boolean, or a number or boolean column declared a
+     date, is a retryable <code>JOIN_KEY_TYPE_MISMATCH</code> that asks for another
+     column, never a cast (the plan has none): "The join key order_key is
+     declared a date, but Orders.OrderKey is a number. Select a column that
+     holds a date for this key." Every other pair is coerced by the
+     aggregator; a type sqlglot cannot place, a column with no type and a
+     computed select item are not checked (<a href="../../wave_a/#the-join-key-type-check">Wave A, D30</a>).</li>
 <li><code>_validate_buildable()</code> runs last and is the <strong>buildability</strong> check: it
      calls the generator's own <code>_build_query()</code> and throws the tree away. See
      below.</li>
@@ -2675,6 +2688,7 @@ was validated, not only what failed. The names are fixed and always in this orde
 <li><code>SECURITY_VIOLATION</code></li>
 <li><code>TABLE_NOT_FOUND</code>, <code>COLUMN_NOT_FOUND</code></li>
 <li><code>JOIN_TABLE_NOT_IN_PLAN</code></li>
+<li><code>JOIN_KEY_TYPE_MISMATCH</code>, retried</li>
 <li><code>VALIDATOR_CRASH</code></li>
 </ul>
 <hr/>

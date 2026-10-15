@@ -919,15 +919,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#combine-groups-require-roles-and-join-keys" class="md-nav__link">
+  <a href="#combine-groups-require-roles-and-typed-join-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Combine Groups Require Roles and Join Keys
+        Combine Groups Require Roles and Typed Join Keys
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Combine Groups Require Roles and Join Keys">
+    <nav class="md-nav" aria-label="Combine Groups Require Roles and Typed Join Keys">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6793,15 +6793,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#combine-groups-require-roles-and-join-keys" class="md-nav__link">
+  <a href="#combine-groups-require-roles-and-typed-join-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Combine Groups Require Roles and Join Keys
+        Combine Groups Require Roles and Typed Join Keys
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Combine Groups Require Roles and Join Keys">
+    <nav class="md-nav" aria-label="Combine Groups Require Roles and Typed Join Keys">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -8539,17 +8539,18 @@
 <h3 id="why-it-exists">Why It Exists</h3>
 <p>Prevents physical SQL leakage into semantic planning stages and keeps decomposer output safe to interpret downstream.</p>
 <hr />
-<h2 id="combine-groups-require-roles-and-join-keys">Combine Groups Require Roles and Join Keys</h2>
+<h2 id="combine-groups-require-roles-and-typed-join-keys">Combine Groups Require Roles and Typed Join Keys</h2>
 <h3 id="definition_1">Definition</h3>
-<p>Combine groups with <code>compare</code> or <code>join</code> operations must include a role for every input and at least one join key pair.</p>
+<p>Combine groups with <code>compare</code> or <code>join</code> operations must include a role for every input, at most one left-hand input (<code>left</code>, <code>base</code> or <code>primary</code>) and one right-hand input (<code>right</code>, <code>compare</code> or <code>secondary</code>), and at least one join key pair; a group with only one side is refused by the decomposer node. Each key names a column in the <code>expected_schema</code> of its side's sub-query, that column declares a <code>dtype</code>, and the two sides' dtypes can be coerced to each other: a number or a boolean never joins a date (<a href="../wave_a/#the-join-key-type-check">Wave A, D30</a>). The aggregator casts both sides of each key to one type before the join, in polars; a value that does not convert joins nothing and is a <code>JOIN_KEY_UNCONVERTED</code> warning.</p>
 <h3 id="enforcement-points_1">Enforcement Points</h3>
 <ul>
-<li><code>CombineGroup.validate_roles()</code> in <code>nl2sql.pipeline.nodes.decomposer.schemas</code></li>
+<li><code>CombineGroup.validate_roles()</code> and <code>DecomposerResponse.validate_join_key_types()</code> in <code>nl2sql.pipeline.nodes.decomposer.schemas</code></li>
+<li><code>LogicalValidatorNode</code> (<code>validator/join_keys.py</code>): a join-key column whose database type cannot be coerced to its declared <code>dtype</code> is a retryable <code>JOIN_KEY_TYPE_MISMATCH</code>. The check lives in the validator, not the aggregator, because the validator has the retry edge.</li>
 </ul>
 <h3 id="failure-behavior_1">Failure Behavior</h3>
-<p>Raises <code>ValueError</code> when roles or join keys are missing.</p>
+<p>Raises <code>ValueError</code> when roles, join keys or their types are missing or cannot meet; parse-and-retry sends it back to the model.</p>
 <h3 id="why-it-exists_1">Why It Exists</h3>
-<p>Ensures combine operations are well-defined and deterministic for aggregation.</p>
+<p>Ensures combine operations are well-defined and deterministic for aggregation. A text key from one database joined to an integer from another used to fail in the aggregator, terminally, or match nothing (B30).</p>
 <hr />
 <h2 id="decomposer-references-must-resolve">Decomposer References Must Resolve</h2>
 <h3 id="definition_2">Definition</h3>

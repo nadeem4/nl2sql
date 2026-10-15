@@ -5309,8 +5309,8 @@ schema retriever and the resolver had before 0.7 (<code>TABLE_K</code>, <code>PL
 <p>Cross-database routing: which datasources a question goes to, and how far it
 may spread. The resolver reads <code>candidates</code>, <code>max_datasources</code> and
 <code>floor_ratio</code> (<a href="../../architecture/indexing/#routing-five-signals-fused">Routing</a>);
-<code>max_sub_queries</code> is read from release 0.7's limits work
-(<a href="../../architecture/wave_a/#limits">Wave A</a>).</p>
+the decomposer reads <code>max_sub_queries</code>
+(<a href="../../architecture/wave_a/#limits">Wave A, Limits</a>).</p>
 <table>
 <thead>
 <tr>
