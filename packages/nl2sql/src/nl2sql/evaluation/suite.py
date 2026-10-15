@@ -121,6 +121,19 @@ def load_suite(path: pathlib.Path) -> EvalSuite:
     return EvalSuite.model_validate({**raw, "path": path})
 
 
+def holds_approved_cases(path: pathlib.Path) -> bool:
+    """Whether ``path`` exists and lists at least one ``status: approved`` case (read as plain YAML)."""
+    path = pathlib.Path(path)
+    if not path.is_file():
+        return False
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, UnicodeDecodeError):
+        return False
+    cases = raw.get("cases") if isinstance(raw, dict) else None
+    return any(isinstance(c, dict) and c.get("status") == "approved" for c in cases or [])
+
+
 def select_cases(cases: Sequence[EvalCase], selectors: Sequence[str]) -> List[EvalCase]:
     """The cases whose id or one of whose tags is in ``selectors``, in suite order.
 

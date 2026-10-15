@@ -110,11 +110,15 @@ class EvalsAPI:
             report.database = database_identity(self._ctx, datasources)
         return report
 
-    def regenerate(self, path: Union[str, Path]) -> "RegenerateReport":
-        """Run each approved case's ``sql`` and ``alt_sql`` through its datasource's adapter and write the rows."""
+    def regenerate(self, path: Union[str, Path], *, allow_packaged: bool = False) -> "RegenerateReport":
+        """Run each approved case's ``sql`` and ``alt_sql`` through its datasource's adapter and write the rows.
+
+        A suite the package ships is refused unless ``allow_packaged`` (the
+        repo's own workflow, from a checkout).
+        """
         from nl2sql.evaluation.regenerate import regenerate
 
-        return regenerate(self._ctx.ds_registry, self._path(path))
+        return regenerate(self._ctx.ds_registry, self._path(path), allow_packaged=allow_packaged)
 
     def scorers(self) -> List[str]:
         """The registered scorer names: the built-ins and every plugin's."""

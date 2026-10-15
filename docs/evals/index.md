@@ -45,7 +45,7 @@ print(report.accuracy, report.accuracy_generated)
 | --- | --- |
 | `engine.evals.load(path=None)` | The suites `evals.yaml` names, or the one file at `path`, as `EvalSuite`s |
 | `engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)` | Runs every approved case once per role in its `outcome` map, `passes` times, and returns an `EvalReport` |
-| `engine.evals.regenerate(path)` | Runs each approved case's `sql` and `alt_sql` through its datasource's adapter and writes `rows` and `alt_rows` ([Regenerating rows](cases.md#regenerating-rows)) |
+| `engine.evals.regenerate(path, *, allow_packaged=False)` | Runs each approved case's `sql` and `alt_sql` through its datasource's adapter and writes `rows` and `alt_rows` ([Regenerating rows](cases.md#regenerating-rows)). A suite the package ships is refused unless `allow_packaged` |
 | `engine.evals.scorers()` | The registered scorer names: the five built-ins and any plugin's |
 
 The `run` arguments:
@@ -154,11 +154,19 @@ passes them when the run's status is `needs_clarification`.
 `report.accuracy` and `report.accuracy_generated` read the first config's
 board.
 
+**Two accuracies, on purpose.** `accuracy.overall` counts a case as passed
+only when every scorer that applies passes. In mode full with the default
+scorers, that includes `faithfulness`, `retrieval_recall` at 1.0 and
+`routing`. So it is stricter than the accuracy 0.6's tier 2 published.
+`accuracy.execution` is that older measure alone: `result_match` and
+`outcome` passed, no other scorer counted. Compare it, not `overall`, with
+the runs published before 0.7 (`docs/benchmarks.md`).
+
 A board holds:
 
 | Field | What it is |
 | --- | --- |
-| `accuracy` | `overall` (what users see), `lenient`, `generated`, each with a 95% Wilson interval; `pass_k` over several passes; and the rates `by_tag`, `by_difficulty`, `by_source` and `generated_by_source` |
+| `accuracy` | `overall` (what users see), `lenient`, `generated` and `execution`, each with a 95% Wilson interval; `pass_k` over several passes; and the rates `by_tag`, `by_difficulty`, `by_source` and `generated_by_source` |
 | `summary` | `pass`, `fail`, `error` and `skip` counts per role and in total |
 | `scores` | Per scorer: how many cases it applied to, passed, failed and errored on, and its mean value |
 | `retrieval` | The mean table and column recall over the cases `retrieval_recall` scored, how many were perfect, and how much was sent |
@@ -174,7 +182,8 @@ compared case by case, not headline to headline. The statistics are in
 
 Each case runs under its own run scope (`QueryAPI.open_scope` and
 `close_scope`), so it publishes `run.started` and `run.finished` like any
-question. Every finished case also publishes `eval.case` on the engine's bus,
+question. This includes mode retrieval, where no graph runs: its scope
+closes with an empty result. Every finished case also publishes `eval.case` on the engine's bus,
 with the suite, case, role, whether it passed, the answer's source, each
 scorer's verdict and its cost. The end of the run publishes `eval.finished`,
 with the suites, the number of cases, both accuracies and the dollars spent.

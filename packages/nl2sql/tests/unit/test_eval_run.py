@@ -297,6 +297,17 @@ def test_every_case_publishes_eval_case_and_the_run_eval_finished(monkeypatch):
     assert events[-1].data["cases"] == 2 and events[-1].data["accuracy"] == 1.0
 
 
+def test_mode_retrieval_cases_run_under_their_own_run_scope(monkeypatch):
+    monkeypatch.setattr(run_module, "_measure_retrieval", lambda run, case, role: ({}, []))
+    ctx = _ctx()
+    events = []
+    ctx.bus.subscribe(events.append, names=["run.started", "run.finished", "run.failed"])
+    _run(monkeypatch, [_suite(_case("a"), _case("b"))], mode="retrieval", ctx=ctx,
+         scorers=("retrieval_recall",))
+    assert [e.name for e in events] == ["run.started", "run.finished"] * 2
+    assert events[0].data["question"] == "question a"
+
+
 def test_on_case_is_called_after_each_case_with_the_spend_so_far(monkeypatch):
     calls = []
     _run(monkeypatch, [_suite(_case("a"), _case("b"))], on_case=lambda name, record, spent: calls.append(

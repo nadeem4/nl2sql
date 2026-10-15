@@ -153,6 +153,16 @@ def _pass_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
             "accuracy": _share(passed, len(records)), "lenient_accuracy": _share(lenient, len(records))}
 
 
+def _execution(record: Dict[str, Any]) -> bool:
+    """The 0.6 tier 2 measure: ``result_match`` and ``outcome`` passed where they apply; no other scorer counts."""
+    scores = record.get("scores") or {}
+    mine = {n: s for n, s in scores.items() if n in ("result_match", "outcome")}
+    if any("error" in s.get("detail", {}) for s in mine.values()):
+        return False
+    applied = [s for s in mine.values() if s.get("passed") is not None]
+    return bool(applied) and all(s["passed"] for s in applied)
+
+
 def _generated_rate(records: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     passed = sum(_generated(r) == "pass" for r in records)
     return {"pass": passed, "total": len(records), "accuracy": _share(passed, len(records))}
@@ -280,6 +290,7 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     total_cost = sum(r.get("cost") or 0.0 for r in records)
     overall = _pass_rate(records)
     generated = _generated_rate(records)
+    executed = sum(_execution(r) for r in records)
     latencies = [r["latency_s"] for r in records if r.get("latency_s") is not None]
     return {
         "summary": summarize(records),
@@ -289,12 +300,16 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
             "overall": overall["accuracy"],
             "lenient": overall["lenient_accuracy"],
             "generated": generated["accuracy"],
+            # Execution accuracy alone: rows and outcome, as the 0.6 tier 2
+            # scored it, so the published series stays comparable.
+            "execution": _share(executed, len(records)),
             # A 95% Wilson interval on each: at n = 47 it is about +-14 points.
             # Over several passes the runs of one case are not independent, so
             # it reads narrower than it is; pass^k counts cases and does not.
             "interval": _interval(overall["pass"], overall["total"]),
             "lenient_interval": _interval(overall["lenient_pass"], overall["total"]),
             "generated_interval": _interval(generated["pass"], generated["total"]),
+            "execution_interval": _interval(executed, len(records)),
             "pass_k": _pass_k(records, passes),
             "by_tag": {t: _pass_rate(rs) for t, rs in sorted(by_tag.items())},
             "by_difficulty": {d: _pass_rate(rs) for d, rs in sorted(by_difficulty.items())},
@@ -336,6 +351,7 @@ def compare(boards: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """Configs side by side, and each case and role at least two configs scored differently."""
     rows = [{"config": name, "cases": len(b["results"]), "accuracy": b["accuracy"]["overall"],
              "accuracy_generated": b["accuracy"]["generated"],
+             "execution_accuracy": b["accuracy"]["execution"],
              "lenient_accuracy": b["accuracy"]["lenient"],
              "answerability_precision": b["answerability"]["precision"],
              "answerability_recall": b["answerability"]["recall"],

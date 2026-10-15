@@ -107,6 +107,12 @@ in `failed` each case left unchanged and why:
 - the result was cut at the datasource's row limit;
 - a case with SQL names more than one datasource.
 
+A suite the package ships (`nl2sql/evaluation/suites/`) is refused unless
+you pass `allow_packaged=True`. In an installed package it is not yours to
+rewrite: copy it into your project, as `nl2sql init --demo` does. The repo's
+own workflow passes the flag, from a checkout, after a reviewed `alt_sql` is
+added to `suites/chinook.yaml`.
+
 The other cases are still written. The file keeps its leading comment lines
 and its layout, and the committed Chinook suite is byte for byte what
 `regenerate` writes.
@@ -127,4 +133,10 @@ To promote a draft:
 3. Set `status: approved`.
 4. Run `regenerate` to write its rows.
 
-Export never writes into a suite the package ships.
+Drafts never replace reviewed cases. Export refuses these paths:
+
+- a suite the package ships;
+- a suite `evals.yaml` names;
+- any existing file that holds an approved case.
+
+A file of drafts may be written again.

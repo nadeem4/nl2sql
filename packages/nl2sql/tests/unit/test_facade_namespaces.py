@@ -412,6 +412,34 @@ def test_feedback_export_never_writes_a_packaged_suite(engine):
     assert CHINOOK_SUITE_PATH.read_bytes() == before
 
 
+def test_feedback_export_never_writes_a_configured_suite(tmp_path):
+    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH
+
+    suite = tmp_path / "evals" / "chinook.yaml"
+    suite.parent.mkdir()
+    suite.write_bytes(CHINOOK_SUITE_PATH.read_bytes())
+    with _engine(tmp_path, evals={"suites": ["evals/chinook.yaml"]}) as engine:
+        before = suite.read_bytes()
+        with pytest.raises(ValueError, match="evals.yaml"):
+            engine.feedback.export(suite)
+        with pytest.raises(ValueError, match="evals.yaml"):
+            engine.feedback.export("evals/chinook.yaml")
+    assert suite.read_bytes() == before
+
+
+def test_feedback_export_never_writes_over_approved_cases(engine, tmp_path):
+    from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH
+
+    mine = tmp_path / "mine.yaml"
+    mine.write_bytes(CHINOOK_SUITE_PATH.read_bytes())
+    with pytest.raises(ValueError, match="approved"):
+        engine.feedback.export(mine)
+    assert mine.read_bytes() == CHINOOK_SUITE_PATH.read_bytes()
+    # A file of drafts may be written again.
+    engine.feedback.export(tmp_path / "drafts.yaml")
+    engine.feedback.export(tmp_path / "drafts.yaml")
+
+
 def test_feedback_clear_empties_the_table(engine):
     engine.feedback.record(_answered(), question="q", role="admin", rating="up")
 

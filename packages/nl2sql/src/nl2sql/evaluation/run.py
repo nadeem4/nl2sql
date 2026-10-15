@@ -347,7 +347,16 @@ def _run_retrieval(run: Any, jobs: List[_Case], scorers: Dict[str, Scorer], pass
     for pass_no in range(1, passes + 1):
         for job in jobs:
             t0 = time.perf_counter()
-            sent, routed = _measure_retrieval(run, job.case, job.role)
+            # Under a run scope of its own, as every case: run.started, then run.finished.
+            api = QueryAPI(run)
+            scope = api.open_scope(job.case.question, user_context=UserContext(roles=[job.role]), execute=False)
+            try:
+                with scope.entered():
+                    sent, routed = _measure_retrieval(run, job.case, job.role)
+            except BaseException as exc:
+                scope.fail(f"The run failed: {exc or type(exc).__name__}")
+                raise
+            api.close_scope(scope, QueryResult())
             scored = _scored(job.case, job.role, "retrieval", scorers, QueryResult(), sent, routed)
             record = _record(job.suite, job.case, job.role, pass_no, scored, None, 0.0, time.perf_counter() - t0)
             _finish(run, "retrieval", record, records, 0.0, on_case)

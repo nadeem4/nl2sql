@@ -1108,6 +1108,16 @@ accepted answer is a reviewed `alt_sql`, then `regenerate`.
     `nl2sql benchmark`, so the committed pages stay byte-identical until V2
     rewires publishing.
 
+    After review:
+
+    - Each board also reports `accuracy.execution`. It counts only
+      `result_match` and `outcome`, the 0.6 tier 2 measure, so the published
+      series stays comparable.
+    - Mode retrieval cases open a run scope too.
+    - `regenerate` refuses a packaged suite unless `allow_packaged=True`.
+    - `feedback export` refuses a configured suite and any file holding
+      approved cases.
+
 ### The regression gate
 
 `nl2sql/evaluation/gate.py` takes tier 2's gate as it is

@@ -20,7 +20,7 @@ from typing import Any, Dict, List
 from nl2sql_sdk.contracts import AdapterRequest
 from pydantic import BaseModel, Field
 
-from nl2sql.evaluation.suite import EvalCase, file_header, load_suite, write_suite
+from nl2sql.evaluation.suite import SUITES_DIR, EvalCase, file_header, load_suite, write_suite
 
 
 class RegenerateReport(BaseModel):
@@ -55,9 +55,21 @@ def _regenerated(ds_registry: Any, case: EvalCase) -> EvalCase:
         "alt_rows": [_rows(ds_registry, datasource_id, alt) for alt in alternatives]})
 
 
-def regenerate(ds_registry: Any, path: pathlib.Path) -> RegenerateReport:
-    """Re-run every approved case's ``sql`` and ``alt_sql`` through its adapter and rewrite the suite in place."""
+def regenerate(ds_registry: Any, path: pathlib.Path, *, allow_packaged: bool = False) -> RegenerateReport:
+    """Re-run every approved case's ``sql`` and ``alt_sql`` through its adapter and rewrite the suite in place.
+
+    A suite the package ships (``nl2sql/evaluation/suites/``) is refused
+    unless ``allow_packaged``: in an installed package it is not yours to
+    rewrite. The repo's own workflow passes it, from a checkout, to
+    regenerate ``suites/chinook.yaml`` after a reviewed ``alt_sql`` is added.
+
+    Raises:
+        ValueError: ``path`` is a packaged suite and ``allow_packaged`` is off.
+    """
     path = pathlib.Path(path)
+    if not allow_packaged and path.resolve().parent == SUITES_DIR.resolve():
+        raise ValueError(f"{path} is a suite the package ships. Copy it into your project, or pass "
+                         "allow_packaged=True from a checkout of the repo.")
     header = file_header(path)
     suite = load_suite(path)
     report = RegenerateReport(path=path)

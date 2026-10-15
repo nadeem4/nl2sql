@@ -129,8 +129,12 @@ a suite file of its own:
 - no `rows`.
 
 A run with no SQL, or with more than one statement, is skipped: a case's
-`sql` is one query. `export` never writes into a suite the package ships, and
-refuses an `--out` inside that folder.
+`sql` is one query. Drafts never replace reviewed cases. `export` refuses an
+`--out` that is:
+
+- a suite the package ships;
+- a suite `evals.yaml` names;
+- an existing file that holds an approved case.
 
 **A person must review every draft before it runs.** A thumbs up says an
 answer looked right, not that its SQL is the reference answer. To promote a

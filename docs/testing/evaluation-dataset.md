@@ -229,8 +229,10 @@ it looks. Two from the run this was built on, both refused:
 To add one:
 
 1. Write the SQL into `alt_sql`.
-2. Run `engine.evals.regenerate("evals/chinook.yaml")` to write its
-   `alt_rows`.
+2. From a checkout of the repo, run
+   `engine.evals.regenerate(CHINOOK_SUITE_PATH, allow_packaged=True)` to
+   write its `alt_rows` (`CHINOOK_SUITE_PATH` from `nl2sql.evaluation.suite`).
+   The flag is needed because the suite lives in the package.
 3. Read the rows it wrote.
 4. Commit both.
 

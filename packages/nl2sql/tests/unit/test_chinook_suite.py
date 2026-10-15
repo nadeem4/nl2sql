@@ -29,10 +29,11 @@ ROLES = set(CHINOOK_POLICIES)
 
 # SHA-256 over every case's id, question, datasource, difficulty, tags,
 # paraphrase group, outcomes, needed tables and columns, order rule, SQL, rows,
-# alternatives and plan, computed from chinook_gold.yaml and
+# alternatives and plan -- every key in its written order, so a row's column
+# order is pinned too -- computed from chinook_gold.yaml and
 # chinook_gold_plans.yaml with the 0.6 loader before they were deleted
 # (wave_a.md, section 8). The data never changes; only the keys around it did.
-GOLD_DIGEST = "9287e40e4b019a1d8e42c48af2a141fda1e4fbf3077727fb4931cc6acecb42b7"
+GOLD_DIGEST = "72d28a8507eeb1af1e86204ef778a34f3f974b6d968aa14cf150739d58d071cb"
 
 
 def _canonical(case: EvalCase) -> dict:
@@ -45,7 +46,7 @@ def _canonical(case: EvalCase) -> dict:
 
 def test_chinook_suite_holds_the_gold_data_unchanged():
     cases = sorted((_canonical(c) for c in CASES), key=lambda c: c["id"])
-    digest = hashlib.sha256(json.dumps(cases, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(json.dumps(cases, sort_keys=False, ensure_ascii=False).encode("utf-8")).hexdigest()
     assert digest == GOLD_DIGEST, "The Chinook gold data changed. Add a reviewed alt_sql instead."
 
 

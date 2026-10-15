@@ -115,6 +115,24 @@ def test_scoreboard_reports_accuracy_overall_by_tag_and_by_difficulty():
     assert board["determinism"] is None
 
 
+def _scored(qid, status, scores):
+    rec = _rec(qid, status)
+    rec["scores"] = {n: {"passed": p, "value": None, "detail": {}} for n, p in scores.items()}
+    return rec
+
+
+def test_execution_accuracy_counts_only_rows_and_outcome_as_0_6s_tier_2_did():
+    records = [_scored("a", "pass", {"result_match": True, "outcome": True, "faithfulness": True}),
+               _scored("b", "fail", {"result_match": True, "outcome": True, "faithfulness": False}),
+               _scored("c", "fail", {"result_match": False, "outcome": True}),
+               _scored("d", "pass", {"result_match": None, "outcome": True, "routing": None})]
+    board = report.score_config(records, passes=1)
+    assert board["accuracy"]["overall"] == 0.5
+    assert board["accuracy"]["execution"] == 0.75
+    assert board["accuracy"]["execution_interval"] == [round(b, 4) for b in report.wilson_interval(3, 4)]
+    assert report.compare({"x": board})["configs"][0]["execution_accuracy"] == 0.75
+
+
 def test_scoreboard_reports_a_lenient_accuracy_beside_the_strict_one():
     records = [_rec("a", "pass"), _rec("b", "fail", lenient="pass"), _rec("c", "fail"), _rec("d", "fail")]
     board = report.score_config(records, passes=1)

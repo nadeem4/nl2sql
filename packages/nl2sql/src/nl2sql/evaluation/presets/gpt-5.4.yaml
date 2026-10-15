@@ -1,6 +1,6 @@
-# Tier 2 benchmark config, an llm section: every LLM node on gpt-5.4.
-#   nl2sql benchmark --tier 2 --llm gpt-5.4 --max-cost 5
-# (the same as --model gpt-5.4)
+# An llm section for an eval in mode full: every LLM node on gpt-5.4.
+#   engine.evals.run(llm={"gpt-5.4": load_llm_file(PRESETS_DIR / "gpt-5.4.yaml")}, max_cost_usd=5)
+# (the same as model_config("gpt-5.4"))
 provider: openai
 model: gpt-5.4
 temperature: 0.0

@@ -48,6 +48,16 @@ def test_regenerate_runs_through_the_adapter(tmp_path):
     assert copy.read_text(encoding="utf-8") == CHINOOK_SUITE_PATH.read_text(encoding="utf-8")
 
 
+def test_regenerate_refuses_a_packaged_suite_without_the_flag():
+    import pytest
+
+    before = CHINOOK_SUITE_PATH.read_bytes()
+    adapter = _Spy()
+    with pytest.raises(ValueError, match="allow_packaged"):
+        regenerate(stub_ds_registry(adapter), CHINOOK_SUITE_PATH)
+    assert adapter.ran == [] and CHINOOK_SUITE_PATH.read_bytes() == before
+
+
 def test_regenerate_leaves_a_failing_case_unchanged(tmp_path):
     copy = _copy(tmp_path)
     document = yaml.safe_load(copy.read_text(encoding="utf-8"))
