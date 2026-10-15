@@ -147,6 +147,23 @@ def holds_approved_cases(path: pathlib.Path) -> bool:
     return any(isinstance(c, dict) and c.get("status") == "approved" for c in cases or [])
 
 
+def check_target(path: pathlib.Path, configured: Sequence[pathlib.Path]) -> None:
+    """Refuse a file machine-written drafts (seeded or exported) must never go into.
+
+    Raises:
+        ValueError: ``path`` is a suite the package ships, one of ``configured``
+            (the suites ``evals.yaml`` names, resolved), or a file holding
+            approved cases.
+    """
+    target = pathlib.Path(path).resolve()
+    if target.parent == SUITES_DIR.resolve():
+        raise ValueError(f"{path} is a suite the package ships; drafts never go into it. Write them to another file.")
+    if target in {pathlib.Path(p).resolve() for p in configured}:
+        raise ValueError(f"{path} is a suite evals.yaml names; drafts never go into it. Write them to another file.")
+    if holds_approved_cases(path):
+        raise ValueError(f"{path} holds approved cases; drafts never go into it. Write them to another file.")
+
+
 def select_cases(cases: Sequence[EvalCase], selectors: Sequence[str]) -> List[EvalCase]:
     """The cases whose id or one of whose tags is in ``selectors``, in suite order.
 

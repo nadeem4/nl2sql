@@ -297,8 +297,8 @@ Nothing is retried without the parameter: what the config says is what is sent.
 
 ## Per-node models
 
-The six pipeline nodes that call a model, and indexing enrichment, each have
-an agent. An agent not under `agents` runs on the top level:
+The six pipeline nodes that call a model, indexing enrichment and eval
+seeding each have an agent. An agent not under `agents` runs on the top level:
 
 | `agents` key | node |
 | --- | --- |
@@ -309,6 +309,7 @@ an agent. An agent not under `agents` runs on the top level:
 | `refiner` | explains a failed plan so the planner can retry |
 | `answer_synthesizer` | writes the final answer from the rows |
 | `indexing_enrichment` | writes missing schema descriptions during `nl2sql index --enrich` (optional, off by default) |
+| `eval_seeder` | drafts eval questions with typed plans during `nl2sql eval seed` ([Benchmark your own database](../evals/seeding.md)) |
 
 Any other key is an error with "did you mean". An agent takes every field it
 sets (`provider`, `model`, `temperature`, `api_key`, `base_url`,

@@ -46,7 +46,8 @@ app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
 app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
 app.add_typer(storage_app, name="storage", help="Retention for traces and results (`nl2sql storage purge`).")
-app.add_typer(eval_app, name="eval", help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `publish`.")
+app.add_typer(eval_app, name="eval",
+              help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `seed`, `publish`.")
 
 
 def _version_callback(value: bool) -> None:

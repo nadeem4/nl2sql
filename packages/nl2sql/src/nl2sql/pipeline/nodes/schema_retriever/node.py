@@ -69,7 +69,18 @@ class SchemaRetrieverNode:
                 near.append(entry["table"])
         return near
 
-    def _visible(self, state: SubgraphExecutionState, datasource_id: str,
+    def visible_tables(self, user_context: Any, datasource_id: str) -> List[Table]:
+        """Every table of the datasource's live build the caller may read, as the planner is shown them.
+
+        For work that plans without a question (V3's seeding): the same tables,
+        columns, keys, descriptions and sample values a pinned plan's sub-query
+        gets, and nothing the caller's scope hides. Empty before the first build.
+        """
+        snapshot = self._resolve_snapshot(datasource_id, None)
+        visible = self._visible(user_context, datasource_id, snapshot)
+        return self._build_tables_from_snapshot(snapshot, visible=visible, preferred=self._preferred(datasource_id))
+
+    def _visible(self, user_context: Any, datasource_id: str,
                  snapshot: Optional[SchemaSnapshot]) -> Dict[str, Any]:
         """The snapshot's tables the caller's scope allows, by key.
 
@@ -82,7 +93,7 @@ class SchemaRetrieverNode:
         """
         if not snapshot:
             return {}
-        scope = self.policy_engine.scope(state.user_context, datasource_id)
+        scope = self.policy_engine.scope(user_context, datasource_id)
         return {key: contract for key, contract in snapshot.contract.tables.items()
                 if scope.allows(contract.table.schema_name, contract.table.table_name)}
 
@@ -233,7 +244,7 @@ class SchemaRetrieverNode:
             query = self._build_semantic_query(sub_query)
 
             snapshot = self._resolve_snapshot(datasource_id, schema_version)
-            visible = self._visible(state, datasource_id, snapshot)
+            visible = self._visible(state.user_context, datasource_id, snapshot)
             preferred = self._preferred(datasource_id)
             limit = self.full_snapshot_max_tables
             # A pinned plan is not planned here: the validator checks it against every table the caller may

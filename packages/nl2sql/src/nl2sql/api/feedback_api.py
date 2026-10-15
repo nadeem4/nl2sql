@@ -91,23 +91,15 @@ class FeedbackAPI:
             ValueError: ``path`` is a suite the package ships, a suite ``evals.yaml``
                 names, or a file holding approved cases.
         """
-        from nl2sql.evaluation.suite import SUITES_DIR, holds_approved_cases
+        from nl2sql.evaluation.suite import check_target
         from nl2sql.feedback import draft_entries, write_drafts
 
         path = Path(path)
         folder = self._ctx.config.folder
         if not path.is_absolute() and folder is not None:
             path = Path(folder) / path
-        target = path.resolve()
-        if target.parent == SUITES_DIR.resolve():
-            raise ValueError("Drafts never go into a suite the package ships. Write them to another file.")
-        configured = {(p if p.is_absolute() or folder is None else Path(folder) / p).resolve()
-                      for p in self._ctx.config.evals.suites}
-        if target in configured:
-            raise ValueError(f"{path} is a suite evals.yaml names; drafts never replace it. "
-                             "Write them to another file.")
-        if holds_approved_cases(path):
-            raise ValueError(f"{path} holds approved cases; drafts never replace them. Write them to another file.")
+        check_target(path, [p if p.is_absolute() or folder is None else Path(folder) / p
+                            for p in self._ctx.config.evals.suites])
         drafts, skipped = draft_entries(self.list())
         write_drafts(drafts, path)
         return {"written": len(drafts), "skipped": skipped}

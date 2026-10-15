@@ -1,9 +1,12 @@
-"""``nl2sql eval``: run eval suites, gate a run against a baseline, regenerate expected rows, publish records.
+"""``nl2sql eval``: run eval suites, gate a run against a baseline, regenerate expected rows, seed drafts, publish.
 
 * ``run``        -- ``engine.evals.run`` in one mode, then ``engine.evals.gate``
   with ``--baseline``. Writes the report (and when and which code ran it) to
   ``--out``, by default ``eval_<mode>.json`` next to ``nl2sql.yaml``.
 * ``regenerate`` -- ``engine.evals.regenerate``: a suite's expected rows, through the adapter.
+* ``seed``       -- ``engine.evals.seed``: draft cases from a datasource, as the
+  caller ``--role`` names (else ``policies.default_role``; with neither it
+  refuses). Exits 2 on a refusal, 3 when the cost cap or the call limit stopped it.
 * ``publish``    -- each report given becomes one record per config under
   ``benchmarks/``; then ``docs/benchmarks.md`` and the README block are
   rebuilt from every record. Run from the repo root.
@@ -14,7 +17,8 @@ mode full with ``CI`` set, a baseline that is missing or unreadable, or one
 that cannot be compared) and 3 when the cost cap stopped mode full early.
 
 ``CI`` counts as set whatever its value, ``CI=false`` included: refusing a
-paid run by mistake is cheap, spending a key in CI by mistake is not.
+paid run by mistake is cheap, spending a key in CI by mistake is not. Mode
+full and ``seed`` both refuse to run with it set.
 """
 from __future__ import annotations
 
@@ -217,6 +221,59 @@ def regenerate_command(
                       soft_wrap=True)
     if result.failed:
         raise typer.Exit(1)
+
+
+@app.command("seed")
+def seed_command(
+    ctx: typer.Context,
+    datasource: Annotated[str, typer.Option("--datasource", help="The datasource to seed drafts from.")],
+    out: Annotated[str, typer.Option(
+        "--out", help="The suite file to append drafts to, relative to nl2sql.yaml or absolute. Never a suite "
+                      "evals.yaml names or a file holding approved cases.")],
+    count: Annotated[int, typer.Option("--count", min=1, help="How many drafts to write at most.")] = 20,
+    role: Annotated[Optional[str], typer.Option(
+        "--role", help="The role to seed as: only the tables it may read are used. Without it, "
+                       "policies.default_role.")] = None,
+    max_cost: Annotated[Optional[float], typer.Option(
+        "--max-cost", help="Stop seeding's model calls at this many USD (default: evals.yaml's max_cost_usd).")]
+    = None,
+) -> None:
+    """
+    Draft eval cases from a datasource's schema, for a person to review.
+
+    The model writes questions with typed plans, five per call; each plan is
+    validated and rendered by the engine and run read-only, and the survivors
+    are appended as status: draft. Review each, set status: approved, then run
+    `nl2sql eval regenerate`. Exits 2 on a refusal, 3 when the cost cap or the call limit stopped it.
+    """
+    from nl2sql import UserContext
+
+    if os.environ.get("CI"):
+        _usage("Seeding calls a paid model and never runs in CI (CI is set).")
+    with build_engine(ctx) as engine:
+        role = role or engine.config.policies.default_role
+        if not role:
+            _usage("Seeding asks as a role: pass --role <role>, or set policies.default_role in nl2sql.yaml.")
+        try:
+            report = engine.evals.seed(datasource, count=count, out=out, user_context=UserContext(roles=[role]),
+                                       max_cost_usd=max_cost)
+        except (ValueError, PermissionError) as error:
+            _usage(str(error))
+    console.print(escape(
+        f"Wrote {report.written} draft case(s) to {report.path}; dropped {report.dropped_invalid} invalid, "
+        f"{report.dropped_hooked} stopped by a hook, {report.dropped_failed} failed, {report.dropped_empty} empty, "
+        f"{report.dropped_duplicate} duplicate."),
+        soft_wrap=True)
+    cost = report.usage.total.cost
+    console.print(escape(f"{report.usage.total.calls} model call(s)"
+                         + (f", ${cost:.4f}" if cost is not None else "")), soft_wrap=True)
+    if report.stopped_at_cost_cap:
+        console.print("[yellow]Stopped at the cost cap: fewer drafts than asked for.[/yellow]", soft_wrap=True)
+        raise typer.Exit(EXIT_STOPPED_AT_MAX_COST)
+    if report.stopped_at_call_limit:
+        console.print("[yellow]Stopped at the call limit (three model calls per batch of five): the model's "
+                      "answers kept being dropped, so fewer drafts than asked for.[/yellow]", soft_wrap=True)
+        raise typer.Exit(EXIT_STOPPED_AT_MAX_COST)
 
 
 @app.command("publish")

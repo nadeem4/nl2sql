@@ -159,6 +159,8 @@ and its layout, and the committed Chinook suite is byte for byte what
 ## Drafts
 
 A case that a machine wrote starts as a `draft`, and a draft never runs.
+`nl2sql eval seed` (`engine.evals.seed`) drafts cases from a datasource's
+schema, with `origin: seeded` ([Benchmark your own database](seeding.md)).
 `nl2sql feedback export --good` (`engine.feedback.export(path)`) writes each
 thumbs-up run as a draft case to a suite file of its own, with
 `origin: feedback`, the run's SQL, the datasources it read, and the rating
@@ -172,7 +174,7 @@ To promote a draft:
 3. Set `status: approved`.
 4. Run `regenerate` to write its rows.
 
-Drafts never replace reviewed cases. Export refuses these paths:
+Drafts never replace reviewed cases. Seeding and export refuse these paths:
 
 - a suite the package ships;
 - a suite `evals.yaml` names;
