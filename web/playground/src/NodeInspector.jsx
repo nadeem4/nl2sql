@@ -44,11 +44,8 @@ function Problems({ run }) {
   const items = [
     ...(run.exception ? [{ kind: "error", text: run.exception }] : []),
     ...(run.errors || []).map((e) => ({ kind: "error", text: e.error_code ? `${e.error_code}: ${e.message}` : pretty(e) })),
-    // A node's warnings are RunWarnings (`code`); errors it downgraded keep `error_code`.
-    ...(run.warnings || []).map((w) => {
-      const code = w.code || w.error_code;
-      return { kind: "warning", text: code ? `${code}: ${w.message}` : (w.message || pretty(w)) };
-    }),
+    // A node's warnings are RunWarnings: `code`, `message`.
+    ...(run.warnings || []).map((w) => ({ kind: "warning", text: w.code ? `${w.code}: ${w.message}` : (w.message || pretty(w)) })),
   ];
   if (!items.length) return null;
   return (

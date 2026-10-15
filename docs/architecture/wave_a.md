@@ -1907,8 +1907,8 @@ The answer synthesizer is given the warnings, as it is given
     - **`sanity.flagged`** is published through `nl2sql.events.publish` for
       each finding: `code`, `sub_query_id`, `retry` (true for a retried
       `ERROR`).
-    - **The playground.** `NodeInspector.jsx` reads a warning's `code` (and
-      a downgraded error's `error_code`); the bundle is rebuilt.
+    - **The playground.** `NodeInspector.jsx` reads a warning's `code` only,
+      with no fallback to `error_code`; the bundle is rebuilt.
     - **Breaking for REST clients.** `QueryResult.warnings[]` items lost
       `error_code` and `severity` for `code` and `detail.recovered`. Runs are
       not stored across an upgrade, so no older warning is read back.
