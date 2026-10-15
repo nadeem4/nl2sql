@@ -4960,8 +4960,8 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
   and calls <code>engine.check()</code> before it serves. A <code>required</code> datasource that
   fails, or no datasource ready at all, raises <code>EngineNotReady</code> and the server
   does not start; an optional one that fails leaves it serving the others. The
-  engine is stored in <code>app.state.engine</code> and closed at shutdown. When
-  <code>settings.observability.exporter</code> is <code>otlp</code>, logs switch to JSON.</li>
+  engine is stored in <code>app.state.engine</code> and closed at shutdown. Logs are
+  text, or JSON lines with <code>NL2SQL_LOG_FORMAT=json</code>.</li>
 <li>Retention: the lifespan calls <code>engine.storage.purge()</code> once before it
   serves and then once a day (<code>purge_daily</code>, every <code>PURGE_INTERVAL_S</code>
   seconds), so traces and results older than their store's <code>max_age_days</code>

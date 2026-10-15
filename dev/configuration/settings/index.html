@@ -2142,6 +2142,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        routing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#results" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2190,17 +2201,6 @@
     <span class="md-ellipsis">
       
         feedback
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        observability
       
     </span>
   </a>
@@ -4813,6 +4813,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        routing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#results" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4867,17 +4878,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        observability
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -4908,26 +4908,34 @@ different settings.</p>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">strict_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">today</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">                 </span><span class="c1"># pin the run date: 2013-12-31</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">retries</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="nt"> base_delay_s</span><span class="p">:</span><span class="w"> </span><span class="nv">1.0</span><span class="p p-Indicator">,</span><span class="nt"> max_delay_s</span><span class="p">:</span><span class="w"> </span><span class="nv">10.0</span><span class="p p-Indicator">,</span><span class="nt"> jitter_s</span><span class="p">:</span><span class="w"> </span><span class="nv">0.5</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nt">retrieval</span><span class="p">:</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">full_snapshot_max_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="nt">results</span><span class="p">:</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">fetch_batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">preview_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">traces</span><span class="p">:</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on_failure</span><span class="w">            </span><span class="c1"># off | on_failure | always</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">sample_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">max_field_chars</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="nt">schema</span><span class="p">:</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">max_versions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="nt">curated</span><span class="p">:</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">  </span><span class="nt">match_top_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span><span class="nt">match_floor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.6</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="nt">feedback</span><span class="p">:</span>
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="nt">observability</span><span class="p">:</span>
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="nt">exporter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span><span class="w">              </span><span class="c1"># none | console | otlp</span>
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">otlp_endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">max_llm_calls</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span><span class="w">           </span><span class="c1"># model calls per question; null: no cap</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">          </span><span class="c1"># dollars per question; null: no cap</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">sanity_checks</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">retrieval</span><span class="p">:</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">full_snapshot_max_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">table_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">  </span><span class="nt">planning_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">12</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">decomposer_tables</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">routing</span><span class="p">:</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">candidates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">max_datasources</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span><span class="nt">max_sub_queries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span><span class="nt">floor_ratio</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="nt">results</span><span class="p">:</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span><span class="nt">row_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">  </span><span class="nt">fetch_batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="nt">preview_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="nt">traces</span><span class="p">:</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on_failure</span><span class="w">            </span><span class="c1"># off | on_failure | always</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">sample_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">  </span><span class="nt">max_field_chars</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="nt">schema</span><span class="p">:</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">  </span><span class="nt">max_versions</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="nt">curated</span><span class="p">:</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="w">  </span><span class="nt">match_top_k</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="w">  </span><span class="nt">match_floor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.6</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="nt">feedback</span><span class="p">:</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </code></pre></div>
 <p>Unknown keys are errors, as everywhere in the config. The demo
 (<code>nl2sql init --demo</code>) writes a <code>settings.yaml</code> with <code>pipeline.timeout_s: 300</code>
@@ -4935,9 +4943,13 @@ different settings.</p>
 <code>traces.mode: always</code> (the playground's Debug drill-down reads every run's
 trace).</p>
 <p>In Python, the groups are <code>Settings</code>, <code>PipelineSettings</code>, <code>RetrySettings</code>,
-<code>RetrievalSettings</code>, <code>ResultSettings</code>, <code>TraceSettings</code>, <code>SchemaSettings</code>,
-<code>CuratedSettings</code>, <code>FeedbackSettings</code> and <code>ObservabilitySettings</code> in
-<code>nl2sql.config</code>. The <code>schema</code> group is the attribute <code>schema_</code>
+<code>RetrievalSettings</code>, <code>RoutingSettings</code>, <code>ResultSettings</code>, <code>TraceSettings</code>,
+<code>SchemaSettings</code>, <code>CuratedSettings</code> and <code>FeedbackSettings</code> in
+<code>nl2sql.config</code>.</p>
+<p>Where the engine's events, logs and metrics go is not a setting: it is the
+<a href="../system/#observers-hooks-and-evals"><code>observers</code> section</a> of
+<code>nl2sql.yaml</code>. The 0.6 <code>observability</code> group (<code>exporter</code>, <code>otlp_endpoint</code>)
+is gone; an <code>otel</code> observer takes its place. The <code>schema</code> group is the attribute <code>schema_</code>
 (<code>cfg.settings.schema_.max_versions</code>), because <code>schema</code> would shadow a
 pydantic method; the YAML key is <code>schema</code>.</p>
 <h2 id="tenant_id"><code>tenant_id</code></h2>
@@ -4992,6 +5004,21 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 <td><code>0.5</code></td>
 <td>Most jitter added to a delay.</td>
 </tr>
+<tr>
+<td><code>max_llm_calls</code></td>
+<td><code>60</code></td>
+<td>The most model calls one question may make, parse retries included; <code>null</code> turns the cap off. 60 covers the largest legitimate run. A run that reaches it ends with <code>status: "stopped"</code> and <code>QueryResult.stop</code>. Enforced from release 0.7's cost and caps work (<a href="../../architecture/wave_a/#5-cost-the-price-table-and-per-question-caps">Wave A</a>).</td>
+</tr>
+<tr>
+<td><code>max_cost_usd</code></td>
+<td>none</td>
+<td>The most one question may spend, in dollars; <code>null</code> (the default) is no cap. With a cap set, every model the config names must have a price. Enforced as <code>max_llm_calls</code> is.</td>
+</tr>
+<tr>
+<td><code>sanity_checks</code></td>
+<td><code>true</code></td>
+<td>The answer sanity checks after each sub-query runs (join fan-out, all-null columns, missing filter values). <code>false</code> turns them all off. Read from release 0.7's sanity checks (<a href="../../architecture/wave_a/#11-answer-sanity-checks">Wave A</a>).</td>
+</tr>
 </tbody>
 </table>
 <h2 id="retrieval"><code>retrieval</code></h2>
@@ -5008,6 +5035,59 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 <td><code>full_snapshot_max_tables</code></td>
 <td><code>15</code></td>
 <td>When a datasource's schema has at most this many tables, the schema retriever skips vector retrieval and passes the full schema snapshot (every table, every column) to the planner. <code>0</code> always uses vector retrieval.</td>
+</tr>
+<tr>
+<td><code>table_k</code></td>
+<td><code>8</code></td>
+<td>Tables the schema retriever keeps for a sub-query.</td>
+</tr>
+<tr>
+<td><code>planning_k</code></td>
+<td><code>12</code></td>
+<td>Schema entries the planner is shown for a sub-query.</td>
+</tr>
+<tr>
+<td><code>decomposer_tables</code></td>
+<td><code>30</code></td>
+<td>Tables the decomposer is shown per datasource.</td>
+</tr>
+</tbody>
+</table>
+<p><code>table_k</code>, <code>planning_k</code> and <code>decomposer_tables</code> replace constants in the
+schema retriever and the resolver; the nodes read them from release 0.7's
+routing work (<a href="../../architecture/wave_a/#limits">Wave A</a>).</p>
+<h2 id="routing"><code>routing</code></h2>
+<p>Cross-database routing: which datasources a question goes to, and how far it
+may spread. Read from release 0.7's routing work
+(<a href="../../architecture/wave_a/#9-phase-r-cross-database-routing">Wave A</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>candidates</code></td>
+<td><code>5</code></td>
+<td>Datasources shown to the answerability check.</td>
+</tr>
+<tr>
+<td><code>max_datasources</code></td>
+<td><code>3</code></td>
+<td>Datasources one question may use.</td>
+</tr>
+<tr>
+<td><code>max_sub_queries</code></td>
+<td><code>6</code></td>
+<td>Sub-queries one question may have. A decomposition over it ends the run with <code>QUESTION_TOO_BROAD</code>.</td>
+</tr>
+<tr>
+<td><code>floor_ratio</code></td>
+<td><code>0.5</code></td>
+<td>A candidate scoring under this share of the best is dropped, between 0 and 1.</td>
 </tr>
 </tbody>
 </table>
@@ -5120,28 +5200,6 @@ pydantic method; the YAML key is <code>schema</code>.</p>
 <td><code>enabled</code></td>
 <td><code>true</code></td>
 <td>Let the playground record a thumbs up or down, with an optional note, for a run. Stored in <code>&lt;storage.path&gt;/state.db</code>: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. <code>nl2sql feedback clear</code> empties it. See <a href="../../observability/feedback/">Feedback and Signals</a>.</td>
-</tr>
-</tbody>
-</table>
-<h2 id="observability"><code>observability</code></h2>
-<table>
-<thead>
-<tr>
-<th>Key</th>
-<th>Default</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>exporter</code></td>
-<td><code>none</code></td>
-<td><code>none</code>, <code>console</code> or <code>otlp</code>. With <code>otlp</code>, the CLI and <code>nl2sql-api</code> also switch to JSON logs.</td>
-</tr>
-<tr>
-<td><code>otlp_endpoint</code></td>
-<td>none</td>
-<td>The OTLP endpoint.</td>
 </tr>
 </tbody>
 </table>

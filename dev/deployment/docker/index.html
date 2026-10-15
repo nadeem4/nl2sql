@@ -4879,8 +4879,9 @@ through a published port does not come from loopback. See
 <li>Schema indexing is not automatic; you must run indexing in your operational
   flow: <code>nl2sql --config /etc/nl2sql/nl2sql.yaml index</code> against the same
   storage, or <code>POST /api/v1/index-all</code> (admin role).</li>
-<li>Observability exporters require network access; set
-  <code>settings.observability</code> in the config.</li>
+<li>Observability exporters require network access. From release 0.7 they
+  are observers in the config's <code>observers</code> section (an <code>otel</code> observer with
+  its <code>endpoint</code>); <code>NL2SQL_LOG_FORMAT=json</code> gives JSON log lines.</li>
 </ul>
 <h2 id="reference-configuration">Reference configuration</h2>
 <p>See <a href="../../configuration/system/">Configuration</a> for the whole config and the

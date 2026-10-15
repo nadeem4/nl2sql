@@ -2137,8 +2137,8 @@
 <li><code>extensions/add-execution-backend.md</code> for new executor services.</li>
 </ul>
 <h2 id="the-registry">The registry</h2>
-<p>Adapters, LLM providers, embeddings providers, secret providers and stores are all
-found by name through <code>nl2sql.registry.Registry</code>
+<p>Adapters, LLM providers, embeddings providers, secret providers, stores, policy
+checks, observers, hooks and scorers are all found by name through <code>nl2sql.registry.Registry</code>
 (<a href="../architecture/configuration_v2/#5-the-registry">design</a>). Each kind has an
 entry point group, and the built-ins are declared in
 <code>packages/nl2sql/pyproject.toml</code> in the same groups a plugin uses:</p>
@@ -2182,12 +2182,37 @@ entry point group, and the built-ins are declared in
 <td><code>nl2sql_sdk.stores</code> (four interfaces, one per slot)</td>
 <td><code>chroma</code>, <code>sqlite</code>, <code>files</code>, <code>local</code></td>
 </tr>
+<tr>
+<td><code>policy_check</code></td>
+<td><code>nl2sql.policy_checks</code></td>
+<td><code>nl2sql_sdk.policy.PolicyCheck</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>observer</code></td>
+<td><code>nl2sql.observers</code></td>
+<td><code>nl2sql_sdk.events.Observer</code> (version 1)</td>
+<td>none yet; <code>log</code>, <code>audit</code> and <code>otel</code> arrive with release 0.7</td>
+</tr>
+<tr>
+<td><code>hook</code></td>
+<td><code>nl2sql.hooks</code></td>
+<td><code>nl2sql.hooks.Hook</code> (version 1, from release 0.7)</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>scorer</code></td>
+<td><code>nl2sql.scorers</code></td>
+<td><code>nl2sql.evaluation.scorers.Scorer</code> (version 1, from release 0.7)</td>
+<td>none yet; five arrive with release 0.7</td>
+</tr>
 </tbody>
 </table>
 <ul>
 <li><code>Registry.default()</code> lists the installed entry points by name and imports
   none of them. <code>Registry.empty()</code> holds nothing.</li>
-<li><code>add_adapter</code>, <code>add_llm</code>, <code>add_embeddings</code>, <code>add_secrets</code> and <code>add_store</code>, and the
+<li><code>add_adapter</code>, <code>add_llm</code>, <code>add_embeddings</code>, <code>add_secrets</code>, <code>add_store</code>,
+  <code>add_policy_check</code>, <code>add_observer</code>, <code>add_hook</code> and <code>add_scorer</code>, and the
   decorators <code>@registry.adapter(name)</code> and so on, register in code on that
   registry only. A name already present raises unless <code>replace=True</code>.</li>
 <li><code>names(kind)</code> lists the names; <code>load(kind, name)</code> imports one and checks its

@@ -4819,8 +4819,9 @@ files (<code>results/</code>). Mount one persistent volume and point <code>stora
   admin roles (<code>policies.admin_roles</code>, default <code>[admin]</code>): pod traffic is not
   loopback, so without them the admin routes answer HTTP 403. See
   <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
-<li>Configure observability exporters in <code>settings.observability</code> (<code>exporter</code>,
-  <code>otlp_endpoint</code>).</li>
+<li>Configure observability exporters as observers in the <code>observers</code> section
+  (from release 0.7, an <code>otel</code> observer with its <code>endpoint</code>), and set
+  <code>NL2SQL_LOG_FORMAT=json</code> for JSON log lines.</li>
 </ul>
 <h2 id="reference-configuration">Reference configuration</h2>
 <p>See <a href="../../configuration/system/">Configuration</a> for the whole config and the

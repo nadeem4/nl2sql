@@ -3095,9 +3095,9 @@
 <div class="admonition note">
 <p class="admonition-title">Status: design</p>
 <p>This page is the design for Wave A of the product redesign, which ships
-as release 0.7. Nothing on it is built yet. Each pull request in
+as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did. Phase 1 is
+as Phase 1 and Phase 2 did; A0, the foundation, is built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -3577,9 +3577,11 @@ sits follows from the code as it is:</p>
    published with the result's summary. The scope makes the run's <code>trace_id</code>
    and hands it to <code>run_with_graph</code>, which puts it in <code>GraphState</code>.</li>
 <li><strong>Its context is entered inside the worker.</strong> <code>run_with_graph</code> submits the
-   graph to its own <code>ThreadPoolExecutor</code> without copying the context
-   (<code>pipeline/runtime.py</code>), which is why <code>policy_engine.run()</code> is entered
-   inside <code>_invoke</code>. The scope's context variables (the <code>trace_id</code>, the
+   graph to its own <code>ThreadPoolExecutor</code> with the caller's
+   <code>copy_context()</code> (<code>pipeline/runtime.py</code>; 0.6 submitted it without one),
+   so the worker inherits the caller's context variables (a request's keys,
+   the run's pinned LLM set), and <code>policy_engine.run()</code> is entered inside
+   <code>_invoke</code>. The scope's context variables (the <code>trace_id</code>, the
    <code>tenant_id</code> and the scope itself) are entered there too, beside it;
    LangGraph's own worker threads then inherit them, as they already inherit
    <code>current_datasource_id</code>. Code deep in a run (the structured-output retry
@@ -3838,6 +3840,52 @@ names in the same PR.</p>
 </tbody>
 </table>
 <p><code>Event</code> is exported from <code>nl2sql</code> (from <code>nl2sql_sdk.events</code>, lazily).</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the event, the bus, the catalog and the run scope (A0)</p>
+<p><code>nl2sql_sdk/events.py</code> holds <code>Event</code> (with <code>sse()</code>, whose <code>data</code> line is
+the whole event as JSON) and the <code>Observer</code> protocol. <code>nl2sql/events/</code>
+holds <code>EventBus</code> (<code>bus.py</code>; <code>publish</code> also takes <code>tenant_id</code>), the catalog
+with a strict model per event and <code>catalog()</code> returning <code>EventInfo</code>
+(<code>catalog.py</code>, which also defines <code>RunStatus</code>), and <code>RunScope</code>,
+<code>current_scope()</code> and the module <code>publish</code> (<code>run.py</code>). <code>Runtime.bus</code> is
+built with the runtime and closed with it. <code>QueryAPI.open_scope(question,
+datasource_id=, execute=, user_context=)</code> makes the scope, with the run's
+usage collector, and calls <code>start()</code> (which publishes <code>run.started</code>);
+<code>QueryAPI.close_scope(scope, result)</code> closes it with
+<code>finish(result, tables=...)</code>, or <code>fail(message, code)</code> when the summary
+cannot be built, and a <code>result</code> built without a graph run is accepted.
+<code>run_query</code> and <code>stream_query</code> open their own scope, or take an open one
+as <code>scope=</code> (internal; Wave C's turn opens it before its rewrite call) and
+close it. <code>RunScope.callbacks()</code> is the usage collector and the LangChain
+handlers attached (the budget, from E3): a model call made in the run
+but outside the graph passes them, inside <code>entered()</code>, so it counts in
+the run's <code>usage</code> and carries its <code>trace_id</code>. <code>run_with_graph</code> takes
+<code>scope=</code>, uses its <code>trace_id</code> and its usage collector, enters it beside
+<code>policy_engine.run()</code> in <code>_invoke</code> (submitted with the caller's
+<code>copy_context()</code>) and adds its <code>callbacks()</code> to the graph's. That is all
+of Wave C's A2 need (<a href="../wave_c/">wave_c.md</a>); E1 keeps <code>scope=</code> when it
+moves <code>stream_query</code> to <code>Event</code>s. The
+scope sets the context <code>TraceContextFilter</code> reads, so log lines written
+during a run carry its <code>trace_id</code> and <code>tenant_id</code>. <code>attach</code> takes a
+function or an object with <code>on_event</code> (subscribed to this run's events
+with <code>fail="raise"</code>), a LangChain callback handler (added to the
+graph's callbacks) and anything with <code>close</code> (closed with the scope);
+a closed scope refuses <code>attach</code> with <code>RuntimeError</code>. Closing detaches
+every subscription and calls every <code>close</code> even when an attached piece
+raised on the terminal event. <code>run_query</code> and <code>stream_query</code> close the
+scope with <code>run.failed</code> on any <code>BaseException</code> (a <code>KeyboardInterrupt</code>
+too) and re-raise it. The scope holds its lock while the bus delivers
+each of its events, so <code>run.finished</code> is always last; the cost is that
+a run's events reach subscribers one at a time and <code>finish</code> (a timed-out
+run's too) waits for the delivery in flight, so an observer must never
+block (the <code>Observer</code> and <code>RunScope</code> docstrings say so; E2's <code>audit</code> and
+<code>otel</code> hand slow work to a queue). <code>run.finished</code>'s <code>usage</code> and
+<code>result_manifest</code> copy only the catalog models' own fields, so a field
+added to <code>UsageTotals</code> or <code>ResultSummary</code> never fails a run.
+<code>run.finished</code>'s <code>tables</code> come from each sub-query's plan, or a verified
+query's SQL, as <code>datasource.schema.table</code>. <code>engine.events</code> and
+<code>engine.evals</code> are empty namespaces; E1 adds <code>subscribe</code> and <code>catalog</code>.</p>
+</div>
 <h2 id="4-observers">4. Observers</h2>
 <h3 id="the-registry-kind-and-the-config">The registry kind and the config</h3>
 <table>
@@ -3910,6 +3958,18 @@ names in the same PR.</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built: the observer kind and the section (A0)</p>
+<p>The <code>observer</code> registry kind (<code>add_observer</code>, <code>@registry.observer</code>) and
+the <code>observers</code> section (<code>ObserverConfig</code>, or an object with
+<code>on_event</code>) are accepted and validated; nothing builds an observer yet
+(E2). <code>Config.observers</code> is <code>None</code> when the section is absent, which E2
+reads as <code>log</code> and <code>audit</code>. <code>settings.observability</code> and its readers
+(<code>nl2sql run</code>'s <code>configure_metrics</code>, the CLI's and <code>nl2sql-api</code>'s switch
+to JSON logs) are gone. <code>nl2sql --log-format text|json</code> and
+<code>NL2SQL_LOG_FORMAT</code> choose the log format; <code>configure_logging(json_format=None)</code>
+reads the variable.</p>
+</div>
 <h3 id="built-in-observers">Built-in observers</h3>
 <table>
 <thead>
@@ -4282,6 +4342,15 @@ there).</p>
 </table>
 <p><code>registry.add_hook(name, cls)</code>, <code>@registry.hook(name)</code>. A point the hook does
 not declare is a <code>ConfigError</code> at build.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the hook kind and the section (A0)</p>
+<p>The <code>hook</code> registry kind and the <code>hooks</code> section are accepted and
+validated: <code>HookConfig</code> (<code>points</code>, <code>on_error</code>, <code>approver_roles</code>, and the
+hook's own keys) or an object with <code>__call__</code>. <code>HookPoint</code>, the six point
+names, is defined in <code>nl2sql/config/models.py</code>, where the config and the
+<code>hook.decision</code> event both read it, and re-exported from <code>nl2sql.hooks</code>,
+where H1 imports it.</p>
+</div>
 <h3 id="the-architecture-test">The architecture test</h3>
 <p><code>test_hooks_modify_only_before_the_validator</code> holds the boundary three ways:</p>
 <ol>
@@ -4364,6 +4433,23 @@ The minimal shape (D10, D24):</p>
    <code>needs_approval</code> again with the new SQL: an approval never covers SQL
    nobody saw.</li>
 </ol>
+<div class="admonition note">
+<p class="admonition-title">Built: the shapes on the result (A0)</p>
+<p><code>ApprovalRequest</code>, <code>Approval</code> and <code>VerifiedRef</code> (<code>id</code>, <code>params</code>) are in
+<code>nl2sql/hooks/approval.py</code>, and <code>RunStop</code> in <code>nl2sql/limits.py</code>; all are
+exported from <code>nl2sql</code>. <code>QueryResult.status</code> is a <code>RunStatus</code>
+(<code>success</code>, <code>plan_only</code>, <code>error</code>, <code>needs_approval</code>, <code>stopped</code>, and
+<code>needs_clarification</code>, reserved for Wave B), or <code>None</code> when nothing ran
+and nothing failed (0.6's <code>""</code>). <code>result_from_state</code> reads the state's
+<code>approvals_needed</code> and <code>stop</code>, and sets the status from them before
+looking at errors, so H2 and E3 put those keys in the state and touch no
+result code. The error codes <code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>,
+<code>NEEDS_APPROVAL</code>, <code>RUN_LIMIT_REACHED</code> and <code>QUESTION_TOO_BROAD</code> (never
+retried), <code>JOIN_KEY_TYPE_MISMATCH</code> and <code>JOIN_FAN_OUT</code> (retried) and
+<code>JOIN_KEY_UNCONVERTED</code> and <code>ALL_NULL_COLUMN</code> (warnings) are in
+<code>ErrorCode</code>; <code>DECLARED_AHEAD</code> in <code>test_boundary_tidy_ups.py</code> lists each
+with the PR that raises it, which takes it off the list.</p>
+</div>
 <p>Nothing is stored: no queue, no expiry, no table. The asking app holds the
 request until someone acts on it. An <code>Approval</code> is not signed and does not
 expire (D24): it is trusted as far as the <code>user_context</code> a caller passes is
@@ -4451,6 +4537,15 @@ scored by registered scorers.</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built: the section and the settings (A0)</p>
+<p><code>EvalsConfig</code> (with <code>EvalGate</code>) is <code>Config.evals</code>, from <code>evals.yaml</code>;
+<code>suites</code> are paths relative to <code>nl2sql.yaml</code>, resolved by V1. The
+settings the other tracks read are in place with their defaults:
+<code>settings.pipeline.max_llm_calls</code>, <code>max_cost_usd</code> and <code>sanity_checks</code>,
+<code>settings.routing</code>, and <code>settings.retrieval.table_k</code>, <code>planning_k</code> and
+<code>decomposer_tables</code>; <code>eval_seeder</code> is in <code>AgentName</code>.</p>
+</div>
 <p><code>evals.yaml</code> is a config section file like the others: strict keys, loaded
 with the config. A suite file is data: it is read when a run asks for it,
 not when the engine starts, so a thousand cases cost an engine start
@@ -5251,6 +5346,12 @@ schema panel passes the selected role.</p>
 </table>
 <p>New on <code>Registry</code>: <code>add_observer</code>, <code>add_hook</code>, <code>add_scorer</code> and their
 decorators. Knowledge sources stay for Wave B.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the three kinds (A0)</p>
+<p><code>observer</code>, <code>hook</code> and <code>scorer</code> are in <code>nl2sql/registry.py</code> (<code>GROUPS</code>,
+<code>INTERFACE_VERSIONS</code> at 1, <code>add_*</code> and the decorators). No built-in is
+declared yet: E2 adds the observers and V1 the scorers.</p>
+</div>
 <h2 id="14-bugs-wave-a-fixes">14. Bugs Wave A fixes</h2>
 <table>
 <thead>

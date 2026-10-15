@@ -2170,7 +2170,8 @@ telemetry</strong> on every run, plus <strong>OpenTelemetry metrics</strong> and
 <h2 id="metrics">Metrics</h2>
 <p><code>configure_metrics()</code> installs an OpenTelemetry meter provider. Exported metrics include:</p>
 <ul>
-<li><code>nl2sql.node.duration</code> (histogram), attribute <code>node</code>. CLI only.</li>
+<li><code>nl2sql.node.duration</code> (histogram), attribute <code>node</code>. Not recorded until
+  the <code>otel</code> observer arrives (see below).</li>
 <li><code>nl2sql.token.usage</code> (counter), attributes <code>node</code>, <code>model</code>, <code>datasource_id</code>
   and <code>type</code>: one point per LLM call for each of <code>input</code>, <code>cached_input</code>,
   <code>cache_write_input</code>, <code>output</code>, <code>reasoning</code> and <code>total</code>. Every run.</li>
@@ -2180,10 +2181,13 @@ telemetry</strong> on every run, plus <strong>OpenTelemetry metrics</strong> and
   <code>QueryResult.usage.plan_cache_hits</code> and <code>sub_queries[].plan_source</code>; see
   <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</li>
 </ul>
-<p><code>configure_metrics()</code> is called by <code>nl2sql run</code>, with the exporter the
-config's <code>settings.observability</code> names, so outside the CLI no meter provider
-is installed unless the embedding application installs one; the counter is
-then recorded against OpenTelemetry's no-op provider and discarded. Token usage
+<p>No meter provider is installed unless the embedding application installs
+one; the counters are then recorded against OpenTelemetry's no-op provider
+and discarded. The 0.6 <code>settings.observability</code> section, and <code>nl2sql run</code>'s
+call to <code>configure_metrics()</code> that read it, are gone: release 0.7 replaces
+them with an <code>otel</code> observer in the <code>observers</code> section
+(<a href="../../architecture/wave_a/#4-observers">Wave A</a>), and until it lands nothing
+exports to OpenTelemetry. Token usage
 is not kept in a process-wide list; read it from <code>QueryResult.usage</code>.</p>
 <h2 id="audit-logging">Audit logging</h2>
 <p><code>EventLogger</code> writes JSON events to a rotating log file at <code>logs/audit_events.log</code>
@@ -2198,7 +2202,7 @@ callback used to write went with that callback, when <code>nl2sql run</code> mov
 the public API. Treat the log as a record of model changes, not as a
 compliance audit trail.</p>
 <h2 id="structured-logging">Structured logging</h2>
-<p>The library does not configure logging on import; the application entry point calls <code>nl2sql.configure_logging</code> after loading the <code>.env</code> next to <code>nl2sql.yaml</code>, so a <code>NL2SQL_LOG_LEVEL</code> there applies (the REST API does it in its lifespan, the CLI before every command, <code>nl2sql demo</code> again once the demo project's <code>.env</code> is loaded). JSON formatting is enabled when <code>Settings.observability_exporter == "otlp"</code>. Trace and tenant context helpers exist (<code>trace_context</code>, <code>tenant_context</code>), but the pipeline does not set them; callers must establish context if they want trace/tenant IDs in logs.</p>
+<p>The library does not configure logging on import; the application entry point calls <code>nl2sql.configure_logging</code> after loading the <code>.env</code> next to <code>nl2sql.yaml</code>, so a <code>NL2SQL_LOG_LEVEL</code> there applies (the REST API does it in its lifespan, the CLI before every command, <code>nl2sql demo</code> again once the demo project's <code>.env</code> is loaded). JSON lines are chosen with <code>nl2sql --log-format json</code> (any command) or <code>NL2SQL_LOG_FORMAT=json</code> (any entry point); text is the default. Every question's <code>RunScope</code> sets the run's <code>trace_id</code> and <code>tenant_id</code> in the context <code>TraceContextFilter</code> reads, inside the run's worker, so a log line written during a run carries them, on LangGraph's worker threads too.</p>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Metrics: <code>packages/nl2sql/src/nl2sql/common/metrics.py</code></li>
