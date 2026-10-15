@@ -105,6 +105,22 @@ def test_mssql_encrypts_with_either_driver_and_trusts_the_certificate_only_when_
     assert url.query.get("TrustServerCertificate") == expected
 
 
+@pytest.mark.parametrize("encrypt, expected", [(True, "yes"), (False, "no")])
+def test_mssql_encrypts_unless_the_connection_turns_it_off(encrypt, expected):
+    # Encrypt=no is sent, not left out: Driver 18 would otherwise encrypt anyway.
+    url = _mssql().url(MssqlConnection(host="h", database="d", driver="ODBC Driver 18 for SQL Server",
+                                       encrypt=encrypt))
+
+    assert url.query["Encrypt"] == expected
+
+
+def test_mssql_connection_encrypts_by_default_and_types_the_option():
+    assert MssqlConnection(host="h", database="d").encrypt is True
+    with pytest.raises(ValueError):
+        MssqlConnection(host="h", database="d", encrypt="sometimes")
+    assert MssqlConnection.model_json_schema()["properties"]["encrypt"]["type"] == "boolean"
+
+
 def test_mssql_with_no_sql_server_driver_installed_is_the_driver_stage(odbc_drivers):
     odbc_drivers("SQL Server", "PostgreSQL Unicode")
     adapter = _mssql()
