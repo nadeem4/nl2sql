@@ -309,8 +309,10 @@ def test_resolver_refusal_publishes_policy_decision():
     seen = _capture(bus, "policy.decision")
     scope = RunScope(bus, question="q")
     with scope.entered():
-        DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext(roles=["r"])))
+        out = DatasourceResolverNode(ctx)(GraphState(user_query="q", user_context=UserContext(roles=["r"])))
 
+    assert [e.error_code.value for e in out["errors"]] == ["SECURITY_VIOLATION"], out["errors"]
+    assert len(seen) == 1, (seen, scope.events)
     [event] = seen
     assert event.data["datasource_id"] == "ds1" and event.data["table"] is None
     assert event.data["schema"] is None and event.data["step"] == "datasource_resolver"
