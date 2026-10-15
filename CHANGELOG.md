@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.6.0](https://github.com/nadeem4/nl2sql/compare/v0.5.0...v0.6.0) (2026-10-15)
+
+
+### Features
+
+* **datasources:** engine.datasources.types(), test(Datasource) and add() validating the index scope (phase 2, B5) ([#296](https://github.com/nadeem4/nl2sql/issues/296)) ([ee2756f](https://github.com/nadeem4/nl2sql/commit/ee2756fe36bc9b419a6a0b677d2f1b13c726abfa))
+* **embeddings:** providers v2 with openai_compatible, base_url, dimension and the one-call probe ([#281](https://github.com/nadeem4/nl2sql/issues/281)) ([c6a72a5](https://github.com/nadeem4/nl2sql/commit/c6a72a5a7ad73aa28fdbe8f908cd037c91655ee3))
+* **llm:** parse-and-retry for structured answers, with parse_retries and MODEL_OUTPUT_INVALID ([#287](https://github.com/nadeem4/nl2sql/issues/287)) ([b131e82](https://github.com/nadeem4/nl2sql/commit/b131e82ce286509e78d0abe71746cbb2f323e280))
+* **llm:** providers v2 with openai_compatible, its openrouter and ollama presets, and the agent fields ([#284](https://github.com/nadeem4/nl2sql/issues/284)) ([2fb2605](https://github.com/nadeem4/nl2sql/commit/2fb26052d19ce3bf62a917554b177f8f2070cecf))
+* **policies:** allow and deny globs, one Scope, denied tables hidden from the planner (P1) ([#285](https://github.com/nadeem4/nl2sql/issues/285)) ([e28cd44](https://github.com/nadeem4/nl2sql/commit/e28cd446cb457510f5dac10496f43f85e25cfc0a))
+* **policies:** PolicyCheck extension point, intersected with the roles and failing closed (P2) ([#288](https://github.com/nadeem4/nl2sql/issues/288)) ([d5e5d89](https://github.com/nadeem4/nl2sql/commit/d5e5d895b5edec2b5cd7cb5c4ee00b3d84d5639f))
+* **sdk:** adapter SDK v2 contract, strict connection models and the index scope (B1) ([#291](https://github.com/nadeem4/nl2sql/issues/291)) ([59d0f47](https://github.com/nadeem4/nl2sql/commit/59d0f47897045b6b944669ec2bd004fb2b0d6e9c))
+* **sdk:** read-only sessions, statement timeouts and connection stages, honestly (B3) ([#297](https://github.com/nadeem4/nl2sql/issues/297)) ([fc60e32](https://github.com/nadeem4/nl2sql/commit/fc60e32cc04be937e6acbc74b1c4bb90c38a9b71))
+* **sdk:** the adapter conformance kit, run on all five built-ins (phase 2, B4) ([#298](https://github.com/nadeem4/nl2sql/issues/298)) ([6846c09](https://github.com/nadeem4/nl2sql/commit/6846c094d9800bc78f36a28acf4e39efbf027dd9))
+* **sdk:** the SQLAlchemy base in the SDK, reflect once, catalog row estimates and index issues (B2) ([#295](https://github.com/nadeem4/nl2sql/issues/295)) ([ebdc040](https://github.com/nadeem4/nl2sql/commit/ebdc040978b001f8fa9c5e05bcf328f1a7edcb77))
+* **storage:** index store, namespaces per model and the build pointer as the commit (phase 2, S2) ([#289](https://github.com/nadeem4/nl2sql/issues/289)) ([13d971f](https://github.com/nadeem4/nl2sql/commit/13d971f909b243904a718d8d6366cfc9692d7500))
+* **storage:** sqlite state store with immutable snapshots, migrations and the index lock (phase 2, S3) ([#293](https://github.com/nadeem4/nl2sql/issues/293)) ([4c09c45](https://github.com/nadeem4/nl2sql/commit/4c09c4557c9d72f572c8956a6c341d08a761fe0c))
+* **storage:** store interfaces, the four storage slots and the store registry kind (phase 2, S1) ([#283](https://github.com/nadeem4/nl2sql/issues/283)) ([4d66b99](https://github.com/nadeem4/nl2sql/commit/4d66b99fac95a58c1ed9c06bc4633bd2aa1650a0))
+* **storage:** trace and result stores, retention and engine.storage (phase 2, S4) ([#292](https://github.com/nadeem4/nl2sql/issues/292)) ([cc7aaf6](https://github.com/nadeem4/nl2sql/commit/cc7aaf6a3c7e3a84fbe57911d0fb9c4808431c91))
+* **testbed:** real-database test bed, realdb marker and CI workflow ([#286](https://github.com/nadeem4/nl2sql/issues/286)) ([a883ef8](https://github.com/nadeem4/nl2sql/commit/a883ef83e5b624d9dd83dfa18120ad84d05f2504))
+* **testbed:** scripts/testbed.py drives the GCP test-bed VM through IAP (T2) ([#290](https://github.com/nadeem4/nl2sql/issues/290)) ([632f417](https://github.com/nadeem4/nl2sql/commit/632f4172db891db0503765e4c5049a30a8084fda))
+
+
+### Bug Fixes
+
+* **adapters:** install cryptography for MySQL 8 logins, and pick the newest SQL Server ODBC driver ([#303](https://github.com/nadeem4/nl2sql/issues/303)) ([a9444a8](https://github.com/nadeem4/nl2sql/commit/a9444a8e1c5088376f17e63f4d0775a944021810))
+* **docs:** resolve conflict markers in the SDK page and fail CI on any left behind ([#294](https://github.com/nadeem4/nl2sql/issues/294)) ([e7af71f](https://github.com/nadeem4/nl2sql/commit/e7af71f71b1d56b5334b19e11845be1ef6e07429))
+* **duckdb:** read DuckDB's own catalog, so schema reading works on SQLAlchemy 2.1 ([#300](https://github.com/nadeem4/nl2sql/issues/300)) ([35c355b](https://github.com/nadeem4/nl2sql/commit/35c355bf6e10c9946113cbbbf87c27f9f88aee49))
+* **testbed:** keep mssql-init running so a second up --wait passes, and write the VM startup script with LF endings ([#301](https://github.com/nadeem4/nl2sql/issues/301)) ([ae76887](https://github.com/nadeem4/nl2sql/commit/ae76887f222a3e622210bd096c174210d79f2259))
+* **testbed:** pass the passwords through plink, retry the first connection and wait for Docker ([#299](https://github.com/nadeem4/nl2sql/issues/299)) ([a19c1f9](https://github.com/nadeem4/nl2sql/commit/a19c1f975c1870831f69303fd74e72f92884f849))
+* **testbed:** send the passwords to the VM without a carriage return, and strip one there ([#304](https://github.com/nadeem4/nl2sql/issues/304)) ([86083d2](https://github.com/nadeem4/nl2sql/commit/86083d235f2d7a08084d3c3050597d7c9f2449ed))
+* **testbed:** stop the servers cleanly before the VM, and wait for SQL Server's databases to come online ([#302](https://github.com/nadeem4/nl2sql/issues/302)) ([94ef5a5](https://github.com/nadeem4/nl2sql/commit/94ef5a51ae6f99ade2ab1126f552b8ca5a80e2f6))
+
+
+### Documentation
+
+* **architecture:** phase 2 design — test bed, storage, providers, policies, adapter SDK v2 ([#279](https://github.com/nadeem4/nl2sql/issues/279)) ([ba0a2f6](https://github.com/nadeem4/nl2sql/commit/ba0a2f6212806e530b770fa4e481de7895f7f19e))
+* **release:** notes for 0.6.0 ([#305](https://github.com/nadeem4/nl2sql/issues/305)) ([219e882](https://github.com/nadeem4/nl2sql/commit/219e882e0ef599c2b75e4141f2e41f3d4f8c3a4a))
+
 ## [0.5.0](https://github.com/nadeem4/nl2sql/compare/v0.4.1...v0.5.0) (2026-10-14)
 
 
