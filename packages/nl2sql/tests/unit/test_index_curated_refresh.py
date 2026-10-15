@@ -61,6 +61,9 @@ class _Adapter:
 
 
 class _NoLLM:
+    # The secrets the redactor reads (an event's error text is redacted) are not a use of a model.
+    secret_manager = llms = None
+
     def __getattr__(self, name):
         raise AssertionError(f"the LLM registry was used ({name})")
 

@@ -16,6 +16,9 @@ A build holds the state store's ``index`` lock, so ``nl2sql index`` is safe
 to run while ``nl2sql-api`` serves the same ``storage.path``: a second build
 started meanwhile fails at once, naming when the lease runs out. The lease
 expires after ``INDEX_LOCK_TTL_S``, so a build that died cannot block forever.
+
+Each datasource's start and failure is published on the engine's bus
+(``index.started``, ``index.failed``); the orchestrator publishes the rest.
 """
 from __future__ import annotations
 
@@ -74,7 +77,12 @@ def rebuild_index(
         A :class:`RebuildResult`.
     """
     say = on_progress or (lambda _msg: None)
-    tell = on_datasource or (lambda _progress: None)
+    told = on_datasource or (lambda _progress: None)
+
+    def tell(progress: IndexProgress) -> None:
+        _publish(ctx, progress)
+        told(progress)
+
     result = RebuildResult()
 
     adapters = list(ctx.ds_registry.list_adapters())
@@ -143,3 +151,19 @@ def _build(ctx, adapters, result: RebuildResult, *, enrich: bool, curated_only: 
             result.empty.append(ds_id)
         tell(IndexProgress(ds_id, "done", counts={k: v for k, v in (stats or {}).items()
                                                   if isinstance(v, int) and not isinstance(v, bool)}))
+
+
+def _publish(ctx, progress: IndexProgress) -> None:
+    """``index.started`` and ``index.failed`` on the engine's bus: a build runs outside any question.
+
+    ``index.swapped`` is the orchestrator's, published when the pointer switches.
+    """
+    if progress.state == "started":
+        ctx.bus.publish("index.started", {"datasource_id": progress.datasource_id, "namespace": ctx.namespace},
+                        tenant_id=ctx.tenant_id)
+    elif progress.state == "failed":
+        from nl2sql.tracing.trace import redact_for
+
+        # The reason is exception text, so it is redacted (D15).
+        ctx.bus.publish("index.failed", {"datasource_id": progress.datasource_id,
+                                         "reason": redact_for(ctx, progress.reason or "")}, tenant_id=ctx.tenant_id)

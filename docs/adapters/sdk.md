@@ -180,7 +180,8 @@ matching its patterns yourself, and leave out your database's system schemas.
 progress.
 
 The snapshot's `issues` list holds an `IndexIssue` (`table`, `column`,
-`stage`, `message`) for each table or column indexed without something, and
+`stage`, `message`, and `error_type`, the exception's class name when an
+exception caused it) for each table or column indexed without something, and
 each table's `row_count_source` says where its `row_count` came from:
 `catalog` (an estimate) or `exact` (a count).
 

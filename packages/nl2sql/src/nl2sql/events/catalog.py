@@ -316,12 +316,14 @@ CATALOG: Dict[str, EventSpec] = {
                                                  "rows.", run=True, stream=True),
     "llm.call": _spec(LLMCall, "A model call finished: tokens, latency and cost. Published by "
                                  "TokenUsageCallback.", run=True),
-    "llm.parse_retry": _spec(LLMParseRetry, "A structured answer did not parse and is asked for again (E4).",
+    "llm.parse_retry": _spec(LLMParseRetry, "A structured answer did not parse and is asked for again: the "
+                                             "validation messages only. Published by structured() in llm/wires.",
                              run=True),
     "plan_cache.lookup": _spec(PlanCacheLookup, "The plan cache was asked for a plan. Published by "
                                                  "PlanCache.get.", run=True),
-    "policy.decision": _spec(PolicyDecision, "A denial at an enforcement point: the validator, the curated "
-                                             "matcher or the resolver (E4).", run=True, audit=True),
+    "policy.decision": _spec(PolicyDecision, "A denial at an enforcement point (D16): the logical validator, the "
+                                             "curated matcher or the datasource resolver. Never on the caller's "
+                                             "stream.", run=True, audit=True),
     "hook.decision": _spec(HookDecision, "A hook answered at one of the six points (H1). The audit "
                                          "observer writes deny, needs_approval, approved and error.",
                            run=True, audit=True,
@@ -331,15 +333,22 @@ CATALOG: Dict[str, EventSpec] = {
     "sanity.flagged": _spec(SanityFlagged, "An answer sanity check found something (S1).", run=True,
                             stream=True),
     # Engine events
-    "datasource.failed": _spec(DatasourceFailed, "A datasource check failed (E4).", run=False),
-    "index.started": _spec(IndexStarted, "An index build began (E4).", run=False),
-    "index.column_failed": _spec(IndexColumnFailed, "An index build could not index a column (E4).", run=False),
-    "index.swapped": _spec(IndexSwapped, "An index build went live (E4).", run=False, audit=True),
-    "index.failed": _spec(IndexFailed, "An index build failed (E4).", run=False),
+    "datasource.failed": _spec(DatasourceFailed, "A datasource check failed. Published by "
+                                                 "Runtime.check_datasource and try_datasource.", run=False),
+    "index.started": _spec(IndexStarted, "An index build of one datasource began. Published by rebuild_index.",
+                           run=False),
+    "index.column_failed": _spec(IndexColumnFailed, "A build indexed a table or column without something (an "
+                                                    "IndexIssue); never its sample values. Published by the "
+                                                    "orchestrator.", run=False),
+    "index.swapped": _spec(IndexSwapped, "A datasource's new build went live: its pointer switched. Published "
+                                         "by IndexingOrchestrator._commit.", run=False, audit=True),
+    "index.failed": _spec(IndexFailed, "An index build of one datasource failed; its previous build stays live. "
+                                       "Published by rebuild_index.", run=False),
     "schema.drifted": _spec(SchemaDrifted, "A datasource's structure differs from its build (D1).", run=False,
                             audit=True),
-    "retention.purged": _spec(RetentionPurged, "Old traces, results and audit files were deleted (E4).",
-                              run=False, audit=True),
+    "retention.purged": _spec(RetentionPurged, "Old traces, results and audit files were deleted: the counts "
+                                               "per slot. Published by engine.storage.purge().", run=False,
+                              audit=True),
     "llm.changed": _spec(LLMChanged, "The LLM configuration was replaced; never a key. Published by "
                                       "engine.llm.replace.", run=False,
                          audit=True),

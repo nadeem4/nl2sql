@@ -431,13 +431,31 @@ class Runtime:
                                     warnings=warnings)
         reason = check.message or "The connection test failed."
         self.ds_registry.mark_unavailable(datasource.id, reason)
-        return DatasourceStatus(
+        return self._published(DatasourceStatus(
             id=datasource.id, status="failed", required=datasource.required, stage=check.stage,
             reason=reason,
             fix=check.fix or f"Check datasources[{i}].connection for '{datasource.id}', and that the database "
-                             "is reachable from this machine. The log has the driver's error.")
+                             "is reachable from this machine. The log has the driver's error."))
+
+    def _published(self, status: DatasourceStatus) -> DatasourceStatus:
+        """``status``, after publishing ``datasource.failed`` on the engine's bus when it failed.
+
+        The driver's words are redacted (D15): a plugin adapter may echo its DSN.
+        """
+        if status.status == "failed":
+            from nl2sql.tracing.trace import redact_for
+
+            self.bus.publish("datasource.failed", {
+                "datasource_id": status.id, "stage": status.stage, "message": redact_for(self, status.reason or ""),
+                "fix": redact_for(self, status.fix) if status.fix else None}, tenant_id=self.tenant_id)
+        return status
 
     def try_datasource(self, datasource: "Datasource") -> DatasourceStatus:
+        """Builds ``datasource``'s adapter, tests its connection and closes it; a failure publishes
+        ``datasource.failed``. See ``_try_datasource``."""
+        return self._published(self._try_datasource(datasource))
+
+    def _try_datasource(self, datasource: "Datasource") -> DatasourceStatus:
         """Builds ``datasource``'s adapter, tests its connection and closes it. Registers nothing.
 
         A failure is reported, never raised, with the stage it failed at:

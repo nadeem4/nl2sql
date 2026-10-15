@@ -50,7 +50,8 @@ class StorageAPI:
         ``max_age_days`` keeps everything and is left out, and so is
         ``audit`` when the engine runs no ``audit`` observer.
         ``nl2sql storage purge`` calls this, and ``nl2sql-api`` calls it at
-        startup and once a day.
+        startup and once a day. It publishes ``retention.purged`` with the
+        counts on the engine's bus, which the audit observer writes.
         """
         now = datetime.now(timezone.utc)
         counts: Dict[str, int] = {}
@@ -62,4 +63,5 @@ class StorageAPI:
         audits = [o for o in getattr(self._ctx, "observers", ()) if isinstance(o, AuditObserver)]
         if audits:
             counts["audit"] = sum(audit.purge(now) for audit in audits)
+        self._ctx.bus.publish("retention.purged", {"counts": counts}, tenant_id=self._ctx.tenant_id)
         return counts

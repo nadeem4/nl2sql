@@ -103,11 +103,14 @@ def test_registering_a_fixed_datasource_clears_its_unavailable_entry(registry):
 def test_indexing_an_unavailable_datasource_fails_with_the_reason():
     from nl2sql.indexing.rebuild import rebuild_index
 
+    from nl2sql.events import EventBus
+
     ctx = SimpleNamespace(
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [],
             unavailable=lambda: {"bad": "No adapter found for engine type: 'nosuchdb'"},
         ),
+        bus=EventBus(), tenant_id="default",
     )
 
     result = rebuild_index(ctx, datasource_ids=["bad"])

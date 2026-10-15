@@ -87,7 +87,9 @@ results: { type: local, max_age_days: 2 }
 before that age, and the [audit observer's](observers.md#audit) day files older
 than its `max_age_days` (90 by default), and returns the counts,
 `{"traces": 3, "results": 12, "audit": 1}` (no `audit` when the engine runs no
-audit observer). A
+audit observer). It publishes the counts as the
+[`retention.purged` event](../observability/events.md#the-catalog), which the
+audit observer writes. A
 plugin trace or results store is purged when it has a `max_age_days`
 attribute, and left alone when it does not (a bucket with its own lifecycle
 rule, say). Three things call it:

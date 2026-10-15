@@ -37,6 +37,7 @@ from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash, curated_s
 from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
 from nl2sql.indexing.models import BaseChunk
 from nl2sql.indexing.retrieval import CURATED_TYPE
+from nl2sql_sdk.schema import IndexIssue
 from nl2sql_sdk.stores import BuildPointer, Entry, Filter
 
 if TYPE_CHECKING:
@@ -45,6 +46,9 @@ if TYPE_CHECKING:
 logger = get_logger("indexing_orchestrator")
 
 BATCH_SIZE = 256
+
+# ``index.column_failed``'s message for the stages that read the data itself.
+_FIXED_MESSAGES = {"values": "The column's values could not be read", "profile": "The column could not be profiled"}
 
 
 def entry_metadata(chunk: BaseChunk) -> Dict[str, Any]:
@@ -72,6 +76,10 @@ class IndexingOrchestrator:
         self.max_versions = ctx.settings.schema_.max_versions
         self.ds_registry = ctx.ds_registry
         self.llm_registry = ctx.llm_registry
+        # A build runs outside any question, so its events go on the engine's bus.
+        self.bus = ctx.bus
+        self.tenant_id = ctx.tenant_id
+        self._ctx = ctx  # for the redactor's secrets
         # The loaded curated.yaml, or None when the feature is off.
         self.curated = getattr(ctx, "curated", None)
 
@@ -120,6 +128,11 @@ class IndexingOrchestrator:
             schema_version=schema_version, questions=questions,
         ).build() + CuratedChunkBuilder(datasource_id, curated, schema_version).build()
 
+        for issue in schema_snapshot.issues:
+            # The issue only: never the column's statistics or sample values (D15).
+            self._publish("index.column_failed", {"datasource_id": datasource_id, "table": issue.table,
+                                                  "column": issue.column, "stage": issue.stage,
+                                                  "message": self._issue_message(issue)})
         previous = self.index.pointers(self.namespace).get(datasource_id)
         self._commit(datasource_id, schema_version, chunks, [], curated_hash(curated))
         self._keep_snapshots(datasource_id, previous.schema_version if previous else None)
@@ -130,6 +143,23 @@ class IndexingOrchestrator:
             logger.warning(f"Indexed {datasource_id} with {len(schema_snapshot.issues)} issue(s); "
                            f"the first: {schema_snapshot.issues[0].table}: {schema_snapshot.issues[0].message}")
         return stats
+
+    def _issue_message(self, issue: IndexIssue) -> str:
+        """What ``index.column_failed`` says of ``issue``, never a value from the data (D15).
+
+        Reading a column's values or statistics can fail on a value (a cast
+        error quotes it), so those two stages say only what failed and the
+        error's type. The other stages' driver words are redacted.
+        """
+        fixed = _FIXED_MESSAGES.get(issue.stage)
+        if fixed is not None:
+            return f"{fixed} ({issue.error_type})." if issue.error_type else f"{fixed}."
+        from nl2sql.tracing.trace import redact_for
+
+        return redact_for(self._ctx, issue.message)
+
+    def _publish(self, name: str, data: Dict[str, Any]) -> None:
+        self.bus.publish(name, data, tenant_id=self.tenant_id)
 
     def _keep_snapshots(self, datasource_id: str, replaced: Optional[str]) -> None:
         """Deletes the datasource's snapshots that nothing can read any more.
@@ -208,6 +238,14 @@ class IndexingOrchestrator:
         )})
         logger.info(f"Index pointer for {datasource_id} switched to build {build_id} "
                     f"(schema version {schema_version}) in {self.namespace}")
+        counts: Dict[str, int] = {}
+        for kind in [str(e.metadata.get("type", "unknown")) for e in copied] + [c.type for c in chunks]:
+            counts[kind] = counts.get(kind, 0) + 1
+        self._publish("index.swapped", {
+            "datasource_id": datasource_id, "namespace": self.namespace, "build_id": build_id,
+            "schema_version": schema_version, "counts": counts,
+            "replaced_build_id": previous.build_id if previous else None,
+            "replaced_schema_version": previous.schema_version if previous else None})
 
         # After the switch no new run reads these. The replaced build is kept
         # for runs that pinned it; older builds and failed ones go. A failure

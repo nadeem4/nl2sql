@@ -12,6 +12,7 @@ from nl2sql.indexing.retrieval import CURATED_TYPE
 from nl2sql_sdk.schema import TableRef
 from nl2sql.policies import UserContext
 from nl2sql.common.logger import get_logger
+from nl2sql.events import publish
 from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
@@ -303,6 +304,7 @@ class DatasourceResolverNode:
                 # caller may not read is never searched, so it never ranks.
                 reachable = self._get_allowed_datasource_ids(state.user_context, registered_ids)
                 if not reachable:
+                    _publish_refusals(self.policy_engine, state.user_context, registered_ids)
                     return self._error_response(
                         resolved_datasources=[],
                         allowed_ids=[],
@@ -346,6 +348,7 @@ class DatasourceResolverNode:
             # role may not read.
             allowed_ids = self._get_allowed_datasource_ids(state.user_context, candidate_ids)
             if not allowed_ids:
+                _publish_refusals(self.policy_engine, state.user_context, candidate_ids)
                 return self._error_response(
                     resolved_datasources=candidates,
                     allowed_ids=[],
@@ -412,3 +415,16 @@ class DatasourceResolverNode:
                     )
                 ],
             }
+
+
+def _publish_refusals(policy_engine, user_context: UserContext, datasource_ids: list[str]) -> None:
+    """``policy.decision`` for each datasource the role check refused, when it refused them all (D16).
+
+    Before a search that means every registered datasource; otherwise the
+    explicit or only one. Routing that skips some while others go on is
+    filtering and publishes nothing.
+    """
+    for ds_id in datasource_ids:
+        rule = policy_engine.scope(user_context, ds_id).datasource_rule()
+        if rule is not None:
+            publish("policy.decision", {"datasource_id": ds_id, "rule": rule, "step": "datasource_resolver"})

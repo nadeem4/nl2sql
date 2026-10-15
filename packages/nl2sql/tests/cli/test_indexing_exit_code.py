@@ -12,6 +12,7 @@ import pytest
 
 from nl2sql import NL2SQL
 from nl2sql.cli.commands import indexing as indexing_cmd
+from nl2sql.events import EventBus
 
 
 class _StubAdapter:
@@ -33,6 +34,7 @@ def _context(*datasource_ids: str) -> NL2SQL:
         ds_registry=SimpleNamespace(
             list_adapters=lambda: [_StubAdapter(ds) for ds in datasource_ids]
         ),
+        bus=EventBus(), tenant_id="default", namespace="nl2sql__test__1",
     )
     return engine
 
