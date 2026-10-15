@@ -69,8 +69,9 @@ def test_a_verified_answer_carries_its_source_on_ask_and_on_the_stream(demo_proj
     # Only the choice and the answer: no planner, no decomposer.
     assert [c["name"] for c in server.calls][:2] == ["VerifiedQueryChoice", "AggregatedResponse"]
 
-    name, final = events[-1]
-    assert name == "final"
+    name, finished = events[-1]
+    assert name == "run.finished"
+    final = finished["result"]
     assert final["source"] == asked["source"]
     assert final["sub_queries"][0]["plan"] is None
 
