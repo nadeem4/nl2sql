@@ -732,6 +732,19 @@
       
     </span>
 </a>
+<nav aria-label="7. Approval" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#addendum-the-pinned-plan-entry-is-public">
+<span class="md-ellipsis">
+      
+        Addendum: the pinned-plan entry is public
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#8-evals-as-a-product">
@@ -2935,6 +2948,19 @@
       
     </span>
 </a>
+<nav aria-label="7. Approval" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#addendum-the-pinned-plan-entry-is-public">
+<span class="md-ellipsis">
+      
+        Addendum: the pinned-plan entry is public
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#8-evals-as-a-product">
@@ -3204,7 +3230,7 @@
 <p>This page is the design for Wave A of the product redesign, which ships
 as release 0.7. Each pull request in
 <a href="#16-pr-plan">the PR plan</a> adds a "Built" note to the sections it builds,
-as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1, E2 and V2 are built. Phase 1 is
+as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, H2, V1, E2 and V2 are built. Phase 1 is
 <a href="../configuration_v2/">Configuration v2 and the extension registry</a>;
 Phase 2 is <a href="../phase2/">Phase 2: test bed, storage, providers, policies and adapter
 SDK v2</a>. Wave A is what those pages called "Phase 3", plus
@@ -4728,6 +4754,91 @@ request until someone acts on it. An <code>Approval</code> is not signed and doe
 expire (D24): it is trusted as far as the <code>user_context</code> a caller passes is
 trusted today, which is the application's responsibility (<code>nl2sql-api</code>
 resolves both from its auth). The REST shape is Wave D.</p>
+<h3 id="addendum-the-pinned-plan-entry-is-public">Addendum: the pinned-plan entry is public</h3>
+<p>Decided after this design merged, with the Wave B to D reviews: the entry
+the approved re-run uses is built once and is public.
+<code>run_query(question, plan=SuppliedPlan(datasource_id, sub_query, plan))</code>
+(and <code>stream_query</code>) runs a plan the caller holds. It skips the curated
+matcher, the resolver, the decomposer and the planner's model call; checks
+the datasource against the caller's scope; sets <code>plan_source="supplied"</code>;
+runs <code>plan.after</code>, the validator, the generator and the executor; is never
+cached; and never asks the refiner on a validator failure (the sub-query
+fails with the validator's error). The run's state carries the pin as a
+<code>PinnedRun</code> whose <code>source</code> is a <code>PinnedSource</code>: <code>supplied</code>, <code>approved</code> (this
+section's re-run) or <code>chosen</code> (Wave B's clarification re-ask, which may not
+be combined with approvals). <code>SuppliedPlan</code> is exported from <code>nl2sql</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: approval and the pinned-plan entry (H2)</p>
+<ul>
+<li><strong>The entry.</strong> <code>nl2sql/pipeline/pinned.py</code>: <code>PinnedSource</code>,
+  <code>SuppliedPlan</code>, <code>PinnedRun</code> (<code>source</code>, <code>decomposition</code>, <code>plans</code> keyed
+  by sub-query id, or <code>verified</code> with <code>verified_datasource_id</code>),
+  <code>PinnedRun.supplied(plan)</code>, <code>pinned_from_approvals(approvals,
+  question=, user=)</code> and <code>PinnedEntryNode</code>. <code>build_graph(ctx,
+  execute, pinned=True)</code> builds a pinned run's graph, whose entry is
+  <code>pinned_entry</code> (with no curated matcher); every other run's graph is
+  unchanged and has no such node. <code>run_with_graph</code> builds the pinned
+  graph for a supplied pin, or, for an approval's pin (known only after
+  <code>run.before</code>), inside the worker. The
+  <code>pinned_entry</code> node scope-checks every datasource of the decomposition
+  (<code>SECURITY_VIOLATION</code> otherwise, <code>routes.pinned_route</code> ends the run)
+  and goes to the layer router. <code>build_scan_payload</code> hands each
+  sub-query its <code>pinned_plan</code> and <code>pinned_source</code>; the planner returns
+  it through <code>after_plan(state, plan, source)</code>. The SQL agent reads a
+  pinned sub-query's retries as spent, so neither a validator nor a
+  database error is retried, and the executor's value check never asks
+  for a retry on it. The schema retriever gives a pinned plan every
+  table the caller may read, with no search, for the validator.
+  <code>check_pinned(pinned, approvals, datasource_id)</code> refuses, with a
+  <code>ValueError</code> at the call (<code>QueryAPI.run_query</code> and <code>stream_query</code>,
+  before the run's scope opens), a <code>chosen</code> pin with approvals and a
+  <code>datasource_id</code> that is not the pinned plan's datasource.
+  <code>QueryAPI.run_query(..., pinned=)</code> (internal) takes a pin of another
+  source; Wave B passes its chosen plan there.</li>
+<li><strong>The request.</strong> <code>ApprovalRequest.build(...)</code> computes <code>sql_sha256</code>
+  and <code>id</code>; <code>expected_id()</code> recomputes it: SHA-256 of the canonical
+  JSON of the fields in <code>REQUEST_ID_FIELDS</code> only, each dumped without
+  the values it holds at their defaults. <strong>The rule for Wave D's
+  store:</strong> a field added later, to the request or with a default to a
+  nested model, keeps the ids of stored requests; changing a default or
+  the meaning of a listed field changes them, and a test pins one id
+  (<code>GOLDEN_ID</code>) so that never happens by accident. <code>wrap_subgraph</code> builds the request for a
+  sub-query that ended <code>NEEDS_APPROVAL</code> (the error's <code>details</code> now carry
+  the <code>reason</code>) into <code>GraphState.approvals_needed</code>; the curated matcher
+  does the same with a <code>VerifiedRef</code>. <strong>One difference from the sketch
+  above:</strong> the request pins the plan as <code>plan.after</code> received it
+  (<code>planner_plan</code>), not the plan the hooks let through, because the
+  re-run passes it through <code>plan.after</code> again; pinning the hooked plan
+  would apply a hook's <code>Modify</code> twice and the SQL would never match the
+  hash. What the approver approves is the SQL, and it is the same.</li>
+<li><strong>The check.</strong> <code>HookRunner(bindings, admin_roles=)</code> (the runtime
+  passes <code>policies.admin_roles</code>), <code>HookRunner.approver_roles(hook)</code>. On a
+  <code>NeedsApproval</code> the runner looks for an approval in <code>ctx.approvals</code>
+  with no <code>approval_problem(...)</code>: unedited, this run's question (after
+  <code>run.before</code>) and asker, this hook and datasource, the hash of the SQL
+  just generated, the same verified values, and an approver holding one
+  of the hook's configured roles. A match publishes <code>hook.decision</code> with
+  <code>decision: "approved"</code> and the <code>approver</code>, and the next hook runs.
+  <code>request_problem</code> refuses an edited request, a request whose <code>sql</code> is
+  not the SQL of its <code>sql_sha256</code> (so the SQL an approver reads is the
+  SQL whose hash is checked), and another question or asker.
+  <code>pinned_from_approvals(approvals, question=, user=, hooks=)</code> pins only
+  an approval with no <code>request_problem</code>, for a configured hook, whose
+  <code>by</code> holds one of that hook's approver roles; so a forged approval, an
+  approver without the role, or a request the asker built with no
+  approval hook configured, pins nothing and covers nothing: the run
+  plans as usual and asks again, and <code>plan_source</code> is never
+  <code>"approved"</code> for it.</li>
+<li><strong>The verified path.</strong> A pinned <code>verified</code> request takes the default
+  entry; the curated matcher runs that query with its values
+  (<code>_run_pinned</code>), with no search and no model call, through the same
+  access checks and hooks. If it is no longer available, the matcher
+  falls back as usual.</li>
+<li><strong>Not done:</strong> the result's <code>final_answer</code> stays None on a
+  <code>needs_approval</code> run (the error's message is the answer text), as on
+  every run a hook ended; nothing is stored (Wave D).</li>
+</ul>
+</div>
 <h2 id="8-evals-as-a-product">8. Evals as a product</h2>
 <p><code>engine.benchmark</code> becomes <code>engine.evals</code> (D25). What 0.6 calls tier 1, tier
 2 and retrieval recall become three modes of one run over one case format,

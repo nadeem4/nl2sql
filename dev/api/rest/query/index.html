@@ -5354,9 +5354,9 @@
 </tr>
 <tr>
 <td><code>plan_source</code></td>
-<td><code>str</code></td>
+<td><code>"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"</code></td>
 <td>no</td>
-<td><code>"cache"</code> when the plan came from the plan cache (no planner call; still validated and executed), <code>"verified"</code> when a <a href="../../../configuration/curated/#what-happens-at-question-time">verified query</a> answered (there is no plan; <code>sql</code> is the verified query's own, with its <code>:name</code> placeholders), otherwise <code>"llm"</code>.</td>
+<td><code>"cache"</code> when the plan came from the plan cache (no planner call; still validated and executed), <code>"verified"</code> when a <a href="../../../configuration/curated/#what-happens-at-question-time">verified query</a> answered (there is no plan; <code>sql</code> is the verified query's own, with its <code>:name</code> placeholders), <code>"supplied"</code> or <code>"approved"</code> for a pinned plan (see <a href="../../core/query/#running-a-plan-you-hold">Query API → Running a plan you hold</a>), otherwise <code>"llm"</code>.</td>
 </tr>
 <tr>
 <td><code>row_cap</code></td>

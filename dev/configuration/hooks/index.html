@@ -2328,12 +2328,22 @@ the run; it does not fall back to the generated path. <strong>A plan-only run</s
   to the caller. With <code>on_error: open</code>, an
   exception is logged and counts as <code>Allow</code>; a disallowed decision still
   fails, because it is a bug in the hook, not an outage.</li>
-<li><strong>Approval.</strong> <code>NeedsApproval</code> at <code>execute.before</code> stops the SQL with the
-  error <code>NEEDS_APPROVAL</code>. The approval round trip (the request on the result
-  and the approved re-run) is <a href="../../architecture/wave_a/#7-approval">Wave A's H2</a>.</li>
+<li><strong>Approval.</strong> <code>NeedsApproval</code> at <code>execute.before</code> (on the generated or the
+  verified path) ends the run with <code>status: "needs_approval"</code>, the error
+  <code>NEEDS_APPROVAL</code> and an <code>ApprovalRequest</code> per pending sub-query in
+  <code>approvals_needed</code>. Re-running the question as the asker with
+  <code>approvals=[Approval(request=..., by=&lt;the approver&gt;)]</code> pins what was
+  approved and generates the SQL again; the engine accepts the approval
+  only if the request is unedited, the question and the asker are this
+  run's, the hash of the new SQL matches, and the approver holds one of the
+  hook's <code>approver_roles</code> (by default <code>policies.admin_roles</code>). An accepted
+  approval counts as <code>Allow</code> (<code>hook.decision</code> with <code>decision: "approved"</code>
+  and the <code>approver</code>), and the next hook at the point still runs. A hook
+  also sees the run's approvals as <code>ctx.approvals</code>. See
+  <a href="../../api/core/query/#approval">Query API → Approval</a>.</li>
 <li><strong>Timeouts</strong> are the hook's own; the pipeline's <code>timeout_s</code> bounds the run.</li>
 <li><strong>Events.</strong> Every hook asked publishes <code>hook.decision</code> (<code>hook</code>, <code>point</code>,
-  <code>decision</code>, <code>reason</code>, <code>sub_query_id</code>, <code>seconds</code>).</li>
+  <code>decision</code>, <code>reason</code>, <code>sub_query_id</code>, <code>approver</code>, <code>seconds</code>).</li>
 <li><strong>The plan cache keeps the planner's plan</strong>, never a hook's change of it;
   <code>plan.after</code> runs on every cache hit, so a change applies afresh on each
   run and stops the moment the hook config changes.</li>

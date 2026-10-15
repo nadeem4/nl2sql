@@ -2481,10 +2481,11 @@
 <h2 id="responsibilities">Responsibilities</h2>
 <ul>
 <li>Serve a pinned plan from the plan cache on a first attempt, without an LLM call.</li>
+<li>Return a plan the run pins (<code>state.pinned_plan</code>: a supplied, approved or chosen plan) without an LLM call, through <code>after_plan()</code> with <code>plan_source</code> set to its source.</li>
 <li>Serialize <code>relevant_tables</code> into the planning prompt.</li>
 <li>Pass user intent, expected schema, and error feedback to the LLM.</li>
 <li>Run the <code>plan.after</code> hooks on the plan (the planner's or the cached one) in <code>after_plan()</code>, the one place every plan the validator gets passes through.</li>
-<li>Return <code>ASTPlannerResponse</code> with the <code>PlanModel</code> the hooks let through, the planner's own plan (<code>planner_plan</code>, which the plan cache stores) and its <code>plan_source</code> (<code>"llm"</code> or <code>"cache"</code>).</li>
+<li>Return <code>ASTPlannerResponse</code> with the <code>PlanModel</code> the hooks let through, the planner's own plan (<code>planner_plan</code>, which the plan cache stores) and its <code>plan_source</code> (<code>"llm"</code>, <code>"cache"</code>, or <code>"supplied"</code>, <code>"approved"</code> or <code>"chosen"</code> for a pinned plan). Only an <code>"llm"</code> plan is ever cached.</li>
 </ul>
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>
