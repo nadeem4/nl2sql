@@ -176,12 +176,16 @@ class VerifiedSql:
 
     placeholders: Set[str]
     tables: List[Tuple[str, str]]  # (schema or "", table), CTE names excluded
+    # Every column it references, lower-cased: (schema or "", table, column). The table is the one
+    # its qualifier (or the only table read) names, or "" when it cannot be told.
+    columns: Set[Tuple[str, str, str]] = field(default_factory=set)
 
 
 def inspect_verified_sql(sql: str, dialect: str) -> VerifiedSql:
     """Parse ``sql`` in ``dialect`` and check it is exactly one read-only query.
 
-    Returns its ``:name`` placeholders and the tables it reads. Raises
+    Returns its ``:name`` placeholders, the tables it reads and the column
+    names it references (schema drift's impact reads them). Raises
     :class:`CuratedSqlError` otherwise.
     """
     import sqlglot
@@ -216,7 +220,12 @@ def inspect_verified_sql(sql: str, dialect: str) -> VerifiedSql:
     ctes = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
     tables = sorted({(t.db or "", t.name) for t in tree.find_all(exp.Table)
                      if t.name and not (not t.db and t.name.lower() in ctes)})
-    return VerifiedSql(placeholders=placeholders, tables=tables)
+    aliases = {t.alias_or_name.lower(): ((t.db or "").lower(), t.name.lower())
+               for t in tree.find_all(exp.Table) if t.name and not (not t.db and t.name.lower() in ctes)}
+    only = next(iter(aliases.values())) if len(set(aliases.values())) == 1 else ("", "")
+    columns = {(*(aliases.get(c.table.lower(), ("", "")) if c.table else only), c.name.lower())
+               for c in tree.find_all(exp.Column) if c.name}
+    return VerifiedSql(placeholders=placeholders, tables=tables, columns=columns)
 
 
 @dataclass

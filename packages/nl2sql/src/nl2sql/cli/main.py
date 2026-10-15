@@ -143,7 +143,8 @@ def trace_replay(
     replay_command(target, lambda: build_engine(ctx), ctx)
 
 
-index_app = typer.Typer(help="Index schemas and verified queries, one datasource at a time; `nl2sql index prune`.")
+index_app = typer.Typer(help="Index schemas and verified queries, one datasource at a time; `nl2sql index --check` "
+                             "measures schema drift; `nl2sql index prune`.")
 app.add_typer(index_app, name="index")
 
 
@@ -168,12 +169,38 @@ def index(
             "database has none. Spends tokens; off by default."
         ),
     )] = False,
+    check: Annotated[bool, typer.Option(
+        "--check",
+        help=(
+            "Re-index nothing: compare each live database with the schema its index was built from and "
+            "print the drift. Exits 0 when nothing drifted, 1 when something did, 2 when a check failed."
+        ),
+    )] = False,
+    role: Annotated[Optional[List[str]], typer.Option(
+        "--role",
+        help="With --check: a role to check as (repeatable); drift shows only in the tables it may read.",
+    )] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="With --check: print the reports as JSON.")] = False,
 ):
     """
     Index schemas and examples into the index of the configured embedding model, one datasource at a time.
     """
     if ctx.invoked_subcommand is not None:
         return
+    if check:
+        if enrich or curated_only:
+            raise typer.BadParameter("--check re-indexes nothing, so it cannot be combined with --enrich "
+                                     "or --curated-only.")
+        from nl2sql.cli.common.indexing import run_drift_check
+
+        try:
+            engine = build_engine(ctx, check=False)
+        except typer.Exit:
+            raise typer.Exit(2)  # the config did not load: the check could not run
+        with engine:
+            raise typer.Exit(run_drift_check(engine, datasource or None, role or ["admin"], as_json))
+    if role or as_json:
+        raise typer.BadParameter("--role and --json go with --check.")
     if enrich and curated_only:
         raise typer.BadParameter("--enrich and --curated-only cannot be combined.")
     run_indexing(build_engine(ctx), enrich=enrich, datasource_ids=datasource or None, curated_only=curated_only)

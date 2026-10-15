@@ -19,6 +19,9 @@ from .schema import (
     SchemaSnapshot,
     ColumnRef,
     IndexIssue,
+    ColumnChange,
+    ForeignKeyRef,
+    SchemaDiff,
 )
 
 __all__ = [
@@ -46,4 +49,7 @@ __all__ = [
     "SchemaSnapshot",
     "ColumnRef",
     "IndexIssue",
+    "ColumnChange",
+    "ForeignKeyRef",
+    "SchemaDiff",
 ]

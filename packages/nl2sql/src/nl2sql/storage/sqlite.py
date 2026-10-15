@@ -1,7 +1,8 @@
 """The ``sqlite`` state store: ``<storage.path>/state.db``.
 
-Schema snapshots, the plan cache, answer feedback, the migrations that build
-them, and a lock (docs/architecture/phase2.md, section 4).
+Schema snapshots and the diffs between them, the plan cache, answer feedback,
+the migrations that build them, and a lock (docs/architecture/phase2.md,
+section 4; the diffs, docs/architecture/wave_a.md, section 10).
 
 * **Snapshots are immutable.** A row is keyed by ``(datasource_id,
   schema_version)`` and never updated: new content is a new version, and
@@ -33,7 +34,7 @@ from uuid import uuid4
 from nl2sql.common.logger import get_logger
 from nl2sql.schema.fingerprint import generate_schema_fingerprint
 from nl2sql.storage import NoKeys
-from nl2sql_sdk.schema import SchemaContract, SchemaMetadata, SchemaSnapshot
+from nl2sql_sdk.schema import SchemaContract, SchemaDiff, SchemaMetadata, SchemaSnapshot
 
 logger = get_logger(__name__)
 
@@ -109,10 +110,24 @@ def _immutable_snapshots_and_locks(connection: sqlite3.Connection) -> None:
     """)
 
 
+def _schema_diffs(connection: sqlite3.Connection) -> None:
+    """The structural diff that introduced each version, beside its snapshot (D31)."""
+    connection.executescript("""
+        CREATE TABLE IF NOT EXISTS schema_diffs (
+            datasource_id TEXT NOT NULL,
+            schema_version TEXT NOT NULL,
+            diff_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (datasource_id, schema_version)
+        );
+    """)
+
+
 MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0001_adopt_0_5_tables", _adopt_0_5),
     ("0002_feedback_datasources_and_source", _feedback_datasources_and_source),
     ("0003_immutable_snapshots_and_locks", _immutable_snapshots_and_locks),
+    ("0004_schema_diffs", _schema_diffs),
 ]
 
 # -- feedback columns --------------------------------------------------------------
@@ -134,7 +149,7 @@ def _locked(method):
 class SqliteState:
     """The built-in ``StateStore``, on one SQLite file (or ``:memory:``, for tests)."""
 
-    interface_version: ClassVar[int] = 1
+    interface_version: ClassVar[int] = 2
     slot: ClassVar[str] = "state"
     config_model: ClassVar[type] = NoKeys
 
@@ -231,7 +246,7 @@ class SqliteState:
 
     @_locked
     def keep_snapshots(self, datasource_id: str, keep: Set[str]) -> int:
-        """Deletes the datasource's other snapshots, and the cached plans made on them; returns how many."""
+        """Deletes the datasource's other snapshots, and the cached plans and diffs of them; returns how many."""
         gone = [v for v in self.list_versions(datasource_id) if v not in keep]
         if not gone:
             return 0
@@ -242,8 +257,31 @@ class SqliteState:
                 "DELETE FROM schema_snapshots WHERE datasource_id = ? AND schema_version = ?;", pairs)
             connection.executemany(
                 "DELETE FROM plan_cache WHERE datasource_id = ? AND schema_version = ?;", pairs)
+            connection.executemany(
+                "DELETE FROM schema_diffs WHERE datasource_id = ? AND schema_version = ?;", pairs)
         logger.info(f"Deleted {len(gone)} old schema snapshots of {datasource_id}: {', '.join(gone)}")
         return len(gone)
+
+    # -- schema diffs ------------------------------------------------------------
+
+    @_locked
+    def put_schema_diff(self, diff: SchemaDiff) -> None:
+        """Stores the diff that introduced ``diff.to_version``, replacing one stored for it before."""
+        if diff.to_version is None:
+            raise ValueError("A stored schema diff needs a to_version: the version it introduced.")
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO schema_diffs (datasource_id, schema_version, diff_json, created_at) "
+                "VALUES (?, ?, ?, ?);",
+                (diff.datasource_id, diff.to_version, diff.model_dump_json(), int(self.clock())))
+
+    @_locked
+    def get_schema_diff(self, datasource_id: str, schema_version: str) -> Optional[SchemaDiff]:
+        row = self._conn().execute(
+            "SELECT diff_json FROM schema_diffs WHERE datasource_id = ? AND schema_version = ?;",
+            (datasource_id, schema_version)).fetchone()
+        return SchemaDiff.model_validate_json(row[0]) if row else None
 
     # -- the plan cache ----------------------------------------------------------
 

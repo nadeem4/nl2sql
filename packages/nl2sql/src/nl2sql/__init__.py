@@ -16,6 +16,10 @@ from .public_api import NL2SQL
 _EXPORTS = {
     "nl2sql.api.query_api": ("QueryResult", "AnswerSource", "SubQueryResult", "RowSample"),
     "nl2sql.api.types": ("DatasourceInfo", "DatasourceType", "IndexProgress"),
+    # Schema drift (engine.index.check, versions, diff).
+    "nl2sql.schema.drift": ("DriftReport", "SchemaVersionInfo"),
+    "nl2sql.schema.impact": ("DriftImpact",),
+    "nl2sql_sdk.schema": ("SchemaDiff",),
     "nl2sql.llm.llm_set": ("LLMChange",),
     "nl2sql.execution.artifacts.results": ("MAX_RESULT_PAGE_SIZE", "ResultManifest", "ResultNotFound",
                                            "ResultPage", "ResultSummary"),
@@ -118,5 +122,9 @@ __all__ = [
     "DatasourceInfo",
     "DatasourceType",
     "IndexProgress",
+    "DriftReport",
+    "DriftImpact",
+    "SchemaDiff",
+    "SchemaVersionInfo",
     "LLMChange",
 ]

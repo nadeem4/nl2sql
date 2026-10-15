@@ -330,7 +330,7 @@ Every store class has the same four members, whatever its slot:
 
 | Member | Description |
 | :--- | :--- |
-| `interface_version` | `1`. The engine accepts exactly the version it was built for. |
+| `interface_version` | `2`. The engine accepts exactly the version it was built for. Version 2 added `StateStore.put_schema_diff` and `get_schema_diff` (schema drift); the version is one per kind, so a store of any slot declares `2`. |
 | `slot` | `"index"`, `"state"`, `"traces"` or `"results"`: the sub-block it fills. The engine refuses a store in another slot. |
 | `config_model` | A pydantic model for the store's sub-block apart from `type`. Set `extra="forbid"`, so a misspelt key is an error, and hold credentials as `SecretStr`. |
 | `from_config(cfg, *, folder)` | Builds the store from a validated `config_model` instance, after the engine has resolved any `${provider:key}` in it. `folder` is `storage.path`. It should write nothing: `nl2sql config check` builds the stores too. |
@@ -340,7 +340,7 @@ The slots' methods:
 | Interface | Methods |
 | :--- | :--- |
 | `IndexStore` | `open(namespace, dimension)`, `add(namespace, entries)`, `query(namespace, vector, k, where=None, with_vectors=False)`, `get(namespace, where, with_vectors=False)`, `delete(namespace, where)`, `pointers(namespace)`, `set_pointers(namespace, updates)` (atomic), `namespaces()`, `drop(namespace)`, `close()` |
-| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)`, `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `lock(name, ttl_s)`, `close()` |
+| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)` (also deletes the diffs of the snapshots it deletes), `put_schema_diff(diff)` (keyed by `diff.datasource_id` and `diff.to_version`, which it requires; replaces one stored before), `get_schema_diff(datasource_id, schema_version)` (or `None`), `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `lock(name, ttl_s)`, `close()` |
 | `TraceStore` | `write(trace_id, document)`, `get(trace_id)`, `purge(older_than)` |
 | `ResultStore` | `write(key, chunks)`, `open(key)`, `exists(key)`, `purge(older_than)`. Bytes only: the engine writes the Parquet. |
 
@@ -367,7 +367,7 @@ class BucketConfig(BaseModel):
 
 
 class BucketResults:
-    interface_version: ClassVar[int] = 1
+    interface_version: ClassVar[int] = 2
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type[BaseModel]] = BucketConfig
 

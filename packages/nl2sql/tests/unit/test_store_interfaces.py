@@ -31,7 +31,7 @@ class MemoTracesConfig(BaseModel):
 class MemoTraces:
     """A plugin trace store, registered in code."""
 
-    interface_version: ClassVar[int] = 1
+    interface_version: ClassVar[int] = 2
     slot: ClassVar[str] = "traces"
     config_model: ClassVar[type[BaseModel]] = MemoTracesConfig
 
@@ -171,5 +171,19 @@ def test_store_interface_version_is_checked():
         interface_version = 0
 
     registry.add_store("old", Old)
-    with pytest.raises(ValueError, match="store interface 0; this engine needs 1"):
+    with pytest.raises(ValueError, match="store interface 0; this engine needs 2"):
         registry.load("store", "old")
+
+
+def test_store_version_1_is_rejected():
+    """Version 2 added ``put_schema_diff`` and ``get_schema_diff`` to ``StateStore`` (D31): one version per kind."""
+    registry = Registry.empty()
+
+    class Old(MemoTraces):
+        interface_version = 1
+
+    registry.add_store("old", Old)
+    with pytest.raises(ValueError, match="store interface 1; this engine needs 2"):
+        registry.load("store", "old")
+    for name in ("chroma", "sqlite", "files", "local"):
+        assert Registry.default().load("store", name).interface_version == 2

@@ -120,6 +120,7 @@ nav:
     - SQLite: adapters/sqlite.md
   - Schema:
     - Schema Store + Metadata: schema/store.md
+    - Schema Drift: schema/drift.md
   - Execution:
     - Execution Isolation + Concurrency: execution/isolation.md
   - Storage:

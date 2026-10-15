@@ -73,7 +73,7 @@ on the engine's bus directly.
 | `index.column_failed` | `datasource_id`, `table`, `column`, `stage`, `message` | one per issue the adapter reported (a column it could not profile, a table it could not reflect): the issue only, never the column's statistics or sample values. For the `values` and `profile` stages, whose driver message may quote a value, `message` is a fixed sentence and the error's type |
 | `index.swapped` | `datasource_id`, `namespace`, `build_id`, `schema_version`, `replaced_build_id`, `replaced_schema_version`, `counts` (entries by type) | a datasource's new build goes live (audited) |
 | `index.failed` | `datasource_id`, `reason` | one datasource's build fails; its previous build stays live |
-| `schema.drifted` | `datasource_id`, `from_version`, `to_version`, `detected_by`, the diff's `counts` | not yet published (D1) |
+| `schema.drifted` | `datasource_id`, `from_version`, `to_version` (`None` for the live database), `detected_by` (`check` or `build`), the whole diff's `counts`; never a table name | `engine.index.check()` finds the live database differs from its build (once per drift per engine, not on every check), or a build stores a structural diff (audited). See [Schema Drift](../schema/drift.md) |
 | `retention.purged` | `counts`: what `engine.storage.purge()` returned (`traces`, `results`, `audit`) | `engine.storage.purge()` ran (audited) |
 | `llm.changed` | `by`, `changes` (never a key) | `engine.llm.replace` (audited) |
 | `eval.case`, `eval.finished` | see [Evals](../evals/index.md) | `engine.evals.run` |
@@ -92,8 +92,8 @@ once per check, even when the plan names it twice. A scope asked only to filter 
 skips some datasources, the schema retriever, the value check) publishes
 nothing, so the bus is not flooded with tables
 nobody asked for. Every catalogued event is published today except
-`run.limit_reached`, `sanity.flagged` and `schema.drifted`, whose Wave A
-PRs are named in their descriptions. While a
+`run.limit_reached`, whose Wave A
+PR is named in its description. While a
 [hook](../configuration/hooks.md) is attached at `answer.after`, a run
 publishes no `answer.delta` and sends `result.manifest` only after the hooks
 allowed the answer (never, on a deny).

@@ -142,3 +142,75 @@ def run_prune(engine) -> None:
     for name in dropped:
         presenter.print_info(f"Dropped {name}")
     presenter.print_success(f"Pruned {len(dropped)} index namespace(s); kept the current one.")
+
+
+def _change_lines(diff) -> List[str]:
+    """One line per change in a ``SchemaDiff``, for the terminal."""
+    def table(ref) -> str:
+        return f"{ref.schema_name}.{ref.table_name}"
+
+    lines = [f"+ table {table(t)}" for t in diff.tables_added]
+    lines += [f"- table {table(t)}" for t in diff.tables_dropped]
+    lines += [f"+ column {table(c.table)}.{c.column_name}" for c in diff.columns_added]
+    lines += [f"- column {table(c.table)}.{c.column_name}" for c in diff.columns_dropped]
+    lines += [f"~ column {table(c.table)}.{c.column}: "
+              + ", ".join(f"{key} {old} -> {new}" for key, (old, new) in c.changes.items())
+              for c in diff.columns_changed]
+    lines += [f"+ foreign key {table(f.table)}({', '.join(f.columns)}) -> "
+              f"{table(f.referred_table)}({', '.join(f.referred_columns)})" for f in diff.foreign_keys_added]
+    lines += [f"- foreign key {table(f.table)}({', '.join(f.columns)}) -> "
+              f"{table(f.referred_table)}({', '.join(f.referred_columns)})" for f in diff.foreign_keys_dropped]
+    if diff.engine_type:
+        lines.append(f"~ engine type {diff.engine_type[0]} -> {diff.engine_type[1]}")
+    return lines
+
+
+def run_drift_check(engine, datasource_ids: Optional[List[str]], roles: List[str], as_json: bool) -> int:
+    """``nl2sql index --check``: prints each datasource's drift report; returns the exit code.
+
+    0 when nothing drifted, 1 when something did, 2 when a check failed (a
+    failure wins) or nothing was checked (no datasource, or the roles reach
+    none). Never re-indexes. A datasource never indexed is reported and does
+    not change the code.
+    """
+    from nl2sql import UserContext
+
+    presenter = ConsolePresenter()
+    try:
+        reports = engine.index.check(datasource_ids, user_context=UserContext(roles=roles))
+    except ValueError as error:
+        presenter.print_error(str(error))
+        return 2
+    if as_json:
+        import typer
+
+        typer.echo(json.dumps([r.model_dump(mode="json") for r in reports], indent=2))
+    else:
+        for report in reports:
+            version = f" (build {report.live_version})" if report.live_version else ""
+            if report.status == "unchanged":
+                presenter.print_success(f"{report.datasource_id}: unchanged{version}")
+            elif report.status == "not_indexed":
+                presenter.print_warning(f"{report.datasource_id}: not indexed; run `nl2sql index` first")
+            elif report.status == "failed":
+                presenter.print_error(f"{report.datasource_id}: check failed: {report.error}")
+            else:
+                presenter.print_warning(f"{report.datasource_id}: drifted from its build{version}")
+                for line in _change_lines(report.diff):
+                    presenter.console.print(f"    {line}", markup=False, soft_wrap=True)
+                impact = report.impact
+                for query in impact.verified_queries:
+                    presenter.console.print(f"    verified query {query.query_id}: {'; '.join(query.reasons)}",
+                                            markup=False, soft_wrap=True)
+                for rule in impact.policy_rules:
+                    presenter.console.print(f"    role {rule.role}: {rule.kind} '{rule.pattern}' now matches "
+                                            "nothing", markup=False, soft_wrap=True)
+                for name in impact.preferred_tables:
+                    presenter.console.print(f"    preferred table {name} was dropped", markup=False, soft_wrap=True)
+    if not reports:
+        presenter.print_error("Nothing was checked: no datasource is configured, or the role(s) "
+                              f"{', '.join(roles)} reach none. Pass --role with a role that reads them.")
+        return 2
+    if any(r.status == "failed" for r in reports):
+        return 2
+    return 1 if any(r.status == "drifted" for r in reports) else 0

@@ -4,7 +4,7 @@ The schema layer provides **authoritative, versioned snapshots** and **structure
 
 - **Schema contracts**: structural schema (tables, columns, foreign keys).
 - **Schema metadata**: descriptive enrichment and statistics.
-- **The state store**: immutable, versioned snapshots, kept by `storage.state`.
+- **The state store**: immutable, versioned snapshots, and the diffs between them, kept by `storage.state`.
 - **Schema retrieval**: staged lookup via schema chunks.
 
 ## Schema contracts and metadata
@@ -53,11 +53,22 @@ The structural fingerprint (`nl2sql.schema.generate_schema_fingerprint`:
 datasource ID, engine type, sorted tables, columns and foreign keys) is still
 stored beside each row, and eval reports and records use it to identify a database.
 
+### Schema diffs
+
+When a build stores a snapshot whose structure differs from the version it
+replaces, the orchestrator stores the diff between them beside the new
+version (`put_schema_diff(diff)`, keyed by datasource and `diff.to_version`;
+`get_schema_diff(datasource_id, schema_version)` reads it back) and publishes
+`schema.drifted`. A version whose statistics alone changed gets no diff. The
+diff (`nl2sql_sdk.schema.SchemaDiff`) and how to read it are in
+[Schema Drift](drift.md). These two methods are why the store interface is
+version 2.
+
 ### Which snapshots are kept
 
 After each build of a datasource, indexing calls
 `keep_snapshots(datasource_id, keep)`, which deletes every other snapshot of
-the datasource and the plans cached on them. `keep` is:
+the datasource, the plans cached on them and their diffs. `keep` is:
 
 - every version a build pointer names, in **every** index namespace, so
   switching back to an earlier embedding model still finds its snapshot;
@@ -86,7 +97,8 @@ table, and the engine applies the pending ones when it starts
 (`StateStore.migrate()`). Migration 1 creates 0.5's three tables
 (`schema_snapshots`, `plan_cache`, `feedback`) if they are missing, so a 0.5
 `state.db` is adopted as it is; migration 2 adds the feedback columns that
-came later; migration 3 adds the immutability trigger and the `locks` table.
+came later; migration 3 adds the immutability trigger and the `locks` table;
+migration 4 adds the `schema_diffs` table.
 
 ### The lock
 
@@ -123,6 +135,7 @@ See `../architecture/indexing.md` for retrieval stages, chunk types, and vector 
 
 - Contracts and metadata: `packages/sdk/src/nl2sql_sdk/schema.py`
 - Fingerprinting: `packages/nl2sql/src/nl2sql/schema/fingerprint.py`
+- Diffs and drift: `packages/nl2sql/src/nl2sql/schema/diff.py`, `drift.py`, `impact.py`
 - The `StateStore` interface: `packages/sdk/src/nl2sql_sdk/stores.py`
 - The `sqlite` state store: `packages/nl2sql/src/nl2sql/storage/sqlite.py`
 - Which snapshots are kept: `packages/nl2sql/src/nl2sql/indexing/orchestrator.py`

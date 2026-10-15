@@ -1,11 +1,17 @@
-"""``engine.index``: build, check, clear, prune and inspect the vector index."""
+"""``engine.index``: build, clear, prune and inspect the vector index, and measure schema drift."""
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional
 
 from nl2sql.api.types import IndexProgress
+from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
+
+if TYPE_CHECKING:
+    from nl2sql.policies import Scope
+    from nl2sql.schema.drift import DriftReport, SchemaVersionInfo
+    from nl2sql_sdk.schema import SchemaDiff
 
 
 # The entry types the index holds, in the order the inspector lists them.
@@ -80,6 +86,71 @@ class IndexAPI:
         )
         health.warnings.extend(down)
         return health.to_dict()
+
+    def check(self, datasource_ids: Optional[Iterable[str]] = None, *,
+              user_context: UserContext) -> List["DriftReport"]:
+        """Compare each datasource's live database with the snapshot its live build was made from.
+
+        The database is reflected with the datasource's ``index`` scope and no
+        profiling (``profile: catalog``). Equal fingerprints are
+        ``unchanged``; otherwise the report is ``drifted`` with the diff and
+        its impact (verified queries, policy rules and preferred tables it
+        breaks), and ``schema.drifted`` is published on the engine's bus. A
+        datasource with no build is ``not_indexed``; one that could not be
+        read is ``failed`` with the (redacted) error. Nothing is stored and
+        nothing is rebuilt: drift is measured, not acted on.
+
+        ``user_context`` is required. The caller sees drift only in the
+        tables its scope may read, so drift only in denied tables is
+        ``unchanged`` for it, and a datasource it cannot reach is left out
+        (``datasource_ids=None``) or unknown (named).
+
+        Raises:
+            ValueError: a named datasource is not configured, or the caller
+                cannot reach it (the same message, so neither is told apart).
+        """
+        from nl2sql.schema.drift import check
+
+        configured = [d.id for d in self._ctx.config.datasources]
+        if datasource_ids is None:
+            scopes = [(ds, self._ctx.policy_engine.scope(user_context, ds)) for ds in configured]
+            return [check(self._ctx, ds, scope) for ds, scope in scopes if scope.reaches_datasource()]
+        return [check(self._ctx, ds, self._scope(ds, user_context)) for ds in datasource_ids]
+
+    def versions(self, datasource_id: str, *, user_context: UserContext) -> List["SchemaVersionInfo"]:
+        """Each stored schema version of the datasource, newest first.
+
+        ``schema_version``, its structural ``fingerprint``, ``live`` (the live
+        build pointer names it) and ``has_diff`` (a build stored the diff that
+        introduced it, with something in it the caller may read).
+
+        Raises:
+            ValueError: the datasource is not configured or the caller cannot reach it.
+        """
+        from nl2sql.schema.drift import versions
+
+        return versions(self._ctx, datasource_id, self._scope(datasource_id, user_context))
+
+    def diff(self, datasource_id: str, schema_version: Optional[str] = None, *,
+             user_context: UserContext) -> Optional["SchemaDiff"]:
+        """The stored diff that introduced ``schema_version`` (the live one when None), as the caller may see it.
+
+        None for a first build, a version whose structure did not change, or
+        a diff only in tables the caller's scope denies.
+
+        Raises:
+            ValueError: the datasource is not configured or the caller cannot reach it.
+        """
+        from nl2sql.schema.drift import stored_diff
+
+        return stored_diff(self._ctx, datasource_id, schema_version, self._scope(datasource_id, user_context))
+
+    def _scope(self, datasource_id: str, user_context: UserContext) -> "Scope":
+        """The caller's scope in a configured datasource it can reach; otherwise "unknown", whichever it is."""
+        scope = self._ctx.policy_engine.scope(user_context, datasource_id)
+        if datasource_id not in {d.id for d in self._ctx.config.datasources} or not scope.reaches_datasource():
+            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        return scope
 
     def clear(self) -> None:
         """Remove every entry of the configured embedding model's index. Questions need a ``build`` first."""
