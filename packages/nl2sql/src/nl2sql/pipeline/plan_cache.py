@@ -41,8 +41,8 @@ from datetime import date
 from typing import Any, Optional
 
 from nl2sql.common.logger import get_logger
-from nl2sql.common.metrics import plan_cache_counter
 from nl2sql.common.dates import run_date
+from nl2sql.events import publish
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
 
 logger = get_logger("plan_cache")
@@ -114,8 +114,7 @@ class PlanCache:
         except Exception as exc:
             logger.warning("Ignoring an unreadable cached plan: %s", exc)
             plan = None
-        plan_cache_counter.add(1, attributes={"result": "hit" if plan else "miss",
-                                              "datasource_id": str(key[1])})
+        publish("plan_cache.lookup", {"datasource_id": str(key[1]), "hit": plan is not None})
         return plan
 
     def put(self, sub_query: Any, plan: PlanModel) -> bool:

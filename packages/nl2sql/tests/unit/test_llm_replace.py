@@ -184,13 +184,10 @@ def test_invalid_replacement_changes_nothing(make_engine, monkeypatch):
     assert _llms(engine).get_llm("astplanner") is before_client
 
 
-def test_replace_logs_old_and_new_models_without_keys(make_engine, monkeypatch, caplog):
-    from nl2sql.common.event_logger import event_logger
-
+def test_replace_logs_old_and_new_models_without_keys(make_engine, caplog):
     engine = make_engine()
     records = []
-    monkeypatch.setattr(event_logger, "log_event",
-                        lambda event_type, payload, **kw: records.append((event_type, payload)))
+    engine.events.subscribe(lambda event: records.append((event.name, event.data)), names=["llm.changed"])
 
     with caplog.at_level(logging.INFO, logger="nl2sql.llm"):
         change = engine.llm.replace(

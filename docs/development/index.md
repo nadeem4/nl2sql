@@ -25,7 +25,7 @@ entry point group, and the built-ins are declared in
 | `secrets` | `nl2sql.secrets` | `nl2sql_sdk.SecretProvider` | `env`, `aws`, `azure`, `hashicorp` |
 | `store` | `nl2sql.stores` | `nl2sql_sdk.stores` (four interfaces, one per slot) | `chroma`, `sqlite`, `files`, `local` |
 | `policy_check` | `nl2sql.policy_checks` | `nl2sql_sdk.policy.PolicyCheck` | none |
-| `observer` | `nl2sql.observers` | `nl2sql_sdk.events.Observer` (version 1) | none yet; `log`, `audit` and `otel` arrive with release 0.7 |
+| `observer` | `nl2sql.observers` | `nl2sql_sdk.events.Observer` (version 1) | `log`, `audit`, `otel` (the `otel` extra); see [Observers](../configuration/observers.md) |
 | `hook` | `nl2sql.hooks` | `nl2sql.hooks.Hook` (version 1, from release 0.7) | none |
 | `scorer` | `nl2sql.scorers` | `nl2sql.evaluation.scorers.Scorer` (version 1, from release 0.7; see [Scorers](../evals/scorers.md)) | `result_match`, `outcome`, `retrieval_recall`, `faithfulness`, `routing` |
 

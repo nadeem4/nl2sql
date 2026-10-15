@@ -4,7 +4,7 @@
     This page is the design for Wave A of the product redesign, which ships
     as release 0.7. Each pull request in
     [the PR plan](#16-pr-plan) adds a "Built" note to the sections it builds,
-    as Phase 1 and Phase 2 did; A0, the foundation, E1 and V1 are built. Phase 1 is
+    as Phase 1 and Phase 2 did; A0 (the foundation), E1, H1, V1 and E2 are built. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
     SDK v2](phase2.md). Wave A is what those pages called "Phase 3", plus
@@ -490,6 +490,54 @@ dependencies to the `otel` extra. Only `nl2sql/observers/otel.py` imports
 them, and only when the observer is built. `common/metrics.py` is deleted:
 `plan_cache.py` and `token_handler.py` publish events instead of adding to
 counters.
+
+!!! note "Built: the observers (E2)"
+    `nl2sql/observers/` holds `build_observers` (`__init__.py`, with
+    `DEFAULT_OBSERVERS`, `log` then `audit`), `log.py` (`LogObserver`,
+    `LogConfig`), `audit.py` (`AuditObserver`, `AuditConfig`) and `otel.py`
+    (`OtelObserver`, `OtelConfig`), declared in the `nl2sql.observers` entry
+    point group. `Runtime.components` builds them after every other
+    component (a problem is one more line of the one `ConfigError`, and a
+    built observer is closed again), keeps them as `Runtime.observers` and
+    subscribes them to `Runtime.bus` in config order; `engine.close()` closes
+    them through the bus. The registry checks an observer's `requires` like
+    an LLM provider's, so `otel` without the extra is a `ConfigError` ending
+    in `pip install "nl2sql-engine[otel]"`. **What is audited is the
+    catalog's:** `EventSpec.audit`, and a new `EventSpec.audit_only` (a field
+    name to the values written; `hook.decision`'s is `decision`: `deny`,
+    `needs_approval`, `approved`, `error`), applied by `EventSpec.audited(data)`
+    and reported in `EventInfo.audit_only`. The observer reads the audited
+    names from the catalog when it is built, so Wave C's
+    `datasource.saved`, `api_key.created`, `api_key.revoked` and `mcp.denied`
+    join the log with `audit=True` on their own entries. `run.failed` gained
+    `user_id` and `roles` (two lines in `RunScope.fail`), so a failed run's
+    line names its user too. The audit observer queues each line and writes
+    on its own daemon thread, started by the first audited event, opening
+    and closing the day file per batch. Its queue is bounded (`MAX_QUEUE`,
+    10,000): a line that does not fit is dropped, counted in `dropped` and
+    warned about once. `close` writes what is queued, and what arrived while
+    it closed; an `atexit` hook (through a weak reference, unregistered by
+    `close`) does the same for a process that never closes its engine.
+    `RunScope.fail` passes `message` through `redact_keys` (D15).
+    `engine.storage.purge()` adds `audit` (day files older than
+    `max_age_days`) when the engine runs an audit observer. `otel` records in
+    memory on its own `MeterProvider` and `TracerProvider` (a
+    `BatchSpanProcessor`, a `PeriodicExportingMetricReader`) and never sets
+    the global ones, and `close` bounds the providers' flush at 5 seconds;
+    `nl2sql.token.usage` lost its `datasource_id` attribute,
+    which `llm.call` does not carry. `TokenUsageCallback` publishes `llm.call`
+    per finished call through `nl2sql.events.publish` (with the client's
+    `nl2sql_agent` metadata as `agent`), `PlanCache.get` publishes
+    `plan_cache.lookup`, and `Runtime.replace_llm` publishes `llm.changed` on
+    `ctx.bus` with the engine's `tenant_id`; `common/metrics.py` and
+    `common/event_logger.py` are deleted, and opentelemetry is the `otel`
+    extra (CI's unit and integration jobs install it). One test differs
+    from the plan: `test_building_an_engine_loads_no_opentelemetry` cannot
+    hold, because chromadb (a core dependency) installs the OpenTelemetry
+    SDK and langsmith, under langchain, imports it whenever it is installed;
+    `test_building_an_engine_loads_no_otel_observer` checks what the engine
+    controls, beside the two AST tests on `nl2sql/observers/otel.py`. The
+    page is [Observers](../configuration/observers.md).
 
 ### The run collectors
 
@@ -1506,7 +1554,9 @@ decorators. Knowledge sources stay for Wave B.
 !!! note "Built: the three kinds (A0)"
     `observer`, `hook` and `scorer` are in `nl2sql/registry.py` (`GROUPS`,
     `INTERFACE_VERSIONS` at 1, `add_*` and the decorators). No built-in is
-    declared yet: E2 adds the observers and V1 the scorers.
+    declared yet: E2 adds the observers and V1 the scorers. E2 declared
+    `log`, `audit` and `otel` and made the registry check an observer's
+    `requires`.
 
 !!! note "Built: the five scorers (V1)"
     `result_match`, `outcome`, `faithfulness`, `retrieval_recall` and

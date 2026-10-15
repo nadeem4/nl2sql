@@ -644,6 +644,46 @@ def test_importing_nl2sql_loads_no_heavy_library(statement):
         f"not at module scope on the import path of nl2sql. The rule is in {RULES}.")
 
 
+OTEL_OBSERVER = ENGINE / "observers" / "otel.py"
+
+
+def test_only_the_otel_observer_imports_opentelemetry():
+    """OpenTelemetry is the ``otel`` extra (wave_a.md, D18): one observer among any."""
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(*SOURCES) if path != OTEL_OBSERVER
+                 for lineno, name, _ in imports(path)
+                 if name.partition(".")[0] == "opentelemetry"]
+    assert not offenders, _broke(
+        "Only nl2sql/observers/otel.py imports opentelemetry. It is the otel extra, not a "
+        "dependency of the engine: metrics and spans come from the event bus through the otel "
+        "observer, so an engine without it never loads the library.", offenders)
+
+
+def test_the_otel_observer_imports_opentelemetry_only_when_it_is_built():
+    at_module_scope = [f"{_where(OTEL_OBSERVER)}:{lineno} {name}"
+                       for lineno, name, module_scope in imports(OTEL_OBSERVER)
+                       if module_scope and name.partition(".")[0] == "opentelemetry"]
+    assert not at_module_scope, _broke(
+        "nl2sql/observers/otel.py imports opentelemetry inside the observer, not at module scope: "
+        "the registry imports the module to check its interface and install hint before the "
+        "extra is known to be installed.", at_module_scope)
+
+
+def test_building_an_engine_loads_no_otel_observer(tmp_path):
+    """The default observers are log and audit; the otel observer is loaded only when configured.
+
+    Not "loads no opentelemetry": chromadb, a core dependency, installs the
+    OpenTelemetry SDK, and langsmith (under langchain) imports it whenever it
+    is installed. What the engine controls is that none of its own code does.
+    """
+    code = ("import sys, pathlib; from nl2sql import NL2SQL; from nl2sql.testing.config import make_config; "
+            f"engine = NL2SQL(make_config(pathlib.Path({str(tmp_path)!r}))); "
+            "print(sorted(type(o).__name__ for o in engine._runtime.observers), "
+            "'nl2sql.observers.otel' in sys.modules); engine.close()")
+    assert _run(code) == "['AuditObserver', 'LogObserver'] False", (
+        f"Building an engine without an otel observer loaded nl2sql.observers.otel. The rule is in {RULES}.")
+
+
 def _import_us(module: str) -> int:
     """The cumulative microseconds ``python -X importtime`` reports for ``module``."""
     out = subprocess.run([sys.executable, "-X", "importtime", "-c", f"import {module}"],

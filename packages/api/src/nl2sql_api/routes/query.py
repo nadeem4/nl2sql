@@ -86,7 +86,7 @@ def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller)
     `answer.delta` (`field`: `summary` or `content`, `text`) as the answer model
     writes; `sanity.flagged` and `run.limit_reached`; then exactly one of
     `run.finished`, the run's summary whose `data.result` is the `/query`
-    response, or `run.failed` (`message`, `error_code`) when the run could not
+    response, or `run.failed` (`message`, `error_code`, and the engine's `user_id` and `roles`) when the run could not
     finish. A refusal or a provider error is a `run.finished` with
     `status: "error"`, as `/query` returns it. Same body and auth as `/query`;
     closing the connection cancels the run before its next step.

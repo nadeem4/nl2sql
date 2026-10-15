@@ -1,7 +1,6 @@
 """Per-LLM-call token and latency telemetry, rolled up per node and per question."""
 
 import uuid
-from unittest.mock import patch
 
 import pytest
 
@@ -220,17 +219,56 @@ def test_an_openai_cache_write_costs_the_input_rate():
     assert call.cost == pytest.approx(1.5 + 0.5)
 
 
-def test_emits_the_otel_token_counter_per_token_type():
+def test_llm_call_is_published_per_call():
+    from nl2sql.events import EventBus, RunScope
+
+    bus = EventBus()
+    seen = []
+    bus.subscribe(seen.append, names=["llm.call"])
+    scope = RunScope(bus, question="q")
+    cb = TokenUsageCallback()
+    with scope.entered():
+        for _ in range(2):
+            run = uuid.uuid4()
+            cb.on_chat_model_start({"name": "ChatOpenAI"}, [[]], run_id=run,
+                                   metadata={"langgraph_node": "ast_planner", "ls_model_name": "gpt-4o",
+                                             "nl2sql_agent": "ast_planner"})
+            cb.on_llm_end(_chat_result(OPENAI_USAGE), run_id=run)
+
+    assert len(seen) == 2
+    event = seen[0]
+    assert event.trace_id == scope.trace_id
+    assert event.data["node"] == "ast_planner" and event.data["agent"] == "ast_planner"
+    assert event.data["model"] == "gpt-4o-2024-08-06"
+    assert (event.data["input_tokens"], event.data["cached_input_tokens"], event.data["output_tokens"],
+            event.data["reasoning_tokens"], event.data["total_tokens"]) == (11000, 7680, 300, 128, 11300)
+    assert event.data["usage_reported"] is True and event.data["cost"] is None
+
+
+def test_a_failed_call_is_published_with_its_error_redacted():
+    from nl2sql.events import EventBus, RunScope
+
+    bus = EventBus()
+    seen = []
+    bus.subscribe(seen.append, names=["llm.call"])
+    scope = RunScope(bus, question="q")
+    cb = TokenUsageCallback()
+    run = uuid.uuid4()
+    with scope.entered():
+        _start(cb, "decomposer", run)
+        cb.on_llm_error(RuntimeError("bad key sk-abcdefghijklmnopqrstuvwxyz0123"), run_id=run)
+
+    [event] = seen
+    assert event.data["usage_reported"] is False and event.data["error"]
+    assert "sk-abcdefghijklmnopqrstuvwxyz0123" not in event.data["error"]
+
+
+def test_outside_a_run_no_event_is_published():
     cb = TokenUsageCallback()
     run = uuid.uuid4()
     _start(cb, "ast_planner", run)
-    with patch("nl2sql.services.callbacks.token_handler.token_usage_counter") as counter:
-        cb.on_llm_end(_chat_result(OPENAI_USAGE), run_id=run)
-    recorded = {c.kwargs["attributes"]["type"]: c.args[0] for c in counter.add.call_args_list}
-    assert recorded == {"input": 11000, "cached_input": 7680, "cache_write_input": 0,
-                        "output": 300, "reasoning": 128, "total": 11300}
-    attrs = counter.add.call_args_list[0].kwargs["attributes"]
-    assert attrs["node"] == "ast_planner" and attrs["model"] == "gpt-4o-2024-08-06"
+    cb.on_llm_end(_chat_result(OPENAI_USAGE), run_id=run)
+    assert len(cb.usage().calls) == 1
 
 
 def test_prices_are_read_from_llm_prices():

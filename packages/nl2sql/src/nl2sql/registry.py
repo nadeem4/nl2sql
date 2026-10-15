@@ -51,7 +51,8 @@ _LABELS: Dict[str, str] = {
 }
 
 # The attribute naming the modules a kind needs before it can be built.
-_REQUIRES: Dict[str, str] = {"adapter": "driver_modules", "llm": "requires", "embeddings": "requires"}
+_REQUIRES: Dict[str, str] = {"adapter": "driver_modules", "llm": "requires", "embeddings": "requires",
+                             "observer": "requires"}
 
 # One installed entry point: (name, "module:attr", the package that declares it).
 _Entry = Tuple[str, str, str]

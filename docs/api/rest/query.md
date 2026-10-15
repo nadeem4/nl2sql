@@ -212,7 +212,7 @@ routes), `tenant_id` and `data`. The table lists each event's `data`:
 | `answer.delta` | `field`, `text` | The next piece of the answer's `summary` or `content`, as the answer model writes it. Joined in order, the pieces of a field are that field of `final_answer`. |
 | `sanity.flagged`, `run.limit_reached` | see [Events](../../observability/events.md) | A sanity check's finding; a cost or call cap reached. |
 | `run.finished` | the run's summary, plus `result`: the `QueryResponse` | The last event of a run that finished: `result` is exactly what `/query` returns for it. A refusal or a provider failure is a `run.finished` with `status: "error"`, as `/query` returns it. |
-| `run.failed` | `message`, `error_code` | The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server). |
+| `run.failed` | `message` (a key in it is redacted), `error_code`; and `user_id`, `roles` when the engine ended the run | The last event of a run that could not finish (an unexpected failure; the traceback is logged on the server). |
 
 Every stream ends in exactly one `run.finished` or one `run.failed`. Policy
 denials, hook decisions and model calls are never on it; they are an

@@ -104,6 +104,7 @@ nav:
     - Secrets: configuration/secrets.md
     - Curated Answers: configuration/curated.md
     - Settings: configuration/settings.md
+    - Observers: configuration/observers.md
     - REST API settings: configuration/api.md
   - Adapters:
     - Overview: adapters/index.md

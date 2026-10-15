@@ -131,11 +131,12 @@ reads a secret from the provider whose `id` is `vault` (see
 ### Observers, hooks and evals
 
 Three sections added in release 0.7 ([Wave A](../architecture/wave_a.md)).
-They are accepted and validated now; the engine runs the hooks, and reads
-the other two from the Wave A change named below.
+They are accepted and validated now; the engine runs the hooks and the
+observers, and reads evals from the Wave A change named below. The observers
+are documented on their own page, [Observers](observers.md).
 
 ```yaml
-# observers.yaml: where the engine's events go (read from E2)
+# observers.yaml: where the engine's events go
 - type: log
   level: INFO
 - type: audit

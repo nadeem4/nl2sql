@@ -203,8 +203,9 @@ another trace format.
 `engine.storage.info()` returns each store slot's `type` and `location` (and
 `max_age_days` for the traces and results stores that have it) and the current
 index `namespace`. `engine.storage.purge()` deletes the traces and results
-older than their store's `max_age_days` and returns the counts,
-`{"traces": 3, "results": 12}`. See
+older than their store's `max_age_days`, and the audit observer's day files
+older than its own, and returns the counts,
+`{"traces": 3, "results": 12, "audit": 1}`. See
 [Storage → Retention](../../configuration/storage.md#retention).
 
 `engine.traces.replay(trace)` re-runs a recorded question, answering every LLM

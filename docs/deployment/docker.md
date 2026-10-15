@@ -62,9 +62,12 @@ through a published port does not come from loopback. See
 - Schema indexing is not automatic; you must run indexing in your operational
   flow: `nl2sql --config /etc/nl2sql/nl2sql.yaml index` against the same
   storage, or `POST /api/v1/index-all` (admin role).
-- Observability exporters require network access. From release 0.7 they
-  are observers in the config's `observers` section (an `otel` observer with
-  its `endpoint`); `NL2SQL_LOG_FORMAT=json` gives JSON log lines.
+- Observability exporters require network access. They are observers in the
+  config's `observers` section: an `otel` observer with its `endpoint` (the
+  API image installs the `otel` extra; see
+  [Observers](../configuration/observers.md#otel)). `NL2SQL_LOG_FORMAT=json`
+  gives JSON log lines. The `audit` observer writes under `storage.path`, so
+  mount that volume to keep the audit log.
 
 ## Reference configuration
 

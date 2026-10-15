@@ -39,8 +39,10 @@ files (`results/`). Mount one persistent volume and point `storage.path` at it
   loopback, so without them the admin routes answer HTTP 403. See
   [Admin routes](../api/rest/index.md#admin-routes).
 - Configure observability exporters as observers in the `observers` section
-  (from release 0.7, an `otel` observer with its `endpoint`), and set
-  `NL2SQL_LOG_FORMAT=json` for JSON log lines.
+  (an `otel` observer with its `endpoint`, with `nl2sql-engine[otel]`
+  installed; see [Observers](../configuration/observers.md#otel)), and set
+  `NL2SQL_LOG_FORMAT=json` for JSON log lines. The audit log is under
+  `storage.path/audit/`, on the same volume as the engine's other data.
 
 ## Reference configuration
 

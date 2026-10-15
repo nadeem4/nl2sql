@@ -27,7 +27,7 @@ COPY ./packages/api /app/packages/api
 RUN pip install --no-cache-dir -U pip setuptools wheel \
     && pip install --no-cache-dir \
         ./packages/sdk \
-        "./packages/nl2sql[postgres,mysql]" \
+        "./packages/nl2sql[postgres,mysql,otel]" \
         ./packages/api
 
 EXPOSE 8000

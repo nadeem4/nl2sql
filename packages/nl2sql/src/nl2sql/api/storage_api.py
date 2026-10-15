@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
+from nl2sql.observers.audit import AuditObserver
 from nl2sql.runtime import Runtime
 
 # The slots retention applies to. Feedback and schema snapshots have no age limit.
@@ -41,11 +42,13 @@ class StorageAPI:
         return info
 
     def purge(self) -> Dict[str, int]:
-        """Delete the traces and results older than their store's ``max_age_days``; return the counts.
+        """Delete the traces, results and audit files older than their ``max_age_days``; return the counts.
 
-        ``{"traces": 3, "results": 12}``: traces deleted, and result files
-        deleted (a run has its manifest and one file per saved result). A
-        store with no ``max_age_days`` keeps everything and is left out.
+        ``{"traces": 3, "results": 12, "audit": 1}``: traces deleted, result
+        files deleted (a run has its manifest and one file per saved result),
+        and the audit observer's day files deleted. A store with no
+        ``max_age_days`` keeps everything and is left out, and so is
+        ``audit`` when the engine runs no ``audit`` observer.
         ``nl2sql storage purge`` calls this, and ``nl2sql-api`` calls it at
         startup and once a day.
         """
@@ -56,4 +59,7 @@ class StorageAPI:
             days = getattr(store, "max_age_days", None)
             if days is not None:
                 counts[slot] = store.purge(now - timedelta(days=days))
+        audits = [o for o in getattr(self._ctx, "observers", ()) if isinstance(o, AuditObserver)]
+        if audits:
+            counts["audit"] = sum(audit.purge(now) for audit in audits)
         return counts
