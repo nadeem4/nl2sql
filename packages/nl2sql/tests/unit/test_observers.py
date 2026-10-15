@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -60,6 +60,11 @@ def make_engine(tmp_path: Path):
     yield build
     for engine in engines:
         engine.close()
+
+
+def _utc_today():
+    """The audit log names its files by the UTC date, not the local one."""
+    return datetime.now(timezone.utc).date()
 
 
 def _audit_lines(folder: Path):
@@ -199,8 +204,8 @@ def test_audit_writes_under_storage_path(make_engine):
     assert line["name"] == "llm.changed"
     assert line["data"]["by"] == {"user_id": "ada", "roles": ["analyst"], "via": "api"}
     assert line["data"]["changes"]["default"] == {"old": "fake/m1", "new": "fake/m2"}
-    assert [p.name for p in (folder / "audit").iterdir()] == [f"{date.today().isoformat()}.jsonl"]
-    assert SECRET not in (folder / "audit" / f"{date.today().isoformat()}.jsonl").read_text(encoding="utf-8")
+    assert [p.name for p in (folder / "audit").iterdir()] == [f"{_utc_today().isoformat()}.jsonl"]
+    assert SECRET not in (folder / "audit" / f"{_utc_today().isoformat()}.jsonl").read_text(encoding="utf-8")
 
 
 def test_audit_writes_one_summary_per_run(tmp_path):
@@ -290,8 +295,8 @@ def test_purge_deletes_old_audit_files(make_engine):
     engine = make_engine(observers=[{"type": "audit", "max_age_days": 30}])
     folder = engine.config.storage.path / "audit"
     folder.mkdir(parents=True)
-    old = folder / f"{(date.today() - timedelta(days=31)).isoformat()}.jsonl"
-    kept = folder / f"{(date.today() - timedelta(days=29)).isoformat()}.jsonl"
+    old = folder / f"{(_utc_today() - timedelta(days=31)).isoformat()}.jsonl"
+    kept = folder / f"{(_utc_today() - timedelta(days=29)).isoformat()}.jsonl"
     for path in (old, kept):
         path.write_text("{}\n", encoding="utf-8")
 
@@ -353,3 +358,87 @@ def test_plan_cache_lookup_is_published_in_the_run():
 
 def test_observer_config_is_exported():
     assert ObserverConfig(type="log").type == "log"
+
+
+# ---------------------------------------------------------------- audit: durability and bounds
+
+def test_audit_files_are_named_by_the_utc_date(tmp_path):
+    from nl2sql_sdk.events import Event
+
+    audit = AuditObserver(tmp_path)
+    late_evening = datetime.fromisoformat("2026-01-01T23:30:00-05:00")
+    audit.on_event(Event(name="llm.changed", at=late_evening, data={"by": {}, "changes": {}}))
+    audit.close()
+    assert [p.name for p in tmp_path.iterdir()] == ["2026-01-02.jsonl"]
+
+
+def test_audit_lines_are_written_when_the_process_exits_without_close(tmp_path):
+    """A script or notebook that never closes its engine still keeps its audit trail."""
+    import subprocess
+    import sys
+
+    code = ("from nl2sql.events import EventBus; from nl2sql.observers.audit import AuditObserver; "
+            f"bus = EventBus(); bus.subscribe(AuditObserver({str(tmp_path)!r})); "
+            "[bus.publish('llm.changed', {'by': {'via': 'python'}, 'changes': {}}) for _ in range(50)]")
+    subprocess.run([sys.executable, "-c", code], check=True, timeout=60)
+    lines = [line for path in tmp_path.glob("*.jsonl") for line in path.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == 50
+
+
+def test_close_unregisters_the_exit_hook(tmp_path, monkeypatch):
+    import atexit
+
+    registered, unregistered = [], []
+    monkeypatch.setattr(atexit, "register", lambda fn, *a, **k: registered.append(fn) or fn)
+    monkeypatch.setattr(atexit, "unregister", lambda fn: unregistered.append(fn))
+    audit = AuditObserver(tmp_path)
+    audit.on_event(_changed())
+    audit.close()
+    assert registered and unregistered == registered
+
+
+def _changed():
+    from nl2sql_sdk.events import Event
+
+    return Event(name="llm.changed", at=datetime.now(timezone.utc), data={"by": {}, "changes": {}})
+
+
+def test_an_event_queued_while_closing_is_still_written(tmp_path):
+    """close() writes what is left after its writer stops, and what came before a writer started."""
+    audit = AuditObserver(tmp_path)
+    audit._queue.put((_utc_today().isoformat(), _changed().model_dump_json()))  # queued, no writer yet
+    audit.close()
+    lines = [line for path in tmp_path.glob("*.jsonl") for line in path.read_text(encoding="utf-8").splitlines()]
+    assert len(lines) == 1
+
+
+def test_a_full_audit_queue_drops_and_warns_once(tmp_path, monkeypatch, caplog):
+    import threading
+
+    audit = AuditObserver(tmp_path, max_queue=2)
+    gate = threading.Event()
+    real = audit._write
+    monkeypatch.setattr(audit, "_write", lambda batch: (gate.wait(5), real(batch)))
+    with caplog.at_level(logging.WARNING, logger="nl2sql.events"):
+        for _ in range(10):
+            audit.on_event(_changed())  # never blocks, even with the writer stuck
+    assert audit.dropped >= 7
+    assert len([r for r in caplog.records if "dropped" in r.getMessage()]) == 1
+    gate.set()
+    audit.close()
+
+
+def test_run_failed_redacts_a_key_in_the_message(tmp_path):
+    """D15: a provider error that quotes a key never reaches the bus, the stream or the audit log."""
+    bus = EventBus()
+    audit = AuditObserver(tmp_path)
+    bus.subscribe(audit)
+    scope = RunScope(bus, question="q", user_context=_USER)
+    scope.start()
+    event = scope.fail("The run failed: invalid key sk-abcdefghijklmnopqrstuvwxyz0123")
+    audit.close()
+
+    assert "sk-abcdefghijklmnopqrstuvwxyz0123" not in event.data["message"]
+    assert "[redacted key]" in event.data["message"]
+    text = "".join(p.read_text(encoding="utf-8") for p in tmp_path.glob("*.jsonl"))
+    assert "[redacted key]" in text and "sk-abcdefghijklmnopqrstuvwxyz0123" not in text

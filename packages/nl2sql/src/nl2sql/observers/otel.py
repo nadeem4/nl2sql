@@ -28,6 +28,8 @@ from pydantic import BaseModel, ConfigDict
 
 from nl2sql_sdk.events import Event
 
+SHUTDOWN_TIMEOUT_MS = 5000
+
 _TOKEN_TYPES = (("input", "input_tokens"), ("cached_input", "cached_input_tokens"),
                 ("cache_write_input", "cache_write_input_tokens"), ("output", "output_tokens"),
                 ("reasoning", "reasoning_tokens"), ("total", "total_tokens"))
@@ -189,7 +191,13 @@ class OtelObserver:
                 run.end(end_time=_ns(event))
 
     def close(self) -> None:
-        """Flush and shut down the observer's own providers."""
-        for provider in (self._tracer_provider, self._meter_provider):
-            if provider is not None:
-                provider.shutdown()
+        """Flush and shut down the observer's own providers, each within ``SHUTDOWN_TIMEOUT_MS``.
+
+        With the collector down the exporters would retry for longer; the
+        bound keeps ``engine.close()`` quick, at the cost of what was not sent.
+        """
+        if self._tracer_provider is not None:
+            self._tracer_provider.force_flush(SHUTDOWN_TIMEOUT_MS)
+            self._tracer_provider.shutdown()
+        if self._meter_provider is not None:
+            self._meter_provider.shutdown(timeout_millis=SHUTDOWN_TIMEOUT_MS)

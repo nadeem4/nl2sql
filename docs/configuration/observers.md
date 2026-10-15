@@ -78,6 +78,12 @@ line is the event as JSON: `name`, `at`, `trace_id`, `tenant_id` and `data`.
 | `llm.changed` | `engine.llm.replace`: who, and each agent's old and new provider and model; never a key |
 | `index.swapped`, `schema.drifted`, `retention.purged` | Changes to the index and to what is kept |
 
+The lines are written on the observer's own thread. Its queue holds up to
+10,000 lines: when the disk cannot keep up, a line is dropped rather than
+holding a run, counted in `AuditObserver.dropped`, and warned about once.
+`engine.close()` writes what is queued, and so does the process's exit when
+nothing closed the engine (a script or a notebook).
+
 The list is the [event catalog's](../observability/events.md#the-catalog):
 an event is audited when its catalog entry says so (`EventInfo.audit`), and
 `audit_only` narrows it to some values of a field (`hook.decision`'s
@@ -113,7 +119,9 @@ step, `nl2sql.node.<node>`, with `nl2sql.node` and `nl2sql.sub_query_id`.
 
 The observer makes its own `MeterProvider` and `TracerProvider` and never sets
 OpenTelemetry's process-wide ones, so two engines in one process can export to
-two collectors.
+two collectors. `engine.close()` gives each provider 5 seconds to flush, so a
+collector that is down does not hold the shutdown longer; what was not sent by
+then is dropped.
 
 | Key | Default | Meaning |
 | --- | --- | --- |

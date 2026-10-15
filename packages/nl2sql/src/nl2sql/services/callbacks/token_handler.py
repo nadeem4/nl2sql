@@ -220,7 +220,7 @@ class TokenUsageCallback(BaseCallbackHandler):
         with self._lock:
             self._calls.append(call)
             self._by_run[run_id] = call
-        # On the run's bus: the audit trail of model calls, and the otel observer's token counter.
+        # On the run's bus, for subscribers and the otel observer's token counter (not audited).
         publish("llm.call", {**call.model_dump(), "agent": agent})
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> None:

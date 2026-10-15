@@ -11,14 +11,20 @@ without a line per table. Then the denials, approvals, limits and changes.
 
 ``on_event`` never blocks: it queues the line, and a thread of the
 observer's own writes it, since the bus delivers a run's events under the
-run's lock. ``close`` writes what is queued. ``engine.storage.purge()``
-deletes the files older than ``max_age_days``.
+run's lock. The queue is bounded: when the writer cannot keep up (a stalled
+disk), a line is dropped, counted in ``dropped`` and warned about once,
+rather than holding a run or growing without limit. ``close`` writes what is
+queued, and so does the process's exit when no one called it (an ``atexit``
+hook, through a weak reference). ``engine.storage.purge()`` deletes the files
+older than ``max_age_days``.
 """
 from __future__ import annotations
 
+import atexit
 import logging
 import queue
 import threading
+import weakref
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import ClassVar, FrozenSet, List, Optional, Tuple
@@ -32,6 +38,13 @@ logger = logging.getLogger("nl2sql.events")
 
 _STOP = None
 _FLUSH_TIMEOUT_S = 10
+MAX_QUEUE = 10_000  # lines waiting for the writer; more are dropped and counted
+
+
+def _close_at_exit(ref: "weakref.ref[AuditObserver]") -> None:
+    observer = ref()
+    if observer is not None:
+        observer.close()
 
 
 class AuditConfig(BaseModel):
@@ -47,14 +60,16 @@ class AuditObserver:
     config_model: ClassVar[type[BaseModel]] = AuditConfig
     events: Optional[FrozenSet[str]]
 
-    def __init__(self, directory: Path, *, max_age_days: int = 90) -> None:
+    def __init__(self, directory: Path, *, max_age_days: int = 90, max_queue: int = MAX_QUEUE) -> None:
         # The catalog's audited events, read when the observer is built.
         self.events = frozenset(name for name, spec in CATALOG.items() if spec.audit)
         self.directory = Path(directory)
         self.max_age_days = max_age_days
-        self._queue: "queue.SimpleQueue[Optional[Tuple[str, str]]]" = queue.SimpleQueue()
+        self.dropped = 0
+        self._queue: "queue.Queue[Optional[Tuple[str, str]]]" = queue.Queue(maxsize=max_queue)
         self._lock = threading.Lock()
         self._writer: Optional[threading.Thread] = None
+        self._exit_hook = None
         self._closed = False
 
     @classmethod
@@ -63,14 +78,25 @@ class AuditObserver:
 
     def on_event(self, event: Event) -> None:
         spec = CATALOG.get(event.name)
-        if spec is None or not spec.audited(event.data) or self._closed:
+        if spec is None or not spec.audited(event.data):
             return
-        self._queue.put((event.at.astimezone(timezone.utc).date().isoformat(), event.model_dump_json()))
-        if self._writer is None:
-            with self._lock:
-                if self._writer is None and not self._closed:
-                    self._writer = threading.Thread(target=self._drain, name="nl2sql-audit", daemon=True)
-                    self._writer.start()
+        line = (event.at.astimezone(timezone.utc).date().isoformat(), event.model_dump_json())
+        with self._lock:
+            if self._closed:
+                return
+            try:
+                self._queue.put_nowait(line)
+            except queue.Full:
+                self.dropped += 1
+                if self.dropped == 1:
+                    logger.warning("The audit observer's queue is full (the disk is not keeping up): audit "
+                                   "lines are dropped and counted in AuditObserver.dropped.")
+                return
+            if self._writer is None:
+                self._writer = threading.Thread(target=self._drain, name="nl2sql-audit", daemon=True)
+                self._writer.start()
+                # A process that exits without closing the engine still writes what is queued.
+                self._exit_hook = atexit.register(_close_at_exit, weakref.ref(self))
 
     def _drain(self) -> None:
         while True:
@@ -127,8 +153,30 @@ class AuditObserver:
         with self._lock:
             if self._closed:
                 return
-            self._closed = True
-            writer = self._writer
+            self._closed = True  # under the lock: no line is queued after this
+            writer, hook = self._writer, self._exit_hook
+        if hook is not None:
+            atexit.unregister(hook)
         if writer is not None:
-            self._queue.put(_STOP)
+            try:
+                self._queue.put(_STOP, timeout=_FLUSH_TIMEOUT_S)
+            except queue.Full:
+                pass
             writer.join(_FLUSH_TIMEOUT_S)
+            if writer.is_alive():
+                logger.warning("The audit observer's writer did not finish; its queued lines are not written.")
+                return
+        # Whatever is left (queued before a writer started, or behind the stop), written here.
+        rest: List[Tuple[str, str]] = []
+        while True:
+            try:
+                item = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if item is not _STOP:
+                rest.append(item)
+        if rest:
+            try:
+                self._write(rest)
+            except Exception as exc:
+                logger.warning(f"The audit observer could not write {len(rest)} line(s): {exc}")

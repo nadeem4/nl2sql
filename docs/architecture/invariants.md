@@ -228,7 +228,7 @@ Observers write events to logs, files and collectors outside the engine's access
 ## Observers Fail Open and Never Block
 
 ### Definition
-An observer (the `observers` section, or `engine.events.subscribe`) can never fail a run or an engine call: what it raises is logged once per observer and event name and skipped. It never blocks either: the bus delivers a run's events one at a time under the run's lock, so an observer that writes to disk or the network hands that work to a thread of its own (the `audit` observer queues its lines; the `otel` observer records in memory and its SDK exports in the background). Hooks are the opposite: they fail closed (*Hooks Modify Before the Validator, Deny After*).
+An observer (the `observers` section, or `engine.events.subscribe`) can never fail a run or an engine call: what it raises is logged once per observer and event name and skipped. It never blocks either: the bus delivers a run's events one at a time under the run's lock, so an observer that writes to disk or the network hands that work to a thread of its own (the `audit` observer queues its lines on a bounded queue, dropping and counting what does not fit; the `otel` observer records in memory and its SDK exports in the background). Hooks are the opposite: they fail closed (*Hooks Modify Before the Validator, Deny After*).
 
 ### Enforcement Points
 - `EventBus.publish` in `nl2sql.events.bus` (subscribers made with `fail="open"`, the default for observers)

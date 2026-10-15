@@ -124,3 +124,18 @@ def test_from_config_builds_its_own_exporters_without_touching_the_globals():
         assert (trace.get_tracer_provider(), metrics.get_meter_provider()) == before
     finally:
         observer.close()
+
+
+def test_close_bounds_the_providers_shutdown(monkeypatch):
+    """A collector that is down must not hold engine.close() for the exporters' full retry time."""
+    observer, _, _ = _observer()
+    calls = []
+    monkeypatch.setattr(observer._meter_provider, "shutdown",
+                        lambda timeout_millis=None, **kw: calls.append(("meter", timeout_millis)))
+    monkeypatch.setattr(observer._tracer_provider, "force_flush",
+                        lambda timeout_millis=None: calls.append(("flush", timeout_millis)) or True)
+    real_shutdown = observer._tracer_provider.shutdown
+    monkeypatch.setattr(observer._tracer_provider, "shutdown", lambda: (calls.append(("tracer", None)),
+                                                                        real_shutdown()))
+    observer.close()
+    assert ("flush", 5000) in calls and ("meter", 5000) in calls and ("tracer", None) in calls

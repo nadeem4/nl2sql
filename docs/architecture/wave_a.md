@@ -513,12 +513,18 @@ counters.
     `user_id` and `roles` (two lines in `RunScope.fail`), so a failed run's
     line names its user too. The audit observer queues each line and writes
     on its own daemon thread, started by the first audited event, opening
-    and closing the day file per batch; `close` writes what is queued.
+    and closing the day file per batch. Its queue is bounded (`MAX_QUEUE`,
+    10,000): a line that does not fit is dropped, counted in `dropped` and
+    warned about once. `close` writes what is queued, and what arrived while
+    it closed; an `atexit` hook (through a weak reference, unregistered by
+    `close`) does the same for a process that never closes its engine.
+    `RunScope.fail` passes `message` through `redact_keys` (D15).
     `engine.storage.purge()` adds `audit` (day files older than
     `max_age_days`) when the engine runs an audit observer. `otel` records in
     memory on its own `MeterProvider` and `TracerProvider` (a
     `BatchSpanProcessor`, a `PeriodicExportingMetricReader`) and never sets
-    the global ones; `nl2sql.token.usage` lost its `datasource_id` attribute,
+    the global ones, and `close` bounds the providers' flush at 5 seconds;
+    `nl2sql.token.usage` lost its `datasource_id` attribute,
     which `llm.call` does not carry. `TokenUsageCallback` publishes `llm.call`
     per finished call through `nl2sql.events.publish` (with the client's
     `nl2sql_agent` metadata as `agent`), `PlanCache.get` publishes

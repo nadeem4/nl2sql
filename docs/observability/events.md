@@ -56,7 +56,7 @@ Run events (they carry the run's `trace_id`):
 | `sanity.flagged` | `code`, `sub_query_id`, `retry` | yes |
 | `run.limit_reached` | `limit`, `value`, `spent` | yes |
 | `run.finished` | a summary, never rows: `status`, `duration_s`, `usage`, `error_codes`, `source`, `datasources`, `tables` (`datasource.schema.table`), `result_manifest`, `user_id`, `roles` | yes, with `result` added |
-| `run.failed` | `message`, `error_code`, `user_id`, `roles` | yes |
+| `run.failed` | `message` (a key in it redacted), `error_code`, `user_id`, `roles` | yes |
 | `llm.call` | `node`, `agent`, `model`, the six token counts, `latency_s`, `cost`, `usage_reported`, `error` (redacted) | no |
 | `llm.parse_retry` | `agent`, `schema`, `attempt`, `errors` | no |
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
