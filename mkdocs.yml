@@ -67,6 +67,7 @@ nav:
     - Curated Answers (design): architecture/curated_answers.md
     - Configuration v2 (design): architecture/configuration_v2.md
     - Phase 2 (design): architecture/phase2.md
+    - Wave A (design): architecture/wave_a.md
     - Wave B (design): architecture/wave_b.md
     - Subgraphs:
       - Main Pipeline Graph: architecture/subgraphs/main_pipeline_graph.md

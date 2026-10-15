@@ -79,8 +79,8 @@ Two rules from earlier decisions apply throughout:
 | `openai_compatible` and `azure_openai` providers, structured-output fallback, the price table owned by `llm/` | 2 |
 | `storage.index`, `storage.state`, `storage.traces`, `storage.results` and their store interfaces (`nl2sql.stores`), pgvector and Postgres state | 2 |
 | Policies with `allow`/`deny` globs, `deny_columns`, one `Scope` object, and the `PolicyCheck` interface (`nl2sql.policy_checks`) | 2 |
-| The event bus, hooks and observers (`nl2sql.hooks`, `nl2sql.observers`), OpenTelemetry as an optional extra | 3 |
-| Evals as a product (`engine.evals`, `evals.yaml`, scorers via `nl2sql.scorers`) | 3 |
+| The event bus, hooks and observers (`nl2sql.hooks`, `nl2sql.observers`), OpenTelemetry as an optional extra | 3, built as [Wave A](wave_a.md) |
+| Evals as a product (`engine.evals`, `evals.yaml`, scorers via `nl2sql.scorers`) | 3, built as [Wave A](wave_a.md) |
 | The guided setup flow (connect, scan, draft, review), Connect a database in both apps, the web app served by `nl2sql-api`, the replay provider, the Textual app | 4 |
 | `glossary.yaml` and knowledge sources (`nl2sql.knowledge_sources`), routing signals | 5 |
 
