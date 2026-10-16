@@ -105,6 +105,7 @@ nav:
     - Secrets: configuration/secrets.md
     - Curated Answers: configuration/curated.md
     - Knowledge: configuration/knowledge.md
+    - Review Queue: configuration/review.md
     - Settings: configuration/settings.md
     - Observers: configuration/observers.md
     - REST API settings: configuration/api.md

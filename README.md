@@ -296,16 +296,20 @@ command has `--help`.
 | `nl2sql policy validate` | Check the config's policies against its datasources | |
 | `nl2sql curated validate` | Check the `curated` section (verified queries): ids, params, read-only SQL in each datasource's dialect, tables against the index; exits 1 on any error | |
 | `nl2sql curated test` | Run every verified query once against its database, read-only, with each param's default or example bound; reports pass/fail per query and exits 1 on any failure | |
-| `nl2sql curated proposals export` | Write thumbs-up generated answers as proposed verified queries, in the `curated` section's shape, for review; never writes a file of the config | `--out PATH` (default: print to stdout) |
 | `nl2sql knowledge show` | The glossary as the engine uses it, each item with its origin (`knowledge`, `database`, `derived`); what the role cannot read is left out; problems last, exit 1 when there are any | `--datasource ID`, `--as ROLE` (repeatable), `--user` |
 | `nl2sql knowledge export` | The glossary items the role may see as one canonical `glossary.yaml`; never over a config or source file | `--datasource ID` (repeatable), `--out FILE` (default: stdout), `--as ROLE`, `--user` |
 | `nl2sql knowledge sources` | Each knowledge source: type, item counts, hash, when it loaded, its last reload error | `--as ROLE`, `--user` |
-| `nl2sql review` | The review queue of proposed knowledge and verified queries. Its commands (`list`, `show`, `accept`, `reject`, `export`, `apply`) arrive in 0.8 | |
+| `nl2sql review list` | The review queue: proposed knowledge and verified queries the role may see, newest first | `--kind K`, `--datasource ID`, `--status S` (default `proposed`; `all`), `--as ROLE` (repeatable), `--user` |
+| `nl2sql review show ID` | One proposal, with the current glossary or curated value beside the proposed change | `--as ROLE`, `--user` |
+| `nl2sql review accept ID...` | Accept proposals as an admin role: writes the glossary and `curated.yaml` once each, then reloads and refreshes; exits 1 when an item is refused | `--all` (with `--kind`, `--datasource`), `--as ROLE`, `--user` |
+| `nl2sql review reject ID...` | Reject proposals as an admin role; a rejected change is never proposed again | `--reason TEXT`, `--as ROLE`, `--user` |
+| `nl2sql review export` | The open proposals the role may see as a review file, to decide in a pull request | `--out FILE`, `--kind K`, `--datasource ID`, `--as ROLE`, `--user` |
+| `nl2sql review apply FILE` | Read a review file as an admin role: accept each `accept` (with its edited change), reject each `reject` | `--as ROLE`, `--user` |
 | `nl2sql profile` | Profile the indexed schema and file what it finds for review; arrives in 0.8 | |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |
 | `nl2sql cache clear` | Empty the plan cache in `<storage.path>/state.db`; schema snapshots are kept | |
-| `nl2sql storage purge` | Delete traces and results older than their store's `max_age_days` (14 and 7 days by default); `nl2sql-api` does this at startup and once a day | |
+| `nl2sql storage purge` | Delete traces and results older than their store's `max_age_days` (14 and 7 days by default), and decided proposals older than `settings.review.max_age_days` (365); `nl2sql-api` does this at startup and once a day | |
 | `nl2sql feedback list` | Playground ratings, newest first | `--limit` (default 50) |
 | `nl2sql feedback stats` | Ratings plus guardrail rates: refusals, refiner retries, validator rejections, errors, plan-cache hits | `--json`, `--traces DIR` |
 | `nl2sql feedback export --good` | Write thumbs-up runs as draft eval cases to a separate suite file for review | `--out` (default `feedback_gold_drafts.yaml`) |

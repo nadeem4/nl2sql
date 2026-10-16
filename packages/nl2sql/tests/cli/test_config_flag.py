@@ -33,7 +33,7 @@ COMMANDS = [
     ["policy", "validate"],
     ["curated", "validate"],
     ["curated", "test"],
-    ["curated", "proposals", "export"],
+    ["review", "list", "--as", "admin"],
     ["cache", "clear"],
     ["feedback", "list"],
     ["feedback", "stats"],

@@ -44,11 +44,14 @@ class StorageAPI:
     def purge(self) -> Dict[str, int]:
         """Delete the traces, results and audit files older than their ``max_age_days``; return the counts.
 
-        ``{"traces": 3, "results": 12, "audit": 1}``: traces deleted, result
+        ``{"traces": 3, "results": 12, "proposals": 4, "audit": 1}``: traces deleted, result
         files deleted (a run has its manifest and one file per saved result),
         and the audit observer's day files deleted. A store with no
         ``max_age_days`` keeps everything and is left out, and so is
-        ``audit`` when the engine runs no ``audit`` observer.
+        ``audit`` when the engine runs no ``audit`` observer. ``proposals``
+        counts the decided proposals (accepted, rejected, superseded) of the
+        review queue decided more than ``settings.review.max_age_days`` ago;
+        open ones are never purged.
         ``nl2sql storage purge`` calls this, and ``nl2sql-api`` calls it at
         startup and once a day. It publishes ``retention.purged`` with the
         counts on the engine's bus, which the audit observer writes.
@@ -60,6 +63,8 @@ class StorageAPI:
             days = getattr(store, "max_age_days", None)
             if days is not None:
                 counts[slot] = store.purge(now - timedelta(days=days))
+        counts["proposals"] = self._ctx.state.purge_proposals(
+            now - timedelta(days=self._ctx.settings.review.max_age_days))
         audits = [o for o in getattr(self._ctx, "observers", ()) if isinstance(o, AuditObserver)]
         if audits:
             counts["audit"] = sum(audit.purge(now) for audit in audits)

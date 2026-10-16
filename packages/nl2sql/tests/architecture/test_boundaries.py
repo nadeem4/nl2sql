@@ -795,6 +795,7 @@ ACCESS_DECISIONS = [
     "api/policy_api.py",
     "api/datasource_api.py",
     "api/indexing_api.py",  # schema drift: a caller sees drift only in tables it may read (D1)
+    "review/queue.py",  # a proposal is visible only when the caller reaches every table it names (D60)
 ]
 # The 0.5 access helpers. A second way to decide is how two nodes come to disagree.
 OLD_ACCESS_NAMES = {"table_allowed", "get_allowed_tables", "get_allowed_datasources", "RBAC", "RolePolicy"}
@@ -836,7 +837,7 @@ def test_every_access_decision_goes_through_scope():
 # ``datasources.schema()`` do.
 WAVE_B_READ_METHODS = {
     ("api/knowledge_api.py", "KnowledgeAPI"): ("sources", "show", "export", "reload", "profile", "save_choice"),
-    ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "export"),
+    ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "current", "export"),
 }
 
 
@@ -864,6 +865,28 @@ def test_wave_b_read_methods_require_a_caller():
     assert not offenders, _broke(
         "Every Wave B method that shows knowledge, proposals or schema takes the caller as a required "
         "keyword (D60): an app that forgot the caller fails rather than seeing everything.", offenders)
+
+
+# The writers of a file a person owns (D42): the glossary's and the curated section's. Each is called only by
+# the review queue's accept.
+PERSONS_FILE_WRITERS = {"write_glossary", "write_curated"}
+ACCEPT = ENGINE / "review" / "accept.py"
+
+
+def test_only_accept_writes_a_persons_file():
+    offenders = []
+    for path in python_files(ENGINE):
+        if path == ACCEPT:
+            continue
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, ast.Call):
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+                if name in PERSONS_FILE_WRITERS:
+                    offenders.append(f"{_where(path)}:{node.lineno} calls {name}")
+    assert not offenders, _broke(
+        "Only an accept writes a person's file: write_glossary and write_curated are called from "
+        "nl2sql/review/accept.py alone, under its lock, after its admin check and hash check (D42).", offenders)
 
 
 # --------------------------------------------------------------------------

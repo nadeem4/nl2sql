@@ -132,8 +132,14 @@ class Runtime:
             problem("embeddings.provider" if isinstance(e, RegistryError) else "embeddings", str(e))
 
         self.curated = config.curated
+        # The hash of the curated section's own file as the config holds it: accept refuses a file changed
+        # since the config was loaded (D42).
+        self.curated_sha256 = None
         if config.curated is not None:
             from nl2sql.config.curated import check_curated
+            from nl2sql.review.curated_file import loaded_sha256
+
+            self.curated_sha256 = loaded_sha256(config)
 
             dialects = {ds_id: self.ds_registry.get_dialect(ds_id) for ds_id in self.ds_registry.list_ids()}
             for issue in check_curated(config.curated, dialects):
@@ -417,6 +423,18 @@ class Runtime:
             self.knowledge = knowledge
         self._publish_knowledge(error)
         return error
+
+    def replace_curated(self, curated: Any, *, sha256: Optional[str]) -> None:
+        """Swap in the ``curated`` section an accept just wrote, with its file's new hash, as one step.
+
+        Only the review queue's accept calls it, after writing the section's
+        own file. Runs in flight keep the section they started with; the next
+        run's curated matcher reads the new one.
+        """
+        with self._lock:
+            self._config = self._config.model_copy(update={"curated": curated})
+            self.curated = curated
+            self.curated_sha256 = sha256
 
     def derive(self, changes: Dict[str, Any]) -> "Runtime":
         """A run-scoped runtime whose config is this one's with ``changes`` (dotted paths) set.

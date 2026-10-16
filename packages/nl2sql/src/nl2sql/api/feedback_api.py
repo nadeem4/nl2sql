@@ -11,7 +11,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Union
 
+from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
+
+logger = get_logger(__name__)
 
 
 class FeedbackAPI:
@@ -32,6 +35,12 @@ class FeedbackAPI:
         Never rows, the written answer, error messages or keys; a run refused
         for the role keeps no SQL. A later rating of the same run replaces the
         earlier one.
+
+        A thumbs-up on a generated answer of one datasource with one read-only
+        SQL statement also files a ``verified_query`` proposal in the review
+        queue (``engine.proposals``): the question, the run's SQL and an id
+        from the question. The same change is one proposal however often it
+        is rated; it reaches ``curated.yaml`` only when an admin accepts it.
 
         Returns:
             The stored row.
@@ -54,7 +63,13 @@ class FeedbackAPI:
             row.update(run_signals(trace.get("result") or {}, trace))
             if "SECURITY_VIOLATION" in row["error_codes"]:
                 row["sql"] = []
-        return self._ctx.state.add_feedback(rated_row(row, rating, note))
+        stored = self._ctx.state.add_feedback(rated_row(row, rating, note))
+        try:
+            self._propose(stored)
+        except Exception as e:  # the rating is stored; a queue that cannot take the proposal never fails it
+            logger.warning("The thumbs-up of run %s was stored, but its verified-query proposal was not filed: %s",
+                           stored.get("trace_id"), e)
+        return stored
 
     def list(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Every rating, newest first; at most ``limit`` of them."""
@@ -107,6 +122,28 @@ class FeedbackAPI:
     def clear(self) -> int:
         """Delete every rating; returns how many. Schema snapshots and the plan cache stay."""
         return self._ctx.state.clear_feedback()
+
+    def _propose(self, row: Dict[str, Any]) -> None:
+        """File a thumbs-up generated answer as a ``verified_query`` proposal (D43); other rows file nothing."""
+        from nl2sql.config.curated import CuratedSqlError, inspect_verified_sql
+        from nl2sql.feedback import skip_reason, verified_query
+        from nl2sql.review.queue import propose, table_names
+        from nl2sql_sdk.stores import Proposal
+
+        if skip_reason(row):
+            return
+        datasource_id = row["datasource_ids"][0]
+        if datasource_id not in self._ctx.ds_registry.list_ids():
+            return
+        change = verified_query(row)
+        try:
+            parsed = inspect_verified_sql(change["sql"], self._ctx.ds_registry.get_dialect(datasource_id))
+        except CuratedSqlError:
+            return  # not one read-only query: nothing a person could verify
+        propose(self._ctx, Proposal.build(
+            kind="verified_query", datasource_id=datasource_id, target=change["questions"][0], change=change,
+            origin="thumbs_up", tables=table_names(self._ctx, datasource_id, parsed.tables),
+            evidence={"trace_id": row["trace_id"], "role": row.get("role") or None}))
 
     def _llm_configs(self) -> Dict[str, Any]:
         """Provider and model per agent, by the name each model step asks for."""

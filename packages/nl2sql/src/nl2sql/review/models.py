@@ -18,10 +18,12 @@ class AcceptReport(BaseModel):
 
     ``accepted``: the proposals now accepted; ``files_written``: each file
     written, once; ``warnings``: such as an earlier knowledge source shadowing
-    what was written; ``refused``: proposal id to why it was not accepted.
+    what was written; ``refused``: proposal id to why it was not accepted (or,
+    from ``apply``, rejected); ``rejected``: the proposals ``apply`` rejected.
     """
 
     accepted: List[Proposal] = Field(default_factory=list)
+    rejected: List[Proposal] = Field(default_factory=list)
     files_written: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
     refused: Dict[str, str] = Field(default_factory=dict)
