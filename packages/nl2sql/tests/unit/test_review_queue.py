@@ -234,6 +234,25 @@ def test_concurrent_accepts_do_not_lose_a_write(engine, tmp_path):
     assert "four" in {q["id"] for q in _curated_file(tmp_path)["datasources"]["shop"]["verified_queries"]}
 
 
+def test_the_same_proposal_accepted_twice_at_once_is_accepted_once(engine):
+    proposal = _proposal(engine)
+    start = threading.Barrier(2)
+    reports = []
+
+    def accept():
+        start.wait()
+        reports.append(engine.proposals.accept(proposal.id, by=ADMIN))
+
+    threads = [threading.Thread(target=accept) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(len(r.accepted) for r in reports) == [0, 1]
+    assert sum(proposal.id in r.refused for r in reports) == 1
+
+
 def test_accepting_many_writes_each_file_once(engine, tmp_path, monkeypatch):
     from nl2sql.review import accept as accept_module
 

@@ -63,7 +63,9 @@ def accept(ctx: Any, ids: Sequence[str], by: Any, edits: Optional[Mapping[str, M
     with ExitStack() as held:
         for kind in sorted(groups, key=lambda k: str(targets[k])):
             held.enter_context(_locked(ctx, f"accept:{os.path.realpath(targets[kind])}"))
-        # Read under the locks: another accept of this engine may just have written and reloaded.
+        # Read under the locks: another accept may just have decided an item, written and reloaded.
+        for kind, items in groups.items():
+            groups[kind] = [p for p in items if _still_proposed(ctx, p, report)]
         if GLOSSARY in groups:
             glossary_plan = _plan_glossary(ctx, groups[GLOSSARY], report)
         if CURATED in groups:
@@ -161,6 +163,14 @@ def _locked(ctx: Any, name: str) -> Iterator[None]:
         yield
     finally:
         lock.__exit__(None, None, None)
+
+
+def _still_proposed(ctx: Any, proposal: Proposal, report: AcceptReport) -> bool:
+    row = ctx.state.get_proposal(proposal.id)
+    if row is not None and row.status == "proposed":
+        return True
+    report.refused[proposal.id] = f"It is {row.status if row else 'gone'}, not proposed."
+    return False
 
 
 def _unchanged(path: Path, expected_sha256: Optional[str]) -> None:
