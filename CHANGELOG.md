@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.0](https://github.com/nadeem4/nl2sql/compare/v0.7.0...v0.8.0) (2026-10-16)
+
+
+### Features
+
+* **adapters:** estimate (rows read) and probe_overlap (C1) ([#332](https://github.com/nadeem4/nl2sql/issues/332)) ([a9f9890](https://github.com/nadeem4/nl2sql/commit/a9f9890a2779d8c22b22db0d6e32a03ca5677e9e))
+* **knowledge:** knowledge sources, merge, scope filter, show and export (K1) ([#336](https://github.com/nadeem4/nl2sql/issues/336)) ([9092eac](https://github.com/nadeem4/nl2sql/commit/9092eacd277598c48656709d8761c69fa9e1792a))
+* **wave-b:** the shared shapes for knowledge, review, profiler, clarify, explain and cost (B0) ([#329](https://github.com/nadeem4/nl2sql/issues/329)) ([1b56cd8](https://github.com/nadeem4/nl2sql/commit/1b56cd82345a957acd967429ae253fab2025ee7d))
+
 ## [0.7.0](https://github.com/nadeem4/nl2sql/compare/v0.6.0...v0.7.0) (2026-10-15)
 
 
