@@ -495,7 +495,7 @@ The validator resolves columns against a throw-away query in which every table i
 ## Verified SQL Is Human-Authored, Read-Only and Parameter-Bound
 
 ### Definition
-A verified query's SQL is written, reviewed and committed by a person in `curated.yaml`. The model picks a verified query by id and supplies parameter values; it never writes or edits the SQL. The SQL must be exactly one read-only query whose `:name` placeholders are exactly its declared params. Values are typed and checked by code (type, `min`/`max`, `choices`, required) and bound by the adapter's driver, never interpolated into the SQL text. A query with params runs only on an adapter that declares `SUPPORTS_BOUND_PARAMETERS`.
+A verified query's SQL is written by a person in `curated.yaml`, or proposed (from a thumbs-up or a correction) and reviewed and accepted by a person through the review queue. The model picks a verified query by id and supplies parameter values; it never writes or edits the SQL. The SQL must be exactly one read-only query whose `:name` placeholders are exactly its declared params. Values are typed and checked by code (type, `min`/`max`, `choices`, required) and bound by the adapter's driver, never interpolated into the SQL text. A query with params runs only on an adapter that declares `SUPPORTS_BOUND_PARAMETERS`.
 
 ### Enforcement Points
 - `VerifiedQuery` and `ParamSpec` in `nl2sql.config.curated`, and `inspect_verified_sql()` and `check_curated_queries()` in `nl2sql.configs.curated`, at startup, in `nl2sql curated validate`, and in `nl2sql curated test` (`CuratedAPI.test()`), which runs only queries that pass them, with their values bound
@@ -532,11 +532,30 @@ A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook 
 
 ---
 
+## Only an Accept Writes a Person's File
+
+### Definition
+The engine writes two files a person owns, and only from the review queue's accept: the first `yaml` knowledge source's `glossary.yaml` and the `curated` section's own file. An accept needs `by` with one of `policies.admin_roles` (any caller under `allow_all`). For each file it takes the state store's lock `accept:<real path>`, refuses when the file's SHA-256 is no longer the one the engine loaded, applies every accepted item, runs the item's checks (the glossary's validation; the curated checks for a verified query), and rewrites the file once, canonically and atomically (a temporary file renamed over the real path, through a symlink). An inline `curated` section, a config built in code, or a project without a `yaml` knowledge source is never written. Nothing a model or a thumbs-up produced reaches either file, or a prompt, before an accept.
+
+### Enforcement Points
+- `accept()` in `nl2sql.review.accept`, through `engine.proposals.accept` and `apply`; the admin check is `require_admin()` in `nl2sql.review.queue`
+- `write_glossary()` in `nl2sql.knowledge.yaml_source` and `write_curated()` in `nl2sql.review.curated_file`: the hash check, the atomic rewrite
+- `test_only_accept_writes_a_persons_file` in `packages/nl2sql/tests/architecture/test_boundaries.py`: an AST scan allowing calls of the two writers only in `nl2sql/review/accept.py`
+- `packages/nl2sql/tests/unit/test_review_queue.py`: the admin role, the hash check, the lock, an inline section, the curated checks
+
+### Failure Behavior
+`ReviewError` with `NOT_AUTHORIZED`, `NOT_WRITABLE` or `FILE_CHANGED`, and nothing written: every file is locked and checked before the first write. An item whose change fails its checks stays proposed and is named in `AcceptReport.refused`; the others are written.
+
+### Why It Exists
+The glossary and the curated answers are what people know and vouch for. An engine that edited them on its own would turn a model's guess into a fact without anyone deciding so, and two writers that did not check the file would lose a person's edit.
+
+---
+
 ## Categories
 
 - **State**: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
-- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After
+- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter
@@ -560,6 +579,7 @@ A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py`
 - `packages/nl2sql/src/nl2sql/config/curated.py`
+- `packages/nl2sql/src/nl2sql/review/`
 - `packages/nl2sql/src/nl2sql/hooks/`
 - `packages/nl2sql/src/nl2sql/observers/`
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`

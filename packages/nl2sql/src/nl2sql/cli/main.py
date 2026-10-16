@@ -44,7 +44,7 @@ app = typer.Typer(
 
 app.add_typer(config_app, name="config", help="Check the config without starting the engine (`nl2sql config check`).")
 app.add_typer(policy_app, name="policy", help="Manage RBAC policies and security.")
-app.add_typer(curated_app, name="curated", help="The curated answers file: `nl2sql curated validate`, `nl2sql curated test`, `nl2sql curated proposals export`.")
+app.add_typer(curated_app, name="curated", help="The curated answers file: `nl2sql curated validate`, `nl2sql curated test`.")
 app.add_typer(trace_app, name="trace", help="Inspect and replay run traces.")
 app.add_typer(cache_app, name="cache", help="Manage the plan cache (`nl2sql cache clear`).")
 app.add_typer(feedback_app, name="feedback", help="Answer feedback and guardrail rates (`nl2sql feedback stats`).")
@@ -52,7 +52,7 @@ app.add_typer(storage_app, name="storage", help="Retention for traces and result
 app.add_typer(eval_app, name="eval",
               help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `seed`, `publish`.")
 app.add_typer(knowledge_app, name="knowledge", help="The glossary as the engine uses it (from 0.8).")
-app.add_typer(review_app, name="review", help="The review queue: proposals to accept or reject (from 0.8).")
+app.add_typer(review_app, name="review", help="The review queue: proposed knowledge and verified queries to accept or reject.")
 app.add_typer(profile_app, name="profile", help="Profile the indexed schema and file what it finds for review (from 0.8).")
 
 

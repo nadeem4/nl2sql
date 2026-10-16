@@ -329,58 +329,63 @@ data team, never by the package) the planner should reach for first. See
 
 ## From feedback to verified queries
 
-A thumbs-up on a generated answer in the playground is a candidate verified
-query: a real question, and SQL a person said was right. Export them as
-proposals and review them like any other change to the curated section:
+A thumbs-up on a generated answer is a candidate verified query: a real
+question, and SQL a person said was right. `engine.feedback.record(...,
+rating="up")` files it in the [review queue](review.md) as a `verified_query`
+proposal; it reaches the curated section only when an admin accepts it.
 
 ```bash
-nl2sql curated proposals export                                   # print to stdout
-nl2sql curated proposals export --out curated.proposals.yaml
+nl2sql review list --kind verified_query --as admin
+nl2sql review show <id> --as admin
+nl2sql review accept <id> --as admin
 ```
 
-Each proposal is an entry in the curated section's shape, under the
+The proposal's `change` is an entry in the curated section's shape, for the
 datasource the run used:
 
 ```yaml
-datasources:
-  chinook:
-    verified_queries:
-    - id: how_many_customers_are_in_brazil
-      description: 'TODO: say what this query returns.'
-      questions:
-      - How many customers are in Brazil?
-      sql: |
-        SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'
+id: how_many_customers_are_in_brazil
+description: 'TODO: say what this query returns. ...'
+questions:
+- How many customers are in Brazil?
+sql: |
+  SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'
 ```
 
 - **`id`** comes from the question: lower case, words joined by `_`, at most
-  60 characters, `q_` in front when it would start with a digit, and `_2`,
-  `_3` after it when two questions give the same id.
+  60 characters, `q_` in front when it would start with a digit.
 - **`questions`** holds the question as it was asked, as the one phrasing.
 - **`sql`** is the run's generated SQL, exactly as it ran. **Every value in it
   is literal** (`'Brazil'` above): the proposal has no `params`.
 - **`description`** is a placeholder.
 
-The same question (ignoring case and spacing) on the same datasource is
-proposed once, from its newest thumbs-up. These are skipped, and counted by
-reason in the command's summary: thumbs-down ratings, answers that came from
-a verified query already, runs that did not succeed, runs with no SQL or more
-than one statement, runs on more than one datasource, and ratings recorded
-before the feedback table kept the datasource (see
+The same question and SQL is one proposal however often it is rated; a new
+SQL for the same question supersedes the open one. These file nothing:
+thumbs-down ratings, answers that came from a verified query already, runs
+that did not succeed, runs with no SQL or more than one statement, runs on
+more than one datasource, and ratings recorded before the feedback table kept
+the datasource (see
 [Feedback and Signals](../observability/feedback.md#what-is-stored)).
 
-**Reviewing is the approval.** There is no approved state and no queue: a
-person reads each entry, checks the SQL answers the question, writes the
-description, turns the values a reader would change into `{params}` in the
-question and `:params` in the SQL with a `params:` entry, drops the row-cap
-`LIMIT` the generator added unless the question asks for it, adds other
-phrasings, moves the entry into the curated section, runs
-`nl2sql curated validate`, and commits it. The same steps head the exported
-file as comments.
+**Accepting is the approval.** Before accepting, a reviewer checks the SQL
+answers the question and, with `edits` (or by editing the `change` in a
+[review file](review.md#the-review-file)), writes the description, turns the
+values a reader would change into `{params}` in the question and `:params` in
+the SQL with a `params:` entry, drops the row-cap `LIMIT` the generator added
+unless the question asks for it, and adds other phrasings. Accept then runs the
+curated checks on the edited section, rewrites the section's own file
+(`curated: {file: curated.yaml}`) in canonical form, swaps the engine's curated
+answers and refreshes that datasource's curated index entries, so the next
+question can match it. An inline section, or a config built in code, is never
+written: export the proposals and edit by hand. See
+[The review queue](review.md#accept-the-only-writer).
 
-`export` never writes the config's own files: it refuses an `--out` that is
-`nl2sql.yaml` or any file it includes, and exits 2. Neither the REST API nor the
-playground writes it either.
+!!! warning "Accept rewrites `curated.yaml`"
+    The rewrite is canonical: keys in the models' order, datasources and
+    params sorted by name, SQL as literal blocks, under a fixed header.
+    **Comments in `curated.yaml` are not kept**; write remarks in a query's
+    `description`. A file edited since the engine loaded it is never
+    overwritten: accept refuses with `FILE_CHANGED`.
 
 ## Source references
 
@@ -393,4 +398,5 @@ playground writes it either.
 - The demo's verified queries: `CHINOOK_VERIFIED_QUERIES` in `packages/nl2sql/src/nl2sql/datasets/chinook.py`
 - The playground badge: `verifiedSource()` in `web/playground/src/results.js`
 - Matching and running: `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/`
-- Proposals from feedback: `packages/nl2sql/src/nl2sql/feedback/proposals.py`
+- Proposals from feedback: `packages/nl2sql/src/nl2sql/feedback/proposals.py`; the review queue and the
+  canonical writer: `packages/nl2sql/src/nl2sql/review/`

@@ -150,18 +150,24 @@ draft:
 engine.evals.regenerate("feedback_gold_drafts.yaml")
 ```
 
-## Proposing verified queries: `nl2sql curated proposals export`
+## Proposing verified queries: the review queue
 
-A thumbs-up on a *generated* answer can also become a proposed verified query
-for `curated.yaml`, for a person to review and commit:
+A thumbs-up on a *generated* answer also files a `verified_query` proposal in
+the [review queue](../configuration/review.md): `engine.feedback.record(...,
+rating="up")` keeps the rating and, when the run qualifies, proposes the
+question and the run's SQL for `curated.yaml`. Nothing is written until an
+admin accepts it:
 
 ```bash
-nl2sql curated proposals export --out curated.proposals.yaml
+nl2sql review list --kind verified_query --as admin
+nl2sql review accept <id> --as admin
 ```
 
 Runs answered by a verified query, failed runs, runs on more than one
-datasource and runs with no SQL are skipped, and rows rated before the table
-recorded the datasource are skipped too. See
+datasource, runs with no SQL or more than one statement, and rows rated before
+the table recorded the datasource file nothing. The same change is one
+proposal however often it is rated; a thumbs-up therefore influences routing
+only after a person accepts it. See
 [From feedback to verified queries](../configuration/curated.md#from-feedback-to-verified-queries).
 
 ## Turning it off and clearing it

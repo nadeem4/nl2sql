@@ -1499,6 +1499,73 @@ flowchart TD
       file over `GLOSSARY_MAX_BYTES` (5 MB). `write_glossary` fsyncs, keeps the
       file's mode and maps a `PermissionError` to `ReviewError(NOT_WRITABLE)`.
 
+!!! note "Built: the review queue (Q1)"
+    `engine.proposals` is built; a thumbs-up files a `verified_query` proposal and
+    an admin's accept writes the glossary or `curated.yaml`. Exact names, and
+    where the code differs from section 5:
+
+    - **Filing.** `nl2sql/review/queue.py`: `propose(ctx, proposal) -> Proposal`
+      is how every track files a finding (P1, P2, F1, L2 build a
+      `Proposal.build(...)` and call it). It keeps identity (the same change
+      updates the open row's `evidence`; an accepted or rejected change is
+      returned as it is and never re-proposed), supersedes the open row of the
+      same kind, datasource and target (the target compared case-insensitively),
+      revives a superseded row proposed again, and publishes `proposal.created`
+      for a new or revived row only. `table_names(ctx, datasource_id, pairs)`
+      turns `(schema or "", table)` pairs into `datasource.schema.table`, the
+      adapter's default schema filling a blank.
+    - **Visibility and deciding.** `visible(ctx, user, proposal)`: the caller's
+      `Scope` must reach the datasource and every name in `tables` (no text
+      mention check, unlike K1's knowledge filter). `caller(value)` raises
+      `TypeError` for anything but a `UserContext`; `require_admin(ctx, by)`
+      raises `ReviewError(NOT_AUTHORIZED)`. **Under `allow_all` every caller may
+      decide**, as K1's `reload` does: there are no roles to hold. `who(by)` is
+      what `decided_by` records: the user id, else the roles.
+    - **Accept.** `nl2sql/review/accept.py`: `accept(ctx, ids, by, edits)` and
+      `reject(ctx, reasons, by)` (reasons maps id to reason). Unknown or
+      decided ids are named in `AcceptReport.refused` by `accept`; `reject`
+      refuses the whole call with `ReviewError(NOT_FOUND)`. Every lock
+      (`accept:<real path>`, `LOCK_TTL_S` 60; an accept waits up to
+      `LOCK_WAIT_S` 10 s for another) is taken and every file's hash checked
+      before the first write. A per-item failure (the glossary's validation, the
+      curated checks, a verified query id already taken) leaves that item
+      proposed in `refused`. `files_written` and `wrote` are paths relative to
+      the folder of `nl2sql.yaml`. The accepted row keeps its `id` and stores the
+      `change` as accepted (edits included).
+    - **The curated file.** `nl2sql/review/curated_file.py`: `curated_path(config)`
+      (None when inline, absent or built in code), `file_sha256`,
+      `canonical_curated(curated)` and `write_curated(path, curated,
+      expected_sha256) -> str`. `Runtime.curated_sha256` is the file's hash,
+      taken in `components()`; `Runtime.replace_curated(curated, *, sha256)` swaps
+      `config.curated`, `curated` and the hash under the lock. The refresh runs
+      `rebuild_index(ctx, datasource_ids=..., curated_only=True)` (the index
+      lock, `IndexingOrchestrator.refresh_curated`); a datasource that cannot be
+      refreshed is a warning, not a failure. K3 renames that call.
+    - **The review file.** `nl2sql/review/review_file.py`: `render(proposals)`
+      and `read(path) -> ReviewFile` (`ReviewItem`: `id`, `decision`, `reason`,
+      `change`; other keys ignored). `apply` merges an edited `change` over the
+      stored one and rejects with each item's own reason, so it is one `accept`
+      call and per-item rejections rather than one `reject` call.
+      `AcceptReport.rejected` is new: the proposals `apply` rejected.
+      `export` refuses `nl2sql.yaml`, its section files and knowledge source
+      files.
+    - **Thumbs-up.** `feedback/proposals.py` is `skip_reason(row)` and
+      `verified_query(row)` (the `change`); `FeedbackAPI.record` files it with
+      origin `thumbs_up`, `tables` from `inspect_verified_sql`, and `evidence`
+      `{trace_id, role}`. SQL that is not one read-only query files nothing.
+      `build_proposals`, `render_proposals`, `write_proposals` and
+      `nl2sql curated proposals export` are deleted.
+    - **Retention, events, CLI.** `engine.storage.purge()` returns
+      `proposals` (decided rows past `settings.review.max_age_days`).
+      `proposal.decided` is published per decision (the audit set was B0's).
+      `nl2sql review list`, `show`, `accept`, `reject`, `export`, `apply`, with
+      `--as` and `--user` through K1's `caller`; `show` reads the current value
+      through `engine.knowledge.show` and `engine.config.curated`.
+    - **Tests.** `tests/unit/test_review_queue.py` (every Q1 test the row names,
+      and the CLI); `test_only_accept_writes_a_persons_file` in
+      `tests/architecture/test_boundaries.py`, which also lists
+      `review/queue.py` among the access decisions that ask a `Scope`.
+
 **The demo recording.** K2 changes the planner's structured output from
 `PlanModel` to `PlannerAnswer`, and the replay provider keys on the
 structured output's name. K2 converts `cli/demo/recordings/chinook.json`
