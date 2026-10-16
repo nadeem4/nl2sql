@@ -1,0 +1,27 @@
+{
+  "sub_query_id": "chinook_012",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer",
+    "Invoice"
+  ],
+  "joins": [
+    "each Customer to its Invoice, on CustomerId (declared key)"
+  ],
+  "filters": [],
+  "groupings": [
+    "by Customer id",
+    "by Customer first name",
+    "by Customer last name"
+  ],
+  "measures": [
+    "total spend: total of Invoice total, rounded to 2 places"
+  ],
+  "order": "highest total spend first, then lowest Customer id first, top 5",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Sum invoice totals per customer and keep the five largest.",
+  "text": "Shows Customer first name, Customer last name and total spend, by Customer id, Customer first name and Customer last name. Reads Customer and Invoice. Highest total spend first, then lowest Customer id first, top 5."
+}

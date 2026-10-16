@@ -1,0 +1,22 @@
+{
+  "sub_query_id": "chinook_014",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Invoice"
+  ],
+  "joins": [],
+  "filters": [],
+  "groupings": [
+    "by STRFTIME('%Y', Invoice date)"
+  ],
+  "measures": [
+    "revenue: total of Invoice total, rounded to 2 places"
+  ],
+  "order": "lowest invoice year first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Sum invoice totals per invoice year.",
+  "text": "Shows STRFTIME('%Y', Invoice date) and revenue, by STRFTIME('%Y', Invoice date). Reads Invoice. Lowest invoice year first."
+}

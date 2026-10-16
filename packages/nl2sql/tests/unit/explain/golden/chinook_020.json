@@ -1,0 +1,23 @@
+{
+  "sub_query_id": "chinook_020",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track",
+    "Album"
+  ],
+  "joins": [
+    "each Track to its Album, on AlbumId (declared key)"
+  ],
+  "filters": [
+    "Album title is 'Let There Be Rock'"
+  ],
+  "groupings": [],
+  "measures": [],
+  "order": "lowest Track id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Tracks of the album titled Let There Be Rock.",
+  "text": "Shows Track name. Reads Track and Album, where Album title is 'Let There Be Rock'. Lowest Track id first."
+}

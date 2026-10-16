@@ -7,10 +7,11 @@ Provides functionality for executing natural language queries against databases.
 from __future__ import annotations
 
 import contextvars
+import logging
 import queue
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Sequence
+from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
@@ -32,7 +33,10 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCal
 from nl2sql.clarify.models import ClarificationRequest
 from nl2sql.explain.models import Explanation
 from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.models import Estimate
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SAMPLE_ROWS = 50
 # A run's stream ends with exactly one of these.
@@ -134,7 +138,8 @@ class QueryResult(BaseModel):
     approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
     # The readings to choose from, when status is "needs_clarification" (from L1).
     clarification: Optional[ClarificationRequest] = None
-    # The run's plan in plain English, rendered from the typed plan with no model call (from X1).
+    # The run's plan in plain English, rendered from the typed plans with no model call: one step per
+    # sub-query with a plan or a verified answer; None when the run has neither.
     explanation: Optional[Explanation] = None
 
 
@@ -282,8 +287,15 @@ def result_from_state(
     state: Dict[str, Any],
     artifact_store: Any = None,
     sample_rows: int = DEFAULT_SAMPLE_ROWS,
+    knowledge: Optional[Mapping[str, DatasourceKnowledge]] = None,
 ) -> QueryResult:
-    """Build a typed :class:`QueryResult` from a raw pipeline graph state."""
+    """Build a typed :class:`QueryResult` from a raw pipeline graph state.
+
+    ``explanation`` is rendered here from the state's plans, with no model
+    call (``nl2sql.explain``); ``knowledge`` maps a datasource id to its
+    glossary, which names tables and columns and tells a glossary join from
+    a declared key.
+    """
     state = state or {}
 
     warnings: List[RunWarning] = [RunWarning.model_validate(w) for w in state.get("warnings") or []]
@@ -320,7 +332,20 @@ def result_from_state(
         source=_source(state.get("verified_match")),
         stop=state.get("stop"),
         approvals_needed=list(state.get("approvals_needed") or []),
+        explanation=None if withheld else _explanation(state, warnings, knowledge),
     )
+
+
+def _explanation(state: Dict[str, Any], warnings: List[RunWarning],
+                 knowledge: Optional[Mapping[str, DatasourceKnowledge]]) -> Optional[Explanation]:
+    """The run's explanation, or None when it cannot be rendered: an explanation never fails a run."""
+    from nl2sql.explain.render import explain_state  # the renderer loads only when a run is assembled
+
+    try:
+        return explain_state(state, warnings, knowledge)
+    except Exception:
+        logger.warning("Could not render the run's explanation.", exc_info=True)
+        return None
 
 
 def tables_read(result: QueryResult, ds_registry: Any = None) -> List[str]:

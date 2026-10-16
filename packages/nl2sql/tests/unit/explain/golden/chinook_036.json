@@ -1,0 +1,23 @@
+{
+  "sub_query_id": "chinook_036",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Employee"
+  ],
+  "joins": [
+    "each Employee (t1) to its Employee (t2), on Employee.ReportsTo = Employee.EmployeeId (declared key)"
+  ],
+  "filters": [
+    "Employee (t1) first name is 'Jane'",
+    "Employee (t1) last name is 'Peacock'"
+  ],
+  "groupings": [],
+  "measures": [],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Join Jane Peacock to the employee she reports to.",
+  "text": "Shows Employee (t2) first name and Employee (t2) last name. Reads Employee (t1) and Employee (t2), where Employee (t1) first name is 'Jane' and Employee (t1) last name is 'Peacock'."
+}

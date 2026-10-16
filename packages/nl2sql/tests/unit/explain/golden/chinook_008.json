@@ -1,0 +1,24 @@
+{
+  "sub_query_id": "chinook_008",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track",
+    "Genre"
+  ],
+  "joins": [
+    "each Track (t1) to its Genre, on GenreId (declared key)",
+    "each Genre with its Track (t3), if any, on GenreId (declared key), where Track (t3) milliseconds is more than Track (t1) milliseconds or (Track (t3) milliseconds is Track (t1) milliseconds and Track (t3) id is less than Track (t1) id)"
+  ],
+  "filters": [
+    "Track (t3) id is empty"
+  ],
+  "groupings": [],
+  "measures": [],
+  "order": "lowest genre first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Keep each track for which no longer track (ties to the lower TrackId) exists in its genre.",
+  "text": "Shows Genre name, Track (t1) name and Track (t1) milliseconds. Reads Track (t1), Genre and Track (t3), where Track (t3) id is empty. Lowest genre first."
+}

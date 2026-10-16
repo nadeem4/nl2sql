@@ -1,0 +1,27 @@
+{
+  "sub_query_id": "chinook_007",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Employee",
+    "Customer"
+  ],
+  "joins": [
+    "each Employee to its Customer, on Employee.EmployeeId = Customer.SupportRepId (declared key)"
+  ],
+  "filters": [],
+  "groupings": [
+    "by Employee id",
+    "by Employee first name",
+    "by Employee last name"
+  ],
+  "measures": [
+    "customer count: number of Customer id"
+  ],
+  "order": "highest customer count first, then lowest Employee id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count supported customers per employee, most first.",
+  "text": "Shows Employee first name, Employee last name and customer count, by Employee id, Employee first name and Employee last name. Reads Employee and Customer. Highest customer count first, then lowest Employee id first."
+}

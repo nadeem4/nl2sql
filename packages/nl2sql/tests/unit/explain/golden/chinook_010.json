@@ -1,0 +1,29 @@
+{
+  "sub_query_id": "chinook_010",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Invoice",
+    "Customer"
+  ],
+  "joins": [
+    "each Invoice to its Customer, on CustomerId (declared key)"
+  ],
+  "filters": [
+    "Customer country is 'USA'",
+    "Invoice date is at least '2013-01-01'",
+    "Invoice date is less than '2014-01-01'"
+  ],
+  "groupings": [
+    "by STRFTIME('%Y-%m', Invoice date)"
+  ],
+  "measures": [
+    "revenue: total of Invoice total, rounded to 2 places"
+  ],
+  "order": "lowest invoice month first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Sum 2013 invoice totals of USA customers per month.",
+  "text": "Shows STRFTIME('%Y-%m', Invoice date) and revenue, by STRFTIME('%Y-%m', Invoice date). Reads Invoice and Customer, where Customer country is 'USA', Invoice date is at least '2013-01-01' and Invoice date is less than '2014-01-01'. Lowest invoice month first."
+}

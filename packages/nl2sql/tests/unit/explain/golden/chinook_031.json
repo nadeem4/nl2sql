@@ -1,0 +1,28 @@
+{
+  "sub_query_id": "chinook_031",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "InvoiceLine",
+    "Track",
+    "Genre"
+  ],
+  "joins": [
+    "each InvoiceLine to its Track, on TrackId (declared key)",
+    "each Track to its Genre, on GenreId (declared key)"
+  ],
+  "filters": [],
+  "groupings": [
+    "by Genre id",
+    "by Genre name"
+  ],
+  "measures": [
+    "revenue: total of InvoiceLine unit price times InvoiceLine quantity, rounded to 2 places"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Sum price times quantity per genre.",
+  "text": "Shows Genre name and revenue, by Genre id and Genre name. Reads InvoiceLine, Track and Genre."
+}

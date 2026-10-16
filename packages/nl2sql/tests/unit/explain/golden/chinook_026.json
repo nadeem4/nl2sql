@@ -1,0 +1,29 @@
+{
+  "sub_query_id": "chinook_026",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer",
+    "Invoice"
+  ],
+  "joins": [
+    "each Customer to its Invoice, on CustomerId (declared key)"
+  ],
+  "filters": [
+    "for each group, total of Invoice total is more than 45"
+  ],
+  "groupings": [
+    "by Customer id",
+    "by Customer first name",
+    "by Customer last name"
+  ],
+  "measures": [
+    "total spend: total of Invoice total, rounded to 2 places"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Customers whose invoice totals sum to more than 45.",
+  "text": "Shows Customer first name, Customer last name and total spend, by Customer id, Customer first name and Customer last name. Reads Customer and Invoice. Keeps the groups where total of Invoice total is more than 45."
+}
