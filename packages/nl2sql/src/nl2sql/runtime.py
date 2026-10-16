@@ -132,14 +132,14 @@ class Runtime:
             problem("embeddings.provider" if isinstance(e, RegistryError) else "embeddings", str(e))
 
         self.curated = config.curated
-        # The curated section's own file and its hash as loaded: accept refuses a file changed since (D42).
+        # The hash of the curated section's own file as the config holds it: accept refuses a file changed
+        # since the config was loaded (D42).
         self.curated_sha256 = None
         if config.curated is not None:
             from nl2sql.config.curated import check_curated
-            from nl2sql.review.curated_file import curated_path, file_sha256
+            from nl2sql.review.curated_file import loaded_sha256
 
-            path = curated_path(config)
-            self.curated_sha256 = file_sha256(path) if path is not None else None
+            self.curated_sha256 = loaded_sha256(config)
 
             dialects = {ds_id: self.ds_registry.get_dialect(ds_id) for ds_id in self.ds_registry.list_ids()}
             for issue in check_curated(config.curated, dialects):

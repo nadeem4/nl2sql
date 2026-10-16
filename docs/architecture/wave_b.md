@@ -1513,7 +1513,13 @@ flowchart TD
       revives a superseded row proposed again, and publishes `proposal.created`
       for a new or revived row only. `table_names(ctx, datasource_id, pairs)`
       turns `(schema or "", table)` pairs into `datasource.schema.table`, the
-      adapter's default schema filling a blank.
+      adapter's default schema filling a blank. **`propose` completes
+      `tables`** with `named_tables(ctx, proposal)`: the table of a `table`,
+      a `column`'s table, both sides of a `join`, a `term`'s `tables` and its
+      `columns`' tables, and the tables a `verified_query`'s SQL reads. A
+      caller sees a proposal only when their scope reaches all of them, so a
+      track that forgets one cannot leak a denied table; P1, F1 and L2 should
+      still pass `tables` themselves.
     - **Visibility and deciding.** `visible(ctx, user, proposal)`: the caller's
       `Scope` must reach the datasource and every name in `tables` (no text
       mention check, unlike K1's knowledge filter). `caller(value)` raises
@@ -1525,22 +1531,32 @@ flowchart TD
       `reject(ctx, reasons, by)` (reasons maps id to reason). Unknown or
       decided ids are named in `AcceptReport.refused` by `accept`; `reject`
       refuses the whole call with `ReviewError(NOT_FOUND)`. Every lock
-      (`accept:<real path>`, `LOCK_TTL_S` 60; an accept waits up to
+      (`accept:<real path>`, `LOCK_TTL_S` 60; a caller waits up to
       `LOCK_WAIT_S` 10 s for another) is taken and every file's hash checked
-      before the first write. A per-item failure (the glossary's validation, the
+      before the first write. Each file's items are decided (stored,
+      `decide_proposal`, `proposal.decided`) under the locks right after that
+      file's write, and every item is re-read as still proposed under the
+      locks; `reject` takes the same locks. So an id is accepted once, and a
+      failed second write leaves the first file's items accepted and the
+      second's proposed. `apply` passes `replace=True`: the file's `change`
+      replaces the stored one. A per-item failure (the glossary's validation, the
       curated checks, a verified query id already taken) leaves that item
       proposed in `refused`. `files_written` and `wrote` are paths relative to
       the folder of `nl2sql.yaml`. The accepted row keeps its `id` and stores the
       `change` as accepted (edits included).
     - **The curated file.** `nl2sql/review/curated_file.py`: `curated_path(config)`
       (None when inline, absent or built in code), `file_sha256`,
-      `canonical_curated(curated)` and `write_curated(path, curated,
-      expected_sha256) -> str`. `Runtime.curated_sha256` is the file's hash,
-      taken in `components()`; `Runtime.replace_curated(curated, *, sha256)` swaps
+      `canonical_curated(curated)`, `write_curated(path, curated,
+      expected_sha256) -> str` and `loaded_sha256(config)`.
+      `Runtime.curated_sha256` is taken in `components()`: the file is read
+      once, hashed and parsed, and when the parse is not `config.curated` (an
+      edit after the config was loaded) the hash is `STALE`, so accept refuses
+      with `FILE_CHANGED`; `Runtime.replace_curated(curated, *, sha256)` swaps
       `config.curated`, `curated` and the hash under the lock. The refresh runs
       `rebuild_index(ctx, datasource_ids=..., curated_only=True)` (the index
-      lock, `IndexingOrchestrator.refresh_curated`); a datasource that cannot be
-      refreshed is a warning, not a failure. K3 renames that call.
+      lock, `IndexingOrchestrator.refresh_curated`, which section 5 names
+      directly); a datasource that cannot be refreshed is a warning, not a
+      failure. K3 renames that call, in `_refreshed()` in `review/accept.py`.
     - **The review file.** `nl2sql/review/review_file.py`: `render(proposals)`
       and `read(path) -> ReviewFile` (`ReviewItem`: `id`, `decision`, `reason`,
       `change`; other keys ignored). `apply` merges an edited `change` over the
@@ -1559,8 +1575,12 @@ flowchart TD
       `proposals` (decided rows past `settings.review.max_age_days`).
       `proposal.decided` is published per decision (the audit set was B0's).
       `nl2sql review list`, `show`, `accept`, `reject`, `export`, `apply`, with
-      `--as` and `--user` through K1's `caller`; `show` reads the current value
-      through `engine.knowledge.show` and `engine.config.curated`.
+      `--as` and `--user` through K1's `caller`. `engine.proposals.current(id, *,
+      user_context)` is new (a read method, so it takes the caller): what the
+      proposal would replace, through `current_value` in `review/queue.py`; a
+      curated query whose SQL reads a table outside the caller's scope is
+      None. `review show` prints it. A thumbs-up whose proposal cannot be filed
+      is logged; `feedback.record` still returns the stored rating.
     - **Tests.** `tests/unit/test_review_queue.py` (every Q1 test the row names,
       and the CLI); `test_only_accept_writes_a_persons_file` in
       `tests/architecture/test_boundaries.py`, which also lists

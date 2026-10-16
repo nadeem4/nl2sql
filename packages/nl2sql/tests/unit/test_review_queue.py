@@ -234,23 +234,190 @@ def test_concurrent_accepts_do_not_lose_a_write(engine, tmp_path):
     assert "four" in {q["id"] for q in _curated_file(tmp_path)["datasources"]["shop"]["verified_queries"]}
 
 
-def test_the_same_proposal_accepted_twice_at_once_is_accepted_once(engine):
+def _gate_first_decision(engine, monkeypatch):
+    """Hold the first ``decide_proposal`` call until ``release`` is set; ``entered`` is set when it is held."""
+    state = engine._runtime.state
+    real = state.decide_proposal
+    entered, release, calls = threading.Event(), threading.Event(), []
+
+    def gated(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 1:
+            entered.set()
+            assert release.wait(10)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(state, "decide_proposal", gated)
+    return entered, release
+
+
+def _second_lock_attempt(engine, monkeypatch):
+    """An event set when a second caller asks for an ``accept:`` lock (it then waits for the first)."""
+    state = engine._runtime.state
+    real = state.lock
+    attempted, calls = threading.Event(), []
+
+    def watched(name, ttl_s):
+        calls.append(name)
+        if len(calls) >= 2:
+            attempted.set()
+        return real(name, ttl_s)
+
+    monkeypatch.setattr(state, "lock", watched)
+    return attempted
+
+
+def _in_thread(fn):
+    out = {}
+
+    def run():
+        try:
+            out["value"] = fn()
+        except Exception as e:
+            out["error"] = e
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread, out
+
+
+def test_the_same_proposal_accepted_twice_at_once_is_accepted_once(engine, monkeypatch):
+    from nl2sql.review import accept as accept_module
+
     proposal = _proposal(engine)
-    start = threading.Barrier(2)
-    reports = []
+    writes = []
+    real_write = accept_module.write_glossary
+    monkeypatch.setattr(accept_module, "write_glossary", lambda *a, **k: (writes.append(1), real_write(*a, **k))[1])
+    entered, release = _gate_first_decision(engine, monkeypatch)
+    attempted = _second_lock_attempt(engine, monkeypatch)
 
-    def accept():
-        start.wait()
-        reports.append(engine.proposals.accept(proposal.id, by=ADMIN))
+    first, first_out = _in_thread(lambda: engine.proposals.accept(proposal.id, by=ADMIN))
+    assert entered.wait(10)  # the first accept has written the file and is recording its decision
+    second, second_out = _in_thread(lambda: engine.proposals.accept(proposal.id, by=ADMIN))
+    assert attempted.wait(10)  # the second call is at the lock
+    release.set()
+    first.join()
+    second.join()
 
-    threads = [threading.Thread(target=accept) for _ in range(2)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
+    reports = [first_out["value"], second_out["value"]]
+    assert [len(r.accepted) for r in reports] == [1, 0]
+    assert proposal.id in reports[1].refused and reports[1].files_written == []
+    assert len(writes) == 1
 
-    assert sorted(len(r.accepted) for r in reports) == [0, 1]
-    assert sum(proposal.id in r.refused for r in reports) == 1
+
+def test_a_reject_waits_for_an_accept_in_flight(engine, monkeypatch):
+    proposal = _proposal(engine)
+    entered, release = _gate_first_decision(engine, monkeypatch)
+    attempted = _second_lock_attempt(engine, monkeypatch)
+
+    first, first_out = _in_thread(lambda: engine.proposals.accept(proposal.id, by=ADMIN))
+    assert entered.wait(10)
+    second, second_out = _in_thread(lambda: engine.proposals.reject(proposal.id, by=ADMIN))
+    assert attempted.wait(10)  # the second call is at the lock
+    release.set()
+    first.join()
+    second.join()
+
+    assert [p.id for p in first_out["value"].accepted] == [proposal.id]
+    assert isinstance(second_out.get("error"), ReviewError)
+    assert second_out["error"].code == ReviewErrorCode.NOT_FOUND
+    assert engine.proposals.get(proposal.id, user_context=ADMIN).status == "accepted"
+
+
+def test_a_failed_second_write_keeps_the_first_files_decisions(engine, tmp_path, monkeypatch):
+    from nl2sql.review import accept as accept_module
+
+    column, query = _proposal(engine), _verified(engine)
+
+    def refuse(*args, **kwargs):
+        raise ReviewError(ReviewErrorCode.NOT_WRITABLE, "curated.yaml cannot be replaced.")
+
+    monkeypatch.setattr(accept_module, "write_curated", refuse)
+    with pytest.raises(ReviewError):
+        engine.proposals.accept([column.id, query.id], by=ADMIN)
+
+    # The glossary was written, so its item is accepted; the curated one is still open.
+    assert engine.proposals.get(column.id, user_context=ADMIN).status == "accepted"
+    assert engine.proposals.get(query.id, user_context=ADMIN).status == "proposed"
+    assert "Order total in USD." in (tmp_path / "glossary.yaml").read_text(encoding="utf-8")
+
+
+def test_curated_yaml_edited_before_the_engine_was_built_is_not_overwritten(tmp_path):
+    config = _project(tmp_path)
+    by_hand = yaml.safe_load((tmp_path / "curated.yaml").read_text(encoding="utf-8"))
+    by_hand["datasources"]["shop"]["verified_queries"].append({
+        "id": "by_hand", "description": "Written after the config was loaded.",
+        "questions": ["How many customers?"], "sql": "SELECT COUNT(*) FROM customers"})
+    (tmp_path / "curated.yaml").write_text(yaml.safe_dump(by_hand, sort_keys=False), encoding="utf-8")
+
+    with _engine(config) as engine:
+        proposal = _verified(engine)
+        with pytest.raises(ReviewError) as error:
+            engine.proposals.accept(proposal.id, by=ADMIN)
+
+    assert error.value.code == ReviewErrorCode.FILE_CHANGED
+    assert "by_hand" in (tmp_path / "curated.yaml").read_text(encoding="utf-8")
+
+
+def test_proposal_tables_cover_every_table_its_change_names(engine):
+    term = _proposal(engine, kind="term", target="payroll", tables=(),
+                     change={"term": "payroll", "definition": "Sum of pay.", "columns": ["salaries.amount"]})
+    join = _proposal(engine, kind="join", target="salaries.id->customers.id", tables=(),
+                     change={"from": "salaries.id", "to": "customers.id"})
+    query = _proposal(engine, kind="verified_query", target="Pay?", tables=(), origin="correction",
+                      change={"id": "pay", "description": "Pay.", "questions": ["Pay?"],
+                              "sql": "SELECT amount FROM salaries"})
+
+    assert term.tables == ["shop.main.salaries"]
+    assert join.tables == ["shop.main.customers", "shop.main.salaries"]
+    assert query.tables == ["shop.main.salaries"]
+    seen = {p.id for p in engine.proposals.list(user_context=ANALYST, status=None)}
+    assert not seen & {term.id, join.id, query.id}
+
+
+def test_current_value_is_shown_only_when_the_caller_may_see_it(engine):
+    clash = _verified(engine, qid="order_count", question="Count the orders")
+    assert engine.proposals.current(clash.id, user_context=ADMIN)["sql"].startswith("SELECT COUNT(*)")
+    table = _proposal(engine, target="orders", kind="table", change={"description": "Orders."})
+    assert engine.proposals.current(table.id, user_context=ADMIN)["description"] == "One row per order."
+
+    # A curated query with the proposal's id that reads a denied table is not shown.
+    ctx = engine._runtime
+    ctx.replace_curated(ctx.curated.model_validate({"datasources": {"shop": {"verified_queries": [{
+        "id": "order_count", "description": "Pay.", "questions": ["Pay?"],
+        "sql": "SELECT amount FROM salaries"}]}}}), sha256=ctx.curated_sha256)
+    assert engine.proposals.current(clash.id, user_context=ANALYST) is None
+    assert engine.proposals.current(clash.id, user_context=ADMIN)["id"] == "order_count"
+
+
+def test_a_failed_proposal_never_fails_the_rating(engine, monkeypatch, caplog):
+    from nl2sql.review import queue
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the queue is down")
+
+    monkeypatch.setattr(queue, "propose", broken)
+    row = engine.feedback.record(_result(), question="What is the revenue?", role="admin", rating="up")
+
+    assert row["rating"] == "up"
+    assert "the queue is down" in caplog.text
+
+
+def test_apply_replaces_a_change_rather_than_merging(engine, tmp_path):
+    proposal = _proposal(engine, change={"description": "Order total.", "role": "money", "unit": "USD"})
+    path = tmp_path / "review.yaml"
+    engine.proposals.export(path, user_context=ADMIN)
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    [item] = document["proposals"]
+    item["decision"] = "accept"
+    del item["change"]["unit"]
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    report = engine.proposals.apply(path, by=ADMIN)
+
+    assert report.accepted[0].change == {"description": "Order total.", "role": "money"}
+    column = engine._runtime.knowledge.get("shop").columns["orders.total"]
+    assert column.role == "money" and column.unit is None
 
 
 def test_accepting_many_writes_each_file_once(engine, tmp_path, monkeypatch):

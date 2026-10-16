@@ -122,7 +122,7 @@ engine.storage       # info, purge
 engine.events        # subscribe, catalog
 engine.evals         # load, run, regenerate, scorers
 engine.knowledge     # sources, show, export, reload; profile, save_choice (0.8; stubs until then)
-engine.proposals     # list, get, accept, reject, export, apply (the review queue)
+engine.proposals     # list, get, current, accept, reject, export, apply (the review queue)
 ```
 
 | namespace | reference |
@@ -138,7 +138,7 @@ engine.proposals     # list, get, accept, reject, export, apply (the review queu
 | `events` | [Events](../../observability/events.md) |
 | `evals` | [Evals](../../evals/index.md) |
 | `knowledge` | [Knowledge](../../configuration/knowledge.md): `sources`, `show`, `export` and `reload`. `profile` and `save_choice` have their final signatures and raise `NotImplementedError`, naming the change that builds them, until release 0.8. Each read takes `user_context` as a required keyword. |
-| `proposals` | [The review queue](../../configuration/review.md): `list`, `get`, `accept`, `reject`, `export` and `apply`. Each read takes `user_context` as a required keyword; deciding takes `by`, a caller with an admin role. |
+| `proposals` | [The review queue](../../configuration/review.md): `list`, `get`, `current`, `accept`, `reject`, `export` and `apply`. Each read takes `user_context` as a required keyword; deciding takes `by`, a caller with an admin role. |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.

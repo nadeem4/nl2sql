@@ -837,7 +837,7 @@ def test_every_access_decision_goes_through_scope():
 # ``datasources.schema()`` do.
 WAVE_B_READ_METHODS = {
     ("api/knowledge_api.py", "KnowledgeAPI"): ("sources", "show", "export", "reload", "profile", "save_choice"),
-    ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "export"),
+    ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "current", "export"),
 }
 
 

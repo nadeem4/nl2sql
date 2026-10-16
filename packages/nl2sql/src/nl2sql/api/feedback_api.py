@@ -11,7 +11,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Union
 
+from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
+
+logger = get_logger(__name__)
 
 
 class FeedbackAPI:
@@ -61,7 +64,11 @@ class FeedbackAPI:
             if "SECURITY_VIOLATION" in row["error_codes"]:
                 row["sql"] = []
         stored = self._ctx.state.add_feedback(rated_row(row, rating, note))
-        self._propose(stored)
+        try:
+            self._propose(stored)
+        except Exception as e:  # the rating is stored; a queue that cannot take the proposal never fails it
+            logger.warning("The thumbs-up of run %s was stored, but its verified-query proposal was not filed: %s",
+                           stored.get("trace_id"), e)
         return stored
 
     def list(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:

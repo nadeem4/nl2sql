@@ -544,7 +544,7 @@ The engine writes two files a person owns, and only from the review queue's acce
 - `packages/nl2sql/tests/unit/test_review_queue.py`: the admin role, the hash check, the lock, an inline section, the curated checks
 
 ### Failure Behavior
-`ReviewError` with `NOT_AUTHORIZED`, `NOT_WRITABLE` or `FILE_CHANGED`, and nothing written: every file is locked and checked before the first write. An item whose change fails its checks stays proposed and is named in `AcceptReport.refused`; the others are written.
+`ReviewError` with `NOT_AUTHORIZED`, `NOT_WRITABLE` or `FILE_CHANGED`, and nothing written: every file is locked and checked before the first write. Each file's items are recorded as accepted under its lock right after its write, so the queue always matches the files: if a later write fails, the items already written stay accepted and the rest stay proposed. An item whose change fails its checks stays proposed and is named in `AcceptReport.refused`; the others are written.
 
 ### Why It Exists
 The glossary and the curated answers are what people know and vouch for. An engine that edited them on its own would turn a model's guess into a fact without anyone deciding so, and two writers that did not check the file would lose a person's edit.

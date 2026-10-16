@@ -26,7 +26,7 @@ from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
 
 if TYPE_CHECKING:
-    from nl2sql import AcceptReport, NL2SQL, Proposal, UserContext
+    from nl2sql import AcceptReport
 
 app = typer.Typer(help="The review queue: `list`, `show`, `accept`, `reject`, `export`, `apply`.",
                   no_args_is_help=True)
@@ -80,28 +80,6 @@ def _print_report(report: "AcceptReport") -> None:
         console.print(f"[red]refused[/red] {escape(proposal_id)}: {escape(reason)}", soft_wrap=True)
 
 
-def _current(engine: "NL2SQL", proposal: "Proposal", who: "UserContext") -> Any:
-    """What the proposal would replace: the glossary's item as the engine uses it, or the curated query."""
-    if proposal.kind == "verified_query":
-        curated = engine.config.curated
-        section = curated.datasources.get(proposal.datasource_id) if curated else None
-        query_id = proposal.change.get("id")
-        found = next((q for q in (section.verified_queries if section else []) if q.id == query_id), None)
-        return found.model_dump(mode="json", exclude_defaults=True) if found else None
-    views = engine.knowledge.show(proposal.datasource_id, user_context=who)
-    if not views:
-        return None
-    knowledge, target = views[0].knowledge, proposal.target.strip().lower()
-    if proposal.kind in ("table", "column"):
-        items = knowledge.tables if proposal.kind == "table" else knowledge.columns
-        item = next((v for k, v in items.items() if k.strip().lower() == target), None)
-    elif proposal.kind == "term":
-        item = next((t for t in knowledge.terms if t.term.strip().lower() == target), None)
-    else:
-        return None
-    return item.model_dump(mode="json", by_alias=True, exclude_defaults=True) if item else None
-
-
 @app.command("list")
 def list_command(ctx: typer.Context, kind: KindOption = None, datasource: DatasourceOption = None,
                  status: Annotated[str, typer.Option(
@@ -126,12 +104,13 @@ def show_command(ctx: typer.Context, proposal_id: Annotated[str, typer.Argument(
     engine, who = _engine_and_caller(ctx, as_, user)
     with engine:
         proposal = _run(lambda: engine.proposals.get(proposal_id, user_context=who))
-        current = _current(engine, proposal, who)
+        current = engine.proposals.current(proposal_id, user_context=who)
     console.print(f"[bold]{escape(proposal.id)}[/bold] {escape(proposal.status)} {escape(proposal.kind)} "
                   f"in {escape(proposal.datasource_id)}: {escape(proposal.target)}", soft_wrap=True)
     console.print(f"  origin: {escape(proposal.origin)}; created {proposal.created_at.isoformat(timespec='seconds')}"
                   f"{' by ' + escape(proposal.created_by) if proposal.created_by else ''}", soft_wrap=True)
-    console.print(f"  current:  {escape(_compact(current)) if current is not None else '(none)'}", soft_wrap=True)
+    console.print(f"  current:  {escape(_compact(current)) if current is not None else '(none you can see)'}",
+                  soft_wrap=True)
     console.print(f"  proposed: {escape(_compact(proposal.change))}", soft_wrap=True)
     if proposal.evidence:
         console.print(f"  evidence: {escape(_compact(proposal.evidence))}", soft_wrap=True)

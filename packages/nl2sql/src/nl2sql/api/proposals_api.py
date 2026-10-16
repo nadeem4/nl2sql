@@ -57,6 +57,20 @@ class ProposalsAPI:
                               fix="List the queue (engine.proposals.list) for the ids you can see.")
         return proposal
 
+    def current(self, id: str, *, user_context: "UserContext") -> Optional[Dict[str, Any]]:
+        """What the proposal would replace, beside its ``change``: the glossary item as the caller sees it, or
+        the curated query with the same id. None when there is none, or the caller may not see it (a curated
+        query reading a table outside their scope).
+
+        Raises:
+            TypeError: ``user_context`` is not a ``UserContext``.
+            ReviewError: ``NOT_FOUND``, as ``get``.
+        """
+        from nl2sql.review.queue import caller, current_value
+
+        who = caller(user_context)
+        return current_value(self._ctx, who, self.get(id, user_context=who))
+
     def accept(self, ids: Union[str, Sequence[str]], *, by: "UserContext",
                edits: Optional[Dict[str, Dict[str, Any]]] = None) -> "AcceptReport":
         """Accept one id or a list, writing each file once. ``edits`` maps an id to a dict merged over its
@@ -113,8 +127,8 @@ class ProposalsAPI:
         return len(proposals)
 
     def apply(self, path: PathLike, *, by: "UserContext") -> "AcceptReport":
-        """Read a review file: accept the items marked ``accept`` (their edited ``change`` merged over the
-        stored one) and reject those marked ``reject`` (with their ``reason``).
+        """Read a review file: accept the items marked ``accept`` (their ``change`` in the file replaces the
+        stored one, so a reviewer can remove a key) and reject those marked ``reject`` (with their ``reason``).
 
         Items left empty stay proposed. An id that is unknown or no longer
         proposed is named in ``refused``; the rejected ones are in ``rejected``.
@@ -145,7 +159,7 @@ class ProposalsAPI:
                     edits[item.id] = item.change
             else:
                 reasons[item.id] = item.reason
-        report = accept(self._ctx, to_accept, by, edits)
+        report = accept(self._ctx, to_accept, by, edits, replace=True)
         report.refused.update(refused)
         report.rejected = reject(self._ctx, reasons, by) if reasons else []
         return report

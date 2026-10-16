@@ -45,6 +45,32 @@ def file_sha256(path: Path) -> Optional[str]:
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
+STALE = "stale"  # the file no longer holds the section the config loaded: accept refuses with FILE_CHANGED
+
+
+def loaded_sha256(config: "Config") -> Optional[str]:
+    """The hash of the curated section's own file, when it still holds the section ``config`` loaded.
+
+    The file is read once: its bytes are hashed and parsed. When the parse is
+    not ``config.curated`` (a person edited the file after the config was
+    loaded), the hash is ``STALE``, which no file matches, so accept refuses
+    rather than write over the edit. None when the section has no file.
+    """
+    from pydantic import ValidationError
+
+    from nl2sql.config import Curated
+
+    path = curated_path(config)
+    if path is None:
+        return None
+    try:
+        data = Path(path).read_bytes()
+        loaded = Curated.model_validate(yaml.safe_load(data) or {})
+    except (OSError, yaml.YAMLError, ValidationError):
+        return STALE
+    return hashlib.sha256(data).hexdigest() if loaded == config.curated else STALE
+
+
 class _Dumper(yaml.SafeDumper):
     """Multi-line text (the SQL) as a literal block, so the file reads as written."""
 

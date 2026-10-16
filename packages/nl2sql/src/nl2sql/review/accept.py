@@ -5,16 +5,24 @@ glossary (``table``, ``column``, ``join`` and ``term`` proposals) and the
 ``curated`` section's own file (``verified_query`` proposals). It groups the
 accepted items by file and, for each file, takes the state store's lock
 ``accept:<real path>``, checks the file's hash once, applies every item, writes
-once and reloads once. Every lock is taken and every file is checked before the
-first write, so a refused call writes nothing.
+once and reloads once. Every lock is taken and every file's hash is checked
+before the first write, so a call refused by those checks writes nothing.
+
+Each file's items are recorded as accepted (and ``proposal.decided``
+published) right after that file is written, still under the locks, so a
+second accept or a reject of the same id waits and then finds it decided. If
+the second file's write then fails, the first file's items stay accepted and
+the second file's stay proposed: the queue always matches the files.
 
 An item that cannot be applied (its change does not validate, the curated
 checks refuse its SQL, an id that is taken) is left proposed and reported in
 ``AcceptReport.refused``; the rest are written. After a glossary write the
 knowledge is reloaded; after a curated write the runtime's section is swapped
 (``Runtime.replace_curated``) and each datasource's curated entries are
-refreshed in the index (``IndexingOrchestrator.refresh_curated``, through
-``rebuild_index(curated_only=True)``), so the next question can match it.
+refreshed in the index: ``rebuild_index(curated_only=True)``, which runs
+``IndexingOrchestrator.refresh_curated``, so the next question can match it.
+``reject`` takes the same locks, so it never decides an item an accept in
+flight is writing.
 """
 from __future__ import annotations
 
@@ -34,16 +42,23 @@ from nl2sql.review.queue import who
 GLOSSARY = "glossary"
 CURATED = "curated"
 LOCK_TTL_S = 60
-LOCK_WAIT_S = 10.0  # how long an accept waits for another accept of the same file
+LOCK_WAIT_S = 10.0  # how long an accept or reject waits for another of the same file
 
 
-def accept(ctx: Any, ids: Sequence[str], by: Any, edits: Optional[Mapping[str, Mapping[str, Any]]] = None
-           ) -> AcceptReport:
-    """Accept the proposals ``ids``, ``edits`` merged over their ``change``. ``by`` is already checked as an
-    admin."""
+def _kind(proposal: Proposal) -> str:
+    return CURATED if proposal.kind == "verified_query" else GLOSSARY
+
+
+def accept(ctx: Any, ids: Sequence[str], by: Any, edits: Optional[Mapping[str, Mapping[str, Any]]] = None,
+           *, replace: bool = False) -> AcceptReport:
+    """Accept the proposals ``ids``. ``by`` is already checked as an admin.
+
+    ``edits`` maps an id to a dict merged over its ``change``; with
+    ``replace`` (a review file's ``apply``) the dict replaces the change.
+    """
     report = AcceptReport()
     edits = dict(edits or {})
-    wanted: List[Proposal] = []
+    groups: Dict[str, List[Proposal]] = {}
     for proposal_id in dict.fromkeys(ids):
         proposal = ctx.state.get_proposal(proposal_id)
         if proposal is None:
@@ -51,67 +66,82 @@ def accept(ctx: Any, ids: Sequence[str], by: Any, edits: Optional[Mapping[str, M
         elif proposal.status != "proposed":
             report.refused[proposal_id] = f"It is {proposal.status}, not proposed."
         else:
-            change = {**proposal.change, **dict(edits.get(proposal_id) or {})}
-            wanted.append(proposal.model_copy(update={"change": change}))
-    if not wanted:
+            edit = edits.get(proposal_id)
+            change = dict(edit) if replace and edit is not None else {**proposal.change, **dict(edit or {})}
+            groups.setdefault(_kind(proposal), []).append(proposal.model_copy(update={"change": change}))
+    if not groups:
         return report
 
-    groups: Dict[str, List[Proposal]] = {}
-    for proposal in wanted:
-        groups.setdefault(CURATED if proposal.kind == "verified_query" else GLOSSARY, []).append(proposal)
     targets = {kind: _target(ctx, kind) for kind in groups}
     with ExitStack() as held:
-        for kind in sorted(groups, key=lambda k: str(targets[k])):
-            held.enter_context(_locked(ctx, f"accept:{os.path.realpath(targets[kind])}"))
+        _lock_all(ctx, held, targets.values())
         # Read under the locks: another accept may just have decided an item, written and reloaded.
         for kind, items in groups.items():
             groups[kind] = [p for p in items if _still_proposed(ctx, p, report)]
-        if GLOSSARY in groups:
-            glossary_plan = _plan_glossary(ctx, groups[GLOSSARY], report)
-        if CURATED in groups:
-            curated_plan = _plan_curated(ctx, groups[CURATED], report)
-        # Every file is checked before the first write, so a refused call writes nothing.
-        if GLOSSARY in groups and glossary_plan[1]:
+        glossary_plan = _plan_glossary(ctx, groups[GLOSSARY], report) if groups.get(GLOSSARY) else None
+        curated_plan = _plan_curated(ctx, groups[CURATED], report) if groups.get(CURATED) else None
+        # Every file is checked before the first write, so a call refused here writes nothing.
+        if glossary_plan and glossary_plan[1]:
             _unchanged(targets[GLOSSARY], glossary_plan[0].sha256)
-        if CURATED in groups and curated_plan[1]:
+        if curated_plan and curated_plan[1]:
             _unchanged(targets[CURATED], ctx.curated_sha256)
-        written: List[Tuple[str, List[Proposal]]] = []
-        if GLOSSARY in groups and glossary_plan[1]:
-            written.append(_write_glossary(ctx, *glossary_plan))
-        if CURATED in groups and curated_plan[1]:
-            written.append(_write_curated(ctx, *curated_plan, report))
+        if glossary_plan and glossary_plan[1]:
+            _decide_written(ctx, report, by, *_write_glossary(ctx, *glossary_plan))
+        if curated_plan and curated_plan[1]:
+            _decide_written(ctx, report, by, *_write_curated(ctx, *curated_plan, report))
 
-    for label, applied in written:
-        report.files_written.append(label)
-        for proposal in applied:
-            ctx.state.put_proposal(proposal)  # the change as accepted, edits included
-            decided = ctx.state.decide_proposal(proposal.id, "accepted", by=who(by), wrote=label)
-            report.accepted.append(decided)
-            _published(ctx, decided, "accepted")
-    if GLOSSARY in groups and glossary_plan[1]:
+    if glossary_plan and glossary_plan[1]:
         report.warnings.extend(_shadowed(ctx, glossary_plan[1]))
-    if CURATED in groups and curated_plan[1]:
+    if curated_plan and curated_plan[1]:
         report.warnings.extend(_refreshed(ctx, sorted({p.datasource_id for p in curated_plan[1]})))
     return report
+
+
+def _decide_written(ctx: Any, report: AcceptReport, by: Any, label: str, applied: List[Proposal]) -> None:
+    """Record one written file's items as accepted, under its lock."""
+    report.files_written.append(label)
+    for proposal in applied:
+        ctx.state.put_proposal(proposal)  # the change as accepted, edits included
+        decided = ctx.state.decide_proposal(proposal.id, "accepted", by=who(by), wrote=label)
+        report.accepted.append(decided)
+        _published(ctx, decided, "accepted")
 
 
 def reject(ctx: Any, reasons: Mapping[str, Optional[str]], by: Any) -> List[Proposal]:
     """Reject each id with its reason. Every id must be proposed, or nothing is rejected.
 
+    Takes the locks of the files the ids would be accepted into, so an accept
+    in flight finishes first.
+
     Raises:
         ReviewError: ``NOT_FOUND``, naming the ids that are missing or no longer proposed.
     """
-    rows = {proposal_id: ctx.state.get_proposal(proposal_id) for proposal_id in reasons}
-    missing = [i for i, row in rows.items() if row is None or row.status != "proposed"]
-    if missing:
-        raise ReviewError(ReviewErrorCode.NOT_FOUND, f"No proposed item with the id(s) {', '.join(missing)}.",
-                          fix="List the queue (engine.proposals.list) for the open ids.")
-    rejected = []
-    for proposal_id, reason in reasons.items():
-        decided = ctx.state.decide_proposal(proposal_id, "rejected", by=who(by), reason=reason)
-        rejected.append(decided)
-        _published(ctx, decided, "rejected")
+    kinds = {_kind(row) for row in (ctx.state.get_proposal(i) for i in reasons) if row is not None}
+    targets = []
+    for kind in kinds:
+        try:
+            targets.append(_target(ctx, kind))
+        except ReviewError:
+            pass  # a file nothing can be accepted into: no accept to wait for
+    with ExitStack() as held:
+        _lock_all(ctx, held, targets)
+        rows = {proposal_id: ctx.state.get_proposal(proposal_id) for proposal_id in reasons}
+        missing = [i for i, row in rows.items() if row is None or row.status != "proposed"]
+        if missing:
+            raise ReviewError(ReviewErrorCode.NOT_FOUND, f"No proposed item with the id(s) {', '.join(missing)}.",
+                              fix="List the queue (engine.proposals.list) for the open ids.")
+        rejected = []
+        for proposal_id, reason in reasons.items():
+            decided = ctx.state.decide_proposal(proposal_id, "rejected", by=who(by), reason=reason)
+            rejected.append(decided)
+            _published(ctx, decided, "rejected")
     return rejected
+
+
+def _lock_all(ctx: Any, held: ExitStack, paths) -> None:
+    """Every ``accept:<real path>`` lock, in one order, so two callers never wait on each other in a circle."""
+    for name in sorted({f"accept:{os.path.realpath(path)}" for path in paths}):
+        held.enter_context(_locked(ctx, name))
 
 
 # ---------------------------------------------------------------- where each kind is written

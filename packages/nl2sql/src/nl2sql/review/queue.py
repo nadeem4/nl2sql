@@ -14,7 +14,7 @@ every table in its ``tables`` (D60); deciding needs ``by`` with an admin role.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 from nl2sql_sdk.stores import Proposal
 
@@ -91,12 +91,59 @@ def table_names(ctx: Any, datasource_id: str, tables: Iterable[Tuple[str, str]])
     return sorted({f"{datasource_id}.{schema or fallback}.{table}" for schema, table in tables})
 
 
+def _table_of(name: str) -> str:
+    """The table part of a column name: ``Invoice.Total`` is ``Invoice``, ``sales.Invoice.Total`` is ``sales.Invoice``."""
+    return name.rpartition(".")[0]
+
+
+def _sides(value: Any) -> List[str]:
+    return [value] if isinstance(value, str) else [v for v in value or [] if isinstance(v, str)]
+
+
+def named_tables(ctx: Any, proposal: Proposal) -> List[str]:
+    """Every table the proposal's target and change name, as ``datasource.schema.table``.
+
+    A table is ``table`` or ``schema.table``, a column ``table.column`` or
+    ``schema.table.column``; a verified query's tables are read from its SQL
+    in the datasource's dialect.
+    """
+    change, names = proposal.change, []
+    if proposal.kind == "table":
+        names = [proposal.target]
+    elif proposal.kind == "column":
+        names = [_table_of(proposal.target)]
+    elif proposal.kind == "join":
+        names = [_table_of(n) for n in _sides(change.get("from")) + _sides(change.get("to"))]
+    elif proposal.kind == "term":
+        names = _sides(change.get("tables")) + [_table_of(n) for n in _sides(change.get("columns"))]
+    elif proposal.kind == "verified_query" and isinstance(change.get("sql"), str):
+        from nl2sql.config.curated import inspect_verified_sql
+
+        try:
+            dialect = ctx.ds_registry.get_dialect(proposal.datasource_id)
+            pairs = inspect_verified_sql(change["sql"], dialect).tables
+        except Exception:  # not one read-only query, or no such datasource: nothing to read from it
+            pairs = []
+        return table_names(ctx, proposal.datasource_id, pairs)
+    pairs = []
+    for name in (n.strip() for n in names if n and n.strip()):
+        schema, _, table = name.rpartition(".")
+        pairs.append((schema, table))
+    return table_names(ctx, proposal.datasource_id, pairs)
+
+
 def propose(ctx: Any, proposal: Proposal) -> Proposal:
     """File ``proposal`` in the queue, by its identity and the supersede rule; return the row as stored.
 
-    Publishes ``proposal.created`` when the row is new, or was superseded and
-    is proposed again.
+    ``tables`` is completed with every table the target and change name
+    (``named_tables``), so a caller who cannot read one of them never sees it
+    (D60). Publishes ``proposal.created`` when the row is new, or was
+    superseded and is proposed again.
     """
+    given = {t.lower() for t in proposal.tables}
+    missing = [t for t in named_tables(ctx, proposal) if t.lower() not in given]
+    if missing:
+        proposal = proposal.model_copy(update={"tables": sorted([*proposal.tables, *missing])})
     state = ctx.state
     existing = state.get_proposal(proposal.id)
     if existing is not None and existing.status in ("accepted", "rejected"):
@@ -113,3 +160,42 @@ def propose(ctx: Any, proposal: Proposal) -> Proposal:
                                          "datasource_id": proposal.datasource_id, "origin": proposal.origin},
                     tenant_id=ctx.tenant_id)
     return proposal
+
+
+def current_value(ctx: Any, user: "UserContext", proposal: Proposal) -> Optional[Dict[str, Any]]:
+    """What ``proposal`` would replace, as ``user`` may see it; None when there is none or it is hidden.
+
+    For a glossary kind, the item in the merged knowledge as ``user`` sees it
+    (K1's ``engine.knowledge.show``, which hides an item on or mentioning a
+    denied table). For a verified query, the curated query with the same id,
+    only when ``user``'s scope reaches every table its SQL reads.
+    """
+    target = proposal.target.strip().lower()
+    if proposal.kind == "verified_query":
+        curated = ctx.curated
+        section = curated.datasources.get(proposal.datasource_id) if curated else None
+        found = next((q for q in (section.verified_queries if section else []) if q.id == proposal.change.get("id")),
+                     None)
+        if found is None:
+            return None
+        value = found.model_dump(mode="json", exclude_defaults=True)
+        probe = Proposal.build(kind="verified_query", datasource_id=proposal.datasource_id, target=proposal.target,
+                               change=value, origin=proposal.origin)
+        probe = probe.model_copy(update={"tables": named_tables(ctx, probe)})
+        return value if probe.tables and visible(ctx, user, probe) else None
+    from nl2sql.api.knowledge_api import KnowledgeAPI
+
+    views = KnowledgeAPI(ctx).show(proposal.datasource_id, user_context=user)
+    if not views:
+        return None
+    knowledge = views[0].knowledge
+    if proposal.kind in ("table", "column"):
+        items = knowledge.tables if proposal.kind == "table" else knowledge.columns
+        item = next((v for k, v in items.items() if k.strip().lower() == target), None)
+    elif proposal.kind == "term":
+        item = next((t for t in knowledge.terms if t.term.strip().lower() == target), None)
+    else:
+        item = next((j for j in knowledge.joins
+                     if "->".join(",".join(_sides(s)) for s in (j.from_, j.to)).lower() == target.replace(" ", "")),
+                    None)
+    return item.model_dump(mode="json", by_alias=True, exclude_defaults=True) if item is not None else None
