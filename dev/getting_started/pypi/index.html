@@ -5434,7 +5434,7 @@ See <a href="../../configuration/datasources/">Datasource config</a> for field d
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="nt">temperature</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># api_key is optional: without it OPENAI_API_KEY is read.</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nt">agents</span><span class="p">:</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">indexing_enrichment</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> model</span><span class="p">:</span><span class="w"> </span><span class="nv">gpt-5.4-mini</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">profiler</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> model</span><span class="p">:</span><span class="w"> </span><span class="nv">gpt-5.4-mini</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>To route chat through <a href="https://openrouter.ai">OpenRouter</a> instead — one key for
 Anthropic, Google, Meta and hundreds of other models, with no extra dependency:</p>
@@ -5484,7 +5484,7 @@ with a key-free ONNX model, and <code>provider: openai</code> needs <code>OPENAI
 <p>The <code>description</code> is indexed as given, even though no file lists
 <code>runtime_pg</code>, and the datasource joins <code>engine.config</code>. Indexing makes no LLM call unless you ask for one:
 <code>engine.index.build(["runtime_pg"], enrich=True)</code> has the
-<code>indexing_enrichment</code> agent write descriptions for tables and columns the
+<code>profiler</code> agent write descriptions for tables and columns the
 database left without a comment.</p>
 <p>You can also add the datasources of another config:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">load_config</span>

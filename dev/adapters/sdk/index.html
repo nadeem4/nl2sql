@@ -2547,6 +2547,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#optional-hooks-estimate-and-probe_overlap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hooks: estimate and probe_overlap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#result-types-every-adapter-returns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2589,6 +2600,17 @@
     <span class="md-ellipsis">
       
         Interface: PolicyCheck
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interface-knowledgesource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface: KnowledgeSource
       
     </span>
   </a>
@@ -5424,6 +5446,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#optional-hooks-estimate-and-probe_overlap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hooks: estimate and probe_overlap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#result-types-every-adapter-returns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5466,6 +5499,17 @@
     <span class="md-ellipsis">
       
         Interface: PolicyCheck
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interface-knowledgesource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interface: KnowledgeSource
       
     </span>
   </a>
@@ -5518,8 +5562,11 @@ extension implements. Its core depends on pydantic and the standard library only
 <li>Stores: the four protocols in <code>nl2sql_sdk.stores</code></li>
 <li>Policy checks: <code>nl2sql_sdk.policy.PolicyCheck</code>, with <code>UserContext</code> and
   <code>Grant</code></li>
+<li>Knowledge sources: <code>nl2sql_sdk.knowledge.KnowledgeSource</code>, with the
+  glossary's models; see <a href="#interface-knowledgesource">below</a></li>
 </ul>
-<p>Everything but the stores is also exported from <code>nl2sql_sdk</code> itself.</p>
+<p>The adapter's interfaces and models are exported from <code>nl2sql_sdk</code> itself;
+the stores, policy checks and knowledge sources are read from their modules.</p>
 <h2 id="interface-datasourceadapter">Interface: <code>DatasourceAdapter</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ConnectionCheck</span><span class="p">,</span> <span class="n">ConnectionModel</span><span class="p">,</span> <span class="n">DatasourceAdapter</span><span class="p">,</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                        <span class="n">DatasourceCapability</span><span class="p">,</span> <span class="n">IndexScope</span><span class="p">,</span> <span class="n">Limits</span><span class="p">,</span> <span class="n">ResultFrame</span><span class="p">,</span> <span class="n">SchemaSnapshot</span><span class="p">)</span>
@@ -5726,6 +5773,10 @@ server.</p>
 <td style="text-align: left;"><code>ENFORCES_TIMEOUT</code></td>
 <td style="text-align: left;">A statement running past <code>limits.timeout_ms</code> is stopped by the server or the driver.</td>
 </tr>
+<tr>
+<td style="text-align: left;"><code>ESTIMATES_COST</code></td>
+<td style="text-align: left;">The adapter has <code>estimate(sql, parameters)</code> (<a href="#optional-hooks-estimate-and-probe_overlap">below</a>): the database's estimate of the rows a query reads, without running it. Release 0.8's cost rule reads it.</td>
+</tr>
 </tbody>
 </table>
 <h4 id="get_dialect-str"><code>get_dialect() -&gt; str</code></h4>
@@ -5851,6 +5902,36 @@ adapter written before the hook keeps working unchanged.</p>
 <a href="../sqlalchemy/">SQLAlchemy adapters</a>).</p>
 <p>The hook is an optional protocol rather than a required method, so an adapter
 without it needs no change.</p>
+<h3 id="optional-hooks-estimate-and-probe_overlap">Optional hooks: <code>estimate</code> and <code>probe_overlap</code></h3>
+<p>Two optional protocols in <code>nl2sql_sdk.protocols</code>, added for release 0.8
+(<a href="../../architecture/wave_b/">Wave B</a>, D45 and D52), found with <code>isinstance</code>
+as the two hooks above are. The adapter interface stays at version 2.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Protocol</th>
+<th style="text-align: left;">Method</th>
+<th style="text-align: left;">Contract</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>EstimatingAdapterProtocol</code></td>
+<td style="text-align: left;"><code>estimate(sql, parameters) -&gt; Estimate</code></td>
+<td style="text-align: left;">The database's estimate of the rows <code>sql</code> <em>reads</em>, without executing it, under <code>timeout_ms</code>; raise on failure. Declare <code>ESTIMATES_COST</code> with it.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ProfilingAdapterProtocol</code></td>
+<td style="text-align: left;"><code>probe_overlap(left, right, sample_rows) -&gt; Overlap</code></td>
+<td style="text-align: left;">Of up to <code>sample_rows</code> distinct non-null values of the column <code>left</code> (a <code>ColumnRef</code>), how many exist in <code>right</code>. Read-only, within the adapter's limits.</td>
+</tr>
+</tbody>
+</table>
+<p><code>Estimate</code> (<code>nl2sql_sdk.models</code>) has <code>rows</code> (the rows the query is expected
+to read, added up over the plan's scan operators: a full scan counts its
+table, not its filtered output), <code>cost</code> (the planner's own units, for
+display only) and <code>source</code> (what was read, for people). <code>Overlap</code> has
+<code>sampled</code> and <code>matched</code>. Wave B's C1 implements both on the built-ins.</p>
 <h3 id="result-types-every-adapter-returns">Result types every adapter returns</h3>
 <p>These are part of the contract, so the same plan gives the same values on
 every database:</p>
@@ -5959,7 +6040,7 @@ The storage config names one per slot by <code>type</code> (see
 <tbody>
 <tr>
 <td style="text-align: left;"><code>interface_version</code></td>
-<td style="text-align: left;"><code>2</code>. The engine accepts exactly the version it was built for. Version 2 added <code>StateStore.put_schema_diff</code> and <code>get_schema_diff</code> (schema drift); the version is one per kind, so a store of any slot declares <code>2</code>.</td>
+<td style="text-align: left;"><code>3</code>. The engine accepts exactly the version it was built for. Version 2 added <code>StateStore.put_schema_diff</code> and <code>get_schema_diff</code> (schema drift); version 3 the review queue's proposal methods and <code>BuildPointer.knowledge_hash</code>. The version is one per kind, so a store of any slot declares <code>3</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>slot</code></td>
@@ -5990,7 +6071,7 @@ The storage config names one per slot by <code>type</code> (see
 </tr>
 <tr>
 <td style="text-align: left;"><code>StateStore</code></td>
-<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code> (also deletes the diffs of the snapshots it deletes), <code>put_schema_diff(diff)</code> (keyed by <code>diff.datasource_id</code> and <code>diff.to_version</code>, which it requires; replaces one stored before), <code>get_schema_diff(datasource_id, schema_version)</code> (or <code>None</code>), <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>lock(name, ttl_s)</code>, <code>close()</code></td>
+<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code> (also deletes the diffs of the snapshots it deletes), <code>put_schema_diff(diff)</code> (keyed by <code>diff.datasource_id</code> and <code>diff.to_version</code>, which it requires; replaces one stored before), <code>get_schema_diff(datasource_id, schema_version)</code> (or <code>None</code>), <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>put_proposal(proposal)</code> (replaces the row with its id), <code>get_proposal(id)</code>, <code>list_proposals(kind=None, status=None, datasource_id=None, limit=None)</code> (newest first), <code>decide_proposal(id, status, *, by, reason=None, wrote=None, at=None)</code>, <code>purge_proposals(older_than)</code> (decided rows only), <code>lock(name, ttl_s)</code>, <code>close()</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>TraceStore</code></td>
@@ -6004,9 +6085,13 @@ The storage config names one per slot by <code>type</code> (see
 </table>
 <p>The models they exchange: <code>Entry</code> (<code>id</code>, <code>text</code>, <code>vector</code>, <code>metadata</code>), <code>Hit</code>
 (an entry with its <code>distance</code>, and its <code>vector</code> when asked for), <code>Filter</code>
-(<code>eq</code>, <code>ne</code> and <code>in</code>, all of which must hold) and <code>BuildPointer</code> (which build
-of a datasource is live, and the <code>schema_version</code> it was built from). The
-engine embeds; a store keeps the vectors it is handed.</p>
+(<code>eq</code>, <code>ne</code> and <code>in</code>, all of which must hold), <code>BuildPointer</code> (which build
+of a datasource is live, the <code>schema_version</code> it was built from, and the
+<code>curated_hash</code> and <code>knowledge_hash</code> it was built with) and <code>Proposal</code> (one
+row of the <a href="../../architecture/wave_b/#5-the-review-queue">review queue</a>: its
+<code>id</code> is a hash of its kind, datasource, target and change, which
+<code>Proposal.build(...)</code> computes). The engine embeds; a store keeps the
+vectors it is handed.</p>
 <p>A results store, sketched:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
@@ -6022,7 +6107,7 @@ engine embeds; a store keeps the vectors it is handed.</p>
 <a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
 <a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
 <a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="k">class</span><span class="w"> </span><span class="nc">BucketResults</span><span class="p">:</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
 <a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">slot</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"results"</span>
 <a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]]</span> <span class="o">=</span> <span class="n">BucketConfig</span>
 <a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
@@ -6092,6 +6177,49 @@ and <code>deny</code> patterns, written like a role's).</p>
 <p>Declare it in the <code>nl2sql.policy_checks</code> entry point group, or register it in
 code with <code>registry.add_policy_check(name, cls)</code> or
 <code>@registry.policy_check(name)</code>. No check is built in.</p>
+<hr />
+<h2 id="interface-knowledgesource">Interface: <code>KnowledgeSource</code></h2>
+<p>A knowledge source is where a glossary comes from: what people write about
+their data (descriptions, synonyms, column roles, joins, business terms,
+prose rules, example questions). The <code>knowledge</code> section names one per item
+by <code>type</code> (see <a href="../../configuration/system/#knowledge">Configuration</a>). It
+lives in <code>nl2sql_sdk.knowledge</code>, which imports only pydantic and the
+standard library, with the glossary's models (<code>Glossary</code>,
+<code>DatasourceKnowledge</code>, <code>TableKnowledge</code>, <code>ColumnKnowledge</code>,
+<code>JoinKnowledge</code>, <code>Term</code>, <code>Rule</code>), all strict. A source only reads.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Member</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>interface_version</code></td>
+<td style="text-align: left;"><code>1</code>. The engine accepts exactly the version it was built for.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>config_model</code></td>
+<td style="text-align: left;">A pydantic model for the source's keys apart from <code>type</code>. Set <code>extra="forbid"</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>from_config(cfg, *, folder)</code></td>
+<td style="text-align: left;">Builds the source from a validated <code>config_model</code> instance. <code>folder</code> is the folder of <code>nl2sql.yaml</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>load()</code></td>
+<td style="text-align: left;">Returns the <code>Glossary</code>, read now. Called when the engine is built and on reload, never during a run.</td>
+</tr>
+</tbody>
+</table>
+<p>Every glossary text is at most 500 characters (the engine passes
+<code>settings.knowledge.item_max_chars</code> as the validation context
+<code>item_max_chars</code>); a longer one is a load error naming the item. Declare a
+source in the <code>nl2sql.knowledge_sources</code> entry point group, or register it
+in code with <code>registry.add_knowledge_source(name, cls)</code> or
+<code>@registry.knowledge_source(name)</code>. The built-in <code>yaml</code> source arrives
+with release 0.8.</p>
 <hr />
 <h2 id="the-conformance-kit-nl2sql_sdktesting">The conformance kit: <code>nl2sql_sdk.testing</code></h2>
 <p><code>AdapterConformance</code>, installed with <code>pip install "nl2sql-sdk[testing]"</code>

@@ -5403,7 +5403,7 @@ mechanically (see the note under the table).</p>
 </tr>
 <tr>
 <td>K2</td>
-<td><strong>Knowledge in the prompts.</strong> The retriever: chosen descriptions, derived and glossary roles, glossary joins as relationships, lexical term matching, rules by table, the scope filter, <code>knowledge_used</code> and <code>knowledge.used</code>; <code>[BUSINESS_CONTEXT]</code> in the planner's and refiner's human messages with its cap; instructions 15 and 16 and the <code>[CONSTRAINTS]</code> and <code>[EXAMPLES]</code> text for <code>PlannerAnswer</code>; the planner's structured output becomes <code>PlannerAnswer</code>, and the node runs <code>plan.after</code> on each alternative and fills <code>ASTPlannerResponse.alternatives</code>; the plan cache key's digest, and no cache write for an answer with alternatives; the fake LLM wrapping a bare <code>PlanModel</code> payload as <code>{"plan": ...}</code> for the <code>PlannerAnswer</code> rule; every test rule keyed on <code>"PlanModel"</code> renamed; the demo recording converted mechanically; the injection tests. Files: <code>pipeline/nodes/schema_retriever/node.py</code>, <code>schema_retriever/schema.py</code>, <code>nl2sql/knowledge/match.py</code>, <code>nl2sql/knowledge/render.py</code>, <code>ast_planner/prompts.py</code>, <code>ast_planner/node.py</code>, <code>refiner/prompts.py</code>, <code>refiner/node.py</code>, <code>pipeline/plan_cache.py</code>, <code>pipeline/graph_utils.py</code>, <code>testing/fake_llm.py</code>, <code>llm/replay.py</code> (the name list), <code>cli/demo/recordings/chinook.json</code>, <code>scripts/convert_recordings_planner_answer.py</code> (one-off, deleted after), and the tests keyed on <code>"PlanModel"</code>: <code>tests/e2e/*_fake_llm.py</code> (16 files), <code>tests/e2e/recordings_chinook.py</code>, <code>tests/unit/test_replay.py</code>, <code>test_fake_llm_server.py</code>, <code>test_llm_wire_contract.py</code>, <code>test_trace_playback.py</code>.</td>
+<td><strong>Knowledge in the prompts.</strong> The retriever: chosen descriptions, derived and glossary roles, glossary joins as relationships, lexical term matching, rules by table, the scope filter, <code>knowledge_used</code> and <code>knowledge.used</code> (both hold only items within the caller's scope: no item on, or naming, a denied table, since <code>SubQueryResult.knowledge_used</code> is returned to the caller); <code>[BUSINESS_CONTEXT]</code> in the planner's and refiner's human messages with its cap; instructions 15 and 16 and the <code>[CONSTRAINTS]</code> and <code>[EXAMPLES]</code> text for <code>PlannerAnswer</code>; the planner's structured output becomes <code>PlannerAnswer</code>, and the node runs <code>plan.after</code> on each alternative and fills <code>ASTPlannerResponse.alternatives</code>; the plan cache key's digest, and no cache write for an answer with alternatives; the fake LLM wrapping a bare <code>PlanModel</code> payload as <code>{"plan": ...}</code> for the <code>PlannerAnswer</code> rule; every test rule keyed on <code>"PlanModel"</code> renamed; the demo recording converted mechanically; the injection tests. Files: <code>pipeline/nodes/schema_retriever/node.py</code>, <code>schema_retriever/schema.py</code>, <code>nl2sql/knowledge/match.py</code>, <code>nl2sql/knowledge/render.py</code>, <code>ast_planner/prompts.py</code>, <code>ast_planner/node.py</code>, <code>refiner/prompts.py</code>, <code>refiner/node.py</code>, <code>pipeline/plan_cache.py</code>, <code>pipeline/graph_utils.py</code>, <code>testing/fake_llm.py</code>, <code>llm/replay.py</code> (the name list), <code>cli/demo/recordings/chinook.json</code>, <code>scripts/convert_recordings_planner_answer.py</code> (one-off, deleted after), and the tests keyed on <code>"PlanModel"</code>: <code>tests/e2e/*_fake_llm.py</code> (16 files), <code>tests/e2e/recordings_chinook.py</code>, <code>tests/unit/test_replay.py</code>, <code>test_fake_llm_server.py</code>, <code>test_llm_wire_contract.py</code>, <code>test_trace_playback.py</code>.</td>
 <td>K1</td>
 <td><code>test_glossary_join_lets_the_validator_accept_a_plan</code> (and the parity case), <code>test_description_precedence_in_the_schema_block</code>, <code>test_column_role_unit_and_values_reach_the_schema_block</code>, <code>test_term_matches_by_name_and_synonym</code>, <code>test_both_terms_sharing_a_synonym_are_sent</code>, <code>test_rules_are_sent_by_table</code>, <code>test_business_context_is_last_before_feedback_and_query</code>, the injection tests of section 4, <code>test_plan_cache_key_changes_with_the_glossary</code>, <code>test_answer_with_alternatives_is_never_cached</code>, <code>test_alternative_denied_by_plan_after_is_not_offered</code>, <code>test_planner_answer_default_plan_is_used_without_alternatives</code>, <code>test_converted_recording_replays_every_guided_question</code></td>
 <td><code>architecture/nodes/schema_retriever_node.md</code>, <code>ast_planner_node.md</code>, <code>refiner_node.md</code>, <code>architecture/invariants.md</code> (<em>Knowledge Is Data</em>), <code>security/model.md</code> (the stance)</td>
@@ -5467,6 +5467,75 @@ mechanically (see the note under the table).</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built: the foundation (B0)</p>
+<p>Every shape the four tracks share is in place; nothing reads or publishes
+it yet. Where the code on <code>main</code> differed from this page, the code won:</p>
+<ul>
+<li><strong>SDK.</strong> <code>nl2sql_sdk/knowledge.py</code>: <code>Glossary</code>, <code>DatasourceKnowledge</code>,
+  <code>TableKnowledge</code>, <code>ColumnKnowledge</code>, <code>JoinKnowledge</code> (<code>from_</code>, alias
+  <code>from</code>), <code>Term</code>, <code>Rule</code> and the <code>KnowledgeSource</code> protocol. The text cap
+  is the validation context: <code>Glossary.model_validate(data,
+  context={"item_max_chars": n})</code>, 500 (<code>ITEM_MAX_CHARS</code>) without one.
+  <code>values</code> is allowed on <code>role: enum</code> only; rule ids are unique slugs.
+  <code>nl2sql_sdk/stores.py</code>: <code>Proposal</code> (with <code>Proposal.build(...)</code>, which
+  computes <code>id</code> through <code>proposal_id(kind, datasource_id, target,
+  change)</code>), its <code>ProposalKind</code>, <code>ProposalOrigin</code> and <code>ProposalStatus</code>,
+  <code>BuildPointer.knowledge_hash</code>, and <code>StateStore.put_proposal</code> (an upsert
+  by id; superseding is Q1's queue), <code>get_proposal</code>, <code>list_proposals</code>
+  (newest first), <code>decide_proposal(id, status, *, by, reason, wrote, at)</code>
+  and <code>purge_proposals(older_than)</code> (decided rows only). <code>Estimate</code> and
+  <code>Overlap</code> in <code>models.py</code>, <code>ESTIMATES_COST</code>, and
+  <code>EstimatingAdapterProtocol</code> and <code>ProfilingAdapterProtocol</code> in
+  <code>protocols.py</code>, all exported from <code>nl2sql_sdk</code>.</li>
+<li><strong>Stores.</strong> Interface version 3 and migration <code>0005_proposals</code>, after
+  Wave A's D1 (version 2, migration <code>0004_schema_diffs</code>). Every built-in
+  store declares 3; a version-2 store is refused.</li>
+<li><strong>Config.</strong> <code>knowledge</code> is a list section (<code>KnowledgeSourceConfig</code>, or
+  an object with <code>load</code>), <code>[]</code> when absent. <code>CostRule</code> on <code>Policies.cost</code>
+  and <code>Role.cost</code> (a role's <code>model_fields_set</code> says what it replaces).
+  <code>settings.knowledge</code>, <code>clarify</code>, <code>profiler</code>, <code>review</code>. The agent
+  <code>indexing_enrichment</code> is <code>profiler</code>, read by <code>ENRICHMENT_LLM_NAME</code> until
+  K3 moves it; the old key is an error whose message names the new one
+  (<code>RENAMED_KEYS</code> in <code>config/loader.py</code>), not an alias.</li>
+<li><strong>Errors.</strong> <code>NEEDS_CLARIFICATION</code>, <code>CLARIFICATION_INVALID</code>,
+  <code>CLARIFICATION_STALE</code> and <code>COST_LIMIT_EXCEEDED</code>, never retried, each in
+  <code>DECLARED_AHEAD</code> with the PR that raises it. <code>ReviewError</code> and
+  <code>ReviewErrorCode</code> (<code>NOT_AUTHORIZED</code>, <code>NOT_WRITABLE</code>, <code>FILE_CHANGED</code>,
+  <code>NOT_FOUND</code>) are in <code>nl2sql/review/models.py</code>, beside <code>AcceptReport</code>.</li>
+<li><strong>Results.</strong> <code>nl2sql/explain/models.py</code>, <code>nl2sql/clarify/models.py</code>
+  (<code>ClarificationRequest.build(...)</code> and <code>expected_id()</code>: SHA-256 of the
+  canonical JSON without <code>id</code>, 32 hex), <code>nl2sql/profiler/models.py</code>, and
+  <code>nl2sql/knowledge/models.py</code>: <code>KnowledgeUsed</code> (<code>terms</code> as <code>TermMatch</code>,
+  <code>rules</code> as <code>RuleUse</code>, <code>dropped</code>, <code>digest</code>), <code>KnowledgeSourceInfo</code> and
+  <code>DatasourceKnowledgeView</code>, which K1 may refine. <code>ExplainedStep.source</code>
+  also takes <code>supplied</code>, for a plan passed as <code>run_query(plan=...)</code>. <code>QueryResult.clarification</code>
+  and <code>explanation</code>, <code>SubQueryResult.knowledge_used</code> and <code>estimate</code>.
+  <code>needs_clarification</code> and <code>plan_source="chosen"</code> were already there (A0,
+  H2).</li>
+<li><strong>State.</strong> <code>SubgraphExecutionState</code> lives in <code>pipeline/state.py</code>, not
+  <code>subgraphs/schemas.py</code>: it gains <code>knowledge_used</code>, and the planner's
+  readings are <code>ASTPlannerResponse.alternatives</code> and <code>ambiguous_phrase</code>
+  (with <code>PlanAlternative</code> and <code>PlannerAnswer</code> in <code>ast_planner/schemas.py</code>).
+  <code>SubgraphOutput</code> carries <code>knowledge_used</code>, <code>ambiguous_phrase</code>,
+  <code>alternatives</code> and <code>estimate</code> to the result: <code>graph_utils</code> copies the
+  first three from the sub-query's state, so K2 and L1 fill only the state
+  and X1 reads only the output; C2 sets <code>estimate</code>.</li>
+<li><strong>Events.</strong> The seven are catalogued, none on the stream; the audit
+  observer writes <code>proposal.decided</code> and <code>cost.estimated</code> with
+  <code>decision</code> <code>confirm</code> or <code>refuse</code>. <code>cost.estimated</code> names its count
+  <code>estimated_rows</code>, not <code>rows</code>: no event has a field called <code>rows</code>
+  (<code>test_no_catalogued_event_has_a_rows_field</code>, D15).</li>
+<li><strong>Registry, facade, CLI.</strong> The <code>knowledge_source</code> kind
+  (<code>nl2sql.knowledge_sources</code>, version 1); no entry point is declared
+  until K1 adds <code>yaml</code>. <code>engine.knowledge</code> and <code>engine.proposals</code>
+  (<code>api/knowledge_api.py</code>, <code>api/proposals_api.py</code>) with their final
+  signatures, each raising <code>NotImplementedError</code> naming its PR;
+  <code>test_wave_b_read_methods_require_a_caller</code> holds D60. The CLI groups
+  <code>knowledge</code>, <code>review</code> and <code>profile</code> are registered empty; P1 gives
+  <code>profile</code> its callback. <code>DIALECT_SCAN</code> covers the five new packages.</li>
+</ul>
+</div>
 <p><strong>The demo recording.</strong> K2 changes the planner's structured output from
 <code>PlanModel</code> to <code>PlannerAnswer</code>, and the replay provider keys on the
 structured output's name. K2 converts <code>cli/demo/recordings/chinook.json</code>

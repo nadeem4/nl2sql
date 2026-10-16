@@ -5307,6 +5307,21 @@ that is not in it cannot be published.</p>
 <td><code>hook</code>, <code>point</code>, <code>decision</code>, <code>reason</code>, ...</td>
 <td>no</td>
 </tr>
+<tr>
+<td><code>knowledge.used</code></td>
+<td><code>sub_query_id</code>, <code>datasource_id</code>, <code>terms</code> (name to match score), <code>rules</code> (ids), <code>dropped</code>, <code>digest</code></td>
+<td>no; not yet published (Wave B's K2)</td>
+</tr>
+<tr>
+<td><code>clarification.requested</code></td>
+<td><code>sub_query_id</code>, <code>phrase</code>, <code>options</code> (how many)</td>
+<td>no; not yet published (L1)</td>
+</tr>
+<tr>
+<td><code>cost.estimated</code></td>
+<td><code>datasource_id</code>, <code>sub_query_id</code>, <code>estimated_rows</code>, <code>cost</code>, <code>limit</code>, <code>decision</code> (<code>allow</code>, <code>confirm</code>, <code>refuse</code>; the audit observer writes <code>confirm</code> and <code>refuse</code>)</td>
+<td>no; not yet published (C2)</td>
+</tr>
 </tbody>
 </table>
 <p>Engine events carry no <code>trace_id</code>: they happen outside any question and go
@@ -5364,6 +5379,26 @@ on the engine's bus directly.</p>
 <td><code>eval.case</code>, <code>eval.finished</code></td>
 <td>see <a href="../../evals/">Evals</a></td>
 <td><code>engine.evals.run</code></td>
+</tr>
+<tr>
+<td><code>knowledge.loaded</code></td>
+<td><code>sources</code> (<code>type</code>, <code>counts</code>, <code>sha256</code>), <code>digests</code> per datasource, <code>error</code></td>
+<td>not yet published: the engine loads its knowledge from Wave B's K1</td>
+</tr>
+<tr>
+<td><code>profile.finished</code></td>
+<td><code>datasource_id</code>, the report's counts, <code>stopped_by</code>, <code>cost</code>, <code>seconds</code></td>
+<td>not yet published (P1)</td>
+</tr>
+<tr>
+<td><code>proposal.created</code></td>
+<td><code>id</code>, <code>kind</code>, <code>datasource_id</code>, <code>origin</code></td>
+<td>not yet published (Q1)</td>
+</tr>
+<tr>
+<td><code>proposal.decided</code></td>
+<td><code>id</code>, <code>kind</code>, <code>datasource_id</code>, <code>decision</code>, <code>by</code>, <code>wrote</code></td>
+<td>not yet published (Q1; audited)</td>
 </tr>
 </tbody>
 </table>

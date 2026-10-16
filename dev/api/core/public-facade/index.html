@@ -5487,6 +5487,8 @@ datasource fails.</p>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span>       <span class="c1"># info, purge</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">engine</span><span class="o">.</span><span class="n">events</span>        <span class="c1"># subscribe, catalog</span>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span>         <span class="c1"># load, run, regenerate, scorers</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span>     <span class="c1"># sources, show, export, reload, profile, save_choice (0.8; stubs until then)</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">engine</span><span class="o">.</span><span class="n">proposals</span>     <span class="c1"># list, get, accept, reject, export, apply (0.8; stubs until then)</span>
 </code></pre></div>
 <table>
 <thead>
@@ -5535,6 +5537,10 @@ datasource fails.</p>
 <tr>
 <td><code>evals</code></td>
 <td><a href="../../../evals/">Evals</a></td>
+</tr>
+<tr>
+<td><code>knowledge</code>, <code>proposals</code></td>
+<td><a href="../../../architecture/wave_b/">Wave B</a>: every method has its final signature and raises <code>NotImplementedError</code>, naming the change that builds it, until release 0.8. Each read takes <code>user_context</code> as a required keyword.</td>
 </tr>
 </tbody>
 </table>
@@ -5650,7 +5656,11 @@ classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>Ag
 (<code>CheckReport</code>, <code>DatasourceStatus</code>, <code>EngineNotReady</code>), the error types
 (<code>PipelineError</code>, <code>ErrorCode</code>, <code>ErrorSeverity</code>), and the evals' shapes
 (<code>EvalSuite</code>, <code>EvalCase</code>, <code>EvalReport</code>, <code>RegenerateReport</code>) and scorer
-interface (<code>Scorer</code>, <code>Score</code>, <code>CaseRun</code>). The list is fixed by
+interface (<code>Scorer</code>, <code>Score</code>, <code>CaseRun</code>), and release 0.8's shapes
+(<code>KnowledgeSourceConfig</code>, <code>CostRule</code>, <code>KnowledgeSourceInfo</code>,
+<code>DatasourceKnowledgeView</code>, <code>Proposal</code>, <code>AcceptReport</code>, <code>ReviewError</code>,
+<code>ProfileReport</code>, <code>ClarificationRequest</code>, <code>ClarificationOption</code>,
+<code>ClarificationChoice</code>, <code>Explanation</code>, <code>ExplainedStep</code>, <code>TermUse</code>). The list is fixed by
 <code>tests/unit/test_public_surface.py</code>: adding or removing a name is a semver
 decision. The REST API (<code>nl2sql-api</code>) is held to importing only from <code>nl2sql</code>
 by an architecture test.</p>

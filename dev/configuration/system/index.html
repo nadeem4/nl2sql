@@ -1978,6 +1978,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#knowledge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Knowledge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#strict-keys-and-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5281,6 +5292,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#knowledge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Knowledge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#strict-keys-and-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5490,6 +5512,7 @@ checks what it wrote with <code>load_config</code>.</p>
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="nt">observers</span><span class="p">:</span><span class="w">   </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">observers.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># optional: where events, logs and metrics go</span>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="nt">hooks</span><span class="p">:</span><span class="w">       </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">hooks.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">        </span><span class="c1"># optional</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="nt">evals</span><span class="p">:</span><span class="w">       </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">evals.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">        </span><span class="c1"># optional</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="nt">knowledge</span><span class="p">:</span><span class="w">   </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">knowledge.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">    </span><span class="c1"># optional: where the glossary comes from (0.8)</span>
 </code></pre></div>
 <p>A small project can write every section inline instead. This file builds the
 same <code>Config</code> as a split layout would:</p>
@@ -5591,6 +5614,12 @@ same <code>Config</code> as a split layout would:</p>
 <td><a href="#observers-hooks-and-evals">below</a></td>
 <td>The eval suites, scorers and regression gate.</td>
 </tr>
+<tr>
+<td><code>knowledge</code></td>
+<td>no</td>
+<td><a href="#knowledge">below</a></td>
+<td>A list of knowledge sources, in precedence order. Absent (or <code>[]</code>) means no knowledge.</td>
+</tr>
 </tbody>
 </table>
 <p>From Python:</p>
@@ -5636,7 +5665,7 @@ same <code>Config</code> as a split layout would:</p>
 </tr>
 <tr>
 <td>List sections</td>
-<td><code>observers</code> and <code>hooks</code> are lists too: their file's body is the list.</td>
+<td><code>observers</code>, <code>hooks</code> and <code>knowledge</code> are lists too: their file's body is the list.</td>
 </tr>
 <tr>
 <td>Literal paths</td>
@@ -5743,19 +5772,49 @@ are documented on their own page, <a href="../observers/">Observers</a>.</p>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">Config</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">observers</span><span class="o">=</span><span class="p">[</span><span class="n">ObserverConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"log"</span><span class="p">),</span> <span class="n">MyObserver</span><span class="p">()],</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>       <span class="n">hooks</span><span class="o">=</span><span class="p">[</span><span class="n">HookConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"corp_sql_review"</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="p">[</span><span class="s2">"execute.before"</span><span class="p">]),</span> <span class="n">MyHook</span><span class="p">()])</span>
 </code></pre></div>
+<h3 id="knowledge">Knowledge</h3>
+<p>A section added for release 0.8 (<a href="../../architecture/wave_b/">Wave B</a>): the
+knowledge sources the glossary comes from, in precedence order. It is
+accepted and validated now; the engine loads the sources from Wave B's K1.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># knowledge.yaml: a list, in precedence order</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">glossary.yaml</span><span class="w">             </span><span class="c1"># relative to nl2sql.yaml</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">corp_catalog</span><span class="w">              </span><span class="c1"># a plugin; its config_model checks the rest</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:CATALOG_URL}"</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Item</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>knowledge</code></td>
+<td><code>{type: &lt;name&gt;, ...}</code> (<code>KnowledgeSourceConfig</code>) or a knowledge source object in code (one with <code>load</code>)</td>
+<td><code>type</code> names a registered knowledge source (<code>nl2sql.knowledge_sources</code>); its <code>config_model</code> checks the other keys and keeps their <code>${...}</code> references until it is built. A source only reads; <code>glossary.yaml</code> itself is data, not a config section.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Config</span><span class="p">,</span> <span class="n">KnowledgeSourceConfig</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">Config</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">knowledge</span><span class="o">=</span><span class="p">[</span><span class="n">KnowledgeSourceConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"yaml"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"glossary.yaml"</span><span class="p">),</span> <span class="n">MySource</span><span class="p">()])</span>
+</code></pre></div>
 <h3 id="strict-keys-and-errors">Strict keys and errors</h3>
 <p>Every section forbids unknown keys and suggests the closest known one. Names
 resolved through the <a href="../../development/">registry</a> (<code>type:</code>,
 <code>provider:</code>) suggest from the installed names. <code>load_config</code> and <code>NL2SQL(...)</code>
 collect every problem before raising one <code>ConfigError</code>, each naming the file
 it is in (an included file, not <code>nl2sql.yaml</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql.yaml has 2 problems:
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  datasources/sales.yaml → preferd_tables
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    Unknown key. Did you mean 'preferred_tables'?
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>  llm.yaml → provider
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    'antropic' is not an installed LLM provider. Did you mean 'anthropic'?
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nl2sql.yaml has 2 problems:
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  datasources/sales.yaml → preferd_tables
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    Unknown key. Did you mean 'preferred_tables'?
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  llm.yaml → provider
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    'antropic' is not an installed LLM provider. Did you mean 'anthropic'?
 </code></pre></div>
 <p>A secret is shown as its reference, never as its value. A 0.4 file
 (<code>version: 1</code>) gets one message pointing to <a href="#from-04">the mapping</a>.</p>
@@ -5808,21 +5867,21 @@ never overrides it. Each loads the <code>.env</code> before it configures loggin
 project's <code>.env</code>, except with <code>--hosted</code>, which reads none).</p>
 <p>The library itself never reads a <code>.env</code> file. A Python caller that wants one
 loads it before building the engine:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dotenv</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dotenv</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">load_dotenv</span><span class="p">(</span><span class="s2">"my-project/.env"</span><span class="p">)</span>   <span class="c1"># or nl2sql.load_env_file("my-project/nl2sql.yaml")</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"my-project/nl2sql.yaml"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dotenv</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dotenv</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">load_dotenv</span><span class="p">(</span><span class="s2">"my-project/.env"</span><span class="p">)</span>   <span class="c1"># or nl2sql.load_env_file("my-project/nl2sql.yaml")</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"my-project/nl2sql.yaml"</span><span class="p">)</span>
 </code></pre></div>
 <p><code>nl2sql init</code> adds <code>.env</code> to <code>.gitignore</code>. Keep keys there, or in the
 environment, never in the YAML.</p>
 <h2 id="the-cli">The CLI</h2>
 <p>Every command reads the same config, named once, before the subcommand:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>index
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>run<span class="w"> </span><span class="s2">"Top 5 customers by revenue"</span>
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>prod/nl2sql.yaml<span class="w"> </span>nl2sql<span class="w"> </span>curated<span class="w"> </span>validate
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"..."</span><span class="w">                       </span><span class="c1"># ./nl2sql.yaml</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>nl2sql<span class="w"> </span>--log-format<span class="w"> </span>json<span class="w"> </span>run<span class="w"> </span><span class="s2">"..."</span><span class="w">     </span><span class="c1"># JSON log lines, for any command</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>index
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>run<span class="w"> </span><span class="s2">"Top 5 customers by revenue"</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>prod/nl2sql.yaml<span class="w"> </span>nl2sql<span class="w"> </span>curated<span class="w"> </span>validate
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"..."</span><span class="w">                       </span><span class="c1"># ./nl2sql.yaml</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>nl2sql<span class="w"> </span>--log-format<span class="w"> </span>json<span class="w"> </span>run<span class="w"> </span><span class="s2">"..."</span><span class="w">     </span><span class="c1"># JSON log lines, for any command</span>
 </code></pre></div>
 <p>There are no per-command path flags. Commands that query or index build the
 engine and call <code>engine.check()</code> first (see <a href="#startup-check-and-required">Startup</a>).
@@ -5831,8 +5890,8 @@ paths under <code>storage.path</code>, and build no engine.</p>
 <h2 id="checking-a-config-nl2sql-config-check">Checking a config: <code>nl2sql config check</code></h2>
 <p><code>nl2sql config check</code> checks the whole config without starting the engine,
 so it fits a CI job or a pre-deploy step:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>config<span class="w"> </span>check<span class="w">            </span><span class="c1"># files, names, drivers</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>config<span class="w"> </span>check<span class="w"> </span>--connect<span class="w">  </span><span class="c1"># and connect to every datasource</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>config<span class="w"> </span>check<span class="w">            </span><span class="c1"># files, names, drivers</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>prod/nl2sql.yaml<span class="w"> </span>config<span class="w"> </span>check<span class="w"> </span>--connect<span class="w">  </span><span class="c1"># and connect to every datasource</span>
 </code></pre></div>
 <p>It does what building the engine does, short of the stores:</p>
 <ul>
@@ -5847,18 +5906,18 @@ so it fits a CI job or a pre-deploy step:</p>
 <a href="#startup-check-and-required"><code>engine.check()</code></a> does, and a datasource that
 fails is a problem (<code>required</code> or not).</p>
 <p>Problems are printed by the file they are in, then a line per secret:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>datasources/sales.yaml
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>  type
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    Unknown adapter 'postgress'. Did you mean 'postgres'? Registered: duckdb, mssql, mysql, postgres, sqlite.
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>llm.yaml
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>  provider
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>    Unknown LLM provider 'antropic'. Did you mean 'anthropic'? Registered: anthropic, ollama, openai, openrouter.
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>Secrets:
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>  ${env:SALES_DB_PASSWORD} missing (datasources/sales.yaml → connection.password)
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>prod/nl2sql.yaml: 2 problems in 2 files.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>datasources/sales.yaml
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>  type
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    Unknown adapter 'postgress'. Did you mean 'postgres'? Registered: duckdb, mssql, mysql, postgres, sqlite.
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>llm.yaml
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>  provider
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    Unknown LLM provider 'antropic'. Did you mean 'anthropic'? Registered: anthropic, ollama, openai, openrouter.
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>Secrets:
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>  ${env:SALES_DB_PASSWORD} missing (datasources/sales.yaml → connection.password)
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>prod/nl2sql.yaml: 2 problems in 2 files.
 </code></pre></div>
 <p>A secret is reported as present or missing, never printed. Where the <code>llm</code>
 section names no <code>api_key</code>, the provider's standard variable is listed. A
@@ -5905,10 +5964,10 @@ then connects to each datasource, checks that every agent's API key resolves
 <li>An optional datasource that fails is printed, left out of routing, and the
   entry point runs degraded.</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># datasources/sales.yaml</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">           </span><span class="c1"># without it, nothing works: refuse to start</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> host</span><span class="p">:</span><span class="w"> </span><span class="nv">db.internal</span><span class="p p-Indicator">,</span><span class="nt"> database</span><span class="p">:</span><span class="w"> </span><span class="nv">sales</span><span class="p p-Indicator">,</span><span class="nt"> user</span><span class="p">:</span><span class="w"> </span><span class="nv">nl2sql</span><span class="p p-Indicator">,</span><span class="nt"> password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:SALES_DB_PASSWORD}"</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># datasources/sales.yaml</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="nt">required</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">           </span><span class="c1"># without it, nothing works: refuse to start</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="nt">connection</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> host</span><span class="p">:</span><span class="w"> </span><span class="nv">db.internal</span><span class="p p-Indicator">,</span><span class="nt"> database</span><span class="p">:</span><span class="w"> </span><span class="nv">sales</span><span class="p p-Indicator">,</span><span class="nt"> user</span><span class="p">:</span><span class="w"> </span><span class="nv">nl2sql</span><span class="p p-Indicator">,</span><span class="nt"> password</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:SALES_DB_PASSWORD}"</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
 <p>A Python caller decides for itself. Without <code>check()</code>, a broken datasource
 fails the first query that targets it, with its reason.</p>

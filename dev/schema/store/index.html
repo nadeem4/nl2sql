@@ -5398,7 +5398,8 @@ table, and the engine applies the pending ones when it starts
 (<code>schema_snapshots</code>, <code>plan_cache</code>, <code>feedback</code>) if they are missing, so a 0.5
 <code>state.db</code> is adopted as it is; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the <code>locks</code> table;
-migration 4 adds the <code>schema_diffs</code> table.</p>
+migration 4 adds the <code>schema_diffs</code> table; migration 5 adds the <code>proposals</code>
+table, the review queue (release 0.8, <a href="../../architecture/wave_b/#5-the-review-queue">Wave B</a>).</p>
 <h3 id="the-lock">The lock</h3>
 <p><code>lock(name, ttl_s)</code> is a lease held for a <code>with</code> block: in the <code>sqlite</code> store,
 a <code>locks</code> row taken in a <code>BEGIN IMMEDIATE</code> transaction, with an expiry. Every

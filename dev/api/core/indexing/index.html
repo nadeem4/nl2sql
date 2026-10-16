@@ -5434,7 +5434,7 @@ inspect one search of it, and measure schema drift.</p>
 </tr>
 <tr>
 <td><code>enrich</code></td>
-<td>Ask the <code>indexing_enrichment</code> LLM for table and column descriptions. Off by default: it spends tokens.</td>
+<td>Ask the <code>profiler</code> LLM for table and column descriptions. Off by default: it spends tokens.</td>
 </tr>
 <tr>
 <td><code>on_progress</code></td>
@@ -5566,7 +5566,7 @@ times it) and <code>types</code>, every entry type the index holds
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
 <li>Fetch schema via adapter.</li>
-<li>Only with <code>enrich=True</code>: enrich schema metadata using the <code>indexing_enrichment</code>
+<li>Only with <code>enrich=True</code>: enrich schema metadata using the <code>profiler</code>
   LLM. Enrichment fills blanks only: a table or column comment read from the
   database is never replaced. If the client cannot be built (no API key), the
   endpoint is unreachable, or the call fails, the unenriched snapshot is used
