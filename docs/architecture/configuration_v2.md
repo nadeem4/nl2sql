@@ -282,7 +282,7 @@ temperature: 0
 agents:
   ast_planner:         { model: claude-opus-5-5 }
   answer_synthesizer:  { provider: openai, model: gpt-5.4 }
-  indexing_enrichment: { model: claude-haiku-5 }
+  profiler:            { model: claude-haiku-5 }   # indexing_enrichment until 0.8
 prices:
   my-finetune: { input: 0.2, cached_input: 0.1, output: 0.6 }
 ```
@@ -303,7 +303,7 @@ it sets and inherits the rest. Inheritance is decided by which fields were
 set (`model_fields_set`), so `temperature: null` on an agent still means
 "send none". `AgentName` is a closed set of the node names:
 `curated_matcher`, `datasource_resolver`, `decomposer`, `ast_planner`,
-`refiner`, `answer_synthesizer` and `indexing_enrichment`. The concatenated
+`refiner`, `answer_synthesizer` and `profiler` (`indexing_enrichment` until 0.8). The concatenated
 0.4 keys (`astplanner`, `answersynthesizer`) and the `name:` field are gone,
 along with the `LLM_AGENTS` mapping between the two spellings. `Price` has
 `input`, `output`, and optionally `cached_input` and `cache_write`, as

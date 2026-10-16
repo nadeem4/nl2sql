@@ -23,6 +23,7 @@ from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table
 from nl2sql.pipeline.pinned import PinnedRun, PinnedSource
+from nl2sql.knowledge.models import KnowledgeUsed
 
 
 def update_results(current: Dict, new: Dict) -> Dict:
@@ -98,6 +99,9 @@ class SubgraphExecutionState(BaseModel):
     pinned_plan: Optional[PlanModel] = None
     pinned_source: Optional[PinnedSource] = None
     approvals: List[Approval] = Field(default_factory=list)
+    # The knowledge this sub-query's prompts carried (the schema retriever fills it from K2). The planner's
+    # other readings are on ast_planner_response.alternatives.
+    knowledge_used: Optional[KnowledgeUsed] = None
 
     ast_planner_response: Optional[ASTPlannerResponse] = Field(default=None)
     logical_validator_response: Optional[LogicalValidatorResponse] = Field(default=None)

@@ -62,6 +62,9 @@ Run events (they carry the run's `trace_id`):
 | `plan_cache.lookup` | `datasource_id`, `hit` | no |
 | `policy.decision` | a denial: `datasource_id`, `schema`, `table` (both None for a datasource), `rule`, `step` (`logical_validator`, `curated_matcher` or `datasource_resolver`) | no |
 | `hook.decision` | `hook`, `point`, `decision`, `reason`, ... | no |
+| `knowledge.used` | `sub_query_id`, `datasource_id`, `terms` (name to match score), `rules` (ids), `dropped`, `digest` | no; not yet published (Wave B's K2) |
+| `clarification.requested` | `sub_query_id`, `phrase`, `options` (how many) | no; not yet published (L1) |
+| `cost.estimated` | `datasource_id`, `sub_query_id`, `estimated_rows`, `cost`, `limit`, `decision` (`allow`, `confirm`, `refuse`; the audit observer writes `confirm` and `refuse`) | no; not yet published (C2) |
 
 Engine events carry no `trace_id`: they happen outside any question and go
 on the engine's bus directly.
@@ -77,6 +80,10 @@ on the engine's bus directly.
 | `retention.purged` | `counts`: what `engine.storage.purge()` returned (`traces`, `results`, `audit`) | `engine.storage.purge()` ran (audited) |
 | `llm.changed` | `by`, `changes` (never a key) | `engine.llm.replace` (audited) |
 | `eval.case`, `eval.finished` | see [Evals](../evals/index.md) | `engine.evals.run` |
+| `knowledge.loaded` | `sources` (`type`, `counts`, `sha256`), `digests` per datasource, `error` | not yet published: the engine loads its knowledge from Wave B's K1 |
+| `profile.finished` | `datasource_id`, the report's counts, `stopped_by`, `cost`, `seconds` | not yet published (P1) |
+| `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | not yet published (Q1) |
+| `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | not yet published (Q1; audited) |
 
 The driver and exception text in `datasource.failed` (`message`, `fix`),
 `index.failed` (`reason`) and `index.column_failed` (`message`) is redacted

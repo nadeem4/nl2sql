@@ -136,8 +136,8 @@ def test_diff_is_pruned_with_its_snapshot(store):
     assert store.get_schema_diff("ds1", v2) is not None
 
 
-def test_the_state_store_implements_store_interface_version_2():
-    assert SqliteState.interface_version == 2
+def test_the_state_store_implements_store_interface_version_3():
+    assert SqliteState.interface_version == 3
 
 
 # -- the plan cache --------------------------------------------------------------
@@ -191,7 +191,7 @@ def test_migrate_applies_each_migration_once(tmp_path):
     state.close()
 
     assert applied and applied == sorted(applied)
-    assert applied[-1] == "0004_schema_diffs"
+    assert applied[-2:] == ["0004_schema_diffs", "0005_proposals"]
     assert again == []
 
 
@@ -416,3 +416,12 @@ def test_a_migration_script_takes_one_statement_per_line():
     with pytest.raises(sqlite3.ProgrammingError):
         _script(connection, "CREATE TABLE b (x); CREATE TABLE c (x);\n")
     connection.close()
+
+
+def test_no_migration_commits_the_migrate_transaction():
+    """``executescript`` commits a pending transaction first, which would let another store migrate the same
+    file between two migrations; every migration runs its statements through ``_script`` instead."""
+    import inspect
+
+    for name, migration in MIGRATIONS:
+        assert ".executescript(" not in inspect.getsource(migration), name

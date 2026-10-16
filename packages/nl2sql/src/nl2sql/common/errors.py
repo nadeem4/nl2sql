@@ -72,6 +72,15 @@ class ErrorCode(str, Enum):
     JOIN_FAN_OUT = "JOIN_FAN_OUT"
     # A warning: a result column whose every value is null.
     ALL_NULL_COLUMN = "ALL_NULL_COLUMN"
+    # Wave B (docs/architecture/wave_b.md). The question can be read more than one way; the result
+    # carries the options (INFO: nothing went wrong).
+    NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"
+    # A ClarificationChoice that is not one of this run's requests, or names no option of it.
+    CLARIFICATION_INVALID = "CLARIFICATION_INVALID"
+    # The data or the glossary changed since the options were offered.
+    CLARIFICATION_STALE = "CLARIFICATION_STALE"
+    # The query is estimated to read more rows than the caller's cost rule allows, with over_limit: refuse.
+    COST_LIMIT_EXCEEDED = "COST_LIMIT_EXCEEDED"
 
 
 
@@ -98,6 +107,12 @@ FATAL_ERRORS = {
     ErrorCode.NEEDS_APPROVAL,
     ErrorCode.RUN_LIMIT_REACHED,
     ErrorCode.QUESTION_TOO_BROAD,
+    # Wave B: a question asked back, a choice that is wrong or stale, and a refused cost are never
+    # retried; planning the same question again rarely reads less (D54).
+    ErrorCode.NEEDS_CLARIFICATION,
+    ErrorCode.CLARIFICATION_INVALID,
+    ErrorCode.CLARIFICATION_STALE,
+    ErrorCode.COST_LIMIT_EXCEEDED,
 }
 
 SAFE_ERROR_MESSAGES = {

@@ -42,6 +42,22 @@ curated:
   match_floor: 0.6
 feedback:
   enabled: true
+knowledge:                    # read from release 0.8 (Wave B)
+  item_max_chars: 500
+  block_max_chars: 4000
+  top_k: 8
+  match_floor: 0.6
+clarify:
+  enabled: true
+profiler:
+  sample_rows: 1000
+  max_probes: 200
+  time_budget_s: 60
+  min_overlap: 0.9
+  enum_max_distinct: 50
+  max_cost_usd: 0.50
+review:
+  max_age_days: 365
 ```
 
 Unknown keys are errors, as everywhere in the config. The demo
@@ -52,8 +68,8 @@ trace).
 
 In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
 `RetrievalSettings`, `RoutingSettings`, `ResultSettings`, `TraceSettings`,
-`SchemaSettings`, `CuratedSettings` and `FeedbackSettings` in
-`nl2sql.config`.
+`SchemaSettings`, `CuratedSettings`, `FeedbackSettings`, `KnowledgeSettings`,
+`ClarifySettings`, `ProfilerSettings` and `ReviewSettings` in `nl2sql.config`.
 
 Where the engine's events, logs and metrics go is not a setting: it is the
 [`observers` section](observers.md) of
@@ -169,3 +185,22 @@ Whether curated answers are on is not a setting: the
 | --- | --- | --- |
 | `enabled` | `true` | Let the playground record a thumbs up or down, with an optional note, for a run. Stored in `<storage.path>/state.db`: question, role, status, SQL, the datasources it ran on, whether the answer was verified or generated, error codes, the model per node and the engine version, never result rows or sample values. `nl2sql feedback clear` empties it. See [Feedback and Signals](../observability/feedback.md). |
 
+## `knowledge`, `clarify`, `profiler` and `review`
+
+Four groups for release 0.8 ([Wave B](../architecture/wave_b.md)). They are
+accepted and validated now; the Wave B change named with each reads it.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `knowledge.item_max_chars` | `500` | The longest one glossary text may be; a longer one is a load error naming the item, so nothing is silently cut (K1). |
+| `knowledge.block_max_chars` | `4000` | The longest the `[BUSINESS_CONTEXT]` block of a prompt may be; the lowest-scored terms, then rules, are dropped, and the trace records what was (K2). |
+| `knowledge.top_k` | `8` | Matched glossary terms kept per sub-query (K2). |
+| `knowledge.match_floor` | `0.6` | Similarity a term's index entry must reach to the sub-query's intent to match, between 0 and 1 (K3). |
+| `clarify.enabled` | `true` | Ask which reading was meant when the planner flags a real ambiguity, instead of guessing (L1). |
+| `profiler.sample_rows` | `1000` | Distinct values one join-overlap probe reads (P1). |
+| `profiler.max_probes` | `200` | Overlap probes per datasource; the remaining candidates are proposed without one (P1). |
+| `profiler.time_budget_s` | `60` | Seconds per datasource after which no probe starts (P1). |
+| `profiler.min_overlap` | `0.9` | A measured overlap under this drops a join candidate, between 0 and 1 (P1). |
+| `profiler.enum_max_distinct` | `50` | The most distinct values a column proposed as an `enum` may have (P1). |
+| `profiler.max_cost_usd` | `0.50` | The most one `profile(draft=True)` call may spend drafting descriptions (P2). |
+| `review.max_age_days` | `365` | Decided proposals older than this are purged by `engine.storage.purge()` (Q1). |

@@ -144,6 +144,8 @@ Fields:
 | `source` | `AnswerSource` | no | Where the answer came from: `type` `"verified"` with the verified query's `id`, `datasource_id` and the `params` it ran with, or `type` `"generated"` with the other fields `None`. See [Curated answers](../../configuration/curated.md#what-happens-at-question-time). |
 | `stop` | `Optional[RunStop]` | no | Set when `status` is `"stopped"`: the `limit` the run reached (`max_llm_calls` or `max_cost_usd`), its configured `value`, and what was `spent`. |
 | `approvals_needed` | `List[ApprovalRequest]` | no | Set when `status` is `"needs_approval"`: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an `Approval` for each. |
+| `clarification` | `Optional[ClarificationRequest]` | no | Set when `status` is `"needs_clarification"`: the phrase, and two or three readings, each a label, a validated plan and its explanation. Nothing produces it yet (release 0.8, [Wave B](../../architecture/wave_b.md#7-clarify-instead-of-guess)). |
+| `explanation` | `Optional[Explanation]` | no | The run's plan in plain English, rendered from the typed plan with no model call: per step its tables, joins, filters, groupings, measures, glossary terms, rules and assumptions. Not filled yet (release 0.8, [Wave B](../../architecture/wave_b.md#8-why-this-answer)). |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as `RunWarning`s.
@@ -339,6 +341,8 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `plan_source` | `"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"` | no | `"cache"` when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), `"verified"` when a verified query answered (no plan; `sql` is the verified query's own), `"supplied"` for a plan passed as `run_query(plan=...)`, `"approved"` for an approval's pinned plan (`"chosen"` is reserved for Wave B), otherwise `"llm"`. Only an `"llm"` plan is ever cached. See [Determinism → The plan cache](../../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture). |
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
+| `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Not filled yet (release 0.8). |
+| `estimate` | `Optional[Estimate]` | no | The database's estimate of the rows this sub-query reads, when the cost rule asked for one. Not filled yet (release 0.8). |
 
 ### RowSample
 

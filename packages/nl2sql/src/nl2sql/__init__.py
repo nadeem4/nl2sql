@@ -45,6 +45,14 @@ _EXPORTS = {
     "nl2sql.evaluation.regenerate": ("RegenerateReport",),
     "nl2sql.evaluation.gate": ("GateResult",),
     "nl2sql.evaluation.scorers": ("Scorer", "Score", "CaseRun"),
+    # Wave B: knowledge, the review queue, the profiler, clarification and the explanation.
+    "nl2sql.config.models": ("KnowledgeSourceConfig", "CostRule"),
+    "nl2sql.knowledge.models": ("KnowledgeSourceInfo", "DatasourceKnowledgeView"),
+    "nl2sql_sdk.stores": ("Proposal",),
+    "nl2sql.review.models": ("AcceptReport", "ReviewError"),
+    "nl2sql.profiler.models": ("ProfileReport",),
+    "nl2sql.clarify.models": ("ClarificationRequest", "ClarificationOption", "ClarificationChoice"),
+    "nl2sql.explain.models": ("Explanation", "ExplainedStep", "TermUse"),
 }
 _LAZY = {name: module for module, names in _EXPORTS.items() for name in names}
 
@@ -127,4 +135,18 @@ __all__ = [
     "SchemaDiff",
     "SchemaVersionInfo",
     "LLMChange",
+    "KnowledgeSourceConfig",
+    "CostRule",
+    "KnowledgeSourceInfo",
+    "DatasourceKnowledgeView",
+    "Proposal",
+    "AcceptReport",
+    "ReviewError",
+    "ProfileReport",
+    "ClarificationRequest",
+    "ClarificationOption",
+    "ClarificationChoice",
+    "Explanation",
+    "ExplainedStep",
+    "TermUse",
 ]

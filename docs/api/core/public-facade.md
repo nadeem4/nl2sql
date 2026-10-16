@@ -121,6 +121,8 @@ engine.traces        # get, replay
 engine.storage       # info, purge
 engine.events        # subscribe, catalog
 engine.evals         # load, run, regenerate, scorers
+engine.knowledge     # sources, show, export, reload, profile, save_choice (0.8; stubs until then)
+engine.proposals     # list, get, accept, reject, export, apply (0.8; stubs until then)
 ```
 
 | namespace | reference |
@@ -135,6 +137,7 @@ engine.evals         # load, run, regenerate, scorers
 | `traces`, `about()` | below |
 | `events` | [Events](../../observability/events.md) |
 | `evals` | [Evals](../../evals/index.md) |
+| `knowledge`, `proposals` | [Wave B](../../architecture/wave_b.md): every method has its final signature and raises `NotImplementedError`, naming the change that builds it, until release 0.8. Each read takes `user_context` as a required keyword. |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.
@@ -244,7 +247,11 @@ classes `Datasource`, `Limits`, `LLM`, `AgentLLM`, `Embeddings`, `Policies`,
 (`CheckReport`, `DatasourceStatus`, `EngineNotReady`), the error types
 (`PipelineError`, `ErrorCode`, `ErrorSeverity`), and the evals' shapes
 (`EvalSuite`, `EvalCase`, `EvalReport`, `RegenerateReport`) and scorer
-interface (`Scorer`, `Score`, `CaseRun`). The list is fixed by
+interface (`Scorer`, `Score`, `CaseRun`), and release 0.8's shapes
+(`KnowledgeSourceConfig`, `CostRule`, `KnowledgeSourceInfo`,
+`DatasourceKnowledgeView`, `Proposal`, `AcceptReport`, `ReviewError`,
+`ProfileReport`, `ClarificationRequest`, `ClarificationOption`,
+`ClarificationChoice`, `Explanation`, `ExplainedStep`, `TermUse`). The list is fixed by
 `tests/unit/test_public_surface.py`: adding or removing a name is a semver
 decision. The REST API (`nl2sql-api`) is held to importing only from `nl2sql`
 by an architecture test.

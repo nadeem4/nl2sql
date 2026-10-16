@@ -37,7 +37,7 @@ Signature:
 | --- | --- |
 | `datasource_ids` | Only these datasources; every configured one when `None`. |
 | `curated_only` | Re-index only the verified queries, keeping each datasource's schema entries: no schema read, no model call. |
-| `enrich` | Ask the `indexing_enrichment` LLM for table and column descriptions. Off by default: it spends tokens. |
+| `enrich` | Ask the `profiler` LLM for table and column descriptions. Off by default: it spends tokens. |
 | `on_progress` | Called with a sentence before each step. |
 | `on_datasource` | Called with an `IndexProgress` as each datasource starts, is done or fails. |
 
@@ -171,7 +171,7 @@ times it) and `types`, every entry type the index holds
 
 ## Execution Lifecycle
 - Fetch schema via adapter.
-- Only with `enrich=True`: enrich schema metadata using the `indexing_enrichment`
+- Only with `enrich=True`: enrich schema metadata using the `profiler`
   LLM. Enrichment fills blanks only: a table or column comment read from the
   database is never replaced. If the client cannot be built (no API key), the
   endpoint is unreachable, or the call fails, the unenriched snapshot is used

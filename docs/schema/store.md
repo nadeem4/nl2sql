@@ -98,7 +98,8 @@ table, and the engine applies the pending ones when it starts
 (`schema_snapshots`, `plan_cache`, `feedback`) if they are missing, so a 0.5
 `state.db` is adopted as it is; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the `locks` table;
-migration 4 adds the `schema_diffs` table.
+migration 4 adds the `schema_diffs` table; migration 5 adds the `proposals`
+table, the review queue (release 0.8, [Wave B](../architecture/wave_b.md#5-the-review-queue)).
 
 ### The lock
 

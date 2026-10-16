@@ -14,7 +14,7 @@ temperature: 0.0
 # api_key: "${env:TEAM_OPENAI_KEY}"
 agents:
   ast_planner:         { provider: anthropic, model: claude-opus-5, temperature: null }
-  indexing_enrichment: { model: gpt-5.4-mini }
+  profiler: { model: gpt-5.4-mini }
 prices:
   gpt-4o: { input: 2.5, cached_input: 1.25, output: 10 }
 ```
@@ -308,7 +308,7 @@ seeding each have an agent. An agent not under `agents` runs on the top level:
 | `ast_planner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |
 | `answer_synthesizer` | writes the final answer from the rows |
-| `indexing_enrichment` | writes missing schema descriptions during `nl2sql index --enrich` (optional, off by default) |
+| `profiler` | writes missing schema descriptions during `nl2sql index --enrich` (optional, off by default) |
 | `eval_seeder` | drafts eval questions with typed plans during `nl2sql eval seed` ([Benchmark your own database](../evals/seeding.md)) |
 
 Any other key is an error with "did you mean". An agent takes every field it
@@ -487,7 +487,7 @@ A missing key does not stop the engine from starting:
 - Building the engine (which `nl2sql index`, the API and the demo all do) does
   not require a chat provider key. A machine with no key can still run
   key-free work such as indexing with `embeddings: {provider: local}`. That
-  holds for indexing because the `indexing_enrichment` pass is genuinely
+  holds for indexing because the `profiler` pass is genuinely
   optional: it is skipped, not merely deferred to a later failure.
 - `engine.check()` reports every agent whose key does not resolve, without
   calling a model. Using that agent raises the same error, naming the agent,
@@ -623,7 +623,7 @@ rates, `verified`, `source` (`table` or `config`) and `citation`.
 
 - `agents` overrides give individual nodes, or indexing enrichment, their own
   model and temperature; see [Per-node models](#per-node-models).
-- `indexing_enrichment` is optional and runs only when asked for
+- `profiler` is optional and runs only when asked for
   (`nl2sql index --enrich`, or `enrich=True` from Python). Omit it, or leave
   its key unset, and indexing still works - the schema is indexed without
   LLM-written descriptions. It never replaces a comment read from the database.

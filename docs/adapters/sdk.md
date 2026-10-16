@@ -17,8 +17,11 @@ extension implements. Its core depends on pydantic and the standard library only
 - Stores: the four protocols in `nl2sql_sdk.stores`
 - Policy checks: `nl2sql_sdk.policy.PolicyCheck`, with `UserContext` and
   `Grant`
+- Knowledge sources: `nl2sql_sdk.knowledge.KnowledgeSource`, with the
+  glossary's models; see [below](#interface-knowledgesource)
 
-Everything but the stores is also exported from `nl2sql_sdk` itself.
+The adapter's interfaces and models are exported from `nl2sql_sdk` itself;
+the stores, policy checks and knowledge sources are read from their modules.
 
 ## Interface: `DatasourceAdapter`
 
@@ -140,6 +143,7 @@ server.
 | `SUPPORTS_BOUND_PARAMETERS` | The adapter binds `AdapterRequest.parameters` by name to the `:name` placeholders in the SQL, and never pastes a value into the SQL text. The engine sends parameters (for a [verified query](../configuration/curated.md)) only to an adapter that declares it. Every built-in SQLAlchemy adapter does. |
 | `ENFORCES_READ_ONLY` | The session cannot write: an `INSERT` or `CREATE TABLE` through `execute` fails. |
 | `ENFORCES_TIMEOUT` | A statement running past `limits.timeout_ms` is stopped by the server or the driver. |
+| `ESTIMATES_COST` | The adapter has `estimate(sql, parameters)` ([below](#optional-hooks-estimate-and-probe_overlap)): the database's estimate of the rows a query reads, without running it. Release 0.8's cost rule reads it. |
 
 #### `get_dialect() -> str`
 
@@ -252,6 +256,23 @@ The contract:
 The hook is an optional protocol rather than a required method, so an adapter
 without it needs no change.
 
+### Optional hooks: `estimate` and `probe_overlap`
+
+Two optional protocols in `nl2sql_sdk.protocols`, added for release 0.8
+([Wave B](../architecture/wave_b.md), D45 and D52), found with `isinstance`
+as the two hooks above are. The adapter interface stays at version 2.
+
+| Protocol | Method | Contract |
+| :--- | :--- | :--- |
+| `EstimatingAdapterProtocol` | `estimate(sql, parameters) -> Estimate` | The database's estimate of the rows `sql` *reads*, without executing it, under `timeout_ms`; raise on failure. Declare `ESTIMATES_COST` with it. |
+| `ProfilingAdapterProtocol` | `probe_overlap(left, right, sample_rows) -> Overlap` | Of up to `sample_rows` distinct non-null values of the column `left` (a `ColumnRef`), how many exist in `right`. Read-only, within the adapter's limits. |
+
+`Estimate` (`nl2sql_sdk.models`) has `rows` (the rows the query is expected
+to read, added up over the plan's scan operators: a full scan counts its
+table, not its filtered output), `cost` (the planner's own units, for
+display only) and `source` (what was read, for people). `Overlap` has
+`sampled` and `matched`. Wave B's C1 implements both on the built-ins.
+
 ### Result types every adapter returns
 
 These are part of the contract, so the same plan gives the same values on
@@ -330,7 +351,7 @@ Every store class has the same four members, whatever its slot:
 
 | Member | Description |
 | :--- | :--- |
-| `interface_version` | `2`. The engine accepts exactly the version it was built for. Version 2 added `StateStore.put_schema_diff` and `get_schema_diff` (schema drift); the version is one per kind, so a store of any slot declares `2`. |
+| `interface_version` | `3`. The engine accepts exactly the version it was built for. Version 2 added `StateStore.put_schema_diff` and `get_schema_diff` (schema drift); version 3 the review queue's proposal methods and `BuildPointer.knowledge_hash`. The version is one per kind, so a store of any slot declares `3`. |
 | `slot` | `"index"`, `"state"`, `"traces"` or `"results"`: the sub-block it fills. The engine refuses a store in another slot. |
 | `config_model` | A pydantic model for the store's sub-block apart from `type`. Set `extra="forbid"`, so a misspelt key is an error, and hold credentials as `SecretStr`. |
 | `from_config(cfg, *, folder)` | Builds the store from a validated `config_model` instance, after the engine has resolved any `${provider:key}` in it. `folder` is `storage.path`. It should write nothing: `nl2sql config check` builds the stores too. |
@@ -340,15 +361,19 @@ The slots' methods:
 | Interface | Methods |
 | :--- | :--- |
 | `IndexStore` | `open(namespace, dimension)`, `add(namespace, entries)`, `query(namespace, vector, k, where=None, with_vectors=False)`, `get(namespace, where, with_vectors=False)`, `delete(namespace, where)`, `pointers(namespace)`, `set_pointers(namespace, updates)` (atomic), `namespaces()`, `drop(namespace)`, `close()` |
-| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)` (also deletes the diffs of the snapshots it deletes), `put_schema_diff(diff)` (keyed by `diff.datasource_id` and `diff.to_version`, which it requires; replaces one stored before), `get_schema_diff(datasource_id, schema_version)` (or `None`), `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `lock(name, ttl_s)`, `close()` |
+| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)` (also deletes the diffs of the snapshots it deletes), `put_schema_diff(diff)` (keyed by `diff.datasource_id` and `diff.to_version`, which it requires; replaces one stored before), `get_schema_diff(datasource_id, schema_version)` (or `None`), `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `put_proposal(proposal)` (replaces the row with its id), `get_proposal(id)`, `list_proposals(kind=None, status=None, datasource_id=None, limit=None)` (newest first), `decide_proposal(id, status, *, by, reason=None, wrote=None, at=None)`, `purge_proposals(older_than)` (decided rows only), `lock(name, ttl_s)`, `close()` |
 | `TraceStore` | `write(trace_id, document)`, `get(trace_id)`, `purge(older_than)` |
 | `ResultStore` | `write(key, chunks)`, `open(key)`, `exists(key)`, `purge(older_than)`. Bytes only: the engine writes the Parquet. |
 
 The models they exchange: `Entry` (`id`, `text`, `vector`, `metadata`), `Hit`
 (an entry with its `distance`, and its `vector` when asked for), `Filter`
-(`eq`, `ne` and `in`, all of which must hold) and `BuildPointer` (which build
-of a datasource is live, and the `schema_version` it was built from). The
-engine embeds; a store keeps the vectors it is handed.
+(`eq`, `ne` and `in`, all of which must hold), `BuildPointer` (which build
+of a datasource is live, the `schema_version` it was built from, and the
+`curated_hash` and `knowledge_hash` it was built with) and `Proposal` (one
+row of the [review queue](../architecture/wave_b.md#5-the-review-queue): its
+`id` is a hash of its kind, datasource, target and change, which
+`Proposal.build(...)` computes). The engine embeds; a store keeps the
+vectors it is handed.
 
 A results store, sketched:
 
@@ -367,7 +392,7 @@ class BucketConfig(BaseModel):
 
 
 class BucketResults:
-    interface_version: ClassVar[int] = 2
+    interface_version: ClassVar[int] = 3
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type[BaseModel]] = BucketConfig
 
@@ -422,6 +447,34 @@ and `deny` patterns, written like a role's).
 Declare it in the `nl2sql.policy_checks` entry point group, or register it in
 code with `registry.add_policy_check(name, cls)` or
 `@registry.policy_check(name)`. No check is built in.
+
+---
+
+## Interface: `KnowledgeSource`
+
+A knowledge source is where a glossary comes from: what people write about
+their data (descriptions, synonyms, column roles, joins, business terms,
+prose rules, example questions). The `knowledge` section names one per item
+by `type` (see [Configuration](../configuration/system.md#knowledge)). It
+lives in `nl2sql_sdk.knowledge`, which imports only pydantic and the
+standard library, with the glossary's models (`Glossary`,
+`DatasourceKnowledge`, `TableKnowledge`, `ColumnKnowledge`,
+`JoinKnowledge`, `Term`, `Rule`), all strict. A source only reads.
+
+| Member | Description |
+| :--- | :--- |
+| `interface_version` | `1`. The engine accepts exactly the version it was built for. |
+| `config_model` | A pydantic model for the source's keys apart from `type`. Set `extra="forbid"`. |
+| `from_config(cfg, *, folder)` | Builds the source from a validated `config_model` instance. `folder` is the folder of `nl2sql.yaml`. |
+| `load()` | Returns the `Glossary`, read now. Called when the engine is built and on reload, never during a run. |
+
+Every glossary text is at most 500 characters (the engine passes
+`settings.knowledge.item_max_chars` as the validation context
+`item_max_chars`); a longer one is a load error naming the item. Declare a
+source in the `nl2sql.knowledge_sources` entry point group, or register it
+in code with `registry.add_knowledge_source(name, cls)` or
+`@registry.knowledge_source(name)`. The built-in `yaml` source arrives
+with release 0.8.
 
 ---
 

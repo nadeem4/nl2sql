@@ -38,7 +38,10 @@ Loc = Tuple[Union[str, int], ...]
 _UNIONS = (Union, getattr(types, "UnionType", Union))
 
 # The sections whose body is a list, in nl2sql.yaml or in their own file.
-LIST_SECTIONS = ("datasources", "observers", "hooks")
+LIST_SECTIONS = ("datasources", "observers", "hooks", "knowledge")
+
+# Keys a release renamed: still an error (no alias), with a message that names the new key.
+RENAMED_KEYS = {"indexing_enrichment": "profiler"}  # llm.agents, 0.8 (docs/architecture/wave_b.md, D44)
 
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_-]*):([^{}]+)\}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -455,6 +458,10 @@ class _Loader:
         self._problem(loc, _sentence(message))
 
     def _unknown(self, loc: Loc, known: List[str]) -> None:
+        renamed = RENAMED_KEYS.get(str(loc[-1]))
+        if renamed is not None and renamed in known:
+            return self._problem(loc, f"Unknown key: it was renamed to '{renamed}'.",
+                                 fix=f"Write '{renamed}' instead.")
         close = difflib.get_close_matches(str(loc[-1]), known, n=1, cutoff=0.6)
         self._problem(loc, f"Unknown key. Did you mean '{close[0]}'?" if close else "Unknown key.")
 

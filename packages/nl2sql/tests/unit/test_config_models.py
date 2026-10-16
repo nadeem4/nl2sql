@@ -162,7 +162,7 @@ def test_llm_temperature_null_means_send_none():
 def test_agent_names_are_the_node_names():
     agents = {name: AgentLLM(model="x") for name in (
         "curated_matcher", "datasource_resolver", "decomposer", "ast_planner",
-        "refiner", "answer_synthesizer", "indexing_enrichment")}
+        "refiner", "answer_synthesizer", "profiler")}
     assert set(LLM(provider="openai", model="m", agents=agents).agents) == set(agents)
     with pytest.raises(ValidationError):
         LLM(provider="openai", model="m", agents={"astplanner": AgentLLM(model="x")})
