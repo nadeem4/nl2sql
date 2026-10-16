@@ -183,16 +183,21 @@ def _binary(expr: Expr, names: Names) -> str:
     op = expr.op or ""
     left = _operand(op, expr.left, names)
     right_expr = expr.right
-    if op in ("IS", "IS NOT") and right_expr.kind == "literal" and (right_expr.is_null or right_expr.value is None):
+    null = right_expr.kind == "literal" and (right_expr.is_null or right_expr.value is None)
+    if null and op in ("IS", "IS NOT"):
         return f"{left} {'is empty' if op == 'IS' else 'is not empty'}"
-    return f"{left} {BINARY_PHRASES[op]} {_operand(op, right_expr, names)}"
+    if null and op in ("=", "!="):
+        # Never true in SQL: said as written, so the explanation does not hide a plan's mistake.
+        return f"{left} {'is equal to empty' if op == '=' else 'is not equal to empty'}"
+    # An operator with no phrase (one the validator refuses) is written as itself: rendering never fails.
+    return f"{left} {BINARY_PHRASES.get(op, op)} {_operand(op, right_expr, names)}"
 
 
 def _unary(expr: Expr, names: Names) -> str:
     inner = phrase(expr.expr, names)
     if expr.op == "NOT":
         return f"not ({inner})"
-    return f"{UNARY_PHRASES[expr.op]} {inner}"
+    return f"{UNARY_PHRASES.get(expr.op, expr.op)} {inner}"
 
 
 def _case(expr: Expr, names: Names) -> str:

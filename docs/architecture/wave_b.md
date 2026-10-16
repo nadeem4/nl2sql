@@ -1039,22 +1039,35 @@ stored text, so a renderer change is a reviewed diff.
     Optional[Explanation]`. `result_from_state` fills
     `QueryResult.explanation` with `explain_state`, importing the renderer
     only there, so every caller (run, stream, evals, replay) gets it. It
-    reads `SubgraphOutput` only, as B0 set up. Where the build filled a gap:
+    reads `SubgraphOutput` only, as B0 set up. Where the build filled a gap
+    (some after an independent review on #335):
+
+    - **Only validated steps are explained.** An output whose `status` is
+      not `success` (a plan the validator or a hook refused, a dropped
+      sub-query) gets no step, and a run a hook ended has no explanation:
+      naming a refused plan's tables would confirm what the refusal withholds.
+      This narrows "every status that has a plan" above.
+    - **It never fails a run.** An operator without a phrase is written as
+      itself, and a state that cannot be rendered gives `explanation=None`
+      with the error logged, as `tables_read` does.
 
     - **The glossary is an argument.** Glossary names and a join's source
       need the datasource's glossary, which no output carries:
       `result_from_state(..., knowledge=)` takes a mapping from datasource
       id to `DatasourceKnowledge`. Nothing passes it yet; K2, which makes
-      glossary joins valid, passes the run's pinned knowledge at the call
-      sites. Without it every join is a declared key, which is true until
-      then.
+      glossary joins valid, passes the caller's **scope-filtered** knowledge
+      (K1's scope filter), never the whole glossary, at the call sites.
+      Without it every join is a declared key, which is true until then.
     - **The default reading** is "'sales' was read as revenue" when exactly
       one term sent with the step is read by the plan, else "was read one
       way"; the planner's answer has no label for its default.
     - **`text`** is two to four sentences: what it shows, what it reads and
       filters, the groups it keeps (`HAVING`), its order.
     - **Assumptions** from warnings are the step's own (`sub_query_id`): a
-      recovered `VALUE_NOT_FOUND` is a replaced value; an unrecovered
+      recovered `VALUE_NOT_FOUND` is said from the final plan ("'Brasil' is
+      not in Customer country; 'Brazil' was used instead." only when a
+      suggested value is a literal of the final plan, else "the question was
+      planned again"), never the planner's retry message; an unrecovered
       `VALUE_NOT_FOUND`, `JOIN_FAN_OUT`, `ALL_NULL_COLUMN` or
       `JOIN_KEY_UNCONVERTED` is said as is; the row cap from `truncated`.
     - **Golden files** are one JSON per gold case in

@@ -11,6 +11,7 @@ only as ``planner_note``.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from nl2sql.explain.models import ExplainedStep, Explanation, TermUse
@@ -140,7 +141,9 @@ def _columns_read(plan: PlanModel) -> Set[str]:
         if expr is None:
             return
         if expr.kind == "column" and expr.column_name:
-            tables = [aliases[expr.alias]] if expr.alias in aliases else list(aliases.values())
+            # A column with no table alias counts only when the plan reads one table: it is not guessed.
+            tables = [aliases[expr.alias]] if expr.alias in aliases else (
+                list(aliases.values()) if len(aliases) == 1 else [])
             for table in tables:
                 found.add(f"{table.name}.{expr.column_name}".lower())
                 if table.schema_name:
@@ -210,7 +213,37 @@ def _reading_not_chosen(phrase_text: Optional[str], labels: Sequence[str], terms
     return [f"'{phrase_text}' was {read_as}; it could also mean {', or '.join(labels)}."]
 
 
-def _from_warnings(warnings: Iterable[Any], sub_query_id: Optional[str]) -> List[str]:
+# The executor's retry message for a filter value the column does not have (sanity/values.py).
+_VALUE_RETRY = re.compile(r"^No (?P<table>[^ ]+?)\.(?P<column>[^ .]+) value (?:is|matches) '(?P<value>.*?)', so the "
+                          r"query returned no rows\. The closest existing values are (?P<closest>.*?); use one")
+
+
+def _literals(expr: Optional[Expr]) -> Set[str]:
+    if expr is None:
+        return set()
+    found = {str(expr.value)} if expr.kind == "literal" and expr.value is not None else set()
+    for child in [expr.left, expr.right, expr.expr, expr.else_expr, *expr.args]:
+        found |= _literals(child)
+    for when in expr.whens:
+        found |= _literals(when.condition) | _literals(when.result)
+    return found
+
+
+def _replaced_value(message: str, plan: Optional[PlanModel]) -> str:
+    """A value the column did not have, said from the final plan: what replaced it, only when the plan shows it."""
+    match = _VALUE_RETRY.match(message)
+    if match is None:
+        return "A filter value was not in the data; the question was planned again."
+    column = Names({"x": match["table"]}).column("x", match["column"])
+    said = f"'{match['value']}' is not in {column}"
+    used = _literals(plan.where) | _literals(plan.having) if plan is not None else set()
+    for value in re.findall(r"'([^']*)'", match["closest"]):
+        if value in used:
+            return f"{said}; '{value}' was used instead."
+    return f"{said}; the question was planned again."
+
+
+def _from_warnings(warnings: Iterable[Any], sub_query_id: Optional[str], plan: Optional[PlanModel]) -> List[str]:
     out = []
     for warning in warnings:
         if sub_query_id is None or _get(warning, "sub_query_id") != sub_query_id:
@@ -218,7 +251,7 @@ def _from_warnings(warnings: Iterable[Any], sub_query_id: Optional[str]) -> List
         code, message = _get(warning, "code"), _get(warning, "message") or ""
         recovered = bool((_get(warning, "detail") or {}).get("recovered"))
         if code == "VALUE_NOT_FOUND" and recovered:
-            out.append(f"A filter value was not in the data, so the closest existing one was used: {message}")
+            out.append(_replaced_value(message, plan))
         elif code in _SANITY_CODES and not recovered:
             out.append(message)
     return out
@@ -290,18 +323,23 @@ def explain_verified(match: Any, sub_query_id: Optional[str], assumptions: Seque
 
 def _explain_output(output: Any, state: Mapping[str, Any], warnings: Sequence[Any],
                     knowledge: Optional[Mapping[str, DatasourceKnowledge]]) -> Optional[ExplainedStep]:
+    # Only a step that passed validation (and ran, or was planned only) is explained. A plan the validator or a
+    # hook refused, or a dropped step, is not: its tables and their descriptions would confirm what the
+    # refusal withholds.
+    if _get(output, "status") != "success":
+        return None
     sub_query = _get(output, "sub_query")
     sub_query_id = _get(sub_query, "id")
     datasource_id = _get(sub_query, "datasource_id") or ""
-    found = _from_warnings(warnings, sub_query_id) + _truncation(output)
     source = _get(output, "plan_source") or "llm"
     match = state.get("verified_match")
-    if source == "verified" and match is not None:
-        return explain_verified(match, sub_query_id, found)
     plan = _get(output, "plan")
+    if source == "verified" and match is not None:
+        return explain_verified(match, sub_query_id, _from_warnings(warnings, sub_query_id, None) + _truncation(output))
     if plan is None:
         return None
     plan = plan if isinstance(plan, PlanModel) else PlanModel.model_validate(plan)
+    found = _from_warnings(warnings, sub_query_id, plan) + _truncation(output)
     used = _get(output, "knowledge_used")
     if isinstance(used, dict):
         used = KnowledgeUsed.model_validate(used)

@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from nl2sql.api.query_api import result_from_state
-from nl2sql.common.errors import ErrorCode, RunWarning
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.evaluation.suite import CHINOOK_SUITE_PATH, load_suite
 from nl2sql.explain import phrases
 from nl2sql.explain.models import TermUse
@@ -110,8 +110,10 @@ def test_rendering_is_deterministic():
 def test_each_expr_kind_has_a_phrase():
     kinds = typing.get_args(Expr.model_fields["kind"].annotation)
     assert set(kinds) <= set(phrases.KIND_PHRASES)
-    ops = typing.get_args(typing.get_args(Expr.model_fields["op"].annotation)[0])
-    assert set(ops) <= set(phrases.BINARY_PHRASES) | set(phrases.UNARY_PHRASES)
+    ops = set(typing.get_args(typing.get_args(Expr.model_fields["op"].annotation)[0]))
+    # Each table is checked on its own: a binary operator needs a binary phrase, a unary one a unary phrase.
+    assert ops - {"NOT"} <= set(phrases.BINARY_PHRASES)
+    assert {"NOT", "+", "-"} <= set(phrases.UNARY_PHRASES)
 
     names = phrases.Names({"t": "Track", "g": "Genre", "i": "Invoice"})
 
@@ -138,6 +140,8 @@ def test_each_expr_kind_has_a_phrase():
         "not (Genre name is 'Rock')"
     # A function on ALLOWED_FUNCTIONS without a phrase is written as its name.
     assert say(fn("REPLACE", col("t", "Name"), lit("a"), lit("b"))) == "REPLACE(Track name, 'a', 'b')"
+    # = NULL is never true in SQL; the phrase does not hide it as "is empty".
+    assert say(eq(col("t", "Composer"), {"kind": "literal", "is_null": True})) == "Track composer is equal to empty"
     # AND inside OR keeps its grouping.
     assert say({"kind": "binary", "op": "OR", "left": eq(col("g", "Name"), lit("Rock")),
                 "right": {"kind": "binary", "op": "AND", "left": eq(col("g", "Name"), lit("Jazz")),
@@ -247,23 +251,40 @@ def test_truncated_result_adds_an_assumption():
     assert explain_state({"subgraph_outputs": {"sg1": _output(row_cap=1000)}}).steps[0].assumptions == []
 
 
+def _retry_warning(value, suggestions):
+    """The recovered warning as the executor writes it: its message is the planner's retry prompt."""
+    quoted = ", ".join(f"'{v}'" for v in suggestions)
+    return RunWarning(code=ErrorCode.VALUE_NOT_FOUND.value, node="executor", sub_query_id="sq1",
+                      message=f"No Customer.Country value is '{value}', so the query returned no rows. "
+                              f"The closest existing values are {quoted}; use one of them if it is what the "
+                              "question means.",
+                      detail={"recovered": True})
+
+
+def _country_plan(value):
+    return PlanModel.model_validate({"tables": [{"name": "Customer", "alias": "c"}],
+                                     "select_items": [{"expr": col("c", "FirstName")}],
+                                     "where": eq(col("c", "Country"), lit(value))})
+
+
 def test_value_not_found_replacement_is_an_assumption():
-    replaced = RunWarning(code=ErrorCode.VALUE_NOT_FOUND.value, node="executor", sub_query_id="sq1",
-                          message="No Genre.Name value is 'Rok', so the query returned no rows. "
-                                  "The closest existing values are 'Rock'.",
-                          detail={"recovered": True})
     fan_out = RunWarning(code=ErrorCode.JOIN_FAN_OUT.value, node="executor", sub_query_id="sq1",
                          message="The join repeats rows.")
     other_step = RunWarning(code=ErrorCode.JOIN_FAN_OUT.value, node="executor", sub_query_id="sq2", message="x")
     retried = RunWarning(code=ErrorCode.MISSING_SQL.value, node="generator", sub_query_id="sq1", message="y",
                          detail={"recovered": True})
-    state = {"subgraph_outputs": {"sg1": _output()}, "warnings": [replaced, fan_out, other_step, retried]}
+    state = {"subgraph_outputs": {"sg1": _output(plan=_country_plan("Brazil"))},
+             "warnings": [_retry_warning("Brasil", ["Brazil", "Brunei"]), fan_out, other_step, retried]}
     step = result_from_state(state).explanation.steps[0]
-    assert step.assumptions == [
-        "A filter value was not in the data, so the closest existing one was used: No Genre.Name value is 'Rok', "
-        "so the query returned no rows. The closest existing values are 'Rock'.",
-        "The join repeats rows.",
-    ]
+    # Said in the reader's words, from the final plan's literals; nothing of the planner's prompt.
+    assert step.assumptions == ["'Brasil' is not in Customer country; 'Brazil' was used instead.",
+                                "The join repeats rows."]
+
+    # The replan did not use a suggested value: nothing is claimed about what was used.
+    state = {"subgraph_outputs": {"sg1": _output(plan=_country_plan("Chile"))},
+             "warnings": [_retry_warning("Brasil", ["Brazil"])]}
+    assert result_from_state(state).explanation.steps[0].assumptions == [
+        "'Brasil' is not in Customer country; the question was planned again."]
 
 
 def test_planner_note_is_labelled():
@@ -272,6 +293,58 @@ def test_planner_note_is_labelled():
     # Model text appears only in its labelled field.
     others = step.model_dump(exclude={"planner_note"})
     assert "unit price times quantity." not in json.dumps(others)
+
+
+def test_unaliased_column_matches_no_term_across_tables():
+    plan = PlanModel.model_validate({
+        "tables": [{"name": "Track", "alias": "t"}, {"name": "Album", "alias": "a"}],
+        "joins": [{"left_alias": "t", "right_alias": "a", "condition": eq(col("t", "AlbumId"), col("a", "AlbumId"))}],
+        "select_items": [{"expr": {"kind": "column", "column_name": "Title"}}],
+    })
+    used = KnowledgeUsed(datasource_id="chinook", digest="k1", terms=[
+        TermMatch(term="album name", columns=["Album.Title"], source="yaml", score=1.0)])
+    assert explain_plan(plan, datasource_id="chinook", knowledge_used=used).terms == []
+
+
+# ---------------------------------------------------------------- what is never explained
+
+def test_refused_plan_is_not_explained():
+    """A plan the validator refused (refusal_names_tables off) must not confirm the table it named."""
+    refusal = PipelineError(node="logical_validator", message="You do not have permission to read this data.",
+                            severity=ErrorSeverity.ERROR, error_code=ErrorCode.SECURITY_VIOLATION)
+    secret = PlanModel.model_validate({"tables": [{"name": "EmployeeSalary", "alias": "s"}],
+                                       "select_items": [{"expr": col("s", "Amount")}]})
+    refused = _output(plan=secret).model_copy(update={"status": "error", "errors": [refusal]})
+    result = result_from_state({"subgraph_outputs": {"sg1": refused}, "errors": [refusal]})
+    assert result.explanation is None
+    assert "EmployeeSalary" not in json.dumps(result.model_dump(mode="json", exclude={"sub_queries"}))
+
+
+def test_denied_or_dropped_step_is_not_explained():
+    denial = PipelineError(node="ast_planner", message="Denied by a hook.", severity=ErrorSeverity.ERROR,
+                           error_code=ErrorCode.HOOK_DENIED)
+    dropped = _output().model_copy(update={"status": "dropped", "errors": [denial]})
+    assert result_from_state({"subgraph_outputs": {"sg1": dropped}}).explanation is None
+    # A run a hook ended withholds its data, and its explanation with it.
+    assert result_from_state({"subgraph_outputs": {"sg1": _output()}, "errors": [denial]}).explanation is None
+
+
+def test_unknown_operator_never_fails_the_result():
+    names = phrases.Names({"g": "Genre"})
+    rejected = Expr.model_validate({"kind": "binary", "op": "NOT", "left": col("g", "Name"), "right": lit("x")})
+    assert phrases.phrase(rejected, names) == "Genre name NOT 'x'"
+    plan = PlanModel.model_validate({"tables": [{"name": "Genre", "alias": "g"}],
+                                     "select_items": [{"expr": col("g", "Name")}],
+                                     "where": rejected.model_dump()})
+    assert result_from_state({"subgraph_outputs": {"sg1": _output(plan=plan)}}).explanation is not None
+
+
+def test_unrenderable_plan_gives_no_explanation():
+    """A stored plan that no longer validates (a trace from an older version) leaves the explanation out."""
+    output = _output().model_dump()
+    output["plan"] = {"tables": [{"name": "Genre"}], "no_such_field": 1}
+    result = result_from_state({"subgraph_outputs": {"sg1": output}})
+    assert result.explanation is None and result.status == "plan_only"
 
 
 # ---------------------------------------------------------------- assembly

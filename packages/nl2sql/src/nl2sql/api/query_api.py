@@ -7,6 +7,7 @@ Provides functionality for executing natural language queries against databases.
 from __future__ import annotations
 
 import contextvars
+import logging
 import queue
 import threading
 from datetime import datetime, timezone
@@ -34,6 +35,8 @@ from nl2sql.explain.models import Explanation
 from nl2sql.knowledge.models import KnowledgeUsed
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.models import Estimate
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_SAMPLE_ROWS = 50
 # A run's stream ends with exactly one of these.
@@ -293,8 +296,6 @@ def result_from_state(
     glossary, which names tables and columns and tells a glossary join from
     a declared key.
     """
-    from nl2sql.explain.render import explain_state  # the renderer loads only when a run is assembled
-
     state = state or {}
 
     warnings: List[RunWarning] = [RunWarning.model_validate(w) for w in state.get("warnings") or []]
@@ -331,8 +332,20 @@ def result_from_state(
         source=_source(state.get("verified_match")),
         stop=state.get("stop"),
         approvals_needed=list(state.get("approvals_needed") or []),
-        explanation=explain_state(state, warnings, knowledge),
+        explanation=None if withheld else _explanation(state, warnings, knowledge),
     )
+
+
+def _explanation(state: Dict[str, Any], warnings: List[RunWarning],
+                 knowledge: Optional[Mapping[str, DatasourceKnowledge]]) -> Optional[Explanation]:
+    """The run's explanation, or None when it cannot be rendered: an explanation never fails a run."""
+    from nl2sql.explain.render import explain_state  # the renderer loads only when a run is assembled
+
+    try:
+        return explain_state(state, warnings, knowledge)
+    except Exception:
+        logger.warning("Could not render the run's explanation.", exc_info=True)
+        return None
 
 
 def tables_read(result: QueryResult, ds_registry: Any = None) -> List[str]:
