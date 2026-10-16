@@ -5931,7 +5931,26 @@ as the two hooks above are. The adapter interface stays at version 2.</p>
 to read, added up over the plan's scan operators: a full scan counts its
 table, not its filtered output), <code>cost</code> (the planner's own units, for
 display only) and <code>source</code> (what was read, for people). <code>Overlap</code> has
-<code>sampled</code> and <code>matched</code>. Wave B's C1 implements both on the built-ins.</p>
+<code>sampled</code> and <code>matched</code>.</p>
+<p>On the built-ins:</p>
+<ul>
+<li><strong><code>probe_overlap</code></strong> is on the SDK's <code>SQLAlchemyAdapter</code>, so all five
+  built-ins and every adapter on the base have it. It is one statement in
+  SQLAlchemy Core (a <code>DISTINCT</code> sample of <code>left</code> with a limit, and an
+  <code>EXISTS</code> on <code>right</code>), run on the adapter's own connections, so read-only
+  and under <code>timeout_ms</code> wherever the adapter enforces them. The limit caps
+  the sample, not the read: <code>DISTINCT</code> can read all of <code>left</code>, so on a
+  large table the timeout is what bounds it. A failure raises
+  <code>RuntimeError</code> naming the two columns and the driver's error class, never
+  the driver's message, which can quote a value.</li>
+<li><strong><code>estimate</code></strong> is on PostgreSQL, MySQL, SQL Server and DuckDB, which
+  declare <code>ESTIMATES_COST</code>. SQLite does not: <code>EXPLAIN QUERY PLAN</code> has no row
+  estimates. Each reads the database's plan without running the query and
+  adds up what its scan operators read, per execution where the plan
+  gives the executions; the four adapter pages say how and what they do not
+  count. Every failure raises <code>RuntimeError</code>, which the cost rule reads as
+  "no estimate".</li>
+</ul>
 <h3 id="result-types-every-adapter-returns">Result types every adapter returns</h3>
 <p>These are part of the contract, so the same plan gives the same values on
 every database:</p>

@@ -5302,6 +5302,11 @@ when running in <strong>Docker</strong>.</p>
 <td style="text-align: left;">A file that does not exist is <code>database</code>.</td>
 </tr>
 <tr>
+<td style="text-align: left;"><strong>Estimates</strong></td>
+<td style="text-align: left;"><code>EXPLAIN (FORMAT JSON)</code>, then <code>duckdb_tables().estimated_size</code></td>
+<td style="text-align: left;"><code>estimate</code> never runs the query. A scan of a table counts the table's size, never the operator's estimate; its name is read as DuckDB prints it (<code>memory.main."Big Orders"</code>), and a scanned table with no size raises. A table function (<code>range</code>, <code>read_parquet</code>) counts its own estimate. DuckDB plans hash joins, so each scan counts once. DuckDB reports no cost. Declares <code>ESTIMATES_COST</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
 <td style="text-align: left;"><code>duckdb_tables().estimated_size</code></td>
 <td style="text-align: left;">The catalog's count.</td>

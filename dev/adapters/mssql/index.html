@@ -2549,6 +2549,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#estimates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estimates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#statement-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5171,6 +5182,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#estimates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estimates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#statement-timeout" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5277,6 +5299,11 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 <td style="text-align: left;">18456 is <code>auth</code>, 4060 <code>database</code>, 916 <code>permission</code>; ODBC's <code>08001</code>, <code>08S01</code> and <code>HYT00</code> are <code>network</code>; no ODBC Driver for SQL Server installed is <code>driver</code>.</td>
 </tr>
 <tr>
+<td style="text-align: left;"><strong>Estimates</strong></td>
+<td style="text-align: left;"><code>SET SHOWPLAN_XML ON</code>, then <code>sys.partitions</code></td>
+<td style="text-align: left;"><code>estimate</code> never runs the query. Each <code>Table Scan</code>, <code>Clustered Index Scan</code>, <code>Index Scan</code>, <code>Columnstore Index Scan</code>, <code>Index Seek</code> or <code>Clustered Index Seek</code> counts <code>EstimatedRowsRead</code> where the server reports it; else a scan counts its table's catalog row count and a seek its <code>EstimateRows</code>. Each is per execution, so it is multiplied by <code>1 + EstimateRebinds + EstimateRewinds</code> (the inner side of a nested loop). <code>cost</code> is <code>StatementSubtreeCost</code>, else the plan's top <code>EstimatedTotalSubtreeCost</code>, else none. Bound parameters are written into the statement as escaped literals, because SQL Server returns no plan for a statement sent with parameters (an <code>sp_executesql</code> call). A statement SQL Server gives no plan for (<code>WAITFOR</code>) raises rather than counting zero rows. SHOWPLAN is turned off again before the connection is closed, because pyodbc's ODBC pooling hands the session on to the next connection. Needs the <code>SHOWPLAN</code> permission: see <a href="#estimates">Estimates</a>. Declares <code>ESTIMATES_COST</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
 <td style="text-align: left;"><code>sys.partitions</code></td>
 <td style="text-align: left;">The row count SQL Server keeps for each table.</td>
@@ -5305,6 +5332,13 @@ is <code>db_datareader</code>.</strong></p>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">USER</span><span class="w"> </span><span class="n">nl2sql</span><span class="w"> </span><span class="k">FOR</span><span class="w"> </span><span class="n">LOGIN</span><span class="w"> </span><span class="n">nl2sql</span><span class="p">;</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">ROLE</span><span class="w"> </span><span class="n">db_datareader</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="n">MEMBER</span><span class="w"> </span><span class="n">nl2sql</span><span class="p">;</span>
 </code></pre></div>
+<h3 id="estimates">Estimates</h3>
+<p><code>estimate</code> reads SQL Server's estimated plan, which needs the <code>SHOWPLAN</code>
+permission. A <code>db_datareader</code> login does not have it, and its estimate
+raises, which a cost rule treats as <code>unknown</code>. To give the cost rule real
+numbers, grant it; it lets the login see plans, not data:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">GRANT</span><span class="w"> </span><span class="n">SHOWPLAN</span><span class="w"> </span><span class="k">TO</span><span class="w"> </span><span class="n">nl2sql</span><span class="p">;</span>
+</code></pre></div>
 <h3 id="statement-timeout">Statement Timeout</h3>
 <p>SQL Server has no session setting for a statement timeout, so the adapter's
 <code>session_setup</code> sets pyodbc's query timeout (<code>Connection.timeout</code>) on every new
@@ -5318,8 +5352,8 @@ limit passes, the driver cancels the query and the adapter reports it as a timeo
 Microsoft's ODBC Driver for SQL Server (17 or 18) in your Docker image or local
 environment; the adapter uses the newest one installed.</p>
 <p><a href="https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server">Download ODBC Driver for SQL Server</a></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Debian / Ubuntu</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>unixodbc-dev
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Debian / Ubuntu</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>unixodbc-dev
 </code></pre></div>
 
 

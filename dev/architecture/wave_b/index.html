@@ -4451,6 +4451,31 @@ exception. The conformance kit checks it on the kit's seed (a known overlap
 of 1.0 and of 0.0, and a timeout honoured where <code>ENFORCES_TIMEOUT</code> is
 declared). An adapter without the method gets name-and-type proposals with
 <code>overlap: null</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: <code>probe_overlap</code> (C1)</p>
+<p><code>SQLAlchemyAdapter.probe_overlap(left, right, sample_rows)</code> in
+<code>nl2sql_sdk/sqlalchemy/adapter.py</code>, with its statement in
+<code>overlap_statement</code>: a <code>DISTINCT</code> subquery of <code>left</code> with
+<code>.limit(sample_rows)</code>, a subquery flagging each value 1 when it <code>EXISTS</code>
+in <code>right</code>, then <code>COUNT(*)</code> and <code>SUM</code> of the flag. The flag is one level
+down because SQL Server refuses an aggregate over a subquery (Msg 130).
+It runs on the adapter's own connections (read-only and under
+<code>timeout_ms</code> where the adapter enforces them). The limit caps the
+sample, not the read: <code>DISTINCT</code> usually reads all of <code>left</code> first, so
+on a large table only the timeout bounds the probe. The adapter raises
+<code>RuntimeError</code> on failure, naming the two columns and the driver's error
+class, never the driver's message (a conversion error quotes the value);
+P1 turns that into the report's issue. A <code>ColumnRef</code>'s <code>schema_name</code> is
+the schema as the snapshot names it (DuckDB's <code>catalog.schema</code>). The
+kit's <code>test_kit_overlap_on_the_seed</code> checks 1.0 (<code>kit_orders.person_id</code>
+to <code>kit_people.id</code>: 2 sampled, 2 matched) and 0.0.</p>
+<p><strong>Not built: the kit's overlap-timeout check.</strong> No seed makes the probe
+slow on every database without seeding millions of rows, which the kit
+cannot afford on each test. The probe runs on the same pooled
+connections whose timeout <code>test_slow_query_is_stopped_when_timeout_is_declared</code>
+proves, so the timeout holds by construction; P1 must still treat a
+timed-out probe as an issue, not an exception.</p>
+</div>
 <h3 id="column-roles">Column roles</h3>
 <p>Two kinds of role (D61). <strong>Derived</strong> roles are facts the snapshot proves;
 they are computed at use, shown with origin <code>derived</code>, overridden by the
@@ -4882,6 +4907,62 @@ filtered full scan of the kit's largest seeded table (a <code>WHERE</code> on an
 unindexed column that matches no row) reports at least half the table's
 row count, not the filter's output; and an estimate of SQL naming a
 missing table raises.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: <code>estimate</code> (C1)</p>
+<p><code>estimate(sql, parameters)</code> on the PostgreSQL, MySQL, SQL Server and
+DuckDB adapters, which declare <code>ESTIMATES_COST</code>; SQLite does not. Each
+asks for the plan on the adapter's own connections (read-only and under
+<code>timeout_ms</code>), with <code>parameters</code> bound as <code>execute</code> binds them. Every
+failure raises <code>RuntimeError</code>: the database's, with the driver's first
+line, and a plan the adapter cannot read, with the error's class. None
+falls back to an operator's filtered estimate, and none reports a
+statement with no plan (SQL Server's <code>WAITFOR</code>, a parameterized RPC) as
+zero rows: no plan is no estimate, which the cost rule's <code>unknown</code>
+decides. The kit's <code>sleep_sql</code> check accepts that <code>RuntimeError</code>. The table above holds,
+with these details:</p>
+<ul>
+<li><strong>Per execution.</strong> Scan rows are per execution, so the inner side of a
+  nested loop is multiplied: SQL Server by <code>1 + EstimateRebinds +
+  EstimateRewinds</code>; PostgreSQL by the outer side's <code>Plan Rows</code> (EXPLAIN
+  without ANALYZE gives no loops), except below a <code>Materialize</code>; MySQL by
+  the <code>rows_produced_per_join</code> of the tables before it, except through a
+  join buffer (a hash join reads its table once). DuckDB plans hash
+  joins. Not multiplied: a correlated subquery (PostgreSQL <code>SubPlan</code>,
+  MySQL dependent subquery) counts one execution.</li>
+<li><strong>postgres</strong> asks <code>EXPLAIN (FORMAT JSON, VERBOSE)</code>, for each scan's
+  <code>Schema</code>. A <code>Seq Scan</code> counts the <code>Plan Rows</code> of <code>EXPLAIN SELECT *
+  FROM</code> its relation, the planner's <code>reltuples</code> scaled to the current
+  size on disk, rather than <code>reltuples</code> itself: that counts a relation
+  never analyzed on every version (-1 since 14, 0 before) and is fresher
+  on stale statistics. <code>Foreign Scan</code> and <code>Function Scan</code> are not counted.</li>
+<li><strong>mysql</strong> skips a table with <code>materialized_from_subquery</code> (a derived
+  table, named by its alias in the JSON) and <code>&lt;union...&gt;</code>, and counts what
+  they read.</li>
+<li><strong>mssql</strong> counts <code>Columnstore Index Scan</code> too. SHOWPLAN is a session
+  setting, and pyodbc's ODBC pooling hands a closed connection's session
+  to the next connection, so <code>invalidate()</code> alone leaked it into later
+  adapters (the first <code>realdb</code> run showed it). The estimate now runs <code>SET
+  SHOWPLAN_XML OFF</code> in a <code>finally</code>, then invalidates the connection.
+  Bound parameters are written in as escaped literals
+  (<code>inline_parameters</code>): sent as parameters, the statement is an
+  <code>sp_executesql</code> call, for which SHOWPLAN returned no plan (<code>realdb</code>
+  showed <code>rows=0</code>). <code>cost</code> is <code>StatementSubtreeCost</code>, else the top <code>RelOp</code>'s
+  <code>EstimatedTotalSubtreeCost</code>, else None. The test bed's reader login
+  lacks <code>SHOWPLAN</code>; its estimate raises.</li>
+<li><strong>duckdb</strong> reads the scan's <code>Table</code> as DuckDB prints it
+  (<code>memory.main."Big Orders"</code>) with <code>sqlglot.exp.to_table</code>, and a scanned
+  table with no size in <code>duckdb_tables()</code> raises. A table function
+  (<code>range</code>) counts its own <code>Estimated Cardinality</code>. DuckDB rules a scan
+  out from its min/max statistics when a filter falls outside them, so
+  the kit's no-match filter (<code>amount = 50.5</code> on <code>kit_orders</code>, now 100
+  rows) falls inside them.</li>
+</ul>
+<p>The kit's checks are <code>test_kit_estimate_does_not_execute</code> (two seconds,
+not one: SQL Server opens a fresh connection per estimate),
+<code>test_kit_filtered_full_scan_reports_the_table_size</code> and
+<code>test_kit_estimate_of_a_missing_table_raises</code> (a <code>RuntimeError</code>, the
+contract C2 relies on). <code>cost</code> is <code>None</code> on DuckDB.</p>
+</div>
 <h3 id="the-policy-rule">The policy rule</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-16-1" id="__codelineno-16-1" name="__codelineno-16-1"></a><span class="c1"># policies.yaml</span>
 <a href="#__codelineno-16-2" id="__codelineno-16-2" name="__codelineno-16-2"></a><span class="nt">cost</span><span class="p">:</span><span class="w">                            </span><span class="c1"># absent: no estimate is ever asked for</span>

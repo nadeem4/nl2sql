@@ -2475,6 +2475,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#adding-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding estimate
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5153,6 +5164,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#adding-estimate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding estimate
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5248,6 +5270,7 @@
 <li>Reading the schema: one reflection pass per schema, filtered by the datasource's <code>index</code> scope</li>
 <li>Catalog row estimates, type-aware statistics, and values only when <code>index.sample_values</code> is on</li>
 <li>Reporting what a table or column was indexed without as an <code>IndexIssue</code></li>
+<li><code>probe_overlap</code>, the schema profiler's join check, in SQLAlchemy Core</li>
 </ul>
 <h3 id="example">Example</h3>
 <p>A complete adapter: the built-in PostgreSQL one, less its <code>session_setup</code>, <code>classify</code> and <code>capabilities</code>.</p>
@@ -5302,6 +5325,51 @@
 declare <code>ENFORCES_READ_ONLY</code> and <code>ENFORCES_TIMEOUT</code> for what it enforces, and
 override <code>classify()</code> to map your driver's connection errors to stages (see
 the <a href="../sqlalchemy/#session_setupdbapi_connection">reference</a>).</p>
+<h3 id="adding-estimate">Adding <code>estimate</code></h3>
+<p>The engine's cost rule asks an adapter for the rows a query will <em>read</em>
+before it runs it. Reading a plan is the database's own, so the base has no
+<code>estimate</code>: add one and declare <code>ESTIMATES_COST</code>
+(<a href="../sdk/#optional-hooks-estimate-and-probe_overlap">the contract</a>).</p>
+<ol>
+<li>Ask for the plan without running the query (<code>EXPLAIN</code>, an estimated
+   plan), on the adapter's own connections, so it runs read-only and under
+   <code>timeout_ms</code>, with <code>parameters</code> bound as <code>execute</code> binds them.</li>
+<li>Add up the rows each scan operator <em>reads</em>. A full scan counts its
+   table's row count, never the operator's own row estimate, which is its
+   output after the filter: a scan that filters a billion rows down to ten
+   reads a billion. An index seek counts its own estimate. Both are per
+   execution: an operator on the inner side of a nested loop runs once per
+   outer row, so multiply by the times it runs where the plan says.</li>
+<li>Return <code>Estimate(rows=..., cost=..., source=...)</code>: <code>cost</code> is the
+   planner's total, for display only, or None when the plan has none;
+   <code>source</code> says what was read.</li>
+<li>Raise <code>RuntimeError</code> on every failure, the database's (with the
+   driver's first line, <code>driver_message</code>) and a plan you cannot read
+   alike: the engine's cost rule reads a <code>RuntimeError</code> as "no estimate",
+   and the kit checks it. Never fall back to the operator's filtered
+   estimate, and never report a statement the database gives no plan for
+   as zero rows: no plan is no estimate, so raise.</li>
+<li>Leave no session setting behind. A setting that changes what a query
+   returns (SQL Server's <code>SHOWPLAN_XML</code>) must be turned off before the
+   connection is closed: a driver's own pool can hand the session on.</li>
+</ol>
+<p>The built-in PostgreSQL adapter's:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">estimate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sql</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Estimate</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">engine</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>            <span class="n">plan</span> <span class="o">=</span> <span class="n">_plan</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"EXPLAIN (FORMAT JSON, VERBOSE) </span><span class="si">{</span><span class="n">sql</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">parameters</span><span class="p">)</span><span class="o">.</span><span class="n">scalar</span><span class="p">())</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>            <span class="n">seq_scans</span><span class="p">,</span> <span class="n">rows</span> <span class="o">=</span> <span class="n">scans</span><span class="p">(</span><span class="n">plan</span><span class="p">)</span>  <span class="c1"># each Seq Scan with the times it runs; index scans' rows</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            <span class="n">sizes</span> <span class="o">=</span> <span class="p">{(</span><span class="n">schema</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span> <span class="bp">self</span><span class="o">.</span><span class="n">_planned_size</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">schema</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">schema</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">seq_scans</span><span class="p">}</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="n">rows</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sizes</span><span class="p">[(</span><span class="n">schema</span><span class="p">,</span> <span class="n">name</span><span class="p">)]</span> <span class="o">*</span> <span class="n">times</span> <span class="k">for</span> <span class="n">schema</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">times</span> <span class="ow">in</span> <span class="n">seq_scans</span><span class="p">)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="n">cost</span> <span class="o">=</span> <span class="n">plan</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"Total Cost"</span><span class="p">)</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="k">return</span> <span class="n">Estimate</span><span class="p">(</span><span class="n">rows</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">rows</span><span class="p">),</span> <span class="n">cost</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">cost</span><span class="p">)</span> <span class="k">if</span> <span class="n">cost</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>                        <span class="n">source</span><span class="o">=</span><span class="s2">"EXPLAIN (FORMAT JSON) and pg_class.reltuples"</span><span class="p">)</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">except</span> <span class="n">SQLAlchemyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> could not estimate the query: </span><span class="si">{</span><span class="n">driver_message</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="k">except</span> <span class="n">_UNREADABLE</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># KeyError, TypeError, ValueError, AttributeError, IndexError</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> could not estimate the query: the plan could not be read "</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>                           <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+</code></pre></div>
 <blockquote>
 <p>See the <strong><a href="../sqlalchemy/">SQLAlchemy Adapter Reference</a></strong> for full API details.</p>
 </blockquote>
@@ -5319,42 +5387,42 @@ the <a href="../sqlalchemy/#session_setupdbapi_connection">reference</a>).</p>
 <li>A <code>fetch_schema_snapshot(scope, on_table=None)</code> that reads only what the datasource's <code>IndexScope</code> wants (<code>scope.wants_table</code>, <code>scope.wants_column</code>).</li>
 </ul>
 <h3 id="example_1">Example</h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">SecretStr</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ConnectionCheck</span><span class="p">,</span> <span class="n">ConnectionModel</span><span class="p">,</span> <span class="n">IndexScope</span><span class="p">,</span> <span class="n">Limits</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                        <span class="n">ResultFrame</span><span class="p">,</span> <span class="n">SchemaSnapshot</span><span class="p">)</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyApiConnection</span><span class="p">(</span><span class="n">ConnectionModel</span><span class="p">):</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">url</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">token</span><span class="p">:</span> <span class="n">SecretStr</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyApiAdapter</span><span class="p">:</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">interface_version</span> <span class="o">=</span> <span class="mi">2</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">title</span> <span class="o">=</span> <span class="s2">"My API"</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">connection_model</span> <span class="o">=</span> <span class="n">MyApiConnection</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">driver_modules</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"httpx"</span><span class="p">,)</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">install_hint</span> <span class="o">=</span> <span class="s1">'pip install "nl2sql-my-api"'</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">datasource_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">connection</span><span class="p">:</span> <span class="n">MyApiConnection</span><span class="p">,</span> <span class="n">limits</span><span class="p">:</span> <span class="n">Limits</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">folder</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">datasource_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span> <span class="o">=</span> <span class="n">datasource_id</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">capabilities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># not SQL: the SQL agent does not serve it</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">test_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConnectionCheck</span><span class="p">:</span>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>        <span class="o">...</span>  <span class="c1"># call the API; return ConnectionCheck(ok=False, message=...) on failure</span>
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_schema_snapshot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="n">IndexScope</span><span class="p">,</span> <span class="n">on_table</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SchemaSnapshot</span><span class="p">:</span>
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        <span class="o">...</span>  <span class="c1"># call the API, return the schema of what scope.wants_table() keeps</span>
-<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>
-<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">AdapterRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResultFrame</span><span class="p">:</span>
-<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>        <span class="o">...</span>  <span class="c1"># run the request, return rows</span>
-<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>
-<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_dialect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
-<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">default_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
-<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">pass</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">SecretStr</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">AdapterRequest</span><span class="p">,</span> <span class="n">ConnectionCheck</span><span class="p">,</span> <span class="n">ConnectionModel</span><span class="p">,</span> <span class="n">IndexScope</span><span class="p">,</span> <span class="n">Limits</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                        <span class="n">ResultFrame</span><span class="p">,</span> <span class="n">SchemaSnapshot</span><span class="p">)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyApiConnection</span><span class="p">(</span><span class="n">ConnectionModel</span><span class="p">):</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">url</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">token</span><span class="p">:</span> <span class="n">SecretStr</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyApiAdapter</span><span class="p">:</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>    <span class="n">interface_version</span> <span class="o">=</span> <span class="mi">2</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="n">title</span> <span class="o">=</span> <span class="s2">"My API"</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="n">connection_model</span> <span class="o">=</span> <span class="n">MyApiConnection</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>    <span class="n">driver_modules</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"httpx"</span><span class="p">,)</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>    <span class="n">install_hint</span> <span class="o">=</span> <span class="s1">'pip install "nl2sql-my-api"'</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">datasource_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">connection</span><span class="p">:</span> <span class="n">MyApiConnection</span><span class="p">,</span> <span class="n">limits</span><span class="p">:</span> <span class="n">Limits</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">folder</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">datasource_id</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">connection</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limits</span> <span class="o">=</span> <span class="n">datasource_id</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">capabilities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a>        <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># not SQL: the SQL agent does not serve it</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">test_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ConnectionCheck</span><span class="p">:</span>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>        <span class="o">...</span>  <span class="c1"># call the API; return ConnectionCheck(ok=False, message=...) on failure</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_schema_snapshot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="n">IndexScope</span><span class="p">,</span> <span class="n">on_table</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SchemaSnapshot</span><span class="p">:</span>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a>        <span class="o">...</span>  <span class="c1"># call the API, return the schema of what scope.wants_table() keeps</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">execute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">AdapterRequest</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResultFrame</span><span class="p">:</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a>        <span class="o">...</span>  <span class="c1"># run the request, return rows</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_dialect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">default_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="k">pass</span>
 </code></pre></div>
 <blockquote>
 <p>See the <strong><a href="../sdk/">Adapter Interface Reference</a></strong> for the method signatures and compliance guide.</p>
@@ -5363,7 +5431,7 @@ the <a href="../sqlalchemy/#session_setupdbapi_connection">reference</a>).</p>
 <p>Whichever path you choose, run the conformance kit against a real database
 before you publish. It is a pytest test class, <code>AdapterConformance</code>, in
 <code>nl2sql_sdk.testing</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-sdk[testing]"</span><span class="w">   </span><span class="c1"># adds pytest and sqlglot</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-sdk[testing]"</span><span class="w">   </span><span class="c1"># adds pytest and sqlglot</span>
 </code></pre></div>
 <p>Subclass it in a test module (the name must start with <code>Test</code>) and give it
 four fixtures:</p>
@@ -5393,41 +5461,41 @@ four fixtures:</p>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_engine</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterConformance</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">MyAdapter</span><span class="p">,</span> <span class="n">MyConnection</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestMyAdapterConformance</span><span class="p">(</span><span class="n">AdapterConformance</span><span class="p">):</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">connection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="k">return</span> <span class="n">MyConnection</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">"127.0.0.1"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s2">"..."</span><span class="p">)</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">adapter_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        <span class="k">return</span> <span class="k">lambda</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span><span class="p">:</span> <span class="n">MyAdapter</span><span class="p">(</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span><span class="p">)</span>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">seed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>        <span class="n">admin</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="s2">"mydb://admin:...@127.0.0.1/kit"</span><span class="p">)</span>
-<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>
-<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">statements</span><span class="p">):</span>
-<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>            <span class="k">with</span> <span class="n">admin</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span><span class="o">.</span><span class="n">execution_options</span><span class="p">(</span><span class="n">isolation_level</span><span class="o">=</span><span class="s2">"AUTOCOMMIT"</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
-<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>                <span class="k">for</span> <span class="n">statement</span> <span class="ow">in</span> <span class="n">statements</span><span class="p">:</span>
-<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>                    <span class="n">conn</span><span class="o">.</span><span class="n">exec_driver_sql</span><span class="p">(</span><span class="n">statement</span><span class="p">)</span>
-<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>        <span class="k">return</span> <span class="n">run</span>
-<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>
-<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
-<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">sleep_sql</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>        <span class="k">return</span> <span class="k">lambda</span> <span class="n">seconds</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"SELECT pg_sleep(</span><span class="si">{</span><span class="n">seconds</span><span class="si">}</span><span class="s2">)"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_engine</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.testing</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdapterConformance</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">my_adapter</span><span class="w"> </span><span class="kn">import</span> <span class="n">MyAdapter</span><span class="p">,</span> <span class="n">MyConnection</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">TestMyAdapterConformance</span><span class="p">(</span><span class="n">AdapterConformance</span><span class="p">):</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">connection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="k">return</span> <span class="n">MyConnection</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">"127.0.0.1"</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">user</span><span class="o">=</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">password</span><span class="o">=</span><span class="s2">"..."</span><span class="p">)</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">adapter_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>        <span class="k">return</span> <span class="k">lambda</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span><span class="p">:</span> <span class="n">MyAdapter</span><span class="p">(</span><span class="s2">"kit"</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="n">limits</span><span class="p">)</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">seed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>        <span class="n">admin</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="s2">"mydb://admin:...@127.0.0.1/kit"</span><span class="p">)</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>        <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="n">statements</span><span class="p">):</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>            <span class="k">with</span> <span class="n">admin</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span><span class="o">.</span><span class="n">execution_options</span><span class="p">(</span><span class="n">isolation_level</span><span class="o">=</span><span class="s2">"AUTOCOMMIT"</span><span class="p">)</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>                <span class="k">for</span> <span class="n">statement</span> <span class="ow">in</span> <span class="n">statements</span><span class="p">:</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>                    <span class="n">conn</span><span class="o">.</span><span class="n">exec_driver_sql</span><span class="p">(</span><span class="n">statement</span><span class="p">)</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>        <span class="k">return</span> <span class="n">run</span>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>    <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">sleep_sql</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>        <span class="k">return</span> <span class="k">lambda</span> <span class="n">seconds</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"SELECT pg_sleep(</span><span class="si">{</span><span class="n">seconds</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div>
 <p>Each test writes the kit's seed first and drops it after: two schemas
-(<code>kit_a</code>, <code>kit_b</code>), a view, a mixed-case table, and boolean, uuid and json
-columns. It is written once and transpiled to your <code>get_dialect()</code> with
+(<code>kit_a</code>, <code>kit_b</code>), a view, a mixed-case table, boolean, uuid and json
+columns, and <code>kit_orders</code>, the largest table, with 100 rows. It is written once and transpiled to your <code>get_dialect()</code> with
 sqlglot. Two class attributes adapt it:</p>
 <ul>
 <li><code>schemas = ("main",)</code> for a database with one schema, such as SQLite: the
@@ -5490,6 +5558,14 @@ seed. Without it, the two checks that need it are skipped.</p>
 <tr>
 <td style="text-align: left;">Streaming</td>
 <td style="text-align: left;">If the adapter has <code>execute_batches</code>, its frames match <code>execute</code>'s result</td>
+</tr>
+<tr>
+<td style="text-align: left;">Estimates</td>
+<td style="text-align: left;">If <code>ESTIMATES_COST</code> is declared: <code>estimate</code> returns <code>rows &gt;= 0</code> and a <code>source</code>; an estimate of <code>sleep_sql(5)</code> returns or raises <code>RuntimeError</code> within two seconds (it does not run the statement; a statement with no plan, such as SQL Server's <code>WAITFOR</code>, raises); a filter on an unindexed column of <code>kit_orders</code> that matches no row reports at least half the table's rows; a missing table raises <code>RuntimeError</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">Overlap</td>
+<td style="text-align: left;">If the adapter has <code>probe_overlap</code>: <code>kit_orders.person_id</code> against <code>kit_people.id</code> samples 2 distinct values and matches 2; <code>kit_people.name</code> against <code>KitMixedCase.DisplayName</code> matches none</td>
 </tr>
 </tbody>
 </table>

@@ -5242,6 +5242,11 @@
 <td style="text-align: left;">psycopg2 has no SQLSTATE for a failed connection, so <code>classify</code> reads the message: a refused password is <code>auth</code>, a missing database <code>database</code>, an unreachable host or port <code>network</code>.</td>
 </tr>
 <tr>
+<td style="text-align: left;"><strong>Estimates</strong></td>
+<td style="text-align: left;"><code>EXPLAIN (FORMAT JSON, VERBOSE)</code></td>
+<td style="text-align: left;"><code>estimate</code> never runs the query. A <code>Seq Scan</code> counts its whole relation, not its <code>Plan Rows</code> (the rows left after the filter): the <code>Plan Rows</code> of an unfiltered scan of it, which the planner makes from <code>pg_class.reltuples</code> scaled to the relation's current size, so a relation never analyzed (on any version) is counted too. <code>Index Scan</code>, <code>Index Only Scan</code> and <code>Bitmap Index Scan</code> count their <code>Plan Rows</code>. A scan on the inner side of a <code>Nested Loop</code> counts once per outer row, unless a <code>Materialize</code> keeps its rows. Not counted: <code>Foreign Scan</code>, <code>Function Scan</code>, and the repeats of a correlated <code>SubPlan</code>. <code>cost</code> is the plan's <code>Total Cost</code>. Runs read-only, under <code>statement_timeout</code>. Declares <code>ESTIMATES_COST</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
 <td style="text-align: left;"><code>pg_class.reltuples</code></td>
 <td style="text-align: left;">The catalog's estimate; a table never analyzed has none, and is counted under <code>profile: stats</code>.</td>

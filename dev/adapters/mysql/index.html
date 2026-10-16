@@ -5192,6 +5192,11 @@ other key is an error; see <a href="../../configuration/datasources/#connection"
 <td style="text-align: left;">1045 is <code>auth</code>, 1049 <code>database</code>, 1044 <code>permission</code>, 2003 and 2005 <code>network</code>; PyMySQL's "'cryptography' package is required" is <code>driver</code>.</td>
 </tr>
 <tr>
+<td style="text-align: left;"><strong>Estimates</strong></td>
+<td style="text-align: left;"><code>EXPLAIN FORMAT=JSON</code></td>
+<td style="text-align: left;"><code>estimate</code> never runs the query. Each table access counts <code>rows_examined_per_scan</code>, MySQL's estimate of the rows one scan reads (a full scan, <code>access_type: ALL</code>, counts the table), times its scans: in a nested loop, once per row the tables before it produce (<code>rows_produced_per_join</code>), and once when it is joined through a join buffer (a hash join). A materialized derived table is not counted again; what it reads is. A dependent subquery counts one execution. <code>cost</code> is <code>query_cost</code>. Runs read-only, under <code>MAX_EXECUTION_TIME</code>. Declares <code>ESTIMATES_COST</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
 <td style="text-align: left;"><code>information_schema.tables.table_rows</code></td>
 <td style="text-align: left;">InnoDB's estimate; <code>ANALYZE TABLE</code> refreshes it.</td>

@@ -5248,6 +5248,11 @@ does the same.</p>
 <td style="text-align: left;">A file that cannot be opened is <code>database</code>.</td>
 </tr>
 <tr>
+<td style="text-align: left;"><strong>Estimates</strong></td>
+<td style="text-align: left;">None</td>
+<td style="text-align: left;">Does not declare <code>ESTIMATES_COST</code>: <code>EXPLAIN QUERY PLAN</code> has no row estimates. A cost rule treats every SQLite query as <code>unknown</code>.</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Row counts</strong></td>
 <td style="text-align: left;"><code>COUNT(*)</code></td>
 <td style="text-align: left;">SQLite keeps no estimate, so rows are counted under <code>profile: stats</code>, and there is no row count under <code>catalog</code>.</td>

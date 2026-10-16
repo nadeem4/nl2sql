@@ -2676,6 +2676,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#probe_overlapleft-right-sample_rows-overlap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        probe_overlap(left, right, sample_rows) -&gt; Overlap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#close" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5587,6 +5598,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#probe_overlapleft-right-sample_rows-overlap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        probe_overlap(left, right, sample_rows) -&gt; Overlap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#close" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5997,6 +6019,21 @@ in the driver, which is still not a Python row list. A <code>SQLAlchemyError</co
 before the first row or between batches, is yielded as <code>query_failed(exc)</code>,
 the same failed frame <code>execute</code> returns. <code>execute</code> itself still reads the whole
 result with <code>fetchall</code>.</p>
+<h4 id="probe_overlapleft-right-sample_rows-overlap"><code>probe_overlap(left, right, sample_rows) -&gt; Overlap</code></h4>
+<p>Implements the SDK's optional <code>ProfilingAdapterProtocol</code> (see <a href="../sdk/#optional-hooks-estimate-and-probe_overlap">the SDK</a>):
+of up to <code>sample_rows</code> distinct non-null values of <code>left</code>, how many exist in
+<code>right</code>. One statement in SQLAlchemy Core, a <code>DISTINCT</code> sample with a limit
+and an <code>EXISTS</code> on <code>right</code>, on the adapter's own connections, so it runs
+read-only and under <code>limits.timeout_ms</code> wherever <code>session_setup</code> enforces
+them. The value flag is computed in a subquery and only a plain column is
+aggregated, since SQL Server refuses an aggregate over a subquery. A failure
+raises <code>RuntimeError</code> naming the columns and the driver's error class, never
+the driver's message, which can quote a sampled value.</p>
+<p>The limit caps the sample, not the read: <code>DISTINCT</code> usually reads all of
+<code>left</code> before the limit applies, so on a large table only <code>timeout_ms</code>
+bounds the probe.</p>
+<p>The base has no <code>estimate</code>: reading a plan is the database's own. See
+<a href="../development/#adding-estimate">Adding <code>estimate</code></a>.</p>
 <h4 id="close"><code>close()</code></h4>
 <p>Disposes the connection pool, if one was made. The engine calls an adapter's
 <code>close()</code> once, from <code>engine.close()</code>.</p>
