@@ -1,0 +1,22 @@
+{
+  "sub_query_id": "chinook_019",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track"
+  ],
+  "joins": [],
+  "filters": [
+    "Track milliseconds is more than 600000"
+  ],
+  "groupings": [],
+  "measures": [
+    "track count: number of Track id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count tracks longer than 600000 ms.",
+  "text": "Shows track count. Reads Track, where Track milliseconds is more than 600000."
+}

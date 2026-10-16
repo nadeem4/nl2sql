@@ -1028,6 +1028,45 @@ the plan from this view is later.
 Golden tests render every gold plan in the Chinook suite and compare with
 stored text, so a renderer change is a reviewed diff.
 
+!!! note "Built: why this answer (X1)"
+    `nl2sql/explain/phrases.py` names tables and columns and phrases every
+    `Expr` kind and operator (`KIND_PHRASES`, `BINARY_PHRASES`,
+    `UNARY_PHRASES`, `FUNCTION_PHRASES`); `nl2sql/explain/render.py` has
+    `explain_plan(plan, *, datasource_id, sub_query_id=None,
+    source="generated", knowledge_used=None, knowledge=None, assumptions=())
+    -> ExplainedStep`, `explain_verified(match, sub_query_id, assumptions)`
+    and `explain_state(state, warnings=None, knowledge=None) ->
+    Optional[Explanation]`. `result_from_state` fills
+    `QueryResult.explanation` with `explain_state`, importing the renderer
+    only there, so every caller (run, stream, evals, replay) gets it. It
+    reads `SubgraphOutput` only, as B0 set up. Where the build filled a gap:
+
+    - **The glossary is an argument.** Glossary names and a join's source
+      need the datasource's glossary, which no output carries:
+      `result_from_state(..., knowledge=)` takes a mapping from datasource
+      id to `DatasourceKnowledge`. Nothing passes it yet; K2, which makes
+      glossary joins valid, passes the run's pinned knowledge at the call
+      sites. Without it every join is a declared key, which is true until
+      then.
+    - **The default reading** is "'sales' was read as revenue" when exactly
+      one term sent with the step is read by the plan, else "was read one
+      way"; the planner's answer has no label for its default.
+    - **`text`** is two to four sentences: what it shows, what it reads and
+      filters, the groups it keeps (`HAVING`), its order.
+    - **Assumptions** from warnings are the step's own (`sub_query_id`): a
+      recovered `VALUE_NOT_FOUND` is a replaced value; an unrecovered
+      `VALUE_NOT_FOUND`, `JOIN_FAN_OUT`, `ALL_NULL_COLUMN` or
+      `JOIN_KEY_UNCONVERTED` is said as is; the row cap from `truncated`.
+    - **Golden files** are one JSON per gold case in
+      `tests/unit/explain/golden/`; a missing one is written and the test
+      fails, so deleting a file is how a reviewed wording change is made.
+
+    For L1: each option's `explanation` is `explain_plan(option_plan, ...)`;
+    a run that did not ask keeps `ambiguous_phrase` and `alternatives` on
+    the output and the step lists them as assumptions. For L2: "You chose:
+    <label>" is passed as an `assumptions` entry or set on the step; the
+    label is not on the output.
+
 ## 9. Cost guard
 
 ### The adapter method

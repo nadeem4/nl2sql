@@ -1,0 +1,20 @@
+{
+  "sub_query_id": "chinook_022",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer"
+  ],
+  "joins": [],
+  "filters": [
+    "Customer country is 'Canada'"
+  ],
+  "groupings": [],
+  "measures": [],
+  "order": "lowest Customer id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Name and email of customers in Canada.",
+  "text": "Shows Customer first name, Customer last name and Customer email. Reads Customer, where Customer country is 'Canada'. Lowest Customer id first."
+}

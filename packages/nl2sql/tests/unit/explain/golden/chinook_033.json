@@ -1,0 +1,32 @@
+{
+  "sub_query_id": "chinook_033",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Playlist",
+    "PlaylistTrack",
+    "Track",
+    "MediaType"
+  ],
+  "joins": [
+    "each Playlist to its PlaylistTrack, on PlaylistId (declared key)",
+    "each PlaylistTrack to its Track, on TrackId (declared key)",
+    "each Track to its MediaType, on MediaTypeId (declared key)"
+  ],
+  "filters": [
+    "Playlist name is 'Grunge'"
+  ],
+  "groupings": [
+    "by MediaType id",
+    "by MediaType name"
+  ],
+  "measures": [
+    "track count: number of Track id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count Grunge playlist tracks per media type.",
+  "text": "Shows MediaType name and track count, by MediaType id and MediaType name. Reads Playlist, PlaylistTrack, Track and MediaType, where Playlist name is 'Grunge'."
+}

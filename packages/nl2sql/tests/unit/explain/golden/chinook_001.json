@@ -1,0 +1,22 @@
+{
+  "sub_query_id": "chinook_001",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer"
+  ],
+  "joins": [],
+  "filters": [],
+  "groupings": [
+    "by Customer country"
+  ],
+  "measures": [
+    "customer count: number of Customer id"
+  ],
+  "order": "highest customer count first, then lowest country first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count customers per country.",
+  "text": "Shows Customer country and customer count, by Customer country. Reads Customer. Highest customer count first, then lowest country first."
+}

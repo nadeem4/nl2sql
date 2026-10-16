@@ -1,0 +1,35 @@
+{
+  "sub_query_id": "chinook_044",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer",
+    "Invoice",
+    "InvoiceLine",
+    "Track",
+    "Genre"
+  ],
+  "joins": [
+    "each Customer to its Invoice, on CustomerId (declared key)",
+    "each Invoice to its InvoiceLine, on InvoiceId (declared key)",
+    "each InvoiceLine to its Track, on TrackId (declared key)",
+    "each Track to its Genre, on GenreId (declared key)"
+  ],
+  "filters": [
+    "Genre name is 'Jazz'"
+  ],
+  "groupings": [
+    "by Customer id",
+    "by Customer first name",
+    "by Customer last name"
+  ],
+  "measures": [
+    "jazz tracks: number of InvoiceLine id"
+  ],
+  "order": "highest jazz tracks first, then lowest Customer id first, top 5",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count each customer's jazz invoice lines and keep the five largest.",
+  "text": "Shows Customer first name, Customer last name and jazz tracks, by Customer id, Customer first name and Customer last name. Reads Customer, Invoice, InvoiceLine, Track and Genre, where Genre name is 'Jazz'. Highest jazz tracks first, then lowest Customer id first, top 5."
+}

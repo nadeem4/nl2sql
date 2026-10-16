@@ -1,0 +1,28 @@
+{
+  "sub_query_id": "chinook_005",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "InvoiceLine",
+    "Track",
+    "Genre"
+  ],
+  "joins": [
+    "each InvoiceLine to its Track, on TrackId (declared key)",
+    "each Track to its Genre, on GenreId (declared key)"
+  ],
+  "filters": [],
+  "groupings": [
+    "by Genre id",
+    "by Genre name"
+  ],
+  "measures": [
+    "tracks sold: total of InvoiceLine quantity"
+  ],
+  "order": "highest tracks sold first, then lowest Genre id first, top 1",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Sum quantities sold per genre and keep the largest.",
+  "text": "Shows Genre name and tracks sold, by Genre id and Genre name. Reads InvoiceLine, Track and Genre. Highest tracks sold first, then lowest Genre id first, top 1."
+}

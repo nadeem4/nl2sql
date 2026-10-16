@@ -1,0 +1,30 @@
+{
+  "sub_query_id": "chinook_011",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Playlist",
+    "PlaylistTrack",
+    "Track"
+  ],
+  "joins": [
+    "each Playlist to its PlaylistTrack, on PlaylistId (declared key)",
+    "each PlaylistTrack to its Track, on TrackId (declared key)"
+  ],
+  "filters": [
+    "for each group, number of different Track genre id is more than 3"
+  ],
+  "groupings": [
+    "by Playlist id",
+    "by Playlist name"
+  ],
+  "measures": [
+    "genre count: number of different Track genre id"
+  ],
+  "order": "lowest playlist id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count distinct genres per playlist and keep those above three.",
+  "text": "Shows Playlist id, Playlist name and genre count, by Playlist id and Playlist name. Reads Playlist, PlaylistTrack and Track. Keeps the groups where number of different Track genre id is more than 3. Lowest playlist id first."
+}

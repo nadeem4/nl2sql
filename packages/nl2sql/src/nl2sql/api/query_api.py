@@ -10,7 +10,7 @@ import contextvars
 import queue
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Sequence
+from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
@@ -32,6 +32,7 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCal
 from nl2sql.clarify.models import ClarificationRequest
 from nl2sql.explain.models import Explanation
 from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.models import Estimate
 
 DEFAULT_SAMPLE_ROWS = 50
@@ -134,7 +135,8 @@ class QueryResult(BaseModel):
     approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
     # The readings to choose from, when status is "needs_clarification" (from L1).
     clarification: Optional[ClarificationRequest] = None
-    # The run's plan in plain English, rendered from the typed plan with no model call (from X1).
+    # The run's plan in plain English, rendered from the typed plans with no model call: one step per
+    # sub-query with a plan or a verified answer; None when the run has neither.
     explanation: Optional[Explanation] = None
 
 
@@ -282,8 +284,17 @@ def result_from_state(
     state: Dict[str, Any],
     artifact_store: Any = None,
     sample_rows: int = DEFAULT_SAMPLE_ROWS,
+    knowledge: Optional[Mapping[str, DatasourceKnowledge]] = None,
 ) -> QueryResult:
-    """Build a typed :class:`QueryResult` from a raw pipeline graph state."""
+    """Build a typed :class:`QueryResult` from a raw pipeline graph state.
+
+    ``explanation`` is rendered here from the state's plans, with no model
+    call (``nl2sql.explain``); ``knowledge`` maps a datasource id to its
+    glossary, which names tables and columns and tells a glossary join from
+    a declared key.
+    """
+    from nl2sql.explain.render import explain_state  # the renderer loads only when a run is assembled
+
     state = state or {}
 
     warnings: List[RunWarning] = [RunWarning.model_validate(w) for w in state.get("warnings") or []]
@@ -320,6 +331,7 @@ def result_from_state(
         source=_source(state.get("verified_match")),
         stop=state.get("stop"),
         approvals_needed=list(state.get("approvals_needed") or []),
+        explanation=explain_state(state, warnings, knowledge),
     )
 
 
