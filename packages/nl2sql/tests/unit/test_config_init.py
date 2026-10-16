@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from nl2sql.config import LLM, Config, Policies, demo_config, init_project, load_config
+from nl2sql.config import LLM, Config, KnowledgeSourceConfig, Policies, demo_config, init_project, load_config
 from nl2sql.datasets import CHINOOK_DB_PATH
 from nl2sql.datasets.demo import DEMO_QUESTIONS_BY_DATASOURCE
 from nl2sql.llm.providers import DEFAULT_ANTHROPIC_MODEL, DEFAULT_OPENAI_MODEL
@@ -25,13 +25,14 @@ def _texts(folder: Path) -> dict:
 
 
 def _without_paths(config: Config) -> Config:
-    """``config`` with ``storage.path`` and each SQLite file reduced to its name."""
+    """``config`` with ``storage.path``, each SQLite file and each glossary file reduced to its name."""
     datasources = [
         d.model_copy(update={"connection": {**d.connection, "database": Path(d.connection["database"]).name}})
         for d in config.datasources
     ]
     evals = config.evals.model_copy(update={"suites": [Path(p.name) for p in config.evals.suites]})
-    return config.model_copy(update={"datasources": datasources, "evals": evals,
+    knowledge = [KnowledgeSourceConfig(type=k.type, path=Path(k.model_extra["path"]).name) for k in config.knowledge]
+    return config.model_copy(update={"datasources": datasources, "evals": evals, "knowledge": knowledge,
                                      "storage": config.storage.model_copy(update={"path": Path("storage")})})
 
 
@@ -62,10 +63,11 @@ def test_init_writes_each_section_in_its_own_file(tmp_path):
         "embeddings": {"file": "embeddings.yaml"},
         "policies": {"file": "policies.yaml"},
         "storage": {"file": "storage.yaml"},
+        "knowledge": {"file": "knowledge.yaml"},
     }
     names = {p.relative_to(tmp_path).as_posix() for p in written}
     assert names == {"nl2sql.yaml", "datasources/example.yaml", "llm.yaml", "embeddings.yaml",
-                     "policies.yaml", "storage.yaml", ".gitignore"}
+                     "policies.yaml", "storage.yaml", "knowledge.yaml", "glossary.yaml", ".gitignore"}
 
 
 def test_init_ignores_the_data_folder_and_env_in_git(tmp_path):
@@ -278,3 +280,30 @@ def test_demo_config_takes_its_llm_and_storage_path(tmp_path):
 
     assert config.llm == llm
     assert config.storage.path == tmp_path / "store"
+
+
+# ---------------------------------------------------------------- knowledge (wave_b.md, K1)
+
+def test_init_writes_knowledge_yaml_and_an_empty_glossary(tmp_path):
+    from nl2sql.knowledge.yaml_source import canonical_yaml
+    from nl2sql_sdk.knowledge import Glossary
+
+    init_project(tmp_path)
+
+    config = load_config(tmp_path / "nl2sql.yaml")
+    assert [(k.type, k.model_extra) for k in config.knowledge] == [("yaml", {"path": "glossary.yaml"})]
+    text = (tmp_path / "glossary.yaml").read_text(encoding="utf-8")
+    glossary = Glossary.model_validate(yaml.safe_load(text))
+    assert list(glossary.datasources) == ["example"], "one empty block per datasource"
+    assert canonical_yaml(glossary) == text
+
+
+def test_init_demo_writes_the_demo_glossary(tmp_path):
+    from nl2sql.datasets import DEMO_GLOSSARY_PATH
+
+    init_project(tmp_path, demo=True)
+
+    assert (tmp_path / "glossary.yaml").read_bytes() == DEMO_GLOSSARY_PATH.read_bytes()
+    config = load_config(tmp_path / "nl2sql.yaml")
+    assert config.knowledge[0].model_extra == {"path": "glossary.yaml"}
+    assert demo_config().knowledge[0].model_extra == {"path": DEMO_GLOSSARY_PATH.as_posix()}

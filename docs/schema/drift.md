@@ -105,6 +105,7 @@ data the engine already has:
 | `verified_queries` | Each verified query (`datasource_id`, `query_id`, `reasons`) whose SQL reads a dropped table, a dropped column, or a column whose type changed. A column is matched by its table (its qualifier's alias, or the only table read); an unqualified column in a query of several tables is reported as one it *may* read |
 | `policy_rules` | Each role's `allow` or `deny` pattern (`role`, `kind`, `pattern`) that matched a dropped table and now matches nothing |
 | `preferred_tables` | The datasource's `preferred_tables` that were dropped |
+| `glossary_items` | Each [glossary](../configuration/knowledge.md) item (`tables.orders`, `columns.orders.note`, `terms.revenue`, `rules.pay_private`, `joins.a.id->b.id`) that named a dropped table or column, of those the caller may see |
 
 The plan cache needs no entry: it is keyed on the schema version, so a
 rebuild already makes its old plans unreachable.

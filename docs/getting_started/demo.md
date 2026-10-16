@@ -79,6 +79,8 @@ llm.yaml               # the provider and model; no key
 embeddings.yaml        # provider: local
 policies.yaml          # the admin, analyst and viewer roles below
 storage.yaml           # path: .nl2sql (index, state.db, traces, results)
+knowledge.yaml         # one yaml knowledge source: glossary.yaml
+glossary.yaml          # the Chinook glossary: descriptions, roles, terms, a rule
 curated.yaml           # six verified queries on Chinook
 settings.yaml          # a 300 s timeout and a trace for every run
 data/                  # chinook.sqlite, support.sqlite, webanalytics.sqlite
@@ -86,7 +88,20 @@ data/                  # chinook.sqlite, support.sqlite, webanalytics.sqlite
 ```
 
 It is the same config `nl2sql.config.demo_config()` (and `NL2SQL.demo()`)
-builds in code. `nl2sql index` then builds the index, and exits `1` if any
+builds in code.
+
+The glossary describes Chinook's invoices, its money and enum columns, the
+terms "revenue" and "invoiced total", and a rule. "Sales" is a synonym of
+both terms on purpose: the demo carries one real ambiguity. After
+`nl2sql index`, see what the engine makes of it, as a role:
+
+```bash
+nl2sql --config nl2sql-demo/nl2sql.yaml knowledge show --as analyst
+nl2sql --config nl2sql-demo/nl2sql.yaml knowledge show --as viewer   # the catalog only: no invoice terms
+```
+
+Each item is labelled with its origin (`knowledge`, `database` or
+`derived`); see [Knowledge](../configuration/knowledge.md). `nl2sql index` then builds the index, and exits `1` if any
 datasource fails. See
 [Start a config with `nl2sql init`](index.md#start-a-config-with-nl2sql-init).
 

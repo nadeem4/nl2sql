@@ -121,7 +121,7 @@ engine.traces        # get, replay
 engine.storage       # info, purge
 engine.events        # subscribe, catalog
 engine.evals         # load, run, regenerate, scorers
-engine.knowledge     # sources, show, export, reload, profile, save_choice (0.8; stubs until then)
+engine.knowledge     # sources, show, export, reload; profile, save_choice (0.8; stubs until then)
 engine.proposals     # list, get, accept, reject, export, apply (0.8; stubs until then)
 ```
 
@@ -137,7 +137,8 @@ engine.proposals     # list, get, accept, reject, export, apply (0.8; stubs unti
 | `traces`, `about()` | below |
 | `events` | [Events](../../observability/events.md) |
 | `evals` | [Evals](../../evals/index.md) |
-| `knowledge`, `proposals` | [Wave B](../../architecture/wave_b.md): every method has its final signature and raises `NotImplementedError`, naming the change that builds it, until release 0.8. Each read takes `user_context` as a required keyword. |
+| `knowledge` | [Knowledge](../../configuration/knowledge.md): `sources`, `show`, `export` and `reload`. `profile` and `save_choice` have their final signatures and raise `NotImplementedError`, naming the change that builds them, until release 0.8. Each read takes `user_context` as a required keyword. |
+| `proposals` | [Wave B](../../architecture/wave_b.md): every method has its final signature and raises `NotImplementedError`, naming the change that builds it, until release 0.8. Each read takes `user_context` as a required keyword. |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.

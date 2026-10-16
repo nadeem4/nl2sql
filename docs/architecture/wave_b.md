@@ -337,6 +337,15 @@ admin role.
 --role` does; without `--as` the role is `policies.default_role`, and with
 neither the command refuses (Wave A D33).
 
+!!! note "Built: sources, merging, show and export (K1)"
+    The `yaml` source, the merge, the digests, resolution and its problems,
+    derived roles, the scope filter, `engine.knowledge.sources`, `show`,
+    `export` and `reload`, the CLI and `knowledge.loaded` are built; see the K1
+    note in [the PR plan](#16-pr-plan) for the exact names. A datasource that is
+    not indexed shows nothing but that problem, since its names cannot be checked
+    against the caller's scope without its schema. The user guide is
+    [Knowledge](../configuration/knowledge.md).
+
 ## 4. Knowledge in the prompts
 
 ### What the planner sees
@@ -1422,6 +1431,73 @@ flowchart TD
       `test_wave_b_read_methods_require_a_caller` holds D60. The CLI groups
       `knowledge`, `review` and `profile` are registered empty; P1 gives
       `profile` its callback. `DIALECT_SCAN` covers the five new packages.
+
+!!! note "Built: knowledge sources, show and export (K1)"
+    The engine loads, merges, resolves, scopes, shows and exports knowledge;
+    nothing reaches a prompt or the index yet (K2, K3). Exact names, and where
+    the code differs from this page:
+
+    - **Sources.** `nl2sql/knowledge/yaml_source.py`: `YamlKnowledgeSource`
+      (`yaml`, entry point `nl2sql.knowledge_sources`, config `YamlSourceConfig(path)`,
+      `sha256` of the bytes it read), `parse_glossary`, `canonical_yaml(glossary)`,
+      `file_sha256(path)` and `write_glossary(path, glossary, expected_sha256) -> str`
+      (the new hash; `ReviewError(FILE_CHANGED)` when the hash moved). A config
+      built in code reads a relative `path` from the current folder.
+    - **Merge.** `nl2sql/knowledge/merge.py`: `load_knowledge(config, registry=,
+      secrets=) -> Knowledge` (raises `KnowledgeLoadError(index, label, message)`);
+      `Knowledge` is frozen: `sources` (`LoadedSource(type, glossary, sha256, path,
+      loaded_at)`), `datasources`, `provenance` (datasource to item key to source),
+      `digests`, `errors`, `get(ds)`, `digest(ds)`. Item keys are `tables.<name>.<field>`,
+      `columns.<name>.<field>`, `joins.<from>-><to>`, `terms.<term>`, `rules.<id>`,
+      `examples.<text>`. Every source's glossary is checked against
+      `settings.knowledge.item_max_chars` again after `load()`, a plugin's too.
+      Two sources of one type are labelled `yaml`, `yaml#2`.
+    - **Resolve and scope.** `resolve.py`: `resolve_table`, `resolve_column`,
+      `table_label`, `derived_roles(snapshot, dialect=)` (a primary key or a
+      foreign key's constrained column is `identifier`, a temporal type `date`),
+      `problems(knowledge, snapshot, dialect=)`. `scope.py`: `visible(knowledge,
+      snapshot, allows)`, `denied_table_names`, `mentions_denied` and
+      `with_schema_facts` (database comments and derived roles, with origins).
+      **Without a snapshot nothing is visible** (fails closed): `show` returns the
+      datasource with only a problem saying to index it, and `export` and
+      `sources` leave it out. K2's retriever should call `visible` with the run's
+      scope and pinned snapshot.
+    - **Runtime.** `Runtime.knowledge` (a `Knowledge`) is loaded in
+      `components()`; a failing source is a `ConfigError` problem at
+      `knowledge[i]`. `Runtime.reload_knowledge() -> Optional[str]` swaps under the
+      lock (on failure the old knowledge stays, carrying `errors`);
+      `pin_index()` keeps the knowledge the run started with. `knowledge.loaded`
+      is published at build only when the `knowledge` section is not empty, and on
+      every reload.
+    - **Facade.** `sources`, `show`, `export`, `reload` as section 3 says. A
+      `user_context` that is not a `UserContext` is a `TypeError`. `reload`
+      needs an admin role, or `allow_all`; otherwise `PermissionError`. `export`
+      writes only knowledge-source items (no derived roles, no database comments)
+      and refuses `nl2sql.yaml`, every section file and every source file.
+    - **Appliers.** `nl2sql/knowledge/apply.py`: `apply_change(glossary, kind,
+      datasource_id, target, change, *, item_max_chars) -> Glossary` and
+      `apply_proposal(glossary, proposal, *, item_max_chars)`, for Q1's accept;
+      `GLOSSARY_KINDS = ("table", "column", "join", "term")`. A `table` or `column`
+      change sets its fields over the item; a `join` replaces the same join in
+      place or is added; a `term` replaces the term of the same name (D50).
+    - **CLI.** `nl2sql knowledge show`, `export`, `sources`, with `--as`
+      (repeatable) and `--user`; `cli/commands/knowledge.py`'s `caller(engine,
+      roles, user)` builds the `UserContext` (P1 and Q1 can reuse it).
+    - **Init and the demo.** `nl2sql init` writes `knowledge.yaml` and an empty
+      `glossary.yaml`; `--demo` copies the demo glossary. The demo glossary is
+      a canonical YAML file, `nl2sql/datasets/glossary.yaml`
+      (`nl2sql.datasets.DEMO_GLOSSARY_PATH`), not a dict in `datasets/chinook.py`,
+      so `demo_config()` (and `NL2SQL.demo()`) can name it with a `yaml` source;
+      `demo_config(glossary=...)` overrides it.
+    - **Drift.** `DriftImpact.glossary_items` and the finder `_glossary_items`,
+      filtered with `visible` to the tables the caller reads.
+    - **After review (#333).** `sources()` shows a reload's `error` only to a
+      caller who may reload; others get `HIDDEN_ERROR`. The mention check also
+      reads rule ids and enum codes, and `visible(..., also_denied=deny_names(scope))`
+      adds the names a role denies explicitly (a table kept out of the index).
+      The SDK caps names at `NAME_MAX_CHARS` (255); the `yaml` source refuses a
+      file over `GLOSSARY_MAX_BYTES` (5 MB). `write_glossary` fsyncs, keeps the
+      file's mode and maps a `PermissionError` to `ReviewError(NOT_WRITABLE)`.
 
 **The demo recording.** K2 changes the planner's structured output from
 `PlanModel` to `PlannerAnswer`, and the replay provider keys on the
