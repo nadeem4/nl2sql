@@ -1,12 +1,15 @@
 import math
 import re
-from typing import Any, Dict, Optional
+import xml.etree.ElementTree as ElementTree
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, text
+from sqlalchemy.dialects import mssql
+from sqlalchemy.exc import SQLAlchemyError
 
-from nl2sql_sdk import DatasourceCapability
-from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection
+from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # SQL Server's error numbers for a failed connection, as the ODBC message
 # carries them: "... (4060)". Checked in this order.
@@ -19,6 +22,10 @@ _STAGE_BY_ERROR = (
 _NETWORK_SQLSTATES = {"08001", "08S01", "HYT00"}
 # Microsoft's ODBC drivers for SQL Server, as pyodbc.drivers() names them: "ODBC Driver 18 for SQL Server".
 _SQL_SERVER_DRIVER = re.compile(r"ODBC Driver (\d+) for SQL Server")
+_SHOWPLAN = "{http://schemas.microsoft.com/sqlserver/2004/07/showplan}"
+# Plan operators that read a whole table or index, and those that seek into one.
+_SCANS = {"Table Scan", "Clustered Index Scan", "Index Scan", "Columnstore Index Scan"}
+_SEEKS = {"Index Seek", "Clustered Index Seek"}
 
 
 class OdbcDriverMissing(ImportError):
@@ -99,7 +106,64 @@ class MssqlAdapter(SQLAlchemyAdapter):
         the guard is a login with only ``db_datareader``, and ``check()``
         warns about every SQL Server datasource.
         """
-        return super().capabilities() | {DatasourceCapability.ENFORCES_TIMEOUT}
+        return super().capabilities() | {DatasourceCapability.ENFORCES_TIMEOUT, DatasourceCapability.ESTIMATES_COST}
+
+    def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+        """The rows ``sql`` reads, from the estimated plan (``SET SHOWPLAN_XML ON``), without running it.
+
+        Each scan or seek counts ``EstimatedRowsRead`` where the server
+        reports it; else a scan counts its table's catalog row count
+        (``sys.partitions``) and a seek its ``EstimateRows``. Both are per
+        execution, so each is multiplied by the times the operator runs
+        (``1 + EstimateRebinds + EstimateRewinds``, the inner side of a
+        nested loop). ``cost`` is ``StatementSubtreeCost``, or the plan's
+        top ``EstimatedTotalSubtreeCost``; None when the plan has neither.
+
+        ``parameters`` are written into the statement as escaped literals
+        (``inline_parameters``): sent as parameters, the statement is an RPC
+        (``sp_executesql``), for which SHOWPLAN returns no plan. Nothing runs
+        while SHOWPLAN is on, and a literal cannot end early, so a value
+        cannot turn SHOWPLAN off.
+
+        SHOWPLAN is a session setting, and pyodbc's ODBC pooling hands a
+        closed connection's session to the next one, so it is turned off
+        again before the connection is closed; the connection is then
+        discarded rather than pooled. The login needs the ``SHOWPLAN``
+        permission; without it, this raises.
+        """
+        try:
+            with self.engine.connect() as conn:
+                try:
+                    conn.exec_driver_sql("SET SHOWPLAN_XML ON")
+                    result = conn.exec_driver_sql(self.inline_parameters(sql, parameters))
+                    plan = result.scalar() if result.returns_rows else None
+                finally:
+                    try:
+                        conn.exec_driver_sql("SET SHOWPLAN_XML OFF")
+                    finally:
+                        conn.invalidate()
+            rows, cost, uncounted = read_showplan(plan)
+            if uncounted:
+                with self.engine.connect() as conn:
+                    for schema in {schema for schema, _, _ in uncounted}:
+                        counts = self.row_estimates(conn, schema)
+                        rows += math.ceil(sum(counts[name] * times for s, name, times in uncounted if s == schema))
+            return Estimate(rows=rows, cost=cost, source="SHOWPLAN_XML and sys.partitions")
+        except SQLAlchemyError as exc:
+            raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
+        except (KeyError, TypeError, ValueError, AttributeError, ElementTree.ParseError) as exc:
+            raise RuntimeError(f"{self} could not estimate the query: the plan could not be read "
+                               f"({type(exc).__name__})") from None
+
+    def inline_parameters(self, sql: str, parameters: Optional[Dict[str, Any]]) -> str:
+        """``sql`` with its ``:name`` parameters written in as SQL Server literals, quotes escaped.
+
+        A value SQLAlchemy cannot write as a literal raises ``CompileError``.
+        """
+        if not parameters:
+            return sql
+        statement = text(sql).bindparams(**parameters)
+        return str(statement.compile(dialect=mssql.dialect(), compile_kwargs={"literal_binds": True}))
 
     def session_setup(self, dbapi_connection: Any) -> None:
         """``limits.timeout_ms`` as pyodbc's query timeout: the client cancels.
@@ -143,3 +207,38 @@ class MssqlAdapter(SQLAlchemyAdapter):
             "WHERE s.name = :schema AND o.type = 'U' GROUP BY o.name"
         ), {"schema": schema})
         return {name: int(count) for name, count in rows}
+
+
+def read_showplan(plan: str) -> Tuple[int, Optional[float], List[Tuple[str, str, float]]]:
+    """``(rows read, cost, (schema, table, executions) of each scan whose rows the plan does not give)`` of a showplan.
+
+    Raises ``ValueError`` when there is no plan (no estimate is never zero rows), and
+    ``ElementTree.ParseError``, ``KeyError`` or ``AttributeError`` on a plan it cannot read.
+    """
+    if not plan:
+        raise ValueError("SQL Server returned no plan")
+    root = ElementTree.fromstring(plan)
+    if next(root.iter(f"{_SHOWPLAN}StmtSimple"), None) is None:
+        raise ValueError("SQL Server returned no plan for a statement")
+    costs = []
+    for statement in root.iter(f"{_SHOWPLAN}StmtSimple"):
+        cost = statement.get("StatementSubtreeCost")
+        if cost is None:
+            top = statement.find(f"{_SHOWPLAN}QueryPlan/{_SHOWPLAN}RelOp")
+            cost = top.get("EstimatedTotalSubtreeCost") if top is not None else None
+        if cost is not None:
+            costs.append(float(cost))
+    rows, uncounted = 0.0, []
+    for operator in root.iter(f"{_SHOWPLAN}RelOp"):
+        kind = operator.get("PhysicalOp")
+        if kind not in _SCANS and kind not in _SEEKS:
+            continue
+        times = 1 + float(operator.get("EstimateRebinds") or 0) + float(operator.get("EstimateRewinds") or 0)
+        if operator.get("EstimatedRowsRead") is not None:
+            rows += float(operator.get("EstimatedRowsRead")) * times
+        elif kind in _SEEKS:
+            rows += float(operator.get("EstimateRows") or 0) * times
+        else:
+            source = operator.find(f".//{_SHOWPLAN}Object")
+            uncounted.append((source.get("Schema").strip("[]"), source.get("Table").strip("[]"), times))
+    return math.ceil(rows), (sum(costs) if costs else None), uncounted

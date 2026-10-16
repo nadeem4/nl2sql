@@ -1,11 +1,15 @@
+import json
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from pydantic import Field
 from sqlalchemy import Connection, Engine, event, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlglot import exp
+from sqlglot.errors import SqlglotError
 
-from nl2sql_sdk import ConnectionModel, DatasourceCapability, ForeignKeyContract, IndexIssue, TableRef
-from nl2sql_sdk.sqlalchemy import ReflectedTable, SQLAlchemyAdapter
+from nl2sql_sdk import ConnectionModel, DatasourceCapability, Estimate, ForeignKeyContract, IndexIssue, TableRef
+from nl2sql_sdk.sqlalchemy import ReflectedTable, SQLAlchemyAdapter, driver_message
 
 # Connection.info key of the running statement's interrupt timer.
 _TIMER = "nl2sql_statement_timer"
@@ -32,7 +36,7 @@ class DuckdbAdapter(SQLAlchemyAdapter):
 
     def capabilities(self) -> set[DatasourceCapability]:
         """Read-only for a file; DuckDB cannot open an in-memory database read-only, nor has it anything to protect."""
-        enforced = {DatasourceCapability.ENFORCES_TIMEOUT}
+        enforced = {DatasourceCapability.ENFORCES_TIMEOUT, DatasourceCapability.ESTIMATES_COST}
         if not self._in_memory():
             enforced.add(DatasourceCapability.ENFORCES_READ_ONLY)
         return super().capabilities() | enforced
@@ -71,6 +75,41 @@ class DuckdbAdapter(SQLAlchemyAdapter):
         event.listen(engine, "after_cursor_execute", stop_timer)
         event.listen(engine, "handle_error", stop_timer_on_error)
         return engine
+
+    def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+        """The rows ``sql`` reads, from ``EXPLAIN (FORMAT JSON)``, without running it.
+
+        A scan of a table counts the table's cardinality
+        (``duckdb_tables().estimated_size``), never the operator's estimate,
+        which is its output after the filter: a scanned table the catalog
+        does not list raises instead. Its name is read as DuckDB prints it
+        (``memory.main."Big Orders"``). A table function (``range``,
+        ``read_parquet``) counts its own estimate. DuckDB plans hash joins,
+        so every scan counts once. DuckDB reports no cost.
+        """
+        try:
+            with self.engine.connect() as conn:
+                explained = self._run(conn, f"EXPLAIN (FORMAT JSON) {sql}", parameters).all()
+                nodes = [node for _, plan in explained for node in _nodes(json.loads(plan))]
+                if not nodes:
+                    raise ValueError("DuckDB returned no plan")
+                sizes = {(database, schema, table): rows for database, schema, table, rows in conn.execute(text(
+                    "SELECT database_name, schema_name, table_name, estimated_size FROM duckdb_tables()"))}
+            rows = 0
+            for node in nodes:
+                info = node.get("extra_info", {})
+                if "Table" in info:
+                    name = exp.to_table(info["Table"], dialect="duckdb")
+                    rows += int(sizes[(name.catalog, name.db, name.name)])
+                elif "Function" in info:
+                    rows += int(info.get("Estimated Cardinality", 0))
+            return Estimate(rows=rows, source="EXPLAIN (FORMAT JSON) and duckdb_tables()")
+        except SQLAlchemyError as exc:
+            raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
+        except (KeyError, TypeError, ValueError, AttributeError, SqlglotError) as exc:
+            # A KeyError is a scanned table duckdb_tables() has no size for.
+            raise RuntimeError(f"{self} could not estimate the query: the plan could not be read "
+                               f"({type(exc).__name__})") from None
 
     def classify(self, exc: BaseException) -> Optional[str]:
         """A file that is not there is the ``database`` stage: read-only never creates one."""
@@ -149,3 +188,11 @@ class DuckdbAdapter(SQLAlchemyAdapter):
             "WHERE schema_name = :schema AND (:database = '' OR database_name = :database)"
         ), {"schema": name, "database": database})
         return {table: int(count) for table, count in rows if count is not None}
+
+
+def _nodes(plan: Any) -> Iterator[Dict[str, Any]]:
+    """Every operator of an ``EXPLAIN (FORMAT JSON)`` plan: a list of trees of ``name``, ``children``, ``extra_info``."""
+    for node in plan if isinstance(plan, list) else [plan]:
+        yield node
+        yield from _nodes(node.get("children") or [])
+

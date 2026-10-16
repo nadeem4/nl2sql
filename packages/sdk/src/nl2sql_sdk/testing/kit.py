@@ -16,14 +16,16 @@ fixture to grant on the seed. Without it, the checks that need it are
 skipped with the reason.
 
 The kit's seed (two schemas, a view, a mixed-case table, boolean, uuid and
-json columns) is written once and transpiled to ``get_dialect()`` with
+json columns, and ``kit_orders``, its largest table, with ``KIT_ORDERS`` rows)
+is written once and transpiled to ``get_dialect()`` with
 sqlglot. A database with one schema sets ``schemas = ("main",)``: the seed
 then creates no schema, and the checks that need two are skipped. A database
 without one of the column types maps it to its nearest in ``column_types``.
 
 Each test seeds the database first and drops the seed after. A capability the
 adapter does not declare is not checked: its test is reported as skipped,
-with the reason.
+with the reason. So is an optional method the adapter does not have
+(``probe_overlap``, ``ProfilingAdapterProtocol``).
 """
 from __future__ import annotations
 
@@ -37,7 +39,8 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from nl2sql_sdk.capabilities import DatasourceCapability
 from nl2sql_sdk.contracts import AdapterRequest, ResultFrame
 from nl2sql_sdk.models import ConnectionModel, IndexScope, Limits
-from nl2sql_sdk.schema import SchemaSnapshot
+from nl2sql_sdk.protocols import EstimatingAdapterProtocol, ProfilingAdapterProtocol
+from nl2sql_sdk.schema import ColumnRef, SchemaSnapshot, TableRef
 
 # The seed is written in this dialect and transpiled to the adapter's.
 SOURCE_DIALECT = "postgres"
@@ -50,6 +53,8 @@ PASSWORD_CHARACTERS = "@:/#%"
 MISSING_DATABASE = "nl2sql_kit_missing_db"
 INJECTION = "1; DROP TABLE kit_people"
 _PARAMETER = "'__nl2sql_kit_parameter__'"
+# kit_orders' rows: ids 1..KIT_ORDERS, person_id 1 or 2, amount a whole number from 1 to KIT_ORDERS.
+KIT_ORDERS = 100
 
 
 def _sql(sql: str) -> AdapterRequest:
@@ -144,7 +149,8 @@ class AdapterConformance:
             f"(1, 'Ada', TRUE, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '{{\"a\": 1}}'), "
             f"(2, 'Grace', FALSE, 'b1ffcd88-8d1a-4ef9-ac7e-7cc0ce491b22', '{{\"b\": 2}}')",
             f'INSERT INTO {a}."KitMixedCase" (id, "DisplayName") VALUES (1, \'Mixed\')',
-            f"INSERT INTO {b}.kit_orders (id, person_id, amount) VALUES (1, 1, 9.50), (2, 2, 12.00)",
+            f"INSERT INTO {b}.kit_orders (id, person_id, amount) VALUES "
+            + ", ".join(f"({i}, {1 + i % 2}, {i}.00)" for i in range(1, KIT_ORDERS + 1)),
         ]
         return drop, make
 
@@ -193,6 +199,11 @@ class AdapterConformance:
         result = self._run(adapter, f"SELECT COUNT(*) AS n FROM {table}")
         assert result.success, result.error
         return int(result.rows[0][0])
+
+    def _estimating(self, adapter: Any) -> None:
+        if DatasourceCapability.ESTIMATES_COST not in adapter.capabilities():
+            pytest.skip(f"{type(adapter).__name__} does not declare ESTIMATES_COST")
+        assert isinstance(adapter, EstimatingAdapterProtocol), "ESTIMATES_COST is declared, but there is no estimate"
 
     def _needs_two_schemas(self) -> None:
         if len(self.schemas) < 2:
@@ -380,3 +391,65 @@ class AdapterConformance:
         assert whole.success and all(frame.success for frame in frames)
         assert all(frame.columns == whole.columns for frame in frames)
         assert [row for frame in frames for row in frame.rows] == whole.rows
+
+    # --- Estimates (ESTIMATES_COST) ------------------------------------------
+
+    def test_kit_estimate_does_not_execute(self, build, sleep_sql):
+        adapter = build(limits=Limits(timeout_ms=10_000))
+        self._estimating(adapter)
+        estimate = adapter.estimate(self._query(adapter, "SELECT id, name FROM {a}.kit_people"), {})
+        assert estimate.rows is not None and estimate.rows >= 0, estimate
+        assert estimate.source
+
+        # A statement the database gives no plan for (SQL Server's WAITFOR) raises: no plan is
+        # no estimate, never zero rows. Either way it must not run.
+        start = time.perf_counter()
+        try:
+            adapter.estimate(sleep_sql(5), {})
+        except RuntimeError:
+            pass
+        elapsed = time.perf_counter() - start
+        assert elapsed < 2, f"the estimate took {elapsed:.1f}s: it ran the statement"
+
+    def test_kit_filtered_full_scan_reports_the_table_size(self, build):
+        """A filter on an unindexed column that matches no row still reads the whole table.
+
+        The amount lies between the column's smallest and largest, so no
+        database can rule the scan out from its statistics.
+        """
+        adapter = build()
+        self._estimating(adapter)
+        sql = "SELECT id FROM {b}.kit_orders WHERE amount = 50.5"
+        assert self._run(adapter, sql).row_count == 0
+        estimate = adapter.estimate(self._query(adapter, sql), {})
+        assert estimate.rows is not None and estimate.rows >= KIT_ORDERS / 2, (
+            f"{estimate}: rows must count what the scan reads, not what the filter keeps")
+
+    def test_kit_estimate_of_a_missing_table_raises(self, build):
+        adapter = build()
+        self._estimating(adapter)
+        # RuntimeError is the contract: the engine's cost rule reads it as "no estimate".
+        with pytest.raises(RuntimeError):
+            adapter.estimate(self._query(adapter, "SELECT id FROM {a}.kit_missing_table"), {})
+
+    # --- Overlap (ProfilingAdapterProtocol) ----------------------------------
+
+    def _column(self, adapter: Any, schema: str, table: str, column: str) -> ColumnRef:
+        """A column of the seed, its schema named as the adapter's snapshot names it."""
+        snapshot = adapter.fetch_schema_snapshot(self._scope(profile="catalog"))
+        ref = next(m.table for m in snapshot.metadata.tables.values()
+                   if _short(m.table.schema_name) == schema and m.table.table_name == table)
+        return ColumnRef(table=TableRef(schema_name=ref.schema_name, table_name=table), column_name=column)
+
+    def test_kit_overlap_on_the_seed(self, build):
+        adapter = build()
+        if not isinstance(adapter, ProfilingAdapterProtocol):
+            pytest.skip(f"{type(adapter).__name__} has no probe_overlap")
+        # KIT_ORDERS orders over two people: two distinct values, both people.
+        full = adapter.probe_overlap(self._column(adapter, self._b, "kit_orders", "person_id"),
+                                     self._column(adapter, self._a, "kit_people", "id"), 1000)
+        assert (full.sampled, full.matched) == (2, 2)
+        # 'Ada' and 'Grace' are no display name.
+        none = adapter.probe_overlap(self._column(adapter, self._a, "kit_people", "name"),
+                                     self._column(adapter, self._a, "KitMixedCase", "DisplayName"), 1000)
+        assert (none.sampled, none.matched) == (2, 0)

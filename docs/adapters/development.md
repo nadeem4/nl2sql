@@ -22,6 +22,7 @@ For 95% of use cases, you are connecting to a SQL database that already has a Py
 * Reading the schema: one reflection pass per schema, filtered by the datasource's `index` scope
 * Catalog row estimates, type-aware statistics, and values only when `index.sample_values` is on
 * Reporting what a table or column was indexed without as an `IndexIssue`
+* `probe_overlap`, the schema profiler's join check, in SQLAlchemy Core
 
 ### Example
 
@@ -80,6 +81,55 @@ Make the session read-only and enforce `limits.timeout_ms` in
 declare `ENFORCES_READ_ONLY` and `ENFORCES_TIMEOUT` for what it enforces, and
 override `classify()` to map your driver's connection errors to stages (see
 the [reference](sqlalchemy.md#session_setupdbapi_connection)).
+
+### Adding `estimate`
+
+The engine's cost rule asks an adapter for the rows a query will *read*
+before it runs it. Reading a plan is the database's own, so the base has no
+`estimate`: add one and declare `ESTIMATES_COST`
+([the contract](sdk.md#optional-hooks-estimate-and-probe_overlap)).
+
+1. Ask for the plan without running the query (`EXPLAIN`, an estimated
+   plan), on the adapter's own connections, so it runs read-only and under
+   `timeout_ms`, with `parameters` bound as `execute` binds them.
+2. Add up the rows each scan operator *reads*. A full scan counts its
+   table's row count, never the operator's own row estimate, which is its
+   output after the filter: a scan that filters a billion rows down to ten
+   reads a billion. An index seek counts its own estimate. Both are per
+   execution: an operator on the inner side of a nested loop runs once per
+   outer row, so multiply by the times it runs where the plan says.
+3. Return `Estimate(rows=..., cost=..., source=...)`: `cost` is the
+   planner's total, for display only, or None when the plan has none;
+   `source` says what was read.
+4. Raise `RuntimeError` on every failure, the database's (with the
+   driver's first line, `driver_message`) and a plan you cannot read
+   alike: the engine's cost rule reads a `RuntimeError` as "no estimate",
+   and the kit checks it. Never fall back to the operator's filtered
+   estimate, and never report a statement the database gives no plan for
+   as zero rows: no plan is no estimate, so raise.
+5. Leave no session setting behind. A setting that changes what a query
+   returns (SQL Server's `SHOWPLAN_XML`) must be turned off before the
+   connection is closed: a driver's own pool can hand the session on.
+
+The built-in PostgreSQL adapter's:
+
+```python
+def estimate(self, sql: str, parameters: Dict[str, Any]) -> Estimate:
+    try:
+        with self.engine.connect() as conn:
+            plan = _plan(self._run(conn, f"EXPLAIN (FORMAT JSON, VERBOSE) {sql}", parameters).scalar())
+            seq_scans, rows = scans(plan)  # each Seq Scan with the times it runs; index scans' rows
+            sizes = {(schema, name): self._planned_size(conn, schema, name) for schema, name, _ in seq_scans}
+        rows += sum(sizes[(schema, name)] * times for schema, name, times in seq_scans)
+        cost = plan.get("Total Cost")
+        return Estimate(rows=int(rows), cost=float(cost) if cost is not None else None,
+                        source="EXPLAIN (FORMAT JSON) and pg_class.reltuples")
+    except SQLAlchemyError as exc:
+        raise RuntimeError(f"{self} could not estimate the query: {driver_message(exc)}") from None
+    except _UNREADABLE as exc:  # KeyError, TypeError, ValueError, AttributeError, IndexError
+        raise RuntimeError(f"{self} could not estimate the query: the plan could not be read "
+                           f"({type(exc).__name__})") from None
+```
 
 > See the **[SQLAlchemy Adapter Reference](sqlalchemy.md)** for full API details.
 
@@ -196,8 +246,8 @@ class TestMyAdapterConformance(AdapterConformance):
 ```
 
 Each test writes the kit's seed first and drops it after: two schemas
-(`kit_a`, `kit_b`), a view, a mixed-case table, and boolean, uuid and json
-columns. It is written once and transpiled to your `get_dialect()` with
+(`kit_a`, `kit_b`), a view, a mixed-case table, boolean, uuid and json
+columns, and `kit_orders`, the largest table, with 100 rows. It is written once and transpiled to your `get_dialect()` with
 sqlglot. Two class attributes adapt it:
 
 - `schemas = ("main",)` for a database with one schema, such as SQLite: the
@@ -223,6 +273,8 @@ seed. Without it, the two checks that need it are skipped.
 | Timeout | If `ENFORCES_TIMEOUT` is declared, `sleep_sql(5)` with a one-second limit fails within three seconds as `QUERY_TIMEOUT` |
 | Errors | A missing column is `retryable`; a permission error is not |
 | Streaming | If the adapter has `execute_batches`, its frames match `execute`'s result |
+| Estimates | If `ESTIMATES_COST` is declared: `estimate` returns `rows >= 0` and a `source`; an estimate of `sleep_sql(5)` returns or raises `RuntimeError` within two seconds (it does not run the statement; a statement with no plan, such as SQL Server's `WAITFOR`, raises); a filter on an unindexed column of `kit_orders` that matches no row reports at least half the table's rows; a missing table raises `RuntimeError` |
+| Overlap | If the adapter has `probe_overlap`: `kit_orders.person_id` against `kit_people.id` samples 2 distinct values and matches 2; `kit_people.name` against `KitMixedCase.DisplayName` matches none |
 
 A capability you do not declare is not checked: its test is reported as
 skipped, with the reason, so `pytest -rs` shows what your adapter does not

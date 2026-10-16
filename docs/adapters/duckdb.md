@@ -55,6 +55,7 @@ connection:
 | **Read-only** | `read_only=True` on the connection | A file is always opened read-only, so it must exist, and declares `ENFORCES_READ_ONLY`. DuckDB cannot open `:memory:` read-only, and an in-memory database has nothing to protect, so it does not declare it. |
 | **Timeout** | `interrupt()` on a timer | See [Statement Timeout](#statement-timeout). Declares `ENFORCES_TIMEOUT`. |
 | **Connection stages** | The message | A file that does not exist is `database`. |
+| **Estimates** | `EXPLAIN (FORMAT JSON)`, then `duckdb_tables().estimated_size` | `estimate` never runs the query. A scan of a table counts the table's size, never the operator's estimate; its name is read as DuckDB prints it (`memory.main."Big Orders"`), and a scanned table with no size raises. A table function (`range`, `read_parquet`) counts its own estimate. DuckDB plans hash joins, so each scan counts once. DuckDB reports no cost. Declares `ESTIMATES_COST`. |
 | **Row counts** | `duckdb_tables().estimated_size` | The catalog's count. |
 | **Stats** | One query per column | See [Reading a schema](sqlalchemy.md#reading-a-schema). |
 
