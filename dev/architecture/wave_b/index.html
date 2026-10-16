@@ -1467,6 +1467,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/knowledge/">
+<span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/settings/">
 <span class="md-ellipsis">
     
@@ -3930,6 +3942,16 @@ admin role.</p>
 <p><code>--as</code> (repeatable) and <code>--user</code> build the <code>UserContext</code>, as <code>nl2sql mcp
 --role</code> does; without <code>--as</code> the role is <code>policies.default_role</code>, and with
 neither the command refuses (Wave A D33).</p>
+<div class="admonition note">
+<p class="admonition-title">Built: sources, merging, show and export (K1)</p>
+<p>The <code>yaml</code> source, the merge, the digests, resolution and its problems,
+derived roles, the scope filter, <code>engine.knowledge.sources</code>, <code>show</code>,
+<code>export</code> and <code>reload</code>, the CLI and <code>knowledge.loaded</code> are built; see the K1
+note in <a href="#16-pr-plan">the PR plan</a> for the exact names. A datasource that is
+not indexed shows nothing but that problem, since its names cannot be checked
+against the caller's scope without its schema. The user guide is
+<a href="../../configuration/knowledge/">Knowledge</a>.</p>
+</div>
 <h2 id="4-knowledge-in-the-prompts">4. Knowledge in the prompts</h2>
 <h3 id="what-the-planner-sees">What the planner sees</h3>
 <p>The schema retriever (<code>pipeline/nodes/schema_retriever/node.py</code>) builds the
@@ -5615,6 +5637,75 @@ it yet. Where the code on <code>main</code> differed from this page, the code wo
   <code>test_wave_b_read_methods_require_a_caller</code> holds D60. The CLI groups
   <code>knowledge</code>, <code>review</code> and <code>profile</code> are registered empty; P1 gives
   <code>profile</code> its callback. <code>DIALECT_SCAN</code> covers the five new packages.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: knowledge sources, show and export (K1)</p>
+<p>The engine loads, merges, resolves, scopes, shows and exports knowledge;
+nothing reaches a prompt or the index yet (K2, K3). Exact names, and where
+the code differs from this page:</p>
+<ul>
+<li><strong>Sources.</strong> <code>nl2sql/knowledge/yaml_source.py</code>: <code>YamlKnowledgeSource</code>
+  (<code>yaml</code>, entry point <code>nl2sql.knowledge_sources</code>, config <code>YamlSourceConfig(path)</code>,
+  <code>sha256</code> of the bytes it read), <code>parse_glossary</code>, <code>canonical_yaml(glossary)</code>,
+  <code>file_sha256(path)</code> and <code>write_glossary(path, glossary, expected_sha256) -&gt; str</code>
+  (the new hash; <code>ReviewError(FILE_CHANGED)</code> when the hash moved). A config
+  built in code reads a relative <code>path</code> from the current folder.</li>
+<li><strong>Merge.</strong> <code>nl2sql/knowledge/merge.py</code>: <code>load_knowledge(config, registry=,
+  secrets=) -&gt; Knowledge</code> (raises <code>KnowledgeLoadError(index, label, message)</code>);
+  <code>Knowledge</code> is frozen: <code>sources</code> (<code>LoadedSource(type, glossary, sha256, path,
+  loaded_at)</code>), <code>datasources</code>, <code>provenance</code> (datasource to item key to source),
+  <code>digests</code>, <code>errors</code>, <code>get(ds)</code>, <code>digest(ds)</code>. Item keys are <code>tables.&lt;name&gt;.&lt;field&gt;</code>,
+  <code>columns.&lt;name&gt;.&lt;field&gt;</code>, <code>joins.&lt;from&gt;-&gt;&lt;to&gt;</code>, <code>terms.&lt;term&gt;</code>, <code>rules.&lt;id&gt;</code>,
+  <code>examples.&lt;text&gt;</code>. Every source's glossary is checked against
+  <code>settings.knowledge.item_max_chars</code> again after <code>load()</code>, a plugin's too.
+  Two sources of one type are labelled <code>yaml</code>, <code>yaml#2</code>.</li>
+<li><strong>Resolve and scope.</strong> <code>resolve.py</code>: <code>resolve_table</code>, <code>resolve_column</code>,
+  <code>table_label</code>, <code>derived_roles(snapshot, dialect=)</code> (a primary key or a
+  foreign key's constrained column is <code>identifier</code>, a temporal type <code>date</code>),
+  <code>problems(knowledge, snapshot, dialect=)</code>. <code>scope.py</code>: <code>visible(knowledge,
+  snapshot, allows)</code>, <code>denied_table_names</code>, <code>mentions_denied</code> and
+  <code>with_schema_facts</code> (database comments and derived roles, with origins).
+  <strong>Without a snapshot nothing is visible</strong> (fails closed): <code>show</code> returns the
+  datasource with only a problem saying to index it, and <code>export</code> and
+  <code>sources</code> leave it out. K2's retriever should call <code>visible</code> with the run's
+  scope and pinned snapshot.</li>
+<li><strong>Runtime.</strong> <code>Runtime.knowledge</code> (a <code>Knowledge</code>) is loaded in
+  <code>components()</code>; a failing source is a <code>ConfigError</code> problem at
+  <code>knowledge[i]</code>. <code>Runtime.reload_knowledge() -&gt; Optional[str]</code> swaps under the
+  lock (on failure the old knowledge stays, carrying <code>errors</code>);
+  <code>pin_index()</code> keeps the knowledge the run started with. <code>knowledge.loaded</code>
+  is published at build only when the <code>knowledge</code> section is not empty, and on
+  every reload.</li>
+<li><strong>Facade.</strong> <code>sources</code>, <code>show</code>, <code>export</code>, <code>reload</code> as section 3 says. A
+  <code>user_context</code> that is not a <code>UserContext</code> is a <code>TypeError</code>. <code>reload</code>
+  needs an admin role, or <code>allow_all</code>; otherwise <code>PermissionError</code>. <code>export</code>
+  writes only knowledge-source items (no derived roles, no database comments)
+  and refuses <code>nl2sql.yaml</code>, every section file and every source file.</li>
+<li><strong>Appliers.</strong> <code>nl2sql/knowledge/apply.py</code>: <code>apply_change(glossary, kind,
+  datasource_id, target, change, *, item_max_chars) -&gt; Glossary</code> and
+  <code>apply_proposal(glossary, proposal, *, item_max_chars)</code>, for Q1's accept;
+  <code>GLOSSARY_KINDS = ("table", "column", "join", "term")</code>. A <code>table</code> or <code>column</code>
+  change sets its fields over the item; a <code>join</code> replaces the same join in
+  place or is added; a <code>term</code> replaces the term of the same name (D50).</li>
+<li><strong>CLI.</strong> <code>nl2sql knowledge show</code>, <code>export</code>, <code>sources</code>, with <code>--as</code>
+  (repeatable) and <code>--user</code>; <code>cli/commands/knowledge.py</code>'s <code>caller(engine,
+  roles, user)</code> builds the <code>UserContext</code> (P1 and Q1 can reuse it).</li>
+<li><strong>Init and the demo.</strong> <code>nl2sql init</code> writes <code>knowledge.yaml</code> and an empty
+  <code>glossary.yaml</code>; <code>--demo</code> copies the demo glossary. The demo glossary is
+  a canonical YAML file, <code>nl2sql/datasets/glossary.yaml</code>
+  (<code>nl2sql.datasets.DEMO_GLOSSARY_PATH</code>), not a dict in <code>datasets/chinook.py</code>,
+  so <code>demo_config()</code> (and <code>NL2SQL.demo()</code>) can name it with a <code>yaml</code> source;
+  <code>demo_config(glossary=...)</code> overrides it.</li>
+<li><strong>Drift.</strong> <code>DriftImpact.glossary_items</code> and the finder <code>_glossary_items</code>,
+  filtered with <code>visible</code> to the tables the caller reads.</li>
+<li><strong>After review (#333).</strong> <code>sources()</code> shows a reload's <code>error</code> only to a
+  caller who may reload; others get <code>HIDDEN_ERROR</code>. The mention check also
+  reads rule ids and enum codes, and <code>visible(..., also_denied=deny_names(scope))</code>
+  adds the names a role denies explicitly (a table kept out of the index).
+  The SDK caps names at <code>NAME_MAX_CHARS</code> (255); the <code>yaml</code> source refuses a
+  file over <code>GLOSSARY_MAX_BYTES</code> (5 MB). <code>write_glossary</code> fsyncs, keeps the
+  file's mode and maps a <code>PermissionError</code> to <code>ReviewError(NOT_WRITABLE)</code>.</li>
 </ul>
 </div>
 <p><strong>The demo recording.</strong> K2 changes the planner's structured output from

@@ -2122,6 +2122,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/settings/" class="md-nav__link">
         
   
@@ -5487,7 +5515,7 @@ datasource fails.</p>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span>       <span class="c1"># info, purge</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">engine</span><span class="o">.</span><span class="n">events</span>        <span class="c1"># subscribe, catalog</span>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span>         <span class="c1"># load, run, regenerate, scorers</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span>     <span class="c1"># sources, show, export, reload, profile, save_choice (0.8; stubs until then)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span>     <span class="c1"># sources, show, export, reload; profile, save_choice (0.8; stubs until then)</span>
 <a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">engine</span><span class="o">.</span><span class="n">proposals</span>     <span class="c1"># list, get, accept, reject, export, apply (0.8; stubs until then)</span>
 </code></pre></div>
 <table>
@@ -5539,7 +5567,11 @@ datasource fails.</p>
 <td><a href="../../../evals/">Evals</a></td>
 </tr>
 <tr>
-<td><code>knowledge</code>, <code>proposals</code></td>
+<td><code>knowledge</code></td>
+<td><a href="../../../configuration/knowledge/">Knowledge</a>: <code>sources</code>, <code>show</code>, <code>export</code> and <code>reload</code>. <code>profile</code> and <code>save_choice</code> have their final signatures and raise <code>NotImplementedError</code>, naming the change that builds them, until release 0.8. Each read takes <code>user_context</code> as a required keyword.</td>
+</tr>
+<tr>
+<td><code>proposals</code></td>
 <td><a href="../../../architecture/wave_b/">Wave B</a>: every method has its final signature and raises <code>NotImplementedError</code>, naming the change that builds it, until release 0.8. Each read takes <code>user_context</code> as a required keyword.</td>
 </tr>
 </tbody>

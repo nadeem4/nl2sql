@@ -2122,6 +2122,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/settings/" class="md-nav__link">
         
   
@@ -5383,7 +5411,7 @@ on the engine's bus directly.</p>
 <tr>
 <td><code>knowledge.loaded</code></td>
 <td><code>sources</code> (<code>type</code>, <code>counts</code>, <code>sha256</code>), <code>digests</code> per datasource, <code>error</code></td>
-<td>not yet published: the engine loads its knowledge from Wave B's K1</td>
+<td>the engine is built with a <code>knowledge</code> section, and <code>engine.knowledge.reload()</code> (with <code>error</code> when the reload failed and the previous knowledge stayed live). See <a href="../../configuration/knowledge/">Knowledge</a></td>
 </tr>
 <tr>
 <td><code>profile.finished</code></td>

@@ -2398,6 +2398,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/settings/" class="md-nav__link">
         
   
@@ -5578,13 +5606,24 @@ from a clone with <code>pip install -e packages/sdk -e "packages/nl2sql[demo]"</
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>embeddings.yaml        # provider: local
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>policies.yaml          # the admin, analyst and viewer roles below
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>storage.yaml           # path: .nl2sql (index, state.db, traces, results)
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>curated.yaml           # six verified queries on Chinook
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>settings.yaml          # a 300 s timeout and a trace for every run
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>data/                  # chinook.sqlite, support.sqlite, webanalytics.sqlite
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>.gitignore             # .nl2sql/ and .env
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>knowledge.yaml         # one yaml knowledge source: glossary.yaml
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>glossary.yaml          # the Chinook glossary: descriptions, roles, terms, a rule
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>curated.yaml           # six verified queries on Chinook
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>settings.yaml          # a 300 s timeout and a trace for every run
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>data/                  # chinook.sqlite, support.sqlite, webanalytics.sqlite
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>.gitignore             # .nl2sql/ and .env
 </code></pre></div>
 <p>It is the same config <code>nl2sql.config.demo_config()</code> (and <code>NL2SQL.demo()</code>)
-builds in code. <code>nl2sql index</code> then builds the index, and exits <code>1</code> if any
+builds in code.</p>
+<p>The glossary describes Chinook's invoices, its money and enum columns, the
+terms "revenue" and "invoiced total", and a rule. "Sales" is a synonym of
+both terms on purpose: the demo carries one real ambiguity. After
+<code>nl2sql index</code>, see what the engine makes of it, as a role:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql-demo/nl2sql.yaml<span class="w"> </span>knowledge<span class="w"> </span>show<span class="w"> </span>--as<span class="w"> </span>analyst
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql-demo/nl2sql.yaml<span class="w"> </span>knowledge<span class="w"> </span>show<span class="w"> </span>--as<span class="w"> </span>viewer<span class="w">   </span><span class="c1"># the catalog only: no invoice terms</span>
+</code></pre></div>
+<p>Each item is labelled with its origin (<code>knowledge</code>, <code>database</code> or
+<code>derived</code>); see <a href="../../configuration/knowledge/">Knowledge</a>. <code>nl2sql index</code> then builds the index, and exits <code>1</code> if any
 datasource fails. See
 <a href="../#start-a-config-with-nl2sql-init">Start a config with <code>nl2sql init</code></a>.</p>
 <p>For the browser playground instead of the CLI, <code>nl2sql demo</code> does both steps in
@@ -6067,29 +6106,29 @@ the refusal, retry, error and plan-cache rates, from the CLI (below). See
 <code>./nl2sql.yaml</code>. Paths inside it are relative to <code>nl2sql.yaml</code>, so from the demo
 folder (<code>cd nl2sql-demo</code>) no flag is needed; from anywhere else, add
 <code>--config nl2sql-demo/nl2sql.yaml</code> before the command.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Run a query against the demo</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Plan and validate without touching the database</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1"># Re-index after editing the demo's config</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>nl2sql<span class="w"> </span>index
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
-<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
-<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># After changing the embedding model: drop the old model's index</span>
-<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>prune
-<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
-<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="c1"># Check the install, the keys, and the engine: each datasource, each key, the index</span>
-<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>nl2sql<span class="w"> </span>doctor
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Run a query against the demo</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>run<span class="w"> </span><span class="s2">"How many customers do we have, by country?"</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Ask as a role that is not allowed the answer</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--role<span class="w"> </span>viewer<span class="w"> </span><span class="s2">"Who are the top 5 customers by total spend?"</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Plan and validate without touching the database</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--no-exec<span class="w"> </span><span class="s2">"Which artist has the most albums?"</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># Pin one datasource instead of letting the resolver pick</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>nl2sql<span class="w"> </span>run<span class="w"> </span>--ds-id<span class="w"> </span>support<span class="w"> </span><span class="s2">"How many support tickets are still open, by priority?"</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1"># Re-index after editing the demo's config</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>nl2sql<span class="w"> </span>index
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="c1"># Re-index one datasource only; the others' entries are left untouched</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--datasource<span class="w"> </span>chinook
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="c1"># After changing the embedding model: drop the old model's index</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>prune
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="c1"># Check the install, the keys, and the engine: each datasource, each key, the index</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>nl2sql<span class="w"> </span>doctor
 </code></pre></div>
 <p>The two flags that name a datasource are not the same flag: <code>run</code> takes
 <code>--ds-id</code>, which pins the datasource and makes the resolver skip its search;
@@ -6103,14 +6142,14 @@ answers with <code>nl2sql trace replay &lt;file&gt;</code>. See
 plan cache (in <code>.nl2sql/state.db</code>), so the SQL and rows are the same and the
 planner is not called; the playground's Debug view says "Plan from the plan
 cache". The plan is still validated for the role you ask as. To start fresh:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>cache<span class="w"> </span>clear
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>cache<span class="w"> </span>clear
 </code></pre></div>
 <p>The playground's ratings, and the guardrail rates over every rated run and
 kept trace:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft eval cases, for review</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>list<span class="w">               </span><span class="c1"># the ratings, newest first</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>stats<span class="w">              </span><span class="c1"># thumbs up/down, refusals, retries, errors, plan cache</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--good<span class="w">      </span><span class="c1"># thumbs-up runs as draft eval cases, for review</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>clear<span class="w">              </span><span class="c1"># delete every rating</span>
 </code></pre></div>
 <p><code>export --good</code> writes <code>feedback_gold_drafts.yaml</code>, a suite of draft cases. A
 person must review each draft, approve it and run <code>engine.evals.regenerate</code>

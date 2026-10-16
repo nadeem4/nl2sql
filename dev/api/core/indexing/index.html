@@ -2122,6 +2122,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../configuration/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../configuration/settings/" class="md-nav__link">
         
   
@@ -5534,8 +5562,8 @@ catalog only, no profiling) with the snapshot its live build was made from.
 Each <code>DriftReport</code> has <code>datasource_id</code>, <code>status</code> (<code>unchanged</code>, <code>drifted</code>,
 <code>not_indexed</code>, <code>failed</code>), <code>live_version</code>, <code>checked_at</code>, and for <code>drifted</code> the
 <code>diff</code> (a <code>SchemaDiff</code>, <code>to_version</code> <code>None</code>) and its <code>impact</code> (a
-<code>DriftImpact</code>: verified queries, policy rules and preferred tables it
-breaks); <code>error</code> (redacted) for <code>failed</code>. Drift publishes <code>schema.drifted</code>,
+<code>DriftImpact</code>: verified queries, policy rules, preferred tables and
+glossary items it breaks); <code>error</code> (redacted) for <code>failed</code>. Drift publishes <code>schema.drifted</code>,
 once per drift and engine.
 Nothing is stored and nothing is rebuilt. <code>user_context</code> is required: the
 caller sees drift only in tables its scope may read, a datasource it cannot

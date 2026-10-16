@@ -2377,6 +2377,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../settings/" class="md-nav__link">
         
   
@@ -5491,10 +5519,12 @@ reference.</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>embeddings.yaml        # provider: local
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>policies.yaml          # allow_all: true            (--demo: admin, analyst, viewer roles)
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>storage.yaml           # path: .nl2sql
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>curated.yaml           # --demo only: the demo's verified queries
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>settings.yaml          # --demo only: the demo's tuning knobs
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>data/                  # --demo only: the three SQLite files, copied
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>.gitignore             # .nl2sql/ and .env
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>knowledge.yaml         # one yaml knowledge source: glossary.yaml
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>glossary.yaml          # one empty block per datasource (--demo: the Chinook glossary)
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>curated.yaml           # --demo only: the demo's verified queries
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>settings.yaml          # --demo only: the demo's tuning knobs
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>data/                  # --demo only: the three SQLite files, copied
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>.gitignore             # .nl2sql/ and .env
 </code></pre></div>
 <p><code>init</code> refuses to overwrite a file without <code>--force</code>, never writes a key, and
 checks what it wrote with <code>load_config</code>.</p>
@@ -5773,9 +5803,10 @@ are documented on their own page, <a href="../observers/">Observers</a>.</p>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>       <span class="n">hooks</span><span class="o">=</span><span class="p">[</span><span class="n">HookConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"corp_sql_review"</span><span class="p">,</span> <span class="n">points</span><span class="o">=</span><span class="p">[</span><span class="s2">"execute.before"</span><span class="p">]),</span> <span class="n">MyHook</span><span class="p">()])</span>
 </code></pre></div>
 <h3 id="knowledge">Knowledge</h3>
-<p>A section added for release 0.8 (<a href="../../architecture/wave_b/">Wave B</a>): the
-knowledge sources the glossary comes from, in precedence order. It is
-accepted and validated now; the engine loads the sources from Wave B's K1.</p>
+<p>The knowledge sources the glossary comes from, in precedence order (release
+0.8, <a href="../../architecture/wave_b/">Wave B</a>). The engine loads them when it is
+built and on <code>engine.knowledge.reload()</code>; see <a href="../knowledge/">Knowledge</a> for
+the glossary, precedence and who sees what.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># knowledge.yaml: a list, in precedence order</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yaml</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">glossary.yaml</span><span class="w">             </span><span class="c1"># relative to nl2sql.yaml</span>

@@ -2205,6 +2205,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../configuration/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../configuration/settings/" class="md-nav__link">
         
   
@@ -5160,10 +5188,12 @@ each section in its own file:</p>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>embeddings.yaml        # provider: local
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>policies.yaml          # allow_all: true      (--demo: admin, analyst and viewer roles)
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>storage.yaml           # path: .nl2sql
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>curated.yaml           # --demo only: the demo's verified queries
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>settings.yaml          # --demo only: a 300 s timeout and a trace for every run
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>data/                  # --demo only: the three sample SQLite files
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>.gitignore             # .nl2sql/ and .env are added to it
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>knowledge.yaml         # one yaml knowledge source: glossary.yaml
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>glossary.yaml          # what people know about the data (--demo: the Chinook glossary)
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>curated.yaml           # --demo only: the demo's verified queries
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>settings.yaml          # --demo only: a 300 s timeout and a trace for every run
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>data/                  # --demo only: the three sample SQLite files
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>.gitignore             # .nl2sql/ and .env are added to it
 </code></pre></div>
 <ul>
 <li><strong>No key is written.</strong> <code>llm.yaml</code> names no <code>api_key</code>, so the provider's
