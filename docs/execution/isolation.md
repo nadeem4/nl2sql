@@ -10,7 +10,7 @@ The engine runs entirely **in one process**. `run_with_graph()` dispatches the
 graph onto a single-worker `concurrent.futures.ThreadPoolExecutor`
 ([`pipeline/runtime.py`](https://github.com/nadeem4/nl2sql/blob/main/packages/nl2sql/src/nl2sql/pipeline/runtime.py))
 created per run, so the caller's thread stays free to enforce
-`GLOBAL_TIMEOUT_SEC`. Concurrency across runs is the caller's to provide (a web
+`settings.pipeline.timeout_s`. Concurrency across runs is the caller's to provide (a web
 server's own worker pool, for instance), not a setting of this engine. Threads
 share one interpreter and one address space.
 
@@ -61,7 +61,7 @@ third-party I/O.
 
 ### Global timeout
 
-`settings.global_timeout_sec` (`GLOBAL_TIMEOUT_SEC`, default `60`) is enforced by
+`settings.pipeline.timeout_s` (default `60`) is enforced by
 `future.result(timeout=...)` in `run_with_graph()`. On expiry the run's
 `CancellationToken` is cancelled and the caller gets a `PIPELINE_TIMEOUT` error
 and a user-facing message, within about a second of the limit.
@@ -105,7 +105,7 @@ Neither is isolation in any case.
 | :--- | :--- | :--- |
 | AST validation + policies | `pipeline/nodes/validator/node.py` | What SQL may be generated at all |
 | `CancellationToken` | `common/cancellation.py` | One run, cooperatively |
-| `global_timeout_sec` | `pipeline/runtime.py` | How long the caller waits |
+| `pipeline.timeout_s` | `pipeline/runtime.py` | How long the caller waits |
 | `VECTOR_BREAKER` | `common/resilience.py` | Vector retrieval only |
 | `ThreadPoolExecutor` | `pipeline/runtime.py` | One worker per run, so the caller can time out; **not** isolation |
 
