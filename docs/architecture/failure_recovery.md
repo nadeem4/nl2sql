@@ -72,7 +72,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
   - Retry count reaches `sql_agent_max_retries` with a blocking (`ERROR`/`CRITICAL`) finding.
   - Cancellation is detected.
 - If errors are retryable and retry budget remains, the subgraph loops through `retry_handler -> refiner -> planner`.
-- Validation findings that are only `WARNING` (`COLUMN_NOT_FOUND` with `LOGICAL_VALIDATOR_STRICT_COLUMNS=false`; it is on by default) also loop while
+- Validation findings that are only `WARNING` (`COLUMN_NOT_FOUND` with `settings.pipeline.strict_columns: false`; it is on by default) also loop while
   retry budget remains, but never end the sub-query: once the budget is spent the plan proceeds to generation.
 
 ### Sub-query status

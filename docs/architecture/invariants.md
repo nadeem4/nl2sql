@@ -356,7 +356,7 @@ The prompt's size must not grow with the result: that is what kept the row limit
 ## Pipeline Execution Is Time-Bounded
 
 ### Definition
-Pipeline execution must complete within `settings.global_timeout_sec`.
+Pipeline execution must complete within `settings.pipeline.timeout_s`.
 
 ### Enforcement Points
 - `run_with_graph()` in `nl2sql.pipeline.runtime`

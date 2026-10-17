@@ -451,7 +451,7 @@ generated SQL does not need:
   `artifact_store.write_batches()` and the manifest by the aggregator, so
   paging (`engine.results.page`) and CSV export (`engine.results.csv`) work for a
   verified answer as for any other.
-- **Time.** The run is inside `run_with_graph()`'s `GLOBAL_TIMEOUT_SEC` like
+- **Time.** The run is inside `run_with_graph()`'s `settings.pipeline.timeout_s` like
   every node, and the datasource's `limits.timeout_ms` applies.
 
 ## Bound parameters through the adapter

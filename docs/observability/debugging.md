@@ -314,7 +314,7 @@ served. It then compares the replayed `QueryResult` with the recorded one
   gives a different result, and replay reports the difference.
 - The datasource resolver and schema retriever still run their vector search,
   which embeds the question with the configured embedding provider (the local
-  model in the demo; with `EMBEDDING_PROVIDER=openai` that is an embeddings API
+  model in the demo; with `embeddings.provider: openai` that is an embeddings API
   call, not a chat model call).
 - Redaction applies to the recorded answers too: a model answer that
   contained something secret-shaped is replayed redacted.
