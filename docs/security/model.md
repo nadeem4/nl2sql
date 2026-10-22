@@ -74,6 +74,18 @@ scope once, so every step decides the same way.
   claim that the role is allowed) is read by the policy check, so a crafted
   prompt cannot turn a refusal into an allow.
 
+**Knowledge is data.** The glossary (Wave B) reaches the planner and the
+refiner only as JSON values, in the schema block and in `[BUSINESS_CONTEXT]`,
+capped per item and per block, and filtered by the caller's scope: an item
+naming a denied table, or whose text (or a database comment) mentions one, is
+never sent, returned on `knowledge_used` or named in the explanation. The
+prompt tells the model the block is reference data, but that is not what the
+guarantee rests on: a plan written under any glossary is validated with the
+caller's scope like every other, so hostile knowledge cannot widen access. A
+paraphrase of a hidden table's name is not caught by the filter; the validator
+still refuses a plan on the table. See
+[Knowledge Is Data](../architecture/invariants.md#knowledge-is-data-the-validator-and-scope-decide).
+
 This is **table-level** access control. It is not column masking and not
 row-level security: a role that may read a table reads every column and every
 row of it. A downloaded trace of a *permitted* run holds real rows, and the

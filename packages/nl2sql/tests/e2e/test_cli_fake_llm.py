@@ -23,7 +23,7 @@ def test_count_customers_end_to_end(demo_project, fake_llm):
     assert r.returncode == 0, r.stdout + r.stderr
     assert "COUNT(" in r.stdout and "Customer" in r.stdout
     assert "59" in r.stdout
-    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlanModel",
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer",
                                                   "AggregatedResponse"]
     # One line totalling the question: the fake reports 1 prompt + 1 completion token per call.
     [line] = [ln for ln in r.stdout.splitlines() if ln.startswith("LLM usage:")]
@@ -60,7 +60,7 @@ def test_a_foreign_key_join_passes_validation_and_executes(demo_project, fake_ll
     assert "JOIN" in r.stdout.upper()
     assert "does not match any allowed relationship" not in r.stdout
     assert "Pipeline Errors" not in r.stdout, r.stdout
-    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlanModel",
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer",
                                                   "AggregatedResponse"]
 
 
@@ -81,7 +81,7 @@ def test_top_n_by_an_aggregate_validates_and_sorts_descending(demo_project, fake
     assert "DESC" in r.stdout.upper()
     # Rock leads with 835 sold invoice lines; ascending would have started at 1.
     assert "Top genre: Rock with 835" in r.stdout
-    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlanModel",
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer",
                                                   "AggregatedResponse"]
 
 
@@ -100,7 +100,7 @@ def test_an_equality_filter_on_an_unsampled_value_validates(demo_project, fake_l
     assert "Pipeline Errors" not in r.stdout, r.stdout
     assert "not found in stats" not in r.stdout
     assert "130" in r.stdout
-    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlanModel",
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer",
                                                   "AggregatedResponse"]
 
 
@@ -122,7 +122,7 @@ def test_a_plan_gpt4o_wrote_generates_sql_that_runs(demo_project, fake_llm):
     assert "t3.UnitPrice * t3.Quantity" in r.stdout
     # Rock grosses 826.65, the most of any genre.
     assert "Top genre: Rock with 826.65" in r.stdout
-    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlanModel",
+    assert [c["name"] for c in server.calls] == ["AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer",
                                                   "AggregatedResponse"]
 
 

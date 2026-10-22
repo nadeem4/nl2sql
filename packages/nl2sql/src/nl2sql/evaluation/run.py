@@ -50,6 +50,7 @@ from nl2sql.evaluation.report import EvalReport, case_status, compare, score_con
 from nl2sql.evaluation.scorers import CaseRun, MODES, Scorer, build_scorers, run_scorer
 from nl2sql.evaluation.scorers import retrieval_recall
 from nl2sql.evaluation.suite import EvalCase, EvalSuite, select_cases
+from nl2sql.knowledge.scope import caller_knowledge
 from nl2sql.llm.models import AgentConfig, LLMFileConfig
 from nl2sql.llm.prices import PRICES_CHECKED_ON, call_cost, price_for
 from nl2sql.llm.providers import LLM_AGENTS
@@ -169,7 +170,7 @@ def _ask(run: Any, case: EvalCase, role: str) -> Tuple[QueryResult, Optional[Dic
         try:
             state = run_with_graph(run, case.question, user_context=user, callbacks=[sent], scope=scope)
             result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
-                                       sample_rows=_ALL_ROWS)
+                                       sample_rows=_ALL_ROWS, knowledge=caller_knowledge(run, state))
         except BaseException as exc:
             # A KeyboardInterrupt too: every scope ends with a terminal event.
             scope.fail(f"The run failed: {exc or type(exc).__name__}")

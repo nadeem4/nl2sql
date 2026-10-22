@@ -342,3 +342,66 @@ def test_a_join_key_that_cannot_be_coerced_is_stopped_at_the_validator():
     [error] = errors
     assert error.error_code == ErrorCode.JOIN_KEY_TYPE_MISMATCH
     assert error.severity == ErrorSeverity.ERROR and error.is_retryable
+
+
+# --- a glossary join (docs/architecture/wave_b.md, D46) ----------------------------------------------
+
+
+def _glossary_join_state(with_glossary: bool) -> SubgraphExecutionState:
+    """The relevant tables the schema retriever builds from a snapshot with no declared key, and the plan."""
+    from datetime import datetime, timezone
+
+    from nl2sql.knowledge.merge import Knowledge, LoadedSource, merge
+    from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
+    from nl2sql_sdk.knowledge import Glossary
+    from nl2sql_sdk.schema import (
+        ColumnContract, SchemaContract, SchemaMetadata, SchemaSnapshot, TableContract, TableMetadata,
+    )
+    from nl2sql_sdk.schema import TableRef as SchemaTable
+
+    def table(name, columns):
+        ref = SchemaTable(schema_name="main", table_name=name)
+        return ref.full_name, TableContract(table=ref, columns={
+            c: ColumnContract(name=c, data_type="INTEGER" if c.endswith("Id") else "TEXT", is_primary_key=c == pk)
+            for c, pk in columns}), TableMetadata(table=ref)
+
+    tables = [table("Artist", [("ArtistId", "ArtistId"), ("Name", None)]),
+              table("Album", [("AlbumId", "AlbumId"), ("ArtistId", None)])]
+    snapshot = SchemaSnapshot(
+        contract=SchemaContract(datasource_id="ds1", engine_type="sqlite", tables={k: c for k, c, _ in tables}),
+        metadata=SchemaMetadata(datasource_id="ds1", engine_type="sqlite", tables={k: m for k, _, m in tables}))
+    knowledge = Knowledge()
+    if with_glossary:
+        glossary = Glossary.model_validate({"version": 1, "datasources": {"ds1": {"joins": [
+            {"from": "Album.ArtistId", "to": "Artist.ArtistId", "cardinality": "many-to-one"}]}}})
+        knowledge = merge([LoadedSource(type="yaml", glossary=glossary, sha256=None, path=None,
+                                        loaded_at=datetime.now(timezone.utc))])
+    registry = stub_ds_registry(_adapter(), limits=Limits(row_limit=1000), get_preferred_tables=lambda _id: [],
+                                get_dialect=lambda _id: "sqlite")
+    ctx = fake_runtime(ds_registry=registry, policies={"allow_all": True}, state=None, knowledge=knowledge,
+                       vector_store=SimpleNamespace(snapshot=lambda _id: snapshot))
+    state = SubgraphExecutionState(trace_id="t", user_query="q", user_context=UserContext(roles=["admin"]),
+                                   sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="albums per artist"))
+    retrieved = SchemaRetrieverNode(ctx)(state)
+    plan = PlanModel(tables=[TableRef(name="Artist", alias="t1"), TableRef(name="Album", alias="t2")],
+                     joins=[_artist_album_join()], select_items=_select_name())
+    return state.model_copy(update={"relevant_tables": retrieved["relevant_tables"],
+                                    "ast_planner_response": ASTPlannerResponse(plan=plan)})
+
+
+def test_glossary_join_lets_the_validator_accept_a_plan():
+    accepted = LogicalValidatorNode(_ctx())(_glossary_join_state(True)).get("errors") or []
+    refused = LogicalValidatorNode(_ctx())(_glossary_join_state(False)).get("errors") or []
+
+    assert not [e for e in accepted if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)]
+    assert [e.message for e in refused if e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE][0].startswith(
+        "Join does not match any allowed relationship.")
+
+
+def test_plan_on_a_glossary_join_validates_and_generates():
+    state = _glossary_join_state(True)
+
+    result = GeneratorNode(_ctx())(state)
+
+    assert not result.get("errors")
+    assert "JOIN" in result["generator_response"].sql_draft.upper()

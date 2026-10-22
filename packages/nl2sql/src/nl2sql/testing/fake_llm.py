@@ -55,6 +55,30 @@ class Rule:
     usage: Optional[Dict[str, Any]] = None
 
 
+PLANNER_ANSWER = "PlannerAnswer"
+
+
+def as_planner_answer(name: str, payload: Any) -> Any:
+    """A ``PlannerAnswer`` rule's payload, with a bare plan wrapped as ``{"plan": <plan>}``.
+
+    The planner's structured output is ``PlannerAnswer`` (docs/architecture/wave_b.md,
+    section 7), whose plan is under ``plan``; a test that answers with a plan
+    alone, as before, gets it wrapped. Any other name, and a payload that
+    already has ``plan``, are returned as given.
+    """
+    if name != PLANNER_ANSWER:
+        return payload
+    if isinstance(payload, str):
+        try:
+            parsed = json.loads(payload)
+        except ValueError:
+            return payload
+        return payload if not isinstance(parsed, dict) or "plan" in parsed else json.dumps({"plan": parsed})
+    if isinstance(payload, dict) and "plan" not in payload:
+        return {"plan": payload}
+    return payload
+
+
 def classify_request(body: Dict[str, Any]) -> tuple:
     """Classifies a chat.completions request body.
 
@@ -292,7 +316,7 @@ class FakeLLMServer:
                     self._send(400, {"type": "error", "error": {"type": "invalid_request_error",
                                                                 "message": f"fake llm: no rule for {name}"}})
                     return
-                payload = rule.payload(text) if callable(rule.payload) else rule.payload
+                payload = as_planner_answer(name, rule.payload(text) if callable(rule.payload) else rule.payload)
                 if body.get("stream"):
                     self._stream(anthropic_stream(body, name, payload, rule.usage))
                     return
@@ -323,7 +347,7 @@ class FakeLLMServer:
                 if rule is None:
                     self._send(400, {"error": {"message": f"fake llm: no rule for {name}"}})
                     return
-                payload = rule.payload(text) if callable(rule.payload) else rule.payload
+                payload = as_planner_answer(name, rule.payload(text) if callable(rule.payload) else rule.payload)
                 if body.get("stream"):
                     chunks = completion_chunks(body, mode, name, payload, rule.usage)
                     self._stream([(None, c) for c in chunks] + [(None, "[DONE]")])

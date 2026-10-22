@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlannerAnswer, PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery, ExpectedColumn
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table, Column
@@ -19,13 +19,13 @@ def test_ast_planner_successful_plan():
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
-    node.chain.invoke.return_value = PlanModel(
+    node.chain.invoke.return_value = PlannerAnswer(plan=PlanModel(
         query_type="READ",
         tables=[],
         select_items=[],
         joins=[],
         reasoning="ok",
-    )
+    ))
 
     state = SubgraphExecutionState(
         trace_id="t",

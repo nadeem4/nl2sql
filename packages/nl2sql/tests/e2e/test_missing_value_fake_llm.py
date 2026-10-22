@@ -81,8 +81,8 @@ def test_a_misspelt_value_is_looked_up_and_the_retry_answers(demo_project, tmp_p
     rules = [
         ANSWERABLE,
         Rule("DecomposerResponse", DECOMPOSER),
-        Rule("PlanModel", _plan("Jazz"), when="closest existing values are 'Jazz'"),
-        Rule("PlanModel", _plan("Jaz")),
+        Rule("PlannerAnswer", _plan("Jazz"), when="closest existing values are 'Jazz'"),
+        Rule("PlannerAnswer", _plan("Jaz")),
         Rule("AggregatedResponse", _answer),
         Rule("plain", "The genre is stored as 'Jazz'."),
     ]
@@ -95,7 +95,7 @@ def test_a_misspelt_value_is_looked_up_and_the_retry_answers(demo_project, tmp_p
     assert result["final_answer"]["summary"] == "There are 130 tracks."
     # The lookup the retry recovered from is not presented as a finding.
     assert result["final_answer"]["warnings"] == []
-    planner_calls = [c for c in server.calls if c["name"] == "PlanModel"]
+    planner_calls = [c for c in server.calls if c["name"] == "PlannerAnswer"]
     assert len(planner_calls) == 2
     assert "No Genre.Name value is 'Jaz'" in _prompt(planner_calls[1])
 
@@ -105,7 +105,7 @@ def test_a_value_with_nothing_close_is_reported_as_missing(demo_project, tmp_pat
     rules = [
         ANSWERABLE,
         Rule("DecomposerResponse", DECOMPOSER),
-        Rule("PlanModel", _plan("Polka")),
+        Rule("PlannerAnswer", _plan("Polka")),
         Rule("AggregatedResponse", _answer),
         Rule("plain", "Keep the same plan."),
     ]

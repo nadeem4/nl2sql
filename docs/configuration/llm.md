@@ -184,7 +184,7 @@ How the engine uses it:
   send no `cache_control`.
 - **Whether a prefix clears the minimum.** On Chinook the planner's cached
   prefix is its system prompt (about 3.5k tokens, most of it the retrieved
-  schema) plus the `PlanModel` tool schema (about 2k): above every model's
+  schema) plus the `PlannerAnswer` tool schema (about 2k): above every model's
   minimum. The decomposer's (about 0.7k of system prompt plus a 1.4k tool
   schema) and the refiner's (about 2.7k, no tool) clear Opus 5's 512 and
   Sonnet 5's 1,024 but not Haiku 4.5's 4,096, so on Haiku they are silently
@@ -242,7 +242,7 @@ different port).
 
 !!! warning "Ollama is supported at the transport level, not guaranteed end to end"
     The pipeline drives every model through `with_structured_output`, and the
-    AST planner's target is `PlanModel` — a *recursive* Pydantic schema whose
+    AST planner's target is `PlannerAnswer`, whose `PlanModel` is a *recursive* Pydantic schema whose
     `Expr` references itself. That is a demanding structured-output target, and
     small local models often handle it poorly: expect malformed plans, empty
     fields or repeated refiner loops depending on the model you choose. Whether

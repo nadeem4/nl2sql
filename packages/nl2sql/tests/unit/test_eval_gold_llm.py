@@ -38,13 +38,13 @@ def test_the_decomposition_matches_the_plan(c):
 
 
 def test_every_structured_output_is_answered_from_one_table_keyed_by_its_schema():
-    # Wave B's planner answer wraps PlanModel: it is one more entry here.
-    assert set(RESPONSES) == {"AnswerabilityResponse", "DecomposerResponse", "PlanModel", "AggregatedResponse",
+    # The planner answer (Wave B) wraps the plan under "plan".
+    assert set(RESPONSES) == {"AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer", "AggregatedResponse",
                               "plain"}
     llm = GoldPlanLLM(PLANS)
     assert [rule.name for rule in llm.server.rules] == list(RESPONSES)
     llm.select(ANSWERABLE[0])
-    assert PlanModel.model_validate(llm.respond("PlanModel")) == PLANS[ANSWERABLE[0].id]
+    assert PlanModel.model_validate(llm.respond("PlannerAnswer")["plan"]) == PLANS[ANSWERABLE[0].id]
 
 
 def test_a_response_can_be_replaced_per_fake():
@@ -59,4 +59,4 @@ def test_a_case_without_a_plan_is_named():
     llm = GoldPlanLLM({})
     llm.select(ANSWERABLE[0])
     with pytest.raises(KeyError, match=ANSWERABLE[0].id):
-        llm.respond("PlanModel")
+        llm.respond("PlannerAnswer")

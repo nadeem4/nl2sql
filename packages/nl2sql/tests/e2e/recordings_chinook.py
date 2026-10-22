@@ -52,7 +52,7 @@ def count_customers_answer(prompt_text: str) -> dict:
 RULES_COUNT_CUSTOMERS = [
     ANSWERABLE,
     Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER),
-    Rule("PlanModel", COUNT_CUSTOMERS_PLAN),
+    Rule("PlannerAnswer", COUNT_CUSTOMERS_PLAN),
     Rule("AggregatedResponse", count_customers_answer),
     Rule("plain", "Keep the same plan."),
 ]
@@ -114,7 +114,7 @@ def albums_per_artist_answer(_prompt_text: str) -> dict:
 RULES_ALBUMS_PER_ARTIST = [
     ANSWERABLE,
     Rule("DecomposerResponse", ALBUMS_PER_ARTIST_DECOMPOSER),
-    Rule("PlanModel", ALBUMS_PER_ARTIST_PLAN),
+    Rule("PlannerAnswer", ALBUMS_PER_ARTIST_PLAN),
     Rule("AggregatedResponse", albums_per_artist_answer),
     Rule("plain", "Keep the same plan."),
 ]
@@ -132,8 +132,8 @@ ALBUMS_PER_ARTIST_PLAN_UNJOINED = {**ALBUMS_PER_ARTIST_PLAN, "joins": []}
 RULES_ALBUMS_PER_ARTIST_RETRY = [
     ANSWERABLE,
     Rule("DecomposerResponse", ALBUMS_PER_ARTIST_DECOMPOSER),
-    Rule("PlanModel", ALBUMS_PER_ARTIST_PLAN, when="never joined to the FROM table"),
-    Rule("PlanModel", ALBUMS_PER_ARTIST_PLAN_UNJOINED),
+    Rule("PlannerAnswer", ALBUMS_PER_ARTIST_PLAN, when="never joined to the FROM table"),
+    Rule("PlannerAnswer", ALBUMS_PER_ARTIST_PLAN_UNJOINED),
     Rule("AggregatedResponse", albums_per_artist_answer),
     Rule("plain", "Join Album to Artist on ArtistId."),
 ]
@@ -204,7 +204,7 @@ def top_genre_answer(prompt_text: str) -> dict:
 RULES_TOP_GENRE = [
     ANSWERABLE,
     Rule("DecomposerResponse", TOP_GENRE_DECOMPOSER),
-    Rule("PlanModel", TOP_GENRE_PLAN),
+    Rule("PlannerAnswer", TOP_GENRE_PLAN),
     Rule("AggregatedResponse", top_genre_answer),
     Rule("plain", "Keep the same plan."),
 ]
@@ -263,7 +263,7 @@ def jazz_tracks_answer(prompt_text: str) -> dict:
 RULES_JAZZ_TRACKS = [
     ANSWERABLE,
     Rule("DecomposerResponse", JAZZ_TRACKS_DECOMPOSER),
-    Rule("PlanModel", JAZZ_TRACKS_PLAN),
+    Rule("PlannerAnswer", JAZZ_TRACKS_PLAN),
     Rule("AggregatedResponse", jazz_tracks_answer),
     Rule("plain", "Keep the same plan."),
 ]
@@ -309,7 +309,7 @@ def genre_sales_answer(prompt_text: str) -> dict:
 RULES_GENRE_SALES_GPT4O = [
     ANSWERABLE,
     Rule("DecomposerResponse", GENRE_SALES_DECOMPOSER),
-    Rule("PlanModel", GENRE_SALES_PLAN_GPT4O),
+    Rule("PlannerAnswer", GENRE_SALES_PLAN_GPT4O),
     Rule("AggregatedResponse", genre_sales_answer),
     Rule("plain", "Keep the same plan."),
 ]
@@ -360,7 +360,7 @@ TOP_CUSTOMERS_PLAN = {
 RULES_TOP_CUSTOMERS = [
     ANSWERABLE,
     Rule("DecomposerResponse", TOP_CUSTOMERS_DECOMPOSER),
-    Rule("PlanModel", TOP_CUSTOMERS_PLAN),
+    Rule("PlannerAnswer", TOP_CUSTOMERS_PLAN),
     Rule("AggregatedResponse", {"summary": "should not be called", "format_type": "text",
                                 "content": "should not be called", "warnings": []}),
     Rule("plain", "Keep the same plan."),

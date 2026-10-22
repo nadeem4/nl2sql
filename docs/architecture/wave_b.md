@@ -457,6 +457,15 @@ plan whose planner answer carried alternatives is never stored, whether or
 not the run asked (D47): the cache write in `pipeline/graph_utils.py`
 skips it, so a later run calls the planner, which flags again.
 
+!!! note "Built: knowledge in the prompts (K2)"
+    The retriever, `[BUSINESS_CONTEXT]`, `PlannerAnswer`, the cache key's
+    digest and the injection tests are built; see the K2 note in
+    [the PR plan](#16-pr-plan) for the exact names. The node pages are
+    [the schema retriever](nodes/schema_retriever_node.md#knowledge),
+    [the planner](nodes/ast_planner_node.md) and
+    [the refiner](nodes/refiner_node.md); the invariant is
+    [Knowledge Is Data](invariants.md#knowledge-is-data-the-validator-and-scope-decide).
+
 ### Knowledge in the index
 
 Prompts read the in-memory knowledge, so an accept is effective in the next
@@ -1637,6 +1646,54 @@ flowchart TD
       and the CLI); `test_only_accept_writes_a_persons_file` in
       `tests/architecture/test_boundaries.py`, which also lists
       `review/queue.py` among the access decisions that ask a `Scope`.
+
+!!! note "Built: knowledge in the prompts (K2)"
+    Knowledge reaches the planner's and the refiner's prompts; the index is
+    K3's. Exact names, and where the code differs from this page:
+
+    - **Matching and rendering.** `nl2sql/knowledge/match.py`:
+      `match_terms(terms, texts, *, sources, top_k) -> List[TermMatch]`
+      (`NAME_SCORE` 1.0, `SYNONYM_SCORE` 0.9, `normalize(text)`) and
+      `rules_for(rules, tables, snapshot, *, sources) -> List[RuleUse]`.
+      `nl2sql/knowledge/render.py`: `render_business_context(terms, rules) -> str`,
+      `fit_business_context(terms, rules, *, max_chars) -> (terms, rules, dropped)`
+      (the cut is its own function, so rendering stays pure) and
+      `business_context_of(state)`, which the planner and the refiner both call.
+      The block carries a term's `term`, `definition`, `columns` and `tables`
+      (no synonyms, as the example above), a rule's `id` and `text`; an empty
+      list is left out.
+    - **The retriever.** `schema_knowledge(knowledge, datasource_id, snapshot,
+      scope, dialect) -> SchemaKnowledge` (in `schema_retriever/node.py`) filters
+      with K1's `visible(..., deny_names(scope))` and resolves descriptions,
+      roles, units, grains, values and glossary joins per snapshot table key;
+      `_build_tables_from_snapshot(..., knowledge=)` puts them on `Table` and
+      `Column` (extra fields `role`, `unit`, `grain`, `values`; a relationship
+      gains `"source": "glossary"`). A database comment that mentions a denied
+      table is dropped too, as `show` drops it. `resolve_join(join, snapshot, *,
+      dialect)` was added to K1's `resolve.py` (a join is used only when
+      `problems` would not report it). `knowledge_used` is None when no term or
+      rule matched, and for a pinned plan; `knowledge.used` is published with it.
+    - **The planner.** The chain's structured output is `PlannerAnswer`; each
+      alternative passes `plan.after` in `checked_alternatives(state,
+      alternatives)`. `ASTPlannerResponse.alternatives_offered` (added here,
+      after L1's review) keeps every alternative the answer carried, before
+      `plan.after` or any filter; the no-cache rule (D47) in `graph_utils` reads
+      it, with `alternatives` and `ambiguous_phrase`, so a plan whose readings
+      were all dropped for one caller is still never cached. It is the name L1
+      (#339) planned for the unfiltered set.
+    - **The cache.** `PlanCache(..., knowledge=)` appends
+      `| knowledge=<Knowledge.digest(datasource_id)>` to every key (the digest
+      of no knowledge when there is none); `plan_cache_for(ctx)` passes the
+      run's pinned `ctx.knowledge`.
+    - **The explanation.** `caller_knowledge(ctx, state)` in
+      `nl2sql/knowledge/scope.py` is the scope-filtered knowledge, per
+      datasource the run planned on, for X1's `result_from_state(...,
+      knowledge=)`; `QueryAPI.run_query`, `QueryAPI._stream`,
+      `evaluation/run.py`, `tracing/replay.py` and `tracing/trace.py` pass it.
+    - **Fakes and the recording.** `nl2sql.testing.fake_llm.as_planner_answer`
+      wraps a bare plan as `{"plan": ...}` for a `PlannerAnswer` rule; the gold
+      plan fake answers `{"plan": ...}` itself. The demo recording was
+      converted by the one-off script (17 entries), which was not committed.
 
 **The demo recording.** K2 changes the planner's structured output from
 `PlanModel` to `PlannerAnswer`, and the replay provider keys on the

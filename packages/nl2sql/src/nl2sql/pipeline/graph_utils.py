@@ -207,7 +207,13 @@ def wrap_subgraph(
             e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL) for e in executor_response.errors
         )
         planner_plan = planner_response.planner_plan if planner_response else None
-        if succeeded and execute and executed_cleanly and planner_plan is not None and plan_source == "llm":
+        # Nor is a plan whose planner answer carried other readings (D47), read from what the planner
+        # offered, before plan.after or a caller's scope dropped any: a later caller allowed a dropped
+        # reading must be asked, so a later run asks the planner again.
+        ambiguous = bool(planner_response and (planner_response.alternatives_offered or planner_response.alternatives
+                                               or planner_response.ambiguous_phrase))
+        if (succeeded and execute and executed_cleanly and planner_plan is not None and plan_source == "llm"
+                and not ambiguous):
             plan_cache_for(ctx, planner).put(sub_query, planner_plan)
         # A hook's deny scoped to this sub-query drops it: the run goes on
         # without it, and the answer says what went unanswered.

@@ -33,7 +33,7 @@ def _trace():
     ]}
 
 
-def _body(messages, mode="json_schema", name="PlanModel"):
+def _body(messages, mode="json_schema", name="PlannerAnswer"):
     body = {"model": "gpt-4o", "messages": messages}
     if mode == "json_schema":
         body["response_format"] = {"type": "json_schema", "json_schema": {"name": name}}

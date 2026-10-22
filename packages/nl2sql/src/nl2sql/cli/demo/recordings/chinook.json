@@ -96,134 +96,136 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "the five customers with the highest total spend",
       "payload": {
-        "reasoning": "Join Customer to Invoice, sum invoice totals per customer, concatenate first and last name as customer label, order by total spend desc, limit 5.",
-        "tables": [
-          {
-            "name": "Customer",
-            "alias": "t1"
-          },
-          {
-            "name": "Invoice",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "CustomerId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "CustomerId"
-              }
+        "plan": {
+          "reasoning": "Join Customer to Invoice, sum invoice totals per customer, concatenate first and last name as customer label, order by total spend desc, limit 5.",
+          "tables": [
+            {
+              "name": "Customer",
+              "alias": "t1"
+            },
+            {
+              "name": "Invoice",
+              "alias": "t2"
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
                 "kind": "binary",
-                "op": "||",
+                "op": "=",
                 "left": {
                   "kind": "column",
                   "alias": "t1",
-                  "column_name": "FirstName"
+                  "column_name": "CustomerId"
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
-                }
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "LastName"
-              }
-            },
-            "alias": "customer"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
                   "kind": "column",
                   "alias": "t2",
-                  "column_name": "Total"
+                  "column_name": "CustomerId"
                 }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "total_spend"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "CustomerId"
+              }
             }
-          },
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          ],
+          "select_items": [
+            {
+              "expr": {
                 "kind": "binary",
                 "op": "||",
                 "left": {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "FirstName"
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
                 }
               },
-              "right": {
+              "alias": "customer"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "Total"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "total_spend"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t1",
-                "column_name": "LastName"
+                "column_name": "CustomerId"
+              }
+            },
+            {
+              "expr": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
+                }
               }
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "Total"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ],
-        "limit": 5
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "Total"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 5
+        }
       }
     },
     {
@@ -313,93 +315,95 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "the artist with the highest number of albums",
       "payload": {
-        "reasoning": "Join Album to Artist, count albums per artist, order desc, limit 1.",
-        "tables": [
-          {
-            "name": "Artist",
-            "alias": "t1"
-          },
-          {
-            "name": "Album",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "ArtistId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "ArtistId"
+        "plan": {
+          "reasoning": "Join Album to Artist, count albums per artist, order desc, limit 1.",
+          "tables": [
+            {
+              "name": "Artist",
+              "alias": "t1"
+            },
+            {
+              "name": "Album",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "ArtistId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "ArtistId"
+                }
               }
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "Name"
+          ],
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Name"
+              },
+              "alias": "artist"
             },
-            "alias": "artist"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "AlbumId"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "album_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "Name"
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "AlbumId"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "album_count"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "direction": "desc",
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "AlbumId"
-                }
-              ],
-              "is_aggregate": true
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Name"
+              }
             }
-          }
-        ],
-        "limit": 1
+          ],
+          "order_by": [
+            {
+              "direction": "desc",
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "AlbumId"
+                  }
+                ],
+                "is_aggregate": true
+              }
+            }
+          ],
+          "limit": 1
+        }
       }
     },
     {
@@ -523,61 +527,63 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "average invoice total for each billing country",
       "payload": {
-        "reasoning": "Group invoices by BillingCountry and compute the average of Total.",
-        "tables": [
-          {
-            "name": "Invoice",
-            "alias": "t1"
-          }
-        ],
-        "joins": [],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "BillingCountry"
-            },
-            "alias": "billing_country"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "AVG",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "Total"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "average_invoice_total"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "BillingCountry"
+        "plan": {
+          "reasoning": "Group invoices by BillingCountry and compute the average of Total.",
+          "tables": [
+            {
+              "name": "Invoice",
+              "alias": "t1"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "BillingCountry"
+          ],
+          "joins": [],
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "BillingCountry"
+              },
+              "alias": "billing_country"
             },
-            "direction": "asc"
-          }
-        ]
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "AVG",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "Total"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "average_invoice_total"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "BillingCountry"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "BillingCountry"
+              },
+              "direction": "asc"
+            }
+          ]
+        }
       }
     },
     {
@@ -666,134 +672,136 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "employees ranked by the number of customers they support, highest first",
       "payload": {
-        "reasoning": "Join Employee to Customer via SupportRepId, count customers per employee, order desc. Semantic context specifies limit 1, so return the top employee. Employee name is FirstName || ' ' || LastName.",
-        "tables": [
-          {
-            "name": "Employee",
-            "alias": "t1"
-          },
-          {
-            "name": "Customer",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
+        "plan": {
+          "reasoning": "Join Employee to Customer via SupportRepId, count customers per employee, order desc. Semantic context specifies limit 1, so return the top employee. Employee name is FirstName || ' ' || LastName.",
+          "tables": [
+            {
+              "name": "Employee",
+              "alias": "t1"
+            },
+            {
+              "name": "Customer",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "EmployeeId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "SupportRepId"
+                }
+              }
+            }
+          ],
+          "select_items": [
+            {
+              "expr": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
+                }
+              },
+              "alias": "employee"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "CustomerId"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "customer_count"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t1",
                 "column_name": "EmployeeId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "SupportRepId"
               }
-            }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+            },
+            {
+              "expr": {
                 "kind": "binary",
                 "op": "||",
                 "left": {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "FirstName"
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
-                }
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "LastName"
-              }
-            },
-            "alias": "employee"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "CustomerId"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "customer_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "EmployeeId"
-            }
-          },
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
-                "kind": "binary",
-                "op": "||",
-                "left": {
                   "kind": "column",
                   "alias": "t1",
-                  "column_name": "FirstName"
-                },
-                "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "column_name": "LastName"
                 }
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "LastName"
               }
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "CustomerId"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ],
-        "limit": 1
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "CustomerId"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 1
+        }
       }
     },
     {
@@ -889,108 +897,110 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "the track with the longest duration in each genre",
       "payload": {
-        "reasoning": "Join Track to Genre, group by genre name and track name, take MAX(Milliseconds) as the duration metric, order descending and limit to 1 as specified by the semantic context.",
-        "tables": [
-          {
-            "name": "Track",
-            "alias": "t1"
-          },
-          {
-            "name": "Genre",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "GenreId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "GenreId"
+        "plan": {
+          "reasoning": "Join Track to Genre, group by genre name and track name, take MAX(Milliseconds) as the duration metric, order descending and limit to 1 as specified by the semantic context.",
+          "tables": [
+            {
+              "name": "Track",
+              "alias": "t1"
+            },
+            {
+              "name": "Genre",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "GenreId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "GenreId"
+                }
               }
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "Name"
+          ],
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "Name"
+              },
+              "alias": "genre"
             },
-            "alias": "genre"
-          },
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "Name"
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Name"
+              },
+              "alias": "track"
             },
-            "alias": "track"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "MAX",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "Milliseconds"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "max_track_duration"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "Name"
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "MAX",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "Milliseconds"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "max_track_duration"
             }
-          },
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "Name"
-            }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "MAX",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "Milliseconds"
-                }
-              ],
-              "is_aggregate": true
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "Name"
+              }
             },
-            "direction": "desc"
-          }
-        ],
-        "limit": 1
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Name"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "MAX",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "Milliseconds"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 1
+        }
       }
     },
     {
@@ -1088,216 +1098,218 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "the five customers who purchased the greatest number of tracks in the jazz genre",
       "payload": {
-        "reasoning": "Join Customer -> Invoice -> InvoiceLine -> Track -> Genre, filter Genre.Name = 'Jazz', sum quantity per customer, order desc, limit 5. Customer name built by concatenating first and last name.",
-        "tables": [
-          {
-            "name": "Customer",
-            "alias": "t1"
-          },
-          {
-            "name": "Invoice",
-            "alias": "t2"
-          },
-          {
-            "name": "InvoiceLine",
-            "alias": "t3"
-          },
-          {
-            "name": "Track",
-            "alias": "t4"
-          },
-          {
-            "name": "Genre",
-            "alias": "t5"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "CustomerId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "CustomerId"
-              }
+        "plan": {
+          "reasoning": "Join Customer -> Invoice -> InvoiceLine -> Track -> Genre, filter Genre.Name = 'Jazz', sum quantity per customer, order desc, limit 5. Customer name built by concatenating first and last name.",
+          "tables": [
+            {
+              "name": "Customer",
+              "alias": "t1"
+            },
+            {
+              "name": "Invoice",
+              "alias": "t2"
+            },
+            {
+              "name": "InvoiceLine",
+              "alias": "t3"
+            },
+            {
+              "name": "Track",
+              "alias": "t4"
+            },
+            {
+              "name": "Genre",
+              "alias": "t5"
             }
-          },
-          {
-            "left_alias": "t2",
-            "right_alias": "t3",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "InvoiceId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t3",
-                "column_name": "InvoiceId"
-              }
-            }
-          },
-          {
-            "left_alias": "t3",
-            "right_alias": "t4",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t3",
-                "column_name": "TrackId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t4",
-                "column_name": "TrackId"
-              }
-            }
-          },
-          {
-            "left_alias": "t4",
-            "right_alias": "t5",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t4",
-                "column_name": "GenreId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t5",
-                "column_name": "GenreId"
-              }
-            }
-          }
-        ],
-        "where": {
-          "kind": "binary",
-          "op": "=",
-          "left": {
-            "kind": "column",
-            "alias": "t5",
-            "column_name": "Name"
-          },
-          "right": {
-            "kind": "literal",
-            "value": "Jazz"
-          }
-        },
-        "select_items": [
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
                 "kind": "binary",
-                "op": "||",
+                "op": "=",
                 "left": {
                   "kind": "column",
                   "alias": "t1",
-                  "column_name": "FirstName"
+                  "column_name": "CustomerId"
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "CustomerId"
                 }
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "LastName"
               }
             },
-            "alias": "customer"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
+            {
+              "left_alias": "t2",
+              "right_alias": "t3",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "InvoiceId"
+                },
+                "right": {
                   "kind": "column",
                   "alias": "t3",
-                  "column_name": "Quantity"
+                  "column_name": "InvoiceId"
                 }
-              ],
-              "is_aggregate": true
+              }
             },
-            "alias": "jazz_tracks_purchased"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
+            {
+              "left_alias": "t3",
+              "right_alias": "t4",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t3",
+                  "column_name": "TrackId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t4",
+                  "column_name": "TrackId"
+                }
+              }
+            },
+            {
+              "left_alias": "t4",
+              "right_alias": "t5",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t4",
+                  "column_name": "GenreId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t5",
+                  "column_name": "GenreId"
+                }
+              }
+            }
+          ],
+          "where": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
               "kind": "column",
-              "alias": "t1",
-              "column_name": "CustomerId"
+              "alias": "t5",
+              "column_name": "Name"
+            },
+            "right": {
+              "kind": "literal",
+              "value": "Jazz"
             }
           },
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          "select_items": [
+            {
+              "expr": {
                 "kind": "binary",
                 "op": "||",
                 "left": {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "FirstName"
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
                 }
               },
-              "right": {
+              "alias": "customer"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t3",
+                    "column_name": "Quantity"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "jazz_tracks_purchased"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t1",
-                "column_name": "LastName"
+                "column_name": "CustomerId"
+              }
+            },
+            {
+              "expr": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
+                }
               }
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t3",
-                  "column_name": "Quantity"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ],
-        "limit": 5
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t3",
+                    "column_name": "Quantity"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 5
+        }
       }
     },
     {
@@ -1397,155 +1409,157 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "Monthly revenue in 2013 from customers located in the USA",
       "payload": {
-        "reasoning": "Sum Invoice.Total by month for 2013, joining Customer to filter Country = 'USA'. Month expressed via DATE_TRUNC('month', InvoiceDate), ordered ascending. 2013 is within the InvoiceDate range (2009-01-01 to 2013-12-22).",
-        "tables": [
-          {
-            "name": "Invoice",
-            "alias": "t1"
-          },
-          {
-            "name": "Customer",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
+        "plan": {
+          "reasoning": "Sum Invoice.Total by month for 2013, joining Customer to filter Country = 'USA'. Month expressed via DATE_TRUNC('month', InvoiceDate), ordered ascending. 2013 is within the InvoiceDate range (2009-01-01 to 2013-12-22).",
+          "tables": [
+            {
+              "name": "Invoice",
+              "alias": "t1"
+            },
+            {
+              "name": "Customer",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "CustomerId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "CustomerId"
+                }
+              }
+            }
+          ],
+          "where": {
+            "kind": "binary",
+            "op": "AND",
+            "left": {
+              "kind": "binary",
+              "op": "=",
+              "left": {
+                "kind": "func",
+                "func_name": "DATE_PART",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "year"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              },
+              "right": {
+                "kind": "literal",
+                "value": 2013
+              }
+            },
+            "right": {
               "kind": "binary",
               "op": "=",
               "left": {
                 "kind": "column",
-                "alias": "t1",
-                "column_name": "CustomerId"
+                "alias": "t2",
+                "column_name": "Country"
               },
               "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "CustomerId"
+                "kind": "literal",
+                "value": "USA"
               }
             }
-          }
-        ],
-        "where": {
-          "kind": "binary",
-          "op": "AND",
-          "left": {
-            "kind": "binary",
-            "op": "=",
-            "left": {
-              "kind": "func",
-              "func_name": "DATE_PART",
-              "args": [
-                {
-                  "kind": "literal",
-                  "value": "year"
-                },
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceDate"
-                }
-              ]
-            },
-            "right": {
-              "kind": "literal",
-              "value": 2013
-            }
           },
-          "right": {
-            "kind": "binary",
-            "op": "=",
-            "left": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "Country"
+          "select_items": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "DATE_TRUNC",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "month"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              },
+              "alias": "month"
             },
-            "right": {
-              "kind": "literal",
-              "value": "USA"
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "Total"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "total_revenue"
             }
-          }
-        },
-        "select_items": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "DATE_TRUNC",
-              "args": [
-                {
-                  "kind": "literal",
-                  "value": "month"
-                },
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceDate"
-                }
-              ]
-            },
-            "alias": "month"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "Total"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "total_revenue"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "DATE_TRUNC",
-              "args": [
-                {
-                  "kind": "literal",
-                  "value": "month"
-                },
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceDate"
-                }
-              ]
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "DATE_TRUNC",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "month"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              }
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "DATE_TRUNC",
-              "args": [
-                {
-                  "kind": "literal",
-                  "value": "month"
-                },
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceDate"
-                }
-              ]
-            },
-            "direction": "asc"
-          }
-        ]
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "DATE_TRUNC",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "month"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              },
+              "direction": "asc"
+            }
+          ]
+        }
       }
     },
     {
@@ -1633,75 +1647,104 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "playlists whose tracks span more than three distinct genres",
       "payload": {
-        "reasoning": "Join Playlist -> PlaylistTrack -> Track, group by playlist name, count distinct GenreId, keep groups with more than 3 distinct genres.",
-        "tables": [
-          {
-            "name": "Playlist",
-            "alias": "t1"
-          },
-          {
-            "name": "PlaylistTrack",
-            "alias": "t2"
-          },
-          {
-            "name": "Track",
-            "alias": "t3"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
+        "plan": {
+          "reasoning": "Join Playlist -> PlaylistTrack -> Track, group by playlist name, count distinct GenreId, keep groups with more than 3 distinct genres.",
+          "tables": [
+            {
+              "name": "Playlist",
+              "alias": "t1"
+            },
+            {
+              "name": "PlaylistTrack",
+              "alias": "t2"
+            },
+            {
+              "name": "Track",
+              "alias": "t3"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "PlaylistId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "PlaylistId"
+                }
+              }
+            },
+            {
+              "left_alias": "t2",
+              "right_alias": "t3",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "TrackId"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t3",
+                  "column_name": "TrackId"
+                }
+              }
+            }
+          ],
+          "select_items": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t1",
-                "column_name": "PlaylistId"
+                "column_name": "Name"
               },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "PlaylistId"
-              }
-            }
-          },
-          {
-            "left_alias": "t2",
-            "right_alias": "t3",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "TrackId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t3",
-                "column_name": "TrackId"
-              }
-            }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "Name"
+              "alias": "playlist"
             },
-            "alias": "playlist"
-          },
-          {
-            "expr": {
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t3",
+                    "column_name": "GenreId"
+                  }
+                ],
+                "is_aggregate": true,
+                "distinct": true
+              },
+              "alias": "distinct_genre_count"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "Name"
+              }
+            }
+          ],
+          "having": {
+            "kind": "binary",
+            "op": ">",
+            "left": {
               "kind": "func",
               "func_name": "COUNT",
               "args": [
@@ -1714,57 +1757,30 @@
               "is_aggregate": true,
               "distinct": true
             },
-            "alias": "distinct_genre_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "Name"
+            "right": {
+              "kind": "literal",
+              "value": 3
             }
-          }
-        ],
-        "having": {
-          "kind": "binary",
-          "op": ">",
-          "left": {
-            "kind": "func",
-            "func_name": "COUNT",
-            "args": [
-              {
-                "kind": "column",
-                "alias": "t3",
-                "column_name": "GenreId"
-              }
-            ],
-            "is_aggregate": true,
-            "distinct": true
           },
-          "right": {
-            "kind": "literal",
-            "value": 3
-          }
-        },
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t3",
-                  "column_name": "GenreId"
-                }
-              ],
-              "is_aggregate": true,
-              "distinct": true
-            },
-            "direction": "desc"
-          }
-        ]
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t3",
+                    "column_name": "GenreId"
+                  }
+                ],
+                "is_aggregate": true,
+                "distinct": true
+              },
+              "direction": "desc"
+            }
+          ]
+        }
       }
     },
     {
@@ -1853,134 +1869,136 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "the top customers ranked by total amount spent",
       "payload": {
-        "reasoning": "Join Customer to Invoice, sum invoice totals per customer, concatenate first and last name as the customer label, rank descending and keep the top 10.",
-        "tables": [
-          {
-            "name": "Customer",
-            "alias": "t1"
-          },
-          {
-            "name": "Invoice",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "CustomerId"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "CustomerId"
-              }
+        "plan": {
+          "reasoning": "Join Customer to Invoice, sum invoice totals per customer, concatenate first and last name as the customer label, rank descending and keep the top 10.",
+          "tables": [
+            {
+              "name": "Customer",
+              "alias": "t1"
+            },
+            {
+              "name": "Invoice",
+              "alias": "t2"
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
                 "kind": "binary",
-                "op": "||",
+                "op": "=",
                 "left": {
                   "kind": "column",
                   "alias": "t1",
-                  "column_name": "FirstName"
+                  "column_name": "CustomerId"
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
-                }
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "LastName"
-              }
-            },
-            "alias": "customer"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
                   "kind": "column",
                   "alias": "t2",
-                  "column_name": "Total"
+                  "column_name": "CustomerId"
                 }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "total_spend"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "CustomerId"
+              }
             }
-          },
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          ],
+          "select_items": [
+            {
+              "expr": {
                 "kind": "binary",
                 "op": "||",
                 "left": {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "FirstName"
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
                 }
               },
-              "right": {
+              "alias": "customer"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "Total"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "total_spend"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t1",
-                "column_name": "LastName"
+                "column_name": "CustomerId"
+              }
+            },
+            {
+              "expr": {
+                "kind": "binary",
+                "op": "||",
+                "left": {
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "FirstName"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "LastName"
+                }
               }
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "SUM",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "Total"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ],
-        "limit": 10
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "SUM",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "Total"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 10
+        }
       }
     },
     {
@@ -2061,81 +2079,83 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "count of support tickets that are still open, grouped by priority",
       "payload": {
-        "reasoning": "Filter tickets to status = 'open', group by priority, count tickets per priority. Ordered by count descending for readability.",
-        "tables": [
-          {
-            "name": "tickets",
-            "alias": "t1"
-          }
-        ],
-        "joins": [],
-        "where": {
-          "kind": "binary",
-          "op": "=",
-          "left": {
-            "kind": "column",
-            "alias": "t1",
-            "column_name": "status"
-          },
-          "right": {
-            "kind": "literal",
-            "value": "open"
-          }
-        },
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "priority"
-            },
-            "alias": "priority"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "ticket_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "open_ticket_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "priority"
+        "plan": {
+          "reasoning": "Filter tickets to status = 'open', group by priority, count tickets per priority. Ordered by count descending for readability.",
+          "tables": [
+            {
+              "name": "tickets",
+              "alias": "t1"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "ticket_id"
-                }
-              ],
-              "is_aggregate": true
+          ],
+          "joins": [],
+          "where": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "status"
             },
-            "direction": "desc"
-          }
-        ]
+            "right": {
+              "kind": "literal",
+              "value": "open"
+            }
+          },
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "priority"
+              },
+              "alias": "priority"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "ticket_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "open_ticket_count"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "priority"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "ticket_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ]
+        }
       }
     },
     {
@@ -2223,106 +2243,108 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "support agents ranked by the number of tickets they resolved, highest first",
       "payload": {
-        "reasoning": "Join tickets to agents, filter status = 'resolved', count tickets per agent, order by count desc. Semantic context specifies limit 1 (highest).",
-        "tables": [
-          {
-            "name": "tickets",
-            "alias": "t1"
-          },
-          {
-            "name": "agents",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "agent_id"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "agent_id"
+        "plan": {
+          "reasoning": "Join tickets to agents, filter status = 'resolved', count tickets per agent, order by count desc. Semantic context specifies limit 1 (highest).",
+          "tables": [
+            {
+              "name": "tickets",
+              "alias": "t1"
+            },
+            {
+              "name": "agents",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "agent_id"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "agent_id"
+                }
               }
             }
-          }
-        ],
-        "where": {
-          "kind": "binary",
-          "op": "=",
-          "left": {
-            "kind": "column",
-            "alias": "t1",
-            "column_name": "status"
-          },
-          "right": {
-            "kind": "literal",
-            "value": "resolved"
-          }
-        },
-        "select_items": [
-          {
-            "expr": {
+          ],
+          "where": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
               "kind": "column",
-              "alias": "t2",
-              "column_name": "full_name"
+              "alias": "t1",
+              "column_name": "status"
             },
-            "alias": "support_agent"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "ticket_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "resolved_ticket_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "full_name"
+            "right": {
+              "kind": "literal",
+              "value": "resolved"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "ticket_id"
-                }
-              ],
-              "is_aggregate": true
+          },
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "full_name"
+              },
+              "alias": "support_agent"
             },
-            "direction": "desc"
-          }
-        ],
-        "limit": 1
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "ticket_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "resolved_ticket_count"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "full_name"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "ticket_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 1
+        }
       }
     },
     {
@@ -2397,119 +2419,121 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "average time to close a support ticket, broken down by ticket category",
       "payload": {
-        "reasoning": "Single table `tickets` has category, opened_at and closed_at. Average elapsed days to close computed with the whitelisted DATE_PART over the difference of the two timestamps (columns are TEXT 'YYYY-MM-DD HH:MM:SS'). JULIANDAY removed per feedback. Only tickets with a non-null closed_at contribute (IS NOT NULL test). Grouped by category, ordered by the average descending.",
-        "tables": [
-          {
-            "name": "tickets",
-            "alias": "t1"
-          }
-        ],
-        "joins": [],
-        "where": {
-          "kind": "binary",
-          "op": "IS NOT",
-          "left": {
-            "kind": "column",
-            "alias": "t1",
-            "column_name": "closed_at"
-          },
-          "right": {
-            "kind": "literal",
-            "is_null": true
-          }
-        },
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "category"
-            },
-            "alias": "category"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "AVG",
-              "is_aggregate": true,
-              "args": [
-                {
-                  "kind": "func",
-                  "func_name": "DATE_PART",
-                  "args": [
-                    {
-                      "kind": "literal",
-                      "value": "day"
-                    },
-                    {
-                      "kind": "binary",
-                      "op": "-",
-                      "left": {
-                        "kind": "column",
-                        "alias": "t1",
-                        "column_name": "closed_at"
-                      },
-                      "right": {
-                        "kind": "column",
-                        "alias": "t1",
-                        "column_name": "opened_at"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            "alias": "avg_time_to_close"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "category"
+        "plan": {
+          "reasoning": "Single table `tickets` has category, opened_at and closed_at. Average elapsed days to close computed with the whitelisted DATE_PART over the difference of the two timestamps (columns are TEXT 'YYYY-MM-DD HH:MM:SS'). JULIANDAY removed per feedback. Only tickets with a non-null closed_at contribute (IS NOT NULL test). Grouped by category, ordered by the average descending.",
+          "tables": [
+            {
+              "name": "tickets",
+              "alias": "t1"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "AVG",
-              "is_aggregate": true,
-              "args": [
-                {
-                  "kind": "func",
-                  "func_name": "DATE_PART",
-                  "args": [
-                    {
-                      "kind": "literal",
-                      "value": "day"
-                    },
-                    {
-                      "kind": "binary",
-                      "op": "-",
-                      "left": {
-                        "kind": "column",
-                        "alias": "t1",
-                        "column_name": "closed_at"
-                      },
-                      "right": {
-                        "kind": "column",
-                        "alias": "t1",
-                        "column_name": "opened_at"
-                      }
-                    }
-                  ]
-                }
-              ]
+          ],
+          "joins": [],
+          "where": {
+            "kind": "binary",
+            "op": "IS NOT",
+            "left": {
+              "kind": "column",
+              "alias": "t1",
+              "column_name": "closed_at"
             },
-            "direction": "desc"
-          }
-        ]
+            "right": {
+              "kind": "literal",
+              "is_null": true
+            }
+          },
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "category"
+              },
+              "alias": "category"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "AVG",
+                "is_aggregate": true,
+                "args": [
+                  {
+                    "kind": "func",
+                    "func_name": "DATE_PART",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": "day"
+                      },
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "column",
+                          "alias": "t1",
+                          "column_name": "closed_at"
+                        },
+                        "right": {
+                          "kind": "column",
+                          "alias": "t1",
+                          "column_name": "opened_at"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "alias": "avg_time_to_close"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "category"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "AVG",
+                "is_aggregate": true,
+                "args": [
+                  {
+                    "kind": "func",
+                    "func_name": "DATE_PART",
+                    "args": [
+                      {
+                        "kind": "literal",
+                        "value": "day"
+                      },
+                      {
+                        "kind": "binary",
+                        "op": "-",
+                        "left": {
+                          "kind": "column",
+                          "alias": "t1",
+                          "column_name": "closed_at"
+                        },
+                        "right": {
+                          "kind": "column",
+                          "alias": "t1",
+                          "column_name": "opened_at"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              "direction": "desc"
+            }
+          ]
+        }
       }
     },
     {
@@ -2595,134 +2619,136 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "customers with the highest number of support tickets raised",
       "payload": {
-        "reasoning": "Count tickets per customer, joining tickets to customers to build the customer full name. Order by ticket count descending and keep the top row.",
-        "tables": [
-          {
-            "name": "tickets",
-            "alias": "t1"
-          },
-          {
-            "name": "customers",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "customer_id"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "customer_id"
+        "plan": {
+          "reasoning": "Count tickets per customer, joining tickets to customers to build the customer full name. Order by ticket count descending and keep the top row.",
+          "tables": [
+            {
+              "name": "tickets",
+              "alias": "t1"
+            },
+            {
+              "name": "customers",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "customer_id"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "customer_id"
+                }
               }
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+          ],
+          "select_items": [
+            {
+              "expr": {
                 "kind": "binary",
                 "op": "||",
                 "left": {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "first_name"
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "first_name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "last_name"
                 }
               },
-              "right": {
+              "alias": "customer"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "ticket_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "ticket_count"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t2",
-                "column_name": "last_name"
+                "column_name": "customer_id"
               }
             },
-            "alias": "customer"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "ticket_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "ticket_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "customer_id"
-            }
-          },
-          {
-            "expr": {
-              "kind": "binary",
-              "op": "||",
-              "left": {
+            {
+              "expr": {
                 "kind": "binary",
                 "op": "||",
                 "left": {
-                  "kind": "column",
-                  "alias": "t2",
-                  "column_name": "first_name"
+                  "kind": "binary",
+                  "op": "||",
+                  "left": {
+                    "kind": "column",
+                    "alias": "t2",
+                    "column_name": "first_name"
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": " "
+                  }
                 },
                 "right": {
-                  "kind": "literal",
-                  "value": " "
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "last_name"
                 }
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "last_name"
               }
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "ticket_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ],
-        "limit": 1
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "ticket_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 1
+        }
       }
     },
     {
@@ -2808,92 +2834,94 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "the pages with the most views last year",
       "payload": {
-        "reasoning": "Count page views per page_path, restricted to \"last year\". The data ends 2013-12-21, so the latest full year in range is 2013; filter DATE_PART('year', viewed_at) = 2013 instead of 2025. Order by count desc, top 10.",
-        "tables": [
-          {
-            "name": "page_views",
-            "alias": "t1"
-          }
-        ],
-        "joins": [],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "page_path"
-            },
-            "alias": "page"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "page_view_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "page_views"
-          }
-        ],
-        "where": {
-          "kind": "binary",
-          "op": "=",
-          "left": {
-            "kind": "func",
-            "func_name": "DATE_PART",
-            "args": [
-              {
-                "kind": "literal",
-                "value": "year"
-              },
-              {
+        "plan": {
+          "reasoning": "Count page views per page_path, restricted to \"last year\". The data ends 2013-12-21, so the latest full year in range is 2013; filter DATE_PART('year', viewed_at) = 2013 instead of 2025. Order by count desc, top 10.",
+          "tables": [
+            {
+              "name": "page_views",
+              "alias": "t1"
+            }
+          ],
+          "joins": [],
+          "select_items": [
+            {
+              "expr": {
                 "kind": "column",
                 "alias": "t1",
-                "column_name": "viewed_at"
-              }
-            ]
-          },
-          "right": {
-            "kind": "literal",
-            "value": 2013
-          }
-        },
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t1",
-              "column_name": "page_path"
+                "column_name": "page_path"
+              },
+              "alias": "page"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "page_view_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "page_views"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
+          ],
+          "where": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
               "kind": "func",
-              "func_name": "COUNT",
+              "func_name": "DATE_PART",
               "args": [
+                {
+                  "kind": "literal",
+                  "value": "year"
+                },
                 {
                   "kind": "column",
                   "alias": "t1",
-                  "column_name": "page_view_id"
+                  "column_name": "viewed_at"
                 }
-              ],
-              "is_aggregate": true
+              ]
             },
-            "direction": "desc"
-          }
-        ],
-        "limit": 10
+            "right": {
+              "kind": "literal",
+              "value": 2013
+            }
+          },
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t1",
+                "column_name": "page_path"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "page_view_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ],
+          "limit": 10
+        }
       }
     },
     {
@@ -2966,92 +2994,94 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "count of sessions by marketing channel",
       "payload": {
-        "reasoning": "Join sessions to referrers via referrer_id, group by channel and count sessions.",
-        "tables": [
-          {
-            "name": "sessions",
-            "alias": "t1"
-          },
-          {
-            "name": "referrers",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "referrer_id"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "referrer_id"
+        "plan": {
+          "reasoning": "Join sessions to referrers via referrer_id, group by channel and count sessions.",
+          "tables": [
+            {
+              "name": "sessions",
+              "alias": "t1"
+            },
+            {
+              "name": "referrers",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "referrer_id"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "referrer_id"
+                }
               }
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "channel"
+          ],
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "channel"
+              },
+              "alias": "marketing_channel"
             },
-            "alias": "marketing_channel"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "session_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "session_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "channel"
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "session_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "session_count"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "session_id"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ]
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "channel"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "session_id"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ]
+        }
       }
     },
     {
@@ -3126,92 +3156,94 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "bounce rate broken down by device type",
       "payload": {
-        "reasoning": "Join sessions to devices on device_id, group by device_type, and compute bounce rate as AVG(is_bounce) (share of sessions that bounced). No date filter requested.",
-        "tables": [
-          {
-            "name": "sessions",
-            "alias": "t1"
-          },
-          {
-            "name": "devices",
-            "alias": "t2"
-          }
-        ],
-        "joins": [
-          {
-            "left_alias": "t1",
-            "right_alias": "t2",
-            "join_type": "inner",
-            "condition": {
-              "kind": "binary",
-              "op": "=",
-              "left": {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "device_id"
-              },
-              "right": {
-                "kind": "column",
-                "alias": "t2",
-                "column_name": "device_id"
+        "plan": {
+          "reasoning": "Join sessions to devices on device_id, group by device_type, and compute bounce rate as AVG(is_bounce) (share of sessions that bounced). No date filter requested.",
+          "tables": [
+            {
+              "name": "sessions",
+              "alias": "t1"
+            },
+            {
+              "name": "devices",
+              "alias": "t2"
+            }
+          ],
+          "joins": [
+            {
+              "left_alias": "t1",
+              "right_alias": "t2",
+              "join_type": "inner",
+              "condition": {
+                "kind": "binary",
+                "op": "=",
+                "left": {
+                  "kind": "column",
+                  "alias": "t1",
+                  "column_name": "device_id"
+                },
+                "right": {
+                  "kind": "column",
+                  "alias": "t2",
+                  "column_name": "device_id"
+                }
               }
             }
-          }
-        ],
-        "select_items": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "device_type"
+          ],
+          "select_items": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "device_type"
+              },
+              "alias": "device_type"
             },
-            "alias": "device_type"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "AVG",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "is_bounce"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "bounce_rate"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "column",
-              "alias": "t2",
-              "column_name": "device_type"
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "AVG",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "is_bounce"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "bounce_rate"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "AVG",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "is_bounce"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "direction": "desc"
-          }
-        ]
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "column",
+                "alias": "t2",
+                "column_name": "device_type"
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "AVG",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "is_bounce"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "direction": "desc"
+            }
+          ]
+        }
       }
     },
     {
@@ -3321,103 +3353,28 @@
       }
     },
     {
-      "name": "PlanModel",
+      "name": "PlannerAnswer",
       "when": "count of purchases per month in 2013",
       "payload": {
-        "reasoning": "Count invoices (purchases) per month for year 2013. Filter with DATE_PART('year', InvoiceDate) = 2013, group by DATE_TRUNC('month', InvoiceDate) to get the month label, ordered ascending.",
-        "tables": [
-          {
-            "name": "Invoice",
-            "alias": "t1"
-          }
-        ],
-        "joins": [],
-        "where": {
-          "kind": "binary",
-          "op": "=",
-          "left": {
-            "kind": "func",
-            "func_name": "DATE_PART",
-            "args": [
-              {
-                "kind": "literal",
-                "value": "year"
-              },
-              {
-                "kind": "column",
-                "alias": "t1",
-                "column_name": "InvoiceDate"
-              }
-            ]
-          },
-          "right": {
-            "kind": "literal",
-            "value": 2013
-          }
-        },
-        "select_items": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "DATE_TRUNC",
-              "args": [
-                {
-                  "kind": "literal",
-                  "value": "month"
-                },
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceDate"
-                }
-              ]
-            },
-            "alias": "purchase_month"
-          },
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "COUNT",
-              "args": [
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceId"
-                }
-              ],
-              "is_aggregate": true
-            },
-            "alias": "purchase_count"
-          }
-        ],
-        "group_by": [
-          {
-            "expr": {
-              "kind": "func",
-              "func_name": "DATE_TRUNC",
-              "args": [
-                {
-                  "kind": "literal",
-                  "value": "month"
-                },
-                {
-                  "kind": "column",
-                  "alias": "t1",
-                  "column_name": "InvoiceDate"
-                }
-              ]
+        "plan": {
+          "reasoning": "Count invoices (purchases) per month for year 2013. Filter with DATE_PART('year', InvoiceDate) = 2013, group by DATE_TRUNC('month', InvoiceDate) to get the month label, ordered ascending.",
+          "tables": [
+            {
+              "name": "Invoice",
+              "alias": "t1"
             }
-          }
-        ],
-        "order_by": [
-          {
-            "expr": {
+          ],
+          "joins": [],
+          "where": {
+            "kind": "binary",
+            "op": "=",
+            "left": {
               "kind": "func",
-              "func_name": "DATE_TRUNC",
+              "func_name": "DATE_PART",
               "args": [
                 {
                   "kind": "literal",
-                  "value": "month"
+                  "value": "year"
                 },
                 {
                   "kind": "column",
@@ -3426,9 +3383,86 @@
                 }
               ]
             },
-            "direction": "asc"
-          }
-        ]
+            "right": {
+              "kind": "literal",
+              "value": 2013
+            }
+          },
+          "select_items": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "DATE_TRUNC",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "month"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              },
+              "alias": "purchase_month"
+            },
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "COUNT",
+                "args": [
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceId"
+                  }
+                ],
+                "is_aggregate": true
+              },
+              "alias": "purchase_count"
+            }
+          ],
+          "group_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "DATE_TRUNC",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "month"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              }
+            }
+          ],
+          "order_by": [
+            {
+              "expr": {
+                "kind": "func",
+                "func_name": "DATE_TRUNC",
+                "args": [
+                  {
+                    "kind": "literal",
+                    "value": "month"
+                  },
+                  {
+                    "kind": "column",
+                    "alias": "t1",
+                    "column_name": "InvoiceDate"
+                  }
+                ]
+              },
+              "direction": "asc"
+            }
+          ]
+        }
       }
     }
   ]

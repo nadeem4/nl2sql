@@ -70,8 +70,8 @@ def test_per_node_models_and_temperatures_reach_the_wire_and_the_trace(demo_proj
     sent = {c["name"]: c["body"] for c in server.calls}
     assert sent["DecomposerResponse"]["model"] == "gpt-5.4"
     assert sent["DecomposerResponse"]["temperature"] == 0.0
-    assert sent["PlanModel"]["model"] == "gpt-5.5"
-    assert "temperature" not in sent["PlanModel"]
+    assert sent["PlannerAnswer"]["model"] == "gpt-5.5"
+    assert "temperature" not in sent["PlannerAnswer"]
     assert sent["AggregatedResponse"]["model"] == "gpt-5.4"
     assert all(body["seed"] == 42 for body in sent.values())
 

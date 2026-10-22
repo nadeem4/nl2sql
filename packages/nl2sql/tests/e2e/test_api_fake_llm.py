@@ -150,7 +150,7 @@ def _rules_with_one_retry():
     return [
         Rule(ANSWERABLE.name, ANSWERABLE.payload, usage=_usage(900, 30, cached=768)),
         Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER, usage=_usage(1900, 250)),
-        Rule("PlanModel", plan, usage=_usage(11000, 300, cached=7680, reasoning=128)),
+        Rule("PlannerAnswer", plan, usage=_usage(11000, 300, cached=7680, reasoning=128)),
         Rule("AggregatedResponse", count_customers_answer, usage=_usage(300, 40)),
         Rule("plain", "Use the table Customer, not Customers.", usage=_usage(8600, 60, reasoning=32)),
     ]
