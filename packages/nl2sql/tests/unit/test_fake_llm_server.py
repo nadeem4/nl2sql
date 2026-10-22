@@ -13,17 +13,17 @@ def _post(url, body):
 
 def test_dispatches_on_tool_name_and_substring():
     server = FakeLLMServer([
-        Rule("PlanModel", {"a": 1}, when="employees"),
-        Rule("PlanModel", {"a": 2}, when="factories"),
+        Rule("PlannerAnswer", {"plan": {"a": 1}}, when="employees"),
+        Rule("PlannerAnswer", {"plan": {"a": 2}}, when="factories"),
         Rule("plain", "retry please"),
     ]).start()
     try:
-        tools = [{"type": "function", "function": {"name": "PlanModel"}}]
+        tools = [{"type": "function", "function": {"name": "PlannerAnswer"}}]
         r = _post(server.base_url, {"messages": [{"content": "tables: factories"}], "tools": tools})
-        assert json.loads(r["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]) == {"a": 2}
+        assert json.loads(r["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]) == {"plan": {"a": 2}}
         r = _post(server.base_url, {"messages": [{"content": "hello"}]})
         assert r["choices"][0]["message"]["content"] == "retry please"
-        assert [c["name"] for c in server.calls] == ["PlanModel", "plain"]
+        assert [c["name"] for c in server.calls] == ["PlannerAnswer", "plain"]
     finally:
         server.stop()
 
@@ -65,3 +65,22 @@ def test_langchain_openai_maps_cached_and_reasoning_tokens_into_usage_metadata()
     assert meta["input_tokens"] == 11000 and meta["output_tokens"] == 300 and meta["total_tokens"] == 11300
     assert meta["input_token_details"]["cache_read"] == 7680
     assert meta["output_token_details"]["reasoning"] == 128
+
+
+def test_a_bare_plan_answers_the_planner_wrapped():
+    # The planner's structured output is PlannerAnswer (K2): a rule that answers with a plan alone is
+    # wrapped as {"plan": ...}; one that already has "plan", and any other name, are sent as given.
+    plan = {"tables": [], "select_items": []}
+    server = FakeLLMServer([Rule("PlannerAnswer", plan, when="bare"), Rule("PlannerAnswer", json.dumps(plan)),
+                            Rule("Other", plan)]).start()
+    try:
+        def ask(name, text):
+            tools = [{"type": "function", "function": {"name": name}}]
+            r = _post(server.base_url, {"messages": [{"content": text}], "tools": tools})
+            return json.loads(r["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
+
+        assert ask("PlannerAnswer", "bare") == {"plan": plan}
+        assert ask("PlannerAnswer", "as a string") == {"plan": plan}
+        assert ask("Other", "x") == plan
+    finally:
+        server.stop()

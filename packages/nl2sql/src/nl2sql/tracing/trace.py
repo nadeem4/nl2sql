@@ -118,6 +118,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
     so the list ends before it.
     """
     from nl2sql.api.query_api import result_from_state  # query_api imports the runtime
+    from nl2sql.knowledge.scope import caller_knowledge
 
     traces = ctx.settings.traces
     limits = Limits(sample_rows=traces.sample_rows, max_field_chars=traces.max_field_chars)
@@ -130,7 +131,8 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
 
     try:
         result = result_from_state(state, artifact_store=getattr(ctx, "artifact_store", None),
-                                   sample_rows=traces.sample_rows).model_dump(mode="json")
+                                   sample_rows=traces.sample_rows,
+                                   knowledge=caller_knowledge(ctx, state)).model_dump(mode="json")
         result.pop("trace_path", None)
     except Exception as exc:  # the trace is still worth having without the typed result
         result = {"error": f"Could not build the QueryResult: {exc}"}

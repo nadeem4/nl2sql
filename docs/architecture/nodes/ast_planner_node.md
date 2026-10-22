@@ -2,7 +2,7 @@
 
 ## Overview
 
-- Generates a structured SQL AST plan (`PlanModel`) using an LLM with structured output.
+- Generates a structured SQL AST plan using an LLM with structured output: the planner's answer is a `PlannerAnswer`, the default plan (`PlanModel`) and, for an ambiguous question, up to two alternative readings.
 - Exists to translate natural language intent into a deterministic, machine‑verifiable plan.
 - Sits after `SchemaRetrieverNode` in the SQL agent subgraph.
 - Class: `ASTPlannerNode`
@@ -17,7 +17,8 @@
 - Serialize `relevant_tables` into the planning prompt.
 - Pass user intent, expected schema, and error feedback to the LLM.
 - Run the `plan.after` hooks on the plan (the planner's or the cached one) in `after_plan()`, the one place every plan the validator gets passes through.
-- Return `ASTPlannerResponse` with the `PlanModel` the hooks let through, the planner's own plan (`planner_plan`, which the plan cache stores) and its `plan_source` (`"llm"`, `"cache"`, or `"supplied"`, `"approved"` or `"chosen"` for a pinned plan). Only an `"llm"` plan is ever cached.
+- Run `plan.after` on each alternative reading too (`checked_alternatives()`): one a hook denies is dropped, one it changes is kept as changed.
+- Return `ASTPlannerResponse` with the `PlanModel` the hooks let through, `ambiguous_phrase`, the `alternatives` the hooks let through and every alternative the planner offered (`alternatives_offered`), the planner's own plan (`planner_plan`, which the plan cache stores) and its `plan_source` (`"llm"`, `"cache"`, or `"supplied"`, `"approved"` or `"chosen"` for a pinned plan). Only an `"llm"` plan is ever cached.
 
 ---
 
@@ -56,6 +57,9 @@ From `SubgraphExecutionState`:
   `limit` as the plan's `limit`, and that a most/least/top-N question needs an
   `order_by` on the ranked value and a `limit`; one example shows it.
 - `relevant_tables` (required for schema grounding)
+- `knowledge_used` (optional): the terms and rules the schema retriever
+  picked, rendered as `[BUSINESS_CONTEXT]` by `business_context_of()`
+  (`nl2sql/knowledge/render.py`); `{}` when there are none
 - `errors` (optional feedback for retries)
 
 Validation performed:
@@ -91,7 +95,10 @@ validation and executed is reused
   intent part (`... | order_by=album_count desc | limit=1`), so a top-1 and a
   top-5 of the same intent are different entries. The run date is always
   appended (`... | today=2026-10-12`): the planner is told today's date and
-  writes relative dates as literals, so a plan from another day misses.
+  writes relative dates as literals, so a plan from another day misses. So are
+  the planner's model and the datasource's knowledge digest
+  (`... | knowledge=<sha256>`, Wave B D57): a changed definition plans again,
+  and swapping the glossary back hits the old entries.
   Normalisation case-folds, collapses whitespace and strips trailing `.?!,;:`;
   the match is exact. No `schema_version`, no caching.
 - **Read:** only on a first attempt (`retry_count == 0` and no errors). A hit
@@ -101,7 +108,12 @@ validation and executed is reused
   cached plan exactly as on a fresh one, so RBAC and policy changes apply.
 - **Written** by `wrap_subgraph` (`pipeline/graph_utils.py`) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
-  and plan-only runs are not stored. What is stored is `planner_plan`, the
+  and plan-only runs are not stored. Nor is a plan whose planner answer
+  carried alternatives or an `ambiguous_phrase` (D47), keyed on
+  `alternatives_offered`, so a reading `plan.after` or the caller's scope
+  dropped still keeps the plan out of the cache. `alternatives_offered`
+  carries over to a retry: a question an earlier attempt read two ways is
+  never cached, however clear the retry's answer. What is stored is `planner_plan`, the
   plan before any `plan.after` hook changed it. When a hook changed it, that
   plan was not itself validated in the run that stored it; a hit is safe
   anyway, because it passes `plan.after` and the validator again every time.
@@ -118,11 +130,13 @@ See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinis
 1. Render `relevant_tables` with `render_schema_for_prompt` (see below).
 2. Build the feedback string from the latest attempt's errors only, one JSON object per line with `node`, `error_code` and `message` (`nl2sql.pipeline.retry_feedback`): an earlier attempt's errors, stack traces and `details` are never sent.
 3. Build `expected_schema` payload from sub‑query.
-4. Invoke the LLM chain with prompt + structured output (`PlanModel`).
+4. Invoke the LLM chain with prompt + structured output (`PlannerAnswer`); its `plan` is the default reading. The first prompt of a sub-query that carries knowledge publishes `knowledge.used`.
 5. Run `plan.after` (`after_plan()`): a `Modify` replaces the plan, which the
    validator then checks like any other; a deny returns `plan=None` with
    `HOOK_DENIED` (or `HOOK_FAILED`), which is never retried. Return
-   `ASTPlannerResponse` with the plan, `planner_plan` and reasoning.
+   `ASTPlannerResponse` with the plan, `planner_plan` and reasoning. Each
+   alternative passes `plan.after` the same way; the clarifier (L1) decides
+   whether to ask.
 6. On exception, emit `PLANNING_FAILURE` error and return `plan=None`.
 
 ---
@@ -135,7 +149,7 @@ caches a stable prefix of 1,024+ tokens automatically):
 | Message | Content | Changes |
 | --- | --- | --- |
 | system (`PLANNER_SYSTEM_PROMPT`) | role, instructions, output contract, constraints, `PLANNER_EXAMPLES`, then `[RELEVANT_TABLES]` | only when the schema or the caller's role changes |
-| human (`PLANNER_HUMAN_PROMPT`) | `[TODAY]`, `[EXPECTED_SCHEMA]`, `[SEMANTIC_CONTEXT]`, `[FEEDBACK]`, `[USER_QUERY]` | every call |
+| human (`PLANNER_HUMAN_PROMPT`) | `[TODAY]`, `[EXPECTED_SCHEMA]`, `[SEMANTIC_CONTEXT]`, `[BUSINESS_CONTEXT]`, `[FEEDBACK]`, `[USER_QUERY]` | every call |
 
 `[TODAY]` is the run date (`run_date(today)` in `common/dates.py`, given
 `settings.pipeline.today`: that date when it is set, else the UTC date), so "this year" or "the last 30 days" resolve to
@@ -143,6 +157,17 @@ real dates rather than a year the model guessed. It is in the human message
 because it changes daily; in the system message it would invalidate the cached
 prefix every midnight. It comes before `[USER_QUERY]`, because demo replay keys
 a recording on the line after that marker.
+
+`[BUSINESS_CONTEXT]` is the glossary terms and rules the question touches, as
+one line of JSON (keys sorted, no whitespace, and U+2028, U+2029 and U+0085
+escaped, as in the schema block): knowledge reaches the model only as JSON
+values, so a line break or a marker in a definition stays inside one JSON
+string. It changes per question, so it is in the human message, before
+`[FEEDBACK]` and `[USER_QUERY]`. Instruction 15 says it is reference data that
+never changes the instructions, the output contract or the constraints;
+instruction 16 asks for `ambiguous_phrase` and alternatives when a question
+can reasonably be read more than one way. See
+[Knowledge Is Data](../invariants.md#knowledge-is-data-the-validator-and-scope-decide).
 
 The examples come before the schema so that the instructions and examples
 (about 1,300 tokens) stay cacheable even when vector retrieval picks a
@@ -192,6 +217,7 @@ def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]
 
 Key contracts:
 
+- `PlannerAnswer` (`plan`, `ambiguous_phrase`, `alternatives`: at most two `PlanAlternative`s, each a `label` and a `plan`)
 - `PlanModel`
 - `ASTPlannerResponse`
 

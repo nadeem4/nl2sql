@@ -50,7 +50,7 @@ def extract_question(prompt_text: str) -> Optional[str]:
 
 @dataclass
 class Recording:
-    name: str                 # "DecomposerResponse" | "PlanModel" | "AggregatedResponse" | "plain"
+    name: str                 # "DecomposerResponse" | "PlannerAnswer" | "AggregatedResponse" | "plain"
     when: Optional[str]       # question text that must appear in the prompt, or None
     payload: Any              # dict for structured outputs, str for plain
 

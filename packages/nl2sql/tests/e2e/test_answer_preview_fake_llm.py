@@ -47,7 +47,7 @@ ANSWER = {"summary": "Chinook has these genres; the full list is in the table.",
 RULES = [
     ANSWERABLE,
     Rule("DecomposerResponse", DECOMPOSER),
-    Rule("PlanModel", PLAN),
+    Rule("PlannerAnswer", PLAN),
     Rule("AggregatedResponse", ANSWER),
     Rule("plain", "Keep the same plan."),
 ]

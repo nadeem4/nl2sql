@@ -22,6 +22,7 @@ from test_approval import ANA, DBA, NEEDS, _approval, _request, _runner
 from nl2sql.common.errors import ErrorCode
 from nl2sql.hooks import Allow, Deny, Modify
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlannerAnswer
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.pinned import PinnedEntryNode, PinnedRun, PinnedSource, SuppliedPlan, pinned_from_approvals
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
@@ -109,7 +110,7 @@ def _sql_agent(monkeypatch, pinned, hook=lambda ctx: Allow(), role="user"):
     ctx.llm_registry.get_llm.return_value = llm
     ctx.llm_registry.effective.return_value = None
     monkeypatch.setattr("nl2sql.pipeline.nodes.ast_planner.node.structured",
-                        lambda _llm, _model: RunnableLambda(lambda _inputs: ORDERS))
+                        lambda _llm, _model: RunnableLambda(lambda _inputs: PlannerAnswer(plan=ORDERS)))
 
     result = build_sql_agent_graph(ctx, execute=False).invoke(SubgraphExecutionState(
         trace_id="t", user_query="q", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),

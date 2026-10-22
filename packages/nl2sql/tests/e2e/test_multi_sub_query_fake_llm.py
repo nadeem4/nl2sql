@@ -124,7 +124,7 @@ def _rules(answerable, decomposition, plans):
         Rule("AnswerabilityResponse", {"answerable_datasource_ids": answerable,
                                        "reason": "Spend is in the music store, tickets in support."}),
         Rule("DecomposerResponse", decomposition),
-        *[Rule("PlanModel", plan, when=intent) for intent, plan in plans],
+        *[Rule("PlannerAnswer", plan, when=intent) for intent, plan in plans],
         Rule("AggregatedResponse", _echo_customers),
         Rule("plain", "Keep the same plan."),
     ]

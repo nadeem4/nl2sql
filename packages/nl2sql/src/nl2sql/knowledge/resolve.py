@@ -77,6 +77,37 @@ def derived_roles(snapshot: SchemaSnapshot, *, dialect: Optional[str]) -> Dict[s
     return roles
 
 
+def resolve_join(join, snapshot: SchemaSnapshot, *, dialect: Optional[str]
+                 ) -> Optional[Tuple[TableContract, List[str], TableContract, List[str]]]:
+    """A glossary join as ``(from table, its columns, to table, its columns)``; None when it is not used.
+
+    Not used, as ``problems`` reports: a name that does not resolve, a side
+    whose columns are not all in one table, sides of different lengths, or a
+    pair whose types cannot be compared.
+    """
+    from nl2sql.aggregation.join_keys import OTHER, coercible
+    from nl2sql.pipeline.nodes.validator.join_keys import column_category
+
+    sides = []
+    for side in (join.from_, join.to):
+        names = [side] if isinstance(side, str) else list(side)
+        resolved = [resolve_column(name, snapshot) for name in names]
+        if not resolved or any(column is None for _, column, _ in resolved):
+            return None
+        tables = {table.table.full_name for table, _, _ in resolved}
+        if len(tables) != 1:
+            return None
+        sides.append((resolved[0][0], [column for _, column, _ in resolved]))
+    (left, left_columns), (right, right_columns) = sides
+    if len(left_columns) != len(right_columns):
+        return None
+    for a, b in zip(left_columns, right_columns):
+        ca, cb = column_category(a.data_type, dialect), column_category(b.data_type, dialect)
+        if OTHER not in (ca, cb) and not coercible(ca, cb):
+            return None
+    return left, [c.name for c in left_columns], right, [c.name for c in right_columns]
+
+
 def _missing(item: str, what: str, name: str, why: str, datasource_id: str) -> str:
     if why.startswith("ambiguous"):
         schemas = why.split(": ", 1)[1]

@@ -80,7 +80,8 @@ Nothing else deletes a snapshot; there is no age limit.
 ### The plan cache and feedback
 
 The **plan cache** holds validated, executed plans keyed by `(normalised
-sub-query intent, run date and planner model, datasource_id, schema_version)`
+sub-query intent, run date, planner model and knowledge digest, datasource_id,
+schema_version)`
 (`get_plan`, `put_plan`). Deleting a snapshot deletes its cached plans;
 `nl2sql cache clear` (`engine.clear_plan_cache()`) deletes them all and keeps
 the snapshots. See [Determinism → The plan cache](../architecture/determinism.md#the-plan-cache-determinism-from-the-architecture).

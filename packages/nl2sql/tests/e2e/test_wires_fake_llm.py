@@ -46,7 +46,7 @@ def test_a_question_runs_end_to_end_on_claude(demo_project, tmp_path):
 
     assert r.returncode == 0, r.stdout + r.stderr
     assert [c["name"] for c in server.calls] == [
-        "AnswerabilityResponse", "DecomposerResponse", "PlanModel", "AggregatedResponse"]
+        "AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer", "AggregatedResponse"]
     assert all(c["mode"] == "anthropic" and c["api_key"] == FAKE_KEY for c in server.calls)
 
     sent = {c["name"]: c["body"] for c in server.calls}
@@ -54,7 +54,7 @@ def test_a_question_runs_end_to_end_on_claude(demo_project, tmp_path):
     # The resolver's prefix (~260 tokens of system prompt plus a small tool
     # schema) is marked too, but is below every Claude model's cache minimum,
     # so Anthropic silently does not cache it.
-    for name in ("AnswerabilityResponse", "DecomposerResponse", "PlanModel"):
+    for name in ("AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer"):
         # The stable system prompt ends in the cache breakpoint; the question follows it.
         assert sent[name]["system"][-1]["cache_control"] == {"type": "ephemeral"}
         assert "cache_control" not in json.dumps(sent[name]["messages"])
@@ -78,7 +78,7 @@ OPENAI_CACHED_USAGE = {"prompt_tokens": 3560, "completion_tokens": 200, "total_t
 @pytest.mark.e2e
 def test_a_mixed_config_sends_each_node_to_its_own_wire(demo_project, tmp_path):
     """The planner on Claude, every other node on OpenAI, in one question."""
-    rules = [Rule(r.name, r.payload, r.when, CACHED_USAGE if r.name == "PlanModel" else OPENAI_CACHED_USAGE)
+    rules = [Rule(r.name, r.payload, r.when, CACHED_USAGE if r.name == "PlannerAnswer" else OPENAI_CACHED_USAGE)
              for r in RULES_COUNT_CUSTOMERS]
     server = FakeLLMServer(rules).start()
     try:
@@ -99,10 +99,10 @@ def test_a_mixed_config_sends_each_node_to_its_own_wire(demo_project, tmp_path):
     # Which endpoint each node hit: /v1/messages is "anthropic", /v1/chat/completions "tools".
     assert [(c["name"], c["mode"]) for c in server.calls] == [
         ("AnswerabilityResponse", "tools"), ("DecomposerResponse", "tools"),
-        ("PlanModel", "anthropic"), ("AggregatedResponse", "tools")]
+        ("PlannerAnswer", "anthropic"), ("AggregatedResponse", "tools")]
     sent = {c["name"]: c for c in server.calls}
-    assert sent["PlanModel"]["api_key"] == FAKE_KEY
-    assert sent["PlanModel"]["body"]["system"][-1]["cache_control"] == {"type": "ephemeral"}
+    assert sent["PlannerAnswer"]["api_key"] == FAKE_KEY
+    assert sent["PlannerAnswer"]["body"]["system"][-1]["cache_control"] == {"type": "ephemeral"}
     assert sent["DecomposerResponse"]["authorization"] == f"Bearer {OPENAI_FAKE_KEY}"
     assert "cache_control" not in json.dumps(sent["DecomposerResponse"]["body"])
 
