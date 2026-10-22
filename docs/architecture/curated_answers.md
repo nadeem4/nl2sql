@@ -25,9 +25,10 @@ Curated answers come in three kinds:
 | **Preferred tables** | Views or tables the planner should reach for first | each datasource's `preferred_tables:` | Built |
 | **Business metrics** | A named expression (`revenue = SUM(...)`) the planner refers to by name | the `curated` section, `metrics:` | Designed only, [deferred](#business-metrics-deferred) |
 
-A thumbs-up on a generated answer becomes a *proposal* for a verified query,
-which a person reviews and commits. Nothing ever writes `curated.yaml` but a
-person.
+A thumbs-up on a generated answer becomes a *proposal* for a verified query
+in the review queue, which a person reviews and accepts. Nothing writes
+`curated.yaml` but a person's accept (Wave B, D42: see
+[The review queue](../configuration/review.md)).
 
 ## Who does what
 
@@ -510,6 +511,13 @@ Every answer says where it came from:
   show, names the query and its values instead.
 
 ## Feedback proposals
+
+!!! note "Replaced in 0.8"
+    `nl2sql curated proposals export` and its file writer are gone. A
+    thumbs-up now files a `verified_query` proposal in the review queue, and
+    an admin's accept writes `curated.yaml` (Wave B, Q1:
+    [The review queue](../configuration/review.md)). The section below is the
+    0.4 design, kept as history.
 
 A thumbs-up on a generated answer is already stored, one row per run, in the
 `feedback` table of the state store (`nl2sql/storage/sqlite.py`), with the question, role, status

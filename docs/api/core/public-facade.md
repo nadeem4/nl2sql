@@ -122,7 +122,7 @@ engine.storage       # info, purge
 engine.events        # subscribe, catalog
 engine.evals         # load, run, regenerate, scorers
 engine.knowledge     # sources, show, export, reload; profile, save_choice (0.8; stubs until then)
-engine.proposals     # list, get, accept, reject, export, apply (0.8; stubs until then)
+engine.proposals     # list, get, current, accept, reject, export, apply (the review queue)
 ```
 
 | namespace | reference |
@@ -138,7 +138,7 @@ engine.proposals     # list, get, accept, reject, export, apply (0.8; stubs unti
 | `events` | [Events](../../observability/events.md) |
 | `evals` | [Evals](../../evals/index.md) |
 | `knowledge` | [Knowledge](../../configuration/knowledge.md): `sources`, `show`, `export` and `reload`. `profile` and `save_choice` have their final signatures and raise `NotImplementedError`, naming the change that builds them, until release 0.8. Each read takes `user_context` as a required keyword. |
-| `proposals` | [Wave B](../../architecture/wave_b.md): every method has its final signature and raises `NotImplementedError`, naming the change that builds it, until release 0.8. Each read takes `user_context` as a required keyword. |
+| `proposals` | [The review queue](../../configuration/review.md): `list`, `get`, `current`, `accept`, `reject`, `export` and `apply`. Each read takes `user_context` as a required keyword; deciding takes `by`, a caller with an admin role. |
 
 The namespace classes are internal: reach them through the engine, never by
 importing them. Each is built on first use.
@@ -180,7 +180,7 @@ thumbs up and down are built on it. See
 
 | method | does |
 | --- | --- |
-| `record(result, *, question, role, rating, note=None) -> dict` | Rate one run, `"up"` or `"down"`, with an optional note (cut to 280 characters). `result` is the run's `QueryResult` or its JSON. The stored row is built from it and from the run's trace when one was kept; never rows, the answer, error messages or keys, and a run refused for the role keeps no SQL. A later rating of the same run replaces the earlier one. Returns the row; raises `ValueError` for another rating or a result with no `trace_id`. |
+| `record(result, *, question, role, rating, note=None) -> dict` | Rate one run, `"up"` or `"down"`, with an optional note (cut to 280 characters). `result` is the run's `QueryResult` or its JSON. The stored row is built from it and from the run's trace when one was kept; never rows, the answer, error messages or keys, and a run refused for the role keeps no SQL. A later rating of the same run replaces the earlier one. A thumbs-up on a generated answer of one datasource with one read-only statement also files a `verified_query` proposal in the [review queue](../../configuration/review.md). Returns the row; raises `ValueError` for another rating or a result with no `trace_id`. |
 | `list(limit=None) -> list[dict]` | Every rating, newest first. |
 | `stats(*, traces=None) -> dict` | Rates over the ratings plus the traces in `traces` (default: the engine's traces folder): feedback, refusals, refiner retries, validator failures, errors, and the plan cache's hit rate. |
 | `export(path) -> dict` | Write the thumbs-up runs to `path` as draft gold entries for review; `{"written", "skipped"}`. Raises `ValueError` for the gold set's own path. |
@@ -208,8 +208,9 @@ another trace format.
 `max_age_days` for the traces and results stores that have it) and the current
 index `namespace`. `engine.storage.purge()` deletes the traces and results
 older than their store's `max_age_days`, and the audit observer's day files
-older than its own, and returns the counts,
-`{"traces": 3, "results": 12, "audit": 1}`, which it also publishes as
+older than its own, and the review queue's decided proposals older than
+`settings.review.max_age_days`, and returns the counts,
+`{"traces": 3, "results": 12, "proposals": 4, "audit": 1}`, which it also publishes as
 `retention.purged`. See
 [Storage → Retention](../../configuration/storage.md#retention).
 

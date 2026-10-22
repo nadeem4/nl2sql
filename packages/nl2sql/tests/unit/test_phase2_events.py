@@ -219,7 +219,7 @@ def test_purge_publishes_counts(tmp_path):
 
     [event] = seen
     assert event.data == {"counts": counts}
-    assert set(counts) == {"traces", "results", "audit"}
+    assert set(counts) == {"traces", "results", "proposals", "audit"}
     assert event.trace_id is None
     # It is audited (D19): the audit observer wrote it.
     lines = [json.loads(line) for path in (engine.config.storage.path / "audit").glob("*.jsonl")

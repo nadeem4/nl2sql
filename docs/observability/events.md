@@ -77,13 +77,13 @@ on the engine's bus directly.
 | `index.swapped` | `datasource_id`, `namespace`, `build_id`, `schema_version`, `replaced_build_id`, `replaced_schema_version`, `counts` (entries by type) | a datasource's new build goes live (audited) |
 | `index.failed` | `datasource_id`, `reason` | one datasource's build fails; its previous build stays live |
 | `schema.drifted` | `datasource_id`, `from_version`, `to_version` (`None` for the live database), `detected_by` (`check` or `build`), the whole diff's `counts`; never a table name | `engine.index.check()` finds the live database differs from its build (once per drift per engine, not on every check), or a build stores a structural diff (audited). See [Schema Drift](../schema/drift.md) |
-| `retention.purged` | `counts`: what `engine.storage.purge()` returned (`traces`, `results`, `audit`) | `engine.storage.purge()` ran (audited) |
+| `retention.purged` | `counts`: what `engine.storage.purge()` returned (`traces`, `results`, `proposals`, `audit`) | `engine.storage.purge()` ran (audited) |
 | `llm.changed` | `by`, `changes` (never a key) | `engine.llm.replace` (audited) |
 | `eval.case`, `eval.finished` | see [Evals](../evals/index.md) | `engine.evals.run` |
 | `knowledge.loaded` | `sources` (`type`, `counts`, `sha256`), `digests` per datasource, `error` | the engine is built with a `knowledge` section, and `engine.knowledge.reload()` (with `error` when the reload failed and the previous knowledge stayed live). See [Knowledge](../configuration/knowledge.md) |
 | `profile.finished` | `datasource_id`, the report's counts, `stopped_by`, `cost`, `seconds` | not yet published (P1) |
-| `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | not yet published (Q1) |
-| `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | not yet published (Q1; audited) |
+| `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | a new proposal entered the review queue (a thumbs-up, or another track's finding) |
+| `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | `engine.proposals.accept` or `reject` decided one (audited) |
 
 The driver and exception text in `datasource.failed` (`message`, `fix`),
 `index.failed` (`reason`) and `index.column_failed` (`message`) is redacted

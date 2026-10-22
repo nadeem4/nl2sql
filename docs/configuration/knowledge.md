@@ -191,7 +191,7 @@ no role is needed.
 ## The canonical form
 
 `glossary.yaml` belongs to people, and the engine rewrites it only when a
-reviewer accepts a proposal (Wave B's review queue). It then writes the
+reviewer accepts a proposal ([the review queue](review.md)). It then writes the
 canonical form: a fixed header comment, the keys in the models' order,
 tables, columns and code values sorted by name, lists in their own order.
 Comments are not kept, so write remarks in a `notes:` field. The write
