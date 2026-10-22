@@ -145,7 +145,7 @@ Fields:
 | `stop` | `Optional[RunStop]` | no | Set when `status` is `"stopped"`: the `limit` the run reached (`max_llm_calls` or `max_cost_usd`), its configured `value`, and what was `spent`. |
 | `approvals_needed` | `List[ApprovalRequest]` | no | Set when `status` is `"needs_approval"`: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an `Approval` for each. |
 | `clarification` | `Optional[ClarificationRequest]` | no | Set when `status` is `"needs_clarification"`: the phrase, and two or three readings, each a label, a validated plan and its explanation. Nothing produces it yet (release 0.8, [Wave B](../../architecture/wave_b.md#7-clarify-instead-of-guess)). |
-| `explanation` | `Optional[Explanation]` | no | The run's plan in plain English, rendered from the typed plan with no model call: per step its tables, joins, filters, groupings, measures, glossary terms, rules and assumptions. Not filled yet (release 0.8, [Wave B](../../architecture/wave_b.md#8-why-this-answer)). |
+| `explanation` | `Optional[Explanation]` | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a `success` or `plan_only` run's, and the successful steps of a partly failed one); `None` when no step did, when a hook ended the run, or when it cannot be rendered. See [Explanation](#explanation). |
 
 `errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
 errors are appended to `warnings` as `RunWarning`s.
@@ -196,6 +196,64 @@ said `ERROR`. A run's state is never kept across an upgrade (a run that ended
 `needs_approval` is asked again, not resumed; see
 [Wave A, D10](../../architecture/wave_a.md#7-approval)), so no older warning is
 ever read back.
+
+### Explanation
+
+`QueryResult.explanation` answers "why this answer" for a business reader. It
+is rendered by `nl2sql/explain/` when the result is assembled
+(`result_from_state`), from each sub-query's typed plan, the knowledge its
+prompt carried (`sub_queries[].knowledge_used`), the planner's readings it did
+not ask about, the row cap and the run's warnings. No model is called, and the
+same plan and knowledge always give the same words. The answer synthesizer is
+not given it: the explanation describes the query, the answer describes the
+rows.
+
+Only a sub-query that passed validation is explained. A plan the validator
+or a hook refused, and a dropped sub-query, get no step: their tables, and
+their glossary descriptions, would confirm what the refusal withholds. A run a
+hook ended (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`) has no
+explanation, as it has no rows. An explanation never fails a run: one that
+cannot be rendered (a stored plan an older version wrote, say) is `None`, and
+the error is logged.
+
+`Explanation` has `steps` (one `ExplainedStep` per sub-query, in the
+decomposition's order) and `combined`: how the steps' results were put
+together ("The results of a and b were joined on country."), or `None` for a
+single step. An `ExplainedStep`:
+
+| name | type | meaning |
+| --- | --- | --- |
+| `sub_query_id` | `Optional[str]` | The sub-query it explains. |
+| `datasource_id` | `str` | Its datasource. |
+| `source` | `str` | Where the plan came from: `generated` (the planner), `cache`, `supplied` (`run_query(plan=...)`), `approved`, `chosen` (a clarification pick) or `verified` (a verified query, with no plan). |
+| `tables` | `List[str]` | Each table, qualified as the plan names it, with its glossary description's first clause when there is one: `"Invoice: one row per customer invoice (glossary)"`. |
+| `joins` | `List[str]` | Each join and the relationship it used: `"each InvoiceLine to its Invoice, on InvoiceId (declared key)"`, or `(glossary)` for a join the glossary declares. |
+| `filters` | `List[str]` | Each condition of the `WHERE`, then each of the `HAVING` as `"for each group, ..."`. |
+| `groupings` | `List[str]` | `"by Customer country"`. |
+| `measures` | `List[str]` | Each aggregate the plan selects, by its alias: `"revenue: total of InvoiceLine unit price times InvoiceLine quantity"`. |
+| `order` | `Optional[str]` | `"highest revenue first, top 10"`. |
+| `terms` | `List[TermUse]` | The glossary terms sent with the step whose columns the plan reads: `term`, `definition`, `source`. |
+| `rules` | `List[str]` | The business rules sent with the step, by text. |
+| `assumptions` | `List[str]` | What the answer took for granted, all deterministic: a reading not chosen when an ambiguity was not asked about; a filter value the column did not have (`'Brasil' is not in Customer country; 'Brazil' was used instead.` when the final plan filters on a suggested value, else `...; the question was planned again.`); the sanity checks' warnings (`VALUE_NOT_FOUND`, `JOIN_FAN_OUT`, `ALL_NULL_COLUMN`, `JOIN_KEY_UNCONVERTED`), and the row cap when the result was cut. |
+| `planner_note` | `Optional[str]` | The plan's own `reasoning`: model text, kept apart and labelled as the planner's. It appears in no other field. |
+| `text` | `str` | The step in two to four sentences: what it shows, what it reads and filters, which groups it keeps, and its order. |
+
+Names are the glossary description's first clause when there is one, else the
+name split into words (`InvoiceDate` on `Invoice` is "Invoice date"); a table
+the plan reads twice is named with its alias ("Track (t3)"). Each expression
+kind has a phrase (`=` "is", `IN` "is one of", `LIKE` "matches", `IS NULL` "is
+empty", `SUM` "total of", `COUNT` with `distinct` "number of different",
+`DATE_PART('year', d)` "the year of d", a `case` "depending on: ..."); a
+function without one is written as its name and arguments.
+
+`result_from_state(state, ..., knowledge=None)` takes `knowledge`, a mapping
+from datasource id to its glossary (`DatasourceKnowledge`) as the caller's
+scope filters it; without it, names are the split names and every join is a
+declared key. A run on the Chinook
+suite's gold plans renders as the files in
+`packages/nl2sql/tests/unit/explain/golden/`, which are compared on every
+test run, so a change to the wording is a reviewed diff. Design:
+[Wave B, section 8](../../architecture/wave_b.md#8-why-this-answer).
 
 ## Streaming a run
 

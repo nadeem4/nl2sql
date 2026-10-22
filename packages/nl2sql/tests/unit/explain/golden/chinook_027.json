@@ -1,0 +1,23 @@
+{
+  "sub_query_id": "chinook_027",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Invoice"
+  ],
+  "joins": [],
+  "filters": [
+    "Invoice date is at least '2010-03-01'",
+    "Invoice date is less than '2010-04-01'"
+  ],
+  "groupings": [],
+  "measures": [
+    "invoice count: number of Invoice id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count invoices dated in March 2010.",
+  "text": "Shows invoice count. Reads Invoice, where Invoice date is at least '2010-03-01' and Invoice date is less than '2010-04-01'."
+}

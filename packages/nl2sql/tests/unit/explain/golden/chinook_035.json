@@ -1,0 +1,20 @@
+{
+  "sub_query_id": "chinook_035",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Employee"
+  ],
+  "joins": [],
+  "filters": [],
+  "groupings": [],
+  "measures": [
+    "employee count: number of Employee id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count employees.",
+  "text": "Shows employee count. Reads Employee."
+}

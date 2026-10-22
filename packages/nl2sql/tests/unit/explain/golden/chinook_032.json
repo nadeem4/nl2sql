@@ -1,0 +1,30 @@
+{
+  "sub_query_id": "chinook_032",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "InvoiceLine",
+    "Track",
+    "Album",
+    "Artist"
+  ],
+  "joins": [
+    "each InvoiceLine to its Track, on TrackId (declared key)",
+    "each Track to its Album, on AlbumId (declared key)",
+    "each Album to its Artist, on ArtistId (declared key)"
+  ],
+  "filters": [],
+  "groupings": [
+    "by Artist id",
+    "by Artist name"
+  ],
+  "measures": [
+    "revenue: total of InvoiceLine unit price times InvoiceLine quantity, rounded to 2 places"
+  ],
+  "order": "highest revenue first, then lowest Artist id first, top 1",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Sum price times quantity per artist and keep the largest.",
+  "text": "Shows Artist name and revenue, by Artist id and Artist name. Reads InvoiceLine, Track, Album and Artist. Highest revenue first, then lowest Artist id first, top 1."
+}

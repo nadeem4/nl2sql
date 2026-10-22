@@ -246,6 +246,19 @@ saying how much was dropped. **LLM messages and raw responses are never cut**,
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.
 
+## Why this answer: the explanation
+
+Before reading a trace, read `QueryResult.explanation`: each sub-query's plan
+in plain English (its tables, joins and where each join came from, filters,
+groupings, measures and order), the glossary terms and rules its prompt
+carried, and the assumptions the answer made (a reading not chosen, a filter
+value replaced after `VALUE_NOT_FOUND`, a sanity warning, a result cut at the
+row cap). It is rendered from the typed plan with no model call, so it says
+what the SQL does, not what a model thinks it does; the planner's own
+`reasoning` is kept apart as `planner_note`. A result rebuilt from a trace
+(`nl2sql trace replay`, `engine.traces`) carries it too, since it is rendered
+from the same state. See [Explanation](../api/core/query.md#explanation).
+
 ## Reading a trace: `nl2sql trace show`
 
 ```bash

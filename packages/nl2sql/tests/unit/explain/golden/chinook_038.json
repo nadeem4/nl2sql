@@ -1,0 +1,18 @@
+{
+  "sub_query_id": "chinook_038",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track"
+  ],
+  "joins": [],
+  "filters": [],
+  "groupings": [],
+  "measures": [],
+  "order": "highest Track milliseconds first, then lowest Track id first, top 5",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Five longest tracks with their length in minutes.",
+  "text": "Shows Track name and Track milliseconds divided by 60000.0, rounded to 2 places. Reads Track. Highest Track milliseconds first, then lowest Track id first, top 5."
+}

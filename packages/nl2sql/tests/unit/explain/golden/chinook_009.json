@@ -1,0 +1,34 @@
+{
+  "sub_query_id": "chinook_009",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer",
+    "Invoice",
+    "InvoiceLine",
+    "Track",
+    "Genre"
+  ],
+  "joins": [
+    "each Customer to its Invoice, on CustomerId (declared key)",
+    "each Invoice to its InvoiceLine, on InvoiceId (declared key)",
+    "each InvoiceLine to its Track, on TrackId (declared key)",
+    "each Track to its Genre, on GenreId (declared key)"
+  ],
+  "filters": [
+    "for each group, total of (depending on: 1 when Genre name is 'Jazz'; otherwise 0) is more than 0",
+    "for each group, total of (depending on: 1 when Genre name is 'Rock'; otherwise 0) is 0"
+  ],
+  "groupings": [
+    "by Customer id",
+    "by Customer first name",
+    "by Customer last name"
+  ],
+  "measures": [],
+  "order": "lowest Customer id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Per customer, count purchased Jazz and Rock lines; keep those with Jazz and no Rock.",
+  "text": "Shows Customer first name and Customer last name, by Customer id, Customer first name and Customer last name. Reads Customer, Invoice, InvoiceLine, Track and Genre. Keeps the groups where total of (depending on: 1 when Genre name is 'Jazz'; otherwise 0) is more than 0 and total of (depending on: 1 when Genre name is 'Rock'; otherwise 0) is 0. Lowest Customer id first."
+}

@@ -1,0 +1,31 @@
+{
+  "sub_query_id": "chinook_034",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Invoice",
+    "InvoiceLine",
+    "Track",
+    "Album",
+    "Artist"
+  ],
+  "joins": [
+    "each Invoice to its InvoiceLine, on InvoiceId (declared key)",
+    "each InvoiceLine to its Track, on TrackId (declared key)",
+    "each Track to its Album, on AlbumId (declared key)",
+    "each Album to its Artist, on ArtistId (declared key)"
+  ],
+  "filters": [
+    "Artist name is 'AC/DC'"
+  ],
+  "groupings": [],
+  "measures": [
+    "customer count: number of different Invoice customer id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count distinct customers on invoices with an AC/DC track.",
+  "text": "Shows customer count. Reads Invoice, InvoiceLine, Track, Album and Artist, where Artist name is 'AC/DC'."
+}
