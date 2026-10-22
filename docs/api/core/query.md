@@ -217,8 +217,9 @@ The result then has:
 Otherwise the most likely reading runs, and the readings that passed the
 checks are listed as assumptions in its explanation step ("'sales' was read
 one way; it could also mean Invoiced amount."). That happens with
-`clarify=False`, with more than one sub-query, and when only one reading
-passed. `clarification.requested` (`sub_query_id`, `phrase`, `options`) is
+`clarify=False`, with more than one sub-query, when only one reading
+passed, and on a re-plan after an attempt already executed (a sanity check's
+retry), so the answer is never the flagged attempt's rows. `clarification.requested` (`sub_query_id`, `phrase`, `options`) is
 published on the engine's bus when a run asks; it is an operator event, not
 on the stream. Asking again with the chosen option arrives in L2. Evals run
 with clarification off, so a case measures the most likely reading.

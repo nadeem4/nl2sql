@@ -33,8 +33,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from nl2sql.config.models import HookPoint
 
-# How a run ended. ``needs_clarification`` is reserved for Wave B's
-# clarification result: nothing produces it in Wave A.
+# How a run ended. ``needs_clarification``: the run asked which reading of the question was meant
+# (the clarifier, Wave B's L1), and nothing was executed.
 RunStatus = Literal["success", "plan_only", "error", "needs_approval", "stopped", "needs_clarification"]
 
 
