@@ -2360,6 +2360,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../settings/" class="md-nav__link">
         
   
@@ -5816,51 +5844,58 @@ list on a datasource, naming views or tables (built by the
 data team, never by the package) the planner should reach for first. See
 <a href="../datasources/#preferred-tables">Datasources: preferred tables</a>.</p>
 <h2 id="from-feedback-to-verified-queries">From feedback to verified queries</h2>
-<p>A thumbs-up on a generated answer in the playground is a candidate verified
-query: a real question, and SQL a person said was right. Export them as
-proposals and review them like any other change to the curated section:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w">                                   </span><span class="c1"># print to stdout</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>curated.proposals.yaml
+<p>A thumbs-up on a generated answer is a candidate verified query: a real
+question, and SQL a person said was right. <code>engine.feedback.record(...,
+rating="up")</code> files it in the <a href="../review/">review queue</a> as a <code>verified_query</code>
+proposal; it reaches the curated section only when an admin accepts it.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--kind<span class="w"> </span>verified_query<span class="w"> </span>--as<span class="w"> </span>admin
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>show<span class="w"> </span>&lt;id&gt;<span class="w"> </span>--as<span class="w"> </span>admin
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>accept<span class="w"> </span>&lt;id&gt;<span class="w"> </span>--as<span class="w"> </span>admin
 </code></pre></div>
-<p>Each proposal is an entry in the curated section's shape, under the
+<p>The proposal's <code>change</code> is an entry in the curated section's shape, for the
 datasource the run used:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">datasources</span><span class="p">:</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">chinook</span><span class="p">:</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span><span class="nt">verified_queries</span><span class="p">:</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">how_many_customers_are_in_brazil</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">      </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">'TODO:</span><span class="nv"> </span><span class="s">say</span><span class="nv"> </span><span class="s">what</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">returns.'</span>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">      </span><span class="nt">questions</span><span class="p">:</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">How many customers are in Brazil?</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">      </span><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">        </span><span class="no">SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">how_many_customers_are_in_brazil</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">'TODO:</span><span class="nv"> </span><span class="s">say</span><span class="nv"> </span><span class="s">what</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">returns.</span><span class="nv"> </span><span class="s">...'</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nt">questions</span><span class="p">:</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">How many customers are in Brazil?</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="nt">sql</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">  </span><span class="no">SELECT COUNT(*) AS n FROM Customer WHERE Country = 'Brazil'</span>
 </code></pre></div>
 <ul>
 <li><strong><code>id</code></strong> comes from the question: lower case, words joined by <code>_</code>, at most
-  60 characters, <code>q_</code> in front when it would start with a digit, and <code>_2</code>,
-  <code>_3</code> after it when two questions give the same id.</li>
+  60 characters, <code>q_</code> in front when it would start with a digit.</li>
 <li><strong><code>questions</code></strong> holds the question as it was asked, as the one phrasing.</li>
 <li><strong><code>sql</code></strong> is the run's generated SQL, exactly as it ran. <strong>Every value in it
   is literal</strong> (<code>'Brazil'</code> above): the proposal has no <code>params</code>.</li>
 <li><strong><code>description</code></strong> is a placeholder.</li>
 </ul>
-<p>The same question (ignoring case and spacing) on the same datasource is
-proposed once, from its newest thumbs-up. These are skipped, and counted by
-reason in the command's summary: thumbs-down ratings, answers that came from
-a verified query already, runs that did not succeed, runs with no SQL or more
-than one statement, runs on more than one datasource, and ratings recorded
-before the feedback table kept the datasource (see
+<p>The same question and SQL is one proposal however often it is rated; a new
+SQL for the same question supersedes the open one. These file nothing:
+thumbs-down ratings, answers that came from a verified query already, runs
+that did not succeed, runs with no SQL or more than one statement, runs on
+more than one datasource, and ratings recorded before the feedback table kept
+the datasource (see
 <a href="../../observability/feedback/#what-is-stored">Feedback and Signals</a>).</p>
-<p><strong>Reviewing is the approval.</strong> There is no approved state and no queue: a
-person reads each entry, checks the SQL answers the question, writes the
-description, turns the values a reader would change into <code>{params}</code> in the
-question and <code>:params</code> in the SQL with a <code>params:</code> entry, drops the row-cap
-<code>LIMIT</code> the generator added unless the question asks for it, adds other
-phrasings, moves the entry into the curated section, runs
-<code>nl2sql curated validate</code>, and commits it. The same steps head the exported
-file as comments.</p>
-<p><code>export</code> never writes the config's own files: it refuses an <code>--out</code> that is
-<code>nl2sql.yaml</code> or any file it includes, and exits 2. Neither the REST API nor the
-playground writes it either.</p>
+<p><strong>Accepting is the approval.</strong> Before accepting, a reviewer checks the SQL
+answers the question and, with <code>edits</code> (or by editing the <code>change</code> in a
+<a href="../review/#the-review-file">review file</a>), writes the description, turns the
+values a reader would change into <code>{params}</code> in the question and <code>:params</code> in
+the SQL with a <code>params:</code> entry, drops the row-cap <code>LIMIT</code> the generator added
+unless the question asks for it, and adds other phrasings. Accept then runs the
+curated checks on the edited section, rewrites the section's own file
+(<code>curated: {file: curated.yaml}</code>) in canonical form, swaps the engine's curated
+answers and refreshes that datasource's curated index entries, so the next
+question can match it. An inline section, or a config built in code, is never
+written: export the proposals and edit by hand. See
+<a href="../review/#accept-the-only-writer">The review queue</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Accept rewrites <code>curated.yaml</code></p>
+<p>The rewrite is canonical: keys in the models' order, datasources and
+params sorted by name, SQL as literal blocks, under a fixed header.
+<strong>Comments in <code>curated.yaml</code> are not kept</strong>; write remarks in a query's
+<code>description</code>. A file edited since the engine loaded it is never
+overwritten: accept refuses with <code>FILE_CHANGED</code>.</p>
+</div>
 <h2 id="source-references">Source references</h2>
 <ul>
 <li>Models and SQL checks: <code>packages/nl2sql/src/nl2sql/config/curated.py</code></li>
@@ -5872,7 +5907,8 @@ playground writes it either.</p>
 <li>The demo's verified queries: <code>CHINOOK_VERIFIED_QUERIES</code> in <code>packages/nl2sql/src/nl2sql/datasets/chinook.py</code></li>
 <li>The playground badge: <code>verifiedSource()</code> in <code>web/playground/src/results.js</code></li>
 <li>Matching and running: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/</code></li>
-<li>Proposals from feedback: <code>packages/nl2sql/src/nl2sql/feedback/proposals.py</code></li>
+<li>Proposals from feedback: <code>packages/nl2sql/src/nl2sql/feedback/proposals.py</code>; the review queue and the
+  canonical writer: <code>packages/nl2sql/src/nl2sql/review/</code></li>
 </ul>
 
 

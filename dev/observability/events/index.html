@@ -2150,6 +2150,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/settings/" class="md-nav__link">
         
   
@@ -5395,7 +5423,7 @@ on the engine's bus directly.</p>
 </tr>
 <tr>
 <td><code>retention.purged</code></td>
-<td><code>counts</code>: what <code>engine.storage.purge()</code> returned (<code>traces</code>, <code>results</code>, <code>audit</code>)</td>
+<td><code>counts</code>: what <code>engine.storage.purge()</code> returned (<code>traces</code>, <code>results</code>, <code>proposals</code>, <code>audit</code>)</td>
 <td><code>engine.storage.purge()</code> ran (audited)</td>
 </tr>
 <tr>
@@ -5421,12 +5449,12 @@ on the engine's bus directly.</p>
 <tr>
 <td><code>proposal.created</code></td>
 <td><code>id</code>, <code>kind</code>, <code>datasource_id</code>, <code>origin</code></td>
-<td>not yet published (Q1)</td>
+<td>a new proposal entered the review queue (a thumbs-up, or another track's finding)</td>
 </tr>
 <tr>
 <td><code>proposal.decided</code></td>
 <td><code>id</code>, <code>kind</code>, <code>datasource_id</code>, <code>decision</code>, <code>by</code>, <code>wrote</code></td>
-<td>not yet published (Q1; audited)</td>
+<td><code>engine.proposals.accept</code> or <code>reject</code> decided one (audited)</td>
 </tr>
 </tbody>
 </table>

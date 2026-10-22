@@ -2266,6 +2266,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../settings/" class="md-nav__link">
         
   
@@ -5330,9 +5358,12 @@ every store.</p>
 </code></pre></div>
 <p><code>engine.storage.purge()</code> deletes the traces and result files last written
 before that age, and the <a href="../observers/#audit">audit observer's</a> day files older
-than its <code>max_age_days</code> (90 by default), and returns the counts,
-<code>{"traces": 3, "results": 12, "audit": 1}</code> (no <code>audit</code> when the engine runs no
-audit observer). It publishes the counts as the
+than its <code>max_age_days</code> (90 by default), and the
+<a href="../review/">review queue's</a> decided proposals (accepted, rejected,
+superseded) decided more than <code>settings.review.max_age_days</code> (365) ago, and
+returns the counts, <code>{"traces": 3, "results": 12, "proposals": 4, "audit": 1}</code>
+(no <code>audit</code> when the engine runs no audit observer). Open proposals are never
+purged. It publishes the counts as the
 <a href="../../observability/events/#the-catalog"><code>retention.purged</code> event</a>, which the
 audit observer writes. A
 plugin trace or results store is purged when it has a <code>max_age_days</code>

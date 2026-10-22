@@ -1479,6 +1479,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/review/">
+<span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/settings/">
 <span class="md-ellipsis">
     
@@ -5762,6 +5774,95 @@ the code differs from this page:</p>
   The SDK caps names at <code>NAME_MAX_CHARS</code> (255); the <code>yaml</code> source refuses a
   file over <code>GLOSSARY_MAX_BYTES</code> (5 MB). <code>write_glossary</code> fsyncs, keeps the
   file's mode and maps a <code>PermissionError</code> to <code>ReviewError(NOT_WRITABLE)</code>.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: the review queue (Q1)</p>
+<p><code>engine.proposals</code> is built; a thumbs-up files a <code>verified_query</code> proposal and
+an admin's accept writes the glossary or <code>curated.yaml</code>. Exact names, and
+where the code differs from section 5:</p>
+<ul>
+<li><strong>Filing.</strong> <code>nl2sql/review/queue.py</code>: <code>propose(ctx, proposal) -&gt; Proposal</code>
+  is how every track files a finding (P1, P2, F1, L2 build a
+  <code>Proposal.build(...)</code> and call it). It keeps identity (the same change
+  updates the open row's <code>evidence</code>; an accepted or rejected change is
+  returned as it is and never re-proposed), supersedes the open row of the
+  same kind, datasource and target (the target compared case-insensitively),
+  revives a superseded row proposed again, and publishes <code>proposal.created</code>
+  for a new or revived row only. <code>table_names(ctx, datasource_id, pairs)</code>
+  turns <code>(schema or "", table)</code> pairs into <code>datasource.schema.table</code>, the
+  adapter's default schema filling a blank. <strong><code>propose</code> completes
+  <code>tables</code></strong> with <code>named_tables(ctx, proposal)</code>: the table of a <code>table</code>,
+  a <code>column</code>'s table, both sides of a <code>join</code>, a <code>term</code>'s <code>tables</code> and its
+  <code>columns</code>' tables, and the tables a <code>verified_query</code>'s SQL reads. A
+  caller sees a proposal only when their scope reaches all of them, so a
+  track that forgets one cannot leak a denied table; P1, F1 and L2 should
+  still pass <code>tables</code> themselves.</li>
+<li><strong>Visibility and deciding.</strong> <code>visible(ctx, user, proposal)</code>: the caller's
+  <code>Scope</code> must reach the datasource and every name in <code>tables</code> (no text
+  mention check, unlike K1's knowledge filter). <code>caller(value)</code> raises
+  <code>TypeError</code> for anything but a <code>UserContext</code>; <code>require_admin(ctx, by)</code>
+  raises <code>ReviewError(NOT_AUTHORIZED)</code>. <strong>Under <code>allow_all</code> every caller may
+  decide</strong>, as K1's <code>reload</code> does: there are no roles to hold. <code>who(by)</code> is
+  what <code>decided_by</code> records: the user id, else the roles.</li>
+<li><strong>Accept.</strong> <code>nl2sql/review/accept.py</code>: <code>accept(ctx, ids, by, edits)</code> and
+  <code>reject(ctx, reasons, by)</code> (reasons maps id to reason). Unknown or
+  decided ids are named in <code>AcceptReport.refused</code> by <code>accept</code>; <code>reject</code>
+  refuses the whole call with <code>ReviewError(NOT_FOUND)</code>. Every lock
+  (<code>accept:&lt;real path&gt;</code>, <code>LOCK_TTL_S</code> 60; a caller waits up to
+  <code>LOCK_WAIT_S</code> 10 s for another) is taken and every file's hash checked
+  before the first write. Each file's items are decided (stored,
+  <code>decide_proposal</code>, <code>proposal.decided</code>) under the locks right after that
+  file's write, and every item is re-read as still proposed under the
+  locks; <code>reject</code> takes the same locks. So an id is accepted once, and a
+  failed second write leaves the first file's items accepted and the
+  second's proposed. <code>apply</code> passes <code>replace=True</code>: the file's <code>change</code>
+  replaces the stored one. A per-item failure (the glossary's validation, the
+  curated checks, a verified query id already taken) leaves that item
+  proposed in <code>refused</code>. <code>files_written</code> and <code>wrote</code> are paths relative to
+  the folder of <code>nl2sql.yaml</code>. The accepted row keeps its <code>id</code> and stores the
+  <code>change</code> as accepted (edits included).</li>
+<li><strong>The curated file.</strong> <code>nl2sql/review/curated_file.py</code>: <code>curated_path(config)</code>
+  (None when inline, absent or built in code), <code>file_sha256</code>,
+  <code>canonical_curated(curated)</code>, <code>write_curated(path, curated,
+  expected_sha256) -&gt; str</code> and <code>loaded_sha256(config)</code>.
+  <code>Runtime.curated_sha256</code> is taken in <code>components()</code>: the file is read
+  once, hashed and parsed, and when the parse is not <code>config.curated</code> (an
+  edit after the config was loaded) the hash is <code>STALE</code>, so accept refuses
+  with <code>FILE_CHANGED</code>; <code>Runtime.replace_curated(curated, *, sha256)</code> swaps
+  <code>config.curated</code>, <code>curated</code> and the hash under the lock. The refresh runs
+  <code>rebuild_index(ctx, datasource_ids=..., curated_only=True)</code> (the index
+  lock, <code>IndexingOrchestrator.refresh_curated</code>, which section 5 names
+  directly); a datasource that cannot be refreshed is a warning, not a
+  failure. K3 renames that call, in <code>_refreshed()</code> in <code>review/accept.py</code>.</li>
+<li><strong>The review file.</strong> <code>nl2sql/review/review_file.py</code>: <code>render(proposals)</code>
+  and <code>read(path) -&gt; ReviewFile</code> (<code>ReviewItem</code>: <code>id</code>, <code>decision</code>, <code>reason</code>,
+  <code>change</code>; other keys ignored). <code>apply</code> merges an edited <code>change</code> over the
+  stored one and rejects with each item's own reason, so it is one <code>accept</code>
+  call and per-item rejections rather than one <code>reject</code> call.
+  <code>AcceptReport.rejected</code> is new: the proposals <code>apply</code> rejected.
+  <code>export</code> refuses <code>nl2sql.yaml</code>, its section files and knowledge source
+  files.</li>
+<li><strong>Thumbs-up.</strong> <code>feedback/proposals.py</code> is <code>skip_reason(row)</code> and
+  <code>verified_query(row)</code> (the <code>change</code>); <code>FeedbackAPI.record</code> files it with
+  origin <code>thumbs_up</code>, <code>tables</code> from <code>inspect_verified_sql</code>, and <code>evidence</code>
+<code>{trace_id, role}</code>. SQL that is not one read-only query files nothing.
+  <code>build_proposals</code>, <code>render_proposals</code>, <code>write_proposals</code> and
+  <code>nl2sql curated proposals export</code> are deleted.</li>
+<li><strong>Retention, events, CLI.</strong> <code>engine.storage.purge()</code> returns
+  <code>proposals</code> (decided rows past <code>settings.review.max_age_days</code>).
+  <code>proposal.decided</code> is published per decision (the audit set was B0's).
+  <code>nl2sql review list</code>, <code>show</code>, <code>accept</code>, <code>reject</code>, <code>export</code>, <code>apply</code>, with
+  <code>--as</code> and <code>--user</code> through K1's <code>caller</code>. <code>engine.proposals.current(id, *,
+  user_context)</code> is new (a read method, so it takes the caller): what the
+  proposal would replace, through <code>current_value</code> in <code>review/queue.py</code>; a
+  curated query whose SQL reads a table outside the caller's scope is
+  None. <code>review show</code> prints it. A thumbs-up whose proposal cannot be filed
+  is logged; <code>feedback.record</code> still returns the stored rating.</li>
+<li><strong>Tests.</strong> <code>tests/unit/test_review_queue.py</code> (every Q1 test the row names,
+  and the CLI); <code>test_only_accept_writes_a_persons_file</code> in
+  <code>tests/architecture/test_boundaries.py</code>, which also lists
+  <code>review/queue.py</code> among the access decisions that ask a <code>Scope</code>.</li>
 </ul>
 </div>
 <p><strong>The demo recording.</strong> K2 changes the planner's structured output from

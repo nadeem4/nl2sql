@@ -2150,6 +2150,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../configuration/review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../configuration/settings/" class="md-nav__link">
         
   
@@ -3122,10 +3150,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposing-verified-queries-nl2sql-curated-proposals-export" class="md-nav__link">
+  <a href="#proposing-verified-queries-the-review-queue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposing verified queries: nl2sql curated proposals export
+        Proposing verified queries: the review queue
       
     </span>
   </a>
@@ -5180,10 +5208,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#proposing-verified-queries-nl2sql-curated-proposals-export" class="md-nav__link">
+  <a href="#proposing-verified-queries-the-review-queue" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Proposing verified queries: nl2sql curated proposals export
+        Proposing verified queries: the review queue
       
     </span>
   </a>
@@ -5424,14 +5452,20 @@ draft:</p>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"feedback_gold_drafts.yaml"</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="proposing-verified-queries-nl2sql-curated-proposals-export">Proposing verified queries: <code>nl2sql curated proposals export</code></h2>
-<p>A thumbs-up on a <em>generated</em> answer can also become a proposed verified query
-for <code>curated.yaml</code>, for a person to review and commit:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>curated<span class="w"> </span>proposals<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--out<span class="w"> </span>curated.proposals.yaml
+<h2 id="proposing-verified-queries-the-review-queue">Proposing verified queries: the review queue</h2>
+<p>A thumbs-up on a <em>generated</em> answer also files a <code>verified_query</code> proposal in
+the <a href="../../configuration/review/">review queue</a>: <code>engine.feedback.record(...,
+rating="up")</code> keeps the rating and, when the run qualifies, proposes the
+question and the run's SQL for <code>curated.yaml</code>. Nothing is written until an
+admin accepts it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--kind<span class="w"> </span>verified_query<span class="w"> </span>--as<span class="w"> </span>admin
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>accept<span class="w"> </span>&lt;id&gt;<span class="w"> </span>--as<span class="w"> </span>admin
 </code></pre></div>
 <p>Runs answered by a verified query, failed runs, runs on more than one
-datasource and runs with no SQL are skipped, and rows rated before the table
-recorded the datasource are skipped too. See
+datasource, runs with no SQL or more than one statement, and rows rated before
+the table recorded the datasource file nothing. The same change is one
+proposal however often it is rated; a thumbs-up therefore influences routing
+only after a person accepts it. See
 <a href="../../configuration/curated/#from-feedback-to-verified-queries">From feedback to verified queries</a>.</p>
 <h2 id="turning-it-off-and-clearing-it">Turning it off and clearing it</h2>
 <ul>

@@ -1202,6 +1202,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration/review/">
+<span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../configuration/settings/">
 <span class="md-ellipsis">
     
@@ -2726,9 +2738,10 @@ so. If it has not, run today's pipeline unchanged.</p>
 </tr>
 </tbody>
 </table>
-<p>A thumbs-up on a generated answer becomes a <em>proposal</em> for a verified query,
-which a person reviews and commits. Nothing ever writes <code>curated.yaml</code> but a
-person.</p>
+<p>A thumbs-up on a generated answer becomes a <em>proposal</em> for a verified query
+in the review queue, which a person reviews and accepts. Nothing writes
+<code>curated.yaml</code> but a person's accept (Wave B, D42: see
+<a href="../../configuration/review/">The review queue</a>).</p>
 <h2 id="who-does-what">Who does what</h2>
 <ul>
 <li><strong>The data team</strong> writes the configuration. They know SQL, they keep config
@@ -3159,6 +3172,14 @@ from.</p>
   show, names the query and its values instead.</li>
 </ul>
 <h2 id="feedback-proposals">Feedback proposals</h2>
+<div class="admonition note">
+<p class="admonition-title">Replaced in 0.8</p>
+<p><code>nl2sql curated proposals export</code> and its file writer are gone. A
+thumbs-up now files a <code>verified_query</code> proposal in the review queue, and
+an admin's accept writes <code>curated.yaml</code> (Wave B, Q1:
+<a href="../../configuration/review/">The review queue</a>). The section below is the
+0.4 design, kept as history.</p>
+</div>
 <p>A thumbs-up on a generated answer is already stored, one row per run, in the
 <code>feedback</code> table of the state store (<code>nl2sql/storage/sqlite.py</code>), with the question, role, status
 and SQL. That row is the proposal; nothing new is stored and nothing writes
