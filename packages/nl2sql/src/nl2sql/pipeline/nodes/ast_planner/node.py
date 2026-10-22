@@ -6,6 +6,7 @@ from langchain_core.runnables import Runnable
 
 from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
 from .schemas import PlanAlternative, PlannerAnswer, PlanModel, ASTPlannerResponse
+from nl2sql.events import publish
 from nl2sql.knowledge.render import business_context_of
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
@@ -97,6 +98,24 @@ class ASTPlannerNode:
             user=state.user_context or UserContext(), datasource_id=sub_query.datasource_id if sub_query else None,
             sub_query=sub_query, plan=plan)
 
+    @staticmethod
+    def _publish_knowledge_used(state: SubgraphExecutionState) -> None:
+        """``knowledge.used``, once per sub-query: on the first prompt that carries the terms and rules.
+
+        A plan-cache hit sends no prompt, so it publishes nothing; a retry
+        after an earlier planner call sends the same block again and is not
+        published twice.
+        """
+        used = state.knowledge_used
+        earlier = state.ast_planner_response
+        if used is None or (earlier is not None and earlier.plan_source == "llm"):
+            return
+        publish("knowledge.used", {"sub_query_id": state.sub_query.id if state.sub_query else None,
+                                   "datasource_id": used.datasource_id,
+                                   "terms": {t.term: t.score for t in used.terms},
+                                   "rules": [r.id for r in used.rules], "dropped": used.dropped,
+                                   "digest": used.digest})
+
     def checked_alternatives(self, state: SubgraphExecutionState,
                              alternatives: List[PlanAlternative]) -> List[PlanAlternative]:
         """Each alternative reading as ``plan.after`` lets it through: a denied one is dropped, a changed one kept
@@ -170,6 +189,7 @@ class ASTPlannerNode:
             if state.sub_query and state.sub_query.expected_schema:
                 # join_key is the engine's flag for the validator, not part of the contract the planner meets.
                 expected_schema = [c.model_dump(exclude={"join_key"}) for c in state.sub_query.expected_schema]
+            self._publish_knowledge_used(state)
             answer: Optional[PlannerAnswer] = self.chain.invoke(
                 {
                     "relevant_tables": relevant_tables,
@@ -205,10 +225,14 @@ class ASTPlannerNode:
                              f"{len(answer.alternatives)} other reading(s).")
             update = self.after_plan(state, plan, "llm", notes)
             response = update["ast_planner_response"]
-            if answer.alternatives or answer.ambiguous_phrase:
+            # What an earlier attempt of this sub-query offered stays offered: a question read more than one
+            # way once is ambiguous, and its final plan is never cached (D47), however clear the retry was.
+            earlier = state.ast_planner_response
+            offered = [*(earlier.alternatives_offered if earlier is not None else []), *answer.alternatives]
+            if offered or answer.ambiguous_phrase:
                 update["ast_planner_response"] = response.model_copy(update={
                     "ambiguous_phrase": answer.ambiguous_phrase,
-                    "alternatives_offered": list(answer.alternatives),
+                    "alternatives_offered": offered,
                     "alternatives": (self.checked_alternatives(state, answer.alternatives)
                                      if response.plan is not None else [])})
             return update

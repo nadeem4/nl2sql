@@ -426,7 +426,8 @@ CATALOG: Dict[str, EventSpec] = {
     "knowledge.loaded": _spec(KnowledgeLoaded, "The knowledge sources were loaded, at build or by "
                                                "engine.knowledge.reload() (K1).", run=False),
     "knowledge.used": _spec(KnowledgeUsedData, "A sub-query's prompts carried glossary terms and rules. "
-                                               "Published by the schema retriever (K2).", run=True),
+                                               "Published by the planner on the sub-query's first prompt "
+                                               "(K2); a plan-cache hit sends none.", run=True),
     "clarification.requested": _spec(ClarificationRequested, "A run ended asking which reading was meant. "
                                                              "Published by the clarifier (L1).", run=True),
     "cost.estimated": _spec(CostEstimated, "The database estimated a sub-query's rows read, and the cost rule "

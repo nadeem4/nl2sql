@@ -97,6 +97,9 @@ def render_schema_for_prompt(tables: List[Table]) -> str:
         (_table_for_prompt(t) for t in tables),
         key=lambda r: (not r.get("preferred"), r.get("name", "")),
     )
+    from nl2sql.knowledge.render import one_line  # descriptions may be glossary text
+
     return "\n".join(
-        json.dumps(r, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str) for r in rows
+        one_line(json.dumps(r, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str))
+        for r in rows
     )
