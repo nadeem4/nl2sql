@@ -4,6 +4,7 @@
 * :mod:`stats` -- rates over feedback rows plus kept run traces.
 * :mod:`drafts` -- thumbs-up runs as draft eval cases for review.
 * :mod:`proposals` -- a thumbs-up generated answer as a proposed verified query (the review queue's change).
+* :mod:`corrections` -- a run's fix, checked as the corrector, filed as a proposed verified query.
 
 The rows are kept by the engine's state store (``storage.state``).
 """

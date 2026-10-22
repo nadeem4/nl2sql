@@ -1274,6 +1274,61 @@ Nothing is written before that accept.
 |---|---|
 | `nl2sql feedback correct TRACE_ID (--sql FILE \| --plan FILE) [--question TEXT] [--note TEXT] --as ROLE` | `engine.feedback.correct` |
 
+!!! note "Built: corrections (F1)"
+    `engine.feedback.correct(trace_id, *, sql=None, plan=None, question=None,
+    note=None, user_context) -> Proposal` and `nl2sql feedback correct` (with
+    `--user` beside `--as`, through K1's `caller`) are built, in
+    `nl2sql/feedback/corrections.py` (`correct`); `FeedbackAPI.correct` only
+    calls it. Exact names, and where the code differs from the steps above:
+
+    - **Refusals.** `CorrectionRefused(ValueError)` in `feedback/corrections.py`,
+      with `code` (one of `REFUSAL_CODES`: `no_run`, `multi_datasource`,
+      `invalid_plan`, `not_read_only`, `denied`, `hook_denied`,
+      `needs_approval`, `failed`) and `messages` (the validator's, the hook's
+      reason, the database's). It is a `ValueError`, so it adds no `ErrorCode`
+      and no export (both B0's). No caller is a `TypeError` and not exactly
+      one fix a `ValueError`, as Q1's methods do.
+    - **The run.** The kept trace (`request.question`, the result's
+      sub-queries) is read first; with no trace (the default
+      `settings.traces.mode` keeps only failed runs), the run's rating gives
+      the question, datasource and SQL. Neither is `no_run`. A run on several
+      datasources is refused before it is rated. The rating is recorded
+      before the fix is checked, through `engine.feedback.record` (or the
+      stored row re-rated), so a refused fix still leaves the thumbs-down.
+    - **A plan fix** is `run_query(plan=SuppliedPlan(...), execute=False,
+      user_context=corrector)`, as Wave A's seeding runs a plan, so `run.before`
+      and `plan.after` see it too. A `PlanModel`, a dict or JSON text.
+    - **The SQL check** is `inspect_verified_sql` for both fixes (the
+      engine's rendering included), and a SQL fix with `:name` placeholders
+      is `not_read_only`: it runs once, with no values. The scope check asks
+      `PolicyEngine.scope` (`feedback/corrections.py` joins `ACCESS_DECISIONS`
+      in the boundary test, and `FeedbackAPI.correct` joins
+      `WAVE_B_READ_METHODS`, so its caller is a required `UserContext`).
+    - **The hooks** are `hooks_of(ctx).call("execute.before", ...)` with the
+      fields a question's executor passes (`trace_id` the corrected run's,
+      `sub_query` id `correction`, `plan` for a plan fix, `params={}`,
+      `tables` as `datasource.schema.table`, `approvals=[]`). C2's built-in
+      `policy.cost` reaches a correction once the runtime puts it in that
+      runner: C2's `test_correction_check_is_cost_guarded` calls
+      `engine.feedback.correct(...)` and expects `CorrectionRefused` with
+      `code` `needs_approval` (`over_limit: confirm`) or `hook_denied`
+      (`refuse`; the message is the hook's). `execute.after` is not called,
+      as step 4 says.
+    - **The check** runs as `CuratedAPI.test` does: `_frames` over the
+      adapter with `settings.results.fetch_batch_size`, the first frame only,
+      no artifact written. `row_count` is that frame's.
+    - **The proposal** is `Proposal.build(kind="verified_query",
+      origin="correction", target=<question>, ...)` filed with
+      `review.queue.propose`, so a correction supersedes an open thumbs-up of
+      the same question. `change` is `{id, description, questions, sql}` (the
+      id `feedback.proposals._slug`'s, the description the note else
+      `DESCRIPTION_PLACEHOLDER`); `created_by` the corrector's user id;
+      `schema_version` the run's. `tables` lists the tables the fix *and the
+      original SQL* read, since `evidence.original_sql` shows the latter: a
+      caller denied either never sees the proposal.
+    - **Tests.** `tests/unit/test_corrections.py` (every F1 test the row
+      names, the visibility tests and the CLI).
+
 ## 11. Events Wave B adds
 
 Added to Wave A's catalog (`nl2sql/events/catalog.py`) in B0, each with
