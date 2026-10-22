@@ -1,0 +1,18 @@
+{
+  "sub_query_id": "chinook_018",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "MediaType"
+  ],
+  "joins": [],
+  "filters": [],
+  "groupings": [],
+  "measures": [],
+  "order": "lowest media type first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "List media type names.",
+  "text": "Shows MediaType name. Reads MediaType. Lowest media type first."
+}

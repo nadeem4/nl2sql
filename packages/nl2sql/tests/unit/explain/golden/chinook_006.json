@@ -1,0 +1,22 @@
+{
+  "sub_query_id": "chinook_006",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Invoice"
+  ],
+  "joins": [],
+  "filters": [],
+  "groupings": [
+    "by Invoice billing country"
+  ],
+  "measures": [
+    "avg invoice total: average of Invoice total, rounded to 2 places"
+  ],
+  "order": "lowest billing country first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Average invoice total per billing country.",
+  "text": "Shows Invoice billing country and avg invoice total, by Invoice billing country. Reads Invoice. Lowest billing country first."
+}

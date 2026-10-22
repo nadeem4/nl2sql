@@ -1,0 +1,23 @@
+{
+  "sub_query_id": "chinook_024",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Album",
+    "Artist"
+  ],
+  "joins": [
+    "each Album to its Artist, on ArtistId (declared key)"
+  ],
+  "filters": [
+    "Album title is 'Somewhere in Time'"
+  ],
+  "groupings": [],
+  "measures": [],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Artist of the album titled Somewhere in Time.",
+  "text": "Shows Artist name. Reads Album and Artist, where Album title is 'Somewhere in Time'."
+}

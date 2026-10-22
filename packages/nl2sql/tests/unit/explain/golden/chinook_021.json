@@ -1,0 +1,20 @@
+{
+  "sub_query_id": "chinook_021",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Customer"
+  ],
+  "joins": [],
+  "filters": [
+    "Customer country is 'Germany'"
+  ],
+  "groupings": [],
+  "measures": [],
+  "order": "lowest Customer id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Name and city of customers in Germany.",
+  "text": "Shows Customer first name, Customer last name and Customer city. Reads Customer, where Customer country is 'Germany'. Lowest Customer id first."
+}

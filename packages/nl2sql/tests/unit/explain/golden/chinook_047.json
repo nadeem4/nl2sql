@@ -1,0 +1,25 @@
+{
+  "sub_query_id": "chinook_047",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track",
+    "Genre"
+  ],
+  "joins": [
+    "each Track to its Genre, on GenreId (declared key)"
+  ],
+  "filters": [
+    "Genre name is 'Heavy Metal'"
+  ],
+  "groupings": [],
+  "measures": [
+    "track count: number of Track id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "'heavy metal' is the genre value 'Heavy Metal'; count its tracks.",
+  "text": "Shows track count. Reads Track and Genre, where Genre name is 'Heavy Metal'."
+}

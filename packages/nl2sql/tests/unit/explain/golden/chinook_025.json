@@ -1,0 +1,28 @@
+{
+  "sub_query_id": "chinook_025",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Artist",
+    "Album"
+  ],
+  "joins": [
+    "each Artist to its Album, on ArtistId (declared key)"
+  ],
+  "filters": [
+    "for each group, number of Album id is more than 10"
+  ],
+  "groupings": [
+    "by Artist id",
+    "by Artist name"
+  ],
+  "measures": [
+    "album count: number of Album id"
+  ],
+  "order": "highest album count first, then lowest Artist id first",
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Artists with more than ten albums.",
+  "text": "Shows Artist name and album count, by Artist id and Artist name. Reads Artist and Album. Keeps the groups where number of Album id is more than 10. Highest album count first, then lowest Artist id first."
+}

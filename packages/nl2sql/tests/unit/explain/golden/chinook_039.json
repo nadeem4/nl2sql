@@ -1,0 +1,25 @@
+{
+  "sub_query_id": "chinook_039",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track",
+    "InvoiceLine"
+  ],
+  "joins": [
+    "each Track with its InvoiceLine, if any, on TrackId (declared key)"
+  ],
+  "filters": [
+    "InvoiceLine id is empty"
+  ],
+  "groupings": [],
+  "measures": [
+    "track count: number of Track id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count tracks with no invoice line.",
+  "text": "Shows track count. Reads Track and InvoiceLine, where InvoiceLine id is empty."
+}

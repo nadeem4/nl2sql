@@ -1,0 +1,25 @@
+{
+  "sub_query_id": "chinook_023",
+  "datasource_id": "chinook",
+  "source": "generated",
+  "tables": [
+    "Track",
+    "Album"
+  ],
+  "joins": [
+    "each Track to its Album, on AlbumId (declared key)"
+  ],
+  "filters": [
+    "Album title is 'From The Muddy Banks Of The Wishkah [Live]'"
+  ],
+  "groupings": [],
+  "measures": [
+    "track count: number of Track id"
+  ],
+  "order": null,
+  "terms": [],
+  "rules": [],
+  "assumptions": [],
+  "planner_note": "Count tracks on the named album.",
+  "text": "Shows track count. Reads Track and Album, where Album title is 'From The Muddy Banks Of The Wishkah [Live]'."
+}
