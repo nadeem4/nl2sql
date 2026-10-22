@@ -52,7 +52,7 @@ def test_an_unjoined_plan_is_retried_and_the_second_plan_answers(demo_project, t
     assert "JOIN" in (sub["sql"] or "").upper()
 
     # Two planner calls, and the second was driven by the validator's feedback.
-    planner_calls = [c for c in server.calls if c["name"] == "PlanModel"]
+    planner_calls = [c for c in server.calls if c["name"] == "PlannerAnswer"]
     assert len(planner_calls) == 2
     assert "never joined to the FROM table" in _prompt(planner_calls[1])
 
@@ -83,8 +83,8 @@ def test_the_refiner_runs_once_between_the_two_planner_calls(demo_project, tmp_p
     # Assert
     assert r.returncode == 0, r.stdout + r.stderr
     assert [c["name"] for c in server.calls] == [
-        "AnswerabilityResponse", "DecomposerResponse", "PlanModel", "plain", "PlanModel", "AggregatedResponse",
+        "AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer", "plain", "PlannerAnswer", "AggregatedResponse",
     ]
-    prompt = _prompt([c for c in server.calls if c["name"] == "PlanModel"][1])
+    prompt = _prompt([c for c in server.calls if c["name"] == "PlannerAnswer"][1])
     assert "Join Album to Artist on ArtistId." in prompt  # the refiner's wording
     assert "never joined to the FROM table" in prompt  # and the validator's own

@@ -33,8 +33,8 @@ BAD_ARITY_PLAN = {
 RULES = [
     ANSWERABLE,
     Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER),
-    Rule("PlanModel", COUNT_CUSTOMERS_PLAN, when="wrong number of arguments"),
-    Rule("PlanModel", BAD_ARITY_PLAN),
+    Rule("PlannerAnswer", COUNT_CUSTOMERS_PLAN, when="wrong number of arguments"),
+    Rule("PlannerAnswer", BAD_ARITY_PLAN),
     Rule("AggregatedResponse", count_customers_answer),
     Rule("plain", "ABS takes one argument; count the customers with COUNT."),
 ]
@@ -73,7 +73,7 @@ def test_a_query_the_database_rejects_is_refined_and_the_second_plan_answers(dem
     # The refiner ran once, and the planner was told the database's words, not a trace.
     names = [c["name"] for c in server.calls]
     assert names.count("plain") == 1
-    planner_calls = [c for c in server.calls if c["name"] == "PlanModel"]
+    planner_calls = [c for c in server.calls if c["name"] == "PlannerAnswer"]
     assert len(planner_calls) == 2
     retry_prompt = _prompt(planner_calls[1])
     assert "wrong number of arguments" in retry_prompt

@@ -281,6 +281,7 @@ def recorded_run_date(doc: Dict[str, Any]) -> Optional[_dt.date]:
 def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
     """Re-runs the traced question, answering every LLM call from the recording."""
     from nl2sql.api.query_api import result_from_state
+    from nl2sql.knowledge.scope import caller_knowledge
     from nl2sql.policies import UserContext
     from nl2sql.pipeline.runtime import run_with_graph
 
@@ -319,7 +320,8 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
 
     traces = run.settings.traces
     result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
-                               sample_rows=traces.sample_rows).model_dump(mode="json")
+                               sample_rows=traces.sample_rows,
+                               knowledge=caller_knowledge(run, state)).model_dump(mode="json")
     # Compared the way the recorded result was stored: capped, then redacted.
     limits = Limits(sample_rows=traces.sample_rows, max_field_chars=traces.max_field_chars)
     result = Redactor(collect_secrets(run)).redact(cap(result, limits))

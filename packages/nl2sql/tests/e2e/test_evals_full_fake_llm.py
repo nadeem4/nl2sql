@@ -162,7 +162,7 @@ def test_mode_full_turns_the_plan_cache_off(demo_env, servers):
     report = _run(engine, {"good": _llm(good.server.base_url)}, passes=2)
 
     answerable = len(QUESTIONS) - 1
-    assert sum(call["name"] == "PlanModel" for call in good.server.calls) == 2 * answerable
+    assert sum(call["name"] == "PlannerAnswer" for call in good.server.calls) == 2 * answerable
     assert engine.settings.pipeline.plan_cache is True  # the engine's own config is untouched
     assert report.configs["good"]["determinism"]["share"] == 1.0
     assert report.configs["good"]["completed_cases"] == 2 * len(QUESTIONS)

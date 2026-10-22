@@ -35,6 +35,9 @@
   sends only `sample_values` and, for date, time and numeric columns other
   than keys, a `range` of `[min_value, max_value]`. See
   [AST Planner: prompt layout](ast_planner_node.md#prompt-layout-and-caching).
+- Read the run's pinned knowledge (the glossary, `Runtime.knowledge` as
+  `pin_index()` kept it) and put what the caller may see into the schema block
+  and `knowledge_used`; see [Knowledge](#knowledge).
 
 ---
 
@@ -64,9 +67,11 @@ From `SubgraphExecutionState`:
 
 From `Runtime`:
 
+- `knowledge` (optional): the run's pinned `Knowledge`; none means no glossary
+- `settings.knowledge`: `top_k` and `block_max_chars`
 - `vector_store` (optional)
 - `state` (the state store; required for authoritative resolution)
-- `ds_registry` (optional): `get_preferred_tables(datasource_id)`
+- `ds_registry` (optional): `get_preferred_tables(datasource_id)`, `get_dialect(datasource_id)` (for derived date roles)
 
 Validation performed:
 
@@ -80,12 +85,16 @@ Validation performed:
 Mutations to `SubgraphExecutionState`:
 
 - `relevant_tables` (list of `Table`)
+- `knowledge_used` (`KnowledgeUsed`): the terms and rules sent as
+  `[BUSINESS_CONTEXT]`; absent when none matched, and for a pinned plan
 - `reasoning` and `warnings` in fallback paths
 
 Side effects:
 
 - Vector store queries.
 - Schema store reads.
+- Publishes `knowledge.used` (an operator event, never on the caller's stream)
+  when it sets `knowledge_used`.
 
 ---
 
@@ -119,6 +128,36 @@ matched against snapshot tables by bare name or `schema.table`, case ignored.
   when it answers the question.
 - Being preferred never shows a hidden table: a preferred table the caller's
   scope denies is left out like any other.
+
+### Knowledge
+
+Wave B (K2, [design](../wave_b.md#4-knowledge-in-the-prompts)). The
+datasource's merged knowledge is first filtered to the caller's scope with
+`nl2sql.knowledge.scope.visible` (an item naming a table the caller cannot
+read, or whose text mentions one, is left out), then resolved against the
+snapshot by `schema_knowledge()`:
+
+| Field of the schema block | What is sent |
+| --- | --- |
+| A table's `description` | The glossary's, else the database's comment (D38). Either is dropped when its text mentions a table the caller cannot read. |
+| A column's `description` | The same rule |
+| A column's `role` | The glossary's, else the one the snapshot proves: `identifier` for a primary or foreign key, `date` for a temporal type (D61) |
+| A column's `unit`, `grain`, `values` | The glossary's, when it sets them (`values` on `role: enum` only) |
+| `relationships` | The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its `cardinality` and `"source": "glossary"` (D46). The logical validator's join check matches it as it matches a foreign key. |
+
+`notes` are never sent. `knowledge_used` (`nl2sql/knowledge/match.py`):
+
+- **Terms** whose name or a synonym appears, as whole words with case and
+  punctuation ignored, in the sub-query's intent or the question: 1.0 for the
+  name, 0.9 for a synonym, the best `settings.knowledge.top_k` (8). Two terms
+  sharing a synonym are both sent; that is how the planner sees an ambiguity.
+- **Rules** whose `tables` is empty or names one of the tables sent.
+- The block is cut to `settings.knowledge.block_max_chars` (4,000) by
+  `fit_business_context` (`nl2sql/knowledge/render.py`): the lowest-scored
+  terms first, then rules from the last; `dropped` lists what was cut.
+
+Both hold only items within the caller's scope, since
+`SubQueryResult.knowledge_used` is returned to the caller.
 
 ---
 

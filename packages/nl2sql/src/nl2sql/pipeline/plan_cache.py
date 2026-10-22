@@ -22,7 +22,13 @@ datasource_id, schema_version)``:
   after ``engine.llm.replace`` a plan written by the old model is never
   served. Its entries stay, and swapping back hits them again;
 * the datasource, because the same words mean different tables elsewhere;
-* the schema version, so a rebuilt index with a changed schema misses.
+* the schema version, so a rebuilt index with a changed schema misses;
+* the datasource's knowledge digest (wave_b.md, D57), so a changed definition
+  of "revenue" plans again; swapping the glossary back hits the old entries.
+
+A plan whose planner answer carried alternatives is never stored (D47): the
+sub-query wrapper skips it, so a later run asks the planner, which flags the
+ambiguity again.
 
 Matching is exact after :func:`normalize_question`, never by similarity.
 
@@ -71,11 +77,12 @@ class PlanCache:
     """
 
     def __init__(self, store: Any, *, enabled: bool = True, today: Optional[date] = None,
-                 planner: Optional[str] = None):
+                 planner: Optional[str] = None, knowledge: Any = None):
         self._store = store
         self._enabled = enabled
         self._today = today
         self._planner = planner
+        self._knowledge = knowledge  # the run's pinned ``Knowledge``; None is no knowledge
 
     def _usable(self) -> bool:
         return self._enabled and self._store is not None
@@ -99,7 +106,13 @@ class PlanCache:
         question += f" | today={run_date(self._today).isoformat()}"
         if self._planner:
             question += f" | planner={self._planner}"
+        question += f" | knowledge={self._digest(sub_query.datasource_id)}"
         return question, sub_query.datasource_id, sub_query.schema_version
+
+    def _digest(self, datasource_id: str) -> str:
+        from nl2sql.knowledge.merge import Knowledge
+
+        return (self._knowledge if self._knowledge is not None else Knowledge()).digest(datasource_id)
 
     def get(self, sub_query: Any) -> Optional[PlanModel]:
         """The cached plan for this sub-query, or None."""
@@ -142,7 +155,7 @@ def planner_of(ctx: Any) -> Optional[str]:
 
 
 def plan_cache_for(ctx: Any, planner: Optional[str] = None) -> PlanCache:
-    """The plan cache of a runtime: its state store, its ``settings.pipeline`` and its planner model.
+    """The plan cache of a runtime: its state store, its ``settings.pipeline``, its planner model and knowledge.
 
     ``planner`` is the run's ``planner_of(ctx)``, read now when not given.
     The planner node and the sub-query wrapper both read it while the graph
@@ -151,4 +164,4 @@ def plan_cache_for(ctx: Any, planner: Optional[str] = None) -> PlanCache:
     pipeline = ctx.settings.pipeline
     planner = planner or planner_of(ctx)
     return PlanCache(getattr(ctx, "state", None), enabled=pipeline.plan_cache, today=pipeline.today,
-                     planner=planner)
+                     planner=planner, knowledge=getattr(ctx, "knowledge", None))

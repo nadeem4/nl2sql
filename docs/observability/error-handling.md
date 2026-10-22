@@ -86,7 +86,7 @@ answer still does not parse, `wires.structured()` raises
 `MODEL_OUTPUT_INVALID`:
 
 ```text
-The ast_planner agent's answer did not match PlanModel after 2 attempts. Set another
+The ast_planner agent's answer did not match PlannerAnswer after 2 attempts. Set another
 structured_output for it (tool_calling, json_schema or json_mode), or use a stronger model.
 ```
 

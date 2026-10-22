@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from langchain_core.runnables import Runnable
 
 from .prompts import PLANNER_PROMPT, PLANNER_EXAMPLES
-from .schemas import PlanModel, ASTPlannerResponse
+from .schemas import PlanAlternative, PlannerAnswer, PlanModel, ASTPlannerResponse
+from nl2sql.knowledge.render import business_context_of
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
@@ -44,7 +45,7 @@ def semantic_context_of(sub_query: Any) -> str:
 
 
 class ASTPlannerNode:
-    """Generates a structured SQL execution plan (PlanModel).
+    """Generates a structured SQL execution plan: the planner's answer (``PlannerAnswer``).
 
     Uses an LLM to interpret the user query and semantic context, producing a
     deterministic Abstract Syntax Tree (AST) that represents the SQL query.
@@ -69,7 +70,7 @@ class ASTPlannerNode:
         self.llm = ctx.llm_registry.get_llm(self.node_name)
 
         self.prompt = PLANNER_PROMPT
-        self.chain = self.prompt | structured(self.llm, PlanModel)
+        self.chain = self.prompt | structured(self.llm, PlannerAnswer)
 
     def _cached(self, state: SubgraphExecutionState) -> Optional[Dict[str, Any]]:
         """The update for a cache hit, or None to ask the model.
@@ -95,6 +96,18 @@ class ASTPlannerNode:
             "plan.after", trace_id=state.trace_id, question=getattr(state, "user_query", "") or "",
             user=state.user_context or UserContext(), datasource_id=sub_query.datasource_id if sub_query else None,
             sub_query=sub_query, plan=plan)
+
+    def checked_alternatives(self, state: SubgraphExecutionState,
+                             alternatives: List[PlanAlternative]) -> List[PlanAlternative]:
+        """Each alternative reading as ``plan.after`` lets it through: a denied one is dropped, a changed one kept
+        as changed (wave_b.md, section 7). The clarifier validates what is left."""
+        kept = []
+        for alternative in alternatives:
+            verdict = self.check_plan(state, alternative.plan)
+            if verdict.allowed:
+                kept.append(alternative.model_copy(update={"plan": verdict.ctx.plan}) if verdict.modified
+                            else alternative)
+        return kept
 
     def after_plan(self, state: SubgraphExecutionState, plan: PlanModel, plan_source: str,
                    reasoning: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -157,18 +170,19 @@ class ASTPlannerNode:
             if state.sub_query and state.sub_query.expected_schema:
                 # join_key is the engine's flag for the validator, not part of the contract the planner meets.
                 expected_schema = [c.model_dump(exclude={"join_key"}) for c in state.sub_query.expected_schema]
-            plan: PlanModel = self.chain.invoke(
+            answer: Optional[PlannerAnswer] = self.chain.invoke(
                 {
                     "relevant_tables": relevant_tables,
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "expected_schema": expected_schema,
                     "semantic_context": semantic_context,
+                    "business_context": business_context_of(state),
                     "user_query": query_text,
                     "today": run_date(self.today).isoformat(),
                 }
             )
-            if plan is None:
+            if answer is None:
                 # Structured output returns None when the model does not call
                 # the tool; that is a failed plan, not a crash.
                 logger.error("Planner returned no plan.")
@@ -184,10 +198,20 @@ class ASTPlannerNode:
                     ],
                 }
 
-            return self.after_plan(state, plan, "llm", [
-                f"Reasoning: {plan.reasoning or 'None'}",
-                f"Tables: {', '.join(t.name for t in plan.tables)}",
-            ])
+            plan = answer.plan
+            notes = [f"Reasoning: {plan.reasoning or 'None'}", f"Tables: {', '.join(t.name for t in plan.tables)}"]
+            if answer.alternatives:
+                notes.append(f"The planner read '{answer.ambiguous_phrase or ''}' more than one way: "
+                             f"{len(answer.alternatives)} other reading(s).")
+            update = self.after_plan(state, plan, "llm", notes)
+            response = update["ast_planner_response"]
+            if answer.alternatives or answer.ambiguous_phrase:
+                update["ast_planner_response"] = response.model_copy(update={
+                    "ambiguous_phrase": answer.ambiguous_phrase,
+                    "alternatives_offered": list(answer.alternatives),
+                    "alternatives": (self.checked_alternatives(state, answer.alternatives)
+                                     if response.plan is not None else [])})
+            return update
 
         except Exception as exc:
             logger.exception("Planner failed")

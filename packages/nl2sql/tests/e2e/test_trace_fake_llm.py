@@ -97,7 +97,7 @@ def test_a_run_writes_a_trace_with_every_node_its_llm_calls_and_no_secret(demo_p
     assert resolver["messages"][-1]["content"].endswith(QUESTION)
     assert decomposer["response"]["tool_calls"][0]["name"] == "DecomposerResponse"
     # Every node, the planner included, answers with a tool call.
-    assert planner["response"]["tool_calls"][0]["name"] == "PlanModel"
+    assert planner["response"]["tool_calls"][0]["name"] == "PlannerAnswer"
     assert planner["response"]["tool_calls"][0]["args"]["tables"][0]["name"] == "Customer"
     assert planner["parsed"]["tables"][0]["name"] == "Customer"
     assert "How many customers" in planner["messages"][-1]["content"]  # the question is in the last (human) message
@@ -139,7 +139,7 @@ def _retry_rules():
     return [
         ANSWERABLE,
         Rule("DecomposerResponse", COUNT_CUSTOMERS_DECOMPOSER),
-        Rule("PlanModel", plan),
+        Rule("PlannerAnswer", plan),
         Rule("AggregatedResponse", count_customers_answer),
         Rule("plain", "Count Customer.CustomerId; CustomerIdd does not exist."),
     ]

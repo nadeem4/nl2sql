@@ -23,7 +23,7 @@ from nl2sql.llm.models import AgentConfig
 from nl2sql.llm.registry import PROVIDER_PRESETS
 from nl2sql.llm.wires import WIRES, structured, wire_of
 from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AggregatedResponse
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlannerAnswer
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import AnswerabilityResponse
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
 from nl2sql.secrets import SecretManager
@@ -54,7 +54,7 @@ PROMPT = ChatPromptTemplate.from_messages([("system", SYSTEM), ("human", "{quest
 CALLS = {
     "AnswerabilityResponse": (AnswerabilityResponse, REC.ANSWERABLE.payload),
     "DecomposerResponse": (DecomposerResponse, REC.COUNT_CUSTOMERS_DECOMPOSER),
-    "PlanModel": (PlanModel, REC.COUNT_CUSTOMERS_PLAN),
+    "PlannerAnswer": (PlannerAnswer, {"plan": REC.COUNT_CUSTOMERS_PLAN}),
     "refiner": (None, "Keep the same plan."),
     "AggregatedResponse": (AggregatedResponse, REC.count_customers_answer("")),
 }
@@ -136,7 +136,7 @@ def _llm(case: WireCase, srv: FakeLLMServer, **overrides):
     return registry.get_llm(fields["name"])
 
 
-def _ask(llm, name="PlanModel", callbacks=None):
+def _ask(llm, name="PlannerAnswer", callbacks=None):
     schema, _answer = CALLS[name]
     tail = llm | StrOutputParser() if schema is None else structured(llm, schema)
     return (PROMPT | tail).invoke({"question": "How many customers?"}, config={"callbacks": callbacks or []})
@@ -173,16 +173,16 @@ def test_each_pipeline_call_round_trips(case, server, name):
 
 
 def test_structured_output_is_the_wires_method(case, server):
-    _ask(_llm(case, server), "PlanModel")
+    _ask(_llm(case, server), "PlannerAnswer")
 
     body = server.calls[-1]["body"]
     assert WIRES[case.wire].structured_output_method == "function_calling"
     if case.wire == "anthropic":
-        # Forced tool use: PlanModel is recursive, which native JSON outputs reject.
-        assert body["tool_choice"] == {"type": "tool", "name": "PlanModel"}
+        # Forced tool use: PlannerAnswer (a PlanModel) is recursive, which native JSON outputs reject.
+        assert body["tool_choice"] == {"type": "tool", "name": "PlannerAnswer"}
         assert "output_config" not in body
     else:
-        assert body["tool_choice"]["function"]["name"] == "PlanModel"
+        assert body["tool_choice"]["function"]["name"] == "PlannerAnswer"
         assert "response_format" not in body
 
 

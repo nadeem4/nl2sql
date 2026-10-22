@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_EXAMPLES, PLANNER_SYSTEM_PROMPT
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+from nl2sql.pipeline.nodes.ast_planner.schemas import PlannerAnswer, PlanModel
 from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse, ResolvedDatasource
 from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode
 from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_SYSTEM_PROMPT
@@ -166,7 +166,7 @@ def _plan_call(sub_query):
     node.today = None
     node.plan_cache = PlanCache(None)
     node.chain = MagicMock()
-    node.chain.invoke.return_value = PlanModel(tables=[])
+    node.chain.invoke.return_value = PlannerAnswer(plan=PlanModel(tables=[]))
     node(SubgraphExecutionState(trace_id="t", sub_query=sub_query))
     return node.chain.invoke.call_args.args[0]
 
@@ -196,5 +196,5 @@ def test_the_plan_cache_key_tells_top_1_from_top_5():
 
     assert key(_sq(**base)) != key(_sq(limit=1, **base))
     assert key(_sq(limit=1, **base)) != key(_sq(limit=5, **base))
-    # Ordering and limit are keyed only when present; the run date always is.
-    assert key(_sq(**base))[0] == "number of albums per artist | today=2013-12-31"
+    # Ordering and limit are keyed only when present; the run date and the knowledge digest always are.
+    assert key(_sq(**base))[0].startswith("number of albums per artist | today=2013-12-31 | knowledge=")

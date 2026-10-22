@@ -33,6 +33,7 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCal
 from nl2sql.clarify.models import ClarificationRequest
 from nl2sql.explain.models import Explanation
 from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql.knowledge.scope import caller_knowledge
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.models import Estimate
 
@@ -467,6 +468,7 @@ class QueryAPI:
                 result = result_from_state(
                     state,
                     artifact_store=getattr(self._ctx, "artifact_store", None),
+                    knowledge=caller_knowledge(self._ctx, state),
                 )
             except BaseException as exc:
                 # A KeyboardInterrupt too: every scope ends with a terminal event.
@@ -600,7 +602,8 @@ class QueryAPI:
                         pinned=pinned,
                         approvals=approvals,
                     )
-                    result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
+                    result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None),
+                                               knowledge=caller_knowledge(self._ctx, state))
                     finished = self.close_scope(scope, result)
                 if finished is not None and "run.finished" in allowed:
                     deliver(finished.model_copy(update={

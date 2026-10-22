@@ -21,7 +21,9 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.execution.contracts import ExecutorRequest, ExecutorResponse
 from nl2sql.execution.executor.sql_executor import SqlExecutorService
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
-from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, Expr, PlanModel, SelectItem, TableRef
+from nl2sql.pipeline.nodes.ast_planner.schemas import (
+    ASTPlannerResponse, Expr, PlannerAnswer, PlanModel, SelectItem, TableRef,
+)
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.nodes.refiner.node import RefinerNode
@@ -171,7 +173,7 @@ def test_the_planner_is_told_only_the_latest_attempt_without_traces():
     ctx.llm_registry.get_llm.return_value = llm
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
-    node.chain.invoke.return_value = _plan("FirstName")
+    node.chain.invoke.return_value = PlannerAnswer(plan=_plan("FirstName"))
 
     node(SubgraphExecutionState(trace_id="t", retry_count=2,
                                 sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),

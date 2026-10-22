@@ -17,13 +17,16 @@ without one, nothing is visible (fails closed).
 """
 from __future__ import annotations
 
+import logging
 import re
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.schema import SchemaSnapshot
 
 from nl2sql.knowledge.resolve import resolve_table
+
+logger = logging.getLogger(__name__)
 
 # Whether a caller may read ``(schema, table)``: a ``Scope``'s ``allows``.
 Allows = Callable[[Optional[str], str], bool]
@@ -120,9 +123,47 @@ def visible(knowledge: DatasourceKnowledge, snapshot: Optional[SchemaSnapshot], 
          "examples": examples}, context={"item_max_chars": 1 << 30})
 
 
-def mentions_denied(text: Optional[str], snapshot: SchemaSnapshot, allows: Allows) -> bool:
-    """Whether ``text`` mentions a table of ``snapshot`` the caller may not read."""
-    return _mentions([text], _pattern(denied_table_names(snapshot, allows)))
+def mentions_denied(text: Optional[str], snapshot: SchemaSnapshot, allows: Allows,
+                    also_denied: Iterable[str] = ()) -> bool:
+    """Whether ``text`` mentions a table of ``snapshot`` the caller may not read (or one of ``also_denied``)."""
+    return _mentions([text], _pattern(denied_table_names(snapshot, allows) | {n.lower() for n in also_denied}))
+
+
+def caller_knowledge(ctx: Any, state: Mapping[str, Any]) -> Dict[str, DatasourceKnowledge]:
+    """The knowledge a finished run's caller may see, per datasource the run planned on, for its explanation.
+
+    Each datasource's knowledge is filtered with ``visible`` by the caller's
+    scope (``state["user_context"]``) and the datasource's live snapshot, so a
+    denied table's description, joins and terms never reach
+    ``QueryResult.explanation``. A datasource the caller cannot reach, or
+    without a snapshot, is left out. Never raises: on a failure it returns
+    nothing and the explanation names every join a declared key.
+    """
+    from nl2sql.policies import UserContext
+
+    try:
+        knowledge = getattr(ctx, "knowledge", None)
+        if knowledge is None or not knowledge.datasources:
+            return {}
+        user = state.get("user_context") or UserContext()
+        user = user if isinstance(user, UserContext) else UserContext.model_validate(user)
+        ids = set()
+        for output in (state.get("subgraph_outputs") or {}).values():
+            sub_query = output.get("sub_query") if isinstance(output, dict) else getattr(output, "sub_query", None)
+            ds = sub_query.get("datasource_id") if isinstance(sub_query, dict) else getattr(sub_query, "datasource_id",
+                                                                                              None)
+            if ds in knowledge.datasources:
+                ids.add(ds)
+        shown: Dict[str, DatasourceKnowledge] = {}
+        for ds in sorted(ids):
+            scope = ctx.policy_engine.scope(user, ds)
+            snapshot = ctx.vector_store.snapshot(ds) if scope.reaches_datasource() else None
+            if snapshot is not None:
+                shown[ds] = visible(knowledge.get(ds), snapshot, scope.allows, deny_names(scope))
+        return shown
+    except Exception:  # the explanation is still worth having without the glossary
+        logger.exception("Could not filter the knowledge for the explanation")
+        return {}
 
 
 def _prefixes(knowledge: DatasourceKnowledge) -> List[str]:

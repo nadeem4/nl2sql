@@ -270,6 +270,10 @@ class ASTPlannerResponse(BaseModel):
     # clarifier validates them and offers them (L1). Empty for a clear question or a pinned plan.
     ambiguous_phrase: Optional[str] = None
     alternatives: List["PlanAlternative"] = Field(default_factory=list)
+    # Every alternative the planner's answer carried, before plan.after or any filter dropped one. A plan
+    # whose answer carried any is never cached (D47), even when none is left for this caller: a later
+    # caller allowed a dropped reading must be asked.
+    alternatives_offered: List["PlanAlternative"] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _planner_plan_defaults_to_plan(self) -> "ASTPlannerResponse":
