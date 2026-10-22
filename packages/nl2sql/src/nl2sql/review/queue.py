@@ -149,7 +149,9 @@ def propose(ctx: Any, proposal: Proposal) -> Proposal:
     if existing is not None and existing.status in ("accepted", "rejected"):
         return existing
     if existing is not None and existing.status == "proposed":
-        row = existing.model_copy(update={"evidence": proposal.evidence})
+        # The new evidence may name other tables (a correction's original SQL): the row keeps both sets.
+        row = existing.model_copy(update={"evidence": proposal.evidence,
+                                          "tables": sorted({*existing.tables, *proposal.tables})})
         state.put_proposal(row)
         return row
     state.put_proposal(proposal)

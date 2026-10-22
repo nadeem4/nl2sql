@@ -7,7 +7,7 @@ reads both. Thumbs-up runs can then be exported as draft entries for the gold
 set, and thumbs-up generated answers as proposed verified queries.
 
 The playground and `nl2sql feedback` are both built on `engine.feedback`
-(`record`, `list`, `stats`, `export`, `clear`), which any Python caller can use
+(`record`, `list`, `stats`, `export`, `clear`, `correct`), which any Python caller can use
 too: see [the public facade](../api/core/public-facade.md#feedback).
 
 ## Rating an answer in the playground
@@ -169,6 +169,46 @@ the table recorded the datasource file nothing. The same change is one
 proposal however often it is rated; a thumbs-up therefore influences routing
 only after a person accepts it. See
 [From feedback to verified queries](../configuration/curated.md#from-feedback-to-verified-queries).
+
+## Correcting an answer: `nl2sql feedback correct`
+
+A thumbs-down says an answer was wrong; a correction also says what was right.
+`engine.feedback.correct` takes the run's trace id and exactly one fix, the
+right SQL or the right plan, and files it as a `verified_query` proposal
+(origin `correction`) in the [review queue](../configuration/review.md):
+
+```bash
+nl2sql feedback correct 7c0e2f4a-... --sql revenue.sql --note "Revenue is invoiced, not gross." --as analyst
+nl2sql feedback correct 7c0e2f4a-... --plan revenue.yaml --question "What was revenue last year?" --as analyst
+```
+
+```python
+from nl2sql import UserContext
+
+analyst = UserContext(user_id="bob", roles=["analyst"])
+proposal = engine.feedback.correct(result.trace_id, sql="SELECT SUM(Total) AS revenue FROM Invoice",
+                                   note="Revenue is invoiced, not gross.", user_context=analyst)
+```
+
+The fix is checked as the corrector before anything is queued, and a check
+that fails raises `CorrectionRefused` (a `ValueError`) with a `code` and the
+check's own `messages`; the command prints them and exits 1.
+
+| Step | What happens | Refused as |
+| --- | --- | --- |
+| The run | Its kept trace gives the question (`question` overrides it), its datasource and its SQL; without a trace, its rating does. First, the corrector's role must reach every datasource the run read and every table its SQL read; the refusal names none of them, and the run's rating is left as it was. Then a run on several datasources is refused (a verified query answers from one), and the run is rated `down` with the note unless it already is. | `no_run`, `denied`, `multi_datasource` |
+| A plan fix | Runs as a pinned plan with `execute=False`: `plan.after`, the logical validator and the generator, under the corrector's scope, with no model call. The SQL is the engine's rendering. | `invalid_plan`, with the validator's messages |
+| A SQL fix | Must parse as exactly one read-only query in the datasource's dialect (the curated config's own check; a trailing `;` and comment are fine), with no `:name` placeholders. It reads plain tables only, never a table-valued function, and calls only the functions a plan may call plus `CAST`, `CASE`, `EXISTS` and the current date and time. It reads only tables the corrector's role may read. | `not_read_only`, `denied` |
+| The hooks | The SQL passes the `execute.before` hooks with the corrector as the caller. A deny or a failed hook refuses it, and so does a request for approval: a correction is never run with an approval. | `hook_denied`, `needs_approval` |
+| The check | The SQL runs once through the adapter, as `nl2sql curated test` runs a verified query: read-only, under the datasource's limits, reading the first batch of rows and keeping none. An empty result is allowed. | `failed`, with the adapter's message (an error it did not wrap is named by its type only) |
+| The proposal | `change` is in `curated.yaml`'s shape: an id slugged from the question, the question as its one phrasing, the SQL, and the note as its description (a placeholder without one). `tables` lists every table the fix and the original SQL read; `evidence` holds the trace id, the original SQL, `ran`, `row_count` and `columns`. | |
+
+Nothing is written to `curated.yaml` (or any file a person owns) until an
+admin accepts the proposal, usually with edits: a better id, more phrasings,
+and `:name` params in place of the literal values. Only a caller whose scope
+reaches every table in `tables` sees the proposal. Keep traces
+(`settings.traces.mode: always`) to correct runs that succeeded and were not
+rated; the default keeps only failed runs' traces.
 
 ## Turning it off and clearing it
 
