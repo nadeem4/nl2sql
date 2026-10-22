@@ -15,6 +15,18 @@ from typing import Any, Dict, List, Sequence, Tuple
 from nl2sql.knowledge.models import RuleUse, TermMatch
 
 
+# Characters a model or a tokenizer may treat as a line break, which ensure_ascii=False leaves as they are.
+# JSON allows them raw, so escaping them changes no value; it keeps a knowledge text on its one line.
+_LINE_BREAKS = {chr(0x2028): "\\u2028", chr(0x2029): "\\u2029", chr(0x85): "\\u0085"}
+
+
+def one_line(text: str) -> str:
+    """``text`` (JSON) with U+2028, U+2029 and U+0085 escaped, so it holds no line break of any kind."""
+    for raw, escaped in _LINE_BREAKS.items():
+        text = text.replace(raw, escaped)
+    return text
+
+
 def _term(term: TermMatch) -> Dict[str, Any]:
     row = {"term": term.term, "definition": term.definition, "columns": term.columns, "tables": term.tables}
     return {k: v for k, v in row.items() if v not in (None, "", [])}
@@ -30,7 +42,7 @@ def render_business_context(terms: Sequence[TermMatch], rules: Sequence[RuleUse]
         block["rules"] = [{"id": rule.id, "text": rule.text} for rule in rules]
     if terms:
         block["terms"] = [_term(term) for term in terms]
-    return json.dumps(block, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return one_line(json.dumps(block, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
 
 
 def business_context_of(state: Any) -> str:

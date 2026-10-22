@@ -93,8 +93,10 @@ Side effects:
 
 - Vector store queries.
 - Schema store reads.
-- Publishes `knowledge.used` (an operator event, never on the caller's stream)
-  when it sets `knowledge_used`.
+- None for knowledge: the planner publishes `knowledge.used` (an operator
+  event, never on the caller's stream) on the sub-query's first prompt that
+  carries `knowledge_used`. A plan-cache hit sends no prompt, so it publishes
+  nothing, and the sub-query's result reports no `knowledge_used`.
 
 ---
 
@@ -152,6 +154,8 @@ snapshot by `schema_knowledge()`:
   name, 0.9 for a synonym, the best `settings.knowledge.top_k` (8). Two terms
   sharing a synonym are both sent; that is how the planner sees an ambiguity.
 - **Rules** whose `tables` is empty or names one of the tables sent.
+- The denied-name pattern is built once per sub-query, and only the readable
+  tables' comments are checked against it.
 - The block is cut to `settings.knowledge.block_max_chars` (4,000) by
   `fit_business_context` (`nl2sql/knowledge/render.py`): the lowest-scored
   terms first, then rules from the last; `dropped` lists what was cut.

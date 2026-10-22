@@ -278,6 +278,10 @@ def run_with_graph(
         )
         if path:
             out["trace_path"] = path
+        # The runtime the run pinned (its knowledge and index pointers), so the result is explained from the
+        # glossary and snapshot the prompts used, even if a reload swapped them meanwhile
+        # (nl2sql.knowledge.scope.caller_knowledge). Not a state field: nothing stores or sends it.
+        out["pinned_runtime"] = ctx
         return out
 
     def _stopped(stop: RunStop) -> Dict:

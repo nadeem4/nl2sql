@@ -357,3 +357,36 @@ def test_alternative_modified_by_plan_after_is_offered_as_modified():
     response = _planner(answer, _hooks(hook))(_planned_state())["ast_planner_response"]
 
     assert [a.plan.limit for a in response.alternatives] == [10]
+
+
+# ---------------------------------------------------------------- review fixes (#340)
+
+
+def test_the_denied_name_pattern_is_built_once_per_sub_query_not_per_comment(monkeypatch):
+    import nl2sql.knowledge.scope as scope
+
+    calls = []
+    real = scope.denied_table_names
+    monkeypatch.setattr(scope, "denied_table_names", lambda *a: calls.append(1) or real(*a))
+
+    retrieve("orders by customer")
+
+    # Once for the glossary's filter (visible) and once for the comments' pattern, whatever the comment count.
+    assert len(calls) == 2
+
+
+def test_the_explanation_reads_the_runs_pinned_knowledge():
+    from nl2sql.knowledge.merge import Knowledge
+    from nl2sql.knowledge.scope import caller_knowledge
+
+    def runtime(knowledge):
+        return fake_runtime(vector_store=SimpleNamespace(snapshot=lambda _id: snapshot()),
+                            policies={"roles": ROLES}, knowledge=knowledge)
+
+    state = {"user_context": ANALYST, "subgraph_outputs": {"sql_agent:sq1:t": {"sub_query": {"datasource_id": "shop"}}}}
+    live, pinned = runtime(Knowledge()), runtime(knowledge_of())
+
+    # A reload swapped the live glossary for an empty one mid-run; the run's own is the one its prompts used.
+    assert caller_knowledge(live, state) == {}
+    shown = caller_knowledge(live, {**state, "pinned_runtime": pinned})
+    assert "orders" in shown["shop"].tables

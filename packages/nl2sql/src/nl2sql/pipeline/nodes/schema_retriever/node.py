@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 from nl2sql.common.errors import ErrorCode, RunWarning
 from nl2sql.common.logger import get_logger
-from nl2sql.events import publish
 from nl2sql.knowledge.models import KnowledgeUsed
 from nl2sql.runtime import Runtime
 from nl2sql.datasources.models import matches_table
@@ -52,7 +51,7 @@ def schema_knowledge(knowledge: Any, datasource_id: str, snapshot: SchemaSnapsho
     """
     from nl2sql.knowledge.merge import Knowledge
     from nl2sql.knowledge.resolve import derived_roles, resolve_column, resolve_join, resolve_table
-    from nl2sql.knowledge.scope import deny_names, mentions_denied, visible
+    from nl2sql.knowledge.scope import denied_pattern, deny_names, mentions, visible
 
     knowledge = knowledge if knowledge is not None else Knowledge()
     also_denied = deny_names(scope)
@@ -60,11 +59,18 @@ def schema_knowledge(knowledge: Any, datasource_id: str, snapshot: SchemaSnapsho
     out = SchemaKnowledge(shown=shown, digest=knowledge.digest(datasource_id),
                           provenance=dict(knowledge.provenance.get(datasource_id) or {}))
     key_of = {contract.table.full_name: key for key, contract in snapshot.contract.tables.items()}
+    readable = {key for key, contract in snapshot.contract.tables.items()
+                if scope.allows(contract.table.schema_name, contract.table.table_name)}
+    # Built once per call: a pass over the snapshot and one regex, not one per comment.
+    pattern = denied_pattern(snapshot, scope.allows, also_denied)
 
     def clean(text: Optional[str]) -> Optional[str]:
-        return text if text and not mentions_denied(text, snapshot, scope.allows, also_denied) else None
+        return text if text and not mentions(text, pattern) else None
 
+    # Only a readable table's comments can reach the prompt.
     for key, metadata in snapshot.metadata.tables.items():
+        if key not in readable:
+            continue
         if clean(metadata.description):
             out.tables[key] = metadata.description
         for name, column in metadata.columns.items():
@@ -203,7 +209,8 @@ class SchemaRetrieverNode:
         Terms match the sub-query's intent or the question; rules concern the
         tables sent. The block is cut to ``settings.knowledge.block_max_chars``
         and what was cut is recorded. None when nothing matched, and for a
-        pinned plan, which no prompt plans.
+        pinned plan, which no prompt plans. The planner publishes
+        ``knowledge.used`` when a prompt carries it (not on a plan-cache hit).
         """
         from nl2sql.knowledge.match import match_terms, rules_for
         from nl2sql.knowledge.render import fit_business_context
@@ -220,13 +227,8 @@ class SchemaRetrieverNode:
         if not terms and not rules:
             return None
         terms, rules, dropped = fit_business_context(terms, rules, max_chars=self.knowledge_settings.block_max_chars)
-        used = KnowledgeUsed(datasource_id=sub_query.datasource_id, digest=knowledge.digest, terms=terms,
+        return KnowledgeUsed(datasource_id=sub_query.datasource_id, digest=knowledge.digest, terms=terms,
                              rules=rules, dropped=dropped)
-        publish("knowledge.used", {"sub_query_id": sub_query.id, "datasource_id": used.datasource_id,
-                                   "terms": {t.term: t.score for t in used.terms},
-                                   "rules": [r.id for r in used.rules], "dropped": used.dropped,
-                                   "digest": used.digest})
-        return used
 
     def _build_semantic_query(self, sub_query: SubQuery) -> str:
         parts: List[str] = []

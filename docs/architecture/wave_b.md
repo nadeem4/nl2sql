@@ -1748,15 +1748,23 @@ flowchart TD
       table is dropped too, as `show` drops it. `resolve_join(join, snapshot, *,
       dialect)` was added to K1's `resolve.py` (a join is used only when
       `problems` would not report it). `knowledge_used` is None when no term or
-      rule matched, and for a pinned plan; `knowledge.used` is published with it.
+      rule matched, and for a pinned plan. The denied-name pattern is built once
+      per sub-query (`denied_pattern`, `mentions` in `knowledge/scope.py`) and
+      only readable tables' comments are checked.
     - **The planner.** The chain's structured output is `PlannerAnswer`; each
       alternative passes `plan.after` in `checked_alternatives(state,
       alternatives)`. `ASTPlannerResponse.alternatives_offered` (added here,
       after L1's review) keeps every alternative the answer carried, before
       `plan.after` or any filter; the no-cache rule (D47) in `graph_utils` reads
       it, with `alternatives` and `ambiguous_phrase`, so a plan whose readings
-      were all dropped for one caller is still never cached. It is the name L1
-      (#339) planned for the unfiltered set.
+      were all dropped for one caller is still never cached. It carries over to
+      a retry, so an ambiguity an earlier attempt flagged is never forgotten. It
+      is the canonical field; L1 (#339) rebases onto it.
+    - **`knowledge.used`** is published by the planner, once per sub-query, on
+      the first prompt that carries the block, not by the retriever: a
+      plan-cache hit sends no prompt, publishes nothing, and its
+      `SubQueryResult.knowledge_used` is None. JSON blocks escape U+2028,
+      U+2029 and U+0085 (`one_line` in `knowledge/render.py`).
     - **The cache.** `PlanCache(..., knowledge=)` appends
       `| knowledge=<Knowledge.digest(datasource_id)>` to every key (the digest
       of no knowledge when there is none); `plan_cache_for(ctx)` passes the
@@ -1764,7 +1772,8 @@ flowchart TD
     - **The explanation.** `caller_knowledge(ctx, state)` in
       `nl2sql/knowledge/scope.py` is the scope-filtered knowledge, per
       datasource the run planned on, for X1's `result_from_state(...,
-      knowledge=)`; `QueryAPI.run_query`, `QueryAPI._stream`,
+      knowledge=)`, read from the runtime the run pinned (`run_with_graph`
+      returns it as `state["pinned_runtime"]`); `QueryAPI.run_query`, `QueryAPI._stream`,
       `evaluation/run.py`, `tracing/replay.py` and `tracing/trace.py` pass it.
     - **Fakes and the recording.** `nl2sql.testing.fake_llm.as_planner_answer`
       wraps a bare plan as `{"plan": ...}` for a `PlannerAnswer` rule; the gold

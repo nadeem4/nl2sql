@@ -123,6 +123,20 @@ def visible(knowledge: DatasourceKnowledge, snapshot: Optional[SchemaSnapshot], 
          "examples": examples}, context={"item_max_chars": 1 << 30})
 
 
+def denied_pattern(snapshot: SchemaSnapshot, allows: Allows, also_denied: Iterable[str] = ()
+                   ) -> Optional["re.Pattern[str]"]:
+    """One regex for every table name the caller may not read (and ``also_denied``); None when there is none.
+
+    Build it once and test many texts with ``mentions``: building it is a pass over the snapshot.
+    """
+    return _pattern(denied_table_names(snapshot, allows) | {n.lower() for n in also_denied})
+
+
+def mentions(text: Optional[str], pattern: Optional["re.Pattern[str]"]) -> bool:
+    """Whether ``text`` names, as a whole word and ignoring case, a table ``pattern`` matches."""
+    return _mentions([text], pattern)
+
+
 def mentions_denied(text: Optional[str], snapshot: SchemaSnapshot, allows: Allows,
                     also_denied: Iterable[str] = ()) -> bool:
     """Whether ``text`` mentions a table of ``snapshot`` the caller may not read (or one of ``also_denied``)."""
@@ -142,6 +156,9 @@ def caller_knowledge(ctx: Any, state: Mapping[str, Any]) -> Dict[str, Datasource
     from nl2sql.policies import UserContext
 
     try:
+        # The runtime the run pinned (``run_with_graph`` hands it back), so the glossary and snapshot are the
+        # ones the prompts used, not what a reload swapped in meanwhile.
+        ctx = state.get("pinned_runtime") or ctx
         knowledge = getattr(ctx, "knowledge", None)
         if knowledge is None or not knowledge.datasources:
             return {}

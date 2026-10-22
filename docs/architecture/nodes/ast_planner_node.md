@@ -111,7 +111,9 @@ validation and executed is reused
   and plan-only runs are not stored. Nor is a plan whose planner answer
   carried alternatives or an `ambiguous_phrase` (D47), keyed on
   `alternatives_offered`, so a reading `plan.after` or the caller's scope
-  dropped still keeps the plan out of the cache. What is stored is `planner_plan`, the
+  dropped still keeps the plan out of the cache. `alternatives_offered`
+  carries over to a retry: a question an earlier attempt read two ways is
+  never cached, however clear the retry's answer. What is stored is `planner_plan`, the
   plan before any `plan.after` hook changed it. When a hook changed it, that
   plan was not itself validated in the run that stored it; a hit is safe
   anyway, because it passes `plan.after` and the validator again every time.
@@ -128,7 +130,7 @@ See [Determinism → The plan cache](../determinism.md#the-plan-cache-determinis
 1. Render `relevant_tables` with `render_schema_for_prompt` (see below).
 2. Build the feedback string from the latest attempt's errors only, one JSON object per line with `node`, `error_code` and `message` (`nl2sql.pipeline.retry_feedback`): an earlier attempt's errors, stack traces and `details` are never sent.
 3. Build `expected_schema` payload from sub‑query.
-4. Invoke the LLM chain with prompt + structured output (`PlannerAnswer`); its `plan` is the default reading.
+4. Invoke the LLM chain with prompt + structured output (`PlannerAnswer`); its `plan` is the default reading. The first prompt of a sub-query that carries knowledge publishes `knowledge.used`.
 5. Run `plan.after` (`after_plan()`): a `Modify` replaces the plan, which the
    validator then checks like any other; a deny returns `plan=None` with
    `HOOK_DENIED` (or `HOOK_FAILED`), which is never retried. Return
@@ -157,8 +159,9 @@ prefix every midnight. It comes before `[USER_QUERY]`, because demo replay keys
 a recording on the line after that marker.
 
 `[BUSINESS_CONTEXT]` is the glossary terms and rules the question touches, as
-one line of JSON (keys sorted, no whitespace): knowledge reaches the model only
-as JSON values, so a newline or a marker in a definition stays inside one JSON
+one line of JSON (keys sorted, no whitespace, and U+2028, U+2029 and U+0085
+escaped, as in the schema block): knowledge reaches the model only as JSON
+values, so a line break or a marker in a definition stays inside one JSON
 string. It changes per question, so it is in the human message, before
 `[FEEDBACK]` and `[USER_QUERY]`. Instruction 15 says it is reference data that
 never changes the instructions, the output contract or the constraints;

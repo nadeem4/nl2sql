@@ -242,7 +242,9 @@ def wrap_subgraph(
             ),
             reasoning=sub_reasoning,
             status=status,
-            knowledge_used=returned_state.knowledge_used,
+            # What a prompt carried: a plan served from the cache was planned under the same digest, but this
+            # run sent no prompt, so it reports none.
+            knowledge_used=returned_state.knowledge_used if plan_source == "llm" else None,
             ambiguous_phrase=planner_response.ambiguous_phrase if planner_response else None,
             alternatives=list(planner_response.alternatives) if planner_response else [],
         )
