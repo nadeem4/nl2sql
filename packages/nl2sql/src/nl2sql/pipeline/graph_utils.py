@@ -86,6 +86,7 @@ def build_scan_payload(
         "pinned_plan": pinned_plan,
         "pinned_source": pinned.source if pinned_plan is not None else None,
         "approvals": list(getattr(state, "approvals", None) or []),
+        "clarify": getattr(state, "clarify", True),
     }
 
 def _as_warning(error: PipelineError, sub_query_id: str) -> RunWarning:
@@ -137,6 +138,12 @@ def wrap_subgraph(
     keeps every attempt's errors. When the sub-query succeeded, those errors
     were superseded by a later attempt, so they reach the run's ``warnings``
     rather than its ``errors``.
+
+    The clarifier may ask which reading was meant only when the run's
+    ``clarify`` (in the scan payload) is on and the sub-query is the run's
+    only one (D47). A
+    sub-query that asked ends with status ``needs_clarification`` and its
+    ``NEEDS_CLARIFICATION`` (INFO) as its error; no SQL is missing.
     """
     # Read with the graph, so the plan is keyed on the planner model this run uses.
     planner = planner_of(ctx)
@@ -162,6 +169,7 @@ def wrap_subgraph(
             pinned_plan=state_dict.get("pinned_plan"),
             pinned_source=state_dict.get("pinned_source"),
             approvals=state_dict.get("approvals") or [],
+            clarify=bool(state_dict.get("clarify", True)) and len(decomposer_response.sub_queries) == 1,
         )
         # Propagate the run config (carrying the cancellation token) into the subgraph.
         result = subgraph.invoke(sub_state.model_dump(), config=config)
@@ -181,7 +189,10 @@ def wrap_subgraph(
         status = "success" if succeeded else "error"
         errors = list(returned_state.errors)
         blocking = [e for e in errors if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)]
-        if not succeeded and not blocking:
+        asked = any(e.error_code == ErrorCode.NEEDS_CLARIFICATION for e in errors)
+        if asked:
+            status = "needs_clarification"
+        elif not succeeded and not blocking:
             errors.append(
                 PipelineError(
                     node=subgraph_name,

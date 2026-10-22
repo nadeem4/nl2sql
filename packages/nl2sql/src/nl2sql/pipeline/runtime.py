@@ -174,6 +174,7 @@ def run_with_graph(
     scope: Optional["RunScope"] = None,
     pinned: Optional[PinnedRun] = None,
     approvals: Optional[Sequence["Approval"]] = None,
+    clarify: bool = True,
 ) -> Dict:
     """Convenience function to run the full pipeline.
 
@@ -199,6 +200,10 @@ def run_with_graph(
     ``approved`` (``pinned_from_approvals``). ``check_pinned`` refuses a
     chosen plan with approvals (a clarification re-ask is a new question,
     not an approved one) and a ``datasource_id`` that is not the pin's.
+
+    ``clarify`` off runs the default reading where the planner saw two
+    (``settings.clarify.enabled`` must be on too for the run to ask); the
+    prompts are the same either way (docs/architecture/wave_b.md, D58).
     """
     approvals = list(approvals or [])
     # QueryAPI checks this first, before the run's scope opens; a direct caller is held to it here.
@@ -230,6 +235,7 @@ def run_with_graph(
         user_query=user_query,
         user_context=user_context or UserContext(),
         datasource_id=datasource_id,
+        clarify=clarify,
         **({"trace_id": scope.trace_id} if scope is not None else {}),
     )
 

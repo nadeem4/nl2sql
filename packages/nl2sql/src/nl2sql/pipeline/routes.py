@@ -17,8 +17,8 @@ from nl2sql.common.logger import get_logger
 
 logger = get_logger("router")
 
-# What a hook ends a run with.
-_HOOK_ENDINGS = {ErrorCode.HOOK_DENIED, ErrorCode.HOOK_FAILED, ErrorCode.NEEDS_APPROVAL}
+# What ends a run once the layer in flight is done: a hook's ending, or a question asked back (L1).
+_RUN_ENDINGS = {ErrorCode.HOOK_DENIED, ErrorCode.HOOK_FAILED, ErrorCode.NEEDS_APPROVAL, ErrorCode.NEEDS_CLARIFICATION}
 
 
 def pinned_route(state: GraphState) -> str:
@@ -74,11 +74,13 @@ def build_scan_layer_router(ctx: Runtime, execute: bool = True):
     A hook that stopped the run (a run-scoped deny, a hook error, a request
     for approval) ends it once the layer in flight is done. A sub-query a hook
     dropped is done without a result; the aggregator answers from the rest,
-    and says what is missing.
+    and says what is missing. A sub-query that asked which reading was meant
+    (``NEEDS_CLARIFICATION``) ends the run the same way: nothing is
+    executed, aggregated or synthesized.
     """
 
     def route_scan_layers(state: GraphState):
-        if any(e.error_code in _HOOK_ENDINGS for e in getattr(state, "errors", None) or []):
+        if any(e.error_code in _RUN_ENDINGS for e in getattr(state, "errors", None) or []):
             return END
         dag = state.execution_dag
         decomposer_response = state.decomposer_response

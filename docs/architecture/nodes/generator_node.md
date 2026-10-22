@@ -21,17 +21,17 @@
 ## Position in Execution Graph
 
 Upstream:
-- `LogicalValidatorNode`
+- [`ClarifierNode`](clarifier_node.md), after `LogicalValidatorNode` passed the plan
 
 Downstream:
 - `ExecutorNode`
 
 Trigger conditions:
-- Executed when logical validation passes.
+- Executed when logical validation passes and the clarifier did not ask which reading was meant.
 
 ```mermaid
 flowchart LR
-    Validator[LogicalValidatorNode] --> Generator[GeneratorNode] --> Executor[ExecutorNode]
+    Validator[LogicalValidatorNode] --> Clarifier[ClarifierNode] --> Generator[GeneratorNode] --> Executor[ExecutorNode]
 ```
 
 ---

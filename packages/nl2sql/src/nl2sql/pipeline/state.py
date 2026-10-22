@@ -58,6 +58,8 @@ class GraphState(BaseModel):
             run enters at the pinned entry instead of routing and decomposing.
         approvals (List[Approval]): The approvals the run was asked with; the hooks at execute.before see them.
         approvals_needed (List[ApprovalRequest]): What a person must approve; the run ends ``needs_approval``.
+        clarify (bool): The run's ``clarify``: whether a run of one sub-query may end ``needs_clarification``
+            (docs/architecture/wave_b.md, section 7). Off, the default reading runs.
     """
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
@@ -82,6 +84,7 @@ class GraphState(BaseModel):
     pinned: Optional[PinnedRun] = Field(default=None)
     approvals: List[Approval] = Field(default_factory=list)
     approvals_needed: Annotated[List[ApprovalRequest], operator.add] = Field(default_factory=list)
+    clarify: bool = True
 
 
 class SubgraphExecutionState(BaseModel):
@@ -102,6 +105,9 @@ class SubgraphExecutionState(BaseModel):
     # The knowledge this sub-query's prompts carried (the schema retriever fills it from K2). The planner's
     # other readings are on ast_planner_response.alternatives.
     knowledge_used: Optional[KnowledgeUsed] = None
+    # Whether the clarifier may end this sub-query with a question (L1): the run's ``clarify`` is on and this
+    # is its only sub-query (D47). The sub-query wrapper sets it; otherwise the default plan runs.
+    clarify: bool = False
 
     ast_planner_response: Optional[ASTPlannerResponse] = Field(default=None)
     logical_validator_response: Optional[LogicalValidatorResponse] = Field(default=None)

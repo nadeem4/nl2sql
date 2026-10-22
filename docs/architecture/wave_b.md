@@ -907,6 +907,47 @@ sentence: "This question can be read more than one way. Choose one:
 Revenue (sum of unit price times quantity); Invoiced total (tax included)."
 `clarification.requested` is published. Nothing is stored.
 
+!!! note "Built: the clarifier and the result (L1)"
+    `ClarifierNode` (`pipeline/nodes/clarifier/node.py`) is on the validator's
+    "valid" edge (`check_clarifier` routes to `END` when it asked, else to the
+    generator), and `LogicalValidatorNode.check(plan, state) ->
+    List[PipelineError]` is the node's checks as a function (the policy
+    findings first). It reads K2's `ASTPlannerResponse.alternatives` and
+    `ambiguous_phrase` and passes through without them. Where the build filled
+    a gap:
+
+    - **The flag.** `run_query`, `stream_query` and `run_with_graph` take
+      `clarify: bool = True`; it rides on `GraphState.clarify` and the scan
+      payload, and `wrap_subgraph` sets `SubgraphExecutionState.clarify` to it
+      only when the decomposition has one sub-query. The clarifier asks when
+      that, `settings.clarify.enabled` and a named phrase hold. The eval runner
+      passes `clarify=False` (D58); L2 turns it on for `clarify` cases.
+    - **Dropped means gone.** An alternative that fails `check` (or that the
+      generator cannot render) is removed from `ast_planner_response.alternatives`,
+      so it is neither offered nor listed as an assumption by X1. Merging keeps
+      the first label. `plan.after` on each alternative stays K2's (the planner
+      node); H1's test still allows no other caller.
+    - **The ending.** The clarifier ends the sub-query with
+      `NEEDS_CLARIFICATION` (`INFO`) whose `details` hold `phrase`,
+      `datasource_id`, `schema_version` (the sub-query's), `knowledge_digest`
+      (the run's pinned `Runtime.knowledge.digest(ds)`), `sub_query` and
+      `options` (`id`, `label`, `plan` as JSON; option `a` is the default plan
+      after `plan.after`). `wrap_subgraph` gives the sub-query the status
+      `needs_clarification` and adds no `MISSING_SQL`; the layer router ends
+      the run on the code, as on a hook's ending.
+    - **The request** is built in `result_from_state(..., question=)`, which
+      adds the question as passed (before `run.before`; the state's when not
+      given), the asker, and each option's `explanation =
+      explain_plan(plan, datasource_id=, sub_query_id=, knowledge_used=,
+      knowledge=)`. X1 still explains only `success` steps, so the run's
+      `explanation` is `None`. The default reading has no planner label: it is
+      the one glossary term its step reads, else its first measure, filter or
+      table, capped at 60. `final_answer` is the fixed sentence as
+      `{summary, format_type: "text", content, warnings: []}`.
+    - **Status.** `needs_clarification` comes after `needs_approval` and
+      `stopped`, before `error`. The pipeline step list (`pipeline/steps.py`)
+      and the trace recorder's inputs name the `clarifier`.
+
 ### Asking again
 
 ```python

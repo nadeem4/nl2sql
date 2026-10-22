@@ -31,6 +31,7 @@ Fields (exact names and types from code):
 - `pinned: Optional[PinnedRun]` (a pinned decomposition and plans; `source` is a `PinnedSource`: `supplied`, `approved` or `chosen`)
 - `approvals: List[Approval]` (what the run was asked with)
 - `approvals_needed: Annotated[List[ApprovalRequest], operator.add]`
+- `clarify: bool` (the run's `clarify`, default `True`; `build_scan_payload` passes it to each sub-query)
 
 Reducer behavior in `GraphState`:
 - `update_results(current, new)` merges dicts as `{**current, **new}`.
@@ -49,6 +50,7 @@ Fields (exact names and types from code):
 - `relevant_tables: List[Table]`
 - `pinned_plan: Optional[PlanModel]` and `pinned_source: Optional[PinnedSource]` (the sub-query's pinned plan, from `build_scan_payload`; the planner returns it, and the SQL agent never retries it)
 - `approvals: List[Approval]` (the run's, for the `execute.before` hooks)
+- `clarify: bool` (set by `wrap_subgraph`: the run's `clarify` is on and this is the run's only sub-query; the [clarifier](nodes/clarifier_node.md) asks only then)
 - `ast_planner_response: Optional[ASTPlannerResponse]`
 - `logical_validator_response: Optional[LogicalValidatorResponse]`
 - `generator_response: Optional[GeneratorResponse]`
@@ -181,7 +183,7 @@ Ownership is defined by which node returns updates for a field:
 - `errors`, `reasoning`: emitted by many nodes and merged by list reducers
 - `warnings`: emitted by nodes that return `warnings` in the main graph (currently `DatasourceResolverNode`)
 - `subgraph_id`, `subgraph_name`: created in `build_scan_payload`, used only for subgraph execution context
-- `trace_id`, `user_query`, `user_context`, `datasource_id`, `pinned`, `approvals`: owned by the pipeline entrypoint (`run_with_graph`); without a supplied plan, `pinned` comes from the first approval that is this run's (`pinned_from_approvals`)
+- `trace_id`, `user_query`, `user_context`, `datasource_id`, `pinned`, `approvals`, `clarify`: owned by the pipeline entrypoint (`run_with_graph`); without a supplied plan, `pinned` comes from the first approval that is this run's (`pinned_from_approvals`)
 - `decomposer_response`, `execution_dag` on a pinned run: `PinnedEntryNode`, from `pinned.decomposition`
 - `approvals_needed`: `wrap_subgraph`, and `CuratedMatcherNode` on the verified path
 

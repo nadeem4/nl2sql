@@ -17,7 +17,7 @@ from nl2sql.pipeline.nodes.ast_planner.functions import (
     date_operation,
     is_allowed_function,
 )
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr
+from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel, Expr
 from nl2sql.pipeline.nodes.generator.node import (
     SUPPORTED_BINARY_OPS,
     GeneratorNode,
@@ -891,6 +891,42 @@ class LogicalValidatorNode:
 
 
 
+    def _findings(self, state: SubgraphExecutionState) -> Tuple[List[PipelineError], List[PipelineError]]:
+        """The policy and the static findings on the state's plan.
+
+        Static validation is isolated so that a failure inside it can never
+        skip policy enforcement. RBAC must run for every plan.
+        """
+        static_errors: List[PipelineError] = []
+        try:
+            static_errors.extend(self._validate_static(state))
+        except Exception as exc:
+            logger.exception("Static logical validation crashed")
+            static_errors.append(
+                PipelineError(
+                    node="logical_validator",
+                    message=f"Static logical validation crashed: {exc}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.VALIDATOR_CRASH,
+                    stack_trace=traceback.format_exc(),
+                )
+            )
+        return list(self._validate_policy(state)), static_errors
+
+    def check(self, plan: PlanModel, state: SubgraphExecutionState) -> List[PipelineError]:
+        """The validator's checks on ``plan`` as a function: every finding, the refusal first.
+
+        ``plan`` is checked as a plan of ``state``'s sub-query, with its
+        retrieved schema and its caller's scope, exactly as the node checks
+        the state's own plan; the state is not changed. The clarifier runs
+        each of the planner's alternatives through it (docs/architecture/wave_b.md,
+        section 7), so an option is offered only when the node would pass it.
+        An ERROR or CRITICAL finding means the plan would not pass.
+        """
+        probe = state.model_copy(update={"ast_planner_response": ASTPlannerResponse(plan=plan)})
+        policy_errors, static_errors = self._findings(probe)
+        return policy_errors + static_errors
+
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
         """Executes the validation node.
 
@@ -941,24 +977,7 @@ class LogicalValidatorNode:
                     ],
                 }
 
-            # Static validation is isolated so that a failure inside it can
-            # never skip policy enforcement. RBAC must run for every plan.
-            static_errors: list[PipelineError] = []
-            try:
-                static_errors.extend(self._validate_static(state))
-            except Exception as exc:
-                logger.exception("Static logical validation crashed")
-                static_errors.append(
-                    PipelineError(
-                        node=node_name,
-                        message=f"Static logical validation crashed: {exc}",
-                        severity=ErrorSeverity.ERROR,
-                        error_code=ErrorCode.VALIDATOR_CRASH,
-                        stack_trace=traceback.format_exc(),
-                    )
-                )
-
-            policy_errors = list(self._validate_policy(state))
+            policy_errors, static_errors = self._findings(state)
             # The refusal comes first: a table the scope hid from the planner
             # is also missing from its schema, and the denial is the reason.
             errors.extend(policy_errors)
