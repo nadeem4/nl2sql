@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0](https://github.com/nadeem4/nl2sql/compare/v0.7.0...v0.8.0) (2026-10-22)
+
+
+### Features
+
+* **adapters:** estimate (rows read) and probe_overlap (C1) ([#332](https://github.com/nadeem4/nl2sql/issues/332)) ([a9f9890](https://github.com/nadeem4/nl2sql/commit/a9f9890a2779d8c22b22db0d6e32a03ca5677e9e))
+* **explain:** why this answer, rendered from the typed plan (X1) ([#335](https://github.com/nadeem4/nl2sql/issues/335)) ([da43eba](https://github.com/nadeem4/nl2sql/commit/da43eba7c2cbff244154d6223819947d7c09466d))
+* **knowledge:** knowledge sources, merge, scope filter, show and export (K1) ([#336](https://github.com/nadeem4/nl2sql/issues/336)) ([9092eac](https://github.com/nadeem4/nl2sql/commit/9092eacd277598c48656709d8761c69fa9e1792a))
+* **review:** the review queue, accept as the only writer, thumbs-up proposals (Q1) ([#337](https://github.com/nadeem4/nl2sql/issues/337)) ([13567e7](https://github.com/nadeem4/nl2sql/commit/13567e7c41a1ae9fb636632f79db77afd5709063))
+* **wave-b:** the shared shapes for knowledge, review, profiler, clarify, explain and cost (B0) ([#329](https://github.com/nadeem4/nl2sql/issues/329)) ([1b56cd8](https://github.com/nadeem4/nl2sql/commit/1b56cd82345a957acd967429ae253fab2025ee7d))
+
 ## [0.7.0](https://github.com/nadeem4/nl2sql/compare/v0.6.0...v0.7.0) (2026-10-15)
 
 
