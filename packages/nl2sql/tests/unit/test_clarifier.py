@@ -209,7 +209,7 @@ def test_more_than_one_sub_query_runs_the_default_and_lists_assumptions(monkeypa
     assert any("could also mean Invoiced amount" in a for a in step.assumptions)
 
 
-def test_clarify_false_runs_the_default_with_the_same_prompt(monkeypatch):
+def test_clarify_false_runs_the_default_with_the_same_planner_input(monkeypatch):
     asked, asked_planned, _ = _wrapped(monkeypatch, [INVOICED], clarify=True)
     out, planned, executed = _wrapped(monkeypatch, [INVOICED], clarify=False)
 
@@ -342,3 +342,166 @@ def test_public_run_query_takes_clarify():
     for method in (NL2SQL.run_query, NL2SQL.stream_query):
         parameter = inspect.signature(method).parameters["clarify"]
         assert parameter.default is True and parameter.kind is inspect.Parameter.KEYWORD_ONLY
+
+
+# ---------------------------------------------------------------- after review (#339)
+
+
+def _retrying_agent(monkeypatch):
+    """Attempt 1 has no alternatives and its result is flagged JOIN_FAN_OUT; the re-plan reads "sales" two ways."""
+    from nl2sql.common.errors import PipelineError
+    from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
+
+    settings = {"pipeline": {"retries": {"max": 2, "base_delay_s": 0, "jitter_s": 0}}}
+    answers = [ASTPlannerResponse(plan=GROSS),
+               ASTPlannerResponse(plan=GROSS, ambiguous_phrase="sales", alternatives=[INVOICED])]
+    executed = []
+
+    def execute(state):
+        executed.append(state)
+        update = {"executor_response": _executed(_artifact())}
+        if len(executed) == 1:
+            update["errors"] = [PipelineError(node="executor", message="fan-out", severity=ErrorSeverity.ERROR,
+                                              error_code=ErrorCode.JOIN_FAN_OUT, details={"attempt": 0})]
+        return update
+
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.SchemaRetrieverNode",
+                        lambda _ctx: (lambda s: {"relevant_tables": TABLES}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ASTPlannerNode",
+                        lambda _ctx: (lambda s: {"ast_planner_response": answers[min(s.retry_count, 1)]}))
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: execute)
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: (lambda s: {}))
+    return build_sql_agent_graph(_ctx(settings), execute=True), executed, settings
+
+
+def test_no_question_after_an_executed_attempt(monkeypatch):
+    graph, executed, settings = _retrying_agent(monkeypatch)
+
+    out = wrap_subgraph(graph, "sql_agent", _ctx(settings))({
+        "trace_id": "t", "subgraph_id": "sql_agent:sq1:t", "user_query": QUESTION, "user_context": ANA,
+        "decomposer_response": _decomposition(), "clarify": True})
+    result = _result(out)
+
+    # The default reading runs again: the rows are the second attempt's, never the flagged first one's.
+    assert len(executed) == 2
+    assert result.status == "success" and result.clarification is None
+    assert ErrorCode.NEEDS_CLARIFICATION.value not in {w.code for w in result.warnings}
+    [step] = result.explanation.steps
+    assert any("could also mean Invoiced amount" in a for a in step.assumptions)
+
+
+def test_a_sub_query_that_asked_never_counts_as_succeeded():
+    from nl2sql.common.errors import PipelineError
+    from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
+
+    asked = PipelineError(node="clarifier", message="m", severity=ErrorSeverity.INFO,
+                          error_code=ErrorCode.NEEDS_CLARIFICATION)
+    earlier = PipelineError(node="logical_validator", message="No such column.", severity=ErrorSeverity.ERROR,
+                            error_code=ErrorCode.COLUMN_NOT_FOUND)
+    returned = SubgraphExecutionState(
+        trace_id="t", sub_query=_sq(), ast_planner_response=ASTPlannerResponse(plan=GROSS),
+        generator_response=GeneratorResponse(sql_draft="SELECT 1"), executor_response=_executed(_artifact()),
+        errors=[earlier, asked]).model_dump()
+    sub = SimpleNamespace(invoke=lambda state, config=None: returned)
+
+    out = wrap_subgraph(sub, "sql_agent", _ctx())({
+        "trace_id": "t", "subgraph_id": "sql_agent:sq1:t", "user_query": QUESTION, "user_context": ANA,
+        "decomposer_response": _decomposition()})
+
+    [output] = out["subgraph_outputs"].values()
+    assert output.status == "needs_clarification"
+    assert out["artifact_refs"] == {}
+    # Only the question is the sub-query's error; a superseded attempt's error is a warning, as on success.
+    assert [e.error_code for e in out["errors"]] == [ErrorCode.NEEDS_CLARIFICATION]
+    assert [(w.code, w.detail) for w in out["warnings"]] == [("COLUMN_NOT_FOUND", {"recovered": True})]
+
+
+def test_the_planners_alternatives_are_still_counted_after_the_filtering(monkeypatch):
+    graph, _, _ = _agent(monkeypatch, [DENIED, BROKEN])
+
+    state = graph.invoke(_sub_state())
+
+    response = state["ast_planner_response"]
+    assert response.alternatives == []
+    # What the plan cache keys "never cache an answer with alternatives" on (D47): the planner gave two.
+    assert response.alternatives_offered == 2
+    assert ASTPlannerResponse(plan=GROSS, alternatives=[INVOICED]).alternatives_offered == 1
+    assert ASTPlannerResponse(plan=GROSS).alternatives_offered == 0
+
+
+def test_checking_a_denied_alternative_publishes_no_denial(monkeypatch):
+    graph, _, _ = _agent(monkeypatch, [DENIED, INVOICED])
+    bus = EventBus()
+    seen = []
+    bus.subscribe(seen.append, names=["policy.decision"])
+    scope = RunScope(bus, question=QUESTION)
+    with scope.entered():
+        graph.invoke(_sub_state())
+
+    assert seen == []
+
+
+def _engine(monkeypatch, written=None):
+    """An engine over a fake runtime whose graph records the state it starts from."""
+    from nl2sql import NL2SQL
+    from nl2sql.pipeline import runtime
+
+    states = []
+
+    class Graph:
+        def invoke(self, state, config=None):
+            states.append(state)
+            return {}
+
+    monkeypatch.setattr(runtime, "build_graph", lambda ctx, execute=True: Graph())
+    if written is not None:
+        monkeypatch.setattr(runtime, "write_run_trace", lambda mode, **kwargs: written.append(kwargs))
+    engine = NL2SQL.__new__(NL2SQL)
+    engine._runtime = _ctx(bus=EventBus())
+    return engine, states
+
+
+def test_stream_query_passes_clarify_to_the_run(monkeypatch):
+    engine, states = _engine(monkeypatch)
+
+    events = list(engine.stream_query(QUESTION, user_context=ANA, clarify=False))
+    list(engine.stream_query(QUESTION, user_context=ANA))
+
+    assert events[-1].name == "run.finished"
+    assert [s["clarify"] for s in states] == [False, True]
+
+
+def test_the_trace_records_clarify_and_replay_runs_with_it(monkeypatch):
+    from nl2sql.pipeline import runtime as pipeline_runtime
+    from nl2sql.tracing.replay import replay_trace
+
+    written = []
+    engine, _ = _engine(monkeypatch, written)
+    engine.run_query(QUESTION, user_context=ANA, clarify=False)
+    [trace] = written
+    assert trace["request"]["clarify"] is False
+
+    seen = {}
+    monkeypatch.setattr(pipeline_runtime, "run_with_graph",
+                        lambda ctx, question, **kwargs: seen.update(kwargs) or {"trace_id": "t"})
+    replay_trace({"request": {"question": QUESTION, "clarify": False}, "nodes": [], "result": {}},
+                 engine._runtime)
+    assert seen["clarify"] is False
+
+
+def test_the_rendered_planner_prompt_does_not_depend_on_clarify():
+    from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
+    from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_PROMPT
+
+    ctx = _ctx()
+    ctx.llm_registry.get_llm.return_value = MagicMock()
+    node = ASTPlannerNode(ctx)
+    node.chain = MagicMock()
+    node.chain.invoke.return_value = GROSS
+    prompts = []
+    for clarify in (True, False):
+        node(SubgraphExecutionState(trace_id="t", user_query=QUESTION, sub_query=_sq(), user_context=ANA,
+                                    relevant_tables=TABLES, clarify=clarify))
+        prompts.append(PLANNER_PROMPT.format_messages(**node.chain.invoke.call_args.args[0]))
+
+    assert prompts[0] == prompts[1]

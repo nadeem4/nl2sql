@@ -269,6 +269,7 @@ def run_with_graph(
                 "tenant_id": getattr(initial_state.user_context, "tenant_id", None),
                 "datasource_id": datasource_id,
                 "execute": execute,
+                "clarify": clarify,
                 "today": today,
             },
             started_at=started_at,

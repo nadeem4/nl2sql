@@ -311,6 +311,8 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
         state = run_with_graph(
             run, request.get("question") or "", datasource_id=request.get("datasource_id"),
             execute=bool(request.get("execute", True)), callbacks=[playback.recorder],
+            # As recorded: a run with clarification off would otherwise replay as a question asked back.
+            clarify=bool(request.get("clarify", True)),
             user_context=user_context, cancellation_token=playback.token, trace_mode="off",
         )
     finally:
@@ -319,7 +321,8 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
 
     traces = run.settings.traces
     result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
-                               sample_rows=traces.sample_rows).model_dump(mode="json")
+                               sample_rows=traces.sample_rows,
+                               question=request.get("question") or "").model_dump(mode="json")
     # Compared the way the recorded result was stored: capped, then redacted.
     limits = Limits(sample_rows=traces.sample_rows, max_field_chars=traces.max_field_chars)
     result = Redactor(collect_secrets(run)).redact(cap(result, limits))

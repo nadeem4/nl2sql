@@ -270,11 +270,17 @@ class ASTPlannerResponse(BaseModel):
     # clarifier validates them and offers them (L1). Empty for a clear question or a pinned plan.
     ambiguous_phrase: Optional[str] = None
     alternatives: List["PlanAlternative"] = Field(default_factory=list)
+    # How many alternatives the planner gave, before the clarifier dropped the ones that failed the validator
+    # or repeated another option's SQL. Built without it, it is ``len(alternatives)``. An answer with any is
+    # never cached (D47), even when none was left for this caller.
+    alternatives_offered: int = 0
 
     @model_validator(mode="after")
     def _planner_plan_defaults_to_plan(self) -> "ASTPlannerResponse":
         if "planner_plan" not in self.model_fields_set:
             self.planner_plan = self.plan
+        if "alternatives_offered" not in self.model_fields_set:
+            self.alternatives_offered = len(self.alternatives)
         return self
 
 

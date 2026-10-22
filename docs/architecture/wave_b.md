@@ -911,21 +911,34 @@ Revenue (sum of unit price times quantity); Invoiced total (tax included)."
       `clarify: bool = True`; it rides on `GraphState.clarify` and the scan
       payload, and `wrap_subgraph` sets `SubgraphExecutionState.clarify` to it
       only when the decomposition has one sub-query. The clarifier asks when
-      that, `settings.clarify.enabled` and a named phrase hold. The eval runner
-      passes `clarify=False` (D58); L2 turns it on for `clarify` cases.
+      that, `settings.clarify.enabled` and a named phrase hold, and only while
+      no attempt of the sub-query has executed (`state.executor_response is
+      None`): a sanity retry's re-plan runs its default reading, so a flagged
+      attempt's rows are never returned. The eval runner passes
+      `clarify=False` (D58); L2 turns it on for `clarify` cases. The trace
+      request records `clarify`, and replay runs with it.
     - **Dropped means gone.** An alternative that fails `check` (or that the
       generator cannot render) is removed from `ast_planner_response.alternatives`,
       so it is neither offered nor listed as an assumption by X1. Merging keeps
-      the first label. `plan.after` on each alternative stays K2's (the planner
-      node); H1's test still allows no other caller.
+      the first label. `ASTPlannerResponse.alternatives_offered` keeps how
+      many the planner gave (`len(alternatives)` unless set; the clarifier
+      carries it over), so K2's rule that an answer with alternatives is never
+      cached (D47) holds even when none was left for this caller. Checking an
+      alternative is `check(..., audit=False)`: a denied reading publishes no
+      `policy.decision` and logs no denial warning. `plan.after` on each
+      alternative stays K2's (the planner node); H1's test still allows no
+      other caller.
     - **The ending.** The clarifier ends the sub-query with
       `NEEDS_CLARIFICATION` (`INFO`) whose `details` hold `phrase`,
       `datasource_id`, `schema_version` (the sub-query's), `knowledge_digest`
       (the run's pinned `Runtime.knowledge.digest(ds)`), `sub_query` and
       `options` (`id`, `label`, `plan` as JSON; option `a` is the default plan
-      after `plan.after`). `wrap_subgraph` gives the sub-query the status
-      `needs_clarification` and adds no `MISSING_SQL`; the layer router ends
-      the run on the code, as on a hook's ending.
+      after `plan.after`). `wrap_subgraph` never counts a sub-query that
+      asked as succeeded and returns no artifact for it; it gives it the
+      status `needs_clarification`, the question as its one error and its
+      earlier attempts' errors as warnings (as on success), and adds no
+      `MISSING_SQL`. The layer router ends the run on the code, as on a hook's
+      ending.
     - **The request** is built in `result_from_state(..., question=)`, which
       adds the question as passed (before `run.before`; the state's when not
       given), the asker, and each option's `explanation =

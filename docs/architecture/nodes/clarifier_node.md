@@ -70,7 +70,9 @@ for the datasource's knowledge digest.
 
 - No alternatives: nothing (it passes straight through).
 - Otherwise `ast_planner_response` with `alternatives` cut to the readings that
-  passed and were not merged.
+  passed and were not merged. `alternatives_offered` still says how many the
+  planner gave, so an answer with readings is never cached (D47), even when
+  none was left for this caller.
 - When it asks, also one `PipelineError`: `NEEDS_CLARIFICATION`, severity
   `INFO`, never retried. Its `details` carry what the result needs to build the
   `ClarificationRequest`: `phrase`, `datasource_id`, `schema_version`,
@@ -90,6 +92,11 @@ All of these hold:
 2. `state.clarify` is on: the run's `clarify` (`run_query(clarify=...)`,
    default true; evals pass false) and the run has exactly one sub-query.
 3. `settings.clarify.enabled` is on (the default).
+4. No attempt of the sub-query has executed yet. After a sanity retry
+   (`VALUE_NOT_FOUND`, `JOIN_FAN_OUT`) the re-plan's default reading runs, so
+   the flagged attempt's rows are never the answer, and the readings that
+   passed are assumptions. `wrap_subgraph` never counts a sub-query that asked
+   as succeeded, nor returns its artifact.
 
 The prompts are the same either way: `clarify` only decides whether the
 clarifier ends the run.
@@ -113,7 +120,9 @@ the sub-query with status `needs_clarification` and no `MISSING_SQL` error.
 
 - `clarification.requested` (`sub_query_id`, `phrase`, `options`), an operator
   event, never on the caller's stream.
-- A validator's `policy.decision` for an alternative that read a denied table.
+- No `policy.decision` and no denial warning for an alternative that names a
+  denied table (`check(..., audit=False)`): that reading is dropped and
+  reaches no caller. The plan the caller gets is audited as always.
 - `node.started` and `node.finished` as every step.
 
 ---

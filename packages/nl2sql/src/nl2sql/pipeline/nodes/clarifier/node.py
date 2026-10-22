@@ -14,7 +14,8 @@ would pass it, so no option names a table the caller cannot read.
 
 When at least one alternative is left, the planner named the phrase, and the
 sub-query may ask (``state.clarify``: the run's ``clarify`` is on and this is
-its only sub-query, D47) and ``settings.clarify.enabled`` is on, the sub-query
+its only sub-query, D47), ``settings.clarify.enabled`` is on and no attempt of
+the sub-query has executed yet (a sanity retry's re-plan never asks), the sub-query
 ends with ``NEEDS_CLARIFICATION`` (INFO, never retried) before the generator,
 and ``clarification.requested`` is published. The error's ``details`` carry
 what the result needs to build the ``ClarificationRequest``
@@ -70,7 +71,7 @@ class ClarifierNode:
         for alternative in response.alternatives:
             if len(kept) >= MAX_OPTIONS - 1:
                 break
-            findings = self.validator.check(alternative.plan, state)
+            findings = self.validator.check(alternative.plan, state, audit=False)
             if any(f.severity in _BLOCKING for f in findings):
                 logger.info("An alternative reading failed validation (%s); it is not offered.",
                             ", ".join(sorted({f.error_code.value for f in findings})))
@@ -118,8 +119,13 @@ class ClarifierNode:
         if response is None or response.plan is None or not response.alternatives:
             return {}
         kept = self._options(state, response)
-        update: Dict[str, Any] = {"ast_planner_response": response.model_copy(update={"alternatives": kept})}
-        ask = self.enabled and state.clarify and bool(kept) and bool(response.ambiguous_phrase)
+        # alternatives_offered keeps the planner's count, so an answer with readings is never cached (D47).
+        update: Dict[str, Any] = {"ast_planner_response": response.model_copy(
+            update={"alternatives": kept, "alternatives_offered": response.alternatives_offered})}
+        # Never once an attempt executed (a sanity retry's re-plan): the default reading runs again, so the
+        # flagged attempt's rows are replaced, and the other readings are assumptions.
+        ask = (self.enabled and state.clarify and bool(kept) and bool(response.ambiguous_phrase)
+               and state.executor_response is None)
         if not ask:
             return update
         error = self._ask(state, response, kept)
