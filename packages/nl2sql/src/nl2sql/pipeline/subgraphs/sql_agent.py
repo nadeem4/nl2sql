@@ -8,6 +8,8 @@ from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.schema_retriever import SchemaRetrieverNode
 from nl2sql.pipeline.nodes.validator import LogicalValidatorNode
+from nl2sql.pipeline.nodes.clarifier import ClarifierNode
+from nl2sql.pipeline.nodes.clarifier.node import asked
 from nl2sql.pipeline.nodes.refiner import RefinerNode
 from nl2sql.pipeline.nodes.generator import GeneratorNode
 from nl2sql.pipeline.nodes.executor import ExecutorNode
@@ -30,7 +32,12 @@ def build_sql_agent_graph(
     """Builds the SQL Agent Subgraph.
 
     Pipeline Flow:
-    Planner -> LogicalValidator -> Generator -> Executor
+    Planner -> LogicalValidator -> Clarifier -> Generator -> Executor
+
+    The clarifier is on the validator's "valid" edge: with no alternative
+    readings from the planner it passes straight through; when it asks which
+    reading was meant (``NEEDS_CLARIFICATION``) the sub-query ends before the
+    generator (docs/architecture/wave_b.md, section 7).
 
     Feedback Loop:
     (LogicalValidator Error) -> RetryHandler -> Refiner -> Planner
@@ -52,6 +59,7 @@ def build_sql_agent_graph(
     logical_validator = LogicalValidatorNode(ctx)
     refiner = RefinerNode(ctx)
     generator = GeneratorNode(ctx)
+    clarifier = ClarifierNode(ctx, logical_validator, generator)
     retries = ctx.settings.pipeline.retries
 
     def _get_retry_count(state: SubgraphExecutionState) -> int:
@@ -149,6 +157,12 @@ def build_sql_agent_graph(
             return "retry"
         return "end" if blocking else "ok"
 
+    def check_clarifier(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
+        """Ends the sub-query when the clarifier asked which reading was meant; else on to the generator."""
+        if _is_cancelled(config) or asked(state):
+            return "end"
+        return "ok"
+
     def check_execution(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
         """Routes a query the database rejected back to the refiner.
 
@@ -184,6 +198,7 @@ def build_sql_agent_graph(
     graph.add_node("schema_retriever", schema_retriever)
     graph.add_node("ast_planner", ast_planner)
     graph.add_node("logical_validator", logical_validator)
+    graph.add_node("clarifier", clarifier)
     graph.add_node("generator", generator)
     if execute:
         graph.add_node("executor", ExecutorNode(ctx))
@@ -203,7 +218,13 @@ def build_sql_agent_graph(
     graph.add_conditional_edges(
         "logical_validator",
         check_logical_validation,
-        {"ok": "generator", "retry": "retry_handler", "end": END},
+        {"ok": "clarifier", "retry": "retry_handler", "end": END},
+    )
+
+    graph.add_conditional_edges(
+        "clarifier",
+        check_clarifier,
+        {"ok": "generator", "end": END},
     )
 
     if execute:

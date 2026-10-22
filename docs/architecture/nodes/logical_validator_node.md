@@ -79,7 +79,7 @@ Upstream:
 - `ASTPlannerNode`
 
 Downstream:
-- `GeneratorNode` on success
+- [`ClarifierNode`](clarifier_node.md) on success, which goes on to `GeneratorNode` unless it asks which reading was meant
 - `retry_handler` on retryable errors
 
 Trigger conditions:
@@ -87,7 +87,7 @@ Trigger conditions:
 
 ```mermaid
 flowchart LR
-    Planner[ASTPlannerNode] --> Validator[LogicalValidatorNode] --> Generator[GeneratorNode]
+    Planner[ASTPlannerNode] --> Validator[LogicalValidatorNode] --> Clarifier[ClarifierNode] --> Generator[GeneratorNode]
     Validator --> RetryHandler[retry_handler]
 ```
 
@@ -221,6 +221,20 @@ Implements a LangGraph node callable:
 ```
 def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]
 ```
+
+and its checks as a function, which the clarifier runs on each of the
+planner's alternative readings:
+
+```
+def check(self, plan: PlanModel, state: SubgraphExecutionState, *, audit: bool = True) -> List[PipelineError]
+```
+
+`check` checks `plan` as a plan of `state`'s sub-query, with its retrieved
+schema and its caller's scope, exactly as the node checks the state's own
+plan (the policy findings first, then the static ones), and leaves the state
+unchanged. An `ERROR` or `CRITICAL` finding means the node would not pass it.
+`audit=False` (the clarifier's) publishes no `policy.decision` and logs no
+denial warning, since a reading that is only checked reaches no caller.
 
 Key contracts:
 

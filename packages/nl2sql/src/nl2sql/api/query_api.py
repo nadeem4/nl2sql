@@ -30,8 +30,8 @@ from nl2sql.pipeline.events import RunEvents
 from nl2sql.pipeline.pinned import PinnedRun, SuppliedPlan, check_pinned
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
-from nl2sql.clarify.models import ClarificationRequest
-from nl2sql.explain.models import Explanation
+from nl2sql.clarify.models import ClarificationOption, ClarificationRequest
+from nl2sql.explain.models import ExplainedStep, Explanation
 from nl2sql.knowledge.models import KnowledgeUsed
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.models import Estimate
@@ -118,9 +118,8 @@ class QueryResult(BaseModel):
     warnings: List[RunWarning] = Field(default_factory=list)
     artifact_refs: Dict[str, ArtifactRef] = Field(default_factory=dict)
     # How the run ended: success, plan_only, error, needs_approval (see
-    # approvals_needed), stopped (see stop), or needs_clarification (reserved
-    # for Wave B's clarification result; nothing produces it yet). None when
-    # nothing ran and nothing failed.
+    # approvals_needed), stopped (see stop), or needs_clarification (see
+    # clarification). None when nothing ran and nothing failed.
     status: Optional[RunStatus] = None
     timings: Dict[str, float] = Field(default_factory=dict)
     usage: QuestionUsage = Field(default_factory=QuestionUsage)
@@ -136,7 +135,8 @@ class QueryResult(BaseModel):
     # What a person must approve before the question runs, one per pending sub-query, when status is
     # "needs_approval". Re-run the question with an Approval for each.
     approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
-    # The readings to choose from, when status is "needs_clarification" (from L1).
+    # The readings to choose from, when status is "needs_clarification": nothing was executed, and
+    # final_answer is a fixed sentence naming the options.
     clarification: Optional[ClarificationRequest] = None
     # The run's plan in plain English, rendered from the typed plans with no model call: one step per
     # sub-query with a plan or a verified answer; None when the run has neither.
@@ -267,6 +267,8 @@ def _overall_status(
         return "needs_approval"
     if state.get("stop"):
         return "stopped"
+    if any(e.get("error_code") == ErrorCode.NEEDS_CLARIFICATION.value for e in blocking_errors):
+        return "needs_clarification"
     if blocking_errors:
         return "error"
     if not sub_queries:
@@ -288,13 +290,16 @@ def result_from_state(
     artifact_store: Any = None,
     sample_rows: int = DEFAULT_SAMPLE_ROWS,
     knowledge: Optional[Mapping[str, DatasourceKnowledge]] = None,
+    question: Optional[str] = None,
 ) -> QueryResult:
     """Build a typed :class:`QueryResult` from a raw pipeline graph state.
 
     ``explanation`` is rendered here from the state's plans, with no model
     call (``nl2sql.explain``); ``knowledge`` maps a datasource id to its
     glossary, which names tables and columns and tells a glossary join from
-    a declared key.
+    a declared key. ``question`` is the question as the caller passed it,
+    before any ``run.before`` hook (the state's own when not given): a
+    ``clarification`` request records it.
     """
     state = state or {}
 
@@ -314,10 +319,14 @@ def result_from_state(
     sub_queries = _sub_query_results(state, None if withheld else artifact_store, sample_rows, warnings)
     usage = QuestionUsage.model_validate(state.get("usage") or {})
     usage.plan_cache_hits = sum(1 for sq in sub_queries if sq.plan_source == "cache")
+    clarification = _clarification(state, question, knowledge)
+    final_answer = _field(state.get("answer_synthesizer_response"), "final_answer")
+    if clarification is not None:
+        final_answer = _choose_one(clarification)
 
     return QueryResult(
         sub_queries=sub_queries,
-        final_answer=_field(state.get("answer_synthesizer_response"), "final_answer"),
+        final_answer=final_answer,
         errors=errors,
         trace_id=state.get("trace_id") or "",
         reasoning=list(state.get("reasoning") or []),
@@ -332,6 +341,7 @@ def result_from_state(
         source=_source(state.get("verified_match")),
         stop=state.get("stop"),
         approvals_needed=list(state.get("approvals_needed") or []),
+        clarification=clarification,
         explanation=None if withheld else _explanation(state, warnings, knowledge),
     )
 
@@ -346,6 +356,62 @@ def _explanation(state: Dict[str, Any], warnings: List[RunWarning],
     except Exception:
         logger.warning("Could not render the run's explanation.", exc_info=True)
         return None
+
+
+def _clarification(state: Dict[str, Any], question: Optional[str],
+                   knowledge: Optional[Mapping[str, DatasourceKnowledge]]) -> Optional[ClarificationRequest]:
+    """The request the clarifier's ``NEEDS_CLARIFICATION`` asks, with each option explained; None without one.
+
+    The clarifier put the options (labels and plans) and what pins them in
+    the error's ``details``; the question, the asker and each option's
+    explanation (X1's ``explain_plan``, with the knowledge the step's prompts
+    carried) are added here. The default reading, ``a``, has no label from
+    the planner: it is named by the glossary term its plan reads, else its
+    first measure, filter or table.
+    """
+    asked = next((e for e in state.get("errors") or []
+                  if _enum_value(_field(e, "error_code")) == ErrorCode.NEEDS_CLARIFICATION.value), None)
+    if asked is None:
+        return None
+    from nl2sql.explain.render import explain_plan  # the renderer loads only when a run is assembled
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+
+    details = dict(_field(asked, "details") or {})
+    sub_query = details["sub_query"]
+    datasource_id = details["datasource_id"]
+    output = next((o for o in (state.get("subgraph_outputs") or {}).values()
+                   if _field(_field(o, "sub_query"), "id") == sub_query.get("id")), None)
+    used = _field(output, "knowledge_used")
+    options = []
+    for option in details["options"]:
+        step = explain_plan(PlanModel.model_validate(option["plan"]), datasource_id=datasource_id,
+                            sub_query_id=sub_query.get("id"), knowledge_used=used,
+                            knowledge=(knowledge or {}).get(datasource_id))
+        options.append(ClarificationOption(id=option["id"], label=option["label"] or _default_label(step),
+                                           plan=option["plan"], explanation=step))
+    asker = state.get("user_context")
+    return ClarificationRequest.build(
+        question=question if question is not None else state.get("user_query") or "",
+        asker_user_id=_field(asker, "user_id"), asker_tenant_id=_field(asker, "tenant_id"),
+        phrase=details["phrase"], datasource_id=datasource_id, schema_version=details["schema_version"],
+        knowledge_digest=details["knowledge_digest"], sub_query=sub_query, options=options)
+
+
+def _default_label(step: ExplainedStep) -> str:
+    """A label for the default reading, at most 60 characters, from its explanation."""
+    if len(step.terms) == 1:
+        text = step.terms[0].term
+    else:
+        text = next(iter(step.measures or step.filters or step.tables), "The most likely reading")
+    text = text[:1].upper() + text[1:]
+    return text if len(text) <= 60 else text[:59].rstrip() + "…"
+
+
+def _choose_one(request: ClarificationRequest) -> Dict[str, Any]:
+    """The fixed answer of a run that asked: the options by label, in order."""
+    text = ("This question can be read more than one way. Choose one: "
+            + "; ".join(option.label for option in request.options) + ".")
+    return {"summary": text, "format_type": "text", "content": text, "warnings": []}
 
 
 def tables_read(result: QueryResult, ds_registry: Any = None) -> List[str]:
@@ -415,6 +481,7 @@ class QueryAPI:
         plan: Optional[SuppliedPlan] = None,
         approvals: Optional[Sequence[Approval]] = None,
         pinned: Optional[PinnedRun] = None,
+        clarify: bool = True,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -438,6 +505,12 @@ class QueryAPI:
                 and plan.
             pinned: (internal) a pin of another source, such as Wave B's
                 chosen plan, in place of ``plan``.
+            clarify: When the planner reads a phrase two ways and both
+                readings pass the validator, end the run ``needs_clarification``
+                with the options in ``clarification`` instead of running the
+                most likely one (a run of one sub-query, with
+                ``settings.clarify.enabled`` on). False runs the default
+                reading; the prompts are the same either way.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
@@ -463,10 +536,12 @@ class QueryAPI:
                     scope=scope,
                     pinned=pinned,
                     approvals=approvals,
+                    clarify=clarify,
                 )
                 result = result_from_state(
                     state,
                     artifact_store=getattr(self._ctx, "artifact_store", None),
+                    question=question,
                 )
             except BaseException as exc:
                 # A KeyboardInterrupt too: every scope ends with a terminal event.
@@ -530,6 +605,7 @@ class QueryAPI:
         plan: Optional[SuppliedPlan] = None,
         approvals: Optional[Sequence[Approval]] = None,
         pinned: Optional[PinnedRun] = None,
+        clarify: bool = True,
     ) -> Iterator[Event]:
         """
         Run a question as :meth:`run_query` does, yielding its events as they are published.
@@ -557,19 +633,19 @@ class QueryAPI:
         with exactly one terminal event. ``names``
         (internal) is the allow-list; Wave C's conversation stream adds its
         own events to it. ``plan``, ``approvals`` and ``pinned`` are as for
-        :meth:`run_query`, and refused the same way, at the call.
+        :meth:`run_query`, and refused the same way, at the call; so is ``clarify``.
         """
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
         pinned = _pin(plan, pinned, approvals, datasource_id)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                             token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
-                            pinned=pinned, approvals=approvals)
+                            pinned=pinned, approvals=approvals, clarify=clarify)
 
     def _stream(self, question: str, *, datasource_id: Optional[str], execute: bool,
                 user_context: Optional[UserContext], token: CancellationToken, opened: Optional[RunScope],
                 allowed: frozenset, pinned: Optional[PinnedRun] = None,
-                approvals: Optional[Sequence[Approval]] = None) -> Iterator[Event]:
+                approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -> Iterator[Event]:
         """:meth:`stream_query`'s run, on a thread of its own, and the events it hands over."""
         events: "queue.Queue[Optional[Event]]" = queue.Queue()
         terminal_sent = threading.Event()
@@ -599,8 +675,10 @@ class QueryAPI:
                         scope=scope,
                         pinned=pinned,
                         approvals=approvals,
+                        clarify=clarify,
                     )
-                    result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None))
+                    result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None),
+                                               question=question)
                     finished = self.close_scope(scope, result)
                 if finished is not None and "run.finished" in allowed:
                     deliver(finished.model_copy(update={

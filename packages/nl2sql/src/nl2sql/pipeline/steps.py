@@ -93,6 +93,10 @@ PIPELINE_STEPS: List[PipelineStep] = [
     _step("refiner", "Plan repair",
           "Rewrites a plan the checks rejected, using the reasons they gave. Runs only on a "
           "retry.", parent=SQL_AGENT_STEP),
+    _step("clarifier", "Clarification",
+          "Checks the other readings the planner flagged for an ambiguous phrase, and when two or "
+          "three pass the checks, ends the run by asking which one was meant instead of guessing.",
+          parent=SQL_AGENT_STEP),
     _step("generator", "SQL writer",
           "Renders the checked plan into SQL for this database's dialect with sqlglot. No model "
           "writes the SQL.", parent=SQL_AGENT_STEP),
