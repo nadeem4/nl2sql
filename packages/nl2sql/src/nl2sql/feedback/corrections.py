@@ -300,9 +300,10 @@ def _hooked(ctx: Any, run: _Run, question: str, sql: str, plan: Any, tables: Lis
     sub_query = SubQuery.model_construct(id="correction", datasource_id=run.datasource_id, intent=question)
     # What a question's executor shows the hooks (ExecutorNode._hook_fields); no approvals: a correction is
     # never re-run with one.
-    verdict = hooks_of(ctx).call("execute.before", trace_id=run.trace_id, question=question, user=user,
-                                 datasource_id=run.datasource_id, sub_query=sub_query, plan=plan, sql=sql,
-                                 params={}, tables=tables, approvals=[])
+    hooks = hooks_of(ctx)
+    verdict = hooks.call("execute.before", trace_id=run.trace_id, question=question, user=user,
+                         datasource_id=run.datasource_id, sub_query=sub_query, plan=plan, sql=sql,
+                         params={}, tables=tables, approvals=[])
     if verdict.allowed:
         return
     error = verdict.error(NODE)
