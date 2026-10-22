@@ -50,6 +50,7 @@ NODE_INPUTS: Dict[str, Tuple[str, ...]] = {
     "schema_retriever": ("sub_query",),
     "ast_planner": ("sub_query", "relevant_tables", "errors", "retry_count"),
     "logical_validator": ("sub_query", "ast_planner_response", "user_context"),
+    "clarifier": ("ast_planner_response", "clarify"),
     "generator": ("ast_planner_response",),
     "executor": ("sub_query", "generator_response", "user_context"),
     "retry_handler": ("retry_count",),

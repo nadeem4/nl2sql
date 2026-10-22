@@ -25,7 +25,7 @@ Source:
 `packages/nl2sql/src/nl2sql/public_api.py`, `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None) -> QueryResult`
+`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -> QueryResult`
 
 Every argument after the question is keyword-only. `run_query` passes the runtime's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
@@ -40,6 +40,7 @@ Parameters:
 | `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The playground cancels it when the browser drops the request. |
 | `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`: `datasource_id`, `sub_query`, `plan`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the plan's own, or the call raises `ValueError` before anything runs. |
 | `approvals` | `Optional[Sequence[Approval]]` | no | Approvals for an earlier run's `approvals_needed`. See [Approval](#approval). |
+| `clarify` | `bool` | no | Default `True`: a question the planner reads two or three ways ends `needs_clarification` with the options instead of running the most likely one. `False` runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See [Clarification](#clarification). |
 
 #### Running a plan you hold
 
@@ -144,11 +145,12 @@ Fields:
 | `source` | `AnswerSource` | no | Where the answer came from: `type` `"verified"` with the verified query's `id`, `datasource_id` and the `params` it ran with, or `type` `"generated"` with the other fields `None`. See [Curated answers](../../configuration/curated.md#what-happens-at-question-time). |
 | `stop` | `Optional[RunStop]` | no | Set when `status` is `"stopped"`: the `limit` the run reached (`max_llm_calls` or `max_cost_usd`), its configured `value`, and what was `spent`. |
 | `approvals_needed` | `List[ApprovalRequest]` | no | Set when `status` is `"needs_approval"`: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an `Approval` for each. |
-| `clarification` | `Optional[ClarificationRequest]` | no | Set when `status` is `"needs_clarification"`: the phrase, and two or three readings, each a label, a validated plan and its explanation. Nothing produces it yet (release 0.8, [Wave B](../../architecture/wave_b.md#7-clarify-instead-of-guess)). |
+| `clarification` | `Optional[ClarificationRequest]` | no | Set when `status` is `"needs_clarification"`: the phrase, and two or three readings, each a label, a validated plan and its explanation. See [Clarification](#clarification). |
 | `explanation` | `Optional[Explanation]` | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a `success` or `plan_only` run's, and the successful steps of a partly failed one); `None` when no step did, when a hook ended the run, or when it cannot be rendered. See [Explanation](#explanation). |
 
-`errors` holds only `ERROR` and `CRITICAL` entries; `WARNING`-severity pipeline
-errors are appended to `warnings` as `RunWarning`s.
+`errors` holds the `ERROR` and `CRITICAL` entries, and the one `INFO` entry
+`NEEDS_CLARIFICATION` of a run that asked which reading was meant;
+`WARNING`-severity pipeline errors are appended to `warnings` as `RunWarning`s.
 
 A sub-query that succeeded contributes nothing to `errors`: the errors of the
 attempts it recovered from are in `warnings` with `detail.recovered` true, and
@@ -159,11 +161,11 @@ on warnings alone) adds a `MISSING_SQL` error, so the run reports `"error"`.
 
 `status` is derived: `"needs_approval"` when a hook asked for approval
 (`approvals_needed`), `"stopped"` when the run reached a per-question limit
-(`stop`), otherwise `"error"` when any blocking error is present, otherwise
+(`stop`), `"needs_clarification"` when the run asked which reading was meant
+(`clarification`), otherwise `"error"` when any blocking error is present, otherwise
 `"plan_only"` when no sub-query produced rows or an artifact (an
 `execute=False` run), otherwise `"success"`. A state with no sub-queries and no
-errors leaves it `None`. `"needs_clarification"` is reserved for Wave B's
-clarification result: nothing produces it yet. Hooks, approval and the caps
+errors leaves it `None`. Hooks, approval and the caps
 that produce `"needs_approval"` and `"stopped"` arrive with release 0.7 (see
 [Wave A](../../architecture/wave_a.md)).
 
@@ -171,6 +173,55 @@ Only a capped sample of the rows is inlined, in `sub_queries[].rows`. The full
 result set lives in artifact storage, addressed through `artifact_refs`; each
 combined result is listed in `result_manifest` and read back by the run's
 `trace_id` with the methods below.
+
+### Clarification
+
+When the planner reads a phrase of the question in more than one way that
+changes the result ("sales": the invoice total or the invoiced amount), it
+names the phrase and gives up to two other readings beside its most likely
+one. The `clarifier` step, after the logical validator, runs each other
+reading through the validator's own checks with the caller's scope and drops
+any that fail, so an option never names a table the caller cannot read, then
+merges readings that render to the same SQL. When two or three readings
+remain, the question has exactly one sub-query, `clarify` is on and
+`settings.clarify.enabled` is on (the default), the run ends before the
+generator: nothing is executed, aggregated or synthesized.
+
+```python
+result = engine.run_query("What were sales last year?", user_context=ana)
+if result.status == "needs_clarification":
+    for option in result.clarification.options:
+        print(option.id, option.label, option.explanation.text)
+```
+
+The result then has:
+
+- `status` `"needs_clarification"` and one `errors` entry,
+  `NEEDS_CLARIFICATION` (`INFO`, never retried);
+- `final_answer` a fixed sentence: "This question can be read more than one
+  way. Choose one: Sales: total of invoice total; Invoiced amount.";
+- `clarification`, a `ClarificationRequest` (`from nl2sql import
+  ClarificationRequest`): `id` (SHA-256 of every other field, 32 hex, so a
+  mixed-up or edited request is recognised), `question` (as passed, before any
+  `run.before` hook), `asker_user_id`, `asker_tenant_id`, `phrase`,
+  `datasource_id`, `schema_version`, `knowledge_digest`, `sub_query` and
+  `options`;
+- each option a `ClarificationOption`: `id` (`"a"` is the most likely
+  reading, then `"b"`, `"c"`), `label`, `plan` (the plan as JSON) and
+  `explanation` (an `ExplainedStep`, as in [Explanation](#explanation)). The
+  planner gives no label for its most likely reading, so `a` is named by the
+  glossary term its plan reads, else its first measure, filter or table;
+- `explanation` `None`, and the sub-query's `status` `"needs_clarification"`
+  with no SQL: nothing ran, so the options carry the explanations.
+
+Otherwise the most likely reading runs, and the readings that passed the
+checks are listed as assumptions in its explanation step ("'sales' was read
+one way; it could also mean Invoiced amount."). That happens with
+`clarify=False`, with more than one sub-query, and when only one reading
+passed. `clarification.requested` (`sub_query_id`, `phrase`, `options`) is
+published on the engine's bus when a run asks; it is an operator event, not
+on the stream. Asking again with the chosen option arrives in L2. Evals run
+with clarification off, so a case measures the most likely reading.
 
 ### Warnings
 
@@ -265,7 +316,7 @@ Source:
 `packages/nl2sql/src/nl2sql/events/catalog.py`
 
 Signature:
-`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None) -> Iterator[Event]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -> Iterator[Event]`
 
 The same run as `run_query`, with the same parameters, yielded as it happens:
 the run's own events on the engine's bus ([Events](../../observability/events.md)),
