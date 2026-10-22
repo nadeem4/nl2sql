@@ -4407,6 +4407,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5415,6 +5426,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5654,7 +5676,7 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>stop</code> | <code>Optional[RunStop]</code> | no | Set when <code>status</code> is <code>"stopped"</code>: the <code>limit</code> the run reached (<code>max_llm_calls</code> or <code>max_cost_usd</code>), its configured <code>value</code>, and what was <code>spent</code>. |
 | <code>approvals_needed</code> | <code>List[ApprovalRequest]</code> | no | Set when <code>status</code> is <code>"needs_approval"</code>: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an <code>Approval</code> for each. |
 | <code>clarification</code> | <code>Optional[ClarificationRequest]</code> | no | Set when <code>status</code> is <code>"needs_clarification"</code>: the phrase, and two or three readings, each a label, a validated plan and its explanation. Nothing produces it yet (release 0.8, <a href="../../../architecture/wave_b/#7-clarify-instead-of-guess">Wave B</a>). |
-| <code>explanation</code> | <code>Optional[Explanation]</code> | no | The run's plan in plain English, rendered from the typed plan with no model call: per step its tables, joins, filters, groupings, measures, glossary terms, rules and assumptions. Not filled yet (release 0.8, <a href="../../../architecture/wave_b/#8-why-this-answer">Wave B</a>). |</p>
+| <code>explanation</code> | <code>Optional[Explanation]</code> | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a <code>success</code> or <code>plan_only</code> run's, and the successful steps of a partly failed one); <code>None</code> when no step did, when a hook ended the run, or when it cannot be rendered. See <a href="#explanation">Explanation</a>. |</p>
 <p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
 errors are appended to <code>warnings</code> as <code>RunWarning</code>s.</p>
 <p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
@@ -5725,6 +5747,122 @@ said <code>ERROR</code>. A run's state is never kept across an upgrade (a run th
 <code>needs_approval</code> is asked again, not resumed; see
 <a href="../../../architecture/wave_a/#7-approval">Wave A, D10</a>), so no older warning is
 ever read back.</p>
+<h3 id="explanation">Explanation</h3>
+<p><code>QueryResult.explanation</code> answers "why this answer" for a business reader. It
+is rendered by <code>nl2sql/explain/</code> when the result is assembled
+(<code>result_from_state</code>), from each sub-query's typed plan, the knowledge its
+prompt carried (<code>sub_queries[].knowledge_used</code>), the planner's readings it did
+not ask about, the row cap and the run's warnings. No model is called, and the
+same plan and knowledge always give the same words. The answer synthesizer is
+not given it: the explanation describes the query, the answer describes the
+rows.</p>
+<p>Only a sub-query that passed validation is explained. A plan the validator
+or a hook refused, and a dropped sub-query, get no step: their tables, and
+their glossary descriptions, would confirm what the refusal withholds. A run a
+hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>) has no
+explanation, as it has no rows. An explanation never fails a run: one that
+cannot be rendered (a stored plan an older version wrote, say) is <code>None</code>, and
+the error is logged.</p>
+<p><code>Explanation</code> has <code>steps</code> (one <code>ExplainedStep</code> per sub-query, in the
+decomposition's order) and <code>combined</code>: how the steps' results were put
+together ("The results of a and b were joined on country."), or <code>None</code> for a
+single step. An <code>ExplainedStep</code>:</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sub_query_id</code></td>
+<td><code>Optional[str]</code></td>
+<td>The sub-query it explains.</td>
+</tr>
+<tr>
+<td><code>datasource_id</code></td>
+<td><code>str</code></td>
+<td>Its datasource.</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>str</code></td>
+<td>Where the plan came from: <code>generated</code> (the planner), <code>cache</code>, <code>supplied</code> (<code>run_query(plan=...)</code>), <code>approved</code>, <code>chosen</code> (a clarification pick) or <code>verified</code> (a verified query, with no plan).</td>
+</tr>
+<tr>
+<td><code>tables</code></td>
+<td><code>List[str]</code></td>
+<td>Each table, qualified as the plan names it, with its glossary description's first clause when there is one: <code>"Invoice: one row per customer invoice (glossary)"</code>.</td>
+</tr>
+<tr>
+<td><code>joins</code></td>
+<td><code>List[str]</code></td>
+<td>Each join and the relationship it used: <code>"each InvoiceLine to its Invoice, on InvoiceId (declared key)"</code>, or <code>(glossary)</code> for a join the glossary declares.</td>
+</tr>
+<tr>
+<td><code>filters</code></td>
+<td><code>List[str]</code></td>
+<td>Each condition of the <code>WHERE</code>, then each of the <code>HAVING</code> as <code>"for each group, ..."</code>.</td>
+</tr>
+<tr>
+<td><code>groupings</code></td>
+<td><code>List[str]</code></td>
+<td><code>"by Customer country"</code>.</td>
+</tr>
+<tr>
+<td><code>measures</code></td>
+<td><code>List[str]</code></td>
+<td>Each aggregate the plan selects, by its alias: <code>"revenue: total of InvoiceLine unit price times InvoiceLine quantity"</code>.</td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td><code>Optional[str]</code></td>
+<td><code>"highest revenue first, top 10"</code>.</td>
+</tr>
+<tr>
+<td><code>terms</code></td>
+<td><code>List[TermUse]</code></td>
+<td>The glossary terms sent with the step whose columns the plan reads: <code>term</code>, <code>definition</code>, <code>source</code>.</td>
+</tr>
+<tr>
+<td><code>rules</code></td>
+<td><code>List[str]</code></td>
+<td>The business rules sent with the step, by text.</td>
+</tr>
+<tr>
+<td><code>assumptions</code></td>
+<td><code>List[str]</code></td>
+<td>What the answer took for granted, all deterministic: a reading not chosen when an ambiguity was not asked about; a filter value the column did not have (<code>'Brasil' is not in Customer country; 'Brazil' was used instead.</code> when the final plan filters on a suggested value, else <code>...; the question was planned again.</code>); the sanity checks' warnings (<code>VALUE_NOT_FOUND</code>, <code>JOIN_FAN_OUT</code>, <code>ALL_NULL_COLUMN</code>, <code>JOIN_KEY_UNCONVERTED</code>), and the row cap when the result was cut.</td>
+</tr>
+<tr>
+<td><code>planner_note</code></td>
+<td><code>Optional[str]</code></td>
+<td>The plan's own <code>reasoning</code>: model text, kept apart and labelled as the planner's. It appears in no other field.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td>The step in two to four sentences: what it shows, what it reads and filters, which groups it keeps, and its order.</td>
+</tr>
+</tbody>
+</table>
+<p>Names are the glossary description's first clause when there is one, else the
+name split into words (<code>InvoiceDate</code> on <code>Invoice</code> is "Invoice date"); a table
+the plan reads twice is named with its alias ("Track (t3)"). Each expression
+kind has a phrase (<code>=</code> "is", <code>IN</code> "is one of", <code>LIKE</code> "matches", <code>IS NULL</code> "is
+empty", <code>SUM</code> "total of", <code>COUNT</code> with <code>distinct</code> "number of different",
+<code>DATE_PART('year', d)</code> "the year of d", a <code>case</code> "depending on: ..."); a
+function without one is written as its name and arguments.</p>
+<p><code>result_from_state(state, ..., knowledge=None)</code> takes <code>knowledge</code>, a mapping
+from datasource id to its glossary (<code>DatasourceKnowledge</code>) as the caller's
+scope filters it; without it, names are the split names and every join is a
+declared key. A run on the Chinook
+suite's gold plans renders as the files in
+<code>packages/nl2sql/tests/unit/explain/golden/</code>, which are compared on every
+test run, so a change to the wording is a reviewed diff. Design:
+<a href="../../../architecture/wave_b/#8-why-this-answer">Wave B, section 8</a>.</p>
 <h2 id="streaming-a-run">Streaming a run</h2>
 <h3 id="nl2sqlstream_query">NL2SQL.stream_query</h3>
 <p>Source:

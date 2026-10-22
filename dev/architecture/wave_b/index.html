@@ -4847,6 +4847,62 @@ given it: the explanation describes the SQL, the answer describes the rows.
 the plan from this view is later.</p>
 <p>Golden tests render every gold plan in the Chinook suite and compare with
 stored text, so a renderer change is a reviewed diff.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: why this answer (X1)</p>
+<p><code>nl2sql/explain/phrases.py</code> names tables and columns and phrases every
+<code>Expr</code> kind and operator (<code>KIND_PHRASES</code>, <code>BINARY_PHRASES</code>,
+<code>UNARY_PHRASES</code>, <code>FUNCTION_PHRASES</code>); <code>nl2sql/explain/render.py</code> has
+<code>explain_plan(plan, *, datasource_id, sub_query_id=None,
+source="generated", knowledge_used=None, knowledge=None, assumptions=())
+-&gt; ExplainedStep</code>, <code>explain_verified(match, sub_query_id, assumptions)</code>
+and <code>explain_state(state, warnings=None, knowledge=None) -&gt;
+Optional[Explanation]</code>. <code>result_from_state</code> fills
+<code>QueryResult.explanation</code> with <code>explain_state</code>, importing the renderer
+only there, so every caller (run, stream, evals, replay) gets it. It
+reads <code>SubgraphOutput</code> only, as B0 set up. Where the build filled a gap
+(some after an independent review on #335):</p>
+<ul>
+<li><strong>Only validated steps are explained.</strong> An output whose <code>status</code> is
+  not <code>success</code> (a plan the validator or a hook refused, a dropped
+  sub-query) gets no step, and a run a hook ended has no explanation:
+  naming a refused plan's tables would confirm what the refusal withholds.
+  This narrows "every status that has a plan" above.</li>
+<li>
+<p><strong>It never fails a run.</strong> An operator without a phrase is written as
+  itself, and a state that cannot be rendered gives <code>explanation=None</code>
+  with the error logged, as <code>tables_read</code> does.</p>
+</li>
+<li>
+<p><strong>The glossary is an argument.</strong> Glossary names and a join's source
+  need the datasource's glossary, which no output carries:
+  <code>result_from_state(..., knowledge=)</code> takes a mapping from datasource
+  id to <code>DatasourceKnowledge</code>. Nothing passes it yet; K2, which makes
+  glossary joins valid, passes the caller's <strong>scope-filtered</strong> knowledge
+  (K1's scope filter), never the whole glossary, at the call sites.
+  Without it every join is a declared key, which is true until then.</p>
+</li>
+<li><strong>The default reading</strong> is "'sales' was read as revenue" when exactly
+  one term sent with the step is read by the plan, else "was read one
+  way"; the planner's answer has no label for its default.</li>
+<li><strong><code>text</code></strong> is two to four sentences: what it shows, what it reads and
+  filters, the groups it keeps (<code>HAVING</code>), its order.</li>
+<li><strong>Assumptions</strong> from warnings are the step's own (<code>sub_query_id</code>): a
+  recovered <code>VALUE_NOT_FOUND</code> is said from the final plan ("'Brasil' is
+  not in Customer country; 'Brazil' was used instead." only when a
+  suggested value is a literal of the final plan, else "the question was
+  planned again"), never the planner's retry message; an unrecovered
+  <code>VALUE_NOT_FOUND</code>, <code>JOIN_FAN_OUT</code>, <code>ALL_NULL_COLUMN</code> or
+  <code>JOIN_KEY_UNCONVERTED</code> is said as is; the row cap from <code>truncated</code>.</li>
+<li><strong>Golden files</strong> are one JSON per gold case in
+  <code>tests/unit/explain/golden/</code>; a missing one is written and the test
+  fails, so deleting a file is how a reviewed wording change is made.</li>
+</ul>
+<p>For L1: each option's <code>explanation</code> is <code>explain_plan(option_plan, ...)</code>;
+a run that did not ask keeps <code>ambiguous_phrase</code> and <code>alternatives</code> on
+the output and the step lists them as assumptions. For L2: "You chose:
+<label>" is passed as an <code>assumptions</code> entry or set on the step; the
+label is not on the output.</label></p>
+</div>
 <h2 id="9-cost-guard">9. Cost guard</h2>
 <h3 id="the-adapter-method">The adapter method</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-15-1" id="__codelineno-15-1" name="__codelineno-15-1"></a><span class="c1"># nl2sql_sdk</span>

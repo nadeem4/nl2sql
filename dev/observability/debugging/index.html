@@ -3111,6 +3111,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#why-this-answer-the-explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this answer: the explanation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-trace-nl2sql-trace-show" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5242,6 +5253,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#why-this-answer-the-explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this answer: the explanation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-a-trace-nl2sql-trace-show" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5552,6 +5574,17 @@ result rows (<code>rows</code>, and the aggregator's <code>terminal_results</cod
 saying how much was dropped. <strong>LLM messages and raw responses are never cut</strong>,
 because replay needs them whole; a planner prompt on Chinook is about 12 000
 characters, and a whole trace is typically a few hundred kilobytes.</p>
+<h2 id="why-this-answer-the-explanation">Why this answer: the explanation</h2>
+<p>Before reading a trace, read <code>QueryResult.explanation</code>: each sub-query's plan
+in plain English (its tables, joins and where each join came from, filters,
+groupings, measures and order), the glossary terms and rules its prompt
+carried, and the assumptions the answer made (a reading not chosen, a filter
+value replaced after <code>VALUE_NOT_FOUND</code>, a sanity warning, a result cut at the
+row cap). It is rendered from the typed plan with no model call, so it says
+what the SQL does, not what a model thinks it does; the planner's own
+<code>reasoning</code> is kept apart as <code>planner_note</code>. A result rebuilt from a trace
+(<code>nl2sql trace replay</code>, <code>engine.traces</code>) carries it too, since it is rendered
+from the same state. See <a href="../../api/core/query/#explanation">Explanation</a>.</p>
 <h2 id="reading-a-trace-nl2sql-trace-show">Reading a trace: <code>nl2sql trace show</code></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>traces/20260921T164837755710Z_159afe1f-....json
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>trace<span class="w"> </span>show<span class="w"> </span>159afe1f-3305-4907-903a-55495d040665<span class="w">   </span><span class="c1"># looks it up in the trace store (engine.traces.get)</span>
