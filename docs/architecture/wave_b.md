@@ -1291,16 +1291,31 @@ Nothing is written before that accept.
     - **The run.** The kept trace (`request.question`, the result's
       sub-queries) is read first; with no trace (the default
       `settings.traces.mode` keeps only failed runs), the run's rating gives
-      the question, datasource and SQL. Neither is `no_run`. A run on several
-      datasources is refused before it is rated. The rating is recorded
-      before the fix is checked, through `engine.feedback.record` (or the
-      stored row re-rated), so a refused fix still leaves the thumbs-down.
+      the question, datasource and SQL. Neither is `no_run`. **The run's
+      scope comes first** (after review on #341): before anything else, the
+      corrector's `Scope` must reach every datasource the run read and every
+      table its SQL read (`_find_run`; a run whose SQL cannot be parsed is
+      refused), and that refusal (`denied`, `DENIED_RUN`) names no datasource,
+      table or question. Only then is a run on several datasources refused,
+      and the run rated `down`, through `engine.feedback.record` (or the
+      stored row re-rated). So a refused fix still leaves the thumbs-down of a
+      caller who could read the run, and no other caller can change a rating.
     - **A plan fix** is `run_query(plan=SuppliedPlan(...), execute=False,
       user_context=corrector)`, as Wave A's seeding runs a plan, so `run.before`
       and `plan.after` see it too. A `PlanModel`, a dict or JSON text.
     - **The SQL check** is `inspect_verified_sql` for both fixes (the
       engine's rendering included), and a SQL fix with `:name` placeholders
-      is `not_read_only`: it runs once, with no values. The scope check asks
+      is `not_read_only`: it runs once, with no values. A trailing `;` and
+      the comment after it are dropped first (`_one_statement`, with
+      sqlglot's tokenizer). A *person's* SQL fix is also held, in
+      `corrections.py` rather than the shared curated check, to plain tables
+      (an `exp.Table` whose source is not an identifier, a table-valued
+      function such as a catalog or file reader, is refused) and to an
+      allow-list of functions: `ALLOWED_FUNCTIONS`, as sqlglot names them in
+      the datasource's dialect (`_known_functions`), plus
+      `STRUCTURAL_FUNCTIONS` (`CAST`, `TRY_CAST`, `CASE`, `IF`, `EXISTS`, the
+      current date and time). An unknown function is refused too. Both are
+      `not_read_only`. The scope check asks
       `PolicyEngine.scope` (`feedback/corrections.py` joins `ACCESS_DECISIONS`
       in the boundary test, and `FeedbackAPI.correct` joins
       `WAVE_B_READ_METHODS`, so its caller is a required `UserContext`).
@@ -1316,7 +1331,10 @@ Nothing is written before that accept.
       as step 4 says.
     - **The check** runs as `CuratedAPI.test` does: `_frames` over the
       adapter with `settings.results.fetch_batch_size`, the first frame only,
-      no artifact written. `row_count` is that frame's.
+      no artifact written. `row_count` is that frame's. An error the
+      adapter did not wrap is logged and named by its type only, so no
+      driver text (a host, a password) reaches the caller. A
+      `NEEDS_APPROVAL` from a plan fix's run is `needs_approval`.
     - **The proposal** is `Proposal.build(kind="verified_query",
       origin="correction", target=<question>, ...)` filed with
       `review.queue.propose`, so a correction supersedes an open thumbs-up of
@@ -1325,7 +1343,10 @@ Nothing is written before that accept.
       `DESCRIPTION_PLACEHOLDER`); `created_by` the corrector's user id;
       `schema_version` the run's. `tables` lists the tables the fix *and the
       original SQL* read, since `evidence.original_sql` shows the latter: a
-      caller denied either never sees the proposal.
+      caller denied either never sees the proposal. `review/queue.py`
+      `propose` now unions `tables` when the same change is filed again and
+      its evidence is replaced (a second run's correction with the same fix),
+      so new evidence never shows tables the row does not list.
     - **Tests.** `tests/unit/test_corrections.py` (every F1 test the row
       names, the visibility tests and the CLI).
 

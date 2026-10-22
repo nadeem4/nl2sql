@@ -12,10 +12,11 @@ from pathlib import Path
 
 import pytest
 import yaml
-from test_review_queue import ADMIN, ANALYST, _cli, _engine, _project
+from test_review_queue import ADMIN, ANALYST, ROLES, _cli, _database, _engine, _project
 
 from nl2sql.feedback.corrections import CorrectionRefused
 from nl2sql.hooks import Allow, Deny, HookBinding, HookRunner, NeedsApproval
+from nl2sql.testing.config import make_config
 
 QUESTION = "What is the revenue?"
 WRONG_SQL = "SELECT SUM(id) AS revenue FROM orders"
@@ -121,6 +122,80 @@ def test_sql_fix_must_be_one_read_only_select(engine, sql):
     assert not engine.proposals.list(user_context=ADMIN)
 
 
+@pytest.mark.parametrize("sql", [
+    "SELECT name FROM pragma_table_info('salaries')",       # a table-valued function reads past the scope
+    "SELECT * FROM read_csv('salaries.csv')",
+    "SELECT my_side_effect(total) FROM orders",             # a function sqlglot does not know
+    "SELECT ROW_NUMBER() OVER (ORDER BY id) AS n FROM orders",  # known, but not one a plan may call
+])
+def test_sql_fix_may_read_only_plain_tables_and_plan_functions(engine, sql):
+    with pytest.raises(CorrectionRefused) as error:
+        engine.feedback.correct(_run(engine), sql=sql, user_context=ANALYST)
+    assert error.value.code == "not_read_only"
+    assert engine.proposals.list(user_context=ADMIN) == []
+
+
+def test_sql_fix_with_ordinary_expressions_runs(engine):
+    sql = ("SELECT CASE WHEN total > 1 THEN 'big' ELSE 'small' END AS size, COALESCE(total, 0) AS t, "
+           "ROUND(total, 2) AS r, CAST(total AS INTEGER) AS i, LOWER('A') AS l, COUNT(*) AS n "
+           "FROM orders WHERE id IN (1, 2) AND NOT total IS NULL OR EXISTS (SELECT 1 FROM customers) "
+           "GROUP BY total")
+    proposal = engine.feedback.correct(_run(engine), sql=sql, user_context=ANALYST)
+    assert proposal.evidence["ran"] is True
+
+
+def test_a_trailing_comment_is_not_a_second_statement(engine):
+    proposal = engine.feedback.correct(_run(engine), sql=FIX + "; -- the order totals\n", user_context=ADMIN)
+    assert proposal.change["sql"] == FIX + "\n"
+
+
+def test_an_unwrapped_driver_error_is_not_shown(engine, monkeypatch):
+    real = engine._runtime.ds_registry.get_adapter("shop")
+
+    class _Raising:
+        """The real adapter, except that running a query raises the driver's own error."""
+
+        def __getattr__(self, name):
+            return getattr(real, name)
+
+        def execute(self, request):
+            raise RuntimeError("could not connect: password=hunter2 host=db.internal")
+
+        def execute_batches(self, request, batch_size):
+            raise RuntimeError("could not connect: password=hunter2 host=db.internal")
+
+    monkeypatch.setattr(engine._runtime.ds_registry, "get_adapter", lambda ds: _Raising())
+
+    with pytest.raises(CorrectionRefused) as error:
+        engine.feedback.correct(_run(engine), sql=FIX, user_context=ADMIN)
+
+    assert error.value.code == "failed"
+    assert "hunter2" not in str(error.value) and "db.internal" not in " ".join(error.value.messages)
+
+
+def test_a_plan_fix_needing_approval_is_needs_approval(engine, monkeypatch):
+    from nl2sql.api.query_api import QueryAPI, QueryResult
+
+    monkeypatch.setattr(QueryAPI, "run_query", lambda self, *a, **k: QueryResult(
+        status="needs_approval", errors=[{"error_code": "NEEDS_APPROVAL", "message": "A person reviews this."}]))
+
+    with pytest.raises(CorrectionRefused) as error:
+        engine.feedback.correct(_run(engine), plan=_plan(), user_context=ADMIN)
+
+    assert error.value.code == "needs_approval" and "A person reviews this." in str(error.value)
+
+
+def test_refiling_a_fix_from_another_run_keeps_every_table(engine):
+    engine.feedback.correct(_run(engine, "t1"), sql=FIX, user_context=ADMIN)
+    proposal = engine.feedback.correct(_run(engine, "t2", sql="SELECT SUM(amount) AS revenue FROM salaries"),
+                                       sql=FIX, user_context=ADMIN)
+
+    stored = engine.proposals.get(proposal.id, user_context=ADMIN)
+    assert stored.evidence["original_sql"].endswith("FROM salaries")
+    assert stored.tables == ["shop.main.orders", "shop.main.salaries"]
+    assert engine.proposals.list(user_context=ANALYST) == []
+
+
 def test_sql_fix_on_a_denied_table_is_refused(engine, monkeypatch):
     seen = _hooks(engine, monkeypatch, lambda hctx: Allow())
 
@@ -169,14 +244,70 @@ def test_empty_result_is_allowed_and_recorded(engine):
 # ---------------------------------------------------------------- the run
 
 
-def test_multi_datasource_run_is_refused(engine):
-    trace_id = _run(engine, datasources=("shop", "hr"))
+def _two_datasources(folder: Path):
+    """``shop`` and ``hr`` (the same file): the analyst reaches only ``shop``."""
+    _database(folder)
+    sqlite = {"type": "sqlite", "connection": {"database": "shop.db"}}
+    return make_config(folder, datasources=[{"id": "shop", **sqlite}, {"id": "hr", **sqlite}],
+                       policies={"roles": ROLES}, llm=LLM)
+
+
+def test_multi_datasource_run_is_refused(tmp_path):
+    with _engine(_two_datasources(tmp_path)) as engine:
+        trace_id = _run(engine, datasources=("shop", "hr"))
+
+        with pytest.raises(CorrectionRefused) as error:
+            engine.feedback.correct(trace_id, sql=FIX, user_context=ADMIN)
+
+        assert error.value.code == "multi_datasource"
+        assert engine.feedback.list() == []
+
+
+def test_a_run_on_a_datasource_the_caller_cannot_read_is_refused_without_naming_it(tmp_path):
+    with _engine(_two_datasources(tmp_path)) as engine:
+        trace_id = _run(engine, datasources=("shop", "hr"))
+
+        with pytest.raises(CorrectionRefused) as error:
+            engine.feedback.correct(trace_id, sql=FIX, user_context=ANALYST)
+
+        assert error.value.code == "denied" and "'hr'" not in str(error.value)
+        assert engine.feedback.list() == []
+
+
+def test_a_caller_denied_the_original_sqls_tables_cannot_correct_it(engine):
+    trace_id = _run(engine, question="What do we pay?", sql="SELECT SUM(amount) AS pay FROM salaries")
+    engine.feedback.record({"trace_id": trace_id, "status": "success", "sub_queries": []},
+                           question="What do we pay?", role="admin", rating="up")
+
+    with pytest.raises(CorrectionRefused) as error:
+        engine.feedback.correct(trace_id, sql=FIX, note="Injected.", user_context=ANALYST)
+
+    assert error.value.code == "denied"
+    assert "salaries" not in str(error.value) and "pay" not in str(error.value)
+    [row] = engine.feedback.list()
+    assert row["rating"] == "up" and row["note"] is None  # a refused run-level check leaves the rating
+    assert engine.proposals.list(user_context=ADMIN) == []
+
+
+def test_a_rated_run_on_a_denied_table_cannot_be_corrected(engine):
+    engine.feedback.record({"trace_id": "t9", "status": "success",
+                            "sub_queries": [{"sql": "SELECT amount FROM salaries", "datasource_id": "shop"}]},
+                           question="What do we pay?", role="admin", rating="up")
+
+    with pytest.raises(CorrectionRefused) as error:
+        engine.feedback.correct("t9", sql=FIX, user_context=ANALYST)
+
+    assert error.value.code == "denied"
+    assert engine.feedback.list()[0]["rating"] == "up"
+
+
+def test_a_run_whose_sql_cannot_be_read_is_refused(engine):
+    trace_id = _run(engine, sql="THIS IS NOT ; SQL ;")
 
     with pytest.raises(CorrectionRefused) as error:
         engine.feedback.correct(trace_id, sql=FIX, user_context=ADMIN)
 
-    assert error.value.code == "multi_datasource"
-    assert engine.feedback.list() == []
+    assert error.value.code == "denied"
 
 
 def test_unknown_run_is_refused(engine):

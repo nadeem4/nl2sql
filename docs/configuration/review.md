@@ -36,7 +36,7 @@ third-party state store can keep it:
 
 | Rule | Detail |
 | --- | --- |
-| **One change, one row** | The id hashes the change, so filing the same change again updates the open row's evidence. A rejected change keeps its row and is never proposed again; a different change for the same target is a new row. |
+| **One change, one row** | The id hashes the change, so filing the same change again updates the open row's evidence and adds any tables the new filing names. A rejected change keeps its row and is never proposed again; a different change for the same target is a new row. |
 | **Supersede** | A new change for a kind, datasource and target that already has an open row marks that row `superseded`: the queue holds one open item per target. Accepted and rejected rows are never superseded. |
 | **Retention** | Decided rows (accepted, rejected, superseded) are kept for `settings.review.max_age_days` (365) and deleted by `engine.storage.purge()` (`nl2sql storage purge`, and `nl2sql-api` once a day). Open rows are never purged. |
 
