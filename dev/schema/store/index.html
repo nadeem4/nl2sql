@@ -5439,7 +5439,8 @@ the datasource, the plans cached on them and their diffs. <code>keep</code> is:<
 <p>Nothing else deletes a snapshot; there is no age limit.</p>
 <h3 id="the-plan-cache-and-feedback">The plan cache and feedback</h3>
 <p>The <strong>plan cache</strong> holds validated, executed plans keyed by <code>(normalised
-sub-query intent, run date and planner model, datasource_id, schema_version)</code>
+sub-query intent, run date, planner model and knowledge digest, datasource_id,
+schema_version)</code>
 (<code>get_plan</code>, <code>put_plan</code>). Deleting a snapshot deletes its cached plans;
 <code>nl2sql cache clear</code> (<code>engine.clear_plan_cache()</code>) deletes them all and keeps
 the snapshots. See <a href="../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</p>

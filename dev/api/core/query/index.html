@@ -5791,6 +5791,14 @@ hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPR
 explanation, as it has no rows. An explanation never fails a run: one that
 cannot be rendered (a stored plan an older version wrote, say) is <code>None</code>, and
 the error is logged.</p>
+<p>The glossary that names tables and tells a glossary join from a declared key
+is the caller's: every caller of <code>result_from_state</code> (<code>run_query</code>,
+<code>stream_query</code>, evals, trace replay and the trace itself) passes the
+knowledge filtered by the caller's scope (<code>caller_knowledge</code> in
+<code>nl2sql/knowledge/scope.py</code>), so a description that mentions a table the
+caller cannot read never reaches the explanation. It is the knowledge and
+snapshot the run pinned (<code>run_with_graph</code> hands back its pinned runtime as
+<code>pinned_runtime</code>), so a reload during the run does not change the words.</p>
 <p><code>Explanation</code> has <code>steps</code> (one <code>ExplainedStep</code> per sub-query, in the
 decomposition's order) and <code>combined</code>: how the steps' results were put
 together ("The results of a and b were joined on country."), or <code>None</code> for a
@@ -6154,7 +6162,7 @@ and <code>.../{result_id}.csv</code>; the playground serves the same two under <
 <td><code>knowledge_used</code></td>
 <td><code>Optional[KnowledgeUsed]</code></td>
 <td>no</td>
-<td>The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Not filled yet (release 0.8).</td>
+<td>The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever (Wave B's K2); <code>None</code> when no term or rule matched, and for a plan served from the plan cache, which sent no prompt.</td>
 </tr>
 <tr>
 <td><code>estimate</code></td>

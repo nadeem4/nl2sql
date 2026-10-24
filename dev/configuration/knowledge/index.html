@@ -5310,10 +5310,12 @@ and example questions. It is written in <code>glossary.yaml</code> and read by a
 <em>knowledge source</em>; the <code>knowledge</code> section lists the sources.</p>
 <div class="admonition note">
 <p class="admonition-title">Release 0.8</p>
-<p>The engine loads, merges, shows and exports knowledge from release 0.8.
-Knowledge reaches the planner's prompts with Wave B's K2 and the index with
-K3; until then it is shown and checked, not used to plan. See
-<a href="../../architecture/wave_b/">Wave B</a>, section 3.</p>
+<p>The engine loads, merges, shows and exports knowledge from release 0.8,
+and the planner and refiner read it (Wave B's K2): descriptions, roles,
+units, grains, code values and glossary joins in the schema block, matched
+terms and rules in <code>[BUSINESS_CONTEXT]</code>. It reaches the index with K3. See
+<a href="../../architecture/wave_b/">Wave B</a>, sections 3 and 4, and
+<a href="../../architecture/nodes/schema_retriever_node/#knowledge">the schema retriever</a>.</p>
 </div>
 <h2 id="the-section">The section</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># nl2sql.yaml</span>
@@ -5530,7 +5532,12 @@ and not indexed. The validator still refuses any plan on the table.</p>
 datasource that is not indexed yet shows nothing but that problem.</p>
 <p>Knowledge is data, never instructions: it is validated as data when it
 loads, <code>export</code> writes it with a safe YAML dumper, and it reaches a model
-only as JSON values (Wave B's K2).</p>
+only as JSON values, filtered by the caller's scope (see
+<a href="../../architecture/invariants/#knowledge-is-data-the-validator-and-scope-decide">Knowledge Is Data</a>).
+A glossary join between two tables the caller may read is a relationship the
+validator accepts, so a database without declared keys can be joined. A
+changed glossary changes the datasource's knowledge digest, which keys the
+plan cache: the next question plans again.</p>
 <h2 id="the-facade-and-the-cli">The facade and the CLI</h2>
 <table>
 <thead>

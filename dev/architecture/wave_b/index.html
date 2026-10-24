@@ -4106,6 +4106,16 @@ the glossary back hits the old entries, as swapping the LLM does. And a
 plan whose planner answer carried alternatives is never stored, whether or
 not the run asked (D47): the cache write in <code>pipeline/graph_utils.py</code>
 skips it, so a later run calls the planner, which flags again.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: knowledge in the prompts (K2)</p>
+<p>The retriever, <code>[BUSINESS_CONTEXT]</code>, <code>PlannerAnswer</code>, the cache key's
+digest and the injection tests are built; see the K2 note in
+<a href="#16-pr-plan">the PR plan</a> for the exact names. The node pages are
+<a href="../nodes/schema_retriever_node/#knowledge">the schema retriever</a>,
+<a href="../nodes/ast_planner_node/">the planner</a> and
+<a href="../nodes/refiner_node/">the refiner</a>; the invariant is
+<a href="../invariants/#knowledge-is-data-the-validator-and-scope-decide">Knowledge Is Data</a>.</p>
+</div>
 <h3 id="knowledge-in-the-index">Knowledge in the index</h3>
 <p>Prompts read the in-memory knowledge, so an accept is effective in the next
 run. The index carries knowledge for ranking (D56):</p>
@@ -5941,6 +5951,65 @@ where the code differs from section 5:</p>
   and the CLI); <code>test_only_accept_writes_a_persons_file</code> in
   <code>tests/architecture/test_boundaries.py</code>, which also lists
   <code>review/queue.py</code> among the access decisions that ask a <code>Scope</code>.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: knowledge in the prompts (K2)</p>
+<p>Knowledge reaches the planner's and the refiner's prompts; the index is
+K3's. Exact names, and where the code differs from this page:</p>
+<ul>
+<li><strong>Matching and rendering.</strong> <code>nl2sql/knowledge/match.py</code>:
+  <code>match_terms(terms, texts, *, sources, top_k) -&gt; List[TermMatch]</code>
+  (<code>NAME_SCORE</code> 1.0, <code>SYNONYM_SCORE</code> 0.9, <code>normalize(text)</code>) and
+  <code>rules_for(rules, tables, snapshot, *, sources) -&gt; List[RuleUse]</code>.
+  <code>nl2sql/knowledge/render.py</code>: <code>render_business_context(terms, rules) -&gt; str</code>,
+  <code>fit_business_context(terms, rules, *, max_chars) -&gt; (terms, rules, dropped)</code>
+  (the cut is its own function, so rendering stays pure) and
+  <code>business_context_of(state)</code>, which the planner and the refiner both call.
+  The block carries a term's <code>term</code>, <code>definition</code>, <code>columns</code> and <code>tables</code>
+  (no synonyms, as the example above), a rule's <code>id</code> and <code>text</code>; an empty
+  list is left out.</li>
+<li><strong>The retriever.</strong> <code>schema_knowledge(knowledge, datasource_id, snapshot,
+  scope, dialect) -&gt; SchemaKnowledge</code> (in <code>schema_retriever/node.py</code>) filters
+  with K1's <code>visible(..., deny_names(scope))</code> and resolves descriptions,
+  roles, units, grains, values and glossary joins per snapshot table key;
+  <code>_build_tables_from_snapshot(..., knowledge=)</code> puts them on <code>Table</code> and
+  <code>Column</code> (extra fields <code>role</code>, <code>unit</code>, <code>grain</code>, <code>values</code>; a relationship
+  gains <code>"source": "glossary"</code>). A database comment that mentions a denied
+  table is dropped too, as <code>show</code> drops it. <code>resolve_join(join, snapshot, *,
+  dialect)</code> was added to K1's <code>resolve.py</code> (a join is used only when
+  <code>problems</code> would not report it). <code>knowledge_used</code> is None when no term or
+  rule matched, and for a pinned plan. The denied-name pattern is built once
+  per sub-query (<code>denied_pattern</code>, <code>mentions</code> in <code>knowledge/scope.py</code>) and
+  only readable tables' comments are checked.</li>
+<li><strong>The planner.</strong> The chain's structured output is <code>PlannerAnswer</code>; each
+  alternative passes <code>plan.after</code> in <code>checked_alternatives(state,
+  alternatives)</code>. <code>ASTPlannerResponse.alternatives_offered</code> (added here,
+  after L1's review) keeps every alternative the answer carried, before
+  <code>plan.after</code> or any filter; the no-cache rule (D47) in <code>graph_utils</code> reads
+  it, with <code>alternatives</code> and <code>ambiguous_phrase</code>, so a plan whose readings
+  were all dropped for one caller is still never cached. It carries over to
+  a retry, so an ambiguity an earlier attempt flagged is never forgotten. It
+  is the canonical field; L1 (#339) rebases onto it.</li>
+<li><strong><code>knowledge.used</code></strong> is published by the planner, once per sub-query, on
+  the first prompt that carries the block, not by the retriever: a
+  plan-cache hit sends no prompt, publishes nothing, and its
+  <code>SubQueryResult.knowledge_used</code> is None. JSON blocks escape U+2028,
+  U+2029 and U+0085 (<code>one_line</code> in <code>knowledge/render.py</code>).</li>
+<li><strong>The cache.</strong> <code>PlanCache(..., knowledge=)</code> appends
+  <code>| knowledge=&lt;Knowledge.digest(datasource_id)&gt;</code> to every key (the digest
+  of no knowledge when there is none); <code>plan_cache_for(ctx)</code> passes the
+  run's pinned <code>ctx.knowledge</code>.</li>
+<li><strong>The explanation.</strong> <code>caller_knowledge(ctx, state)</code> in
+  <code>nl2sql/knowledge/scope.py</code> is the scope-filtered knowledge, per
+  datasource the run planned on, for X1's <code>result_from_state(...,
+  knowledge=)</code>, read from the runtime the run pinned (<code>run_with_graph</code>
+  returns it as <code>state["pinned_runtime"]</code>); <code>QueryAPI.run_query</code>, <code>QueryAPI._stream</code>,
+  <code>evaluation/run.py</code>, <code>tracing/replay.py</code> and <code>tracing/trace.py</code> pass it.</li>
+<li><strong>Fakes and the recording.</strong> <code>nl2sql.testing.fake_llm.as_planner_answer</code>
+  wraps a bare plan as <code>{"plan": ...}</code> for a <code>PlannerAnswer</code> rule; the gold
+  plan fake answers <code>{"plan": ...}</code> itself. The demo recording was
+  converted by the one-off script (17 entries), which was not committed.</li>
 </ul>
 </div>
 <p><strong>The demo recording.</strong> K2 changes the planner's structured output from

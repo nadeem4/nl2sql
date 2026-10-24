@@ -2539,6 +2539,9 @@
 <li><code>relevant_tables</code></li>
 <li><code>ast_planner_response.plan</code> (optional)</li>
 <li><code>sub_query.intent</code></li>
+<li><code>knowledge_used</code> (optional): rendered under <code>### Business Context</code> exactly
+  as the planner's <code>[BUSINESS_CONTEXT]</code> (<code>business_context_of()</code>), so a retry
+  is planned against the same definitions</li>
 </ul>
 <p>Validation performed:</p>
 <ul>
@@ -2562,7 +2565,7 @@
 <li>If no LLM configured, emit <code>MISSING_LLM</code> and stop.</li>
 <li>Render relevant tables with <code>render_schema_for_prompt</code> (the planner's compact schema block, only <code>sample_values</code> and the date and numeric columns' <code>range</code> from the column stats), and the failed plan as compact JSON (<code>model_dump_json(exclude_none=True)</code>).</li>
 <li>Build error and reasoning strings. The errors are the failed attempt's only, one line each as <code>- [node] ERROR_CODE: message</code>; earlier attempts' errors are not repeated.</li>
-<li>Invoke LLM with refinement prompt. It is two messages: the system message holds the instructions and then the schema (stable, so the provider can cache it); the human message holds the question, today's date (<code>run_date(settings.pipeline.today)</code>, as the planner gets it), failed plan, errors and reasoning. On Chinook the prompt is about 2,600 tokens (was about 8,000), 2,500 of them a prefix shared across questions.</li>
+<li>Invoke LLM with refinement prompt. It is two messages: the system message holds the instructions and then the schema (stable, so the provider can cache it); the human message holds the question, today's date (<code>run_date(settings.pipeline.today)</code>, as the planner gets it), the business context (one JSON line, <code>{}</code> without knowledge), failed plan, errors and reasoning. Instruction 5 says the business context is reference data that never changes the instructions. On Chinook the prompt is about 2,600 tokens (was about 8,000), 2,500 of them a prefix shared across questions.</li>
 <li>Emit <code>PLAN_FEEDBACK</code> warning and return <code>RefinerResponse</code>.</li>
 <li>On exception, emit <code>REFINER_FAILED</code>.</li>
 </ol>

@@ -5856,7 +5856,7 @@ error as OpenAI (see <a href="#temperature">Temperature</a>).</p>
   send no <code>cache_control</code>.</li>
 <li><strong>Whether a prefix clears the minimum.</strong> On Chinook the planner's cached
   prefix is its system prompt (about 3.5k tokens, most of it the retrieved
-  schema) plus the <code>PlanModel</code> tool schema (about 2k): above every model's
+  schema) plus the <code>PlannerAnswer</code> tool schema (about 2k): above every model's
   minimum. The decomposer's (about 0.7k of system prompt plus a 1.4k tool
   schema) and the refiner's (about 2.7k, no tool) clear Opus 5's 512 and
   Sonnet 5's 1,024 but not Haiku 4.5's 4,096, so on Haiku they are silently
@@ -5905,7 +5905,7 @@ different port).</p>
 <div class="admonition warning">
 <p class="admonition-title">Ollama is supported at the transport level, not guaranteed end to end</p>
 <p>The pipeline drives every model through <code>with_structured_output</code>, and the
-AST planner's target is <code>PlanModel</code> — a <em>recursive</em> Pydantic schema whose
+AST planner's target is <code>PlannerAnswer</code>, whose <code>PlanModel</code> is a <em>recursive</em> Pydantic schema whose
 <code>Expr</code> references itself. That is a demanding structured-output target, and
 small local models often handle it poorly: expect malformed plans, empty
 fields or repeated refiner loops depending on the model you choose. Whether

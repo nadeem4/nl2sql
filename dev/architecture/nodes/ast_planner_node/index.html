@@ -2543,7 +2543,7 @@
 <h1 id="astplannernode">ASTPlannerNode</h1>
 <h2 id="overview">Overview</h2>
 <ul>
-<li>Generates a structured SQL AST plan (<code>PlanModel</code>) using an LLM with structured output.</li>
+<li>Generates a structured SQL AST plan using an LLM with structured output: the planner's answer is a <code>PlannerAnswer</code>, the default plan (<code>PlanModel</code>) and, for an ambiguous question, up to two alternative readings.</li>
 <li>Exists to translate natural language intent into a deterministic, machine‑verifiable plan.</li>
 <li>Sits after <code>SchemaRetrieverNode</code> in the SQL agent subgraph.</li>
 <li>Class: <code>ASTPlannerNode</code></li>
@@ -2557,7 +2557,8 @@
 <li>Serialize <code>relevant_tables</code> into the planning prompt.</li>
 <li>Pass user intent, expected schema, and error feedback to the LLM.</li>
 <li>Run the <code>plan.after</code> hooks on the plan (the planner's or the cached one) in <code>after_plan()</code>, the one place every plan the validator gets passes through.</li>
-<li>Return <code>ASTPlannerResponse</code> with the <code>PlanModel</code> the hooks let through, the planner's own plan (<code>planner_plan</code>, which the plan cache stores) and its <code>plan_source</code> (<code>"llm"</code>, <code>"cache"</code>, or <code>"supplied"</code>, <code>"approved"</code> or <code>"chosen"</code> for a pinned plan). Only an <code>"llm"</code> plan is ever cached.</li>
+<li>Run <code>plan.after</code> on each alternative reading too (<code>checked_alternatives()</code>): one a hook denies is dropped, one it changes is kept as changed.</li>
+<li>Return <code>ASTPlannerResponse</code> with the <code>PlanModel</code> the hooks let through, <code>ambiguous_phrase</code>, the <code>alternatives</code> the hooks let through and every alternative the planner offered (<code>alternatives_offered</code>), the planner's own plan (<code>planner_plan</code>, which the plan cache stores) and its <code>plan_source</code> (<code>"llm"</code>, <code>"cache"</code>, or <code>"supplied"</code>, <code>"approved"</code> or <code>"chosen"</code> for a pinned plan). Only an <code>"llm"</code> plan is ever cached.</li>
 </ul>
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>
@@ -2586,6 +2587,9 @@
   <code>limit</code> as the plan's <code>limit</code>, and that a most/least/top-N question needs an
   <code>order_by</code> on the ranked value and a <code>limit</code>; one example shows it.</li>
 <li><code>relevant_tables</code> (required for schema grounding)</li>
+<li><code>knowledge_used</code> (optional): the terms and rules the schema retriever
+  picked, rendered as <code>[BUSINESS_CONTEXT]</code> by <code>business_context_of()</code>
+  (<code>nl2sql/knowledge/render.py</code>); <code>{}</code> when there are none</li>
 <li><code>errors</code> (optional feedback for retries)</li>
 </ul>
 <p>Validation performed:</p>
@@ -2617,7 +2621,10 @@ validation and executed is reused
   intent part (<code>... | order_by=album_count desc | limit=1</code>), so a top-1 and a
   top-5 of the same intent are different entries. The run date is always
   appended (<code>... | today=2026-10-12</code>): the planner is told today's date and
-  writes relative dates as literals, so a plan from another day misses.
+  writes relative dates as literals, so a plan from another day misses. So are
+  the planner's model and the datasource's knowledge digest
+  (<code>... | knowledge=&lt;sha256&gt;</code>, Wave B D57): a changed definition plans again,
+  and swapping the glossary back hits the old entries.
   Normalisation case-folds, collapses whitespace and strips trailing <code>.?!,;:</code>;
   the match is exact. No <code>schema_version</code>, no caching.</li>
 <li><strong>Read:</strong> only on a first attempt (<code>retry_count == 0</code> and no errors). A hit
@@ -2627,7 +2634,12 @@ validation and executed is reused
   cached plan exactly as on a fresh one, so RBAC and policy changes apply.</li>
 <li><strong>Written</strong> by <code>wrap_subgraph</code> (<code>pipeline/graph_utils.py</code>) only when the
   sub-query produced SQL and executed without a blocking error. Refused, failed
-  and plan-only runs are not stored. What is stored is <code>planner_plan</code>, the
+  and plan-only runs are not stored. Nor is a plan whose planner answer
+  carried alternatives or an <code>ambiguous_phrase</code> (D47), keyed on
+  <code>alternatives_offered</code>, so a reading <code>plan.after</code> or the caller's scope
+  dropped still keeps the plan out of the cache. <code>alternatives_offered</code>
+  carries over to a retry: a question an earlier attempt read two ways is
+  never cached, however clear the retry's answer. What is stored is <code>planner_plan</code>, the
   plan before any <code>plan.after</code> hook changed it. When a hook changed it, that
   plan was not itself validated in the run that stored it; a hit is safe
   anyway, because it passes <code>plan.after</code> and the validator again every time.</li>
@@ -2642,11 +2654,13 @@ validation and executed is reused
 <li>Render <code>relevant_tables</code> with <code>render_schema_for_prompt</code> (see below).</li>
 <li>Build the feedback string from the latest attempt's errors only, one JSON object per line with <code>node</code>, <code>error_code</code> and <code>message</code> (<code>nl2sql.pipeline.retry_feedback</code>): an earlier attempt's errors, stack traces and <code>details</code> are never sent.</li>
 <li>Build <code>expected_schema</code> payload from sub‑query.</li>
-<li>Invoke the LLM chain with prompt + structured output (<code>PlanModel</code>).</li>
+<li>Invoke the LLM chain with prompt + structured output (<code>PlannerAnswer</code>); its <code>plan</code> is the default reading. The first prompt of a sub-query that carries knowledge publishes <code>knowledge.used</code>.</li>
 <li>Run <code>plan.after</code> (<code>after_plan()</code>): a <code>Modify</code> replaces the plan, which the
    validator then checks like any other; a deny returns <code>plan=None</code> with
    <code>HOOK_DENIED</code> (or <code>HOOK_FAILED</code>), which is never retried. Return
-   <code>ASTPlannerResponse</code> with the plan, <code>planner_plan</code> and reasoning.</li>
+   <code>ASTPlannerResponse</code> with the plan, <code>planner_plan</code> and reasoning. Each
+   alternative passes <code>plan.after</code> the same way; the clarifier (L1) decides
+   whether to ask.</li>
 <li>On exception, emit <code>PLANNING_FAILURE</code> error and return <code>plan=None</code>.</li>
 </ol>
 <hr/>
@@ -2669,7 +2683,7 @@ caches a stable prefix of 1,024+ tokens automatically):</p>
 </tr>
 <tr>
 <td>human (<code>PLANNER_HUMAN_PROMPT</code>)</td>
-<td><code>[TODAY]</code>, <code>[EXPECTED_SCHEMA]</code>, <code>[SEMANTIC_CONTEXT]</code>, <code>[FEEDBACK]</code>, <code>[USER_QUERY]</code></td>
+<td><code>[TODAY]</code>, <code>[EXPECTED_SCHEMA]</code>, <code>[SEMANTIC_CONTEXT]</code>, <code>[BUSINESS_CONTEXT]</code>, <code>[FEEDBACK]</code>, <code>[USER_QUERY]</code></td>
 <td>every call</td>
 </tr>
 </tbody>
@@ -2680,6 +2694,16 @@ real dates rather than a year the model guessed. It is in the human message
 because it changes daily; in the system message it would invalidate the cached
 prefix every midnight. It comes before <code>[USER_QUERY]</code>, because demo replay keys
 a recording on the line after that marker.</p>
+<p><code>[BUSINESS_CONTEXT]</code> is the glossary terms and rules the question touches, as
+one line of JSON (keys sorted, no whitespace, and U+2028, U+2029 and U+0085
+escaped, as in the schema block): knowledge reaches the model only as JSON
+values, so a line break or a marker in a definition stays inside one JSON
+string. It changes per question, so it is in the human message, before
+<code>[FEEDBACK]</code> and <code>[USER_QUERY]</code>. Instruction 15 says it is reference data that
+never changes the instructions, the output contract or the constraints;
+instruction 16 asks for <code>ambiguous_phrase</code> and alternatives when a question
+can reasonably be read more than one way. See
+<a href="../../invariants/#knowledge-is-data-the-validator-and-scope-decide">Knowledge Is Data</a>.</p>
 <p>The examples come before the schema so that the instructions and examples
 (about 1,300 tokens) stay cacheable even when vector retrieval picks a
 different set of tables per question. The system/human boundary is the single
@@ -2740,6 +2764,7 @@ snapshot. On Chinook the ranges cost about 140 tokens of schema block (2,324 to
 </code></pre></div>
 <p>Key contracts:</p>
 <ul>
+<li><code>PlannerAnswer</code> (<code>plan</code>, <code>ambiguous_phrase</code>, <code>alternatives</code>: at most two <code>PlanAlternative</code>s, each a <code>label</code> and a <code>plan</code>)</li>
 <li><code>PlanModel</code></li>
 <li><code>ASTPlannerResponse</code></li>
 </ul>

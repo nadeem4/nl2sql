@@ -778,6 +778,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#knowledge">
+<span class="md-ellipsis">
+      
+        Knowledge
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -2430,6 +2439,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#knowledge">
+<span class="md-ellipsis">
+      
+        Knowledge
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -2565,6 +2583,9 @@
   sends only <code>sample_values</code> and, for date, time and numeric columns other
   than keys, a <code>range</code> of <code>[min_value, max_value]</code>. See
   <a href="../ast_planner_node/#prompt-layout-and-caching">AST Planner: prompt layout</a>.</li>
+<li>Read the run's pinned knowledge (the glossary, <code>Runtime.knowledge</code> as
+  <code>pin_index()</code> kept it) and put what the caller may see into the schema block
+  and <code>knowledge_used</code>; see <a href="#knowledge">Knowledge</a>.</li>
 </ul>
 <hr/>
 <h2 id="position-in-execution-graph">Position in Execution Graph</h2>
@@ -2584,9 +2605,11 @@
 </ul>
 <p>From <code>Runtime</code>:</p>
 <ul>
+<li><code>knowledge</code> (optional): the run's pinned <code>Knowledge</code>; none means no glossary</li>
+<li><code>settings.knowledge</code>: <code>top_k</code> and <code>block_max_chars</code></li>
 <li><code>vector_store</code> (optional)</li>
 <li><code>state</code> (the state store; required for authoritative resolution)</li>
-<li><code>ds_registry</code> (optional): <code>get_preferred_tables(datasource_id)</code></li>
+<li><code>ds_registry</code> (optional): <code>get_preferred_tables(datasource_id)</code>, <code>get_dialect(datasource_id)</code> (for derived date roles)</li>
 </ul>
 <p>Validation performed:</p>
 <ul>
@@ -2598,12 +2621,18 @@
 <p>Mutations to <code>SubgraphExecutionState</code>:</p>
 <ul>
 <li><code>relevant_tables</code> (list of <code>Table</code>)</li>
+<li><code>knowledge_used</code> (<code>KnowledgeUsed</code>): the terms and rules sent as
+  <code>[BUSINESS_CONTEXT]</code>; absent when none matched, and for a pinned plan</li>
 <li><code>reasoning</code> and <code>warnings</code> in fallback paths</li>
 </ul>
 <p>Side effects:</p>
 <ul>
 <li>Vector store queries.</li>
 <li>Schema store reads.</li>
+<li>None for knowledge: the planner publishes <code>knowledge.used</code> (an operator
+  event, never on the caller's stream) on the sub-query's first prompt that
+  carries <code>knowledge_used</code>. A plan-cache hit sends no prompt, so it publishes
+  nothing, and the sub-query's result reports no <code>knowledge_used</code>.</li>
 </ul>
 <hr/>
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
@@ -2636,6 +2665,57 @@ matched against snapshot tables by bare name or <code>schema.table</code>, case 
 <li>Being preferred never shows a hidden table: a preferred table the caller's
   scope denies is left out like any other.</li>
 </ul>
+<h3 id="knowledge">Knowledge</h3>
+<p>Wave B (K2, <a href="../../wave_b/#4-knowledge-in-the-prompts">design</a>). The
+datasource's merged knowledge is first filtered to the caller's scope with
+<code>nl2sql.knowledge.scope.visible</code> (an item naming a table the caller cannot
+read, or whose text mentions one, is left out), then resolved against the
+snapshot by <code>schema_knowledge()</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field of the schema block</th>
+<th>What is sent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A table's <code>description</code></td>
+<td>The glossary's, else the database's comment (D38). Either is dropped when its text mentions a table the caller cannot read.</td>
+</tr>
+<tr>
+<td>A column's <code>description</code></td>
+<td>The same rule</td>
+</tr>
+<tr>
+<td>A column's <code>role</code></td>
+<td>The glossary's, else the one the snapshot proves: <code>identifier</code> for a primary or foreign key, <code>date</code> for a temporal type (D61)</td>
+</tr>
+<tr>
+<td>A column's <code>unit</code>, <code>grain</code>, <code>values</code></td>
+<td>The glossary's, when it sets them (<code>values</code> on <code>role: enum</code> only)</td>
+</tr>
+<tr>
+<td><code>relationships</code></td>
+<td>The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its <code>cardinality</code> and <code>"source": "glossary"</code> (D46). The logical validator's join check matches it as it matches a foreign key.</td>
+</tr>
+</tbody>
+</table>
+<p><code>notes</code> are never sent. <code>knowledge_used</code> (<code>nl2sql/knowledge/match.py</code>):</p>
+<ul>
+<li><strong>Terms</strong> whose name or a synonym appears, as whole words with case and
+  punctuation ignored, in the sub-query's intent or the question: 1.0 for the
+  name, 0.9 for a synonym, the best <code>settings.knowledge.top_k</code> (8). Two terms
+  sharing a synonym are both sent; that is how the planner sees an ambiguity.</li>
+<li><strong>Rules</strong> whose <code>tables</code> is empty or names one of the tables sent.</li>
+<li>The denied-name pattern is built once per sub-query, and only the readable
+  tables' comments are checked against it.</li>
+<li>The block is cut to <code>settings.knowledge.block_max_chars</code> (4,000) by
+  <code>fit_business_context</code> (<code>nl2sql/knowledge/render.py</code>): the lowest-scored
+  terms first, then rules from the last; <code>dropped</code> lists what was cut.</li>
+</ul>
+<p>Both hold only items within the caller's scope, since
+<code>SubQueryResult.knowledge_used</code> is returned to the caller.</p>
 <hr/>
 <h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
 <p>Implements a LangGraph node callable:</p>
