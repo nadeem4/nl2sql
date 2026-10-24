@@ -70,9 +70,9 @@ for the datasource's knowledge digest.
 
 - No alternatives: nothing (it passes straight through).
 - Otherwise `ast_planner_response` with `alternatives` cut to the readings that
-  passed and were not merged. `alternatives_offered` still says how many the
-  planner gave, so an answer with readings is never cached (D47), even when
-  none was left for this caller.
+  passed and were not merged. `alternatives_offered` (every reading the
+  planner gave, set by the planner node) is left as it is, so an answer with
+  readings is never cached (D47), even when none was left for this caller.
 - When it asks, also one `PipelineError`: `NEEDS_CLARIFICATION`, severity
   `INFO`, never retried. Its `details` carry what the result needs to build the
   `ClarificationRequest`: `phrase`, `datasource_id`, `schema_version`,

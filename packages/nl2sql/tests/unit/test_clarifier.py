@@ -416,17 +416,23 @@ def test_a_sub_query_that_asked_never_counts_as_succeeded():
     assert [(w.code, w.detail) for w in out["warnings"]] == [("COLUMN_NOT_FOUND", {"recovered": True})]
 
 
-def test_the_planners_alternatives_are_still_counted_after_the_filtering(monkeypatch):
+def test_the_clarifier_keeps_what_the_planner_offered(monkeypatch):
+    from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
+
     graph, _, _ = _agent(monkeypatch, [DENIED, BROKEN])
+    offered = [DENIED, BROKEN]
+    monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ASTPlannerNode", lambda _ctx: (
+        lambda s: {"ast_planner_response": ASTPlannerResponse(plan=GROSS, ambiguous_phrase="sales",
+                                                              alternatives=offered, alternatives_offered=offered)}))
+    graph = build_sql_agent_graph(_ctx(), execute=True)
 
     state = graph.invoke(_sub_state())
 
     response = state["ast_planner_response"]
     assert response.alternatives == []
-    # What the plan cache keys "never cache an answer with alternatives" on (D47): the planner gave two.
-    assert response.alternatives_offered == 2
-    assert ASTPlannerResponse(plan=GROSS, alternatives=[INVOICED]).alternatives_offered == 1
-    assert ASTPlannerResponse(plan=GROSS).alternatives_offered == 0
+    # K2's plan cache reads alternatives_offered ("never cache an answer with readings", D47): the clarifier
+    # cuts only alternatives, so the dropped readings still keep the plan out of the cache.
+    assert response.alternatives_offered == offered
 
 
 def test_checking_a_denied_alternative_publishes_no_denial(monkeypatch):

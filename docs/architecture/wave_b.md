@@ -929,10 +929,11 @@ Revenue (sum of unit price times quantity); Invoiced total (tax included)."
     - **Dropped means gone.** An alternative that fails `check` (or that the
       generator cannot render) is removed from `ast_planner_response.alternatives`,
       so it is neither offered nor listed as an assumption by X1. Merging keeps
-      the first label. `ASTPlannerResponse.alternatives_offered` keeps how
-      many the planner gave (`len(alternatives)` unless set; the clarifier
-      carries it over), so K2's rule that an answer with alternatives is never
-      cached (D47) holds even when none was left for this caller. Checking an
+      the first label. The clarifier cuts only `alternatives`: K2's
+      `ASTPlannerResponse.alternatives_offered` (every reading the planner
+      gave, before `plan.after`) stays, so K2's rule that an answer with
+      readings is never cached (D47) holds even when none was left for this
+      caller. Checking an
       alternative is `check(..., audit=False)`: a denied reading publishes no
       `policy.decision` and logs no denial warning. `plan.after` on each
       alternative stays K2's (the planner node); H1's test still allows no
@@ -952,7 +953,9 @@ Revenue (sum of unit price times quantity); Invoiced total (tax included)."
       adds the question as passed (before `run.before`; the state's when not
       given), the asker, and each option's `explanation =
       explain_plan(plan, datasource_id=, sub_query_id=, knowledge_used=,
-      knowledge=)`. X1 still explains only `success` steps, so the run's
+      knowledge=)`, where `knowledge` is the caller's scope-filtered glossary
+      (K2's `caller_knowledge(ctx, state)`, which every `result_from_state`
+      call site passes beside `question=`). X1 still explains only `success` steps, so the run's
       `explanation` is `None`. The default reading has no planner label: it is
       the one glossary term its step reads, else its first measure, filter or
       table, capped at 60. `final_answer` is the fixed sentence as
