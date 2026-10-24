@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -5271,9 +5271,11 @@
 <h1 id="the-review-queue">The Review Queue</h1>
 <p>Every change the engine suggests to a person's knowledge or curated answers is
 a <em>proposal</em> in one queue, kept in the state store (<code>storage.state</code>). A
-thumbs-up on a generated answer files a proposed verified query; later 0.8
-work files the profiler's join candidates and column roles, drafted
-descriptions, corrections and saved clarifications the same way. Nothing in
+thumbs-up on a generated answer files a proposed verified query, and so does a
+checked <a href="../../observability/feedback/#correcting-an-answer-nl2sql-feedback-correct">correction</a>
+(<code>engine.feedback.correct</code>, origin <code>correction</code>); later 0.8 work files the
+profiler's join candidates and column roles, drafted descriptions and saved
+clarifications the same way. Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">                     </span><span class="c1"># what is waiting</span>
@@ -5318,7 +5320,7 @@ third-party state store can keep it:</p>
 </tr>
 <tr>
 <td><code>evidence</code></td>
-<td>Counts and checks (a thumbs-up's trace id and role); never rows</td>
+<td>Counts and checks (a thumbs-up's trace id and role; a correction's trace id, original SQL, <code>ran</code>, <code>row_count</code> and <code>columns</code>); never rows</td>
 </tr>
 <tr>
 <td><code>status</code></td>
@@ -5340,7 +5342,7 @@ third-party state store can keep it:</p>
 <tbody>
 <tr>
 <td><strong>One change, one row</strong></td>
-<td>The id hashes the change, so filing the same change again updates the open row's evidence. A rejected change keeps its row and is never proposed again; a different change for the same target is a new row.</td>
+<td>The id hashes the change, so filing the same change again updates the open row's evidence and adds any tables the new filing names. A rejected change keeps its row and is never proposed again; a different change for the same target is a new row.</td>
 </tr>
 <tr>
 <td><strong>Supersede</strong></td>
@@ -5548,6 +5550,7 @@ build; without <code>--as</code>, the role is <code>policies.default_role</code>
 <li>The review file: <code>packages/nl2sql/src/nl2sql/review/review_file.py</code></li>
 <li>The facade: <code>packages/nl2sql/src/nl2sql/api/proposals_api.py</code></li>
 <li>Thumbs-up proposals: <code>packages/nl2sql/src/nl2sql/api/feedback_api.py</code>, <code>packages/nl2sql/src/nl2sql/feedback/proposals.py</code></li>
+<li>Corrections: <code>packages/nl2sql/src/nl2sql/feedback/corrections.py</code>, and <code>nl2sql feedback correct</code> in <code>packages/nl2sql/src/nl2sql/cli/commands/feedback.py</code></li>
 <li>The command: <code>packages/nl2sql/src/nl2sql/cli/commands/review.py</code></li>
 <li>The design: <a href="../../architecture/wave_b/#5-the-review-queue">Wave B, section 5</a></li>
 </ul>
@@ -5606,10 +5609,10 @@ build; without <code>--as</code>, the role is <code>policies.default_role</code>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>

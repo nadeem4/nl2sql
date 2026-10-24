@@ -10,10 +10,10 @@
 <link href="../wave_a/" rel="prev"/>
 <link href="../wave_c/" rel="next"/>
 <link href="../../assets/favicon.svg" rel="icon"/>
-<meta content="mkdocs-1.6.1, mkdocs-material-9.7.7" name="generator"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.8.0" name="generator"/>
 <title>Wave B (design) - NL2SQL Platform</title>
-<link href="../../assets/stylesheets/main.ec1eaa64.min.css" rel="stylesheet"/>
-<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/main.57a0d79d.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.fb2fffe2.min.css" rel="stylesheet"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
 <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
@@ -5168,6 +5168,84 @@ Nothing is written before that accept.</p>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built: corrections (F1)</p>
+<p><code>engine.feedback.correct(trace_id, *, sql=None, plan=None, question=None,
+note=None, user_context) -&gt; Proposal</code> and <code>nl2sql feedback correct</code> (with
+<code>--user</code> beside <code>--as</code>, through K1's <code>caller</code>) are built, in
+<code>nl2sql/feedback/corrections.py</code> (<code>correct</code>); <code>FeedbackAPI.correct</code> only
+calls it. Exact names, and where the code differs from the steps above:</p>
+<ul>
+<li><strong>Refusals.</strong> <code>CorrectionRefused(ValueError)</code> in <code>feedback/corrections.py</code>,
+  with <code>code</code> (one of <code>REFUSAL_CODES</code>: <code>no_run</code>, <code>multi_datasource</code>,
+  <code>invalid_plan</code>, <code>not_read_only</code>, <code>denied</code>, <code>hook_denied</code>,
+  <code>needs_approval</code>, <code>failed</code>) and <code>messages</code> (the validator's, the hook's
+  reason, the database's). It is a <code>ValueError</code>, so it adds no <code>ErrorCode</code>
+  and no export (both B0's). No caller is a <code>TypeError</code> and not exactly
+  one fix a <code>ValueError</code>, as Q1's methods do.</li>
+<li><strong>The run.</strong> The kept trace (<code>request.question</code>, the result's
+  sub-queries) is read first; with no trace (the default
+  <code>settings.traces.mode</code> keeps only failed runs), the run's rating gives
+  the question, datasource and SQL. Neither is <code>no_run</code>. <strong>The run's
+  scope comes first</strong> (after review on #341): before anything else, the
+  corrector's <code>Scope</code> must reach every datasource the run read and every
+  table its SQL read (<code>_find_run</code>; a run whose SQL cannot be parsed is
+  refused), and that refusal (<code>denied</code>, <code>DENIED_RUN</code>) names no datasource,
+  table or question. Only then is a run on several datasources refused,
+  and the run rated <code>down</code>, through <code>engine.feedback.record</code> (or the
+  stored row re-rated). So a refused fix still leaves the thumbs-down of a
+  caller who could read the run, and no other caller can change a rating.</li>
+<li><strong>A plan fix</strong> is <code>run_query(plan=SuppliedPlan(...), execute=False,
+  user_context=corrector)</code>, as Wave A's seeding runs a plan, so <code>run.before</code>
+  and <code>plan.after</code> see it too. A <code>PlanModel</code>, a dict or JSON text.</li>
+<li><strong>The SQL check</strong> is <code>inspect_verified_sql</code> for both fixes (the
+  engine's rendering included), and a SQL fix with <code>:name</code> placeholders
+  is <code>not_read_only</code>: it runs once, with no values. A trailing <code>;</code> and
+  the comment after it are dropped first (<code>_one_statement</code>, with
+  sqlglot's tokenizer). A <em>person's</em> SQL fix is also held, in
+  <code>corrections.py</code> rather than the shared curated check, to plain tables
+  (an <code>exp.Table</code> whose source is not an identifier, a table-valued
+  function such as a catalog or file reader, is refused) and to an
+  allow-list of functions: <code>ALLOWED_FUNCTIONS</code>, as sqlglot names them in
+  the datasource's dialect (<code>_known_functions</code>), plus
+  <code>STRUCTURAL_FUNCTIONS</code> (<code>CAST</code>, <code>TRY_CAST</code>, <code>CASE</code>, <code>IF</code>, <code>EXISTS</code>, the
+  current date and time). An unknown function is refused too. Both are
+  <code>not_read_only</code>. The scope check asks
+  <code>PolicyEngine.scope</code> (<code>feedback/corrections.py</code> joins <code>ACCESS_DECISIONS</code>
+  in the boundary test, and <code>FeedbackAPI.correct</code> joins
+  <code>WAVE_B_READ_METHODS</code>, so its caller is a required <code>UserContext</code>).</li>
+<li><strong>The hooks</strong> are <code>hooks_of(ctx).call("execute.before", ...)</code> with the
+  fields a question's executor passes (<code>trace_id</code> the corrected run's,
+  <code>sub_query</code> id <code>correction</code>, <code>plan</code> for a plan fix, <code>params={}</code>,
+  <code>tables</code> as <code>datasource.schema.table</code>, <code>approvals=[]</code>). C2's built-in
+  <code>policy.cost</code> reaches a correction once the runtime puts it in that
+  runner: C2's <code>test_correction_check_is_cost_guarded</code> calls
+  <code>engine.feedback.correct(...)</code> and expects <code>CorrectionRefused</code> with
+  <code>code</code> <code>needs_approval</code> (<code>over_limit: confirm</code>) or <code>hook_denied</code>
+  (<code>refuse</code>; the message is the hook's). <code>execute.after</code> is not called,
+  as step 4 says.</li>
+<li><strong>The check</strong> runs as <code>CuratedAPI.test</code> does: <code>_frames</code> over the
+  adapter with <code>settings.results.fetch_batch_size</code>, the first frame only,
+  no artifact written. <code>row_count</code> is that frame's. An error the
+  adapter did not wrap is logged and named by its type only, so no
+  driver text (a host, a password) reaches the caller. A
+  <code>NEEDS_APPROVAL</code> from a plan fix's run is <code>needs_approval</code>.</li>
+<li><strong>The proposal</strong> is <code>Proposal.build(kind="verified_query",
+  origin="correction", target=&lt;question&gt;, ...)</code> filed with
+  <code>review.queue.propose</code>, so a correction supersedes an open thumbs-up of
+  the same question. <code>change</code> is <code>{id, description, questions, sql}</code> (the
+  id <code>feedback.proposals._slug</code>'s, the description the note else
+  <code>DESCRIPTION_PLACEHOLDER</code>); <code>created_by</code> the corrector's user id;
+  <code>schema_version</code> the run's. <code>tables</code> lists the tables the fix <em>and the
+  original SQL</em> read, since <code>evidence.original_sql</code> shows the latter: a
+  caller denied either never sees the proposal. <code>review/queue.py</code>
+<code>propose</code> now unions <code>tables</code> when the same change is filed again and
+  its evidence is replaced (a second run's correction with the same fix),
+  so new evidence never shows tables the row does not list.</li>
+<li><strong>Tests.</strong> <code>tests/unit/test_corrections.py</code> (every F1 test the row
+  names, the visibility tests and the CLI).</li>
+</ul>
+</div>
 <h2 id="11-events-wave-b-adds">11. Events Wave B adds</h2>
 <p>Added to Wave A's catalog (<code>nl2sql/events/catalog.py</code>) in B0, each with
 its data model. None carries rows or sample values (Wave A D15). None of
@@ -5985,7 +6063,7 @@ the owner decides otherwise:</p>
 <div class="md-dialog" data-md-component="dialog">
 <div class="md-dialog__inner md-typeset"></div>
 </div>
-<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
-<script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+<script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
 </body>
 </html>

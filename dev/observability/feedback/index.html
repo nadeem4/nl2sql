@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
     
     
       
@@ -31,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -3161,6 +3161,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#correcting-an-answer-nl2sql-feedback-correct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correcting an answer: nl2sql feedback correct
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#turning-it-off-and-clearing-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5219,6 +5230,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#correcting-an-answer-nl2sql-feedback-correct" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correcting an answer: nl2sql feedback correct
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#turning-it-off-and-clearing-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5253,7 +5275,7 @@ guardrail rates the engine already records for every run. <code>nl2sql feedback<
 reads both. Thumbs-up runs can then be exported as draft entries for the gold
 set, and thumbs-up generated answers as proposed verified queries.</p>
 <p>The playground and <code>nl2sql feedback</code> are both built on <code>engine.feedback</code>
-(<code>record</code>, <code>list</code>, <code>stats</code>, <code>export</code>, <code>clear</code>), which any Python caller can use
+(<code>record</code>, <code>list</code>, <code>stats</code>, <code>export</code>, <code>clear</code>, <code>correct</code>), which any Python caller can use
 too: see <a href="../../api/core/public-facade/#feedback">the public facade</a>.</p>
 <h2 id="rating-an-answer-in-the-playground">Rating an answer in the playground</h2>
 <p>After a run, below <strong>Cost &amp; time</strong>, the playground asks <strong>Was this answer
@@ -5467,6 +5489,70 @@ the table recorded the datasource file nothing. The same change is one
 proposal however often it is rated; a thumbs-up therefore influences routing
 only after a person accepts it. See
 <a href="../../configuration/curated/#from-feedback-to-verified-queries">From feedback to verified queries</a>.</p>
+<h2 id="correcting-an-answer-nl2sql-feedback-correct">Correcting an answer: <code>nl2sql feedback correct</code></h2>
+<p>A thumbs-down says an answer was wrong; a correction also says what was right.
+<code>engine.feedback.correct</code> takes the run's trace id and exactly one fix, the
+right SQL or the right plan, and files it as a <code>verified_query</code> proposal
+(origin <code>correction</code>) in the <a href="../../configuration/review/">review queue</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>correct<span class="w"> </span>7c0e2f4a-...<span class="w"> </span>--sql<span class="w"> </span>revenue.sql<span class="w"> </span>--note<span class="w"> </span><span class="s2">"Revenue is invoiced, not gross."</span><span class="w"> </span>--as<span class="w"> </span>analyst
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>nl2sql<span class="w"> </span>feedback<span class="w"> </span>correct<span class="w"> </span>7c0e2f4a-...<span class="w"> </span>--plan<span class="w"> </span>revenue.yaml<span class="w"> </span>--question<span class="w"> </span><span class="s2">"What was revenue last year?"</span><span class="w"> </span>--as<span class="w"> </span>analyst
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserContext</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">analyst</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"bob"</span><span class="p">,</span> <span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">])</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">proposal</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">feedback</span><span class="o">.</span><span class="n">correct</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">sql</span><span class="o">=</span><span class="s2">"SELECT SUM(Total) AS revenue FROM Invoice"</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>                                   <span class="n">note</span><span class="o">=</span><span class="s2">"Revenue is invoiced, not gross."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">analyst</span><span class="p">)</span>
+</code></pre></div>
+<p>The fix is checked as the corrector before anything is queued, and a check
+that fails raises <code>CorrectionRefused</code> (a <code>ValueError</code>) with a <code>code</code> and the
+check's own <code>messages</code>; the command prints them and exits 1.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What happens</th>
+<th>Refused as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The run</td>
+<td>Its kept trace gives the question (<code>question</code> overrides it), its datasource and its SQL; without a trace, its rating does. First, the corrector's role must reach every datasource the run read and every table its SQL read; the refusal names none of them, and the run's rating is left as it was. Then a run on several datasources is refused (a verified query answers from one), and the run is rated <code>down</code> with the note unless it already is.</td>
+<td><code>no_run</code>, <code>denied</code>, <code>multi_datasource</code></td>
+</tr>
+<tr>
+<td>A plan fix</td>
+<td>Runs as a pinned plan with <code>execute=False</code>: <code>plan.after</code>, the logical validator and the generator, under the corrector's scope, with no model call. The SQL is the engine's rendering.</td>
+<td><code>invalid_plan</code>, with the validator's messages</td>
+</tr>
+<tr>
+<td>A SQL fix</td>
+<td>Must parse as exactly one read-only query in the datasource's dialect (the curated config's own check; a trailing <code>;</code> and comment are fine), with no <code>:name</code> placeholders. It reads plain tables only, never a table-valued function, and calls only the functions a plan may call plus <code>CAST</code>, <code>CASE</code>, <code>EXISTS</code> and the current date and time. It reads only tables the corrector's role may read.</td>
+<td><code>not_read_only</code>, <code>denied</code></td>
+</tr>
+<tr>
+<td>The hooks</td>
+<td>The SQL passes the <code>execute.before</code> hooks with the corrector as the caller. A deny or a failed hook refuses it, and so does a request for approval: a correction is never run with an approval.</td>
+<td><code>hook_denied</code>, <code>needs_approval</code></td>
+</tr>
+<tr>
+<td>The check</td>
+<td>The SQL runs once through the adapter, as <code>nl2sql curated test</code> runs a verified query: read-only, under the datasource's limits, reading the first batch of rows and keeping none. An empty result is allowed.</td>
+<td><code>failed</code>, with the adapter's message (an error it did not wrap is named by its type only)</td>
+</tr>
+<tr>
+<td>The proposal</td>
+<td><code>change</code> is in <code>curated.yaml</code>'s shape: an id slugged from the question, the question as its one phrasing, the SQL, and the note as its description (a placeholder without one). <code>tables</code> lists every table the fix and the original SQL read; <code>evidence</code> holds the trace id, the original SQL, <code>ran</code>, <code>row_count</code> and <code>columns</code>.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Nothing is written to <code>curated.yaml</code> (or any file a person owns) until an
+admin accepts the proposal, usually with edits: a better id, more phrasings,
+and <code>:name</code> params in place of the literal values. Only a caller whose scope
+reaches every table in <code>tables</code> sees the proposal. Keep traces
+(<code>settings.traces.mode: always</code>) to correct runs that succeeded and were not
+rated; the default keeps only failed runs' traces.</p>
 <h2 id="turning-it-off-and-clearing-it">Turning it off and clearing it</h2>
 <ul>
 <li><code>settings.feedback.enabled: false</code> stops the playground recording ratings.</li>
@@ -5529,10 +5615,10 @@ only after a person accepts it. See
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
       
     
   </body>
