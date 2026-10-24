@@ -796,6 +796,7 @@ ACCESS_DECISIONS = [
     "api/datasource_api.py",
     "api/indexing_api.py",  # schema drift: a caller sees drift only in tables it may read (D1)
     "review/queue.py",  # a proposal is visible only when the caller reaches every table it names (D60)
+    "feedback/corrections.py",  # a correction's SQL reads only tables the corrector may read (D55)
 ]
 # The 0.5 access helpers. A second way to decide is how two nodes come to disagree.
 OLD_ACCESS_NAMES = {"table_allowed", "get_allowed_tables", "get_allowed_datasources", "RBAC", "RolePolicy"}
@@ -838,6 +839,7 @@ def test_every_access_decision_goes_through_scope():
 WAVE_B_READ_METHODS = {
     ("api/knowledge_api.py", "KnowledgeAPI"): ("sources", "show", "export", "reload", "profile", "save_choice"),
     ("api/proposals_api.py", "ProposalsAPI"): ("list", "get", "current", "export"),
+    ("api/feedback_api.py", "FeedbackAPI"): ("correct",),  # checked as the corrector, so it names one
 }
 
 

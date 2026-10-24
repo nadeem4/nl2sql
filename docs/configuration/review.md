@@ -2,9 +2,11 @@
 
 Every change the engine suggests to a person's knowledge or curated answers is
 a *proposal* in one queue, kept in the state store (`storage.state`). A
-thumbs-up on a generated answer files a proposed verified query; later 0.8
-work files the profiler's join candidates and column roles, drafted
-descriptions, corrections and saved clarifications the same way. Nothing in
+thumbs-up on a generated answer files a proposed verified query, and so does a
+checked [correction](../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct)
+(`engine.feedback.correct`, origin `correction`); later 0.8 work files the
+profiler's join candidates and column roles, drafted descriptions and saved
+clarifications the same way. Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.
 
@@ -28,13 +30,13 @@ third-party state store can keep it:
 | `change` | The fields it would set, in `glossary.yaml`'s or `curated.yaml`'s shape |
 | `tables` | Every `datasource.schema.table` its target and change name, for the scope filter. Filing completes it: a table, a column's table, both sides of a join, a term's tables and columns' tables, and the tables a verified query's SQL reads are always listed |
 | `origin` | `thumbs_up`, `profiler`, `draft`, `correction` or `clarification` |
-| `evidence` | Counts and checks (a thumbs-up's trace id and role); never rows |
+| `evidence` | Counts and checks (a thumbs-up's trace id and role; a correction's trace id, original SQL, `ran`, `row_count` and `columns`); never rows |
 | `status` | `proposed`, `accepted`, `rejected` or `superseded` |
 | `created_at`, `created_by`, `decided_at`, `decided_by`, `reason`, `wrote` | Who and when; a rejection's reason; the file an accept wrote |
 
 | Rule | Detail |
 | --- | --- |
-| **One change, one row** | The id hashes the change, so filing the same change again updates the open row's evidence. A rejected change keeps its row and is never proposed again; a different change for the same target is a new row. |
+| **One change, one row** | The id hashes the change, so filing the same change again updates the open row's evidence and adds any tables the new filing names. A rejected change keeps its row and is never proposed again; a different change for the same target is a new row. |
 | **Supersede** | A new change for a kind, datasource and target that already has an open row marks that row `superseded`: the queue holds one open item per target. Accepted and rejected rows are never superseded. |
 | **Retention** | Decided rows (accepted, rejected, superseded) are kept for `settings.review.max_age_days` (365) and deleted by `engine.storage.purge()` (`nl2sql storage purge`, and `nl2sql-api` once a day). Open rows are never purged. |
 
@@ -152,5 +154,6 @@ A refusal (`ReviewError`) prints its message and fix and exits 1.
 - The review file: `packages/nl2sql/src/nl2sql/review/review_file.py`
 - The facade: `packages/nl2sql/src/nl2sql/api/proposals_api.py`
 - Thumbs-up proposals: `packages/nl2sql/src/nl2sql/api/feedback_api.py`, `packages/nl2sql/src/nl2sql/feedback/proposals.py`
+- Corrections: `packages/nl2sql/src/nl2sql/feedback/corrections.py`, and `nl2sql feedback correct` in `packages/nl2sql/src/nl2sql/cli/commands/feedback.py`
 - The command: `packages/nl2sql/src/nl2sql/cli/commands/review.py`
 - The design: [Wave B, section 5](../architecture/wave_b.md#5-the-review-queue)

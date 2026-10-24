@@ -185,6 +185,7 @@ thumbs up and down are built on it. See
 | `stats(*, traces=None) -> dict` | Rates over the ratings plus the traces in `traces` (default: the engine's traces folder): feedback, refusals, refiner retries, validator failures, errors, and the plan cache's hit rate. |
 | `export(path) -> dict` | Write the thumbs-up runs to `path` as draft gold entries for review; `{"written", "skipped"}`. Raises `ValueError` for the gold set's own path. |
 | `clear() -> int` | Delete every rating; returns how many. |
+| `correct(trace_id, *, sql=None, plan=None, question=None, note=None, user_context) -> Proposal` | Correct a run with exactly one fix: `sql` (one read-only query) or `plan` (a `PlanModel` or its JSON). The run is rated `down` with `note` unless it already is; the fix is checked as `user_context` and filed in the [review queue](../../configuration/review.md) as a `verified_query` proposal (origin `correction`). Raises `CorrectionRefused` (a `ValueError`, with `code` and `messages`) when a check fails. See [Correcting an answer](../../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct). |
 
 ```python
 result = engine.run_query("How many customers are there?")

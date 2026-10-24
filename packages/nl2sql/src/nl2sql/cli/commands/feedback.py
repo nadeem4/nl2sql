@@ -4,6 +4,7 @@
 * ``stats``  -- rates over the ratings plus any run traces in ``<storage.path>/traces``.
 * ``export --good`` -- thumbs-up runs as draft eval cases in a suite file of their own.
 * ``clear``  -- empty the feedback table; schema snapshots and the plan cache stay.
+* ``correct`` -- a run's fix (``--sql`` or ``--plan`` file), checked and filed as a ``verified_query`` proposal.
 
 Every command builds the engine from ``--config`` and calls ``engine.feedback``,
 which reads the feedback kept by the state store (``storage.state``).
@@ -12,7 +13,7 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import Optional
+from typing import List, Optional
 
 import typer
 from rich import box
@@ -20,6 +21,7 @@ from rich.markup import escape
 from rich.table import Table
 from typing_extensions import Annotated
 
+from nl2sql.cli.commands.knowledge import AsOption, UserOption, caller
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import console
 
@@ -133,3 +135,41 @@ def clear_command(ctx: typer.Context,
             raise typer.Exit(1)
         removed = engine.feedback.clear()
         console.print(f"[green]Cleared {removed} ratings[/green] from the state store.")
+
+
+@app.command("correct")
+def correct_command(
+    ctx: typer.Context,
+    trace_id: Annotated[str, typer.Argument(help="The run to correct: its trace id.")],
+    sql: Annotated[Optional[pathlib.Path], typer.Option(
+        "--sql", help="A file holding the right SQL: one read-only query.")] = None,
+    plan: Annotated[Optional[pathlib.Path], typer.Option(
+        "--plan", help="A file holding the right plan, as JSON or YAML.")] = None,
+    question: Annotated[Optional[str], typer.Option(
+        "--question", help="The question the fix answers (default: the run's).")] = None,
+    note: Annotated[Optional[str], typer.Option("--note", help="What was wrong; the proposal's description.")] = None,
+    as_: AsOption = None,
+    user: UserOption = None,
+) -> None:
+    """Rate a run down with its fix; the checked fix is filed in the review queue as a verified query."""
+    import yaml
+
+    if (sql is None) == (plan is None):
+        console.print("[red][ERROR][/red] Give exactly one fix: --sql FILE or --plan FILE.")
+        raise typer.Exit(2)
+    fix = (sql or plan).read_text(encoding="utf-8")
+    engine = build_engine(ctx, check=False)
+    with engine:
+        try:
+            who = caller(engine, list(as_ or []), user)
+            proposal = engine.feedback.correct(
+                trace_id, sql=fix if sql is not None else None,
+                plan=yaml.safe_load(fix) if plan is not None else None,
+                question=question, note=note, user_context=who)
+        except (ValueError, yaml.YAMLError) as error:
+            console.print(f"[bold red]Refused:[/bold red] {escape(str(error))}", soft_wrap=True)
+            raise typer.Exit(1)
+    console.print(f"[green]Proposed[/green] verified query {escape(proposal.change['id'])} as "
+                  f"{escape(proposal.id)} ({proposal.evidence.get('row_count')} rows in the check). "
+                  f"Review it with `nl2sql review show {escape(proposal.id)}`; it reaches curated.yaml "
+                  "only when an admin accepts it.", soft_wrap=True)

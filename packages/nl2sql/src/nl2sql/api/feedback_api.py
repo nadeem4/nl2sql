@@ -9,10 +9,15 @@ method, so answering a question never loads it.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
 
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
+
+if TYPE_CHECKING:
+    from nl2sql_sdk.stores import Proposal
+
+    from nl2sql.policies import UserContext
 
 logger = get_logger(__name__)
 
@@ -70,6 +75,31 @@ class FeedbackAPI:
             logger.warning("The thumbs-up of run %s was stored, but its verified-query proposal was not filed: %s",
                            stored.get("trace_id"), e)
         return stored
+
+    def correct(self, trace_id: str, *, sql: Optional[str] = None, plan: Any = None, question: Optional[str] = None,
+                note: Optional[str] = None, user_context: "UserContext") -> "Proposal":
+        """Correct run ``trace_id`` with a fix, checked, as a ``verified_query`` proposal (wave_b.md, section 10).
+
+        Exactly one of ``sql`` (one read-only query) or ``plan`` (a
+        ``PlanModel`` or its JSON) is the fix. The run is rated ``down`` with
+        ``note`` unless it already is. The fix is checked as ``user_context``
+        before it is queued: a plan through ``plan.after``, the validator and
+        the generator; the SQL read-only, within the caller's scope, through
+        the ``execute.before`` hooks, and run once. It reaches ``curated.yaml``
+        only when an admin accepts it (``engine.proposals.accept``).
+
+        Returns:
+            The ``Proposal`` (origin ``correction``) as the queue stored it.
+
+        Raises:
+            TypeError: ``user_context`` is not a ``UserContext``.
+            ValueError: not exactly one of ``sql`` and ``plan``.
+            CorrectionRefused: a check failed; its ``code`` and ``messages`` say why. A ``ValueError``.
+        """
+        from nl2sql.feedback.corrections import correct
+
+        return correct(self._ctx, trace_id, sql=sql, plan=plan, question=question, note=note,
+                       user_context=user_context, rate=self.record)
 
     def list(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Every rating, newest first; at most ``limit`` of them."""
