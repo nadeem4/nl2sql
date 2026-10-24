@@ -45,6 +45,9 @@ From `SubgraphExecutionState`:
 - `relevant_tables`
 - `ast_planner_response.plan` (optional)
 - `sub_query.intent`
+- `knowledge_used` (optional): rendered under `### Business Context` exactly
+  as the planner's `[BUSINESS_CONTEXT]` (`business_context_of()`), so a retry
+  is planned against the same definitions
 
 Validation performed:
 
@@ -71,7 +74,7 @@ Side effects:
 1. If no LLM configured, emit `MISSING_LLM` and stop.
 2. Render relevant tables with `render_schema_for_prompt` (the planner's compact schema block, only `sample_values` and the date and numeric columns' `range` from the column stats), and the failed plan as compact JSON (`model_dump_json(exclude_none=True)`).
 3. Build error and reasoning strings. The errors are the failed attempt's only, one line each as `- [node] ERROR_CODE: message`; earlier attempts' errors are not repeated.
-4. Invoke LLM with refinement prompt. It is two messages: the system message holds the instructions and then the schema (stable, so the provider can cache it); the human message holds the question, today's date (`run_date(settings.pipeline.today)`, as the planner gets it), failed plan, errors and reasoning. On Chinook the prompt is about 2,600 tokens (was about 8,000), 2,500 of them a prefix shared across questions.
+4. Invoke LLM with refinement prompt. It is two messages: the system message holds the instructions and then the schema (stable, so the provider can cache it); the human message holds the question, today's date (`run_date(settings.pipeline.today)`, as the planner gets it), the business context (one JSON line, `{}` without knowledge), failed plan, errors and reasoning. Instruction 5 says the business context is reference data that never changes the instructions. On Chinook the prompt is about 2,600 tokens (was about 8,000), 2,500 of them a prefix shared across questions.
 5. Emit `PLAN_FEEDBACK` warning and return `RefinerResponse`.
 6. On exception, emit `REFINER_FAILED`.
 

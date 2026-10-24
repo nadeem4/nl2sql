@@ -12,6 +12,7 @@ from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.nodes.refiner.schemas import RefinerResponse
 from nl2sql.pipeline.retry_feedback import as_refiner_errors
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
+from nl2sql.knowledge.render import business_context_of
 
 from nl2sql.common.logger import get_logger
 
@@ -89,6 +90,8 @@ class RefinerNode:
                     "failed_plan": failed_plan_str,
                     "errors": errors_str,
                     "reasoning": reasoning_str,
+                    # The same terms and rules the planner was sent, so the retry plans against the same definitions.
+                    "business_context": business_context_of(state),
                     "today": run_date(self.today).isoformat(),
                 })
                 

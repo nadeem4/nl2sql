@@ -23,7 +23,7 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity, RunWarning
 from nl2sql.hooks import HOOK_POINTS, Allow, Deny, HookBinding, HookRunner, Modify
 from nl2sql.pipeline.graph_utils import wrap_subgraph
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
-from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel
+from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlannerAnswer, PlanModel
 from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
 from nl2sql.pipeline.nodes.decomposer.schemas import (
     CombineGroup, CombineInput, DecomposerResponse, ExpectedColumn, SubQuery,
@@ -107,7 +107,7 @@ def _planner(store, hooks, plan=None):
     ctx.llm_registry.effective.return_value = None
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
-    node.chain.invoke.return_value = plan or _plan("from the model")
+    node.chain.invoke.return_value = PlannerAnswer(plan=plan or _plan("from the model"))
     return node
 
 
@@ -200,7 +200,7 @@ def _sql_agent(monkeypatch, hook, planned):
     ctx.llm_registry.get_llm.return_value = llm
     ctx.llm_registry.effective.return_value = None
     monkeypatch.setattr("nl2sql.pipeline.nodes.ast_planner.node.structured",
-                        lambda _llm, _model: RunnableLambda(lambda _inputs: planned))
+                        lambda _llm, _model: RunnableLambda(lambda _inputs: PlannerAnswer(plan=planned)))
 
     result = build_sql_agent_graph(ctx, execute=False).invoke(SubgraphExecutionState(
         trace_id="t", user_query="q", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),

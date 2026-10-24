@@ -65,7 +65,7 @@ def _ask(demo_project, tmp_path, store, n, rules, question, role="admin", enable
     assert len(paths) == 1, r.stdout + r.stderr
     [path] = paths
     doc = json.loads(path.read_text(encoding="utf-8"))
-    planner_calls = [c for c in server.calls if c["name"] == "PlanModel"]
+    planner_calls = [c for c in server.calls if c["name"] == "PlannerAnswer"]
     return planner_calls, doc, r
 
 

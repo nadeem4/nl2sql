@@ -47,7 +47,7 @@ def _policies(demo_project, names_tables):
 
 
 def _planner_prompts(server) -> str:
-    bodies = [c["body"] for c in server.calls if c["name"] == "PlanModel"]
+    bodies = [c["body"] for c in server.calls if c["name"] == "PlannerAnswer"]
     assert bodies, [c["name"] for c in server.calls]
     return "\n".join(json.dumps(b) for b in bodies)
 
@@ -62,7 +62,7 @@ def _top_customers_rules(plan=None):
     return [
         ANSWERABLE,
         Rule("DecomposerResponse", TOP_CUSTOMERS_DECOMPOSER),
-        Rule("PlanModel", plan or TOP_CUSTOMERS_PLAN),
+        Rule("PlannerAnswer", plan or TOP_CUSTOMERS_PLAN),
         Rule("AggregatedResponse", {"summary": "should not be called", "format_type": "text",
                                     "content": "should not be called", "warnings": []}),
         Rule("plain", "Keep the same plan."),

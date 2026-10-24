@@ -172,6 +172,47 @@ Prevents invalid joins and enforces schema-authorized relationships.
 
 ---
 
+## Knowledge Is Data: the Validator and Scope Decide
+
+### Definition
+The glossary (Wave B's knowledge) reaches a model only as JSON values: inside
+the schema block, and inside `[BUSINESS_CONTEXT]`, one JSON object on one line
+in the planner's and refiner's human messages, so a newline or a block marker
+in a definition stays inside one JSON string. Every item and the whole block
+are capped (`settings.knowledge.item_max_chars`, `block_max_chars`), and
+`notes` never reach a model. Knowledge is filtered by the caller's `Scope`
+before it reaches a prompt, `knowledge_used`, `knowledge.used` or the
+explanation: an item naming a table the caller cannot read, or whose text
+mentions one as a whole word, is left out, and so is a database comment that
+mentions one. The prompt says it is data. Encoding does not stop a model from
+obeying a sentence it reads; the guarantee is that whatever the model plans
+under any knowledge is a typed plan, validated with the caller's scope. A
+glossary join only adds a relationship between two tables the caller may
+read, which the validator's existing join check matches.
+
+### Enforcement Points
+- `visible()` and `caller_knowledge()` in `nl2sql.knowledge.scope`; `schema_knowledge()` in `nl2sql.pipeline.nodes.schema_retriever.node`
+- `render_business_context()` and `fit_business_context()` in `nl2sql.knowledge.render`
+- Planner instruction 15 (`ast_planner/prompts.py`) and refiner instruction 5 (`refiner/prompts.py`)
+- `LogicalValidatorNode` with the caller's `Scope`, as for every plan
+- `packages/nl2sql/tests/unit/knowledge/test_injection.py`
+
+### Failure Behavior
+An item over the cap is a load error naming it. A plan on a denied table,
+written under any glossary, is refused with `SECURITY_VIOLATION` exactly as
+without one.
+
+### Why It Exists
+A glossary is written by people other than the caller, and may be wrong or
+hostile. It may inform a plan; it may never widen what the caller can read.
+
+### Residual Risk
+A paraphrase ("the pay table"), a plural or singular ("salary" for
+`salaries`) and a name inside a longer identifier cannot be caught by the
+mention check. The validator still refuses any plan on the table.
+
+---
+
 ## Policy Enforcement Is Namespaced and Fail-Closed
 
 ### Definition

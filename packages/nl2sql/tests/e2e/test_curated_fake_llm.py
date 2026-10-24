@@ -164,7 +164,7 @@ def test_b_a_near_miss_is_generated(demo_project, tmp_path, curated):
                            "Top 5 customers by number of tracks bought in 2012")
 
     assert _calls(server)[:2] == ["VerifiedQueryChoice", "AnswerabilityResponse"]
-    assert "PlanModel" in _calls(server)
+    assert "PlannerAnswer" in _calls(server)
     assert doc["result"]["source"]["type"] == "generated"
     assert _matcher_record(doc)["reason"] == "none_of_these"
     assert [sq["plan_source"] for sq in doc["result"]["sub_queries"]] == ["llm"]
@@ -221,7 +221,7 @@ def test_without_a_curated_section_the_graph_and_the_answer_are_todays(demo_proj
 
     assert r.returncode == 0, r.stdout + r.stderr
     assert "VerifiedQueryChoice" not in _calls(server)
-    assert _calls(server) == ["AnswerabilityResponse", "DecomposerResponse", "PlanModel", "AggregatedResponse"]
+    assert _calls(server) == ["AnswerabilityResponse", "DecomposerResponse", "PlannerAnswer", "AggregatedResponse"]
     assert _nodes(doc)[0] == "datasource_resolver" and "curated_matcher" not in _nodes(doc)
     result = doc["result"]
     assert result["source"] == {"type": "generated", "id": None, "datasource_id": None, "params": None}

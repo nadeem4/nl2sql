@@ -12,9 +12,9 @@ never in a model.
 
 Every answer comes from :data:`RESPONSES`, keyed by the structured output's
 schema name, the name the client asks the server for. A new structured
-output is one more entry there: Wave B's planner answer, a wrapper around
-``PlanModel``, is ``"PlannerAnswer": lambda llm: {"plan": llm.plan_payload()}``
-(with its own field name).
+output is one more entry there. The planner's, ``PlannerAnswer``, wraps the
+case's plan as ``{"plan": ...}``: a gold plan is a clear reading, with no
+alternatives.
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def decomposition(case: EvalCase, plan: PlanModel) -> Dict[str, Any]:
 RESPONSES: Dict[str, Callable[["GoldPlanLLM"], Any]] = {
     "AnswerabilityResponse": lambda llm: answerability(llm.case),
     "DecomposerResponse": lambda llm: decomposition(llm.case, llm.plan()),
-    "PlanModel": lambda llm: llm.plan_payload(),
+    "PlannerAnswer": lambda llm: {"plan": llm.plan_payload()},
     "AggregatedResponse": lambda llm: ANSWER,
     # The refiner: the planner then re-serves the same plan, so a rejected plan stays rejected.
     "plain": lambda llm: "Keep the same plan.",

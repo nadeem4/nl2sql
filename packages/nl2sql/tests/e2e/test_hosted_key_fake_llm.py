@@ -155,8 +155,8 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
 
     # Each step went to its own provider's endpoint with its own key.
     by_name = {call["name"]: call for call in provider.calls}
-    assert by_name["PlanModel"]["mode"] == "anthropic"
-    assert by_name["PlanModel"]["api_key"] == CLAUDE_KEY
+    assert by_name["PlannerAnswer"]["mode"] == "anthropic"
+    assert by_name["PlannerAnswer"]["api_key"] == CLAUDE_KEY
     for name in ("AnswerabilityResponse", "DecomposerResponse", "AggregatedResponse"):
         assert by_name[name]["mode"] == "tools", name
         assert by_name[name]["authorization"] == f"Bearer {VISITOR_KEY}", name

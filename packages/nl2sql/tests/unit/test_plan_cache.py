@@ -17,7 +17,7 @@ from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.execution.contracts import ArtifactRef, ExecutorResponse
 from nl2sql.pipeline.graph_utils import wrap_subgraph
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
-from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel
+from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlannerAnswer, PlanModel
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.pipeline.plan_cache import PlanCache, normalize_question, plan_cache_for
@@ -243,7 +243,7 @@ def _planner(store):
     ctx.llm_registry.effective.return_value = None  # the plans below are cached without a planner model
     node = ASTPlannerNode(ctx)
     node.chain = MagicMock()
-    node.chain.invoke.return_value = _plan("from the model")
+    node.chain.invoke.return_value = PlannerAnswer(plan=_plan("from the model"))
     return node
 
 
@@ -418,3 +418,103 @@ def test_trace_replay_uses_the_cache_only_when_the_recorded_run_did():
     assert recorded_plan_cache_hit(doc("llm")) is False
     assert recorded_plan_cache_hit({"nodes": [{"node": "ast_planner", "outputs": None}]}) is False
     assert recorded_plan_cache_hit({}) is False
+
+
+# -- knowledge (wave_b.md, D57 and D47) ------------------------------------------
+
+def _knowledge(definition):
+    from nl2sql.knowledge.merge import LoadedSource, merge
+    from nl2sql_sdk.knowledge import Glossary
+
+    glossary = Glossary.model_validate({"version": 1, "datasources": {"chinook": {"terms": [
+        {"term": "revenue", "definition": definition}]}}})
+    return merge([LoadedSource(type="yaml", glossary=glossary, sha256=None, path=None, loaded_at=datetime.now())])
+
+
+def test_plan_cache_key_changes_with_the_glossary(store):
+    gross, net = _knowledge("Sum of invoice totals."), _knowledge("Sum of unit price times quantity.")
+    PlanCache(store, knowledge=gross).put(_sq(), _plan("under gross"))
+
+    assert PlanCache(store, knowledge=net).get(_sq()) is None, "a new definition plans again"
+    assert PlanCache(store, knowledge=gross).get(_sq()).reasoning == "under gross", "swapping back hits"
+    assert PlanCache(store).get(_sq()) is None, "no knowledge is a knowledge digest too"
+    assert plan_cache_for(fake_runtime(state=store, knowledge=gross)).get(_sq()).reasoning == "under gross"
+
+
+def test_answer_with_alternatives_is_never_cached(store):
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanAlternative
+
+    out = _run_wrapped(store, {
+        "ast_planner_response": ASTPlannerResponse(plan=_plan(), ambiguous_phrase="customers", alternatives=[
+            PlanAlternative(label="Paying customers", plan=_plan("paying"))]),
+        "generator_response": GeneratorResponse(sql_draft="SELECT 1"),
+        "executor_response": _executed(_artifact()),
+    })
+
+    assert out["subgraph_outputs"]["sql_agent:sq1:t1"].status == "success"
+    assert PlanCache(store).get(_sq()) is None
+
+
+def test_plan_whose_alternatives_were_all_dropped_for_the_caller_is_still_not_cached(store):
+    # The planner offered another reading that plan.after (or the caller's scope) dropped: a later
+    # caller allowed that reading must still be asked, so the plan is not cached.
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanAlternative
+
+    _run_wrapped(store, {
+        "ast_planner_response": ASTPlannerResponse(plan=_plan(), alternatives=[], alternatives_offered=[
+            PlanAlternative(label="Paying customers", plan=_plan("paying"))]),
+        "generator_response": GeneratorResponse(sql_draft="SELECT 1"),
+        "executor_response": _executed(_artifact()),
+    })
+
+    assert PlanCache(store).get(_sq()) is None
+
+
+def test_an_ambiguity_flagged_on_an_earlier_attempt_keeps_the_plan_out_of_the_cache(store):
+    # Attempt 1 offered another reading and its plan was rejected; attempt 2 is clear and executes. The
+    # question was still read two ways, so its plan is never cached (D47).
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanAlternative
+
+    other = PlanAlternative(label="Paying customers", plan=_plan("paying"))
+    node = _planner(store)
+    first = ASTPlannerResponse(plan=_plan("first"), ambiguous_phrase="customers", alternatives_offered=[other])
+    rejected = PipelineError(node="logical_validator", message="bad", severity=ErrorSeverity.ERROR,
+                             error_code=ErrorCode.TABLE_NOT_FOUND)
+
+    retried = node(SubgraphExecutionState(trace_id="t", sub_query=_sq(), retry_count=1, errors=[rejected],
+                                          ast_planner_response=first))["ast_planner_response"]
+
+    assert retried.plan.reasoning == "from the model" and retried.alternatives == []
+    assert retried.alternatives_offered == [other]
+    _run_wrapped(store, {"ast_planner_response": retried, "generator_response": GeneratorResponse(sql_draft="SELECT 1"),
+                         "executor_response": _executed(_artifact())})
+    assert PlanCache(store).get(_sq()) is None
+
+
+def test_a_cached_plan_reports_no_knowledge_used(store):
+    # The plan came from the cache: no prompt carried the glossary in this run.
+    from nl2sql.knowledge.models import KnowledgeUsed
+
+    out = _run_wrapped(store, {
+        "ast_planner_response": ASTPlannerResponse(plan=_plan(), plan_source="cache"),
+        "knowledge_used": KnowledgeUsed(datasource_id="chinook", digest="d"),
+        "generator_response": GeneratorResponse(sql_draft="SELECT 1"),
+        "executor_response": _executed(_artifact()),
+    })
+
+    assert out["subgraph_outputs"]["sql_agent:sq1:t1"].knowledge_used is None
+
+
+def test_a_plan_cache_hit_publishes_no_knowledge_used(store, monkeypatch):
+    from nl2sql.knowledge.models import KnowledgeUsed
+
+    published = []
+    monkeypatch.setattr("nl2sql.pipeline.nodes.ast_planner.node.publish", lambda *a: published.append(a))
+    PlanCache(store).put(_sq(), _plan("cached"))
+    used = KnowledgeUsed(datasource_id="chinook", digest="d")
+
+    _planner(store)(SubgraphExecutionState(trace_id="t", sub_query=_sq(), knowledge_used=used))
+    assert published == []
+
+    _planner(store)(SubgraphExecutionState(trace_id="t", sub_query=_sq(intent="another"), knowledge_used=used))
+    assert [name for name, _ in published] == ["knowledge.used"], "the first prompt publishes it"

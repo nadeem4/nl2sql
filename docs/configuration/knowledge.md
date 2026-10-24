@@ -7,10 +7,12 @@ and example questions. It is written in `glossary.yaml` and read by a
 *knowledge source*; the `knowledge` section lists the sources.
 
 !!! note "Release 0.8"
-    The engine loads, merges, shows and exports knowledge from release 0.8.
-    Knowledge reaches the planner's prompts with Wave B's K2 and the index with
-    K3; until then it is shown and checked, not used to plan. See
-    [Wave B](../architecture/wave_b.md), section 3.
+    The engine loads, merges, shows and exports knowledge from release 0.8,
+    and the planner and refiner read it (Wave B's K2): descriptions, roles,
+    units, grains, code values and glossary joins in the schema block, matched
+    terms and rules in `[BUSINESS_CONTEXT]`. It reaches the index with K3. See
+    [Wave B](../architecture/wave_b.md), sections 3 and 4, and
+    [the schema retriever](../architecture/nodes/schema_retriever_node.md#knowledge).
 
 ## The section
 
@@ -158,7 +160,12 @@ datasource that is not indexed yet shows nothing but that problem.
 
 Knowledge is data, never instructions: it is validated as data when it
 loads, `export` writes it with a safe YAML dumper, and it reaches a model
-only as JSON values (Wave B's K2).
+only as JSON values, filtered by the caller's scope (see
+[Knowledge Is Data](../architecture/invariants.md#knowledge-is-data-the-validator-and-scope-decide)).
+A glossary join between two tables the caller may read is a relationship the
+validator accepts, so a database without declared keys can be joined. A
+changed glossary changes the datasource's knowledge digest, which keys the
+plan cache: the next question plans again.
 
 ## The facade and the CLI
 
