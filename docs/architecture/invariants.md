@@ -566,7 +566,7 @@ A hook may change what a run carries only through a `Modify`, and only at the th
 - `test_hooks_modify_only_before_the_validator` in `packages/nl2sql/tests/architecture/test_hooks_boundary.py`: the point table, an AST scan of every runner call (each names its point as a literal, and no other call passes a point name along), and the SQL agent graph, in which every path from the planner to the generator passes the validator
 
 ### Failure Behavior
-A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook and the point only; the exception goes to the log and `hook.decision`), an approval request `NEEDS_APPROVAL`; none is retried. A run-scoped one ends the run once the step in flight is done, and its result carries no rows, artifact references or result manifest. A deny scoped to a sub-query drops it (and a `join` or `compare` group it feeds), and the answer says what went unanswered.
+A deny is `HOOK_DENIED`, a hook error `HOOK_FAILED` (its message names the hook and the point only; the exception goes to the log and `hook.decision`), an approval request `NEEDS_APPROVAL`; the built-in cost hook's deny is `COST_LIMIT_EXCEEDED`; none is retried. A run-scoped one ends the run once the step in flight is done, and its result carries no rows, artifact references or result manifest. A deny scoped to a sub-query drops it (and a `join` or `compare` group it feeds), and the answer says what went unanswered.
 
 ### Why It Exists
 *The validator rejects everything the generator can* would mean nothing if code could change the plan or the SQL after the validator: a hook could otherwise route around the policies, including a table the role may not read.

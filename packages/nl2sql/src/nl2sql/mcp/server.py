@@ -48,7 +48,7 @@ GENERIC_REFUSAL = "You do not have permission to see the data this question requ
 # an exception's text, so its message is replaced. ``ErrorCode`` values, named
 # as text: the engine's own tests read ``ErrorCode.X`` as the place X is raised.
 _CALLER_FACING = frozenset({
-    "QUESTION_NOT_ANSWERABLE", "QUESTION_TOO_BROAD", "HOOK_DENIED", "NEEDS_APPROVAL",
+    "QUESTION_NOT_ANSWERABLE", "QUESTION_TOO_BROAD", "HOOK_DENIED", "NEEDS_APPROVAL", "COST_LIMIT_EXCEEDED",
     "RUN_LIMIT_REACHED", "CANCELLED", "PIPELINE_TIMEOUT", "PROVIDER_AUTH_FAILED", "PROVIDER_RATE_LIMITED",
     "PROVIDER_QUOTA_EXCEEDED", "PROVIDER_TIMEOUT", "PROVIDER_UNAVAILABLE", "PROVIDER_MODEL_UNAVAILABLE",
     "VALUE_NOT_FOUND", "RESULT_TRUNCATED", "JOIN_KEY_UNCONVERTED", "JOIN_FAN_OUT", "ALL_NULL_COLUMN",

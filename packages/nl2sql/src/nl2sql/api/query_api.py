@@ -283,7 +283,8 @@ def _overall_status(
 
 
 # What a hook ends a run with; such a run's result carries none of its data.
-_HOOK_ENDINGS = {ErrorCode.HOOK_DENIED.value, ErrorCode.HOOK_FAILED.value, ErrorCode.NEEDS_APPROVAL.value}
+_HOOK_ENDINGS = {ErrorCode.HOOK_DENIED.value, ErrorCode.HOOK_FAILED.value, ErrorCode.NEEDS_APPROVAL.value,
+                 ErrorCode.COST_LIMIT_EXCEEDED.value}
 
 
 def result_from_state(

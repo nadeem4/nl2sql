@@ -99,7 +99,6 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 DECLARED_AHEAD: dict = {
     "CLARIFICATION_INVALID": "L2",
     "CLARIFICATION_STALE": "L2",
-    "COST_LIMIT_EXCEEDED": "C2",
 }
 
 

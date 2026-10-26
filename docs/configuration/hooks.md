@@ -120,6 +120,17 @@ the run; it does not fall back to the generated path. **A plan-only run**
   `plan.after` runs on every cache hit, so a change applies afresh on each
   run and stops the moment the hook config changes.
 
+## Built-in hooks
+
+One hook is built in: `policy.cost`, the [cost rule](policies.md#cost). The
+engine builds it from `policies.cost` (or a role's `cost`), not from the
+`hooks` list, and puts it first at `execute.before`, ahead of every hook you
+configure, so an over-limit query never reaches your hook. Its approvers are
+`policies.admin_roles`. Its `Deny` ends the run with `COST_LIMIT_EXCEEDED`
+rather than `HOOK_DENIED`, and its `hook.decision` events name `policy.cost`.
+Without a `cost` block it is not built, and `execute.before` is as you
+configured it.
+
 ## Write one
 
 ```python
@@ -207,4 +218,4 @@ An object runs at its `points` (all six when it has none), named by its
 
 | Kind | Entry point group | Interface | Version | Built-ins |
 | --- | --- | --- | --- | --- |
-| hook | `nl2sql.hooks` | `nl2sql.hooks.Hook` | 1 | none |
+| hook | `nl2sql.hooks` | `nl2sql.hooks.Hook` | 1 | none configurable; `policy.cost` is built in from [`policies.cost`](policies.md#cost) |

@@ -31,7 +31,9 @@ from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
 from nl2sql.pipeline.nodes.decomposer.schemas import CombineGroup, CombineInput, DecomposerResponse, SubQuery
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
+from nl2sql.policies.cost import take_record
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql_sdk.models import Estimate
 
 from .params import ParamError, resolve_params
 from .schemas import ParamValue
@@ -267,11 +269,11 @@ class CuratedMatcherNode:
                     params=params, tables=tables, approvals=list(getattr(state, "approvals", None) or []))
 
     def _stop_if_denied(self, verdict, state: GraphState, sub_query: SubQuery, query: VerifiedQuery,
-                        params: Dict[str, Any]) -> None:
+                        params: Dict[str, Any], estimate: Optional[Estimate] = None) -> None:
         """Raises ``_Denied`` when a hook stopped the verified query."""
         if not verdict.allowed:
             error = verdict.error(self.node_name)
-            ended = self._ended(state, sub_query, query, params, error)
+            ended = self._ended(state, sub_query, query, params, error, estimate)
             if error.error_code == ErrorCode.NEEDS_APPROVAL:
                 ended["approvals_needed"] = [ApprovalRequest.build(
                     question=state.user_query, asker=state.user_context or UserContext(), hook=verdict.hook,
@@ -281,7 +283,7 @@ class CuratedMatcherNode:
             raise _Denied(error, ended)
 
     def _ended(self, state: GraphState, sub_query: SubQuery, query: VerifiedQuery, params: Dict[str, Any],
-               error: PipelineError) -> Dict[str, Any]:
+               error: PipelineError, estimate: Optional[Estimate] = None) -> Dict[str, Any]:
         """The state of a verified run a hook stopped: its one sub-query done, with no result, and the error.
 
         The run takes the verified route and ends at the layer router, which
@@ -294,7 +296,7 @@ class CuratedMatcherNode:
         )
         output = SubgraphOutput(sub_query=sub_query, subgraph_id=f"{NODE}:{sub_query.id}:{state.trace_id}",
                                 subgraph_name=NODE, plan_source="verified", sql_draft=query.sql.strip(),
-                                errors=[error], status="error")
+                                errors=[error], status="error", estimate=estimate)
         return {
             "verified_match": VerifiedMatch(datasource_id=sub_query.datasource_id, query_id=query.id,
                                             description=query.description, params=params),
@@ -315,7 +317,11 @@ class CuratedMatcherNode:
         row_cap = self._row_ceiling(ds_id)
         # The verified path has no plan: only the execute points apply to it.
         fields = self._hook_fields(state, sub_query, query, params, tables)
-        self._stop_if_denied(self.hooks.call("execute.before", **fields), state, sub_query, query, params)
+        verdict = self.hooks.call("execute.before", **fields)
+        # What the cost rule estimated (C2) goes on the result, whether or not the SQL then runs.
+        record = take_record(state.trace_id, sub_query.id)
+        estimate = record.estimate if record is not None else None
+        self._stop_if_denied(verdict, state, sub_query, query, params, estimate)
         response = self.executor.execute(ExecutorRequest(
             node_id=sub_query.id,
             trace_id=state.trace_id,
@@ -335,7 +341,7 @@ class CuratedMatcherNode:
         summary = ResultSummary(node_id=sub_query.id, columns=list(artifact.columns),
                                 row_count=artifact.row_count, truncated=artifact.row_count >= row_cap)
         self._stop_if_denied(self.hooks.call("execute.after", **fields, result=summary),
-                             state, sub_query, query, params)
+                             state, sub_query, query, params, estimate)
 
         decomposition = DecomposerResponse(
             sub_queries=[sub_query],
@@ -357,6 +363,7 @@ class CuratedMatcherNode:
                 ValidationCheck(name="policy", passed=True, message="Every table it reads is allowed for this role."),
             ],
             status="success",
+            estimate=estimate,
         )
         match = VerifiedMatch(datasource_id=ds_id, query_id=query.id, description=query.description,
                               params=params)

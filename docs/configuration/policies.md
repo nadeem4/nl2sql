@@ -49,7 +49,51 @@ Policies(default_role="viewer", admin_roles=["admin"],
 | `admin_roles` | `[admin]` | The roles `nl2sql-api` lets through on the routes that change datasources, LLMs or the index. See [REST API](api.md). |
 | `refusal_names_tables` | `false` | Name the role and the forbidden table in the refusal the user sees. Off, the message is "You do not have permission to see the data this question requires."; the table, the role and the rule that denied it are always in the log and the run trace. The demo (`nl2sql init --demo`) sets it, since showing a refusal is its point. See [Security Model](../security/model.md#hidden-tables-and-strict-refusal). |
 | `roles` | `{}` | Role name to its `description`, `allow` patterns and `deny` patterns. |
+| `cost` | none | The [cost rule](#cost): a limit on the rows a query is estimated to read. Absent, no estimate is ever asked for. Valid beside `allow_all`. |
 | `check` | none | A [policy check](#a-policy-check): `{type: <name>, <its keys>}` naming a registered one, or, in Python, a check object. What it grants is intersected with the roles. |
+
+## Cost
+
+A query that reads a billion rows can be cheap to ask and expensive to run.
+The cost rule asks the database what a query is expected to read, before it
+runs, and acts when that is over a limit.
+
+```yaml
+# policies.yaml
+cost:                            # absent: no estimate is ever asked for
+  max_estimated_rows: 5000000    # null: no limit
+  over_limit: confirm            # allow | confirm | refuse
+  unknown: allow                 # no estimate: allow | confirm | refuse
+roles:
+  analyst:
+    description: Sales
+    allow: [sales]
+    cost: { max_estimated_rows: 1000000, over_limit: refuse }
+  admin:
+    description: Everything
+    allow: ["*"]
+    cost: { max_estimated_rows: null }
+```
+
+| Field | Meaning |
+| --- | --- |
+| `max_estimated_rows` | The most rows a query may be estimated to *read*: the rows its scans visit, not the rows it returns, so a `LIMIT` does not hide a full scan. `null` is no limit, and no estimate is asked for. |
+| `over_limit` | What to do over the limit. `allow` runs it. `confirm` ends the run `needs_approval`, as a [hook's `NeedsApproval`](hooks.md#decisions): a person with a role in `admin_roles` approves, and the same SQL then runs. `refuse` ends the run with `COST_LIMIT_EXCEEDED`, which is never retried. Default `confirm`. |
+| `unknown` | What to do when there is no estimate: the datasource's adapter does not declare `ESTIMATES_COST` (SQLite), the estimate failed (SQL Server without the `SHOWPLAN` permission, say) or it reported no rows. The same three actions. Default `allow`. |
+
+A role's `cost` replaces the top-level fields it sets, for that role. A caller
+with several roles gets each field's most permissive value across them: the
+highest `max_estimated_rows` (`null`, no limit, wins) and the weakest of
+`over_limit` and `unknown` (`allow` over `confirm` over `refuse`). The values
+may come from different roles, as grants add up across roles. A `cost` on a
+role with no top-level `cost` starts from no limit.
+
+It is a built-in hook, `policy.cost`, that runs first at `execute.before`
+(see [Hooks](hooks.md#built-in-hooks)), so it applies to generated SQL, to
+verified queries and to the check run of a correction alike, and under
+`allow_all: true`, which opens tables, not cost. One estimate is asked for
+per sub-query. `QueryResult.sub_queries[].estimate` carries it, and
+`cost.estimated` is published for each ([Events](../observability/events.md)).
 
 ## Patterns
 

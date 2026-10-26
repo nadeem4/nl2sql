@@ -24,6 +24,7 @@ from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.pipeline.nodes.schema_retriever.schema import Table
 from nl2sql.pipeline.pinned import PinnedRun, PinnedSource
 from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql_sdk.models import Estimate
 
 
 def update_results(current: Dict, new: Dict) -> Dict:
@@ -105,6 +106,8 @@ class SubgraphExecutionState(BaseModel):
     # The knowledge this sub-query's prompts carried (the schema retriever fills it from K2). The planner's
     # other readings are on ast_planner_response.alternatives.
     knowledge_used: Optional[KnowledgeUsed] = None
+    # The cost rule's estimate for this sub-query's SQL, when it asked for one (C2); the executor fills it.
+    estimate: Optional[Estimate] = None
     # Whether the clarifier may end this sub-query with a question (L1): the run's ``clarify`` is on and this
     # is its only sub-query (D47). The sub-query wrapper sets it; otherwise the default plan runs.
     clarify: bool = False
