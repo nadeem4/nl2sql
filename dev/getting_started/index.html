@@ -1764,6 +1764,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#set-up-what-the-engine-knows-connect-index-profile-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set up what the engine knows: connect, index, profile, review
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2811,6 +2822,34 @@
     
   
     Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/profiler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Profiler
   
 
     
@@ -5191,6 +5230,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#set-up-what-the-engine-knows-connect-index-profile-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set up what the engine knows: connect, index, profile, review
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5275,6 +5325,17 @@ name is the datasource id), and build the index:</p>
 connects, or is reported and left out. A datasource with <code>required: true</code> that
 cannot connect stops the command. <code>nl2sql doctor</code> prints the same report
 without running anything.</p>
+<h2 id="set-up-what-the-engine-knows-connect-index-profile-review">Set up what the engine knows: connect, index, profile, review</h2>
+<p>After the first index, let the engine suggest what it cannot read from the
+schema, and decide what to keep:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>index<span class="w">                              </span><span class="c1"># connect and index (--profile --as admin also profiles)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>profile<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">                 </span><span class="c1"># joins the database does not declare, column roles</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">             </span><span class="c1"># what the profiler found, with its evidence</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>accept<span class="w"> </span>--all<span class="w"> </span>--kind<span class="w"> </span>column<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">   </span><span class="c1"># writes glossary.yaml once</span>
+</code></pre></div>
+<p>The profiler is deterministic and bounded (<a href="../schema/profiler/">Schema Profiler</a>);
+nothing it proposes reaches a prompt or the index until an admin accepts it
+(<a href="../configuration/review/">Review Queue</a>).</p>
 <p>From Python, <code>nl2sql.config.init_project(folder, demo=..., provider=..., force=...)</code>
 writes the same files, and <code>nl2sql.config.demo_config()</code> builds the demo's
 <code>Config</code> in code, with the databases opened read-only from the installed

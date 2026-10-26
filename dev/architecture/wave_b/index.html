@@ -1734,6 +1734,18 @@
   </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/profiler/">
+<span class="md-ellipsis">
+    
+  
+    Schema Profiler
+  
+
+    
+  </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4626,6 +4638,49 @@ or <code>time_budget_s</code> is reached, the remaining candidates are proposed 
 <code>overlap: null</code> and the report says <code>stopped_by</code>. A table the caller's
 scope denies is never probed. Each finished profile publishes
 <code>profile.finished</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: joins and roles (P1)</p>
+<p><code>engine.knowledge.profile</code> and <code>nl2sql profile</code> run; behaviour is in
+<a href="../../schema/profiler/">Schema Profiler</a>. Drafts are P2's (<code>draft=True</code> or
+<code>max_cost_usd</code> raises <code>NotImplementedError</code> naming P2). What later rows need,
+and where the code differs from this page:</p>
+<ul>
+<li><strong>Names.</strong> <code>nl2sql/profiler/joins.py</code>: <code>find_candidates(snapshot, *, dialect,
+  allows, known) -&gt; list[JoinCandidate]</code>; <code>roles.py</code>: <code>find_roles(snapshot, *,
+  dialect, allows, said, enum_max_distinct) -&gt; list[RoleFinding]</code> (<code>table</code>,
+  <code>column</code>, <code>change</code>, <code>evidence</code>); <code>run.py</code>: <code>profile(ctx, datasource_ids, user)</code>,
+  <code>_now()</code> the clock tests replace. <code>known</code> and <code>said</code> are keyed by
+  <code>(TableRef.full_name, lower-case column)</code>.</li>
+<li><strong>Proposals.</strong> Join: target <code>from-&gt;to</code> in the glossary's names (<code>table_label</code>),
+  <code>change</code> <code>{from, to, cardinality}</code>. Column: target <code>table.column</code>, <code>change</code>
+  only the fields the glossary does not already set. Both pass <code>tables</code> through
+  <code>review.queue.table_names</code>, <code>schema_version</code> is the live build's.</li>
+<li><strong>Gaps filled.</strong> A failed probe is an issue and its candidate is proposed with
+  <code>overlap: null</code>. A candidate is skipped when any foreign key joins its two
+  tables. A key named <code>id</code> is matched only by the table-name rule. <code>enum</code> skips
+  columns named like a key. <code>values</code> and a refined <code>grain</code> need every distinct
+  value in the snapshot. Two primary keys of one name are one <code>one-to-one</code> pair.
+  A probe that measures an overlap under <code>min_overlap</code> supersedes the profiler's
+  own earlier open <code>overlap: null</code> row for that join. A datasource not indexed
+  gets a report with <code>schema_version</code> <code>""</code> and one issue.</li>
+<li><strong>CLI.</strong> <code>nl2sql profile</code> is a command, not the group B0 registered:
+  <code>profile_command</code> in <code>cli/commands/profile.py</code>, registered in <code>cli/main.py</code>;
+  <code>nl2sql index --profile</code> builds the caller (<code>caller_or_exit</code>) before it indexes.
+  P2 adds <code>--draft</code> and <code>--max-cost</code> to <code>profile_command</code>.</li>
+<li><strong>Hazard for P2: roles and drafts collide in the queue.</strong> A role proposal and
+  a drafted description are both <code>kind: column</code>, <code>target: table.column</code>, and
+  Q1's <code>propose</code> supersedes an open row of the same kind, datasource and target.
+  Filed separately, <code>profile(draft=True)</code> would supersede the role it filed a
+  moment before, and a later plain <code>profile</code> would revive the role and
+  supersede the draft. P2 must merge the role and the description into one
+  <code>change</code> per column in a run (and P1's role rows must then be built together
+  with the drafts), or scope superseding by <code>origin</code>; Q1 is unchanged here.</li>
+<li><strong><code>realdb</code>.</strong> <code>tests/realdb/test_profile.py</code> was written without a test bed
+  (it drops pagila's foreign keys from the stored snapshot, then expects
+  <code>rental.inventory_id</code> and <code>rental.customer_id</code> joins at overlap 1.0); CI's
+  <code>realdb</code> workflow is its first run.</li>
+</ul>
+</div>
 <h2 id="7-clarify-instead-of-guess">7. Clarify instead of guess</h2>
 <h3 id="when-it-asks">When it asks</h3>
 <pre class="mermaid"><code>flowchart TD

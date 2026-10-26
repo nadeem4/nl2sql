@@ -2885,6 +2885,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/profiler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Profiler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5588,6 +5616,10 @@ plan cache: the next question plans again.</p>
 <td>The knowledge-source items the caller may see as one canonical <code>glossary.yaml</code>, returned and, with <code>path</code>, written there. It refuses to write over a config file or a knowledge source's own file. Derived roles and database comments are not exported.</td>
 </tr>
 <tr>
+<td><code>engine.knowledge.profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None)</code></td>
+<td>Probes the indexed schema for joins the database does not declare and for column roles, and files them in the <a href="../review/">review queue</a>; one <code>ProfileReport</code> per datasource the caller reaches. See <a href="../../schema/profiler/">Schema Profiler</a>. <code>draft=True</code> arrives with the drafted descriptions.</td>
+</tr>
+<tr>
 <td><code>engine.knowledge.reload(*, user_context)</code></td>
 <td>Loads every source again and swaps atomically; needs an admin role (<code>policies.admin_roles</code>; any caller under <code>allow_all</code>). Runs in flight keep the knowledge they started with.</td>
 </tr>
@@ -5619,6 +5651,10 @@ plan cache: the next question plans again.</p>
 <tr>
 <td><code>nl2sql knowledge sources --as ROLE</code></td>
 <td><code>sources</code></td>
+</tr>
+<tr>
+<td><code>nl2sql profile [--datasource ID] --as ROLE</code></td>
+<td><code>profile</code>, then the open profiler proposals; <code>nl2sql index --profile --as ROLE</code> indexes first</td>
 </tr>
 </tbody>
 </table>
