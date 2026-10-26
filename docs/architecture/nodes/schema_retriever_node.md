@@ -153,6 +153,10 @@ snapshot by `schema_knowledge()`:
   punctuation ignored, in the sub-query's intent or the question: 1.0 for the
   name, 0.9 for a synonym, the best `settings.knowledge.top_k` (8). Two terms
   sharing a synonym are both sent; that is how the planner sees an ambiguity.
+  A term the caller sees also matches when its `knowledge.term` index entry is
+  at least `settings.knowledge.match_floor` (0.6) similar to the sub-query's
+  intent (`Retriever.retrieve_term_candidates`), scoring that similarity; if the
+  search fails, terms match by name only.
 - **Rules** whose `tables` is empty or names one of the tables sent.
 - The denied-name pattern is built once per sub-query, and only the readable
   tables' comments are checked against it.

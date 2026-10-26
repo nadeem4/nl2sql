@@ -163,10 +163,8 @@ engine.index.build(["runtime_pg"])
 ```
 
 The `description` is indexed as given, even though no file lists
-`runtime_pg`, and the datasource joins `engine.config`. Indexing makes no LLM call unless you ask for one:
-`engine.index.build(["runtime_pg"], enrich=True)` has the
-`profiler` agent write descriptions for tables and columns the
-database left without a comment.
+`runtime_pg`, and the datasource joins `engine.config`. Indexing makes no LLM call; the descriptions it
+indexes are the database's comments and your glossary's.
 
 You can also add the datasources of another config:
 

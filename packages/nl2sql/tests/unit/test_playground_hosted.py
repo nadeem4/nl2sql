@@ -437,7 +437,7 @@ def test_settings_save_nothing_and_say_the_key_stays_in_the_browser(project):
 def test_rebuild_is_refused_in_its_own_words(project):
     _, client = _client(project)
 
-    refused = client.post("/api/index/rebuild", json={"enrich": False})
+    refused = client.post("/api/index/rebuild", json={})
 
     assert refused.status_code == 403
     assert "Rebuilding the index is off on the hosted demo" in refused.json()["detail"]

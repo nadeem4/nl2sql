@@ -53,25 +53,23 @@ class RebuildResult:
 
 def rebuild_index(
     ctx,
-    enrich: bool = False,
     datasource_ids: Optional[Iterable[str]] = None,
     on_progress: Optional[Callable[[str], None]] = None,
     on_datasource: Optional[Callable[["IndexProgress"], None]] = None,
-    curated_only: bool = False,
+    refresh: bool = False,
 ) -> RebuildResult:
     """Builds the index of each datasource, and switches each one's pointer as it succeeds.
 
     Args:
         ctx: The engine's ``Runtime``.
-        enrich: Ask the LLM for descriptions; spends tokens. Off by default.
         datasource_ids: Only these datasources; all registered ones when None.
         on_progress: Called with a sentence before each step.
         on_datasource: Called with an :class:`~nl2sql.api.types.IndexProgress`
             as each datasource starts, is done (with its entry counts) or
             fails (with the reason).
-        curated_only: Re-index only the verified queries from
-            ``curated.yaml``, keeping each datasource's schema entries as they
-            are: no schema read, no enrichment call.
+        refresh: Write each datasource's entries again from its stored
+            snapshot, the verified queries and the knowledge, with no schema
+            read and no model call; only changed entries are embedded.
 
     Returns:
         A :class:`RebuildResult`.
@@ -116,27 +114,27 @@ def rebuild_index(
                 result.errors.append({"datasource_id": adapter.datasource_id, "error": reason})
                 tell(IndexProgress(adapter.datasource_id, "failed", reason=reason))
             return result
-        _build(ctx, adapters, result, enrich=enrich, curated_only=curated_only, say=say, tell=tell)
+        _build(ctx, adapters, result, refresh=refresh, say=say, tell=tell)
 
     result.ok = not result.errors and bool(result.stats)
     return result
 
 
-def _build(ctx, adapters, result: RebuildResult, *, enrich: bool, curated_only: bool,
+def _build(ctx, adapters, result: RebuildResult, *, refresh: bool,
            say: Callable[[str], None], tell: Callable[["IndexProgress"], None]) -> None:
     say(MODEL_STEP)
     # Embeddings load lazily; warming them here puts the one slow,
     # first-run-only download under its own step.
     ctx.embedder.embed_query("warm up")
 
-    orchestrator = IndexingOrchestrator(ctx, enrich=enrich)
+    orchestrator = IndexingOrchestrator(ctx)
     for adapter in adapters:
         ds_id = adapter.datasource_id
         tell(IndexProgress(ds_id, "started"))
         try:
-            if curated_only:
-                say(f"Indexing {ds_id}: embedding its verified queries")
-                stats = orchestrator.refresh_curated(ds_id)
+            if refresh:
+                say(f"Refreshing {ds_id}: embedding the entries that changed")
+                stats = orchestrator.refresh(ds_id)
             else:
                 say(f"Indexing {ds_id}: reading the schema and embedding its entries")
                 stats = orchestrator.index_datasource(adapter)

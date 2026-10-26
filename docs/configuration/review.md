@@ -87,7 +87,7 @@ Accept is the only code that writes a file a person owns, and it writes two:
 | Kind | Writes | Then |
 | --- | --- | --- |
 | `join`, `column`, `table`, `term` | The first `yaml` [knowledge source](knowledge.md)'s `glossary.yaml`, each change merged in. A `term` whose name exists replaces that term. | The knowledge is reloaded: the items are in the next run's prompts. |
-| `verified_query` | The `curated` section's own file (`curated: {file: curated.yaml}`), the query added under its datasource | The curated checks run first, on the edited section. Then the engine's curated answers are swapped and the datasource's curated index entries refreshed (as `nl2sql index --curated-only` does), so the next question can match it. |
+| `verified_query` | The `curated` section's own file (`curated: {file: curated.yaml}`), the query added under its datasource | The curated checks run first, on the edited section. Then the engine's curated answers are swapped and the datasource's curated index entries refreshed (as `nl2sql index --refresh` does), so the next question can match it. |
 
 | Rule | Detail |
 | --- | --- |

@@ -223,12 +223,8 @@ export default function App() {
     return () => clearInterval(timer);
   }, [rebuilding, schemaUrl]);
 
-  const rebuildIndex = async (enrich) => {
-    const response = await fetch("/api/index/rebuild", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enrich }),
-    });
+  const rebuildIndex = async () => {
+    const response = await fetch("/api/index/rebuild", { method: "POST" });
     const reply = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(typeof reply.detail === "string" ? reply.detail : `The server answered ${response.status}.`);

@@ -11,8 +11,8 @@
 Execution flow:
 - Delegates to `engine.index.build([datasource_id])`: the new entries are
   written beside the live ones and switched in when all are written. No
-  enrichment model call is made: enrichment is opt-in in the engine and these
-  routes do not ask for it.
+  model is called: a build embeds the schema, the glossary and the verified
+  queries.
 
 Response:
 `{"success": true, "datasource_id": "...", "indexing_stats": {...}, "message": "..."}`
@@ -24,8 +24,7 @@ Errors:
 ### `POST /api/v1/index-all`
 
 Execution flow:
-- Delegates to `engine.index.build()`, every configured datasource, without
-  enrichment.
+- Delegates to `engine.index.build()`, every configured datasource.
 
 Response:
 `{"success": <every datasource indexed>, "indexing_results": {"stats": [...], "empty": [...], "errors": [...]}, "message": "..."}`.

@@ -3,7 +3,7 @@
 The schema layer provides **authoritative, versioned snapshots** and **structured retrieval** to ground planning. It is split into:
 
 - **Schema contracts**: structural schema (tables, columns, foreign keys).
-- **Schema metadata**: descriptive enrichment and statistics.
+- **Schema metadata**: the database's own comments and statistics.
 - **The state store**: immutable, versioned snapshots, and the diffs between them, kept by `storage.state`.
 - **Schema retrieval**: staged lookup via schema chunks.
 
@@ -46,7 +46,7 @@ of its contract and metadata). A stored snapshot is never changed: in the
 - Storing a snapshot whose contract and metadata are identical to a stored one
   returns that version, and writes nothing.
 - A snapshot with the same structure but new metadata (statistics,
-  descriptions, enrichment) is a **new version**. A run that pinned the old
+  descriptions) is a **new version**. A run that pinned the old
   version keeps reading exactly the snapshot its index build was made from.
 
 The structural fingerprint (`nl2sql.schema.generate_schema_fingerprint`:
@@ -119,7 +119,12 @@ is safe to share between threads: each use of its one connection holds a lock.
 There is no "latest snapshot" to read. Indexing stores a datasource's
 snapshot first and its index entries second; the index store's
 `BuildPointer` for the datasource then records the `schema_version` the live
-build was made from, and switching that pointer is the commit. Every reader
+build was made from, and switching that pointer is the commit. The pointer
+also records the `curated_hash` and the `knowledge_hash` the build was made
+with, so health can tell that `curated.yaml` or the glossary has changed
+since. A snapshot holds only what the database said: model-drafted
+descriptions are proposals, and a person's words live in the glossary
+(see [Indexing](../architecture/indexing.md#knowledge-in-the-index)). Every reader
 (the resolver, the schema retriever, the curated matcher,
 `engine.datasources.schema()`, `engine.curated.validate()`) resolves the
 version through the pointer and reads `get_snapshot(datasource_id,

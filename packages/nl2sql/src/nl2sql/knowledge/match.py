@@ -1,11 +1,12 @@
 """Which knowledge a sub-query touches: matched terms and the rules of its tables (docs/architecture/wave_b.md, section 4).
 
-In K2 a term matches lexically: its name or one of its synonyms appears, as
-whole words, in the sub-query's intent or the question, case and punctuation
+A term matches lexically: its name or one of its synonyms appears, as whole
+words, in the sub-query's intent or the question, case and punctuation
 ignored. A name scores 1.0, a synonym 0.9; the best ``top_k`` are kept, and
 every matching term is kept up to that, so two terms sharing a synonym are
-both sent (that is how the planner sees the ambiguity). K3 adds matching by
-similarity through the index.
+both sent (that is how the planner sees the ambiguity). A term whose
+``knowledge.term`` index entry is at least ``floor`` similar to the intent
+matches too, scoring that similarity (K3).
 
 A rule is sent when its ``tables`` is empty or names one of the tables sent
 with the sub-query. Both take knowledge already filtered to the caller's
@@ -14,7 +15,7 @@ scope (``nl2sql.knowledge.scope.visible``).
 from __future__ import annotations
 
 import re
-from typing import Iterable, List, Mapping, Sequence, Set
+from typing import Iterable, List, Mapping, Optional, Sequence, Set
 
 from nl2sql_sdk.knowledge import Rule, Term
 from nl2sql_sdk.schema import SchemaSnapshot
@@ -39,11 +40,17 @@ def _appears(phrase: str, texts: Sequence[str]) -> bool:
 
 
 def match_terms(terms: Iterable[Term], texts: Iterable[str], *, sources: Mapping[str, str],
-                top_k: int) -> List[TermMatch]:
-    """The terms whose name or a synonym appears in ``texts``, best first (score, then name), at most ``top_k``.
+                top_k: int, similar: Optional[Mapping[str, float]] = None,
+                floor: float = 0.6) -> List[TermMatch]:
+    """The terms matching ``texts``, best first (score, then name), at most ``top_k``.
 
-    ``sources`` maps a term's name to the knowledge source it came from.
+    A term matches when its name or a synonym appears in ``texts``, or when
+    ``similar`` (a term's name to the similarity of its index entry to the
+    intent) reaches ``floor``. Only the ``terms`` given can match, so the
+    caller passes the ones its scope shows. ``sources`` maps a term's name to
+    the knowledge source it came from.
     """
+    similar = similar or {}
     normalized = [normalize(text) for text in texts if text]
     found: List[TermMatch] = []
     for term in terms:
@@ -51,6 +58,8 @@ def match_terms(terms: Iterable[Term], texts: Iterable[str], *, sources: Mapping
             score = NAME_SCORE
         elif any(_appears(synonym, normalized) for synonym in term.synonyms):
             score = SYNONYM_SCORE
+        elif similar.get(term.term, 0.0) >= floor:
+            score = similar[term.term]
         else:
             continue
         found.append(TermMatch(term=term.term, definition=term.definition, columns=list(term.columns),

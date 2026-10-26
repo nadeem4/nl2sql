@@ -372,7 +372,7 @@ def test_new_settings_are_checked(update):
 def test_indexing_enrichment_agent_is_gone():
     assert "indexing_enrichment" not in get_args(AgentName)
     assert "profiler" in get_args(AgentName)
-    from nl2sql.indexing.enrichment_service import ENRICHMENT_LLM_NAME
+    from nl2sql.profiler.drafts import ENRICHMENT_LLM_NAME
 
     assert ENRICHMENT_LLM_NAME == "profiler"
 

@@ -107,8 +107,10 @@ def snapshot():
         metadata=SchemaMetadata(datasource_id="shop", engine_type="sqlite", tables={k: m for k, _, m in tables}))
 
 
-def retriever(knowledge=None, policies=None, settings=None):
-    vector_store = SimpleNamespace(snapshot=lambda _id: snapshot())
+def retriever(knowledge=None, policies=None, settings=None, term_search=None):
+    """``term_search(query, datasource_id, k)`` stands in for the index's term search; none: no such search."""
+    vector_store = SimpleNamespace(snapshot=lambda _id: snapshot(),
+                                   **({"retrieve_term_candidates": term_search} if term_search else {}))
     registry = SimpleNamespace(get_preferred_tables=lambda _id: [], get_dialect=lambda _id: "sqlite")
     ctx = fake_runtime(vector_store=vector_store, state=None, ds_registry=registry,
                        policies=policies or {"roles": ROLES}, settings=settings,
@@ -197,6 +199,55 @@ def test_term_matches_by_name_and_synonym():
     assert [m.term for m in match_terms(terms, ["the invoiced-total, please"], sources=sources, top_k=8)] == [
         "invoiced total"]
     assert by_name[0].source == "yaml" and by_name[0].columns == ["orders.total"]
+
+
+def test_match_terms_adds_a_term_the_index_found_above_the_floor():
+    terms = knowledge_of().get("shop").terms
+
+    matches = match_terms(terms, ["income last year"], sources={}, top_k=8,
+                          similar={"revenue": 0.8, "churn": 0.59, "unknown": 0.99}, floor=0.6)
+
+    assert [(m.term, m.score) for m in matches] == [("revenue", 0.8)]
+    # A name in the text keeps its lexical score, whatever the index said.
+    named = match_terms(terms, ["revenue"], sources={}, top_k=8, similar={"revenue": 0.7}, floor=0.6)
+    assert [(m.term, m.score) for m in named] == [("revenue", 1.0)]
+
+
+def test_terms_are_matched_by_similarity_through_the_index():
+    from nl2sql.indexing.models import TermCandidate
+
+    asked = []
+
+    def term_search(query, datasource_id, k):
+        asked.append((query, datasource_id, k))
+        return [TermCandidate(datasource_id="shop", term="revenue", score=0.8),
+                TermCandidate(datasource_id="shop", term="churn", score=0.5)]
+
+    out = retrieve("income last year", term_search=term_search)
+
+    assert [(t.term, t.score) for t in out["knowledge_used"].terms] == [("revenue", 0.8)]
+    assert asked == [("income last year", "shop", 8)]
+
+
+def test_similarity_never_brings_in_a_term_the_caller_may_not_see():
+    from nl2sql.indexing.models import TermCandidate
+
+    data = {"version": 1, "datasources": {"shop": {"terms": [
+        {"term": "payroll", "definition": "What we pay people.", "tables": ["salaries"]}]}}}
+
+    out = retrieve("what do we spend on people", knowledge=knowledge_of(data),
+                   term_search=lambda *_: [TermCandidate(datasource_id="shop", term="payroll", score=0.95)])
+
+    assert out.get("knowledge_used") is None
+
+
+def test_a_failing_term_search_leaves_the_lexical_match():
+    def broken(*_):
+        raise RuntimeError("the vector store is down")
+
+    out = retrieve("revenue by month", term_search=broken)
+
+    assert [(t.term, t.score) for t in out["knowledge_used"].terms] == [("revenue", 1.0)]
 
 
 def test_both_terms_sharing_a_synonym_are_sent():

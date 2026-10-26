@@ -2,7 +2,7 @@
 
 Through the real CLI and the fake LLM, against the generated demo project. The
 module indexes one verified query into a private copy of the demo's index and
-state store (``nl2sql index --curated-only`` on a config whose ``storage.path``
+state store (``nl2sql index --refresh`` on a config whose ``storage.path``
 is that copy), so no other test sees it. The model's choice is a ``FakeLLMServer`` rule keyed on
 ``VerifiedQueryChoice``; everything after it is the real engine.
 
@@ -88,7 +88,7 @@ def curated(demo_project, tmp_path_factory):
     server = _serve(demo_project, RULES_COUNT_CUSTOMERS, "curated-index.yaml", curated=CURATED)
     server.stop()
     _with_storage(demo_project / "curated-index.yaml", store)
-    r = run_cli(demo_project, _env(), "index", "--curated-only", "--datasource", "chinook",
+    r = run_cli(demo_project, _env(), "index", "--refresh", "--datasource", "chinook",
                 config="curated-index.yaml", timeout=600)
     assert r.returncode == 0, r.stdout + r.stderr
     return {"store": store}

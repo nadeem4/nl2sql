@@ -203,16 +203,10 @@ This covers the embedding step only. The demo is **not** key-free end to end:
   [LLM configuration â†’ Temperature](../configuration/llm.md#temperature). With an
   OpenRouter key or Ollama, change `model` to one that provider serves: live
   mode switches the provider, not the model name.
-- `nl2sql index --enrich` also runs an optional LLM enrichment pass over the
-  schema; without `--enrich` no model is called. Enrichment only fills in
-  descriptions the database does not have, and is best-effort: without a usable chat key it is skipped with an
-  `INFO` line naming the agent, the provider and the variable to set, and the
-  chunks are still indexed - just with no LLM-generated descriptions. An
-  enrichment failure never fails indexing. The demo's own indexing (the first
-  run, the startup repair and the playground's Rebuild) leaves enrichment
-  **off**, because it spends tokens on your key; the playground offers it as an
-  explicit checkbox. When it is on, the demo's indexing uses a key exported in
-  your shell, or one saved in the project's `.env`.
+- Indexing calls no model: the demo's own indexing (the first run, the startup
+  repair and the playground's Rebuild) reads the schema and the glossary and
+  embeds them, with the local embedding model by default. Descriptions a model
+  drafts are proposals for review, not part of the index.
 - `nl2sql demo --api-key <key>` takes the key on the command line and writes it
   into the project's `.env`, never into a YAML file. The provider follows the
   key's shape: a key beginning `sk-or-` is OpenRouter and is stored as

@@ -14,8 +14,9 @@ Status, worst first:
 ``missing``  the configured embedding model has no namespace yet (never
              indexed, or the model changed)
 ``empty``    the namespace has no live entries
-``stale``    a datasource has no live build, or its build's schema snapshot
-             is gone from the state store
+``stale``    a datasource has no live build, its build's schema snapshot
+             is gone from the state store, or its knowledge (the glossary)
+             changed since the build
 ``ok``       everything else
 
 Warnings never change the status. One is a ``curated.yaml`` edited since the
@@ -101,13 +102,18 @@ def index_health(
     embedding_model: Optional[str] = None,
     curated_hashes: Optional[Dict[str, str]] = None,
     preferred_tables: Optional[Dict[str, List[str]]] = None,
+    knowledge_digests: Optional[Dict[str, str]] = None,
 ) -> IndexHealth:
     """Judges the live builds in ``namespace`` of ``index`` against the registered datasources.
 
     ``curated_hashes`` maps a datasource id to the hash of its verified
     queries as the file is now (``indexing.curated.curated_hashes``). An
     indexed datasource whose build recorded another hash gets a warning; None
-    compares nothing.
+    compares nothing. ``knowledge_digests`` maps a datasource id to the digest
+    of its knowledge as it is now (``Knowledge.digest``); a build made with
+    another digest is a problem, so the status is ``stale``: the entries
+    carry the glossary's descriptions and terms, and ``nl2sql index
+    --refresh`` brings them up to date without reading the schema.
     """
     datasource_ids = list(datasource_ids)
     try:
@@ -171,6 +177,19 @@ def index_health(
                 f"Datasource '{ds.datasource_id}' was indexed from schema version {ds.index_version}, "
                 "which is no longer in the state store."
             )
+    if knowledge_digests:
+        from nl2sql.knowledge.merge import digest
+        from nl2sql_sdk.knowledge import DatasourceKnowledge
+
+        nothing = digest(DatasourceKnowledge())  # what a build made without knowledge records
+        for ds in datasources:
+            current = knowledge_digests.get(ds.datasource_id)
+            recorded = pointers[ds.datasource_id].knowledge_hash if ds.datasource_id in pointers else None
+            if current and ds.entries and (recorded or nothing) != current:
+                health.problems.append(
+                    f"The glossary changed for '{ds.datasource_id}' since it was indexed; run "
+                    f"`nl2sql index --refresh --datasource {ds.datasource_id}`."
+                )
     if curated_hashes:
         from nl2sql.indexing.curated import curated_hash
 
@@ -181,7 +200,7 @@ def index_health(
             if current and ds.entries and (recorded or nothing) != current:
                 health.warnings.append(
                     f"curated.yaml changed for '{ds.datasource_id}' since it was indexed; run "
-                    f"`nl2sql index --curated-only --datasource {ds.datasource_id}`."
+                    f"`nl2sql index --refresh --datasource {ds.datasource_id}`."
                 )
     if preferred_tables:
         health.warnings.extend(preferred_table_warnings(preferred_tables, snapshot_of))

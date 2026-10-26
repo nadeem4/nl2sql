@@ -187,10 +187,6 @@ class ModelsRequest(BaseModel):
     models: Dict[str, Union[NodeChoice, str, None]]
 
 
-class RebuildRequest(BaseModel):
-    enrich: bool = False
-
-
 class RetrievalRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     k: int = Field(default=8, ge=1, le=50)
@@ -696,11 +692,11 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         return index_panel.read()
 
     @app.post("/api/index/rebuild", status_code=202, dependencies=[Depends(rebuild_guard)])
-    def rebuild(req: RebuildRequest) -> Dict[str, Any]:
+    def rebuild() -> Dict[str, Any]:
         # Guarded exactly like a settings change: local only unless
         # --allow-settings, and only from the playground page itself. Hosted,
         # it is off outright -- it would write the index and the snapshot.
-        index_panel.start(req.enrich)
+        index_panel.start()
         return index_panel.read()
 
     @app.get("/api/retrieval")

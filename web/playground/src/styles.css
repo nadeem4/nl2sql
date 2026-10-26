@@ -487,8 +487,6 @@ li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
 .index-folder { margin-bottom: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--rule-strong); font-size: var(--fs-2); color: var(--ink); max-width: 46ch; }
 
 .index-action { display: grid; gap: var(--sp-2); justify-items: start; }
-.index-enrich { font-size: var(--fs-2); }
-.index-enrich input:disabled { cursor: default; }
 .index-help { font-size: var(--fs-1); color: var(--ink-2); max-width: 46ch; }
 .index-help code { white-space: nowrap; }
 .index-rebuild { margin-top: var(--sp-1); }

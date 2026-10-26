@@ -1,10 +1,10 @@
-from nl2sql.indexing.enrichment_service import (
+"""The drafting helpers K3 moved out of the index (nl2sql/profiler/drafts.py), unchanged."""
+from nl2sql.profiler.drafts import (
     SchemaEnrichment,
     DatasourceEnrichment,
     TableEnrichment,
     ColumnEnrichment,
     sanitize_enrichment,
-    apply_enrichment,
 )
 from nl2sql_sdk.schema import (
     SchemaSnapshot,
@@ -73,23 +73,3 @@ def test_sanitize_enrichment_filters_unknowns_and_questions():
     assert "public.orders.total" not in sanitized.columns
     assert sanitized.datasource.sample_questions == ["List users"]
 
-
-def test_apply_enrichment_updates_metadata():
-    snapshot = _build_snapshot()
-    table_key = next(iter(snapshot.contract.tables.keys()))
-    enrichment = SchemaEnrichment(
-        datasource=DatasourceEnrichment(description="User data", domains=["crm"]),
-        tables={table_key: TableEnrichment(description="Users table")},
-        columns={
-            f"{table_key}.email": ColumnEnrichment(
-                description="Email address",
-                synonyms=["email_address"],
-            )
-        },
-    )
-
-    updated = apply_enrichment(snapshot, enrichment)
-    table_md = updated.metadata.tables[table_key]
-    assert table_md.description == "Users table"
-    assert table_md.columns["email"].description == "Email address"
-    assert table_md.columns["email"].synonyms == ["email_address"]

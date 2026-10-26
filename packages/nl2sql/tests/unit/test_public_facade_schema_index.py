@@ -182,8 +182,7 @@ def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
     ctx = object()
     assert _engine(ctx).index.build(["chinook"]) == "result"
     assert seen["ctx"] is ctx
-    # Enrichment spends tokens, so it is off unless asked for.
-    assert seen["kwargs"]["enrich"] is False
+    assert "enrich" not in seen["kwargs"] and "curated_only" not in seen["kwargs"]
     assert seen["kwargs"]["datasource_ids"] == ["chinook"]
 
 

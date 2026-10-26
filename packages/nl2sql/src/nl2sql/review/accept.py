@@ -19,8 +19,8 @@ checks refuse its SQL, an id that is taken) is left proposed and reported in
 ``AcceptReport.refused``; the rest are written. After a glossary write the
 knowledge is reloaded; after a curated write the runtime's section is swapped
 (``Runtime.replace_curated``) and each datasource's curated entries are
-refreshed in the index: ``rebuild_index(curated_only=True)``, which runs
-``IndexingOrchestrator.refresh_curated``, so the next question can match it.
+refreshed in the index: ``rebuild_index(refresh=True)``, which runs
+``IndexingOrchestrator.refresh``, so the next question can match it.
 ``reject`` takes the same locks, so it never decides an item an accept in
 flight is writing.
 """
@@ -331,11 +331,11 @@ def _refreshed(ctx: Any, datasource_ids: List[str]) -> List[str]:
     from nl2sql.indexing.rebuild import rebuild_index
 
     try:
-        result = rebuild_index(ctx, datasource_ids=datasource_ids, curated_only=True)
+        result = rebuild_index(ctx, datasource_ids=datasource_ids, refresh=True)
     except Exception as e:  # the file is written either way; the index catches up on the next refresh
-        return [f"The index was not refreshed: {e}. Run `nl2sql index --curated-only`."]
+        return [f"The index was not refreshed: {e}. Run `nl2sql index --refresh`."]
     return [f"The index of {error['datasource_id']} was not refreshed: {error['error']} "
-            f"Run `nl2sql index --curated-only` once it is indexed." for error in result.errors]
+            f"Run `nl2sql index --refresh` once it is indexed." for error in result.errors]
 
 
 def _published(ctx: Any, proposal: Proposal, decision: str) -> None:

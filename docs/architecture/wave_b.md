@@ -493,6 +493,11 @@ embedded. The pointer switches keeping its schema version.
 --curated-only` becomes `nl2sql index --refresh`. `ENTRY_TYPES` in
 `api/indexing_api.py` gains `knowledge.term`.
 
+!!! note "Built: knowledge in the index (K3)"
+    The entries, the term search, `refresh`, the pointer's `knowledge_hash` and
+    `stale`, and B31 are built; see the K3 note in [the PR plan](#16-pr-plan)
+    for the exact names. The user guide is [Indexing](indexing.md#knowledge-in-the-index).
+
 ## 5. The review queue
 
 ### Proposals
@@ -562,7 +567,7 @@ writes only two:
 | Kind | Writes | Then |
 |---|---|---|
 | `join`, `column`, `table`, `term` | The glossary: each accepted `change` merged into the first `yaml` knowledge source's file. A `term` whose name exists replaces that term (D50). | `engine.knowledge.reload()`; the items are in the next run's prompts. The index catches up on `refresh` (D56). |
-| `verified_query` | The `curated` section's own file: the verified query added under its datasource | The curated checks (`config/curated.py`) run on the edited section first; then the runtime's curated section is swapped atomically (`Runtime.replace_curated`) and the datasource's curated entries are refreshed (`IndexingOrchestrator.refresh_curated` until K3 renames it `refresh`), so the next question can match it. |
+| `verified_query` | The `curated` section's own file: the verified query added under its datasource | The curated checks (`config/curated.py`) run on the edited section first; then the runtime's curated section is swapped atomically (`Runtime.replace_curated`) and the datasource's curated entries are refreshed (`IndexingOrchestrator.refresh`), so the next question can match it. |
 
 | Rule | Detail |
 |---|---|
@@ -1832,10 +1837,10 @@ flowchart TD
       edit after the config was loaded) the hash is `STALE`, so accept refuses
       with `FILE_CHANGED`; `Runtime.replace_curated(curated, *, sha256)` swaps
       `config.curated`, `curated` and the hash under the lock. The refresh runs
-      `rebuild_index(ctx, datasource_ids=..., curated_only=True)` (the index
-      lock, `IndexingOrchestrator.refresh_curated`, which section 5 names
+      `rebuild_index(ctx, datasource_ids=..., refresh=True)` (the index
+      lock, `IndexingOrchestrator.refresh`, which section 5 names
       directly); a datasource that cannot be refreshed is a warning, not a
-      failure. K3 renames that call, in `_refreshed()` in `review/accept.py`.
+      failure. K3 renamed that call, in `_refreshed()` in `review/accept.py`.
     - **The review file.** `nl2sql/review/review_file.py`: `render(proposals)`
       and `read(path) -> ReviewFile` (`ReviewItem`: `id`, `decision`, `reason`,
       `change`; other keys ignored). `apply` merges an edited `change` over the
@@ -1930,6 +1935,85 @@ mechanically, with a one-off script: each `PlanModel` entry is renamed
 is called, no key is spent, and every replayed answer is byte-identical to
 today's, which `test_converted_recording_replays_every_guided_question`
 holds.
+
+!!! note "Built: knowledge in the index (K3)"
+    - **The entries.** `SchemaChunkBuilder(ds_id, snapshot, schema_version,
+      questions, knowledge=None, dialect=None)` (`indexing/chunk_builder.py`)
+      takes the datasource's merged `DatasourceKnowledge`. A table or column
+      description is the glossary's, else the snapshot's (the database's
+      comment); a column's synonyms are the database's then the glossary's, and
+      it gains `ColumnChunk.role` (a `Role:` line) only when the glossary sets
+      one, so a role derived from the schema is not written to an entry. A
+      glossary join that `resolve_join` accepts is a `RelationshipChunk` with
+      `origin="glossary"` and its cardinality (`RelationshipChunk.origin` is
+      `"database"` for a foreign key; id `schema.relationship:<from>-><to>:glossary:<columns>:<version>`).
+      `TermChunk` (`knowledge.term`, id `knowledge.term:<datasource>:<12 hex of
+      the lower-cased term>:<version>`) holds the term, its synonyms and its
+      definition. The glossary's `examples` are appended to the datasource's
+      `sample_questions` for `build_example_chunks`. A name that does not
+      resolve is left out of the entries, as `show` reports it.
+    - **Term similarity.** `Retriever.retrieve_term_candidates(query,
+      datasource_id, k) -> list[TermCandidate]` (`TERM_TYPE` in
+      `indexing/retrieval.py`; `TermCandidate(datasource_id, term, score)` in
+      `indexing/models.py`) is a plain similarity search over the live build, and
+      embeds nothing when the datasource has no term entry. `match_terms(terms,
+      texts, *, sources, top_k, similar=None, floor=0.6)` adds a term whose
+      similarity reaches `floor` (`settings.knowledge.match_floor`), scoring that
+      similarity; a lexical match keeps its 1.0 or 0.9. The schema retriever
+      (`_similar_terms`) asks the search with the sub-query's intent only when the
+      caller sees a term, passes only the terms its scope shows to `match_terms`,
+      and keeps the lexical match when the search fails or the store has no such
+      method.
+    - **Refresh.** `IndexingOrchestrator(ctx)` (no `enrich`) has `refresh(datasource_id)`
+      in place of `refresh_curated`: it renders every entry from the live
+      build's stored snapshot (`LookupError` when there is none, naming
+      `nl2sql index --datasource`), the current curated section and the current
+      knowledge, keeps the stored entry whose `id`, text and metadata are
+      unchanged, embeds the rest, and commits with `curated_hash` and
+      `knowledge_hash`. The code on main differs from the design in one respect:
+      the schema entries are rendered again too (they carry the glossary), not
+      copied. `rebuild_index(ctx, datasource_ids=None, on_progress=None,
+      on_datasource=None, refresh=False)`; `IndexAPI.build(datasource_ids=None, *,
+      on_progress, on_datasource)` and `IndexAPI.refresh(datasource_ids=None, *,
+      on_progress, on_datasource)` (both return a `RebuildResult`);
+      `run_indexing(engine, datasource_ids=None, refresh=False)`; `nl2sql index
+      --refresh`. `--enrich` and `--curated-only` are gone (a usage error);
+      `ENTRY_TYPES` gains `knowledge.term`. `review/accept.py` refreshes with
+      `rebuild_index(..., refresh=True)`.
+    - **Health.** `index_health(..., knowledge_digests=None)` compares each
+      datasource's `BuildPointer.knowledge_hash` (a build made before K3 counts as
+      the digest of no knowledge) with the live `Knowledge.digest`; a difference
+      is a problem, so the status is `stale`: "The glossary changed for '<id>'
+      since it was indexed; run `nl2sql index --refresh --datasource <id>`."
+      `IndexAPI.health` passes the runtime's digests. The `curated.yaml` warning
+      now names `--refresh`.
+    - **B31, and what P2 uses.** The orchestrator never touches a model, so a
+      snapshot holds only the database's text. `nl2sql/profiler/drafts.py` holds
+      what was moved from the deleted `indexing/enrichment_service.py`, unchanged:
+      `ENRICHMENT_LLM_NAME` (`"profiler"`), `DatasourceEnrichment`,
+      `TableEnrichment`, `ColumnEnrichment`, `SchemaEnrichment`,
+      `ENRICHMENT_PROMPT`, `build_evidence(snapshot, datasource_description,
+      existing_questions)`, `sanitize_enrichment(snapshot, enrichment,
+      max_questions=100)` and their private helpers. `apply_enrichment` and
+      `enrich_schema_snapshot` were deleted, not moved: they wrote a model's text
+      into a snapshot and call the model with no budget. P2 wires the moved
+      functions into `profile(draft=True)`.
+    - **The playground.** Its Rebuild no longer takes `enrich`
+      (`POST /api/index/rebuild` has no body; `rebuild.enrich_available` and
+      `enrich_reason` are gone from `GET /api/index`), and the checkbox is out of
+      `web/playground/src`. The committed bundle
+      `cli/demo/playground/static/index.html` was not rebuilt: until
+      `npm run build` is run in `web/playground`, its checkbox is disabled and
+      does nothing.
+    - **Tests.** `tests/unit/test_index_knowledge.py` (every K3 test the row
+      names except the node-level one, and `test_a_glossary_join_that_does_not_resolve_is_not_indexed`,
+      `test_refresh_swaps_the_curated_entries`, `test_the_cli_has_refresh_and_not_enrich_or_curated_only`);
+      `test_terms_are_matched_by_similarity_through_the_index`,
+      `test_similarity_never_brings_in_a_term_the_caller_may_not_see` and
+      `test_a_failing_term_search_leaves_the_lexical_match` in
+      `tests/unit/knowledge/test_knowledge_in_prompts.py`;
+      `tests/unit/test_profiler_drafts.py` (the moved sanitizer). The enrichment
+      tests are deleted with the code.
 
 The waves, with at most four PRs at once:
 
