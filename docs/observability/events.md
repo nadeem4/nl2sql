@@ -81,7 +81,7 @@ on the engine's bus directly.
 | `llm.changed` | `by`, `changes` (never a key) | `engine.llm.replace` (audited) |
 | `eval.case`, `eval.finished` | see [Evals](../evals/index.md) | `engine.evals.run` |
 | `knowledge.loaded` | `sources` (`type`, `counts`, `sha256`), `digests` per datasource, `error` | the engine is built with a `knowledge` section, and `engine.knowledge.reload()` (with `error` when the reload failed and the previous knowledge stayed live). See [Knowledge](../configuration/knowledge.md) |
-| `profile.finished` | `datasource_id`, the report's counts, `stopped_by`, `cost`, `seconds` | not yet published (P1) |
+| `profile.finished` | `datasource_id`, the report's counts, `stopped_by`, `cost`, `seconds` | `engine.knowledge.profile` finished one datasource (counts only, never a name or a value). See [Schema Profiler](../schema/profiler.md) |
 | `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | a new proposal entered the review queue (a thumbs-up, or another track's finding) |
 | `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | `engine.proposals.accept` or `reject` decided one (audited) |
 

@@ -30,7 +30,7 @@ from nl2sql.cli.commands.eval import app as eval_app
 from nl2sql.cli.commands.storage import app as storage_app
 from nl2sql.cli.commands.knowledge import app as knowledge_app
 from nl2sql.cli.commands.review import app as review_app
-from nl2sql.cli.commands.profile import app as profile_app
+from nl2sql.cli.commands.profile import profile_command
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import configure_output_encoding
 from nl2sql.cli.types import RunConfig
@@ -53,7 +53,7 @@ app.add_typer(eval_app, name="eval",
               help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `seed`, `publish`.")
 app.add_typer(knowledge_app, name="knowledge", help="The glossary as the engine uses it (from 0.8).")
 app.add_typer(review_app, name="review", help="The review queue: proposed knowledge and verified queries to accept or reject.")
-app.add_typer(profile_app, name="profile", help="Profile the indexed schema and file what it finds for review (from 0.8).")
+app.command("profile", help="Profile the indexed schema and file what it finds for review (from 0.8).")(profile_command)
 
 
 def _version_callback(value: bool) -> None:
@@ -188,6 +188,17 @@ def index(
         help="With --check: a role to check as (repeatable); drift shows only in the tables it may read.",
     )] = None,
     as_json: Annotated[bool, typer.Option("--json", help="With --check: print the reports as JSON.")] = False,
+    profile: Annotated[bool, typer.Option(
+        "--profile",
+        help=(
+            "After indexing, run `nl2sql profile` on the same datasources and file the joins and column roles "
+            "it finds for review."
+        ),
+    )] = False,
+    as_: Annotated[Optional[List[str]], typer.Option(
+        "--as", help="With --profile: a role to profile as (repeatable). Without one, policies.default_role.",
+    )] = None,
+    user: Annotated[Optional[str], typer.Option("--user", help="With --profile: the caller's user id.")] = None,
 ):
     """
     Index schemas and examples into the index of the configured embedding model, one datasource at a time.
@@ -195,9 +206,9 @@ def index(
     if ctx.invoked_subcommand is not None:
         return
     if check:
-        if enrich or curated_only:
-            raise typer.BadParameter("--check re-indexes nothing, so it cannot be combined with --enrich "
-                                     "or --curated-only.")
+        if enrich or curated_only or profile:
+            raise typer.BadParameter("--check re-indexes nothing, so it cannot be combined with --enrich, "
+                                     "--curated-only or --profile.")
         from nl2sql.cli.common.indexing import run_drift_check
 
         try:
@@ -210,7 +221,20 @@ def index(
         raise typer.BadParameter("--role and --json go with --check.")
     if enrich and curated_only:
         raise typer.BadParameter("--enrich and --curated-only cannot be combined.")
-    run_indexing(build_engine(ctx), enrich=enrich, datasource_ids=datasource or None, curated_only=curated_only)
+    if profile and curated_only:
+        raise typer.BadParameter("--curated-only reads no schema, so there is nothing to profile.")
+    if (as_ or user) and not profile:
+        raise typer.BadParameter("--as and --user go with --profile.")
+    engine = build_engine(ctx)
+    if not profile:
+        run_indexing(engine, enrich=enrich, datasource_ids=datasource or None, curated_only=curated_only)
+        return
+    from nl2sql.cli.commands.profile import caller_or_exit, profile_datasources
+
+    with engine:
+        who = caller_or_exit(engine, as_, user)  # before the build: a bad --as should not cost an index
+        run_indexing(engine, enrich=enrich, datasource_ids=datasource or None)  # exits 1 if a datasource failed
+        profile_datasources(engine, who, datasource)
 
 
 @index_app.command("prune")

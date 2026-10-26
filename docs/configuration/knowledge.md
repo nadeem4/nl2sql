@@ -174,6 +174,7 @@ plan cache: the next question plans again.
 | `engine.knowledge.sources(*, user_context)` | Each source (`KnowledgeSourceInfo`): its `type`, item counts per datasource the caller reaches (counting what the caller may see), `sha256`, `loaded_at` and the last reload's `error`. The error quotes the file (its path, its lines, the tables it names), so only a caller who may reload (an admin role, or any caller under `allow_all`) sees it; anyone else gets a fixed text saying the reload failed and an admin can see why |
 | `engine.knowledge.show(datasource_id=None, *, user_context)` | The merged knowledge as the engine uses it (`DatasourceKnowledgeView`): `knowledge` with derived roles and database comments filled in, `origins` and `sources` per item, `digest` and `problems` |
 | `engine.knowledge.export(path=None, *, datasource_ids=None, user_context)` | The knowledge-source items the caller may see as one canonical `glossary.yaml`, returned and, with `path`, written there. It refuses to write over a config file or a knowledge source's own file. Derived roles and database comments are not exported. |
+| `engine.knowledge.profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None)` | Probes the indexed schema for joins the database does not declare and for column roles, and files them in the [review queue](review.md); one `ProfileReport` per datasource the caller reaches. See [Schema Profiler](../schema/profiler.md). `draft=True` arrives with the drafted descriptions. |
 | `engine.knowledge.reload(*, user_context)` | Loads every source again and swaps atomically; needs an admin role (`policies.admin_roles`; any caller under `allow_all`). Runs in flight keep the knowledge they started with. |
 
 ```python
@@ -190,6 +191,7 @@ for view in engine.knowledge.show(user_context=analyst):
 | `nl2sql knowledge show [--datasource ID] --as ROLE` | `show`: a readable listing, each item with its origin; problems last, exit 1 when there are any |
 | `nl2sql knowledge export [--datasource ID] [--out FILE] --as ROLE` | `export`, to stdout or `--out` |
 | `nl2sql knowledge sources --as ROLE` | `sources` |
+| `nl2sql profile [--datasource ID] --as ROLE` | `profile`, then the open profiler proposals; `nl2sql index --profile --as ROLE` indexes first |
 
 `--as` (repeatable) and `--user` build the caller. Without `--as` the role is
 `policies.default_role`; with neither the command refuses. Under `allow_all`

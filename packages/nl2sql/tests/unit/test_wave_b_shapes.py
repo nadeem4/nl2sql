@@ -548,7 +548,6 @@ def _engine(tmp_path: Path) -> NL2SQL:
 STUBS = {
     # K1 built sources, show, export and reload (test_knowledge_sources.py); Q1 the review queue
     # (test_review_queue.py).
-    ("knowledge", "profile"): ("P1", {"user_context": None}),
     ("knowledge", "save_choice"): ("L2", {"choice": None, "user_context": None}),
 }
 

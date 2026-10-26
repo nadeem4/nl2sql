@@ -807,6 +807,47 @@ or `time_budget_s` is reached, the remaining candidates are proposed with
 scope denies is never probed. Each finished profile publishes
 `profile.finished`.
 
+!!! note "Built: joins and roles (P1)"
+    `engine.knowledge.profile` and `nl2sql profile` run; behaviour is in
+    [Schema Profiler](../schema/profiler.md). Drafts are P2's (`draft=True` or
+    `max_cost_usd` raises `NotImplementedError` naming P2). What later rows need,
+    and where the code differs from this page:
+
+    - **Names.** `nl2sql/profiler/joins.py`: `find_candidates(snapshot, *, dialect,
+      allows, known) -> list[JoinCandidate]`; `roles.py`: `find_roles(snapshot, *,
+      dialect, allows, said, enum_max_distinct) -> list[RoleFinding]` (`table`,
+      `column`, `change`, `evidence`); `run.py`: `profile(ctx, datasource_ids, user)`,
+      `_now()` the clock tests replace. `known` and `said` are keyed by
+      `(TableRef.full_name, lower-case column)`.
+    - **Proposals.** Join: target `from->to` in the glossary's names (`table_label`),
+      `change` `{from, to, cardinality}`. Column: target `table.column`, `change`
+      only the fields the glossary does not already set. Both pass `tables` through
+      `review.queue.table_names`, `schema_version` is the live build's.
+    - **Gaps filled.** A failed probe is an issue and its candidate is proposed with
+      `overlap: null`. A candidate is skipped when any foreign key joins its two
+      tables. A key named `id` is matched only by the table-name rule. `enum` skips
+      columns named like a key. `values` and a refined `grain` need every distinct
+      value in the snapshot. Two primary keys of one name are one `one-to-one` pair.
+      A probe that measures an overlap under `min_overlap` supersedes the profiler's
+      own earlier open `overlap: null` row for that join. A datasource not indexed
+      gets a report with `schema_version` `""` and one issue.
+    - **CLI.** `nl2sql profile` is a command, not the group B0 registered:
+      `profile_command` in `cli/commands/profile.py`, registered in `cli/main.py`;
+      `nl2sql index --profile` builds the caller (`caller_or_exit`) before it indexes.
+      P2 adds `--draft` and `--max-cost` to `profile_command`.
+    - **Hazard for P2: roles and drafts collide in the queue.** A role proposal and
+      a drafted description are both `kind: column`, `target: table.column`, and
+      Q1's `propose` supersedes an open row of the same kind, datasource and target.
+      Filed separately, `profile(draft=True)` would supersede the role it filed a
+      moment before, and a later plain `profile` would revive the role and
+      supersede the draft. P2 must merge the role and the description into one
+      `change` per column in a run (and P1's role rows must then be built together
+      with the drafts), or scope superseding by `origin`; Q1 is unchanged here.
+    - **`realdb`.** `tests/realdb/test_profile.py` was written without a test bed
+      (it drops pagila's foreign keys from the stored snapshot, then expects
+      `rental.inventory_id` and `rental.customer_id` joins at overlap 1.0); CI's
+      `realdb` workflow is its first run.
+
 ## 7. Clarify instead of guess
 
 ### When it asks
