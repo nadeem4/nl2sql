@@ -133,9 +133,13 @@ class HookRunner:
                 return binding.approver_roles if binding.approver_roles is not None else self.admin_roles
         return ()
 
-    def attached(self, point: HookPoint) -> bool:
-        """Whether any hook runs at ``point``."""
-        return any(point in binding.points for binding in self.bindings)
+    def attached(self, point: HookPoint, exclude: Optional[str] = None) -> bool:
+        """Whether any hook runs at ``point``, leaving out the hook named ``exclude``."""
+        return any(point in binding.points and binding.name != exclude for binding in self.bindings)
+
+    def builtin(self, name: str) -> Optional[Any]:
+        """The hook object of the built-in binding ``name``, or None."""
+        return next((binding.hook for binding in self.bindings if binding.name == name), None)
 
     def call(self, point: HookPoint, **fields: Any) -> HookVerdict:
         """Ask every hook attached at ``point``; ``fields`` are the ``HookContext``'s, ``point`` aside.

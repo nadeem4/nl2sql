@@ -1329,9 +1329,12 @@ the hook's decision as for any hook.
       `SubgraphExecutionState.estimate` / `SubgraphOutput.estimate`, whether or
       not the SQL then ran. `cost.estimated` carries the decision; the trace
       holds the estimate through the result, not a separate record.
-    - **Probes.** The answer sanity checks run no probe while any hook is
-      attached at `execute.before`; the built-in counts, so an engine with a
-      cost rule runs only the all-null check.
+    - **Probes.** The answer sanity checks run no probe while a configured
+      hook is attached at `execute.before`, or for a caller the cost rule gives
+      a limit (`CostGuard.applies(user)`; a probe passes no hook and would
+      bypass the limit). A caller with no limit keeps them.
+    - **Names.** A configured hook named `policy.cost` is a config error
+      (`hooks[<i>]`): the name is the built-in's.
     - **Corrections** reach the rule with no change of their own: the hook is
       in the runner `feedback/corrections.py` already calls.
 

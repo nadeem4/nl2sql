@@ -80,6 +80,10 @@ class CostGuard:
 
     # ---------------------------------------------------------------- the rule
 
+    def applies(self, user: Any) -> bool:
+        """Whether the rule gives ``user`` a limit, so that every query of hers is estimated."""
+        return self.rule_for(user)[0].max_estimated_rows is not None
+
     def rule_for(self, user: Any) -> Tuple[CostRule, str]:
         """The rule that applies to ``user``, and where its limit is set (a config path, for the message)."""
         base = self.policies.cost or CostRule()

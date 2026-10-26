@@ -400,3 +400,64 @@ def test_a_refused_cost_withholds_data_and_the_result_carries_the_estimate():
 
     assert result.errors[0]["error_code"] == "COST_LIMIT_EXCEEDED"
     assert result.sub_queries[0].estimate.rows == 12_400_000 and result.sub_queries[0].rows is None
+
+
+# ---------------------------------------------------------------- probes, retries, names
+
+
+def _probes_in_a_run(db, monkeypatch, runner, user):  # noqa: F811
+    seen = []
+    monkeypatch.setattr("nl2sql.pipeline.nodes.executor.node.run_checks",
+                        lambda *a, **kw: seen.append(kw["probes"]) or [])
+    state = _sub_state().model_copy(update={"user_context": user})
+    _executor(db, runner)(state)
+    return seen
+
+
+_ROLES_WITH_COST = {
+    "analyst": {"description": "a", "allow": ["shop"], "cost": {"max_estimated_rows": 1_000_000}},
+    "admin": {"description": "b", "allow": ["*"], "cost": {"max_estimated_rows": None}},
+}
+
+
+def test_a_caller_with_no_limit_still_gets_the_probes(db, monkeypatch):  # noqa: F811
+    guard, _ = _guard({"roles": _ROLES_WITH_COST}, _Adapter(rows=5))  # within the limit, so it runs
+    runner = HookRunner([guard.binding()], admin_roles=["admin"])
+
+    assert _probes_in_a_run(db, monkeypatch, runner, APPROVER) == [True]
+    assert _probes_in_a_run(db, monkeypatch, runner, ANALYST) == [False]  # a limit: a probe would bypass it
+
+
+def test_a_configured_hook_still_turns_the_probes_off(db, monkeypatch):  # noqa: F811
+    guard, _ = _guard({"roles": _ROLES_WITH_COST})
+    runner = HookRunner([guard.binding(), HookBinding(name="mine", hook=lambda ctx: Allow(),
+                                                     points=frozenset({"execute.before"}))])
+
+    assert _probes_in_a_run(db, monkeypatch, runner, APPROVER) == [False]
+
+
+def test_a_retry_whose_estimate_failed_clears_the_previous_one(db):  # noqa: F811
+    guard, adapter = _guard({"allow_all": True, "cost": {"max_estimated_rows": 20_000_000}})
+    node = _node(db, guard)
+    first = node(_sub_state())
+    assert first["estimate"].rows == 12_400_000
+
+    adapter.rows = RuntimeError("down")
+    second = node(_sub_state())
+
+    assert second["estimate"] is None  # the state would otherwise keep the first attempt's
+
+
+def test_a_configured_hook_named_policy_cost_is_refused(tmp_path):
+    from nl2sql.config import ConfigError
+
+    def impostor(ctx):
+        return Allow()
+
+    impostor.name = "policy.cost"
+    config = _project(tmp_path).model_copy(update={"hooks": [impostor]})
+
+    with pytest.raises(ConfigError) as error:
+        _engine(config)
+
+    assert "policy.cost" in str(error.value) and "hooks[0]" in str(error.value)

@@ -101,8 +101,10 @@ fails the run. A verified query is not checked: it runs in the
 SQL the [hooks](../../configuration/hooks.md) never see: it runs outside
 `execute.before` and `execute.after`, and nothing publishes it. So when any
 hook is attached at `execute.before` (an operator gating the SQL that reaches
-the database, or the built-in `policy.cost` once `policies.cost` is set), no probe runs: only the all-null check, which reads the saved
-result and sends nothing to the database. `settings.pipeline.sanity_checks:
+the database), no probe runs; only the all-null check, which reads the saved
+result and sends nothing to the database. None runs either for a caller the
+[cost rule](../../configuration/policies.md#cost) gives a limit, since a probe
+would bypass it; a caller with no limit keeps them. `settings.pipeline.sanity_checks:
 false` turns every check off. A probe is bounded by the datasource's timeout;
 one that times out is skipped silently.
 

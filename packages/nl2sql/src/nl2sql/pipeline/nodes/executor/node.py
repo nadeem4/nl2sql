@@ -6,6 +6,7 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.hooks import hooks_of
+from nl2sql.hooks.runner import COST_HOOK
 from nl2sql.policies import UserContext
 from nl2sql.policies.cost import take_record
 from nl2sql.policies.scope import default_schema
@@ -82,7 +83,7 @@ class ExecutorNode:
                 row_count=response.metrics.get("row_count"),
                 frame=lambda: self.artifact_store.scan_parquet(artifact) if artifact is not None else None,
                 can_retry=lambda code: retries_left and code not in retried,
-                probes=not self.hooks.attached("execute.before"),
+                probes=self._probes_allowed(state.user_context),
             )
         except Exception as exc:
             logger.warning(f"Sanity checks skipped: {exc}")
@@ -92,6 +93,17 @@ class ExecutorNode:
                                        "retry": error.severity == ErrorSeverity.ERROR})
         # The SQL agent retries only on this attempt's own finding.
         return [e.model_copy(update={"details": {"attempt": state.retry_count}}) for e in errors]
+
+    def _probes_allowed(self, user) -> bool:
+        """Whether the sanity probes may run: no configured hook gates the SQL and no cost limit applies to ``user``.
+
+        A probe is SQL that never passes ``execute.before``, so it would run past a hook, or past a cost
+        limit, that gates the SQL. The built-in cost hook counts only for a caller it gives a limit.
+        """
+        if self.hooks.attached("execute.before", exclude=COST_HOOK):
+            return False
+        guard = self.hooks.builtin(COST_HOOK)
+        return guard is None or not guard.applies(user or UserContext())
 
     def _hook_fields(self, state: SubgraphExecutionState, ds_id: str, sql: str) -> Dict[str, Any]:
         """What ``execute.before`` and ``execute.after`` see of this sub-query's SQL."""
@@ -153,7 +165,8 @@ class ExecutorNode:
             verdict = self.hooks.call("execute.before", **fields)
             # What the cost rule estimated (C2) goes on the result, whether or not the SQL then runs.
             record = take_record(state.trace_id, state.sub_query.id)
-            estimate = {"estimate": record.estimate} if record is not None and record.estimate is not None else {}
+            # A rule that ran but got no estimate clears the previous attempt's, which was for other SQL.
+            estimate = {"estimate": record.estimate} if record is not None else {}
             if not verdict.allowed:
                 return {"executor_response": None, "errors": [verdict.error(self.node_name)], **estimate}
             response = executor.execute(request)

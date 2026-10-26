@@ -190,13 +190,18 @@ class Runtime:
         the configured ones.
         """
         from nl2sql.hooks import HookRunner, build_hook
+        from nl2sql.hooks.runner import COST_HOOK
         from nl2sql.policies.cost import build_cost_guard
 
         guard = build_cost_guard(config.policies, self.ds_registry)
         bindings = [guard.binding()] if guard is not None else []
         for i, entry in enumerate(config.hooks):
             try:
-                bindings.append(build_hook(entry, registry=self.registry, secrets=self.secret_manager))
+                binding = build_hook(entry, registry=self.registry, secrets=self.secret_manager)
+                if binding.name == COST_HOOK:
+                    raise ValueError(f"'{COST_HOOK}' is the built-in cost rule's name (policies.cost); "
+                                     "give the hook another name.")
+                bindings.append(binding)
             except (RegistryError, ValueError) as e:
                 problem(f"hooks[{i}]", str(e))
         return HookRunner(bindings, admin_roles=config.policies.admin_roles)
