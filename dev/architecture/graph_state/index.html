@@ -1729,6 +1729,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../nodes/clarifier_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../nodes/curated_matcher_node/" class="md-nav__link">
         
   
@@ -5855,7 +5883,8 @@
 - <code>subgraph_name: Optional[str]</code>
 - <code>pinned: Optional[PinnedRun]</code> (a pinned decomposition and plans; <code>source</code> is a <code>PinnedSource</code>: <code>supplied</code>, <code>approved</code> or <code>chosen</code>)
 - <code>approvals: List[Approval]</code> (what the run was asked with)
-- <code>approvals_needed: Annotated[List[ApprovalRequest], operator.add]</code></p>
+- <code>approvals_needed: Annotated[List[ApprovalRequest], operator.add]</code>
+- <code>clarify: bool</code> (the run's <code>clarify</code>, default <code>True</code>; <code>build_scan_payload</code> passes it to each sub-query)</p>
 <p>Reducer behavior in <code>GraphState</code>:
 - <code>update_results(current, new)</code> merges dicts as <code>{**current, **new}</code>.
 - <code>operator.add</code> concatenates lists for <code>errors</code>, <code>reasoning</code>, <code>warnings</code> and <code>approvals_needed</code>.</p>
@@ -5873,6 +5902,7 @@
 - <code>relevant_tables: List[Table]</code>
 - <code>pinned_plan: Optional[PlanModel]</code> and <code>pinned_source: Optional[PinnedSource]</code> (the sub-query's pinned plan, from <code>build_scan_payload</code>; the planner returns it, and the SQL agent never retries it)
 - <code>approvals: List[Approval]</code> (the run's, for the <code>execute.before</code> hooks)
+- <code>clarify: bool</code> (set by <code>wrap_subgraph</code>: the run's <code>clarify</code> is on and this is the run's only sub-query; the <a href="../nodes/clarifier_node/">clarifier</a> asks only then)
 - <code>ast_planner_response: Optional[ASTPlannerResponse]</code>
 - <code>logical_validator_response: Optional[LogicalValidatorResponse]</code>
 - <code>generator_response: Optional[GeneratorResponse]</code>
@@ -6015,7 +6045,7 @@
 - <code>errors</code>, <code>reasoning</code>: emitted by many nodes and merged by list reducers
 - <code>warnings</code>: emitted by nodes that return <code>warnings</code> in the main graph (currently <code>DatasourceResolverNode</code>)
 - <code>subgraph_id</code>, <code>subgraph_name</code>: created in <code>build_scan_payload</code>, used only for subgraph execution context
-- <code>trace_id</code>, <code>user_query</code>, <code>user_context</code>, <code>datasource_id</code>, <code>pinned</code>, <code>approvals</code>: owned by the pipeline entrypoint (<code>run_with_graph</code>); without a supplied plan, <code>pinned</code> comes from the first approval that is this run's (<code>pinned_from_approvals</code>)
+- <code>trace_id</code>, <code>user_query</code>, <code>user_context</code>, <code>datasource_id</code>, <code>pinned</code>, <code>approvals</code>, <code>clarify</code>: owned by the pipeline entrypoint (<code>run_with_graph</code>); without a supplied plan, <code>pinned</code> comes from the first approval that is this run's (<code>pinned_from_approvals</code>)
 - <code>decomposer_response</code>, <code>execution_dag</code> on a pinned run: <code>PinnedEntryNode</code>, from <code>pinned.decomposition</code>
 - <code>approvals_needed</code>: <code>wrap_subgraph</code>, and <code>CuratedMatcherNode</code> on the verified path</p>
 <p>Shared vs private:

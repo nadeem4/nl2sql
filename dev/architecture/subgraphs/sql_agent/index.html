@@ -754,6 +754,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../nodes/clarifier_node/">
+<span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../nodes/curated_matcher_node/">
 <span class="md-ellipsis">
     
@@ -2529,7 +2541,8 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 <hr/>
 <h2 id="exit-conditions">Exit Conditions</h2>
 <p>Successful completion criteria:
-- Reaches <code>END</code> after <code>executor</code> and produces <code>executor_response</code>.</p>
+- Reaches <code>END</code> after <code>executor</code> and produces <code>executor_response</code>.
+- Or reaches <code>END</code> after <code>clarifier</code>, which asked which reading of the question was meant (<code>NEEDS_CLARIFICATION</code>, <code>INFO</code>): no SQL is generated or run, and the wrapper reports the sub-query with status <code>needs_clarification</code>.</p>
 <p>Failure exits:
 - <code>check_planner</code> returns <code>end</code> when planner output is missing and retries are exhausted or errors are non-retryable.
 - <code>check_logical_validation</code> returns <code>end</code> when validation errors are non-retryable or retries are exhausted.
@@ -2544,6 +2557,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 - <code>schema_retriever</code> — <code>SchemaRetrieverNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code> — retrieve relevant schema tables/columns.
 - <code>ast_planner</code> — <code>ASTPlannerNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py</code> — create SQL AST plan.
 - <code>logical_validator</code> — <code>LogicalValidatorNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py</code> — validate plan correctness and policy constraints.
+- <code>clarifier</code> — <code>ClarifierNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py</code> — validate the planner's alternative readings and, when two or three remain, end the sub-query by asking which was meant. See <a href="../../nodes/clarifier_node/">ClarifierNode</a>.
 - <code>generator</code> — <code>GeneratorNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py</code> — generate SQL text from AST.
 - <code>executor</code> — <code>ExecutorNode</code> — <code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code> — execute SQL and produce artifacts.
 - <code>retry_handler</code> — <code>retry_node()</code> — <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py</code> — apply exponential backoff and increment retry count.
@@ -2554,7 +2568,9 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
     ast_planner --&gt;|ok| logical_validator
     ast_planner --&gt;|retry| retry_handler
     ast_planner --&gt;|end| END
-    logical_validator --&gt;|ok| generator
+    logical_validator --&gt;|ok| clarifier
+    clarifier --&gt;|ok| generator
+    clarifier --&gt;|end| END
     logical_validator --&gt;|retry| retry_handler
     logical_validator --&gt;|end| END
     retry_handler --&gt; refiner --&gt; ast_planner
@@ -2579,6 +2595,7 @@ Source file path: <code>packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.
 <li><code>ok</code> when no blocking errors exist.</li>
 <li><code>retry</code> when retryable errors exist and retry budget remains.</li>
 <li><code>end</code> when errors are non-retryable or retries exhausted.</li>
+<li><code>clarifier</code> passes straight through when the planner gave no alternative readings. Otherwise it runs each alternative through <code>LogicalValidatorNode.check</code> (the static checks and the caller's scope), drops those that fail, merges those that render to SQL another option has, and keeps the rest on <code>ast_planner_response.alternatives</code>. <code>check_clarifier</code> routes <code>end</code> when it asked (two or three options, a named phrase, <code>state.clarify</code> and <code>settings.clarify.enabled</code> on), else <code>ok</code>. Every path from the planner to the generator still passes the validator.</li>
 <li><code>generator</code> converts the plan to SQL for the target datasource dialect.</li>
 <li><code>executor</code> runs SQL via the datasource adapter and returns artifacts/errors.
    <code>check_execution</code> routes <code>retry</code> when every executor error is a retryable <code>EXECUTION_FAILED</code> and retry budget remains, otherwise <code>end</code>. It also routes <code>retry</code> when the query returned no rows on a filter value the column does not have but a close one exists (<code>VALUE_NOT_FOUND</code> <code>ERROR</code>, raised once per sub-query; see <a href="../../nodes/executor_node/#an-empty-results-filter-values">ExecutorNode</a>), and when a <code>COUNT</code> counted rows a join repeated (<code>JOIN_FAN_OUT</code> <code>ERROR</code>, raised once per sub-query; see <a href="../../nodes/executor_node/#join-fan-out">ExecutorNode</a>). Only a finding of this attempt (its <code>details.attempt</code>) routes <code>retry</code>.</li>
@@ -2650,12 +2667,14 @@ sub-query with a terminal <code>SQL_GEN_FAILED</code>.</p>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py</code></li>
 <li>Tests:</li>
 <li><code>packages/nl2sql/tests/unit/test_sql_agent_subgraph.py</code></li>
 <li><code>packages/nl2sql/tests/unit/test_subgraph_resolution.py</code></li>
+<li><code>packages/nl2sql/tests/unit/test_clarifier.py</code></li>
 </ul>
 </article>
 </div>

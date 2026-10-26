@@ -1124,6 +1124,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../nodes/clarifier_node/">
+<span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../nodes/curated_matcher_node/">
 <span class="md-ellipsis">
     
@@ -4701,6 +4713,65 @@ synthesized. <code>QueryResult.status</code> is <code>needs_clarification</code>
 sentence: "This question can be read more than one way. Choose one:
 Revenue (sum of unit price times quantity); Invoiced total (tax included)."
 <code>clarification.requested</code> is published. Nothing is stored.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the clarifier and the result (L1)</p>
+<p><code>ClarifierNode</code> (<code>pipeline/nodes/clarifier/node.py</code>) is on the validator's
+"valid" edge (<code>check_clarifier</code> routes to <code>END</code> when it asked, else to the
+generator), and <code>LogicalValidatorNode.check(plan, state) -&gt;
+List[PipelineError]</code> is the node's checks as a function (the policy
+findings first). It reads K2's <code>ASTPlannerResponse.alternatives</code> and
+<code>ambiguous_phrase</code> and passes through without them. Where the build filled
+a gap:</p>
+<ul>
+<li><strong>The flag.</strong> <code>run_query</code>, <code>stream_query</code> and <code>run_with_graph</code> take
+  <code>clarify: bool = True</code>; it rides on <code>GraphState.clarify</code> and the scan
+  payload, and <code>wrap_subgraph</code> sets <code>SubgraphExecutionState.clarify</code> to it
+  only when the decomposition has one sub-query. The clarifier asks when
+  that, <code>settings.clarify.enabled</code> and a named phrase hold, and only while
+  no attempt of the sub-query has executed (<code>state.executor_response is
+  None</code>): a sanity retry's re-plan runs its default reading, so a flagged
+  attempt's rows are never returned. The eval runner passes
+  <code>clarify=False</code> (D58); L2 turns it on for <code>clarify</code> cases. The trace
+  request records <code>clarify</code>, and replay runs with it.</li>
+<li><strong>Dropped means gone.</strong> An alternative that fails <code>check</code> (or that the
+  generator cannot render) is removed from <code>ast_planner_response.alternatives</code>,
+  so it is neither offered nor listed as an assumption by X1. Merging keeps
+  the first label. The clarifier cuts only <code>alternatives</code>: K2's
+  <code>ASTPlannerResponse.alternatives_offered</code> (every reading the planner
+  gave, before <code>plan.after</code>) stays, so K2's rule that an answer with
+  readings is never cached (D47) holds even when none was left for this
+  caller. Checking an
+  alternative is <code>check(..., audit=False)</code>: a denied reading publishes no
+  <code>policy.decision</code> and logs no denial warning. <code>plan.after</code> on each
+  alternative stays K2's (the planner node); H1's test still allows no
+  other caller.</li>
+<li><strong>The ending.</strong> The clarifier ends the sub-query with
+  <code>NEEDS_CLARIFICATION</code> (<code>INFO</code>) whose <code>details</code> hold <code>phrase</code>,
+  <code>datasource_id</code>, <code>schema_version</code> (the sub-query's), <code>knowledge_digest</code>
+  (the run's pinned <code>Runtime.knowledge.digest(ds)</code>), <code>sub_query</code> and
+  <code>options</code> (<code>id</code>, <code>label</code>, <code>plan</code> as JSON; option <code>a</code> is the default plan
+  after <code>plan.after</code>). <code>wrap_subgraph</code> never counts a sub-query that
+  asked as succeeded and returns no artifact for it; it gives it the
+  status <code>needs_clarification</code>, the question as its one error and its
+  earlier attempts' errors as warnings (as on success), and adds no
+  <code>MISSING_SQL</code>. The layer router ends the run on the code, as on a hook's
+  ending.</li>
+<li><strong>The request</strong> is built in <code>result_from_state(..., question=)</code>, which
+  adds the question as passed (before <code>run.before</code>; the state's when not
+  given), the asker, and each option's <code>explanation =
+  explain_plan(plan, datasource_id=, sub_query_id=, knowledge_used=,
+  knowledge=)</code>, where <code>knowledge</code> is the caller's scope-filtered glossary
+  (K2's <code>caller_knowledge(ctx, state)</code>, which every <code>result_from_state</code>
+  call site passes beside <code>question=</code>). X1 still explains only <code>success</code> steps, so the run's
+  <code>explanation</code> is <code>None</code>. The default reading has no planner label: it is
+  the one glossary term its step reads, else its first measure, filter or
+  table, capped at 60. <code>final_answer</code> is the fixed sentence as
+  <code>{summary, format_type: "text", content, warnings: []}</code>.</li>
+<li><strong>Status.</strong> <code>needs_clarification</code> comes after <code>needs_approval</code> and
+  <code>stopped</code>, before <code>error</code>. The pipeline step list (<code>pipeline/steps.py</code>)
+  and the trace recorder's inputs name the <code>clarifier</code>.</li>
+</ul>
+</div>
 <h3 id="asking-again">Asking again</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-12-1" id="__codelineno-12-1" name="__codelineno-12-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=...</span><span class="p">,</span> <span class="n">choice</span><span class="o">=</span><span class="n">ClarificationChoice</span><span class="p">(</span><span class="n">request</span><span class="o">=</span><span class="n">req</span><span class="p">,</span> <span class="n">option_id</span><span class="o">=</span><span class="s2">"b"</span><span class="p">))</span>
 </code></pre></div>

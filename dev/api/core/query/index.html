@@ -1320,6 +1320,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../architecture/nodes/clarifier_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
         
   
@@ -4425,6 +4453,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clarification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clarification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#warnings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5444,6 +5483,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#clarification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clarification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#warnings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5600,7 +5650,7 @@
 <p>Source:
 <code>packages/nl2sql/src/nl2sql/public_api.py</code>, <code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
 <p>Signature:
-<code>run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None) -&gt; QueryResult</code></p>
+<code>run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -&gt; QueryResult</code></p>
 <p>Every argument after the question is keyword-only. <code>run_query</code> passes the runtime's artifact store to <code>result_from_state</code>, so each
 sub-query carries a capped row sample alongside its artifact reference.</p>
 <p>Parameters:
@@ -5612,7 +5662,8 @@ sub-query carries a capped row sample alongside its artifact reference.</p>
 | <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Omitted (or <code>None</code>), the run starts with an empty <code>UserContext</code>, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
 | <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. The playground cancels it when the browser drops the request. |
 | <code>plan</code> | <code>Optional[SuppliedPlan]</code> | no | A plan the caller holds (<code>from nl2sql import SuppliedPlan</code>: <code>datasource_id</code>, <code>sub_query</code>, <code>plan</code>). See <a href="#running-a-plan-you-hold">Running a plan you hold</a>. A <code>datasource_id</code> passed with it must be the plan's own, or the call raises <code>ValueError</code> before anything runs. |
-| <code>approvals</code> | <code>Optional[Sequence[Approval]]</code> | no | Approvals for an earlier run's <code>approvals_needed</code>. See <a href="#approval">Approval</a>. |</p>
+| <code>approvals</code> | <code>Optional[Sequence[Approval]]</code> | no | Approvals for an earlier run's <code>approvals_needed</code>. See <a href="#approval">Approval</a>. |
+| <code>clarify</code> | <code>bool</code> | no | Default <code>True</code>: a question the planner reads two or three ways ends <code>needs_clarification</code> with the options instead of running the most likely one. <code>False</code> runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See <a href="#clarification">Clarification</a>. |</p>
 <h4 id="running-a-plan-you-hold">Running a plan you hold</h4>
 <p><code>run_query(question, plan=SuppliedPlan(datasource_id=..., sub_query=..., plan=...))</code>
 runs one sub-query's plan without routing or planning: the curated matcher,
@@ -5703,10 +5754,11 @@ No exceptions are raised by <code>run_query</code>; errors are returned in <code
 | <code>source</code> | <code>AnswerSource</code> | no | Where the answer came from: <code>type</code> <code>"verified"</code> with the verified query's <code>id</code>, <code>datasource_id</code> and the <code>params</code> it ran with, or <code>type</code> <code>"generated"</code> with the other fields <code>None</code>. See <a href="../../../configuration/curated/#what-happens-at-question-time">Curated answers</a>. |
 | <code>stop</code> | <code>Optional[RunStop]</code> | no | Set when <code>status</code> is <code>"stopped"</code>: the <code>limit</code> the run reached (<code>max_llm_calls</code> or <code>max_cost_usd</code>), its configured <code>value</code>, and what was <code>spent</code>. |
 | <code>approvals_needed</code> | <code>List[ApprovalRequest]</code> | no | Set when <code>status</code> is <code>"needs_approval"</code>: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an <code>Approval</code> for each. |
-| <code>clarification</code> | <code>Optional[ClarificationRequest]</code> | no | Set when <code>status</code> is <code>"needs_clarification"</code>: the phrase, and two or three readings, each a label, a validated plan and its explanation. Nothing produces it yet (release 0.8, <a href="../../../architecture/wave_b/#7-clarify-instead-of-guess">Wave B</a>). |
+| <code>clarification</code> | <code>Optional[ClarificationRequest]</code> | no | Set when <code>status</code> is <code>"needs_clarification"</code>: the phrase, and two or three readings, each a label, a validated plan and its explanation. See <a href="#clarification">Clarification</a>. |
 | <code>explanation</code> | <code>Optional[Explanation]</code> | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a <code>success</code> or <code>plan_only</code> run's, and the successful steps of a partly failed one); <code>None</code> when no step did, when a hook ended the run, or when it cannot be rendered. See <a href="#explanation">Explanation</a>. |</p>
-<p><code>errors</code> holds only <code>ERROR</code> and <code>CRITICAL</code> entries; <code>WARNING</code>-severity pipeline
-errors are appended to <code>warnings</code> as <code>RunWarning</code>s.</p>
+<p><code>errors</code> holds the <code>ERROR</code> and <code>CRITICAL</code> entries, and the one <code>INFO</code> entry
+<code>NEEDS_CLARIFICATION</code> of a run that asked which reading was meant;
+<code>WARNING</code>-severity pipeline errors are appended to <code>warnings</code> as <code>RunWarning</code>s.</p>
 <p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
 attempts it recovered from are in <code>warnings</code> with <code>detail.recovered</code> true, and
 its warnings with an empty <code>detail</code>, each with its <code>sub_query_id</code>. The run trace and
@@ -5715,17 +5767,62 @@ sub-query that failed without a blocking error of its own (it ended with no SQL
 on warnings alone) adds a <code>MISSING_SQL</code> error, so the run reports <code>"error"</code>.</p>
 <p><code>status</code> is derived: <code>"needs_approval"</code> when a hook asked for approval
 (<code>approvals_needed</code>), <code>"stopped"</code> when the run reached a per-question limit
-(<code>stop</code>), otherwise <code>"error"</code> when any blocking error is present, otherwise
+(<code>stop</code>), <code>"needs_clarification"</code> when the run asked which reading was meant
+(<code>clarification</code>), otherwise <code>"error"</code> when any blocking error is present, otherwise
 <code>"plan_only"</code> when no sub-query produced rows or an artifact (an
 <code>execute=False</code> run), otherwise <code>"success"</code>. A state with no sub-queries and no
-errors leaves it <code>None</code>. <code>"needs_clarification"</code> is reserved for Wave B's
-clarification result: nothing produces it yet. Hooks, approval and the caps
+errors leaves it <code>None</code>. Hooks, approval and the caps
 that produce <code>"needs_approval"</code> and <code>"stopped"</code> arrive with release 0.7 (see
 <a href="../../../architecture/wave_a/">Wave A</a>).</p>
 <p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
 result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
 combined result is listed in <code>result_manifest</code> and read back by the run's
 <code>trace_id</code> with the methods below.</p>
+<h3 id="clarification">Clarification</h3>
+<p>When the planner reads a phrase of the question in more than one way that
+changes the result ("sales": the invoice total or the invoiced amount), it
+names the phrase and gives up to two other readings beside its most likely
+one. The <code>clarifier</code> step, after the logical validator, runs each other
+reading through the validator's own checks with the caller's scope and drops
+any that fail, so an option never names a table the caller cannot read, then
+merges readings that render to the same SQL. When two or three readings
+remain, the question has exactly one sub-query, <code>clarify</code> is on and
+<code>settings.clarify.enabled</code> is on (the default), the run ends before the
+generator: nothing is executed, aggregated or synthesized.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"What were sales last year?"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ana</span><span class="p">)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"needs_clarification"</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">clarification</span><span class="o">.</span><span class="n">options</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">option</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">explanation</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+</code></pre></div>
+<p>The result then has:</p>
+<ul>
+<li><code>status</code> <code>"needs_clarification"</code> and one <code>errors</code> entry,
+  <code>NEEDS_CLARIFICATION</code> (<code>INFO</code>, never retried);</li>
+<li><code>final_answer</code> a fixed sentence: "This question can be read more than one
+  way. Choose one: Sales: total of invoice total; Invoiced amount.";</li>
+<li><code>clarification</code>, a <code>ClarificationRequest</code> (<code>from nl2sql import
+  ClarificationRequest</code>): <code>id</code> (SHA-256 of every other field, 32 hex, so a
+  mixed-up or edited request is recognised), <code>question</code> (as passed, before any
+  <code>run.before</code> hook), <code>asker_user_id</code>, <code>asker_tenant_id</code>, <code>phrase</code>,
+  <code>datasource_id</code>, <code>schema_version</code>, <code>knowledge_digest</code>, <code>sub_query</code> and
+  <code>options</code>;</li>
+<li>each option a <code>ClarificationOption</code>: <code>id</code> (<code>"a"</code> is the most likely
+  reading, then <code>"b"</code>, <code>"c"</code>), <code>label</code>, <code>plan</code> (the plan as JSON) and
+  <code>explanation</code> (an <code>ExplainedStep</code>, as in <a href="#explanation">Explanation</a>). The
+  planner gives no label for its most likely reading, so <code>a</code> is named by the
+  glossary term its plan reads, else its first measure, filter or table;</li>
+<li><code>explanation</code> <code>None</code>, and the sub-query's <code>status</code> <code>"needs_clarification"</code>
+  with no SQL: nothing ran, so the options carry the explanations.</li>
+</ul>
+<p>Otherwise the most likely reading runs, and the readings that passed the
+checks are listed as assumptions in its explanation step ("'sales' was read
+one way; it could also mean Invoiced amount."). That happens with
+<code>clarify=False</code>, with more than one sub-query, when only one reading
+passed, and on a re-plan after an attempt already executed (a sanity check's
+retry), so the answer is never the flagged attempt's rows. <code>clarification.requested</code> (<code>sub_query_id</code>, <code>phrase</code>, <code>options</code>) is
+published on the engine's bus when a run asks; it is an operator event, not
+on the stream. Asking again with the chosen option arrives in L2. Evals run
+with clarification off, so a case measures the most likely reading.</p>
 <h3 id="warnings">Warnings</h3>
 <p><code>QueryResult.warnings</code> is a list of <code>RunWarning</code> (<code>from nl2sql import RunWarning</code>):</p>
 <table>
@@ -5906,21 +6003,21 @@ test run, so a change to the wording is a reviewed diff. Design:
 <code>packages/nl2sql/src/nl2sql/pipeline/events.py</code>, the allow-list in
 <code>packages/nl2sql/src/nl2sql/events/catalog.py</code></p>
 <p>Signature:
-<code>stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None) -&gt; Iterator[Event]</code></p>
+<code>stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -&gt; Iterator[Event]</code></p>
 <p>The same run as <code>run_query</code>, with the same parameters, yielded as it happens:
 the run's own events on the engine's bus (<a href="../../../observability/events/">Events</a>),
 from the caller-safe allow-list. <code>nl2sql run</code> shows its live progress from them.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="s2">"Which genre sells the most tracks?"</span><span class="p">,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>                                 <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])):</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"node.finished"</span><span class="p">:</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'node'</span><span class="p">]</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'seconds'</span><span class="p">]</span><span class="si">}</span><span class="s2"> s"</span><span class="p">)</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"answer.delta"</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"field"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"summary"</span><span class="p">:</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"run.finished"</span><span class="p">:</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"result"</span><span class="p">]</span>   <span class="c1"># run_query's QueryResult, as JSON</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="s2">"Which genre sells the most tracks?"</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                                 <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])):</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"node.finished"</span><span class="p">:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'node'</span><span class="p">]</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'seconds'</span><span class="p">]</span><span class="si">}</span><span class="s2"> s"</span><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"answer.delta"</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"field"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"summary"</span><span class="p">:</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"run.finished"</span><span class="p">:</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"result"</span><span class="p">]</span>   <span class="c1"># run_query's QueryResult, as JSON</span>
 </code></pre></div>
 <p>An <code>Event</code> (<code>nl2sql.Event</code>, from <code>nl2sql_sdk.events</code>) has a <code>name</code>, <code>at</code> (UTC),
 the run's <code>trace_id</code>, its <code>tenant_id</code> and a JSON-ready <code>data</code> dict;
@@ -6059,12 +6156,12 @@ manifest does not list, and an id that is not a plain token (letters, digits,
 the parquet path is rendered from the artifact template, never read from the
 manifest, so no id reaches a file outside the run's folder. Nothing else guards
 a result yet: any caller who knows a <code>trace_id</code> can read it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </code></pre></div>
 <p><code>nl2sql-api</code> serves these as
 <a href="../../rest/query/#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>

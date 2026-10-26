@@ -590,6 +590,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../clarifier_node/">
+<span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../curated_matcher_node/">
 <span class="md-ellipsis">
     
@@ -2596,12 +2608,12 @@ emits a <code>PlanModel</code>, never SQL.</p>
 <p>Upstream:
 - <code>ASTPlannerNode</code></p>
 <p>Downstream:
-- <code>GeneratorNode</code> on success
+- <a href="../clarifier_node/"><code>ClarifierNode</code></a> on success, which goes on to <code>GeneratorNode</code> unless it asks which reading was meant
 - <code>retry_handler</code> on retryable errors</p>
 <p>Trigger conditions:
 - Executed when an AST plan is present.</p>
 <pre class="mermaid"><code>flowchart LR
-    Planner[ASTPlannerNode] --&gt; Validator[LogicalValidatorNode] --&gt; Generator[GeneratorNode]
+    Planner[ASTPlannerNode] --&gt; Validator[LogicalValidatorNode] --&gt; Clarifier[ClarifierNode] --&gt; Generator[GeneratorNode]
     Validator --&gt; RetryHandler[retry_handler]</code></pre>
 <hr/>
 <h2 id="inputs">Inputs</h2>
@@ -2738,6 +2750,16 @@ was validated, not only what failed. The names are fixed and always in this orde
 <p>Implements a LangGraph node callable:</p>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a>def __call__(self, state: SubgraphExecutionState) -&gt; Dict[str, Any]
 </code></pre></div>
+<p>and its checks as a function, which the clarifier runs on each of the
+planner's alternative readings:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>def check(self, plan: PlanModel, state: SubgraphExecutionState, *, audit: bool = True) -&gt; List[PipelineError]
+</code></pre></div>
+<p><code>check</code> checks <code>plan</code> as a plan of <code>state</code>'s sub-query, with its retrieved
+schema and its caller's scope, exactly as the node checks the state's own
+plan (the policy findings first, then the static ones), and leaves the state
+unchanged. An <code>ERROR</code> or <code>CRITICAL</code> finding means the node would not pass it.
+<code>audit=False</code> (the clarifier's) publishes no <code>policy.decision</code> and logs no
+denial warning, since a reading that is only checked reaches no caller.</p>
 <p>Key contracts:</p>
 <ul>
 <li><code>LogicalValidatorResponse</code></li>
