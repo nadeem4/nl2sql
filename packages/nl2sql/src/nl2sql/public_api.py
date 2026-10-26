@@ -274,7 +274,7 @@ class NL2SQL:
                   user_context: Optional["UserContext"] = None,
                   cancellation_token: Optional["CancellationToken"] = None,
                   plan: Optional["SuppliedPlan"] = None,
-                  approvals: Optional[Sequence["Approval"]] = None) -> "QueryResult":
+                  approvals: Optional[Sequence["Approval"]] = None, clarify: bool = True) -> "QueryResult":
         """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
 
         ``datasource_id`` skips routing; ``execute=False`` stops after the SQL
@@ -290,17 +290,25 @@ class NL2SQL:
         re-run the question with the asker's ``user_context`` and an
         :class:`~nl2sql.Approval` per request. The engine checks each one and
         pins the approved plan (``plan_source="approved"``).
+
+        When the question can be read more than one way and two or three
+        readings pass the checks, the run ends with ``status ==
+        "needs_clarification"``: nothing is executed, and
+        ``result.clarification`` holds the options, each a label, a plan and
+        its explanation. ``clarify=False`` runs the most likely reading
+        instead and lists the others as assumptions in ``result.explanation``.
         """
         self._ensure_open()
         return self._queries.run_query(question, datasource_id=datasource_id, execute=execute,
                                        user_context=user_context, cancellation_token=cancellation_token,
-                                       plan=plan, approvals=approvals)
+                                       plan=plan, approvals=approvals, clarify=clarify)
 
     def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                      user_context: Optional["UserContext"] = None,
                      cancellation_token: Optional["CancellationToken"] = None,
                      plan: Optional["SuppliedPlan"] = None,
-                     approvals: Optional[Sequence["Approval"]] = None) -> Iterator["Event"]:
+                     approvals: Optional[Sequence["Approval"]] = None,
+                     clarify: bool = True) -> Iterator["Event"]:
         """
         Run a question as ``run_query`` does, yielding its :class:`~nl2sql.Event`
         values as they are published, from the caller-safe allow-list:
@@ -312,12 +320,12 @@ class NL2SQL:
         (``policy.decision``, ``hook.decision``, ``llm.call``) are never on
         it: subscribe to ``events`` for those. ``event.sse()`` is the event as
         one Server-Sent Event. Closing the iterator early cancels the run.
-        ``plan`` and ``approvals`` are as for :meth:`run_query`.
+        ``plan``, ``approvals`` and ``clarify`` are as for :meth:`run_query`.
         """
         self._ensure_open()
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
                                           user_context=user_context, cancellation_token=cancellation_token,
-                                          plan=plan, approvals=approvals)
+                                          plan=plan, approvals=approvals, clarify=clarify)
 
     def clear_plan_cache(self) -> int:
         """Remove every cached plan from the state store; returns how many there were.

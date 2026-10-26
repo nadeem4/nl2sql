@@ -78,6 +78,7 @@ nav:
       - Node Catalog: architecture/nodes/index.md
       - Answer Synthesizer: architecture/nodes/answer_synthesizer_node.md
       - AST Planner: architecture/nodes/ast_planner_node.md
+      - Clarifier: architecture/nodes/clarifier_node.md
       - Curated Matcher: architecture/nodes/curated_matcher_node.md
       - Datasource Resolver: architecture/nodes/datasource_resolver_node.md
       - Decomposer: architecture/nodes/decomposer_node.md

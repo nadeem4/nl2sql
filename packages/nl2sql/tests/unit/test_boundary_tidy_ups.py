@@ -97,7 +97,6 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # PRs never edit errors.py (docs/architecture/wave_a.md, D35; wave_b.md, D59),
 # each with the PR that raises it. Wave A's are all raised now (S1, E3).
 DECLARED_AHEAD: dict = {
-    "NEEDS_CLARIFICATION": "L1",
     "CLARIFICATION_INVALID": "L2",
     "CLARIFICATION_STALE": "L2",
     "COST_LIMIT_EXCEEDED": "C2",

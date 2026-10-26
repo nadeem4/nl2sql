@@ -86,6 +86,7 @@ def build_scan_payload(
         "pinned_plan": pinned_plan,
         "pinned_source": pinned.source if pinned_plan is not None else None,
         "approvals": list(getattr(state, "approvals", None) or []),
+        "clarify": getattr(state, "clarify", True),
     }
 
 def _as_warning(error: PipelineError, sub_query_id: str) -> RunWarning:
@@ -137,6 +138,12 @@ def wrap_subgraph(
     keeps every attempt's errors. When the sub-query succeeded, those errors
     were superseded by a later attempt, so they reach the run's ``warnings``
     rather than its ``errors``.
+
+    The clarifier may ask which reading was meant only when the run's
+    ``clarify`` (in the scan payload) is on and the sub-query is the run's
+    only one (D47). A
+    sub-query that asked ends with status ``needs_clarification`` and its
+    ``NEEDS_CLARIFICATION`` (INFO) as its error; no SQL is missing.
     """
     # Read with the graph, so the plan is keyed on the planner model this run uses.
     planner = planner_of(ctx)
@@ -162,6 +169,7 @@ def wrap_subgraph(
             pinned_plan=state_dict.get("pinned_plan"),
             pinned_source=state_dict.get("pinned_source"),
             approvals=state_dict.get("approvals") or [],
+            clarify=bool(state_dict.get("clarify", True)) and len(decomposer_response.sub_queries) == 1,
         )
         # Propagate the run config (carrying the cancellation token) into the subgraph.
         result = subgraph.invoke(sub_state.model_dump(), config=config)
@@ -172,16 +180,21 @@ def wrap_subgraph(
         planner_response = returned_state.ast_planner_response
         generator_response = returned_state.generator_response
         sub_reasoning = returned_state.reasoning
-        artifact = executor_response.artifact if executor_response else None
+        errors = list(returned_state.errors)
+        question = [e for e in errors if e.error_code == ErrorCode.NEEDS_CLARIFICATION]
+        asked = bool(question)
+        # A sub-query that asked has no result, whatever an earlier attempt left behind.
+        artifact = executor_response.artifact if executor_response and not asked else None
         artifact_refs: Dict[str, Any] = {sub_query.id: artifact} if artifact else {}
 
         retry_count = returned_state.retry_count
         sql_draft = generator_response.sql_draft if generator_response else None
-        succeeded = bool(sql_draft) and (artifact is not None or not execute)
+        succeeded = bool(sql_draft) and (artifact is not None or not execute) and not asked
         status = "success" if succeeded else "error"
-        errors = list(returned_state.errors)
         blocking = [e for e in errors if e.severity in (ErrorSeverity.ERROR, ErrorSeverity.CRITICAL)]
-        if not succeeded and not blocking:
+        if asked:
+            status = "needs_clarification"
+        elif not succeeded and not blocking:
             errors.append(
                 PipelineError(
                     node=subgraph_name,
@@ -263,8 +276,11 @@ def wrap_subgraph(
             "subgraph_outputs": {subgraph_id: subgraph_output},
             "approvals_needed": [] if succeeded else _approval_requests(
                 ctx, errors, state_dict, sub_query, planner_response, sql_draft),
-            "errors": [] if succeeded else errors,
-            "warnings": [_as_warning(e, sub_query.id) for e in errors] if succeeded else [],
+            # A sub-query that asked has the question as its one error; its earlier attempts' errors are
+            # warnings, as a succeeded one's are.
+            "errors": [] if succeeded else question if asked else errors,
+            "warnings": ([_as_warning(e, sub_query.id) for e in errors if e not in question]
+                         if succeeded or asked else []),
             "reasoning": returned_state.reasoning,
         }
 

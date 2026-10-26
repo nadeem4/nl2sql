@@ -168,9 +168,12 @@ def _ask(run: Any, case: EvalCase, role: str) -> Tuple[QueryResult, Optional[Dic
     # As QueryAPI.run_query does: entered here too, so every log line of the case carries its trace_id.
     with scope.entered():
         try:
-            state = run_with_graph(run, case.question, user_context=user, callbacks=[sent], scope=scope)
+            # Clarification off: a case measures the default reading, with the same prompt (D58).
+            state = run_with_graph(run, case.question, user_context=user, callbacks=[sent], scope=scope,
+                                   clarify=False)
             result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
-                                       sample_rows=_ALL_ROWS, knowledge=caller_knowledge(run, state))
+                                       sample_rows=_ALL_ROWS, knowledge=caller_knowledge(run, state),
+                                       question=case.question)
         except BaseException as exc:
             # A KeyboardInterrupt too: every scope ends with a terminal event.
             scope.fail(f"The run failed: {exc or type(exc).__name__}")

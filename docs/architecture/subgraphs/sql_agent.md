@@ -35,6 +35,7 @@ Triggering parent graph:
 
 Successful completion criteria:
 - Reaches `END` after `executor` and produces `executor_response`.
+- Or reaches `END` after `clarifier`, which asked which reading of the question was meant (`NEEDS_CLARIFICATION`, `INFO`): no SQL is generated or run, and the wrapper reports the sub-query with status `needs_clarification`.
 
 Failure exits:
 - `check_planner` returns `end` when planner output is missing and retries are exhausted or errors are non-retryable.
@@ -54,6 +55,7 @@ Execution order (nominal path):
 - `schema_retriever` — `SchemaRetrieverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py` — retrieve relevant schema tables/columns.
 - `ast_planner` — `ASTPlannerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py` — create SQL AST plan.
 - `logical_validator` — `LogicalValidatorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py` — validate plan correctness and policy constraints.
+- `clarifier` — `ClarifierNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py` — validate the planner's alternative readings and, when two or three remain, end the sub-query by asking which was meant. See [ClarifierNode](../nodes/clarifier_node.md).
 - `generator` — `GeneratorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py` — generate SQL text from AST.
 - `executor` — `ExecutorNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py` — execute SQL and produce artifacts.
 - `retry_handler` — `retry_node()` — `packages/nl2sql/src/nl2sql/pipeline/subgraphs/sql_agent.py` — apply exponential backoff and increment retry count.
@@ -66,7 +68,9 @@ flowchart TD
     ast_planner -->|ok| logical_validator
     ast_planner -->|retry| retry_handler
     ast_planner -->|end| END
-    logical_validator -->|ok| generator
+    logical_validator -->|ok| clarifier
+    clarifier -->|ok| generator
+    clarifier -->|end| END
     logical_validator -->|retry| retry_handler
     logical_validator -->|end| END
     retry_handler --> refiner --> ast_planner
@@ -98,12 +102,13 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
    - `ok` when no blocking errors exist.
    - `retry` when retryable errors exist and retry budget remains.
    - `end` when errors are non-retryable or retries exhausted.
-6. `generator` converts the plan to SQL for the target datasource dialect.
-7. `executor` runs SQL via the datasource adapter and returns artifacts/errors.
+6. `clarifier` passes straight through when the planner gave no alternative readings. Otherwise it runs each alternative through `LogicalValidatorNode.check` (the static checks and the caller's scope), drops those that fail, merges those that render to SQL another option has, and keeps the rest on `ast_planner_response.alternatives`. `check_clarifier` routes `end` when it asked (two or three options, a named phrase, `state.clarify` and `settings.clarify.enabled` on), else `ok`. Every path from the planner to the generator still passes the validator.
+7. `generator` converts the plan to SQL for the target datasource dialect.
+8. `executor` runs SQL via the datasource adapter and returns artifacts/errors.
    `check_execution` routes `retry` when every executor error is a retryable `EXECUTION_FAILED` and retry budget remains, otherwise `end`. It also routes `retry` when the query returned no rows on a filter value the column does not have but a close one exists (`VALUE_NOT_FOUND` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#an-empty-results-filter-values)), and when a `COUNT` counted rows a join repeated (`JOIN_FAN_OUT` `ERROR`, raised once per sub-query; see [ExecutorNode](../nodes/executor_node.md#join-fan-out)). Only a finding of this attempt (its `details.attempt`) routes `retry`.
-8. If routed to retry: `retry_handler` waits with exponential backoff and jitter, then increments `retry_count`.
-9. `refiner` uses LLM feedback to enrich error context, then loops back to `ast_planner`. Both are told about the latest attempt only, as `{node, error_code, message}` (`nl2sql.pipeline.retry_feedback`): never an earlier attempt's errors again, never a stack trace or `details`.
-10. Subgraph terminates at `END`.
+9. If routed to retry: `retry_handler` waits with exponential backoff and jitter, then increments `retry_count`.
+10. `refiner` uses LLM feedback to enrich error context, then loops back to `ast_planner`. Both are told about the latest attempt only, as `{node, error_code, message}` (`nl2sql.pipeline.retry_feedback`): never an earlier attempt's errors again, never a stack trace or `details`.
+11. Subgraph terminates at `END`.
 
 ---
 
@@ -186,9 +191,11 @@ sub-query with a terminal `SQL_GEN_FAILED`.
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/ast_planner/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/validator/node.py`
+  - `packages/nl2sql/src/nl2sql/pipeline/nodes/clarifier/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/generator/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/executor/node.py`
   - `packages/nl2sql/src/nl2sql/pipeline/nodes/refiner/node.py`
 - Tests:
   - `packages/nl2sql/tests/unit/test_sql_agent_subgraph.py`
   - `packages/nl2sql/tests/unit/test_subgraph_resolution.py`
+  - `packages/nl2sql/tests/unit/test_clarifier.py`
