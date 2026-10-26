@@ -2056,6 +2056,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patterns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5231,6 +5242,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cost
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patterns" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5369,12 +5391,70 @@ patterns over <code>datasource.schema.table</code>:</p>
 <td>Role name to its <code>description</code>, <code>allow</code> patterns and <code>deny</code> patterns.</td>
 </tr>
 <tr>
+<td><code>cost</code></td>
+<td>none</td>
+<td>The <a href="#cost">cost rule</a>: a limit on the rows a query is estimated to read. Absent, no estimate is ever asked for. Valid beside <code>allow_all</code>.</td>
+</tr>
+<tr>
 <td><code>check</code></td>
 <td>none</td>
 <td>A <a href="#a-policy-check">policy check</a>: <code>{type: &lt;name&gt;, &lt;its keys&gt;}</code> naming a registered one, or, in Python, a check object. What it grants is intersected with the roles.</td>
 </tr>
 </tbody>
 </table>
+<h2 id="cost">Cost</h2>
+<p>A query that reads a billion rows can be cheap to ask and expensive to run.
+The cost rule asks the database what a query is expected to read, before it
+runs, and acts when that is over a limit.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># policies.yaml</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">cost</span><span class="p">:</span><span class="w">                            </span><span class="c1"># absent: no estimate is ever asked for</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">max_estimated_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5000000</span><span class="w">    </span><span class="c1"># null: no limit</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">over_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">confirm</span><span class="w">            </span><span class="c1"># allow | confirm | refuse</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">unknown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allow</span><span class="w">                 </span><span class="c1"># no estimate: allow | confirm | refuse</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">roles</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">analyst</span><span class="p">:</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sales</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">cost</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> max_estimated_rows</span><span class="p">:</span><span class="w"> </span><span class="nv">1000000</span><span class="p p-Indicator">,</span><span class="nt"> over_limit</span><span class="p">:</span><span class="w"> </span><span class="nv">refuse</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">admin</span><span class="p">:</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Everything</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"*"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nt">cost</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> max_estimated_rows</span><span class="p">:</span><span class="w"> </span><span class="nv">null</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_estimated_rows</code></td>
+<td>The most rows a query may be estimated to <em>read</em>: the rows its scans visit, not the rows it returns, so a <code>LIMIT</code> does not hide a full scan. <code>null</code> is no limit, and no estimate is asked for.</td>
+</tr>
+<tr>
+<td><code>over_limit</code></td>
+<td>What to do over the limit. <code>allow</code> runs it. <code>confirm</code> ends the run <code>needs_approval</code>, as a <a href="../hooks/#decisions">hook's <code>NeedsApproval</code></a>: a person with a role in <code>admin_roles</code> approves, and the same SQL then runs. <code>refuse</code> ends the run with <code>COST_LIMIT_EXCEEDED</code>, which is never retried. Default <code>confirm</code>.</td>
+</tr>
+<tr>
+<td><code>unknown</code></td>
+<td>What to do when there is no estimate: the datasource's adapter does not declare <code>ESTIMATES_COST</code> (SQLite), the estimate failed (SQL Server without the <code>SHOWPLAN</code> permission, say) or it reported no rows. The same three actions. Default <code>allow</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>A role's <code>cost</code> replaces the top-level fields it sets, for that role. A caller
+with several roles gets each field's most permissive value across them: the
+highest <code>max_estimated_rows</code> (<code>null</code>, no limit, wins) and the weakest of
+<code>over_limit</code> and <code>unknown</code> (<code>allow</code> over <code>confirm</code> over <code>refuse</code>). The values
+may come from different roles, as grants add up across roles. A <code>cost</code> on a
+role with no top-level <code>cost</code> starts from no limit.</p>
+<p>It is a built-in hook, <code>policy.cost</code>, that runs first at <code>execute.before</code>
+(see <a href="../hooks/#built-in-hooks">Hooks</a>), so it applies to generated SQL, to
+verified queries and to the check run of a correction alike, and under
+<code>allow_all: true</code>, which opens tables, not cost. One estimate is asked for
+per sub-query. <code>QueryResult.sub_queries[].estimate</code> carries it, and
+<code>cost.estimated</code> is published for each (<a href="../../observability/events/">Events</a>).</p>
 <h2 id="patterns">Patterns</h2>
 <table>
 <thead>
@@ -5461,24 +5541,24 @@ curated matcher, the schema retriever, the logical validator, the executor's
 value check and <code>engine.policies.allows()</code> all ask it, so they cannot
 disagree. A run builds each datasource's scope once and keeps it, so every
 step of the run decides the same way.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">policies</span><span class="o">.</span><span class="n">scope</span><span class="p">(</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]),</span> <span class="s2">"sales"</span><span class="p">)</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">scope</span><span class="o">.</span><span class="n">reaches_datasource</span><span class="p">()</span>          <span class="c1"># True</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">scope</span><span class="o">.</span><span class="n">allows</span><span class="p">(</span><span class="s2">"audit"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">)</span>        <span class="c1"># False</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">scope</span><span class="o">.</span><span class="n">rule_for</span><span class="p">(</span><span class="s2">"audit"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">)</span>      <span class="c1"># "role 'analyst' denies 'sales.audit.*'"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">scope</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">policies</span><span class="o">.</span><span class="n">scope</span><span class="p">(</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]),</span> <span class="s2">"sales"</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">scope</span><span class="o">.</span><span class="n">reaches_datasource</span><span class="p">()</span>          <span class="c1"># True</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">scope</span><span class="o">.</span><span class="n">allows</span><span class="p">(</span><span class="s2">"audit"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">)</span>        <span class="c1"># False</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">scope</span><span class="o">.</span><span class="n">rule_for</span><span class="p">(</span><span class="s2">"audit"</span><span class="p">,</span> <span class="s2">"log"</span><span class="p">)</span>      <span class="c1"># "role 'analyst' denies 'sales.audit.*'"</span>
 </code></pre></div>
 <h2 id="a-policy-check">A policy check</h2>
 <p>When access is decided somewhere else (an IAM service, OPA, Cedar, OpenFGA,
 Unity Catalog), a policy check asks it. A check is a plugin: it gets the
 caller and a datasource id, and returns a <code>Grant</code> of allow and deny patterns,
 written exactly like a role's.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># policies.yaml</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">roles</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">analyst</span><span class="p">:</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sales</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="nt">check</span><span class="p">:</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">corp_iam</span><span class="w">               </span><span class="c1"># a registered policy check</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:IAM_URL}"</span><span class="w">        </span><span class="c1"># the check's own keys</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># policies.yaml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">roles</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">analyst</span><span class="p">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Sales</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">allow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sales</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="nt">check</span><span class="p">:</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">corp_iam</span><span class="w">               </span><span class="c1"># a registered policy check</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:IAM_URL}"</span><span class="w">        </span><span class="c1"># the check's own keys</span>
 </code></pre></div>
 <table>
 <thead>
@@ -5519,43 +5599,43 @@ publish it in the <code>nl2sql.policy_checks</code> entry point group. An unknow
 <code>policies.check</code>. In Python, <code>Policies(..., check=obj)</code> uses a check object
 as given.</p>
 <p>A check that asks an HTTP service:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.policy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Grant</span><span class="p">,</span> <span class="n">UserContext</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">CorpIamConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">url</span><span class="p">:</span> <span class="nb">str</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">timeout_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="k">class</span><span class="w"> </span><span class="nc">CorpIam</span><span class="p">:</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    <span class="n">interface_version</span> <span class="o">=</span> <span class="mi">1</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    <span class="n">config_model</span> <span class="o">=</span> <span class="n">CorpIamConfig</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">CorpIamConfig</span><span class="p">):</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">timeout_s</span><span class="p">)</span>
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    <span class="nd">@classmethod</span>
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">CorpIamConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CorpIam"</span><span class="p">:</span>
-<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">grant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">UserContext</span><span class="p">,</span> <span class="n">datasource_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span><span class="p">:</span>
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>        <span class="c1"># Any error here (a timeout, a 500) denies the datasource for this run.</span>
-<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"/grants"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"user"</span><span class="p">:</span> <span class="n">user</span><span class="o">.</span><span class="n">user_id</span><span class="p">,</span> <span class="s2">"datasource"</span><span class="p">:</span> <span class="n">datasource_id</span><span class="p">})</span>
-<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>        <span class="k">return</span> <span class="n">Grant</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>  <span class="c1"># {"allow": [...], "deny": [...]}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">ConfigDict</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql_sdk.policy</span><span class="w"> </span><span class="kn">import</span> <span class="n">Grant</span><span class="p">,</span> <span class="n">UserContext</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">CorpIamConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="n">model_config</span> <span class="o">=</span> <span class="n">ConfigDict</span><span class="p">(</span><span class="n">extra</span><span class="o">=</span><span class="s2">"forbid"</span><span class="p">)</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">url</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">timeout_s</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="k">class</span><span class="w"> </span><span class="nc">CorpIam</span><span class="p">:</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="n">interface_version</span> <span class="o">=</span> <span class="mi">1</span>
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    <span class="n">config_model</span> <span class="o">=</span> <span class="n">CorpIamConfig</span>
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">CorpIamConfig</span><span class="p">):</span>
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">cfg</span><span class="o">.</span><span class="n">timeout_s</span><span class="p">)</span>
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="nd">@classmethod</span>
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">CorpIamConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"CorpIam"</span><span class="p">:</span>
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">grant</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">UserContext</span><span class="p">,</span> <span class="n">datasource_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span><span class="p">:</span>
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>        <span class="c1"># Any error here (a timeout, a 500) denies the datasource for this run.</span>
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"/grants"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"user"</span><span class="p">:</span> <span class="n">user</span><span class="o">.</span><span class="n">user_id</span><span class="p">,</span> <span class="s2">"datasource"</span><span class="p">:</span> <span class="n">datasource_id</span><span class="p">})</span>
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>        <span class="k">return</span> <span class="n">Grant</span><span class="o">.</span><span class="n">model_validate</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>  <span class="c1"># {"allow": [...], "deny": [...]}</span>
 </code></pre></div>
 <p>Publish it in the package that ships it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">[project.entry-points.</span><span class="s2">"nl2sql.policy_checks"</span><span class="k">]</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">corp_iam</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"corp_nl2sql.iam:CorpIam"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[project.entry-points.</span><span class="s2">"nl2sql.policy_checks"</span><span class="k">]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">corp_iam</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"corp_nl2sql.iam:CorpIam"</span>
 </code></pre></div>
 <h2 id="checking-the-policies">Checking the policies</h2>
 <p><code>nl2sql policy validate</code> checks that every pattern a role names matches a
 configured datasource, against the config <code>--config</code> names:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql.yaml<span class="w"> </span>policy<span class="w"> </span>validate
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>nl2sql.yaml<span class="w"> </span>policy<span class="w"> </span>validate
 </code></pre></div>
 <p>A pattern that matches no configured datasource is <code>MISSING</code>, and the command
 exits 1. From Python, <code>engine.policies.validate()</code> returns the same report;

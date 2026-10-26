@@ -5912,7 +5912,7 @@ rows.</p>
 <p>Only a sub-query that passed validation is explained. A plan the validator
 or a hook refused, and a dropped sub-query, get no step: their tables, and
 their glossary descriptions, would confirm what the refusal withholds. A run a
-hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>) has no
+hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>, <code>COST_LIMIT_EXCEEDED</code>) has no
 explanation, as it has no rows. An explanation never fails a run: one that
 cannot be rendered (a stored plan an older version wrote, say) is <code>None</code>, and
 the error is logged.</p>
@@ -6293,7 +6293,7 @@ and <code>.../{result_id}.csv</code>; the playground serves the same two under <
 <td><code>estimate</code></td>
 <td><code>Optional[Estimate]</code></td>
 <td>no</td>
-<td>The database's estimate of the rows this sub-query reads, when the cost rule asked for one. Not filled yet (release 0.8).</td>
+<td>The database's estimate of the rows this sub-query reads, when the cost rule asked for one. <code>rows</code> is what the query is expected to <em>read</em>; <code>cost</code> is the database's own units, for display. <code>None</code> when the cost rule asked for none: no <code>policies.cost</code> limit applies to the caller, or the run did not reach <code>execute.before</code>. Present too when the rule then refused or asked for approval.</td>
 </tr>
 </tbody>
 </table>

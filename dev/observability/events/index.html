@@ -5432,7 +5432,7 @@ that is not in it cannot be published.</p>
 <tr>
 <td><code>cost.estimated</code></td>
 <td><code>datasource_id</code>, <code>sub_query_id</code>, <code>estimated_rows</code>, <code>cost</code>, <code>limit</code>, <code>decision</code> (<code>allow</code>, <code>confirm</code>, <code>refuse</code>; the audit observer writes <code>confirm</code> and <code>refuse</code>)</td>
-<td>no; not yet published (C2)</td>
+<td>no; published by the <code>policy.cost</code> hook when a cost limit applies, once per sub-query's SQL (an approved re-run asks again)</td>
 </tr>
 </tbody>
 </table>

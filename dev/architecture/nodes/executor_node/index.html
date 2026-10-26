@@ -2675,7 +2675,7 @@
 <li>Validate SQL and datasource ID.</li>
 <li>Check the adapter declares <code>supports_sql</code>; otherwise return <code>INVALID_STATE</code>.</li>
 <li>Build <code>ExecutorRequest</code> with trace/subgraph identifiers and schema version.</li>
-<li>Run <code>execute.before</code>, execute the request, and run <code>execute.after</code> on the result's summary.</li>
+<li>Run <code>execute.before</code> (the <a href="../../../configuration/policies/#cost">cost rule</a>'s built-in <code>policy.cost</code> first, when <code>policies.cost</code> is set), execute the request, and run <code>execute.after</code> on the result's summary. The cost rule's estimate, when it asked for one, is returned as <code>estimate</code> and reaches <code>SubQueryResult.estimate</code>, even when the SQL was then stopped.</li>
 <li>After <code>execute.after</code>, run the answer sanity checks on the result (below),
    unless <code>settings.pipeline.sanity_checks</code> is <code>false</code>; a result a hook stopped
    is never checked.</li>
@@ -2694,8 +2694,10 @@ fails the run. A verified query is not checked: it runs in the
 SQL the <a href="../../../configuration/hooks/">hooks</a> never see: it runs outside
 <code>execute.before</code> and <code>execute.after</code>, and nothing publishes it. So when any
 hook is attached at <code>execute.before</code> (an operator gating the SQL that reaches
-the database), no probe runs: only the all-null check, which reads the saved
-result and sends nothing to the database. <code>settings.pipeline.sanity_checks:
+the database), no probe runs; only the all-null check, which reads the saved
+result and sends nothing to the database. None runs either for a caller the
+<a href="../../../configuration/policies/#cost">cost rule</a> gives a limit, since a probe
+would bypass it; a caller with no limit keeps them. <code>settings.pipeline.sanity_checks:
 false</code> turns every check off. A probe is bounded by the datasource's timeout;
 one that times out is skipped silently.</p>
 <table>

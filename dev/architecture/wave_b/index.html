@@ -5252,6 +5252,52 @@ decision. Every estimate publishes <code>cost.estimated</code> (<code>datasource
 <code>sub_query_id</code>, <code>rows</code>, <code>cost</code>, <code>limit</code>, <code>decision</code>); the audit observer
 keeps the <code>confirm</code> and <code>refuse</code> ones, and Wave A's <code>hook.decision</code> records
 the hook's decision as for any hook.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: the cost rule (C2)</p>
+<p><code>policies.cost</code> and a role's <code>cost</code> are enforced by the built-in
+<code>policy.cost</code> hook (<code>nl2sql/policies/cost.py</code>: <code>CostGuard</code>,
+<code>build_cost_guard</code>, <code>take_record</code>). Where the code on <code>main</code> differed from
+this page, the code won:</p>
+<ul>
+<li><strong>Order.</strong> Need 1 was already met: <code>HookRunner</code> takes the runtime's
+  list, so <code>Runtime._build_hooks</code> puts <code>build_cost_guard(...).binding()</code>
+  first, with <code>approver_roles=policies.admin_roles</code>, only when a <code>cost</code>
+  block exists (at the top or on a role). Without one there is no hook, so
+  <code>execute.before</code> is as configured.</li>
+<li><strong>The rule.</strong> A role's override replaces the fields in its
+  <code>model_fields_set</code>; a caller's roles are <code>user.roles</code>, else
+  <code>default_role</code>, keeping the ones <code>policies.roles</code> knows. Each field takes
+  its most permissive value (<code>null</code> limit wins; <code>allow</code> over <code>confirm</code> over
+  <code>refuse</code>); a caller with no known role gets the top-level rule. A <code>cost</code>
+  on a role with no top-level block starts from <code>CostRule()</code> (no limit),
+  so a caller without that role is never estimated. No limit means no
+  <code>estimate</code> call; a limit with an adapter that does not declare
+  <code>ESTIMATES_COST</code>, an exception or <code>rows: None</code> is <code>unknown</code>, and the
+  exception text goes to the log only.</li>
+<li><strong>The refusal.</strong> <code>Deny</code> from <code>policy.cost</code> is <code>COST_LIMIT_EXCEEDED</code>:
+  <code>HookVerdict.error</code> maps a deny from <code>COST_HOOK</code> (<code>hooks/runner.py</code>) to
+  it, with the same <code>details</code> as <code>HOOK_DENIED</code>. The code joins the run
+  endings in <code>pipeline/routes.py</code>, <code>pipeline/events.py</code> (no manifest),
+  <code>api/query_api.py</code> (no rows) and the MCP caller-facing codes. The message
+  names <code>policies.cost</code> or <code>policies.roles.&lt;role&gt;.cost</code>, whichever set the
+  limit that applied.</li>
+<li><strong>The estimate on the result.</strong> The hook leaves a <code>CostRecord</code> (the
+  estimate, the limit, the decision) in a context variable; the executor
+  and the curated matcher read it with <code>take_record(trace_id,
+  sub_query_id)</code> straight after <code>execute.before</code> and put the estimate on
+  <code>SubgraphExecutionState.estimate</code> / <code>SubgraphOutput.estimate</code>, whether or
+  not the SQL then ran. <code>cost.estimated</code> carries the decision; the trace
+  holds the estimate through the result, not a separate record.</li>
+<li><strong>Probes.</strong> The answer sanity checks run no probe while a configured
+  hook is attached at <code>execute.before</code>, or for a caller the cost rule gives
+  a limit (<code>CostGuard.applies(user)</code>; a probe passes no hook and would
+  bypass the limit). A caller with no limit keeps them.</li>
+<li><strong>Names.</strong> A configured hook named <code>policy.cost</code> is a config error
+  (<code>hooks[&lt;i&gt;]</code>): the name is the built-in's.</li>
+<li><strong>Corrections</strong> reach the rule with no change of their own: the hook is
+  in the runner <code>feedback/corrections.py</code> already calls.</li>
+</ul>
+</div>
 <h2 id="10-learn-from-corrections">10. Learn from corrections</h2>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-17-1" id="__codelineno-17-1" name="__codelineno-17-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">feedback</span><span class="o">.</span><span class="n">correct</span><span class="p">(</span><span class="n">trace_id</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">sql</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">plan</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">question</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">note</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <a href="#__codelineno-17-2" id="__codelineno-17-2" name="__codelineno-17-2"></a>                        <span class="n">user_context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Proposal</span>

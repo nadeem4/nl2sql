@@ -2630,7 +2630,7 @@
 </tr>
 </tbody>
 </table>
-<p>A hook that stops the run (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>)
+<p>A hook that stops the run (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>, or the cost rule's <code>COST_LIMIT_EXCEEDED</code>)
 ends it at the layer router once the layer in flight is done. A sub-query a
 hook dropped (<code>scope="sub_query"</code>) reports <code>status: "dropped"</code> from
 <code>wrap_subgraph()</code>, with its reason as a <code>HOOK_DENIED</code> warning; the router

@@ -2473,6 +2473,13 @@ user who produced it is left to a multi-user deployment.</p>
   hook may only stop the run. Hooks <strong>fail closed</strong>: an exception denies
   with <code>HOOK_FAILED</code> unless that hook is configured <code>on_error: open</code>. See
   <a href="../../configuration/hooks/">Hooks</a>.</li>
+<li><strong>Cost rule</strong> (optional, <code>policies.cost</code>): the built-in <code>policy.cost</code> hook
+  asks the database for the rows a query is estimated to read, before it
+  runs, and allows it, asks a person to approve it or refuses it
+  (<code>COST_LIMIT_EXCEEDED</code>, never retried) when it is over the caller's limit.
+  It applies on every path that runs a question's SQL (generated, verified, a correction's check), under <code>allow_all</code> too, and a failed
+  estimate follows the rule's <code>unknown</code> action (default <code>allow</code>). It limits
+  cost, not access. See <a href="../../configuration/policies/#cost">Policies → Cost</a>.</li>
 <li><strong>Approval</strong> (a hook's <code>NeedsApproval</code>): the engine, not the hook, checks
   an <code>Approval</code> on the re-run: the request unedited, the same question and
   asker, the hash of the SQL generated again, and an approver holding one
