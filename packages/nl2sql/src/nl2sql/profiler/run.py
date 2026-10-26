@@ -92,10 +92,11 @@ def _profile_datasource(ctx: Any, datasource_id: str, scope: Any, snapshot: Sche
                 measured = _probe(adapter, candidate, settings.sample_rows, issues)
                 if measured is not None:
                     sampled, matched = measured
-                    overlap = round(matched / sampled, 4) if sampled else 0.0
-                    if overlap < settings.min_overlap:  # an empty sample is not evidence either
+                    ratio = matched / sampled if sampled else 0.0  # compared unrounded
+                    if ratio < settings.min_overlap:  # an empty sample is not evidence either
+                        _withdraw(ctx, _join_proposal(ctx, datasource_id, snapshot, version, candidate, evidence))
                         continue
-                    evidence.update(sampled=sampled, matched=matched, overlap=overlap)
+                    evidence.update(sampled=sampled, matched=matched, overlap=round(ratio, 4))
         file(_join_proposal(ctx, datasource_id, snapshot, version, candidate, evidence))
 
     for finding in find_roles(snapshot, dialect=dialect, allows=scope.allows, said=said,
@@ -110,6 +111,17 @@ def _profile_datasource(ctx: Any, datasource_id: str, scope: Any, snapshot: Sche
     return ProfileReport(datasource_id=datasource_id, schema_version=version, proposals=counts, probes=probes,
                          skipped_by_budget=skipped, seconds=round(_now() - started, 3), stopped_by=stopped,
                          issues=issues)
+
+
+def _withdraw(ctx: Any, proposal: Proposal) -> None:
+    """Supersede the profiler's own open row for a candidate a probe has now measured as a poor match.
+
+    An earlier run may have proposed it with ``overlap: null`` (a bound stopped the probes). The id hashes the
+    change, not the evidence, so that row would otherwise stay open for a reviewer to accept.
+    """
+    row = ctx.state.get_proposal(proposal.id)
+    if row is not None and row.status == "proposed" and row.origin == "profiler":
+        ctx.state.decide_proposal(row.id, "superseded", by=None)
 
 
 def _evidence(candidate: JoinCandidate) -> Dict[str, Any]:

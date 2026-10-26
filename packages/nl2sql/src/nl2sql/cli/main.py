@@ -192,7 +192,7 @@ def index(
         "--profile",
         help=(
             "After indexing, run `nl2sql profile` on the same datasources and file the joins and column roles "
-            "it finds for review. Needs --as."
+            "it finds for review."
         ),
     )] = False,
     as_: Annotated[Optional[List[str]], typer.Option(
@@ -229,11 +229,12 @@ def index(
     if not profile:
         run_indexing(engine, enrich=enrich, datasource_ids=datasource or None, curated_only=curated_only)
         return
-    from nl2sql.cli.commands.profile import profile_datasources
+    from nl2sql.cli.commands.profile import caller_or_exit, profile_datasources
 
     with engine:
+        who = caller_or_exit(engine, as_, user)  # before the build: a bad --as should not cost an index
         run_indexing(engine, enrich=enrich, datasource_ids=datasource or None)  # exits 1 if a datasource failed
-        profile_datasources(engine, as_, user, datasource)
+        profile_datasources(engine, who, datasource)
 
 
 @index_app.command("prune")

@@ -149,6 +149,34 @@ def test_cardinality_and_strength():
     assert _joins(snapshot)[0].rule == "same_name"  # the exact key-name match comes first
 
 
+def test_a_shared_primary_key_name_is_one_one_to_one_pair():
+    snapshot = _snapshot({"film": {"columns": [("film_id", "INTEGER", True)]},
+                          "film_text": {"columns": [("film_id", "INTEGER", True)]}})
+
+    [candidate] = _joins(snapshot)
+
+    assert _pairs([candidate]) == ["film.film_id->film_text.film_id"]
+    assert candidate.cardinality == "one-to-one"
+
+
+def test_candidates_on_a_wide_schema_take_a_moment_not_a_minute():
+    import time
+
+    tables = {}
+    for i in range(1200):
+        name = f"noun{i:04d}s"
+        tables[name] = {"columns": [(f"noun{i:04d}_id", "INTEGER", True)]
+                        + [(f"col_{j}", "TEXT") for j in range(14)]
+                        + [(f"noun{(i + 1) % 1200:04d}_id", "INTEGER")]}
+    snapshot = _snapshot(tables)
+
+    started = time.monotonic()
+    found = _joins(snapshot)
+
+    assert time.monotonic() - started < 3
+    assert len(found) == 1200
+
+
 # ---------------------------------------------------------------- column roles
 
 def test_derived_roles_are_not_proposed():
@@ -269,6 +297,8 @@ READER = UserContext(user_id="rae", roles=["reader"])
 
 
 def _database(folder: Path) -> None:
+    if (folder / "shop.db").exists():
+        return
     with sqlite3.connect(folder / "shop.db") as connection:
         connection.executescript("""
             CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);
@@ -351,6 +381,19 @@ def test_budget_proposes_the_rest_without_overlap(tmp_path):
         assert report.skipped_by_budget == 2
         unprobed = [p for p in joins.values() if p.evidence["overlap"] is None]
         assert len(unprobed) == 2 and all("sampled" not in p.evidence for p in unprobed)
+
+
+def test_a_probe_that_drops_a_candidate_withdraws_its_earlier_unprobed_proposal(tmp_path):
+    folder = tmp_path
+    with _engine(folder, settings={"profiler": {"max_probes": 1}}) as first:
+        first.knowledge.profile(user_context=ADMIN)
+        assert "tickets.customer_id->customers.customer_id" in _targets(first)
+    with _engine(folder) as engine:  # same state store, default bounds: the probe now measures it
+        engine.knowledge.profile(user_context=ADMIN)
+
+        assert "tickets.customer_id->customers.customer_id" not in _targets(engine)
+        withdrawn = [p for p in engine.proposals.list(user_context=ADMIN, status="superseded")]
+        assert [p.target for p in withdrawn] == ["tickets.customer_id->customers.customer_id"]
 
 
 def test_the_time_budget_stops_probing(tmp_path, monkeypatch):

@@ -808,59 +808,45 @@ scope denies is never probed. Each finished profile publishes
 `profile.finished`.
 
 !!! note "Built: joins and roles (P1)"
-    `engine.knowledge.profile` and `nl2sql profile` run; drafts are P2's
-    (`draft=True` or `max_cost_usd` raises `NotImplementedError` naming P2).
-    Exact names, and where the code differs from this page:
+    `engine.knowledge.profile` and `nl2sql profile` run; behaviour is in
+    [Schema Profiler](../schema/profiler.md). Drafts are P2's (`draft=True` or
+    `max_cost_usd` raises `NotImplementedError` naming P2). What later rows need,
+    and where the code differs from this page:
 
-    - **Modules.** `nl2sql/profiler/joins.py`: `find_candidates(snapshot, *,
-      dialect, allows, known) -> list[JoinCandidate]` (`left`, `left_column`,
-      `right`, `right_column`, `rule` `same_name` or `table_name_key`,
-      `category`, `cardinality`); exact key-name matches sort first.
-      `roles.py`: `find_roles(snapshot, *, dialect, allows, said,
-      enum_max_distinct) -> list[RoleFinding]` (`table`, `column`, `change`,
-      `evidence`). `run.py`: `profile(ctx, datasource_ids, user)`, with `_now()`
-      as the clock the tests replace. The two rule modules are pure functions
-      of a snapshot, so they are tested without an engine. `known` and `said`
-      are keyed by `(TableRef.full_name, lower-case column)`.
-    - **Proposals.** `kind` `join` or `column`, `origin` `profiler`,
-      `created_by` None, `schema_version` the live build's. A join's `target`
-      is `from->to` as the glossary writes the names (`table_label`: the bare
-      table name, or `schema.table` when two schemas share it), its `change`
-      `{from, to, cardinality}`, its `evidence` `{rule, types, category,
-      overlap}` plus `sampled` and `matched` when probed. A column's `change`
-      holds only the fields the glossary does not already set (`role`, `unit`,
-      `grain`, `values`); its `evidence` is `{type}` plus `rule: "name"` or
-      `distinct`. Both pass `tables` themselves (`review.queue.table_names`).
-      `ProfileReport.proposals` counts rows that are open after filing
-      (created, updated or revived); a decided row is not counted.
-    - **Gaps filled.** (1) A failed probe is an issue on the report and its
-      candidate is proposed with `overlap: null`, as a candidate the budget did
-      not reach is; `probes` counts it, `skipped_by_budget` does not. (2) A
-      candidate is skipped when any foreign key joins its two tables, not only
-      when its own column is a foreign key. (3) A key named `id` is matched only
-      by the table-name rule, since every table has one. (4) The `enum` rule
-      skips a column named like a key (`..._id`, `..._key`) that is not a
-      declared one, so an undeclared foreign key is not offered as a code list.
-      (5) A `values` map is proposed only when the snapshot holds every
-      distinct value (its `sample_values` are as many as `distinct_count`); and
-      a `grain` only on the same condition. (6) A datasource not indexed gets a
-      `ProfileReport` with `schema_version` `""` and one issue; a datasource the
-      caller cannot reach gets no report; an unavailable adapter still yields
-      name-and-type candidates with an issue.
-    - **CLI.** `nl2sql profile` is a command (not a group), registered in
-      `cli/main.py` as `profile_command` from `cli/commands/profile.py`, with
-      `--datasource`, `--as` and `--user`; it prints each report, then the open
-      profiler proposals of the datasources it profiled. `nl2sql index
-      --profile --as ROLE` runs `run_indexing`, then the same function
-      (`profile_datasources`) on the `--datasource` set (every datasource when
-      none); it is refused with `--check` or `--curated-only`. P2 adds `--draft`
-      and `--max-cost` to `profile_command`.
-    - **The `realdb` tests** (`tests/realdb/test_profile.py`) were written
-      without a test bed to run them on (Docker is not available where P1 was
-      built); CI's `realdb` workflow is their first run. They assert the
-      invariants (no join between tables a foreign key already joins, no role
-      on a key, `payment.amount` proposed as `money`, under a thousand
-      proposals on `wide`) rather than an exact list of joins.
+    - **Names.** `nl2sql/profiler/joins.py`: `find_candidates(snapshot, *, dialect,
+      allows, known) -> list[JoinCandidate]`; `roles.py`: `find_roles(snapshot, *,
+      dialect, allows, said, enum_max_distinct) -> list[RoleFinding]` (`table`,
+      `column`, `change`, `evidence`); `run.py`: `profile(ctx, datasource_ids, user)`,
+      `_now()` the clock tests replace. `known` and `said` are keyed by
+      `(TableRef.full_name, lower-case column)`.
+    - **Proposals.** Join: target `from->to` in the glossary's names (`table_label`),
+      `change` `{from, to, cardinality}`. Column: target `table.column`, `change`
+      only the fields the glossary does not already set. Both pass `tables` through
+      `review.queue.table_names`, `schema_version` is the live build's.
+    - **Gaps filled.** A failed probe is an issue and its candidate is proposed with
+      `overlap: null`. A candidate is skipped when any foreign key joins its two
+      tables. A key named `id` is matched only by the table-name rule. `enum` skips
+      columns named like a key. `values` and a refined `grain` need every distinct
+      value in the snapshot. Two primary keys of one name are one `one-to-one` pair.
+      A probe that measures an overlap under `min_overlap` supersedes the profiler's
+      own earlier open `overlap: null` row for that join. A datasource not indexed
+      gets a report with `schema_version` `""` and one issue.
+    - **CLI.** `nl2sql profile` is a command, not the group B0 registered:
+      `profile_command` in `cli/commands/profile.py`, registered in `cli/main.py`;
+      `nl2sql index --profile` builds the caller (`caller_or_exit`) before it indexes.
+      P2 adds `--draft` and `--max-cost` to `profile_command`.
+    - **Hazard for P2: roles and drafts collide in the queue.** A role proposal and
+      a drafted description are both `kind: column`, `target: table.column`, and
+      Q1's `propose` supersedes an open row of the same kind, datasource and target.
+      Filed separately, `profile(draft=True)` would supersede the role it filed a
+      moment before, and a later plain `profile` would revive the role and
+      supersede the draft. P2 must merge the role and the description into one
+      `change` per column in a run (and P1's role rows must then be built together
+      with the drafts), or scope superseding by `origin`; Q1 is unchanged here.
+    - **`realdb`.** `tests/realdb/test_profile.py` was written without a test bed
+      (it drops pagila's foreign keys from the stored snapshot, then expects
+      `rental.inventory_id` and `rental.customer_id` joins at overlap 1.0); CI's
+      `realdb` workflow is its first run.
 
 ## 7. Clarify instead of guess
 

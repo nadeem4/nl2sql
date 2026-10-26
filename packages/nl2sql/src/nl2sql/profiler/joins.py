@@ -9,11 +9,14 @@ For each column ``A.c`` that is not part of a foreign key, the profiler looks fo
 
 The overlap probe (step 3) and the budget are in ``run``. A pair with a declared foreign key between its tables
 is never a candidate, nor is one the glossary already has (``known``), nor one on a table ``allows`` refuses.
+Two primary keys of one name (``film.film_id``, ``film_text.film_id``) are one ``one-to-one`` pair, in the order
+of the tables' full names, not two. The keys are indexed by name once, so a wide schema costs one dictionary
+lookup per column.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Callable, FrozenSet, List, Optional, Set, Tuple
+from dataclasses import dataclass, replace
+from typing import Callable, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from nl2sql_sdk.schema import ColumnContract, SchemaSnapshot, TableContract
 
@@ -34,7 +37,7 @@ class JoinCandidate:
     right_column: ColumnContract
     rule: str  # SAME_NAME or TABLE_KEY: the name rule that matched
     category: str  # the type category both columns share
-    cardinality: str  # many-to-one when the key is a primary key, else unknown
+    cardinality: str  # many-to-one when the key is a primary key, one-to-one for two of them, else unknown
 
 
 def squash(name: str) -> str:
@@ -68,49 +71,66 @@ def _key_of(table: TableContract) -> Optional[ColumnContract]:
     return None
 
 
-def _name_rule(column: str, key: str, table_name: str) -> Optional[str]:
-    c, k = squash(column), squash(key)
-    if c == k and k != "id":
-        return SAME_NAME
-    if any(c == form + suffix for form in _forms(table_name) for suffix in KEY_SUFFIXES):
-        return TABLE_KEY
-    return None
-
-
 def find_candidates(snapshot: SchemaSnapshot, *, dialect: Optional[str], allows: Allows,
                     known: Known = frozenset()) -> List[JoinCandidate]:
     """Every name-and-type join candidate between the tables ``allows`` reaches, exact key-name matches first.
 
     The order is otherwise the snapshot's, so a run is repeatable.
     """
+    from nl2sql.aggregation.join_keys import OTHER
     from nl2sql.pipeline.nodes.validator.join_keys import column_category
 
-    from nl2sql.aggregation.join_keys import OTHER
+    categories: Dict[str, str] = {}
+
+    def category(data_type: str) -> str:
+        if data_type not in categories:
+            categories[data_type] = column_category(data_type, dialect)
+        return categories[data_type]
 
     tables = [t for t in snapshot.contract.tables.values() if allows(t.table.schema_name, t.table.table_name)]
-    keys = {t.table.full_name: _key_of(t) for t in tables}
+    # The keys by name: `by_key` for a column named like the key, `by_form` for table name + id or key.
+    by_key: Dict[str, List[Tuple[TableContract, ColumnContract]]] = {}
+    by_form: Dict[str, List[Tuple[TableContract, ColumnContract]]] = {}
+    for table in tables:
+        key = _key_of(table)
+        if key is None:
+            continue
+        if squash(key.name) != "id":
+            by_key.setdefault(squash(key.name), []).append((table, key))
+        for form in _forms(table.table.table_name):
+            for suffix in KEY_SUFFIXES:
+                by_form.setdefault(form + suffix, []).append((table, key))
     linked = {frozenset({t.table.full_name, fk.referred_table.full_name})
               for t in snapshot.contract.tables.values() for fk in t.foreign_keys}
-    found: List[JoinCandidate] = []
+
+    found: Dict[FrozenSet[Tuple[str, str]], JoinCandidate] = {}
     for left in tables:
         in_a_key = {c.lower() for fk in left.foreign_keys for c in fk.constrained_columns}
         for column in left.columns.values():
             if column.name.lower() in in_a_key:
                 continue
-            for right in tables:
-                key = keys[right.table.full_name]
-                if right is left or key is None or frozenset({left.table.full_name, right.table.full_name}) in linked:
+            squashed = squash(column.name)
+            matches = [(SAME_NAME, m) for m in by_key.get(squashed, [])]
+            matches += [(TABLE_KEY, m) for m in by_form.get(squashed, [])]
+            for rule, (right, key) in matches:
+                if right is left or frozenset({left.table.full_name, right.table.full_name}) in linked:
                     continue
-                rule = _name_rule(column.name, key.name, right.table.table_name)
-                if rule is None:
-                    continue
-                category = column_category(column.data_type, dialect)
-                if category == OTHER or category != column_category(key.data_type, dialect):
+                kind = category(column.data_type)
+                if kind == OTHER or kind != category(key.data_type):
                     continue
                 pair = frozenset({(left.table.full_name, column.name.lower()),
                                   (right.table.full_name, key.name.lower())})
                 if pair in known:
                     continue
-                found.append(JoinCandidate(left, column, right, key, rule, category,
-                                           "many-to-one" if key.is_primary_key else "unknown"))
-    return sorted(found, key=lambda c: c.rule != SAME_NAME)  # stable: the exact key-name matches first
+                candidate = JoinCandidate(left, column, right, key, rule, kind,
+                                          "many-to-one" if key.is_primary_key else "unknown")
+                earlier = found.get(pair)
+                if earlier is None:
+                    found[pair] = candidate
+                    continue
+                # The same two columns from both sides (and, for a table-name match, perhaps both rules).
+                both_keys = earlier.left_column.is_primary_key and earlier.right_column.is_primary_key
+                first = min(earlier, candidate, key=lambda c: c.left.table.full_name)
+                found[pair] = replace(first, rule=SAME_NAME if SAME_NAME in (earlier.rule, rule) else first.rule,
+                                      cardinality="one-to-one" if both_keys else first.cardinality)
+    return sorted(found.values(), key=lambda c: c.rule != SAME_NAME)  # stable: exact key-name matches first

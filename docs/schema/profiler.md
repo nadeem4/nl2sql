@@ -68,7 +68,9 @@ a column pair the glossary already joins, is skipped.
    non-null values of the left column and counts how many exist in the key
    column. An overlap under `profiler.min_overlap` (0.9), or an empty sample,
    drops the candidate.
-4. **Cardinality.** `many-to-one` when the key is a primary key, else `unknown`.
+4. **Cardinality.** `many-to-one` when the key is a primary key, else `unknown`. Two
+   primary keys of one name (`film.film_id`, `film_text.film_id`) are one
+   `one-to-one` pair, not two.
 
 A join proposal's `change` is the glossary's join (`from`, `to`, `cardinality`)
 and its `evidence` is the name rule that matched (`same_name` or
@@ -116,6 +118,11 @@ caps the sample, not the read: `DISTINCT` usually reads the whole column first,
 so on a large table the timeout is what bounds a probe. When `max_probes` or
 `time_budget_s` is reached the remaining candidates are proposed with
 `overlap: null` and the report says which bound stopped it.
+
+A probe that measures an overlap under `min_overlap` also supersedes the
+profiler's own earlier open proposal for that join (one filed with
+`overlap: null` when a bound stopped the probes), so a reviewer cannot accept a
+join the profiler has since found wrong.
 
 ## Proposals are idempotent
 

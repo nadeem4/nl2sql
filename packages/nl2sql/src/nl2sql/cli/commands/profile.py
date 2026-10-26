@@ -43,11 +43,19 @@ def print_reports(engine: "NL2SQL", who: "UserContext", reports: List["ProfileRe
                       f"[dim]{escape(str(p.change))}[/dim]", soft_wrap=True)
 
 
-def profile_datasources(engine: "NL2SQL", roles: Optional[List[str]], user: Optional[str],
-                        datasource_ids: Optional[List[str]]) -> None:
-    """Profile as the caller ``roles``/``user`` build and print the result; exit 1 on a bad role or datasource."""
+def caller_or_exit(engine: "NL2SQL", roles: Optional[List[str]], user: Optional[str]) -> "UserContext":
+    """The caller ``--as`` and ``--user`` build; exit 1 (closing the engine) on an unknown role or none."""
     try:
-        who = caller(engine, list(roles or []), user)
+        return caller(engine, list(roles or []), user)
+    except ValueError as error:
+        engine.close()
+        console.print(f"[bold red]Error:[/bold red] {escape(str(error))}", soft_wrap=True)
+        raise typer.Exit(1)
+
+
+def profile_datasources(engine: "NL2SQL", who: "UserContext", datasource_ids: Optional[List[str]]) -> None:
+    """Profile as ``who`` and print the result; exit 1 on an unknown datasource."""
+    try:
         reports = engine.knowledge.profile(datasource_ids or None, user_context=who)
     except ValueError as error:
         console.print(f"[bold red]Error:[/bold red] {escape(str(error))}", soft_wrap=True)
@@ -68,4 +76,4 @@ def profile_command(
     """
     engine = build_engine(ctx, check=False)
     with engine:
-        profile_datasources(engine, as_, user, datasource)
+        profile_datasources(engine, caller_or_exit(engine, as_, user), datasource)

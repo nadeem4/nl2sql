@@ -98,3 +98,14 @@ def test_index_profile_option_combinations_are_refused(project):
                  ["index", "--as", "admin"]):
         result, out = _run(project, *args)
         assert result.exit_code == 2, (args, out)
+
+
+def test_index_profile_checks_the_caller_before_indexing(project, monkeypatch):
+    calls = []
+    monkeypatch.setattr("nl2sql.cli.main.run_indexing", lambda engine, **kwargs: calls.append(kwargs))
+
+    for args in (["index", "--profile"], ["index", "--profile", "--as", "nobody"]):
+        result, out = _run(project, *args)
+        assert result.exit_code == 1, (args, out)
+
+    assert calls == []
