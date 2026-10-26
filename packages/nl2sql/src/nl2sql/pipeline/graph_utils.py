@@ -260,6 +260,7 @@ def wrap_subgraph(
             knowledge_used=returned_state.knowledge_used if plan_source == "llm" else None,
             ambiguous_phrase=planner_response.ambiguous_phrase if planner_response else None,
             alternatives=list(planner_response.alternatives) if planner_response else [],
+            estimate=returned_state.estimate,
         )
 
         if status == "dropped":

@@ -263,7 +263,7 @@ rows.
 Only a sub-query that passed validation is explained. A plan the validator
 or a hook refused, and a dropped sub-query, get no step: their tables, and
 their glossary descriptions, would confirm what the refusal withholds. A run a
-hook ended (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`) has no
+hook ended (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`, `COST_LIMIT_EXCEEDED`) has no
 explanation, as it has no rows. An explanation never fails a run: one that
 cannot be rendered (a stored plan an older version wrote, say) is `None`, and
 the error is logged.
@@ -461,7 +461,7 @@ and `.../{result_id}.csv`; the playground serves the same two under `/api/query/
 | `row_cap` | `Optional[int]` | no | The row limit that bounded this sub-query's SQL (the datasource's `row_limit`, bounded by `RESULT_ROW_LIMIT`), or `None` when the plan's own `LIMIT` was smaller. |
 | `truncated` | `bool` | no | True when the result has `row_cap` rows: it was cut at the limit and may be missing rows. A result of exactly `row_cap` rows may be whole; it is counted as cut. |
 | `knowledge_used` | `Optional[KnowledgeUsed]` | no | The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever (Wave B's K2); `None` when no term or rule matched, and for a plan served from the plan cache, which sent no prompt. |
-| `estimate` | `Optional[Estimate]` | no | The database's estimate of the rows this sub-query reads, when the cost rule asked for one. Not filled yet (release 0.8). |
+| `estimate` | `Optional[Estimate]` | no | The database's estimate of the rows this sub-query reads, when the cost rule asked for one. `rows` is what the query is expected to *read*; `cost` is the database's own units, for display. `None` when the cost rule asked for none: no `policies.cost` limit applies to the caller, or the run did not reach `execute.before`. Present too when the rule then refused or asked for approval. |
 
 ### RowSample
 

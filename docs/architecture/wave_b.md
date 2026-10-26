@@ -1294,6 +1294,47 @@ decision. Every estimate publishes `cost.estimated` (`datasource_id`,
 keeps the `confirm` and `refuse` ones, and Wave A's `hook.decision` records
 the hook's decision as for any hook.
 
+!!! note "Built: the cost rule (C2)"
+    `policies.cost` and a role's `cost` are enforced by the built-in
+    `policy.cost` hook (`nl2sql/policies/cost.py`: `CostGuard`,
+    `build_cost_guard`, `take_record`). Where the code on `main` differed from
+    this page, the code won:
+
+    - **Order.** Need 1 was already met: `HookRunner` takes the runtime's
+      list, so `Runtime._build_hooks` puts `build_cost_guard(...).binding()`
+      first, with `approver_roles=policies.admin_roles`, only when a `cost`
+      block exists (at the top or on a role). Without one there is no hook, so
+      `execute.before` is as configured.
+    - **The rule.** A role's override replaces the fields in its
+      `model_fields_set`; a caller's roles are `user.roles`, else
+      `default_role`, keeping the ones `policies.roles` knows. Each field takes
+      its most permissive value (`null` limit wins; `allow` over `confirm` over
+      `refuse`); a caller with no known role gets the top-level rule. A `cost`
+      on a role with no top-level block starts from `CostRule()` (no limit),
+      so a caller without that role is never estimated. No limit means no
+      `estimate` call; a limit with an adapter that does not declare
+      `ESTIMATES_COST`, an exception or `rows: None` is `unknown`, and the
+      exception text goes to the log only.
+    - **The refusal.** `Deny` from `policy.cost` is `COST_LIMIT_EXCEEDED`:
+      `HookVerdict.error` maps a deny from `COST_HOOK` (`hooks/runner.py`) to
+      it, with the same `details` as `HOOK_DENIED`. The code joins the run
+      endings in `pipeline/routes.py`, `pipeline/events.py` (no manifest),
+      `api/query_api.py` (no rows) and the MCP caller-facing codes. The message
+      names `policies.cost` or `policies.roles.<role>.cost`, whichever set the
+      limit that applied.
+    - **The estimate on the result.** The hook leaves a `CostRecord` (the
+      estimate, the limit, the decision) in a context variable; the executor
+      and the curated matcher read it with `take_record(trace_id,
+      sub_query_id)` straight after `execute.before` and put the estimate on
+      `SubgraphExecutionState.estimate` / `SubgraphOutput.estimate`, whether or
+      not the SQL then ran. `cost.estimated` carries the decision; the trace
+      holds the estimate through the result, not a separate record.
+    - **Probes.** The answer sanity checks run no probe while any hook is
+      attached at `execute.before`; the built-in counts, so an engine with a
+      cost rule runs only the all-null check.
+    - **Corrections** reach the rule with no change of their own: the hook is
+      in the runner `feedback/corrections.py` already calls.
+
 ## 10. Learn from corrections
 
 ```python

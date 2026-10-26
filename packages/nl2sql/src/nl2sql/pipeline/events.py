@@ -38,7 +38,7 @@ from nl2sql.tracing.recorder import sub_query_from
 ANSWER_NODE = "answer_synthesizer"
 ANSWER_FIELDS = ("summary", "content")
 # What a hook ends a run with: a held manifest is then never sent.
-_HOOK_ENDINGS = {"HOOK_DENIED", "HOOK_FAILED", "NEEDS_APPROVAL"}
+_HOOK_ENDINGS = {"HOOK_DENIED", "HOOK_FAILED", "NEEDS_APPROVAL", "COST_LIMIT_EXCEEDED"}
 
 Publish = Callable[[str, Mapping[str, Any]], Any]
 

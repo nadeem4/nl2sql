@@ -41,6 +41,9 @@ if TYPE_CHECKING:
 
 logger = get_logger("hooks")
 
+# The built-in hook of the cost rule (policies/cost.py); its deny is COST_LIMIT_EXCEEDED.
+COST_HOOK = "policy.cost"
+
 _DECISIONS = (Allow, Modify, Deny, NeedsApproval)
 _EVENT_NAMES = {Allow: "allow", Modify: "modify", Deny: "deny", NeedsApproval: "needs_approval"}
 
@@ -90,6 +93,8 @@ class HookVerdict:
     def error(self, node: str) -> PipelineError:
         """The run's error for a stopped point: ``HOOK_DENIED``, ``HOOK_FAILED`` or ``NEEDS_APPROVAL``.
 
+        The cost rule's own deny (the built-in ``policy.cost``) is ``COST_LIMIT_EXCEEDED``.
+
         Never retried (``CRITICAL``). ``details`` name the hook and the point,
         and a deny's scope. A hook error names only the hook and the point: the
         exception text may hold an internal URL or a token, so it goes to the
@@ -103,7 +108,8 @@ class HookVerdict:
                                                        f"{self.decision.reason}")
             details["reason"] = self.decision.reason
         else:
-            code, message = ErrorCode.HOOK_DENIED, self.decision.reason
+            code = ErrorCode.COST_LIMIT_EXCEEDED if self.hook == COST_HOOK else ErrorCode.HOOK_DENIED
+            message = self.decision.reason
             details["scope"] = self.decision.scope
         return PipelineError(node=node, message=message, severity=ErrorSeverity.CRITICAL, error_code=code,
                              details=details)

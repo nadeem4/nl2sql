@@ -133,7 +133,7 @@ The engine's `HookRunner` (`ctx.hooks`, built by the runtime from the
 | `execute.before`, `execute.after` | `ExecutorNode`, and `CuratedMatcherNode` for a verified query |
 | `answer.after` | `AnswerSynthesizerNode`, once the answer is written |
 
-A hook that stops the run (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`)
+A hook that stops the run (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`, or the cost rule's `COST_LIMIT_EXCEEDED`)
 ends it at the layer router once the layer in flight is done. A sub-query a
 hook dropped (`scope="sub_query"`) reports `status: "dropped"` from
 `wrap_subgraph()`, with its reason as a `HOOK_DENIED` warning; the router

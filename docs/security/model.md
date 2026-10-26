@@ -113,6 +113,13 @@ user who produced it is left to a multi-user deployment.
   hook may only stop the run. Hooks **fail closed**: an exception denies
   with `HOOK_FAILED` unless that hook is configured `on_error: open`. See
   [Hooks](../configuration/hooks.md).
+- **Cost rule** (optional, `policies.cost`): the built-in `policy.cost` hook
+  asks the database for the rows a query is estimated to read, before it
+  runs, and allows it, asks a person to approve it or refuses it
+  (`COST_LIMIT_EXCEEDED`, never retried) when it is over the caller's limit.
+  It applies on every path that runs SQL, under `allow_all` too, and a failed
+  estimate follows the rule's `unknown` action (default `allow`). It limits
+  cost, not access. See [Policies → Cost](../configuration/policies.md#cost).
 - **Approval** (a hook's `NeedsApproval`): the engine, not the hook, checks
   an `Approval` on the re-run: the request unedited, the same question and
   asker, the hash of the SQL generated again, and an approver holding one

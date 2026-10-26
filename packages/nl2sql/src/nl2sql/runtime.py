@@ -185,12 +185,15 @@ class Runtime:
     def _build_hooks(self, config: Config, problem):
         """The engine's ``HookRunner``: the ``hooks`` section's hooks, in config order.
 
-        The runner takes the list as given, so a built-in hook (Wave B's
-        ``policy.cost``) goes first here, ahead of the configured ones.
+        The runner takes the list as given, so the built-in ``policy.cost`` (when
+        ``policies.cost`` is set, at the top or on a role) goes first here, ahead of
+        the configured ones.
         """
         from nl2sql.hooks import HookRunner, build_hook
+        from nl2sql.policies.cost import build_cost_guard
 
-        bindings = []
+        guard = build_cost_guard(config.policies, self.ds_registry)
+        bindings = [guard.binding()] if guard is not None else []
         for i, entry in enumerate(config.hooks):
             try:
                 bindings.append(build_hook(entry, registry=self.registry, secrets=self.secret_manager))

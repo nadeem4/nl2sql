@@ -7,6 +7,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.hooks import hooks_of
 from nl2sql.policies import UserContext
+from nl2sql.policies.cost import take_record
 from nl2sql.policies.scope import default_schema
 from nl2sql.runtime import Runtime
 from nl2sql.execution.contracts import ExecutorRequest
@@ -150,8 +151,11 @@ class ExecutorNode:
             # execute.before: after the validator, a hook may only stop the SQL.
             fields = self._hook_fields(state, ds_id, sql)
             verdict = self.hooks.call("execute.before", **fields)
+            # What the cost rule estimated (C2) goes on the result, whether or not the SQL then runs.
+            record = take_record(state.trace_id, state.sub_query.id)
+            estimate = {"estimate": record.estimate} if record is not None and record.estimate is not None else {}
             if not verdict.allowed:
-                return {"executor_response": None, "errors": [verdict.error(self.node_name)]}
+                return {"executor_response": None, "errors": [verdict.error(self.node_name)], **estimate}
             response = executor.execute(request)
             if not response.errors and response.artifact is not None:
                 generator_response = getattr(state, "generator_response", None)
@@ -161,13 +165,14 @@ class ExecutorNode:
                                         truncated=bool(row_cap and response.artifact.row_count >= row_cap))
                 verdict = self.hooks.call("execute.after", **fields, result=summary)
                 if not verdict.allowed:
-                    return {"executor_response": None, "errors": [verdict.error(self.node_name)]}
+                    return {"executor_response": None, "errors": [verdict.error(self.node_name)], **estimate}
             # After execute.after: a result a hook stopped is never checked.
             sanity_errors = self._sanity(state, ds_id, response)
             return {
                 "executor_response": response,
                 "errors": response.errors + sanity_errors,
                 "reasoning": response.reasoning,
+                **estimate,
             }
         except Exception as exc:
             logger.error(f"Node {self.node_name} failed: {exc}")

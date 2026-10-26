@@ -80,7 +80,7 @@ Side effects:
 1. Validate SQL and datasource ID.
 2. Check the adapter declares `supports_sql`; otherwise return `INVALID_STATE`.
 3. Build `ExecutorRequest` with trace/subgraph identifiers and schema version.
-4. Run `execute.before`, execute the request, and run `execute.after` on the result's summary.
+4. Run `execute.before` (the [cost rule](../../configuration/policies.md#cost)'s built-in `policy.cost` first, when `policies.cost` is set), execute the request, and run `execute.after` on the result's summary. The cost rule's estimate, when it asked for one, is returned as `estimate` and reaches `SubQueryResult.estimate`, even when the SQL was then stopped.
 5. After `execute.after`, run the answer sanity checks on the result (below),
    unless `settings.pipeline.sanity_checks` is `false`; a result a hook stopped
    is never checked.
@@ -101,7 +101,7 @@ fails the run. A verified query is not checked: it runs in the
 SQL the [hooks](../../configuration/hooks.md) never see: it runs outside
 `execute.before` and `execute.after`, and nothing publishes it. So when any
 hook is attached at `execute.before` (an operator gating the SQL that reaches
-the database), no probe runs: only the all-null check, which reads the saved
+the database, or the built-in `policy.cost` once `policies.cost` is set), no probe runs: only the all-null check, which reads the saved
 result and sends nothing to the database. `settings.pipeline.sanity_checks:
 false` turns every check off. A probe is bounded by the datasource's timeout;
 one that times out is skipped silently.
