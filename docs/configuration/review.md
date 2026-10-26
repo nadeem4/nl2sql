@@ -4,9 +4,9 @@ Every change the engine suggests to a person's knowledge or curated answers is
 a *proposal* in one queue, kept in the state store (`storage.state`). A
 thumbs-up on a generated answer files a proposed verified query, and so does a
 checked [correction](../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct)
-(`engine.feedback.correct`, origin `correction`); later 0.8 work files the
-profiler's join candidates and column roles, drafted descriptions and saved
-clarifications the same way. Nothing in
+(`engine.feedback.correct`, origin `correction`); the [schema profiler](../schema/profiler.md) files its join candidates and
+column roles the same way (`nl2sql profile`), and later 0.8 work files drafted
+descriptions and saved clarifications. Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.
 

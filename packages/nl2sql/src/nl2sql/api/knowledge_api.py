@@ -162,9 +162,25 @@ class KnowledgeAPI:
     def profile(self, datasource_ids: Optional[Sequence[str]] = None, *, user_context: "UserContext",
                 draft: bool = False, max_cost_usd: Optional[float] = None) -> List["ProfileReport"]:
         """Profile each datasource's live snapshot, probing only the tables the caller reaches, and file what
-        it finds as proposals. ``draft=True`` also asks the ``profiler`` model for descriptions under
-        ``max_cost_usd`` (default ``settings.profiler.max_cost_usd``) (P1; drafts, P2)."""
-        raise _not_built("P1")
+        it finds as proposals (``origin: profiler``): joins the database does not declare (by name, type and a
+        bounded value-overlap probe) and heuristic column roles. Nothing is written but the review queue (D38).
+
+        One report per datasource the caller reaches. A datasource that is not indexed yet is reported with an
+        issue and skipped: the profiler reads the live build's snapshot and never reflects on its own. The
+        bounds are ``settings.profiler`` (``max_probes``, ``time_budget_s``, ...); each finished profile
+        publishes ``profile.finished``. ``draft=True`` (descriptions drafted by the ``profiler`` model under
+        ``max_cost_usd``) is P2's.
+
+        Raises:
+            TypeError: ``user_context`` is not a ``UserContext``.
+            ValueError: a datasource is not configured.
+        """
+        from nl2sql.profiler.run import profile
+
+        caller = _caller(user_context)
+        if draft or max_cost_usd is not None:
+            raise _not_built("P2")
+        return profile(self._ctx, self._ids(datasource_ids), caller)
 
     def save_choice(self, choice: "ClarificationChoice", *, user_context: "UserContext",
                     term: Optional[str] = None) -> "Proposal":

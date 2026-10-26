@@ -807,6 +807,61 @@ or `time_budget_s` is reached, the remaining candidates are proposed with
 scope denies is never probed. Each finished profile publishes
 `profile.finished`.
 
+!!! note "Built: joins and roles (P1)"
+    `engine.knowledge.profile` and `nl2sql profile` run; drafts are P2's
+    (`draft=True` or `max_cost_usd` raises `NotImplementedError` naming P2).
+    Exact names, and where the code differs from this page:
+
+    - **Modules.** `nl2sql/profiler/joins.py`: `find_candidates(snapshot, *,
+      dialect, allows, known) -> list[JoinCandidate]` (`left`, `left_column`,
+      `right`, `right_column`, `rule` `same_name` or `table_name_key`,
+      `category`, `cardinality`); exact key-name matches sort first.
+      `roles.py`: `find_roles(snapshot, *, dialect, allows, said,
+      enum_max_distinct) -> list[RoleFinding]` (`table`, `column`, `change`,
+      `evidence`). `run.py`: `profile(ctx, datasource_ids, user)`, with `_now()`
+      as the clock the tests replace. The two rule modules are pure functions
+      of a snapshot, so they are tested without an engine. `known` and `said`
+      are keyed by `(TableRef.full_name, lower-case column)`.
+    - **Proposals.** `kind` `join` or `column`, `origin` `profiler`,
+      `created_by` None, `schema_version` the live build's. A join's `target`
+      is `from->to` as the glossary writes the names (`table_label`: the bare
+      table name, or `schema.table` when two schemas share it), its `change`
+      `{from, to, cardinality}`, its `evidence` `{rule, types, category,
+      overlap}` plus `sampled` and `matched` when probed. A column's `change`
+      holds only the fields the glossary does not already set (`role`, `unit`,
+      `grain`, `values`); its `evidence` is `{type}` plus `rule: "name"` or
+      `distinct`. Both pass `tables` themselves (`review.queue.table_names`).
+      `ProfileReport.proposals` counts rows that are open after filing
+      (created, updated or revived); a decided row is not counted.
+    - **Gaps filled.** (1) A failed probe is an issue on the report and its
+      candidate is proposed with `overlap: null`, as a candidate the budget did
+      not reach is; `probes` counts it, `skipped_by_budget` does not. (2) A
+      candidate is skipped when any foreign key joins its two tables, not only
+      when its own column is a foreign key. (3) A key named `id` is matched only
+      by the table-name rule, since every table has one. (4) The `enum` rule
+      skips a column named like a key (`..._id`, `..._key`) that is not a
+      declared one, so an undeclared foreign key is not offered as a code list.
+      (5) A `values` map is proposed only when the snapshot holds every
+      distinct value (its `sample_values` are as many as `distinct_count`); and
+      a `grain` only on the same condition. (6) A datasource not indexed gets a
+      `ProfileReport` with `schema_version` `""` and one issue; a datasource the
+      caller cannot reach gets no report; an unavailable adapter still yields
+      name-and-type candidates with an issue.
+    - **CLI.** `nl2sql profile` is a command (not a group), registered in
+      `cli/main.py` as `profile_command` from `cli/commands/profile.py`, with
+      `--datasource`, `--as` and `--user`; it prints each report, then the open
+      profiler proposals of the datasources it profiled. `nl2sql index
+      --profile --as ROLE` runs `run_indexing`, then the same function
+      (`profile_datasources`) on the `--datasource` set (every datasource when
+      none); it is refused with `--check` or `--curated-only`. P2 adds `--draft`
+      and `--max-cost` to `profile_command`.
+    - **The `realdb` tests** (`tests/realdb/test_profile.py`) were written
+      without a test bed to run them on (Docker is not available where P1 was
+      built); CI's `realdb` workflow is their first run. They assert the
+      invariants (no join between tables a foreign key already joins, no role
+      on a key, `payment.amount` proposed as `money`, under a thousand
+      proposals on `wide`) rather than an exact list of joins.
+
 ## 7. Clarify instead of guess
 
 ### When it asks

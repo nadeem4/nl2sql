@@ -77,6 +77,22 @@ connects, or is reported and left out. A datasource with `required: true` that
 cannot connect stops the command. `nl2sql doctor` prints the same report
 without running anything.
 
+## Set up what the engine knows: connect, index, profile, review
+
+After the first index, let the engine suggest what it cannot read from the
+schema, and decide what to keep:
+
+```bash
+nl2sql index                              # connect and index (--profile --as admin also profiles)
+nl2sql profile --as admin                 # joins the database does not declare, column roles
+nl2sql review list --as admin             # what the profiler found, with its evidence
+nl2sql review accept --all --kind column --as admin   # writes glossary.yaml once
+```
+
+The profiler is deterministic and bounded ([Schema Profiler](../schema/profiler.md));
+nothing it proposes reaches a prompt or the index until an admin accepts it
+([Review Queue](../configuration/review.md)).
+
 From Python, `nl2sql.config.init_project(folder, demo=..., provider=..., force=...)`
 writes the same files, and `nl2sql.config.demo_config()` builds the demo's
 `Config` in code, with the databases opened read-only from the installed
