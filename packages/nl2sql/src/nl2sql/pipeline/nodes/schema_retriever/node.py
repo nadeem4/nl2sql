@@ -222,7 +222,8 @@ class SchemaRetrieverNode:
         terms = match_terms(shown.terms, [sub_query.intent, state.user_query],
                             sources={t.term: sources.get(f"terms.{t.term}", "knowledge") for t in shown.terms},
                             top_k=self.knowledge_settings.top_k,
-                            similar=(self._similar_terms(sub_query.intent or state.user_query, sub_query.datasource_id)
+                            similar=(self._similar_terms(sub_query.intent or state.user_query, sub_query.datasource_id,
+                                                          [t.term for t in shown.terms])
                                      if shown.terms else None),
                             floor=self.knowledge_settings.match_floor)
         rules = rules_for(shown.rules, {t.name for t in tables}, snapshot,
@@ -233,18 +234,17 @@ class SchemaRetrieverNode:
         return KnowledgeUsed(datasource_id=sub_query.datasource_id, digest=knowledge.digest, terms=terms,
                              rules=rules, dropped=dropped)
 
-    def _similar_terms(self, text: str, datasource_id: str) -> Dict[str, float]:
+    def _similar_terms(self, text: str, datasource_id: str, terms: List[str]) -> Dict[str, float]:
         """Each term's ``knowledge.term`` entry similarity to ``text``, from the index; nothing when it cannot be asked.
 
-        The best ``top_k`` entries are read. Which terms may match is decided
-        by the caller's scope, not here: ``match_terms`` is given only the
-        terms the caller may see. A search that fails leaves the lexical match.
+        Only the ``terms`` the caller may see are searched (the best ``top_k``
+        of them), and ``match_terms`` is given only those too. A search that fails leaves the lexical match.
         """
         search = getattr(self.vector_store, "retrieve_term_candidates", None)
         if search is None or not text:
             return {}
         try:
-            return {c.term: c.score for c in search(text, datasource_id, self.knowledge_settings.top_k)}
+            return {c.term: c.score for c in search(text, datasource_id, self.knowledge_settings.top_k, terms=terms)}
         except Exception as exc:
             logger.warning(f"The term search failed; terms match by name only: {exc}")
             return {}

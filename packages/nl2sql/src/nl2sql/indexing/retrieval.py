@@ -548,18 +548,23 @@ class Retriever:
             })
         return ranked
 
-    def retrieve_term_candidates(self, query: str, datasource_id: str, k: int) -> List[TermCandidate]:
+    def retrieve_term_candidates(self, query: str, datasource_id: str, k: int,
+                                 terms: Optional[Sequence[str]] = None) -> List[TermCandidate]:
         """The glossary terms of ``datasource_id`` whose entries are most like ``query``, best first.
 
         A plain similarity search over the live build's ``knowledge.term``
         entries. The caller keeps only the terms its scope shows and the
-        ones at or above ``settings.knowledge.match_floor``. When the
+        ones at or above ``settings.knowledge.match_floor``. ``terms`` limits the
+        search to those term names (the ones the caller's scope shows), so a
+        visible term is never crowded out of the ``k`` by hidden ones. When the
         datasource has no term entry, nothing is embedded.
         """
         from nl2sql.common.resilience import VECTOR_BREAKER
 
+        if terms is not None and not terms:
+            return []
         where = Filter(eq={"type": TERM_TYPE, "datasource_id": datasource_id},
-                       **{"in": self._live([datasource_id])})
+                       **{"in": {**self._live([datasource_id]), **({"term": list(terms)} if terms is not None else {})}})
         available = len(self.index.get(self.namespace, where))
         if available == 0:
             return []

@@ -218,15 +218,17 @@ def test_terms_are_matched_by_similarity_through_the_index():
 
     asked = []
 
-    def term_search(query, datasource_id, k):
-        asked.append((query, datasource_id, k))
+    def term_search(query, datasource_id, k, terms=None):
+        asked.append((query, datasource_id, k, terms))
         return [TermCandidate(datasource_id="shop", term="revenue", score=0.8),
                 TermCandidate(datasource_id="shop", term="churn", score=0.5)]
 
     out = retrieve("income last year", term_search=term_search)
 
     assert [(t.term, t.score) for t in out["knowledge_used"].terms] == [("revenue", 0.8)]
-    assert asked == [("income last year", "shop", 8)]
+    # Only the terms the caller sees are searched.
+    assert len(asked) == 1 and asked[0][:3] == ("income last year", "shop", 8)
+    assert sorted(asked[0][3]) == ["churn", "invoiced total", "revenue"]
 
 
 def test_similarity_never_brings_in_a_term_the_caller_may_not_see():
@@ -236,13 +238,13 @@ def test_similarity_never_brings_in_a_term_the_caller_may_not_see():
         {"term": "payroll", "definition": "What we pay people.", "tables": ["salaries"]}]}}}
 
     out = retrieve("what do we spend on people", knowledge=knowledge_of(data),
-                   term_search=lambda *_: [TermCandidate(datasource_id="shop", term="payroll", score=0.95)])
+                   term_search=lambda *_, **__: [TermCandidate(datasource_id="shop", term="payroll", score=0.95)])
 
     assert out.get("knowledge_used") is None
 
 
 def test_a_failing_term_search_leaves_the_lexical_match():
-    def broken(*_):
+    def broken(*_, **__):
         raise RuntimeError("the vector store is down")
 
     out = retrieve("revenue by month", term_search=broken)

@@ -1953,7 +1953,7 @@ holds.
       `sample_questions` for `build_example_chunks`. A name that does not
       resolve is left out of the entries, as `show` reports it.
     - **Term similarity.** `Retriever.retrieve_term_candidates(query,
-      datasource_id, k) -> list[TermCandidate]` (`TERM_TYPE` in
+      datasource_id, k, terms=None) -> list[TermCandidate]` (`TERM_TYPE` in
       `indexing/retrieval.py`; `TermCandidate(datasource_id, term, score)` in
       `indexing/models.py`) is a plain similarity search over the live build, and
       embeds nothing when the datasource has no term entry. `match_terms(terms,
@@ -1961,7 +1961,8 @@ holds.
       similarity reaches `floor` (`settings.knowledge.match_floor`), scoring that
       similarity; a lexical match keeps its 1.0 or 0.9. The schema retriever
       (`_similar_terms`) asks the search with the sub-query's intent only when the
-      caller sees a term, passes only the terms its scope shows to `match_terms`,
+      caller sees a term, restricts it to the term names the caller's scope shows
+      (`terms=`, so hidden terms cannot crowd a visible one out of the top `k`),
       and keeps the lexical match when the search fails or the store has no such
       method.
     - **Refresh.** `IndexingOrchestrator(ctx)` (no `enrich`) has `refresh(datasource_id)`
@@ -1970,9 +1971,7 @@ holds.
       `nl2sql index --datasource`), the current curated section and the current
       knowledge, keeps the stored entry whose `id`, text and metadata are
       unchanged, embeds the rest, and commits with `curated_hash` and
-      `knowledge_hash`. The code on main differs from the design in one respect:
-      the schema entries are rendered again too (they carry the glossary), not
-      copied. `rebuild_index(ctx, datasource_ids=None, on_progress=None,
+      `knowledge_hash`. `rebuild_index(ctx, datasource_ids=None, on_progress=None,
       on_datasource=None, refresh=False)`; `IndexAPI.build(datasource_ids=None, *,
       on_progress, on_datasource)` and `IndexAPI.refresh(datasource_ids=None, *,
       on_progress, on_datasource)` (both return a `RebuildResult`);

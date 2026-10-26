@@ -42,6 +42,8 @@ from nl2sql_sdk.schema import (
 )
 from nl2sql_sdk.stores import Filter
 
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
 VOCAB = ["revenue", "sales", "turnover", "customer", "order", "invoice", "total", "country", "money", "region",
          "many", "orders"]
 
@@ -203,6 +205,10 @@ def test_terms_are_indexed_and_matched_by_similarity(tmp_path):
     found = retriever.retrieve_term_candidates("total sales", "shop", k=8)
     assert [(c.term, c.datasource_id) for c in found] == [("revenue", "shop")]
     assert found[0].score >= 0.6
+    # Only the named terms are searched, so a visible term is never crowded out by hidden ones.
+    assert [c.term for c in retriever.retrieve_term_candidates("total sales", "shop", k=1, terms=["churn"])] == []
+    assert [c.term for c in retriever.retrieve_term_candidates("total sales", "shop", k=1, terms=["revenue"])] == [
+        "revenue"]
     # Another datasource's terms are not candidates, and nothing is embedded when there are none.
     assert retriever.retrieve_term_candidates("sales", "music", k=8) == []
 
@@ -410,8 +416,9 @@ def test_the_cli_has_refresh_and_not_enrich_or_curated_only():
     from nl2sql.cli import main
 
     result = CliRunner().invoke(main.app, ["index", "--help"])
-    assert "--refresh" in result.output
-    assert "--enrich" not in result.output and "--curated-only" not in result.output
+    output = ANSI.sub("", result.output)  # Rich colours --help on CI
+    assert "--refresh" in output
+    assert "--enrich" not in output and "--curated-only" not in output
     for option in ("--enrich", "--curated-only"):
         assert CliRunner().invoke(main.app, ["index", option]).exit_code == 2
 

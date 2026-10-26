@@ -109,7 +109,8 @@ example questions. Names that do not resolve against the snapshot are left out,
 as `engine.knowledge.show` reports them.
 
 A term is also matched by similarity: `Retriever.retrieve_term_candidates(query,
-datasource_id, k)` returns the term entries nearest the sub-query's intent, and
+datasource_id, k, terms=None)` returns the term entries nearest the sub-query's intent
+(only the named `terms` when given: the ones the caller's scope shows), and
 the schema retriever keeps the ones at or above `settings.knowledge.match_floor`
 (0.6) whose term the caller's scope shows, beside the terms whose name or
 synonym appears in the text. The search is a plain similarity search over the
