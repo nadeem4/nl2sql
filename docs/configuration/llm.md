@@ -308,7 +308,7 @@ seeding each have an agent. An agent not under `agents` runs on the top level:
 | `ast_planner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |
 | `answer_synthesizer` | writes the final answer from the rows |
-| `profiler` | drafts table and column descriptions as proposals for review, never written into the index or the schema (optional; `nl2sql index` calls no model) |
+| `profiler` | drafts table and column descriptions as proposals for review, never written into the index or the schema (optional; `nl2sql index` calls no model; only `nl2sql profile --draft` or `profile(draft=True)` runs it, under `profiler.max_cost_usd`, and its model must have a price in `llm.prices`) |
 | `eval_seeder` | drafts eval questions with typed plans during `nl2sql eval seed` ([Benchmark your own database](../evals/seeding.md)) |
 
 Any other key is an error with "did you mean". An agent takes every field it

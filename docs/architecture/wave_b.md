@@ -814,9 +814,8 @@ scope denies is never probed. Each finished profile publishes
 
 !!! note "Built: joins and roles (P1)"
     `engine.knowledge.profile` and `nl2sql profile` run; behaviour is in
-    [Schema Profiler](../schema/profiler.md). Drafts are P2's (`draft=True` or
-    `max_cost_usd` raises `NotImplementedError` naming P2). What later rows need,
-    and where the code differs from this page:
+    [Schema Profiler](../schema/profiler.md). Drafts are P2's (see its note below).
+    What later rows need, and where the code differs from this page:
 
     - **Names.** `nl2sql/profiler/joins.py`: `find_candidates(snapshot, *, dialect,
       allows, known) -> list[JoinCandidate]`; `roles.py`: `find_roles(snapshot, *,
@@ -843,15 +842,55 @@ scope denies is never probed. Each finished profile publishes
     - **Hazard for P2: roles and drafts collide in the queue.** A role proposal and
       a drafted description are both `kind: column`, `target: table.column`, and
       Q1's `propose` supersedes an open row of the same kind, datasource and target.
-      Filed separately, `profile(draft=True)` would supersede the role it filed a
-      moment before, and a later plain `profile` would revive the role and
-      supersede the draft. P2 must merge the role and the description into one
-      `change` per column in a run (and P1's role rows must then be built together
-      with the drafts), or scope superseding by `origin`; Q1 is unchanged here.
+      P2 resolved it by merging (see its note below); Q1 is unchanged.
     - **`realdb`.** `tests/realdb/test_profile.py` was written without a test bed
       (it drops pagila's foreign keys from the stored snapshot, then expects
       `rental.inventory_id` and `rental.customer_id` joins at overlap 1.0); CI's
       `realdb` workflow is its first run.
+
+!!! note "Built: drafted descriptions (P2)"
+    `engine.knowledge.profile(..., draft=True, max_cost_usd=None)` and
+    `nl2sql profile --draft [--max-cost USD]`; behaviour is in
+    [Schema Profiler](../schema/profiler.md#drafted-descriptions). P1's
+    `NotImplementedError` is gone. What later rows need, and where the code
+    differs from this page:
+
+    - **Names.** `nl2sql/profiler/drafts.py`: `draft_descriptions(llm, budget,
+      snapshot, *, allows, has_table_text, has_column_text, max_chars, issues) ->
+      Drafted` (`tables` by table key, `columns` by `(table key, column)`, `count`).
+      `nl2sql/profiler/prompts.py`: `DRAFT_PROMPT`, the enrichment prompt cut down
+      to tables and columns (`ENRICHMENT_PROMPT` is gone from `drafts.py`; the
+      datasource-level drafts are not asked for, and `SchemaEnrichment.datasource`
+      now defaults to empty). `nl2sql/profiler/run.py`: `profile(ctx,
+      datasource_ids, user, *, draft=False, max_cost_usd=None)`, `Drafter`,
+      `_drafter`. The table keys sent to the model are the snapshot's own
+      (`[main].[orders]`, and `[main].[orders].total` for a column).
+    - **Merging, the hazard P1 listed.** Within one run, a column's role finding and
+      its drafted description are ONE `column` proposal per `table.column`, with a
+      single `change` (the role's fields the glossary does not set, plus
+      `description` and `synonyms`), `origin` `draft` when it carries a
+      description and `profiler` when only a role. `propose`'s supersede rule is
+      unchanged and superseding is not scoped by origin. The id hashes the change,
+      so a later plain `profile` files the role-only row and supersedes the merged
+      one; profile with `draft=True` again to bring the description back.
+      `test_one_column_proposal_carries_both_role_and_description` pins it.
+    - **Calls and budget.** One call per table the caller reaches that has an item
+      without a description, shown only that table's evidence plus a `describe`
+      list of the table and columns to describe (the code differs from the page's
+      "one prompt over the evidence"). One `Budget` (`nl2sql/limits.py`,
+      `setting` `settings.profiler`) covers the whole `profile` call across
+      datasources; `max_cost_usd` defaults to `settings.profiler.max_cost_usd`, and
+      a value of zero or less is a `ValueError`. An unpriced `profiler` model raises
+      `UnknownPriceError` (the one seeding raises) before any call and before any
+      proposal. A refused call ends drafting and the report says
+      `stopped_by: "cost_cap"`, `cost` is that datasource's spend, and an issue names
+      the limit. No model for the agent (`get_llm` raises `ValueError`) is an issue
+      on each report; joins and roles are still filed. A call that fails is an issue
+      naming the error class; a draft over `knowledge.item_max_chars` is dropped with
+      one issue.
+    - **CLI.** `profile_datasources(engine, who, ids, *, draft, max_cost)`;
+      `print_reports` shows `N descriptions drafted ($cost)` and lists `draft`
+      proposals under "Waiting for review" as well.
 
 ## 7. Clarify instead of guess
 
