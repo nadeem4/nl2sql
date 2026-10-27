@@ -66,7 +66,8 @@ def run_pipeline(
         choice = _ask_which(presenter, request)
         if choice is None:
             sys.exit(4)
-        result = None
+        result, steps = None, []
+        started = time.perf_counter()  # the usage summary is the run that answered, not the wait for the pick
     duration = time.perf_counter() - started
 
     if result is None:

@@ -49,9 +49,17 @@ def choice_problem(choice: ClarificationChoice, *, question: str, user: Optional
     if choice.option_id not in {option.id for option in request.options}:
         return _invalid(f"The request has no option '{choice.option_id}'.")
     ds_id = request.datasource_id
+    try:
+        sub_query = SubQuery.model_validate(request.sub_query)
+        for option in request.options:
+            PlanModel.model_validate(option.plan)
+    except ValueError:
+        return _invalid("The clarification request holds a sub-query or a plan that is not valid.")
+    if sub_query.datasource_id != ds_id:
+        return _invalid("The clarification request's sub-query is for another datasource.")
     if ds_id not in ctx.ds_registry.list_ids() or not ctx.policy_engine.scope(user, ds_id).reaches_datasource():
         return _stale(f"The datasource '{ds_id}' is no longer one this caller may read. Ask again.")
-    if ctx.vector_store.schema_version(ds_id) != request.schema_version or (
+    if (ctx.vector_store.schema_version(ds_id) or "") != request.schema_version or (
             ctx.knowledge.digest(ds_id) != request.knowledge_digest):
         return _stale()
     return None
@@ -69,6 +77,10 @@ def pinned_from_choice(choice: ClarificationChoice) -> PinnedRun:
                      plans={sub_query.id: PlanModel.model_validate(option.plan)})
 
 
+def _qualified(table: Any) -> str:
+    return f"{table.schema_name}.{table.name}" if table.schema_name else table.name
+
+
 def _select_columns(plan: PlanModel) -> List[str]:
     """The ``table.column`` names the plan's select items read, in order, each once."""
     aliases = {t.alias: t for t in plan.tables}
@@ -80,7 +92,7 @@ def _select_columns(plan: PlanModel) -> List[str]:
         if expr.kind == "column" and expr.column_name:
             table = aliases.get(expr.alias) or (plan.tables[0] if len(plan.tables) == 1 else None)
             if table is not None:
-                found.setdefault(f"{table.name}.{expr.column_name}")
+                found.setdefault(f"{_qualified(table)}.{expr.column_name}")
         for child in [expr.left, expr.right, expr.expr, expr.else_expr, *expr.args]:
             walk(child)
         for when in expr.whens:
@@ -110,7 +122,7 @@ def choice_proposal(ctx: Any, choice: ClarificationChoice, user: UserContext, te
     plan = PlanModel.model_validate(option.plan)
     name = (term or request.phrase).strip()
     change: Dict[str, Any] = {"term": name, "definition": option.label,
-                              "columns": _select_columns(plan), "tables": [t.name for t in plan.tables]}
+                              "columns": _select_columns(plan), "tables": sorted({_qualified(t) for t in plan.tables})}
     if name.casefold() != request.phrase.strip().casefold():
         change["synonyms"] = [request.phrase]
     tables = table_names(ctx, request.datasource_id, [(t.schema_name or "", t.name) for t in plan.tables])

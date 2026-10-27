@@ -185,20 +185,25 @@ def test_the_explanation_says_what_you_chose():
 
 
 def test_chosen_plan_needing_cost_approval_round_trips():
-    # A hook answers needs_approval on the chosen plan: the request pins the chosen run's one-sub-query
-    # decomposition and plan, and the approver's re-run (approvals alone) pins them as approved.
-    from test_approval import ADMIN, _runner, NEEDS
+    # A hook answers needs_approval on the chosen plan: the request the graph builds pins the chosen run's
+    # one-sub-query decomposition and plan, and the approver's re-run (approvals alone) pins them as approved.
+    from test_approval import ADMIN, NEEDS, _runner
 
-    from nl2sql.hooks.approval import Approval, ApprovalRequest
+    from nl2sql.common.errors import ErrorSeverity, PipelineError
+    from nl2sql.hooks.approval import Approval
+    from nl2sql.pipeline.graph_utils import _approval_requests
+    from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
+    from nl2sql.pipeline.pinned import pinned_from_approvals
 
     chosen = pinned_from_choice(_choice())
     [sub_query] = chosen.decomposition.sub_queries
-    request = ApprovalRequest.build(question=QUESTION, asker=ANA, hook="review", datasource_id="ds1",
-                                    sql="SELECT 1", reason="Reads a lot", decomposition=chosen.decomposition,
-                                    sub_query=sub_query, plan=chosen.plans["sq1"])
+    asked = PipelineError(node="executor", message="m", severity=ErrorSeverity.ERROR,
+                          error_code=ErrorCode.NEEDS_APPROVAL, details={"hook": "review", "reason": "Reads a lot"})
+    state = {"user_query": QUESTION, "user_context": ANA, "decomposer_response": chosen.decomposition}
+    response = ASTPlannerResponse(plan=chosen.plans["sq1"], plan_source="chosen")
 
-    from nl2sql.pipeline.pinned import pinned_from_approvals
-
+    [request] = _approval_requests(fake_runtime(hooks=_runner(NEEDS, roles=("admin",))), [asked], state, sub_query,
+                                   response, "SELECT 1")
     rerun = pinned_from_approvals([Approval(request=request, by=ADMIN)], question=QUESTION, user=ANA,
                                   hooks=_runner(NEEDS, roles=("admin",)))
 
@@ -206,6 +211,46 @@ def test_chosen_plan_needing_cost_approval_round_trips():
     assert rerun.decomposition == chosen.decomposition
 
 
+def test_mismatched_datasource_is_invalid():
+    choice = _choice(sub_query={**_sq().model_dump(mode="json"), "datasource_id": "other"})
+
+    assert _problem(choice).error_code == ErrorCode.CLARIFICATION_INVALID
+
+
+def test_malformed_sub_query_or_plan_is_invalid_not_an_exception():
+    bad_sub_query = _choice(sub_query={"nonsense": 1})
+    request = _request()
+    bad_option = request.options[1].model_copy(update={"plan": {"tables": "nope"}})
+    bad_plan = _choice(options=[request.options[0], bad_option])
+
+    for choice in (bad_sub_query, bad_plan):
+        assert _problem(choice).error_code == ErrorCode.CLARIFICATION_INVALID
+
+
+def test_a_never_indexed_datasource_is_not_always_stale():
+    assert _problem(_choice(schema_version=""), ctx=_ctx(schema_version=None)) is None
+
+
+def test_the_saved_term_keeps_the_schema_name():
+    from nl2sql.clarify.choice import choice_proposal
+
+    plan = INVOICED.plan.model_copy(update={"tables": [INVOICED.plan.tables[0].model_copy(
+        update={"schema_name": "main"})]})
+    option = _request().options[1].model_copy(update={"plan": plan.model_dump(mode="json")})
+    choice = _choice(options=[_request().options[0], option])
+    ctx = fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True})
+
+    import nl2sql.review.queue as queue
+
+    original = queue.table_names
+    queue.table_names = lambda ctx, ds, pairs: sorted(f"{ds}.{s}.{t}" for s, t in pairs)
+    try:
+        proposal = choice_proposal(ctx, choice, ANA)
+    finally:
+        queue.table_names = original
+
+    assert proposal.change["tables"] == ["main.invoice"]
+    assert proposal.change["columns"] == ["main.invoice.amount"]
 # ---------------------------------------------------------------- the pinned run of a chosen plan
 
 

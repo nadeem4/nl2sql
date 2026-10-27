@@ -172,3 +172,20 @@ def test_on_a_terminal_the_pick_runs_the_question_again_with_the_choice(tmp_path
     assert first.get("choice") is None
     assert second["choice"].option_id == "b" and second["choice"].request.id == _clarification().id
     assert second["user_context"] == first["user_context"]
+
+
+def test_a_re_ask_resets_the_step_timings(tmp_path, monkeypatch):
+    from nl2sql.cli.reporting import ConsolePresenter
+
+    monkeypatch.setattr(run_module, "_is_terminal", lambda: True)
+    monkeypatch.setattr(run_module.typer, "prompt", lambda *args, **kwargs: 2)
+    shown = []
+    monkeypatch.setattr(ConsolePresenter, "print_step_timings", lambda self, steps, tokens: shown.append(list(steps)))
+    engine = AskingEngine(make_config(tmp_path, settings={"tenant_id": "acme"}), [*_steps(), _asks()],
+                          [*_steps(), _final(status="success")])
+
+    run_module.run_pipeline(RunConfig(query="What were sales?", show_perf=True), engine)
+
+    # The decomposer ran in both runs; the table is the last run's steps, not both.
+    [steps] = shown
+    assert [name for name, _, _ in steps] == ["decomposer"]
