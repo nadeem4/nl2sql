@@ -2844,6 +2844,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#drafted-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafted descriptions
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5248,6 +5259,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#drafted-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafted descriptions
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5296,13 +5318,14 @@
 <p>After a datasource is indexed, the profiler reads its live snapshot, asks the
 database a bounded number of cheap questions through the adapter, and files
 what it finds as <a href="../../configuration/review/">proposals</a>. It is deterministic:
-no model runs unless you ask for drafted descriptions (<code>draft=True</code>, release
-0.8, not in this change). Nothing it finds reaches a prompt, the index or a file
-until a person with an admin role accepts it.</p>
+no model runs unless you ask for drafted descriptions (<code>draft=True</code>, or
+<code>nl2sql profile --draft</code>). Nothing it finds or drafts reaches a prompt, the
+index or a file until a person with an admin role accepts it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>index<span class="w">                        </span><span class="c1"># the profiler reads the live build's snapshot</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nl2sql<span class="w"> </span>profile<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">           </span><span class="c1"># file joins and column roles for review</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--as<span class="w"> </span>admin
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>accept<span class="w"> </span>--all<span class="w"> </span>--kind<span class="w"> </span>column<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">   </span><span class="c1"># writes glossary.yaml once</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nl2sql<span class="w"> </span>profile<span class="w"> </span>--as<span class="w"> </span>admin<span class="w"> </span>--draft<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">0</span>.25<span class="w">   </span><span class="c1"># also draft descriptions with the model</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--as<span class="w"> </span>admin
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>accept<span class="w"> </span>--all<span class="w"> </span>--kind<span class="w"> </span>column<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">   </span><span class="c1"># writes glossary.yaml once</span>
 </code></pre></div>
 <p><code>nl2sql index --profile --as admin</code> indexes and then profiles the same
 datasources. From Python:</p>
@@ -5324,7 +5347,7 @@ returns one <code>ProfileReport</code> per datasource the caller reaches:</p>
 </tr>
 <tr>
 <td><code>proposals</code></td>
-<td>Proposals created or updated, by kind (<code>join</code>, <code>column</code>)</td>
+<td>Proposals created or updated, by kind (<code>join</code>, <code>column</code>, <code>table</code>)</td>
 </tr>
 <tr>
 <td><code>probes</code></td>
@@ -5335,12 +5358,20 @@ returns one <code>ProfileReport</code> per datasource the caller reaches:</p>
 <td>Join candidates proposed without a probe because a bound was reached</td>
 </tr>
 <tr>
+<td><code>drafted</code></td>
+<td>Descriptions the model drafted (<code>draft=True</code> only)</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td>What the drafting calls cost in USD; <code>None</code> when nothing was drafted</td>
+</tr>
+<tr>
 <td><code>stopped_by</code></td>
-<td><code>done</code>, <code>max_probes</code> or <code>time_budget</code> (<code>cost_cap</code> is for drafting)</td>
+<td><code>done</code>, <code>max_probes</code>, <code>time_budget</code>, or <code>cost_cap</code> (drafting reached <code>max_cost_usd</code>)</td>
 </tr>
 <tr>
 <td><code>issues</code></td>
-<td>A probe that failed, an unavailable datasource, or "not indexed yet"</td>
+<td>A probe that failed, a draft that could not be used, no model for drafting, an unavailable datasource, or "not indexed yet"</td>
 </tr>
 <tr>
 <td><code>seconds</code></td>
@@ -5348,6 +5379,7 @@ returns one <code>ProfileReport</code> per datasource the caller reaches:</p>
 </tr>
 </tbody>
 </table>
+<p><code>max_cost_usd</code> (<code>--max-cost</code>) without <code>draft=True</code> (<code>--draft</code>) is a <code>ValueError</code>.</p>
 <p>The caller is required and has no default. The profiler reads and probes only
 the tables the caller's scope reaches, so a table the role denies is never
 probed and is named in no proposal. A datasource that was never indexed is
@@ -5428,6 +5460,38 @@ again. The word lists are English only. The rules are one table in
 temporal column is derived) this is a few hundred proposals at most, and
 <code>nl2sql review accept --all --kind column --datasource ID --as admin</code> writes the
 glossary once.</p>
+<h3 id="drafted-descriptions">Drafted descriptions</h3>
+<p><code>draft=True</code> has the <code>profiler</code> agent (see <a href="../../configuration/llm/#per-node-models">Per-node models</a>)
+describe what nobody has: a table or column with no description in the
+glossary (or a knowledge source) and none from the database. It is asked
+about those items only, one call per table the caller reaches, and shown that
+table's evidence (types, statistics, sample values, foreign keys). It never
+sees a table the caller's scope denies. Each answer is cleaned (unknown tables
+and columns dropped, text trimmed, duplicates removed), and a draft longer than
+<code>knowledge.item_max_chars</code> is dropped with an issue, since the glossary would
+refuse it on accept.</p>
+<ul>
+<li>A table's draft is a <code>table</code> proposal (<code>change: {description}</code>).</li>
+<li>A column's draft is merged with its role: one <code>column</code> proposal per column
+  carries <code>role</code>, <code>unit</code>, <code>values</code> and the drafted <code>description</code> and <code>synonyms</code>
+  together, because the queue keeps one open proposal per target. Its origin is
+  <code>draft</code> when it carries a description, <code>profiler</code> when it carries only a role.</li>
+<li>Nothing drafted is written into the schema snapshot or the index. It reaches
+  a prompt only after a person accepts it into the glossary.</li>
+<li>An item with an open drafted description in the queue counts as described:
+  a repeat <code>draft=True</code> run does not ask the model about it again or replace
+  the row. A run that finds only the same role for such a column (a plain
+  <code>profile</code>, a run stopped at the cost cap) leaves the open row alone; a changed
+  role still files and supersedes it.</li>
+<li>A foreign key to a table the caller's scope denies is left out of the
+  evidence, so the model never sees that table's name.</li>
+</ul>
+<p><strong>Cost.</strong> Drafting is capped at <code>max_cost_usd</code> for the whole call, across
+datasources (the argument, else <code>profiler.max_cost_usd</code>, 0.50). A model with no
+price in <code>llm.prices</code> is refused before any call (<code>UnknownPriceError</code>). A run
+that reaches the cap stops, files what it drafted so far, and reports
+<code>stopped_by: cost_cap</code>. With no model configured for the agent, nothing is
+drafted and the report says so in <code>issues</code>; the joins and roles are still filed.</p>
 <h2 id="bounds">Bounds</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># settings.yaml</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">profiler</span><span class="p">:</span>
@@ -5436,7 +5500,7 @@ glossary once.</p>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">time_budget_s</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span><span class="w">     </span><span class="c1"># per datasource; no probe starts after it</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">min_overlap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.9</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">enum_max_distinct</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.50</span><span class="w">    </span><span class="c1"># drafting, per profile call (with drafts)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.50</span><span class="w">    </span><span class="c1"># drafting, per profile call (profile(draft=True), --draft)</span>
 </code></pre></div>
 <p>Probes run one at a time, strongest candidate first (an exact key-name match
 before a table-name match), each under the datasource's <code>timeout_ms</code>. The limit

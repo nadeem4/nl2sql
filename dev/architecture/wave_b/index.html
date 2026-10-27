@@ -4647,9 +4647,8 @@ scope denies is never probed. Each finished profile publishes
 <div class="admonition note">
 <p class="admonition-title">Built: joins and roles (P1)</p>
 <p><code>engine.knowledge.profile</code> and <code>nl2sql profile</code> run; behaviour is in
-<a href="../../schema/profiler/">Schema Profiler</a>. Drafts are P2's (<code>draft=True</code> or
-<code>max_cost_usd</code> raises <code>NotImplementedError</code> naming P2). What later rows need,
-and where the code differs from this page:</p>
+<a href="../../schema/profiler/">Schema Profiler</a>. Drafts are P2's (see its note below).
+What later rows need, and where the code differs from this page:</p>
 <ul>
 <li><strong>Names.</strong> <code>nl2sql/profiler/joins.py</code>: <code>find_candidates(snapshot, *, dialect,
   allows, known) -&gt; list[JoinCandidate]</code>; <code>roles.py</code>: <code>find_roles(snapshot, *,
@@ -4676,15 +4675,64 @@ and where the code differs from this page:</p>
 <li><strong>Hazard for P2: roles and drafts collide in the queue.</strong> A role proposal and
   a drafted description are both <code>kind: column</code>, <code>target: table.column</code>, and
   Q1's <code>propose</code> supersedes an open row of the same kind, datasource and target.
-  Filed separately, <code>profile(draft=True)</code> would supersede the role it filed a
-  moment before, and a later plain <code>profile</code> would revive the role and
-  supersede the draft. P2 must merge the role and the description into one
-  <code>change</code> per column in a run (and P1's role rows must then be built together
-  with the drafts), or scope superseding by <code>origin</code>; Q1 is unchanged here.</li>
+  P2 resolved it by merging (see its note below); Q1 is unchanged.</li>
 <li><strong><code>realdb</code>.</strong> <code>tests/realdb/test_profile.py</code> was written without a test bed
   (it drops pagila's foreign keys from the stored snapshot, then expects
   <code>rental.inventory_id</code> and <code>rental.customer_id</code> joins at overlap 1.0); CI's
   <code>realdb</code> workflow is its first run.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built: drafted descriptions (P2)</p>
+<p><code>engine.knowledge.profile(..., draft=True, max_cost_usd=None)</code> and
+<code>nl2sql profile --draft [--max-cost USD]</code>; behaviour is in
+<a href="../../schema/profiler/#drafted-descriptions">Schema Profiler</a>. P1's
+<code>NotImplementedError</code> is gone. What later rows need, and where the code
+differs from this page:</p>
+<ul>
+<li><strong>Names.</strong> <code>nl2sql/profiler/drafts.py</code>: <code>draft_descriptions(llm, budget,
+  snapshot, *, allows, has_table_text, has_column_text, max_chars, issues) -&gt;
+  Drafted</code> (<code>tables</code> by table key, <code>columns</code> by <code>(table key, column)</code>, <code>count</code>).
+  <code>nl2sql/profiler/prompts.py</code>: <code>DRAFT_PROMPT</code>, the enrichment prompt cut down
+  to tables and columns (<code>ENRICHMENT_PROMPT</code> is gone from <code>drafts.py</code>; the
+  datasource-level drafts are not asked for, and <code>SchemaEnrichment.datasource</code>
+  now defaults to empty). <code>nl2sql/profiler/run.py</code>: <code>profile(ctx,
+  datasource_ids, user, *, draft=False, max_cost_usd=None)</code>, <code>Drafter</code>,
+  <code>_drafter</code>. The table keys sent to the model are the snapshot's own
+  (<code>[main].[orders]</code>, and <code>[main].[orders].total</code> for a column).</li>
+<li><strong>Merging, the hazard P1 listed.</strong> Within one run, a column's role finding and
+  its drafted description are ONE <code>column</code> proposal per <code>table.column</code>, with a
+  single <code>change</code> (the role's fields the glossary does not set, plus
+  <code>description</code> and <code>synonyms</code>), <code>origin</code> <code>draft</code> when it carries a
+  description and <code>profiler</code> when only a role. <code>propose</code>'s supersede rule is
+  unchanged and superseding is not scoped by origin. The id hashes the change, so
+  to keep an open merged row from being retired by a later run that drafts nothing
+  for that column (a plain <code>profile</code>, a cost-capped run), the column loop skips a
+  role-only row when an open <code>column</code> row for the same target already carries a
+  description and the same role fields; a changed role still files and
+  supersedes. An open <code>origin: draft</code> row also counts as already described, so a
+  repeat run neither pays again nor replaces it. Foreign keys to tables the
+  caller's scope denies are dropped before the evidence is built, and
+  <code>max_cost_usd</code> without <code>draft</code> is a <code>ValueError</code>.
+  <code>test_one_column_proposal_carries_both_role_and_description</code> and
+  <code>test_a_plain_profile_keeps_an_open_draft</code> pin the merge.</li>
+<li><strong>Calls and budget.</strong> One call per table the caller reaches that has an item
+  without a description, shown only that table's evidence plus a <code>describe</code>
+  list of the table and columns to describe (the code differs from the page's
+  "one prompt over the evidence"). One <code>Budget</code> (<code>nl2sql/limits.py</code>,
+  <code>setting</code> <code>settings.profiler</code>) covers the whole <code>profile</code> call across
+  datasources; <code>max_cost_usd</code> defaults to <code>settings.profiler.max_cost_usd</code>, and
+  a value of zero or less is a <code>ValueError</code>. An unpriced <code>profiler</code> model raises
+  <code>UnknownPriceError</code> (the one seeding raises) before any call and before any
+  proposal. A refused call ends drafting and the report says
+  <code>stopped_by: "cost_cap"</code>, <code>cost</code> is that datasource's spend, and an issue names
+  the limit. No model for the agent (<code>get_llm</code> raises <code>ValueError</code>) is an issue
+  on each report; joins and roles are still filed. A call that fails is an issue
+  naming the error class; a draft over <code>knowledge.item_max_chars</code> is dropped with
+  one issue.</li>
+<li><strong>CLI.</strong> <code>profile_datasources(engine, who, ids, *, draft, max_cost)</code>;
+  <code>print_reports</code> shows <code>N descriptions drafted ($cost)</code> and lists <code>draft</code>
+  proposals under "Waiting for review" as well.</li>
 </ul>
 </div>
 <h2 id="7-clarify-instead-of-guess">7. Clarify instead of guess</h2>

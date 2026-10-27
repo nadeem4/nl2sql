@@ -6058,7 +6058,7 @@ seeding each have an agent. An agent not under <code>agents</code> runs on the t
 </tr>
 <tr>
 <td><code>profiler</code></td>
-<td>drafts table and column descriptions as proposals for review, never written into the index or the schema (optional; <code>nl2sql index</code> calls no model)</td>
+<td>drafts table and column descriptions as proposals for review, never written into the index or the schema (optional; <code>nl2sql index</code> calls no model; only <code>nl2sql profile --draft</code> or <code>profile(draft=True)</code> runs it, under <code>profiler.max_cost_usd</code>, and its model must have a price in <code>llm.prices</code>)</td>
 </tr>
 <tr>
 <td><code>eval_seeder</code></td>
