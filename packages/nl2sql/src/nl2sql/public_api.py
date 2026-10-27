@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from nl2sql.api.storage_api import StorageAPI
     from nl2sql.api.traces_api import TracesAPI
     from nl2sql.policies import UserContext
+    from nl2sql.clarify.models import ClarificationChoice
     from nl2sql.hooks.approval import Approval
     from nl2sql.pipeline.pinned import SuppliedPlan
     from nl2sql.check import CheckReport
@@ -274,7 +275,8 @@ class NL2SQL:
                   user_context: Optional["UserContext"] = None,
                   cancellation_token: Optional["CancellationToken"] = None,
                   plan: Optional["SuppliedPlan"] = None,
-                  approvals: Optional[Sequence["Approval"]] = None, clarify: bool = True) -> "QueryResult":
+                  approvals: Optional[Sequence["Approval"]] = None, clarify: bool = True,
+                  choice: Optional["ClarificationChoice"] = None) -> "QueryResult":
         """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
 
         ``datasource_id`` skips routing; ``execute=False`` stops after the SQL
@@ -297,18 +299,25 @@ class NL2SQL:
         ``result.clarification`` holds the options, each a label, a plan and
         its explanation. ``clarify=False`` runs the most likely reading
         instead and lists the others as assumptions in ``result.explanation``.
+        To answer one, ask the same question again as the same caller with
+        ``choice=ClarificationChoice(request=result.clarification, option_id="b")``:
+        the chosen option's plan runs through the validator
+        (``plan_source="chosen"``), without routing or planning. A request that
+        is not this question's or this caller's ends the run
+        ``CLARIFICATION_INVALID``; one the data or glossary has outdated,
+        ``CLARIFICATION_STALE``. Not with ``plan`` or ``approvals``.
         """
         self._ensure_open()
         return self._queries.run_query(question, datasource_id=datasource_id, execute=execute,
                                        user_context=user_context, cancellation_token=cancellation_token,
-                                       plan=plan, approvals=approvals, clarify=clarify)
+                                       plan=plan, approvals=approvals, clarify=clarify, choice=choice)
 
     def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                      user_context: Optional["UserContext"] = None,
                      cancellation_token: Optional["CancellationToken"] = None,
                      plan: Optional["SuppliedPlan"] = None,
                      approvals: Optional[Sequence["Approval"]] = None,
-                     clarify: bool = True) -> Iterator["Event"]:
+                     clarify: bool = True, choice: Optional["ClarificationChoice"] = None) -> Iterator["Event"]:
         """
         Run a question as ``run_query`` does, yielding its :class:`~nl2sql.Event`
         values as they are published, from the caller-safe allow-list:
@@ -320,12 +329,12 @@ class NL2SQL:
         (``policy.decision``, ``hook.decision``, ``llm.call``) are never on
         it: subscribe to ``events`` for those. ``event.sse()`` is the event as
         one Server-Sent Event. Closing the iterator early cancels the run.
-        ``plan``, ``approvals`` and ``clarify`` are as for :meth:`run_query`.
+        ``plan``, ``approvals``, ``clarify`` and ``choice`` are as for :meth:`run_query`.
         """
         self._ensure_open()
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
                                           user_context=user_context, cancellation_token=cancellation_token,
-                                          plan=plan, approvals=approvals, clarify=clarify)
+                                          plan=plan, approvals=approvals, clarify=clarify, choice=choice)
 
     def clear_plan_cache(self) -> int:
         """Remove every cached plan from the state store; returns how many there were.

@@ -346,6 +346,9 @@ def _explain_output(output: Any, state: Mapping[str, Any], warnings: Sequence[An
     terms = _terms(plan, used)
     labels = [_get(a, "label") for a in _get(output, "alternatives") or []]
     readings = _reading_not_chosen(_get(output, "ambiguous_phrase"), labels, terms)
+    label = _get(state.get("pinned"), "chosen_label")
+    if source == "chosen" and label:
+        readings = [f"You chose: {label}"] + readings
     return explain_plan(plan, datasource_id=datasource_id, sub_query_id=sub_query_id, source=source,
                         knowledge_used=used, knowledge=(knowledge or {}).get(datasource_id),
                         assumptions=readings + found)

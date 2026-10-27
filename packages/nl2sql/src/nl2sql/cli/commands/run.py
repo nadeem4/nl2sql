@@ -4,9 +4,10 @@ import sys
 import time
 from typing import List, Optional, Tuple
 
+import typer
 from rich.text import Text
 
-from nl2sql import QueryResult, UserContext
+from nl2sql import ClarificationChoice, QueryResult, UserContext
 from nl2sql.cli.common.decorators import handle_cli_errors
 from nl2sql.cli.reporting import ConsolePresenter
 from nl2sql.cli.types import RunConfig
@@ -22,7 +23,10 @@ def run_pipeline(
     The live status follows the run's ``node.started`` events; ``--show-perf``
     is the time of each step from its ``node.finished`` event; the result is
     ``run.finished``'s ``data.result``. Exits 1 when the run could not finish
-    (``run.failed``), or finished with a blocking error.
+    (``run.failed``), or finished with a blocking error. When the question can be
+    read more than one way (``needs_clarification``) it numbers the options; on a
+    terminal it asks which and runs the question again with that choice, otherwise
+    it exits 4.
     """
     if not config.query:
         return
@@ -38,22 +42,32 @@ def run_pipeline(
     failure: Optional[str] = None
 
     started = time.perf_counter()
-    presenter.start_interactive_status("Thinking...")
-    try:
-        for event in engine.stream_query(config.query, datasource_id=config.ds_id,
-                                         execute=not config.no_exec, user_context=user_context):
-            if event.name == "node.started":
-                presenter.update_interactive_status(f"Running {event.data.get('node')}...")
-            elif event.name == "node.finished":
-                step = (str(event.data.get("node")), float(event.data.get("seconds") or 0.0),
-                        bool(event.data.get("ok", True)))
-                steps.append(step)
-            elif event.name == "run.finished":
-                result = QueryResult.model_validate(event.data["result"])
-            elif event.name == "run.failed":
-                failure = event.data.get("message")
-    finally:
-        presenter.stop_interactive_status()
+    choice: Optional[ClarificationChoice] = None
+    while True:
+        presenter.start_interactive_status("Thinking...")
+        try:
+            for event in engine.stream_query(config.query, datasource_id=config.ds_id, execute=not config.no_exec,
+                                             user_context=user_context, **({"choice": choice} if choice else {})):
+                if event.name == "node.started":
+                    presenter.update_interactive_status(f"Running {event.data.get('node')}...")
+                elif event.name == "node.finished":
+                    step = (str(event.data.get("node")), float(event.data.get("seconds") or 0.0),
+                            bool(event.data.get("ok", True)))
+                    steps.append(step)
+                elif event.name == "run.finished":
+                    result = QueryResult.model_validate(event.data["result"])
+                elif event.name == "run.failed":
+                    failure = event.data.get("message")
+        finally:
+            presenter.stop_interactive_status()
+        request = result.clarification if result is not None else None
+        if request is None:
+            break
+        choice = _ask_which(presenter, request)
+        if choice is None:
+            sys.exit(4)
+        result, steps = None, []
+        started = time.perf_counter()  # the usage summary is the run that answered, not the wait for the pick
     duration = time.perf_counter() - started
 
     if result is None:
@@ -75,6 +89,25 @@ def run_pipeline(
     # RBAC refusal included) makes its status "error". Warnings alone do not.
     if result.status == "error":
         sys.exit(1)
+
+
+def _is_terminal() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _ask_which(presenter: ConsolePresenter, request) -> Optional[ClarificationChoice]:
+    """Number the options, and on a terminal ask which; None when there is no terminal to ask."""
+    presenter.print_info(f"'{request.phrase}' can be read more than one way:")
+    for number, option in enumerate(request.options, 1):
+        presenter.print_info(f"  {number}. {option.label} - {option.explanation.text}")
+    if not _is_terminal():
+        presenter.print_warning("Choose one and run the question again with that choice "
+                                "(engine.run_query(..., choice=...)).")
+        return None
+    number = 0
+    while not 1 <= number <= len(request.options):
+        number = typer.prompt(f"Which one (1-{len(request.options)})", type=int)
+    return ClarificationChoice(request=request, option_id=request.options[number - 1].id)
 
 
 def _print_result(presenter: ConsolePresenter, config: RunConfig, result: QueryResult) -> None:

@@ -219,6 +219,25 @@ def test_clarify_is_an_outcome_a_case_can_expect():
         EvalCase(id="c2", question="q", outcome={"admin": "maybe"})
 
 
+def test_clarify_outcome_scores():
+    from nl2sql import QueryResult
+    from nl2sql.evaluation.scorers import CaseRun
+    from nl2sql.evaluation.scorers.outcome import Outcome
+    from nl2sql.evaluation.suite import CLARIFY_SUITE_PATH, load_suite
+
+    suite = load_suite(CLARIFY_SUITE_PATH)
+
+    assert len(suite.cases) >= 3 and all(c.status == "approved" and c.sql is None for c in suite.cases)
+    assert all(c.outcome == {"admin": "clarify"} and "sales" in c.question.lower() for c in suite.cases)
+    case = suite.cases[0]
+
+    def score(result):
+        return Outcome().score(CaseRun(case=case, role="admin", mode="full", result=result))
+
+    assert score(QueryResult(status="needs_clarification")).passed
+    assert not score(QueryResult(status="success")).passed
+
+
 def test_a_suite_refuses_repeated_ids():
     from nl2sql.evaluation.suite import EvalSuite
 

@@ -140,10 +140,11 @@ Both are also split by source.
 ### Clarification
 
 A case may expect the engine to ask the caller to narrow the question
-(outcome `clarify`). Wave B adds that result. Until then, evals run with
-`clarify=False`, the default: those role runs are left out and counted in
-`report.skipped`. With `clarify=True` they run, and the `outcome` scorer
-passes them when the run's status is `needs_clarification`.
+(outcome `clarify`). Evals run with `clarify=False`, the default, so every
+other case measures the most likely reading: the `clarify` role runs are left
+out and counted in `report.skipped`. With `clarify=True` they run, and the
+`outcome` scorer passes them when the run's status is `needs_clarification`.
+The [clarify suite](cases.md#the-clarify-suite) holds such cases.
 
 ## The report
 

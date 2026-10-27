@@ -19,7 +19,7 @@ from typing import Any, Callable, Optional, Union
 import anyio
 from mcp.server.fastmcp import FastMCP
 
-from nl2sql import NL2SQL, UserContext
+from nl2sql import NL2SQL, ClarificationChoice, UserContext
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,7 @@ _CALLER_FACING = frozenset({
     "QUESTION_NOT_ANSWERABLE", "QUESTION_TOO_BROAD", "HOOK_DENIED", "NEEDS_APPROVAL", "COST_LIMIT_EXCEEDED",
     "RUN_LIMIT_REACHED", "CANCELLED", "PIPELINE_TIMEOUT", "PROVIDER_AUTH_FAILED", "PROVIDER_RATE_LIMITED",
     "PROVIDER_QUOTA_EXCEEDED", "PROVIDER_TIMEOUT", "PROVIDER_UNAVAILABLE", "PROVIDER_MODEL_UNAVAILABLE",
+    "NEEDS_CLARIFICATION", "CLARIFICATION_INVALID", "CLARIFICATION_STALE",
     "VALUE_NOT_FOUND", "RESULT_TRUNCATED", "JOIN_KEY_UNCONVERTED", "JOIN_FAN_OUT", "ALL_NULL_COLUMN",
 })
 
@@ -70,17 +71,22 @@ def build_server(engine: NL2SQL, identity: Identity) -> FastMCP:
     # The builtin ``dict`` return type makes the result the tool's structured
     # content as it is; ``typing.Dict`` would wrap it in ``{"result": ...}``.
     @server.tool()
-    async def ask(question: str, datasource_id: Optional[str] = None) -> dict[str, Any]:
+    async def ask(question: str, datasource_id: Optional[str] = None,
+                  choice: Optional[dict[str, Any]] = None) -> dict[str, Any]:
         """Answer a question about the data in plain English.
 
         Returns the run's status, the answer (summary and content), each
         sub-query's SQL with its columns and first 20 rows, whether rows were
         cut, the answer's source, warnings, and the trace id. A run that
         needs a person's approval has status needs_approval and lists
-        approvals_needed; a run stopped at a limit carries stop. Pass
+        approvals_needed; a run stopped at a limit carries stop. A question that
+        can be read more than one way has status needs_clarification and a
+        clarification: its options (id, label, explanation) and the request.
+        Ask the user which, then call ask again with the same question and
+        choice={"request": <the request>, "option_id": <the id>}. Pass
         datasource_id to skip routing.
         """
-        return await _off_the_loop(caller, _ask, engine, question, datasource_id)
+        return await _off_the_loop(caller, _ask, engine, question, datasource_id, choice)
 
     @server.tool()
     async def list_datasources() -> dict[str, Any]:
@@ -150,11 +156,17 @@ def _qualified(table: dict[str, Any], tables: list[dict[str, Any]]) -> str:
     return f"{table['schema']}.{table['name']}" if twins > 1 else table["name"]
 
 
-def _ask(engine: NL2SQL, user: UserContext, question: str, datasource_id: Optional[str]) -> dict[str, Any]:
+def _ask(engine: NL2SQL, user: UserContext, question: str, datasource_id: Optional[str],
+         choice: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    try:
+        picked = ClarificationChoice.model_validate(choice) if choice is not None else None
+    except ValueError:
+        return _error("CLARIFICATION_INVALID", 'choice must be {"request": <the clarification>, "option_id": <an id>}.')
     if datasource_id is not None and datasource_id not in {info.id for info in _reachable(engine, user)}:
         # A datasource the caller may not reach answers as a missing one does.
         return _error("DATASOURCE_NOT_FOUND", f"No datasource '{datasource_id}'.")
-    result = engine.run_query(question, datasource_id=datasource_id, user_context=user)
+    result = engine.run_query(question, datasource_id=datasource_id, user_context=user,
+                              **({"choice": picked} if picked else {}))
     return _answer(result.model_dump(mode="json"))
 
 
@@ -162,7 +174,8 @@ def _answer(run: dict[str, Any]) -> dict[str, Any]:
     """``ask``'s result from a ``QueryResult`` as JSON: the answer, the SQL and the first rows.
 
     ``status`` is the run's: success, plan_only, error, needs_approval,
-    stopped, or needs_clarification (Wave B's clarification adds its own key).
+    stopped, or needs_clarification, which adds ``clarification``: each option's id, label and explanation, and
+    the request itself (the plans stay in it), which the assistant sends back with its pick.
     """
     answer = run.get("final_answer") or None
     trace_id = run.get("trace_id") or ""
@@ -182,6 +195,12 @@ def _answer(run: dict[str, Any]) -> dict[str, Any]:
         out["approvals_needed"] = run["approvals_needed"]
     if run.get("stop"):
         out["stop"] = run["stop"]
+    if run.get("clarification"):
+        request = run["clarification"]
+        out["clarification"] = {
+            "phrase": request["phrase"], "request": request,
+            "options": [{"id": o["id"], "label": o["label"], "explanation": o["explanation"]["text"]}
+                        for o in request["options"]]}
     return out
 
 

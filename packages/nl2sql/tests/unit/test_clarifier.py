@@ -67,15 +67,16 @@ def _decomposition(*ids: str) -> DecomposerResponse:
                                      inputs=[CombineInput(subquery_id=i)]) for n, i in enumerate(ids)])
 
 
-def _ctx(settings=None, bus=None):
+def _ctx(settings=None, bus=None, knowledge=None):
     adapter = SimpleNamespace(get_dialect=lambda: "sqlite")
     llm_registry = MagicMock()
     llm_registry.effective.return_value = None
     return fake_runtime(ds_registry=stub_ds_registry(adapter), policies=POLICIES, llm_registry=llm_registry,
-                        settings=settings, **({"bus": bus} if bus is not None else {}))
+                        settings=settings, **({"bus": bus} if bus is not None else {}),
+                        **({"knowledge": knowledge} if knowledge is not None else {}))
 
 
-def _agent(monkeypatch, alternatives, *, phrase="sales", settings=None):
+def _agent(monkeypatch, alternatives, *, phrase="sales", settings=None, knowledge=None):
     """The SQL agent with the real validator, clarifier and generator; the planner and executor are fakes.
 
     Returns ``(graph, planned, executed)``: what the planner and the executor were called with.
@@ -91,7 +92,7 @@ def _agent(monkeypatch, alternatives, *, phrase="sales", settings=None):
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.ExecutorNode", lambda _ctx: (
         lambda s: executed.append(s) or {"executor_response": _executed(_artifact())}))
     monkeypatch.setattr("nl2sql.pipeline.subgraphs.sql_agent.RefinerNode", lambda _ctx: (lambda s: {}))
-    return build_sql_agent_graph(_ctx(settings), execute=True), planned, executed
+    return build_sql_agent_graph(_ctx(settings, knowledge=knowledge), execute=True), planned, executed
 
 
 def _sub_state(clarify=True) -> SubgraphExecutionState:
@@ -511,3 +512,44 @@ def test_the_rendered_planner_prompt_does_not_depend_on_clarify():
         prompts.append(PLANNER_PROMPT.format_messages(**node.chain.invoke.call_args.args[0]))
 
     assert prompts[0] == prompts[1]
+
+
+# ---------------------------------------------------------------- settled phrases (L2, D48)
+
+
+def _glossary(*terms):
+    from nl2sql.knowledge.merge import Knowledge
+    from nl2sql_sdk.knowledge import DatasourceKnowledge, Term
+
+    return Knowledge(datasources={"ds1": DatasourceKnowledge(terms=[Term(term=n, synonyms=s) for n, s in terms])})
+
+
+def _asked(monkeypatch, knowledge):
+    graph, _, executed = _agent(monkeypatch, [INVOICED], knowledge=knowledge)
+    state = graph.invoke(_sub_state())
+    return executed == [], state
+
+
+def test_phrase_that_is_a_term_name_is_settled(monkeypatch):
+    asked, state = _asked(monkeypatch, _glossary(("Sales", []), ("invoiced total", [])))
+
+    assert not asked and not state["errors"]
+    # The settled phrase is neither asked nor listed as an assumption by the explanation.
+    assert state["ast_planner_response"].ambiguous_phrase is None and state["ast_planner_response"].alternatives == []
+
+
+def test_phrase_that_one_term_lists_as_a_synonym_is_settled(monkeypatch):
+    asked, _ = _asked(monkeypatch, _glossary(("revenue", ["sales"]), ("invoiced total", [])))
+
+    assert not asked
+
+
+def test_synonym_shared_by_two_terms_is_asked(monkeypatch):
+    asked, _ = _asked(monkeypatch, _glossary(("revenue", ["sales"]), ("invoiced total", ["Sales"])))
+
+    assert asked
+
+
+def test_a_phrase_no_term_names_is_asked(monkeypatch):
+    assert _asked(monkeypatch, _glossary(("revenue", ["turnover"])))[0]
+    assert _asked(monkeypatch, None)[0]

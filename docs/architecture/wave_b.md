@@ -1087,6 +1087,72 @@ the `outcome` scorer passes when the run ends `needs_clarification`. The
 Chinook suite gains no such case; a new `evals/suites/clarify.yaml` holds a
 handful over the demo glossary's "sales".
 
+!!! note "Built: asking again, settled phrases, saving a pick and the surfaces (L2)"
+    The code on main wins where it differs from the text above. Where the build
+    filled a gap:
+
+    - **Nothing in the pinned entry changed.** H2 and B0 already built the
+      `chosen` source: `PinnedSource.CHOSEN`, `check_pinned`'s refusal of a
+      chosen plan with approvals, the planner's pinned plan with
+      `plan_source="chosen"`, the pinned graph, and the plan cache storing only
+      `"llm"` plans. So `pipeline/graph.py`, `state.py`, `routes.py` and
+      `ast_planner/node.py` are untouched; L2 adds the checks and the pin.
+    - **`nl2sql/clarify/choice.py`.** `choice_problem(choice, *, question,
+      user, ctx, approvals=())` returns the `PipelineError` that refuses a choice
+      (`CLARIFICATION_INVALID`, `CRITICAL`: a changed request, another question
+      or asker, an unknown option, approvals alongside; `CLARIFICATION_STALE`,
+      `ERROR`: the datasource out of scope or gone, another schema version or
+      knowledge digest), or None. `pinned_from_choice(choice)` is the
+      `PinnedRun`: one sub-query from the request's `sub_query`, a `standalone`
+      group, the option's plan, and `chosen_label` (new on `PinnedRun`, read by
+      the explanation). The scope check is in the table's third row, so a denied
+      datasource is `CLARIFICATION_STALE`, not the pinned entry's
+      `SECURITY_VIOLATION` (which remains behind it).
+    - **`choice` on `run_query` and `stream_query`** (`QueryAPI._pin_choice`).
+      A refused choice does not raise: the scope opens, the run ends with that
+      one error (`status` `error`, `result_from_state` on a state with only the
+      error), `run.finished` is published and no graph runs. A `choice` with a
+      `plan` or a `pinned` is a `ValueError` at the call, as the other
+      incompatible pairs are. A choice with `approvals` is the result above,
+      `CLARIFICATION_INVALID`; `check_pinned`'s `ValueError` stays for a direct
+      `run_with_graph` caller.
+    - **"You chose: <label>"** is the first assumption of the step, from
+      `state["pinned"].chosen_label` when `plan_source` is `"chosen"`.
+    - **Settled phrases.** `ClarifierNode._settled` reads the run's pinned
+      `ctx.knowledge` for the sub-query's datasource: a term whose name equals
+      the phrase, or exactly one term listing it as a synonym (casefolded, not
+      scope-filtered: it only decides not to ask). A settled phrase clears
+      `ambiguous_phrase` and `alternatives` on the planner's response (so X1
+      lists no assumption), keeps `alternatives_offered` (the plan is still not
+      cached), and the default plan goes on.
+    - **`engine.knowledge.save_choice(choice, *, user_context, term=None)`**
+      files a `term` proposal (`origin="clarification"`): the `term` (else the
+      phrase) as the name, with the phrase as a synonym when they differ; the
+      option's label as `definition`; `columns` as the `table.column` names the
+      plan's select items read; `tables` the plan's tables. A request whose id
+      does not match its content, or an unknown option, is a `ValueError`; a
+      caller whose scope does not reach the datasource and every table is a
+      `ReviewError` `NOT_FOUND`. Replacing an existing term on accept was
+      already K1's `apply`.
+    - **CLI.** `nl2sql run` numbers the options (`'sales' can be read more than
+      one way:`, `1. label - explanation`); on a terminal (`sys.stdin` and
+      `sys.stdout` both ttys) it prompts for a number and runs again with
+      `choice=`, else prints how to pass it and exits 4.
+    - **MCP.** `ask(question, datasource_id=None, choice=None)`; `choice` is
+      `{"request": ..., "option_id": ...}`. A result with `status`
+      `needs_clarification` carries `clarification: {phrase, request, options:
+      [{id, label, explanation}]}`; the plans stay in `request`. A malformed
+      `choice` is an `error` with `CLARIFICATION_INVALID` and no run. The three
+      clarification codes are in the caller-facing message list.
+    - **Evals.** The `clarify` outcome, `evals.run(clarify=True)` and the scorer
+      were Q1's; L2 adds `suites/clarify.yaml` (`CLARIFY_SUITE_PATH`): five
+      approved `clarify` cases about "sales" for `admin`. `nl2sql init --demo`
+      copies it; `evals.yaml` does not name it (it runs only with clarification
+      on). `nl2sql eval run` has no `clarify` flag yet; the suite runs through
+      `engine.evals.run(suites=[...], clarify=True)`.
+    - **Tests.** The `STUBS` table of `test_wave_b_shapes.py` is gone: its last
+      entry, `save_choice`, is built.
+
 ## 8. Why this answer
 
 `QueryResult.explanation` (D51) is the run's plan in plain English, rendered

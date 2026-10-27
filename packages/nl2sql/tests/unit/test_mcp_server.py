@@ -82,6 +82,7 @@ class _Engine(NL2SQL):
 
     def run_query(self, question, *, datasource_id=None, user_context=None, **kwargs):
         self.calls.append((question, datasource_id, user_context))
+        self.kwargs = kwargs
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
@@ -285,3 +286,45 @@ def test_the_server_s_settings_come_from_code_not_the_environment(tmp_path, monk
 
     assert settings.debug is False and settings.log_level == "INFO" and settings.port == 8000
     assert settings.warn_on_duplicate_tools is True
+
+
+def _clarification():
+    from nl2sql import ClarificationOption, ClarificationRequest
+    from nl2sql.explain.render import explain_plan
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+
+    plan = PlanModel.model_validate({"tables": [{"name": "Album", "alias": "a"}], "select_items": [
+        {"alias": "n", "expr": {"kind": "column", "alias": "a", "column_name": "AlbumId"}}]})
+    options = [ClarificationOption(id=i, label=label, plan=plan.model_dump(mode="json"),
+                                   explanation=explain_plan(plan, datasource_id="chinook"))
+               for i, label in (("a", "Albums"), ("b", "Releases"))]
+    return ClarificationRequest.build(
+        question="How many records?", asker_user_id="ana", phrase="records", datasource_id="chinook",
+        schema_version="v1", knowledge_digest="d", sub_query={"id": "sq1", "datasource_id": "chinook"},
+        options=options)
+
+
+def test_mcp_ask_round_trips_a_choice():
+    request = _clarification()
+    asked = _call(_Engine(QueryResult(status="needs_clarification", clarification=request)), VIEWER, "ask",
+                  question="How many records?")
+
+    assert asked["status"] == "needs_clarification"
+    shown = asked["clarification"]
+    assert [(o["id"], o["label"]) for o in shown["options"]] == [("a", "Albums"), ("b", "Releases")]
+    assert all(o["explanation"] for o in shown["options"]) and "plan" not in shown["options"][0]
+    assert shown["request"]["id"] == request.id  # the plans stay in the request the assistant sends back
+
+    engine = _Engine()
+    _call(engine, VIEWER, "ask", question="How many records?", choice={"request": shown["request"], "option_id": "b"})
+
+    choice = engine.kwargs["choice"]
+    assert choice.option_id == "b" and choice.request == request
+
+
+def test_mcp_ask_refuses_a_choice_that_is_not_a_request():
+    engine = _Engine()
+    body = _call(engine, VIEWER, "ask", question="How many records?", choice={"option_id": "b"})
+
+    assert body["status"] == "error" and body["errors"][0]["code"] == "CLARIFICATION_INVALID"
+    assert engine.calls == []
