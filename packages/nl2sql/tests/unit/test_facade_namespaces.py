@@ -182,7 +182,7 @@ def test_index_clear_empties_the_index(engine):
 def test_index_inspect_runs_the_mmr_search(engine):
     engine.index.build()
 
-    report = engine.index.inspect("customers", k=2)
+    report = engine.index.inspect("customers", k=2, user_context=UserContext(roles=["admin"]))
 
     assert {"picks", "dropped"} <= set(report)
 

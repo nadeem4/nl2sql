@@ -542,8 +542,11 @@ re-ranking model; the "re-ranking" is MMR, explained in
   same text, and diff the **Copy as text** output of the two runs: one
   fixed-width line per entry (rank, pick or drop, similarity, MMR score, type,
   name).
-- **Local only**, like Settings and Rebuild, because it shows every index entry,
-  column statistics and sample values included, with no role filter: on a
+- **As a role.** The search is made as the role chosen in **Ask as**, so the pool
+  holds only the entries that role may read. The playground trusts the role the
+  page sends; it does not verify who is asking.
+- **Local only**, like Settings and Rebuild, because it shows the index entries
+  the role reaches, column statistics and sample values included: on a
   non-loopback `--host` it is off (`POST /api/retrieval` answers `403`) unless
   `--allow-settings` is given, and it refuses another site's page, a
   non-loopback hostname and anything but JSON.

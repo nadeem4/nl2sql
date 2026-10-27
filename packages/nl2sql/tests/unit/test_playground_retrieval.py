@@ -11,18 +11,64 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
+from types import SimpleNamespace
+
 from nl2sql import NL2SQL
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.embeddings import EmbeddingInfo
 from nl2sql.indexing.retrieval import Retriever
+from nl2sql_sdk.knowledge import DatasourceKnowledge
+from nl2sql_sdk.schema import (
+    ColumnContract,
+    SchemaContract,
+    SchemaMetadata,
+    SchemaSnapshot,
+    TableContract,
+    TableMetadata,
+    TableRef,
+)
 
 from test_retrieval_trace import QUESTION, _store  # noqa: E402  (same directory)
 
 
+def _chinook_snapshot() -> SchemaSnapshot:
+    tables = {name: TableContract(table=TableRef(schema_name="main", table_name=name),
+                                  columns={"Id": ColumnContract(name="Id", data_type="INTEGER")})
+              for name in ("Genre", "Track", "Invoice", "InvoiceLine", "Artist", "Employee")}
+    metadata = {name: TableMetadata(table=contract.table) for name, contract in tables.items()}
+    return SchemaSnapshot(contract=SchemaContract(datasource_id="chinook", engine_type="sqlite", tables=tables),
+                          metadata=SchemaMetadata(datasource_id="chinook", engine_type="sqlite", tables=metadata))
+
+
 class _Snapshots:
     def get_snapshot(self, _ds, _version):
-        return None
+        return _chinook_snapshot()
+
+
+class _Scope:
+    """What ``policy_engine.scope`` returns: the ``analyst`` role may not read ``Employee``."""
+
+    grants: list = []
+    check = None
+
+    def __init__(self, datasource_id, roles):
+        self.datasource_id, self.roles = datasource_id, roles
+
+    def reaches_datasource(self):
+        return True
+
+    def allows(self, _schema, table):
+        return not ("analyst" in self.roles and table == "Employee")
+
+
+class _Policies:
+    def __init__(self):
+        self.asked_as = []
+
+    def scope(self, user_context, datasource_id):
+        self.asked_as.append(user_context.roles)
+        return _Scope(datasource_id, user_context.roles)
 
 
 class _Registry:
@@ -48,6 +94,9 @@ class _Engine(NL2SQL):
         self._runtime.state = _Snapshots()
         self._runtime.ds_registry = _Registry()
         self._runtime.curated = None
+        self._runtime.policy_engine = _Policies()
+        self._runtime.knowledge = SimpleNamespace(get=lambda _ds: DatasourceKnowledge())
+        store.state = self._runtime.state
 
     @property
     def datasources(self):
@@ -99,6 +148,20 @@ def test_the_toggles_narrow_and_reweigh_the_search(tmp_path):
     assert [e["pick_order"] for e in tables["pool"][:2]] == [1, 2]
     assert diverse["pool"][1]["picked"] is False
     assert other["pool"] == []
+
+
+def test_a_search_is_made_as_the_role_asked_and_shows_only_what_it_may_read(tmp_path):
+    engine = _Engine(_store(tmp_path))
+    app = build_app(engine, questions=[], roles=["admin", "analyst"], mode="replay", dataset="chinook",
+                    project_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8765")
+    tables = lambda body: {e["table"] for e in body["pool"] if e["type"] == "schema.table"}  # noqa: E731
+
+    as_default = client.post("/api/retrieval", json={"query": QUESTION}).json()
+    as_analyst = client.post("/api/retrieval", json={"query": QUESTION, "role": "analyst"}).json()
+
+    assert "Employee" in tables(as_default) and "Employee" not in tables(as_analyst)
+    assert engine._runtime.policy_engine.asked_as == [["admin"], ["analyst"]]
 
 
 @pytest.mark.parametrize("body", [

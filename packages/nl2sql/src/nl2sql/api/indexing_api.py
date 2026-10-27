@@ -210,12 +210,65 @@ class IndexAPI:
                 "fetch_multiplier": Retriever.FETCH_MULTIPLIER, "types": list(ENTRY_TYPES)}
 
     def inspect(self, query: str, k: int = 8, lambda_mult: Optional[float] = None,
-                types=None, datasource_id: Optional[str] = None) -> Dict[str, Any]:
-        """One MMR search of the live index, as the engine runs it.
+                types=None, datasource_id: Optional[str] = None, *, user_context: UserContext) -> Dict[str, Any]:
+        """One MMR search of the live index, as the engine runs it, over what the caller's scope reaches.
 
         The candidate pool with scores, the picks in order and what was
         dropped. ``types`` limits the entry types (``schema.table`` ...). It
-        reads index metadata only and needs no LLM.
+        reads index metadata only and needs no LLM. There is no default
+        caller (D60): the entries of a table the caller's scope denies, a
+        glossary term ``engine.knowledge.show`` would hide from them, and any
+        entry whose text names a denied table never reach the pool. A
+        datasource the caller cannot reach, or that is not indexed, shows
+        nothing. Hiding happens after the search, from a pool four times
+        larger, so a scoped caller still gets a full pool unless most of what
+        matches is hidden from them. Verified-query entries are never shown.
+
+        Raises:
+            TypeError: ``user_context`` is not a ``UserContext``.
         """
+        from nl2sql.api.knowledge_api import _caller
+
+        caller = _caller(user_context)
         kwargs = {"lambda_mult": lambda_mult} if lambda_mult is not None else {}
-        return self._ctx.vector_store.inspect(query, k=k, types=types, datasource_id=datasource_id, **kwargs)
+        return self._ctx.vector_store.inspect(query, k=k, types=types, datasource_id=datasource_id,
+                                              allow=self._reachable(caller), **kwargs)
+
+    def _reachable(self, caller: UserContext) -> Callable[[Any], bool]:
+        """Whether an index hit is one the caller's scope reaches; the scope is read once per datasource."""
+        from nl2sql.knowledge.scope import denied_pattern, deny_names, mentions, visible
+
+        ctx, reached = self._ctx, {}
+
+        def reach(datasource_id):
+            if datasource_id not in reached:
+                reached[datasource_id] = None
+                scope = ctx.policy_engine.scope(caller, datasource_id)
+                snapshot = ctx.vector_store.snapshot(datasource_id) if scope.reaches_datasource() else None
+                if snapshot is not None:
+                    denied = deny_names(scope)
+                    shown = visible(ctx.knowledge.get(datasource_id), snapshot, scope.allows, denied)
+                    tables = {key for key, contract in snapshot.contract.tables.items()
+                              if scope.allows(contract.table.schema_name, contract.table.table_name)}
+                    reached[datasource_id] = (tables, {t.term for t in shown.terms},
+                                              denied_pattern(snapshot, scope.allows, denied))
+            return reached[datasource_id]
+
+        def allowed(hit) -> bool:
+            md = hit.metadata
+            access = reach(md.get("datasource_id"))
+            if access is None:
+                return False
+            tables, terms, pattern = access
+            kind = md.get("type")
+            if kind in ("schema.table", "schema.column"):
+                ok = md.get("table") in tables
+            elif kind == "schema.relationship":
+                ok = md.get("from_table") in tables and md.get("to_table") in tables
+            elif kind == "knowledge.term":
+                ok = md.get("term") in terms
+            else:
+                ok = kind in ("schema.datasource", "schema.datasource_example", "schema.metric")
+            return ok and not mentions(hit.text, pattern)
+
+        return allowed

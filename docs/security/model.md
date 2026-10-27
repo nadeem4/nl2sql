@@ -23,6 +23,12 @@ from depends on the client:
   role source configured they answer loopback clients only. See
   [Admin routes](../api/rest/index.md#admin-routes).
 
+- Playground: the page sends the role chosen in "Ask as" with each request
+  (`/api/ask`, and `/api/retrieval` for the Retrieval inspector), and the
+  server believes it. The inspector shows a role only the entries that role may
+  read, but anyone who can reach the playground can ask as any role; it is a
+  local demo, off beyond loopback unless `--allow-settings`.
+
 The REST API still does not verify who the caller is. **If you expose this
 service, put your own authentication in a proxy in front of it, derive the role
 from that, and have the proxy overwrite the role header on every request**;

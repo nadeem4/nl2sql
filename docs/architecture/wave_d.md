@@ -455,7 +455,7 @@ turn's body (Wave C's D104).
 | `POST /jobs/index` (replaces `/index/{id}`, `/index-all`) | `index.build` (a job) | Admin |
 | `DELETE /index` (kept) | `index.clear()` | Admin |
 | `GET /index/check` | Wave A's `index.check(ids)` | Drift: a `DriftReport` per datasource with its impact. Admin: it reflects every live database. |
-| `GET /index/inspect`, `POST /index/inspect` | `index.inspect_defaults()`, `index.inspect(...)` | The Retrieval inspector (the playground's `/api/retrieval`) |
+| `GET /index/inspect`, `POST /index/inspect` | `index.inspect_defaults()`, `index.inspect(..., user_context=)` | The Retrieval inspector (the playground's `/api/retrieval`). Searches as the caller: the pool holds only what the caller's scope reaches (K3b). |
 
 **Knowledge and proposals** (`routes/knowledge.py`)
 
