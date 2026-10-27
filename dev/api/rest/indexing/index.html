@@ -5307,8 +5307,8 @@
 <p>Execution flow:
 - Delegates to <code>engine.index.build([datasource_id])</code>: the new entries are
   written beside the live ones and switched in when all are written. No
-  enrichment model call is made: enrichment is opt-in in the engine and these
-  routes do not ask for it.</p>
+  model is called: a build embeds the schema, the glossary and the verified
+  queries.</p>
 <p>Response:
 <code>{"success": true, "datasource_id": "...", "indexing_stats": {...}, "message": "..."}</code></p>
 <p>Errors:
@@ -5316,8 +5316,7 @@
   <code>HTTP 500</code> naming the reason. It keeps its previous entries.</p>
 <h3 id="post-apiv1index-all"><code>POST /api/v1/index-all</code></h3>
 <p>Execution flow:
-- Delegates to <code>engine.index.build()</code>, every configured datasource, without
-  enrichment.</p>
+- Delegates to <code>engine.index.build()</code>, every configured datasource.</p>
 <p>Response:
 <code>{"success": &lt;every datasource indexed&gt;, "indexing_results": {"stats": [...], "empty": [...], "errors": [...]}, "message": "..."}</code>.
 A datasource that fails is in <code>errors</code> (<code>datasource_id</code>, <code>error</code>) and keeps

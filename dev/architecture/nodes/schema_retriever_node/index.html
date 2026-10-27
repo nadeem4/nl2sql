@@ -2730,7 +2730,11 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <li><strong>Terms</strong> whose name or a synonym appears, as whole words with case and
   punctuation ignored, in the sub-query's intent or the question: 1.0 for the
   name, 0.9 for a synonym, the best <code>settings.knowledge.top_k</code> (8). Two terms
-  sharing a synonym are both sent; that is how the planner sees an ambiguity.</li>
+  sharing a synonym are both sent; that is how the planner sees an ambiguity.
+  A term the caller sees also matches when its <code>knowledge.term</code> index entry is
+  at least <code>settings.knowledge.match_floor</code> (0.6) similar to the sub-query's
+  intent (<code>Retriever.retrieve_term_candidates</code>), scoring that similarity; if the
+  search fails, terms match by name only.</li>
 <li><strong>Rules</strong> whose <code>tables</code> is empty or names one of the tables sent.</li>
 <li>The denied-name pattern is built once per sub-query, and only the readable
   tables' comments are checked against it.</li>

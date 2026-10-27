@@ -448,6 +448,19 @@
       
     </span>
 </a>
+<nav aria-label="Verified queries" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#knowledge-in-the-index">
+<span class="md-ellipsis">
+      
+        Knowledge in the index
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#chunk-index-mapping-actual">
@@ -2461,6 +2474,19 @@
       
     </span>
 </a>
+<nav aria-label="Verified queries" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#knowledge-in-the-index">
+<span class="md-ellipsis">
+      
+        Knowledge in the index
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#chunk-index-mapping-actual">
@@ -2631,9 +2657,9 @@
 <h2 id="indexing-flow">Indexing flow</h2>
 <pre class="mermaid"><code>flowchart TD
     Adapter[Datasource Adapter] --&gt; Snapshot[Schema Snapshot]
-    Snapshot --&gt; Enrich[LLM Enrichment - optional]
-    Enrich --&gt; Register[StateStore.put_snapshot]
+    Snapshot --&gt; Register[StateStore.put_snapshot]
     Register --&gt; Chunker[SchemaChunkBuilder]
+    Knowledge[The glossary] --&gt; Chunker
     Curated[curated.yaml] --&gt; CChunker[CuratedChunkBuilder]
     Chunker --&gt; Embed[The engine's embedder]
     CChunker --&gt; Embed
@@ -2651,25 +2677,33 @@ build returns the issues in the datasource's stats under <code>issues</code>, an
 <code>nl2sql index</code> prints them (see
 <a href="../../adapters/sqlalchemy/#reading-a-schema">Reading a schema</a>).</p>
 <h2 id="what-is-indexed-today">What is indexed today</h2>
-<p>Schema-derived chunks, and the verified queries of <a href="../../configuration/curated/"><code>curated.yaml</code></a>
-when the file exists. There is no symbolic index, behavioral index, or other
-catalog in the current implementation.</p>
+<p>Schema-derived chunks, the verified queries of <a href="../../configuration/curated/"><code>curated.yaml</code></a>
+when the file exists, and <a href="../../configuration/knowledge/">knowledge</a>: the
+glossary's descriptions in the table and column entries, its terms, its joins
+and its example questions (<a href="#knowledge-in-the-index">Knowledge in the index</a>).
+There is no symbolic index, behavioral index, or other catalog in the current
+implementation.</p>
+<p>The stored schema snapshot holds only what the database said (B31): a table or
+column comment the adapter read. A person's words stay in the glossary, and a
+description a model drafts is a proposal in the review queue that reaches
+nothing until a person accepts it. <code>nl2sql index</code> calls no model.</p>
 <h2 id="chunk-types-and-contracts">Chunk types and contracts</h2>
 <p>Chunk types are defined in <code>nl2sql.indexing.models</code>:</p>
 <ul>
-<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description and domains. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> of a <code>Datasource</code> passed to <code>engine.datasources.add</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter or enrichment produced.</li>
+<li><strong>DatasourceChunk</strong> (<code>schema.datasource</code>): datasource description and domains. The description is the one the datasource was registered with (<code>description:</code> in the datasources config, or the <code>description</code> of a <code>Datasource</code> passed to <code>engine.datasources.add</code>); the orchestrator reads it from the datasource registry, falling back to the datasources file only when the registry has none. It lives in the config rather than the database, so the orchestrator writes it into the snapshot's metadata, where it takes precedence over any description the adapter produced.</li>
 <li><strong>DatasourceExampleChunk</strong> (<code>schema.datasource_example</code>): one example question
   the datasource answers, one entry per question, so the fifth question moves
   routing as much as the first (in the datasource entry's one text it barely
   moved the vector). <code>build_example_chunks(datasource_id, questions,
-  schema_version)</code> builds them from a list the caller assembles: today the
-  datasource's <code>sample_questions</code> (or enrichment's), and from Wave B the
-  glossary's <code>examples</code> too. A blank or repeated question is skipped. Ids:
+  schema_version)</code> builds them from a list the caller assembles: the
+  datasource's <code>sample_questions</code> and the glossary's <code>examples</code>
+  (<code>SchemaChunkBuilder</code> joins them). A blank or repeated question is skipped. Ids:
   <code>schema.datasource_example:&lt;datasource_id&gt;:&lt;12 hex of the question's
   SHA-256&gt;:&lt;schema_version&gt;</code>.</li>
-<li><strong>TableChunk</strong> (<code>schema.table</code>): table name, PKs, column list, FK summaries, row counts.</li>
-<li><strong>ColumnChunk</strong> (<code>schema.column</code>): column type, stats, synonyms, PII flags.</li>
-<li><strong>RelationshipChunk</strong> (<code>schema.relationship</code>): FK relationships, columns, cardinality.</li>
+<li><strong>TableChunk</strong> (<code>schema.table</code>): table name, PKs, column list, FK summaries, row counts, and the chosen description (the glossary's, else the database's comment).</li>
+<li><strong>ColumnChunk</strong> (<code>schema.column</code>): column type, stats, PII flags, the chosen description, synonyms (the database's and the glossary's) and the role a person set in the glossary (a <code>Role:</code> line; a role derived from the schema is not written).</li>
+<li><strong>RelationshipChunk</strong> (<code>schema.relationship</code>): FK relationships, columns, cardinality, and <code>origin</code> (<code>database</code>, or <code>glossary</code> for a join a person wrote).</li>
+<li><strong>TermChunk</strong> (<code>knowledge.term</code>): a glossary term, its synonyms and its definition. Metadata: <code>id</code>, <code>type</code>, <code>datasource_id</code>, <code>term</code>, <code>schema_version</code>. Id: <code>knowledge.term:&lt;datasource_id&gt;:&lt;12 hex of the lower-cased term's SHA-256&gt;:&lt;schema_version&gt;</code>.</li>
 <li><strong>MetricChunk</strong> (<code>schema.metric</code>): defined but <strong>not emitted</strong> by <code>SchemaChunkBuilder</code>.</li>
 <li><strong>VerifiedQueryChunk</strong> (<code>curated.verified_query</code>): one phrasing of a verified
   query, or its description, built by <code>CuratedChunkBuilder</code>
@@ -2690,16 +2724,38 @@ next schema re-index.</p>
 <p>The build's pointer also records <code>curated_hash</code>, a SHA-256 of that datasource's verified queries
 as canonical JSON (metrics are left out; nothing indexes them yet). Index
 health compares it with the file as it is now (see <a href="#index-health">Index health</a>).</p>
-<p><strong>Changing <code>curated.yaml</code> does not re-read the schema.</strong>
-<code>nl2sql index --curated-only</code> (<code>engine.index.build(curated_only=True)</code>,
-<code>IndexingOrchestrator.refresh_curated()</code>) writes a new build for each datasource
-the usual way, except that the live build's schema entries are <strong>copied</strong>
-into it with their stored vectors, and the pointer keeps its schema version:
-no schema read, no snapshot registered, no enrichment model call, and only the
-verified queries are embedded. The switch and the clean-up are the ones
-described below, so the refresh is just as safe. It needs the datasource to
-have been indexed once; otherwise that datasource fails with a message saying
-to run <code>nl2sql index</code>. <code>--curated-only</code> cannot be combined with <code>--enrich</code>.</p>
+<p><strong>Changing <code>curated.yaml</code> or the glossary does not re-read the schema.</strong>
+<code>nl2sql index --refresh</code> (<code>engine.index.refresh()</code>,
+<code>IndexingOrchestrator.refresh()</code>) writes a new build for each datasource the
+usual way, except that every entry's text is rendered again from the live
+build's <strong>stored snapshot</strong>, the current verified queries and the current
+knowledge, and the pointer keeps its schema version: no schema read, no
+snapshot registered, no model call. An entry whose text and metadata equal the
+live build's <strong>keeps its stored vector</strong>; only the changed and new entries are
+embedded, and an entry no longer written is dropped. The switch and the
+clean-up are the ones described below, so the refresh is just as safe. It needs
+the datasource to have been indexed once; otherwise that datasource fails with
+a message saying to run <code>nl2sql index</code>.</p>
+<h3 id="knowledge-in-the-index">Knowledge in the index</h3>
+<p>Prompts read the in-memory knowledge, so an accepted change is effective in
+the next run. The index carries knowledge for ranking (D56): the chosen
+descriptions and synonyms in the table and column entries, a <code>knowledge.term</code>
+entry per term, a relationship entry per glossary join that resolves (with its
+cardinality and <code>origin: glossary</code>), and the glossary's <code>examples</code> among the
+example questions. Names that do not resolve against the snapshot are left out,
+as <code>engine.knowledge.show</code> reports them.</p>
+<p>A term is also matched by similarity: <code>Retriever.retrieve_term_candidates(query,
+datasource_id, k, terms=None)</code> returns the term entries nearest the sub-query's intent
+(only the named <code>terms</code> when given: the ones the caller's scope shows), and
+the schema retriever keeps the ones at or above <code>settings.knowledge.match_floor</code>
+(0.6) whose term the caller's scope shows, beside the terms whose name or
+synonym appears in the text. The search is a plain similarity search over the
+live build, embeds nothing when the datasource has no term entry, and a failure
+leaves the match by name.</p>
+<p>The build's pointer records <code>knowledge_hash</code>, the datasource's knowledge digest,
+beside <code>curated_hash</code>. Index health compares it with the digest of the live
+knowledge: a glossary changed since the build makes the index <code>stale</code> (below),
+and <code>nl2sql index --refresh</code> clears it without reading the schema.</p>
 <p><code>Retriever.retrieve_verified_query_candidates(question, datasource_ids, k)</code>
 returns the verified queries a question most resembles. It is a plain
 similarity search, not MMR, because several phrasings of one query are exactly
@@ -2794,14 +2850,16 @@ its <strong>contents</strong>, never by whether a folder exists (the demo once h
 <code>data/vector_store_demo</code> folder holding 0 entries). Only the builds the
 pointers name are counted. Status, worst first: <code>missing</code> (the model has no
 namespace yet: never indexed, or the model changed), <code>empty</code> (no live
-entries), <code>stale</code> (a configured datasource has no live build, or its build's
-snapshot is gone from the state store), <code>ok</code>. It reports entry counts by type,
+entries), <code>stale</code> (a configured datasource has no live build, its build's
+snapshot is gone from the state store, or its glossary changed since the build:
+"The glossary changed for 'chinook' since it was indexed; run <code>nl2sql index
+--refresh --datasource chinook</code>"), <code>ok</code>. It reports entry counts by type,
 the schema version each live build was made from (<code>index_version</code>), when each
 was built, the embedding model and the namespace. <code>warnings</code> never change the
 status: a datasource whose <code>curated.yaml</code> section has changed since it was
 indexed (its pointer's <code>curated_hash</code> differs from the file's) gets
 "curated.yaml changed for 'chinook' since it was indexed; run <code>nl2sql index
---curated-only --datasource chinook</code>". Questions keep working meanwhile; the
+--refresh --datasource chinook</code>". Questions keep working meanwhile; the
 stale entries still name queries that exist. A <code>preferred_tables</code> entry missing
 from the datasource's live snapshot is a warning too. <code>nl2sql doctor</code> prints it
 under <strong>Index</strong>, <code>nl2sql demo</code> rebuilds at startup when it is not <code>ok</code>, and the
@@ -3053,17 +3111,9 @@ searches are approximate.</p>
 <li>Vector store retrieval wrapped by <code>VECTOR_BREAKER</code>; failures fast‑fail.</li>
 <li>Vector retrieval errors in <code>SchemaRetrieverNode</code> return empty results with warnings.</li>
 <li>If no candidates are found, the retriever falls back to full schema snapshot.</li>
-<li>Enrichment is opt-in: <code>engine.index.build</code>, <code>rebuild_index</code>,
-  <code>IndexingOrchestrator</code> and <code>nl2sql index</code> all default to
-  <code>enrich=False</code>; pass <code>enrich=True</code> (or <code>nl2sql index --enrich</code>) to spend
-  tokens on it. It only fills blanks: a table or column comment read from the
-  database is never overwritten.</li>
-<li>Enrichment failures return the original snapshot without enrichment, and
-  never fail indexing. <code>enrich_schema_snapshot</code> resolves its own LLM inside the
-  guard, so a missing API key, an unreachable endpoint and a failed call all
-  degrade the same way. A missing/unusable LLM logs at <code>INFO</code>; any other
-  failure (a 401, a timeout) logs one <code>WARNING</code> line with the reason and no
-  stack trace (the trace is logged at <code>DEBUG</code>).</li>
+<li>Indexing calls no model, so a missing API key never affects it. Descriptions
+  a model drafts are proposals (the profiler), not part of the index or the
+  snapshot, until a person accepts them into the glossary.</li>
 <li>A changed embedding model reads its own, empty namespace: health says
   <code>missing</code> and <code>nl2sql index</code> builds it. Nothing is refused.</li>
 <li>When the resolver finds no datasource and the index is empty, its
@@ -3080,8 +3130,8 @@ searches are approximate.</p>
   <a href="#retrieval-mmr-not-a-re-ranking-model">Retrieval</a>.</li>
 <li>No caching or sharding layers are implemented.</li>
 <li>Index refresh re-embeds every entry of the datasource being re-indexed; other
-  datasources are untouched. <code>nl2sql index --curated-only</code> embeds only the
-  verified queries and copies the schema entries' stored vectors.</li>
+  datasources are untouched. <code>nl2sql index --refresh</code> embeds only the entries
+  whose text changed and keeps the stored vectors of the rest.</li>
 </ul>
 <h2 id="observability-hooks">Observability hooks</h2>
 <ul>

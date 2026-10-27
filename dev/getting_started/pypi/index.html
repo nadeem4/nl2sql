@@ -5594,10 +5594,8 @@ with a key-free ONNX model, and <code>provider: openai</code> needs <code>OPENAI
 <a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"runtime_pg"</span><span class="p">])</span>
 </code></pre></div>
 <p>The <code>description</code> is indexed as given, even though no file lists
-<code>runtime_pg</code>, and the datasource joins <code>engine.config</code>. Indexing makes no LLM call unless you ask for one:
-<code>engine.index.build(["runtime_pg"], enrich=True)</code> has the
-<code>profiler</code> agent write descriptions for tables and columns the
-database left without a comment.</p>
+<code>runtime_pg</code>, and the datasource joins <code>engine.config</code>. Indexing makes no LLM call; the descriptions it
+indexes are the database's comments and your glossary's.</p>
 <p>You can also add the datasources of another config:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">load_config</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>

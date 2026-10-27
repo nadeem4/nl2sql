@@ -5428,7 +5428,7 @@
 <p>The schema layer provides <strong>authoritative, versioned snapshots</strong> and <strong>structured retrieval</strong> to ground planning. It is split into:</p>
 <ul>
 <li><strong>Schema contracts</strong>: structural schema (tables, columns, foreign keys).</li>
-<li><strong>Schema metadata</strong>: descriptive enrichment and statistics.</li>
+<li><strong>Schema metadata</strong>: the database's own comments and statistics.</li>
 <li><strong>The state store</strong>: immutable, versioned snapshots, and the diffs between them, kept by <code>storage.state</code>.</li>
 <li><strong>Schema retrieval</strong>: staged lookup via schema chunks.</li>
 </ul>
@@ -5467,7 +5467,7 @@ of its contract and metadata). A stored snapshot is never changed: in the
 <li>Storing a snapshot whose contract and metadata are identical to a stored one
   returns that version, and writes nothing.</li>
 <li>A snapshot with the same structure but new metadata (statistics,
-  descriptions, enrichment) is a <strong>new version</strong>. A run that pinned the old
+  descriptions) is a <strong>new version</strong>. A run that pinned the old
   version keeps reading exactly the snapshot its index build was made from.</li>
 </ul>
 <p>The structural fingerprint (<code>nl2sql.schema.generate_schema_fingerprint</code>:
@@ -5526,7 +5526,12 @@ is safe to share between threads: each use of its one connection holds a lock.</
 <p>There is no "latest snapshot" to read. Indexing stores a datasource's
 snapshot first and its index entries second; the index store's
 <code>BuildPointer</code> for the datasource then records the <code>schema_version</code> the live
-build was made from, and switching that pointer is the commit. Every reader
+build was made from, and switching that pointer is the commit. The pointer
+also records the <code>curated_hash</code> and the <code>knowledge_hash</code> the build was made
+with, so health can tell that <code>curated.yaml</code> or the glossary has changed
+since. A snapshot holds only what the database said: model-drafted
+descriptions are proposals, and a person's words live in the glossary
+(see <a href="../../architecture/indexing/#knowledge-in-the-index">Indexing</a>). Every reader
 (the resolver, the schema retriever, the curated matcher,
 <code>engine.datasources.schema()</code>, <code>engine.curated.validate()</code>) resolves the
 version through the pointer and reads <code>get_snapshot(datasource_id,

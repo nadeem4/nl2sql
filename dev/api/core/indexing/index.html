@@ -4369,6 +4369,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#indexrefresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#indexhealth" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5376,6 +5387,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#indexrefresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        index.refresh
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#indexhealth" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5520,14 +5542,14 @@ inspect one search of it, and measure schema drift.</p>
 <li><code>packages/nl2sql/src/nl2sql/indexing/retrieval.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/indexing/health.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/storage/chroma.py</code></li>
-<li><code>packages/nl2sql/src/nl2sql/indexing/enrichment_service.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/indexing/chunk_builder.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/storage/sqlite.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/schema/drift.py</code>, <code>diff.py</code>, <code>impact.py</code> (schema drift)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <h3 id="indexbuild">index.build</h3>
 <p>Signature:
-<code>build(datasource_ids=None, *, curated_only=False, enrich=False, on_progress=None, on_datasource=None) -&gt; RebuildResult</code></p>
+<code>build(datasource_ids=None, *, on_progress=None, on_datasource=None) -&gt; RebuildResult</code></p>
 <table>
 <thead>
 <tr>
@@ -5539,14 +5561,6 @@ inspect one search of it, and measure schema drift.</p>
 <tr>
 <td><code>datasource_ids</code></td>
 <td>Only these datasources; every configured one when <code>None</code>.</td>
-</tr>
-<tr>
-<td><code>curated_only</code></td>
-<td>Re-index only the verified queries, keeping each datasource's schema entries: no schema read, no model call.</td>
-</tr>
-<tr>
-<td><code>enrich</code></td>
-<td>Ask the <code>profiler</code> LLM for table and column descriptions. Off by default: it spends tokens.</td>
 </tr>
 <tr>
 <td><code>on_progress</code></td>
@@ -5598,9 +5612,20 @@ console line and a job's status record alike:</p>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">build</span><span class="p">([</span><span class="s2">"shop"</span><span class="p">],</span> <span class="n">on_datasource</span><span class="o">=</span><span class="n">show</span><span class="p">)</span>
 </code></pre></div>
 <p>A failure of one datasource never raises: it is in <code>errors</code>, and that
-datasource keeps its previous build and schema version. Enrichment errors are
-never raised: enrichment is best-effort and degrades to the unenriched
-snapshot.</p>
+datasource keeps its previous build and schema version. A build calls no model.</p>
+<h3 id="indexrefresh">index.refresh</h3>
+<p>Signature:
+<code>refresh(datasource_ids=None, *, on_progress=None, on_datasource=None) -&gt; RebuildResult</code></p>
+<p>Writes the entries of <code>datasource_ids</code> (every datasource when <code>None</code>) again
+after a glossary or <code>curated.yaml</code> change. It reads no schema and calls no
+model: each entry's text is rendered from the live build's stored snapshot,
+the current verified queries and the current knowledge, an entry whose text and
+metadata did not change keeps its stored vector, and only the others are
+embedded. The pointer keeps its schema version and records the new
+<code>knowledge_hash</code> and <code>curated_hash</code>, so <code>health()</code> stops reporting the index
+<code>stale</code>. A datasource that was never indexed (or whose stored snapshot is gone)
+fails with the command to run. The result is a <code>RebuildResult</code> as for <code>build</code>.
+<code>nl2sql index --refresh</code> calls it.</p>
 <p>The build goes into the namespace of the configured embedding model. Each
 datasource's new entries are written under a new build id, and its build
 pointer (the build id and the schema version it was made from) is switched to
@@ -5674,18 +5699,14 @@ pipeline's own retrieval uses: <code>k</code> (8 picks), <code>lambda_mult</code
 only, 0 is difference only), <code>fetch_multiplier</code> (the candidate pool is <code>k</code>
 times it) and <code>types</code>, every entry type the index holds
 (<code>schema.datasource</code>, <code>schema.datasource_example</code>, <code>schema.table</code>,
-<code>schema.column</code>, <code>schema.relationship</code>, <code>schema.metric</code>). The playground's Retrieval inspector starts from it.</p>
+<code>schema.column</code>, <code>schema.relationship</code>, <code>schema.metric</code>, <code>knowledge.term</code>). The playground's Retrieval inspector starts from it.</p>
 <h2 id="execution-lifecycle">Execution Lifecycle</h2>
 <ul>
 <li>Fetch schema via adapter.</li>
-<li>Only with <code>enrich=True</code>: enrich schema metadata using the <code>profiler</code>
-  LLM. Enrichment fills blanks only: a table or column comment read from the
-  database is never replaced. If the client cannot be built (no API key), the
-  endpoint is unreachable, or the call fails, the unenriched snapshot is used
-  and indexing continues.</li>
 <li>Store the schema snapshot and its version (nothing reads it yet).</li>
-<li>Build the chunks, embed them, write them as a new build, and switch the
-  datasource's build pointer to it.</li>
+<li>Build the chunks (the schema's, the knowledge's and the verified queries'),
+  embed them, write them as a new build, and switch the datasource's build
+  pointer to it, recording the <code>knowledge_hash</code> and <code>curated_hash</code>.</li>
 </ul>
 
 

@@ -4188,6 +4188,12 @@ embedded. The pointer switches keeping its schema version.
 <code>engine.index.refresh(datasource_ids=None)</code>, and <code>nl2sql index
 --curated-only</code> becomes <code>nl2sql index --refresh</code>. <code>ENTRY_TYPES</code> in
 <code>api/indexing_api.py</code> gains <code>knowledge.term</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: knowledge in the index (K3)</p>
+<p>The entries, the term search, <code>refresh</code>, the pointer's <code>knowledge_hash</code> and
+<code>stale</code>, and B31 are built; see the K3 note in <a href="#16-pr-plan">the PR plan</a>
+for the exact names. The user guide is <a href="../indexing/#knowledge-in-the-index">Indexing</a>.</p>
+</div>
 <h2 id="5-the-review-queue">5. The review queue</h2>
 <h3 id="proposals">Proposals</h3>
 <p>Every change Wave B suggests to a person's knowledge or curated answers is
@@ -4324,7 +4330,7 @@ writes only two:</p>
 <tr>
 <td><code>verified_query</code></td>
 <td>The <code>curated</code> section's own file: the verified query added under its datasource</td>
-<td>The curated checks (<code>config/curated.py</code>) run on the edited section first; then the runtime's curated section is swapped atomically (<code>Runtime.replace_curated</code>) and the datasource's curated entries are refreshed (<code>IndexingOrchestrator.refresh_curated</code> until K3 renames it <code>refresh</code>), so the next question can match it.</td>
+<td>The curated checks (<code>config/curated.py</code>) run on the edited section first; then the runtime's curated section is swapped atomically (<code>Runtime.replace_curated</code>) and the datasource's curated entries are refreshed (<code>IndexingOrchestrator.refresh</code>), so the next question can match it.</td>
 </tr>
 </tbody>
 </table>
@@ -6091,10 +6097,10 @@ where the code differs from section 5:</p>
   edit after the config was loaded) the hash is <code>STALE</code>, so accept refuses
   with <code>FILE_CHANGED</code>; <code>Runtime.replace_curated(curated, *, sha256)</code> swaps
   <code>config.curated</code>, <code>curated</code> and the hash under the lock. The refresh runs
-  <code>rebuild_index(ctx, datasource_ids=..., curated_only=True)</code> (the index
-  lock, <code>IndexingOrchestrator.refresh_curated</code>, which section 5 names
+  <code>rebuild_index(ctx, datasource_ids=..., refresh=True)</code> (the index
+  lock, <code>IndexingOrchestrator.refresh</code>, which section 5 names
   directly); a datasource that cannot be refreshed is a warning, not a
-  failure. K3 renames that call, in <code>_refreshed()</code> in <code>review/accept.py</code>.</li>
+  failure. K3 renamed that call, in <code>_refreshed()</code> in <code>review/accept.py</code>.</li>
 <li><strong>The review file.</strong> <code>nl2sql/review/review_file.py</code>: <code>render(proposals)</code>
   and <code>read(path) -&gt; ReviewFile</code> (<code>ReviewItem</code>: <code>id</code>, <code>decision</code>, <code>reason</code>,
   <code>change</code>; other keys ignored). <code>apply</code> merges an edited <code>change</code> over the
@@ -6192,6 +6198,87 @@ mechanically, with a one-off script: each <code>PlanModel</code> entry is rename
 is called, no key is spent, and every replayed answer is byte-identical to
 today's, which <code>test_converted_recording_replays_every_guided_question</code>
 holds.</p>
+<div class="admonition note">
+<p class="admonition-title">Built: knowledge in the index (K3)</p>
+<ul>
+<li><strong>The entries.</strong> <code>SchemaChunkBuilder(ds_id, snapshot, schema_version,
+  questions, knowledge=None, dialect=None)</code> (<code>indexing/chunk_builder.py</code>)
+  takes the datasource's merged <code>DatasourceKnowledge</code>. A table or column
+  description is the glossary's, else the snapshot's (the database's
+  comment); a column's synonyms are the database's then the glossary's, and
+  it gains <code>ColumnChunk.role</code> (a <code>Role:</code> line) only when the glossary sets
+  one, so a role derived from the schema is not written to an entry. A
+  glossary join that <code>resolve_join</code> accepts is a <code>RelationshipChunk</code> with
+  <code>origin="glossary"</code> and its cardinality (<code>RelationshipChunk.origin</code> is
+  <code>"database"</code> for a foreign key; id <code>schema.relationship:&lt;from&gt;-&gt;&lt;to&gt;:glossary:&lt;columns&gt;:&lt;version&gt;</code>).
+  <code>TermChunk</code> (<code>knowledge.term</code>, id <code>knowledge.term:&lt;datasource&gt;:&lt;12 hex of
+  the lower-cased term&gt;:&lt;version&gt;</code>) holds the term, its synonyms and its
+  definition. The glossary's <code>examples</code> are appended to the datasource's
+  <code>sample_questions</code> for <code>build_example_chunks</code>. A name that does not
+  resolve is left out of the entries, as <code>show</code> reports it.</li>
+<li><strong>Term similarity.</strong> <code>Retriever.retrieve_term_candidates(query,
+  datasource_id, k, terms=None) -&gt; list[TermCandidate]</code> (<code>TERM_TYPE</code> in
+  <code>indexing/retrieval.py</code>; <code>TermCandidate(datasource_id, term, score)</code> in
+  <code>indexing/models.py</code>) is a plain similarity search over the live build, and
+  embeds nothing when the datasource has no term entry. <code>match_terms(terms,
+  texts, *, sources, top_k, similar=None, floor=0.6)</code> adds a term whose
+  similarity reaches <code>floor</code> (<code>settings.knowledge.match_floor</code>), scoring that
+  similarity; a lexical match keeps its 1.0 or 0.9. The schema retriever
+  (<code>_similar_terms</code>) asks the search with the sub-query's intent only when the
+  caller sees a term, restricts it to the term names the caller's scope shows
+  (<code>terms=</code>, so hidden terms cannot crowd a visible one out of the top <code>k</code>),
+  and keeps the lexical match when the search fails or the store has no such
+  method.</li>
+<li><strong>Refresh.</strong> <code>IndexingOrchestrator(ctx)</code> (no <code>enrich</code>) has <code>refresh(datasource_id)</code>
+  in place of <code>refresh_curated</code>: it renders every entry from the live
+  build's stored snapshot (<code>LookupError</code> when there is none, naming
+  <code>nl2sql index --datasource</code>), the current curated section and the current
+  knowledge, keeps the stored entry whose <code>id</code>, text and metadata are
+  unchanged, embeds the rest, and commits with <code>curated_hash</code> and
+  <code>knowledge_hash</code>. <code>rebuild_index(ctx, datasource_ids=None, on_progress=None,
+  on_datasource=None, refresh=False)</code>; <code>IndexAPI.build(datasource_ids=None, *,
+  on_progress, on_datasource)</code> and <code>IndexAPI.refresh(datasource_ids=None, *,
+  on_progress, on_datasource)</code> (both return a <code>RebuildResult</code>);
+  <code>run_indexing(engine, datasource_ids=None, refresh=False)</code>; <code>nl2sql index
+  --refresh</code>. <code>--enrich</code> and <code>--curated-only</code> are gone (a usage error);
+  <code>ENTRY_TYPES</code> gains <code>knowledge.term</code>. <code>review/accept.py</code> refreshes with
+  <code>rebuild_index(..., refresh=True)</code>.</li>
+<li><strong>Health.</strong> <code>index_health(..., knowledge_digests=None)</code> compares each
+  datasource's <code>BuildPointer.knowledge_hash</code> (a build made before K3 counts as
+  the digest of no knowledge) with the live <code>Knowledge.digest</code>; a difference
+  is a problem, so the status is <code>stale</code>: "The glossary changed for '<id>'
+  since it was indexed; run <code>nl2sql index --refresh --datasource &lt;id&gt;</code>."
+  <code>IndexAPI.health</code> passes the runtime's digests. The <code>curated.yaml</code> warning
+  now names <code>--refresh</code>.</id></li>
+<li><strong>B31, and what P2 uses.</strong> The orchestrator never touches a model, so a
+  snapshot holds only the database's text. <code>nl2sql/profiler/drafts.py</code> holds
+  what was moved from the deleted <code>indexing/enrichment_service.py</code>, unchanged:
+  <code>ENRICHMENT_LLM_NAME</code> (<code>"profiler"</code>), <code>DatasourceEnrichment</code>,
+  <code>TableEnrichment</code>, <code>ColumnEnrichment</code>, <code>SchemaEnrichment</code>,
+  <code>ENRICHMENT_PROMPT</code>, <code>build_evidence(snapshot, datasource_description,
+  existing_questions)</code>, <code>sanitize_enrichment(snapshot, enrichment,
+  max_questions=100)</code> and their private helpers. <code>apply_enrichment</code> and
+  <code>enrich_schema_snapshot</code> were deleted, not moved: they wrote a model's text
+  into a snapshot and call the model with no budget. P2 wires the moved
+  functions into <code>profile(draft=True)</code>.</li>
+<li><strong>The playground.</strong> Its Rebuild no longer takes <code>enrich</code>
+  (<code>POST /api/index/rebuild</code> has no body; <code>rebuild.enrich_available</code> and
+  <code>enrich_reason</code> are gone from <code>GET /api/index</code>), and the checkbox is out of
+  <code>web/playground/src</code>. The committed bundle
+  <code>cli/demo/playground/static/index.html</code> was not rebuilt: until
+  <code>npm run build</code> is run in <code>web/playground</code>, its checkbox is disabled and
+  does nothing.</li>
+<li><strong>Tests.</strong> <code>tests/unit/test_index_knowledge.py</code> (every K3 test the row
+  names except the node-level one, and <code>test_a_glossary_join_that_does_not_resolve_is_not_indexed</code>,
+  <code>test_refresh_swaps_the_curated_entries</code>, <code>test_the_cli_has_refresh_and_not_enrich_or_curated_only</code>);
+  <code>test_terms_are_matched_by_similarity_through_the_index</code>,
+  <code>test_similarity_never_brings_in_a_term_the_caller_may_not_see</code> and
+  <code>test_a_failing_term_search_leaves_the_lexical_match</code> in
+  <code>tests/unit/knowledge/test_knowledge_in_prompts.py</code>;
+  <code>tests/unit/test_profiler_drafts.py</code> (the moved sanitizer). The enrichment
+  tests are deleted with the code.</li>
+</ul>
+</div>
 <p>The waves, with at most four PRs at once:</p>
 <table>
 <thead>

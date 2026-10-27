@@ -5767,17 +5767,17 @@ description, beside the datasource's schema entries. Placeholders are filled
 first with the param's <code>example</code>, else its <code>default</code>: "Best {n} customers in
 {year}" is indexed as "Best 10 customers in 2012". The SQL is never indexed.</p>
 <p>After editing the curated section, re-index its questions:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w">                       </span><span class="c1"># every datasource</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--curated-only<span class="w"> </span>--datasource<span class="w"> </span>chinook<span class="w">  </span><span class="c1"># one</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--refresh<span class="w">                       </span><span class="c1"># every datasource</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>nl2sql<span class="w"> </span>index<span class="w"> </span>--refresh<span class="w"> </span>--datasource<span class="w"> </span>chinook<span class="w">  </span><span class="c1"># one</span>
 </code></pre></div>
-<p><code>--curated-only</code> keeps each datasource's schema entries exactly as they are
-and embeds only the verified queries: it reads no schema and makes no
-enrichment model call, so it takes seconds. The datasource must have been
+<p><code>--refresh</code> writes the entries again from the stored snapshot and embeds only
+those whose text changed (here, the verified queries): it reads no schema and
+makes no model call, so it takes seconds. The datasource must have been
 indexed once with plain <code>nl2sql index</code>. A plain <code>nl2sql index</code> also picks up
 the file, and a schema re-index always keeps the verified queries.</p>
 <p>Until you re-index, <code>nl2sql doctor</code> and the index status (<code>engine.index.health()</code>,
 <code>GET /api/v1/index/status</code>) warn:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --refresh --datasource chinook`.
 </code></pre></div>
 <p>It is a warning, not a failure: the index stays <code>ok</code>, because the stale
 entries still name queries that exist.</p>

@@ -5369,7 +5369,10 @@ and example questions. It is written in <code>glossary.yaml</code> and read by a
 <p>The engine loads, merges, shows and exports knowledge from release 0.8,
 and the planner and refiner read it (Wave B's K2): descriptions, roles,
 units, grains, code values and glossary joins in the schema block, matched
-terms and rules in <code>[BUSINESS_CONTEXT]</code>. It reaches the index with K3. See
+terms and rules in <code>[BUSINESS_CONTEXT]</code>. It reaches the index too (K3): the
+chosen descriptions, the terms, the joins and the examples are index entries,
+and <code>nl2sql index --refresh</code> brings them up to date after an edit without
+reading the schema. See
 <a href="../../architecture/wave_b/">Wave B</a>, sections 3 and 4, and
 <a href="../../architecture/nodes/schema_retriever_node/#knowledge">the schema retriever</a>.</p>
 </div>

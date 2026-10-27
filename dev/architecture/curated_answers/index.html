@@ -2934,17 +2934,18 @@ the curated chunks (built by a small <code>CuratedChunkBuilder</code>) to the sc
 chunks before it writes the build.</p>
 <p>Changing <code>curated.yaml</code> does <strong>not</strong> need a schema re-index (a change from the
 agreed design; see <a href="#open-questions">Re-index cost</a>).
-<code>nl2sql index --curated-only</code> writes a new build per datasource through the
-same write, switch and clean-up as any other, except that the live build's
-schema entries are copied into it with their stored vectors
-(<code>IndexingOrchestrator.refresh_curated()</code>): no schema read, no enrichment call,
-and only the verified queries are embedded.</p>
+<code>nl2sql index --refresh</code> writes a new build per datasource through the
+same write, switch and clean-up as any other, except that every entry is
+rendered again from the live build's stored snapshot and the entries that did
+not change keep their stored vectors (<code>IndexingOrchestrator.refresh()</code>, 0.8; it
+was <code>--curated-only</code> and <code>refresh_curated()</code> before): no schema read, no model
+call, and only the changed entries (here the verified queries) are embedded.</p>
 <p><strong>Staleness.</strong> The build's pointer also records <code>curated_hash</code>, next to
 its <code>build_id</code>, <code>schema_version</code> and <code>built_at</code>: a SHA-256 of that
 datasource's section of <code>curated.yaml</code>, as canonical JSON. <code>IndexHealth</code>
 (<code>nl2sql/indexing/health.py</code>) compares it with the file as it is now and
 reports "curated.yaml changed for 'chinook' since it was indexed; run
-<code>nl2sql index --curated-only --datasource chinook</code>". <code>nl2sql doctor</code> and the
+<code>nl2sql index --refresh --datasource chinook</code>". <code>nl2sql doctor</code> and the
 facade's <code>engine.index.health()</code> show it. Only the verified queries are hashed:
 metrics are not indexed yet, so editing one asks for nothing.
 It is a warning, not a failure: the stale entries still point at queries that
@@ -3458,9 +3459,10 @@ added beside the existing ones, never in place of them.</p>
   <code>get_view_names()</code> too, and a driver that cannot list views logs a warning
   and keeps its tables. PostgreSQL materialized views are still not read.</li>
 <li><strong>Re-index cost.</strong> Resolved in PR 2: a <code>curated.yaml</code> change must not cost
-  a schema re-read or an enrichment model call. <code>nl2sql index --curated-only</code>
-  copies the active build's schema entries, with their stored vectors, into a
-  new build beside freshly embedded verified queries and switches to it. A
+  a schema re-read or a model call. <code>nl2sql index --refresh</code> (<code>--curated-only</code>
+  before 0.8) renders the entries again from the stored snapshot, keeps the
+  stored vectors of those that did not change, embeds the verified queries and
+  switches to the new build. A
   flag rather than detecting "only <code>curated.yaml</code> changed" on a plain
   <code>nl2sql index</code>, because knowing whether the schema changed means reading it.</li>
 <li><strong>The synthesizer's context.</strong> Resolved in PR 3: on a verified answer the

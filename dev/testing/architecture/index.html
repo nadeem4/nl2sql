@@ -2438,9 +2438,8 @@ declared per module, next to a comment saying which call needs the key. Only
 four modules carry it - <code>test_ast_planner_real_data.py</code>,
 <code>test_decomposer_real_data.py</code>, <code>test_logical_validator_real_data.py</code> and
 <code>test_answer_synthesizer_real_data.py</code> - all of them nodes that call a chat
-model directly. Nothing else in the directory needs a key: indexing skips its
-optional enrichment pass when no LLM is available, so tests that index real
-data run key-free.</p>
+model directly. Nothing else in the directory needs a key: indexing calls
+no model, so tests that index real data run key-free.</p>
 <p><code>.github/workflows/test.yml</code> has two test jobs over the source tree:</p>
 <ul>
 <li><strong><code>test</code></strong> runs <code>pytest -m "not integration and not realdb"</code> across Python 3.12 and 3.13.
