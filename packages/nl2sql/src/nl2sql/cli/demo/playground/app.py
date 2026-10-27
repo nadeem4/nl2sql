@@ -194,8 +194,9 @@ class RetrievalRequest(BaseModel):
     lambda_mult: float = Field(default=0.7, ge=0.0, le=1.0)
     types: List[str] = Field(default_factory=list)
     datasource_id: Optional[str] = None
-    # The role the search is made as, like AskRequest.role: the pool holds only what that role may read.
-    role: str = "admin"
+    # The role the search is made as, required like /api/schema's (D33: no default view): the pool holds only
+    # what that role may read.
+    role: str
 
 
 # The longest note a rating keeps (the feedback table keeps no more).

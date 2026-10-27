@@ -248,7 +248,7 @@ class IndexAPI:
                 if snapshot is not None:
                     denied = deny_names(scope)
                     shown = visible(ctx.knowledge.get(datasource_id), snapshot, scope.allows, denied)
-                    tables = {key for key, contract in snapshot.contract.tables.items()
+                    tables = {contract.full_name for contract in snapshot.contract.tables.values()
                               if scope.allows(contract.table.schema_name, contract.table.table_name)}
                     reached[datasource_id] = (tables, {t.term for t in shown.terms},
                                               denied_pattern(snapshot, scope.allows, denied))

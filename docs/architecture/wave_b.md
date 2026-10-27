@@ -2148,14 +2148,15 @@ holds.
       candidates, keeps the first `fetch_k` allowed ones, then runs MMR. A caller
       for whom most matches are hidden can still get a short pool; one for whom
       few are hidden gets a full one.
-    - **The playground.** `RetrievalRequest` has `role` (default `admin`, like
-      `AskRequest`), and `/api/retrieval` searches as `UserContext(roles=[role])`;
-      `Retrieval.jsx` sends the role chosen in "Ask as". The playground trusts
-      the role the page sends (see [the security model](../security/model.md)), as
-      the Ask page does. As with K3, the committed bundle was not rebuilt: until
-      `npm run build` is run in `web/playground`, the page sends no role and the
-      server uses `admin`.
-    - **Tests.** `tests/unit/test_index_inspect_scope.py` and
+    - **The playground.** `RetrievalRequest.role` is required (no default view,
+      as `/api/schema`, D33: a request without it is a 422), and `/api/retrieval`
+      searches as `UserContext(roles=[role])`; `Retrieval.jsx` sends the role
+      chosen in "Ask as", and the committed bundle is rebuilt. The playground
+      trusts the role the page sends (see
+      [the security model](../security/model.md)), as the Ask page does.
+    - **Tests.** `tests/unit/test_index_inspect_scope.py` (denied tables, hidden
+      terms, relationships needing both ends, verified queries never shown, an
+      unindexed datasource, the over-fetch at `Retriever` level) and
       `test_a_search_is_made_as_the_role_asked_and_shows_only_what_it_may_read`
       in `tests/unit/test_playground_retrieval.py`.
 
