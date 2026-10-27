@@ -305,7 +305,7 @@ command has `--help`.
 | `nl2sql review reject ID...` | Reject proposals as an admin role; a rejected change is never proposed again | `--reason TEXT`, `--as ROLE`, `--user` |
 | `nl2sql review export` | The open proposals the role may see as a review file, to decide in a pull request | `--out FILE`, `--kind K`, `--datasource ID`, `--as ROLE`, `--user` |
 | `nl2sql review apply FILE` | Read a review file as an admin role: accept each `accept` (with its edited change), reject each `reject` | `--as ROLE`, `--user` |
-| `nl2sql profile` | Profile the indexed schema and file what it finds for review; arrives in 0.8 | |
+| `nl2sql profile` | Probe the indexed schema for joins the database does not declare and for column roles, and file what it finds in the review queue; no model runs. `nl2sql index --profile` indexes and then profiles | `--datasource`/`-d ID` (repeatable), `--as ROLE` (repeatable), `--user` |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |
 | `nl2sql cache clear` | Empty the plan cache in `<storage.path>/state.db`; schema snapshots are kept | |
