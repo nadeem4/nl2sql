@@ -5350,7 +5350,7 @@ run's trace.</p>
 <tbody>
 <tr>
 <td><code>ask</code></td>
-<td><code>question</code>, <code>datasource_id</code> (optional: skip routing)</td>
+<td><code>question</code>, <code>datasource_id</code> (optional: skip routing), <code>choice</code> (optional: the pick for a question that asked, see below)</td>
 <td>See below.</td>
 </tr>
 <tr>
@@ -5376,7 +5376,7 @@ run's trace.</p>
 <tbody>
 <tr>
 <td><code>status</code></td>
-<td>The run's status: <code>success</code>, <code>plan_only</code>, <code>error</code>, <code>needs_approval</code>, <code>stopped</code> (or, from Wave B, <code>needs_clarification</code>).</td>
+<td>The run's status: <code>success</code>, <code>plan_only</code>, <code>error</code>, <code>needs_approval</code>, <code>stopped</code>, <code>needs_clarification</code>.</td>
 </tr>
 <tr>
 <td><code>answer</code></td>
@@ -5414,8 +5414,18 @@ run's trace.</p>
 <td><code>stop</code></td>
 <td>When <code>status</code> is <code>stopped</code>: which limit stopped the run.</td>
 </tr>
+<tr>
+<td><code>clarification</code></td>
+<td>When <code>status</code> is <code>needs_clarification</code>: the <code>phrase</code>, each option's <code>id</code>, <code>label</code> and plain-English <code>explanation</code>, and the <code>request</code> itself (the plans stay in it).</td>
+</tr>
 </tbody>
 </table>
+<p>A question that can be read more than one way is not run. The assistant shows the
+options to its user and calls <code>ask</code> again with the same question and
+<code>choice={"request": &lt;the clarification's request&gt;, "option_id": "b"}</code>; the engine runs that
+option's plan through the same checks as any plan, under the same role. A request that is not
+this question's, or that the data or glossary has outdated, comes back as an error
+(<code>CLARIFICATION_INVALID</code>, <code>CLARIFICATION_STALE</code>): ask again without a choice.</p>
 <p>An exception out of the engine is <code>{"status": "error", "errors": [{"code":
 "INTERNAL_ERROR", ...}]}</code>, and logged.</p>
 <h2 id="what-a-role-cannot-see">What a role cannot see</h2>

@@ -4932,6 +4932,74 @@ default reading. A case may give <code>clarify</code> as a role's expected outco
 the <code>outcome</code> scorer passes when the run ends <code>needs_clarification</code>. The
 Chinook suite gains no such case; a new <code>evals/suites/clarify.yaml</code> holds a
 handful over the demo glossary's "sales".</p>
+<div class="admonition note">
+<p class="admonition-title">Built: asking again, settled phrases, saving a pick and the surfaces (L2)</p>
+<p>The code on main wins where it differs from the text above. Where the build
+filled a gap:</p>
+<ul>
+<li><strong>Nothing in the pinned entry changed.</strong> H2 and B0 already built the
+  <code>chosen</code> source: <code>PinnedSource.CHOSEN</code>, <code>check_pinned</code>'s refusal of a
+  chosen plan with approvals, the planner's pinned plan with
+  <code>plan_source="chosen"</code>, the pinned graph, and the plan cache storing only
+  <code>"llm"</code> plans. So <code>pipeline/graph.py</code>, <code>state.py</code>, <code>routes.py</code> and
+  <code>ast_planner/node.py</code> are untouched; L2 adds the checks and the pin.</li>
+<li><strong><code>nl2sql/clarify/choice.py</code>.</strong> <code>choice_problem(choice, *, question,
+  user, ctx, approvals=())</code> returns the <code>PipelineError</code> that refuses a choice
+  (<code>CLARIFICATION_INVALID</code>, <code>CRITICAL</code>: a changed request, another question
+  or asker, an unknown option, approvals alongside; <code>CLARIFICATION_STALE</code>,
+  <code>ERROR</code>: the datasource out of scope or gone, another schema version or
+  knowledge digest), or None. <code>pinned_from_choice(choice)</code> is the
+  <code>PinnedRun</code>: one sub-query from the request's <code>sub_query</code>, a <code>standalone</code>
+  group, the option's plan, and <code>chosen_label</code> (new on <code>PinnedRun</code>, read by
+  the explanation). The scope check is in the table's third row, so a denied
+  datasource is <code>CLARIFICATION_STALE</code>, not the pinned entry's
+  <code>SECURITY_VIOLATION</code> (which remains behind it).</li>
+<li><strong><code>choice</code> on <code>run_query</code> and <code>stream_query</code></strong> (<code>QueryAPI._pin_choice</code>).
+  A refused choice does not raise: the scope opens, the run ends with that
+  one error (<code>status</code> <code>error</code>, <code>result_from_state</code> on a state with only the
+  error), <code>run.finished</code> is published and no graph runs. A <code>choice</code> with a
+  <code>plan</code> or a <code>pinned</code> is a <code>ValueError</code> at the call, as the other
+  incompatible pairs are. A choice with <code>approvals</code> is the result above,
+  <code>CLARIFICATION_INVALID</code>; <code>check_pinned</code>'s <code>ValueError</code> stays for a direct
+  <code>run_with_graph</code> caller.</li>
+<li><strong>"You chose: <label>"</label></strong> is the first assumption of the step, from
+  <code>state["pinned"].chosen_label</code> when <code>plan_source</code> is <code>"chosen"</code>.</li>
+<li><strong>Settled phrases.</strong> <code>ClarifierNode._settled</code> reads the run's pinned
+  <code>ctx.knowledge</code> for the sub-query's datasource: a term whose name equals
+  the phrase, or exactly one term listing it as a synonym (casefolded, not
+  scope-filtered: it only decides not to ask). A settled phrase clears
+  <code>ambiguous_phrase</code> and <code>alternatives</code> on the planner's response (so X1
+  lists no assumption), keeps <code>alternatives_offered</code> (the plan is still not
+  cached), and the default plan goes on.</li>
+<li><strong><code>engine.knowledge.save_choice(choice, *, user_context, term=None)</code></strong>
+  files a <code>term</code> proposal (<code>origin="clarification"</code>): the <code>term</code> (else the
+  phrase) as the name, with the phrase as a synonym when they differ; the
+  option's label as <code>definition</code>; <code>columns</code> as the <code>table.column</code> names the
+  plan's select items read; <code>tables</code> the plan's tables. A request whose id
+  does not match its content, or an unknown option, is a <code>ValueError</code>; a
+  caller whose scope does not reach the datasource and every table is a
+  <code>ReviewError</code> <code>NOT_FOUND</code>. Replacing an existing term on accept was
+  already K1's <code>apply</code>.</li>
+<li><strong>CLI.</strong> <code>nl2sql run</code> numbers the options (<code>'sales' can be read more than
+  one way:</code>, <code>1. label - explanation</code>); on a terminal (<code>sys.stdin</code> and
+  <code>sys.stdout</code> both ttys) it prompts for a number and runs again with
+  <code>choice=</code>, else prints how to pass it and exits 4.</li>
+<li><strong>MCP.</strong> <code>ask(question, datasource_id=None, choice=None)</code>; <code>choice</code> is
+  <code>{"request": ..., "option_id": ...}</code>. A result with <code>status</code>
+<code>needs_clarification</code> carries <code>clarification: {phrase, request, options:
+  [{id, label, explanation}]}</code>; the plans stay in <code>request</code>. A malformed
+  <code>choice</code> is an <code>error</code> with <code>CLARIFICATION_INVALID</code> and no run. The three
+  clarification codes are in the caller-facing message list.</li>
+<li><strong>Evals.</strong> The <code>clarify</code> outcome, <code>evals.run(clarify=True)</code> and the scorer
+  were Q1's; L2 adds <code>suites/clarify.yaml</code> (<code>CLARIFY_SUITE_PATH</code>): five
+  approved <code>clarify</code> cases about "sales" for <code>admin</code>. <code>nl2sql init --demo</code>
+  copies it; <code>evals.yaml</code> does not name it (it runs only with clarification
+  on). <code>nl2sql eval run</code> has no <code>clarify</code> flag yet; the suite runs through
+  <code>engine.evals.run(suites=[...], clarify=True)</code>.</li>
+<li><strong>Tests.</strong> The <code>STUBS</code> table of <code>test_wave_b_shapes.py</code> is gone: its last
+  entry, <code>save_choice</code>, is built.</li>
+</ul>
+</div>
 <h2 id="8-why-this-answer">8. Why this answer</h2>
 <p><code>QueryResult.explanation</code> (D51) is the run's plan in plain English, rendered
 by <code>nl2sql/explain/</code> from the typed plan, the sub-query, the knowledge the

@@ -5644,10 +5644,11 @@ for the second run.</p>
 <p>Both are also split by source.</p>
 <h3 id="clarification">Clarification</h3>
 <p>A case may expect the engine to ask the caller to narrow the question
-(outcome <code>clarify</code>). Wave B adds that result. Until then, evals run with
-<code>clarify=False</code>, the default: those role runs are left out and counted in
-<code>report.skipped</code>. With <code>clarify=True</code> they run, and the <code>outcome</code> scorer
-passes them when the run's status is <code>needs_clarification</code>.</p>
+(outcome <code>clarify</code>). Evals run with <code>clarify=False</code>, the default, so every
+other case measures the most likely reading: the <code>clarify</code> role runs are left
+out and counted in <code>report.skipped</code>. With <code>clarify=True</code> they run, and the
+<code>outcome</code> scorer passes them when the run's status is <code>needs_clarification</code>.
+The <a href="cases/#the-clarify-suite">clarify suite</a> holds such cases.</p>
 <h2 id="the-report">The report</h2>
 <p><code>EvalReport</code> has:</p>
 <ul>

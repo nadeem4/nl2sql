@@ -3848,6 +3848,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-clarify-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The clarify suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#regenerating-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5220,6 +5231,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-clarify-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The clarify suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#regenerating-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5384,7 +5406,7 @@ rows that SQL returns. <code>nl2sql.evaluation.suite</code> holds the model
 </tr>
 <tr>
 <td><code>clarify</code></td>
-<td>A request to narrow the question (status <code>needs_clarification</code>). This runs only with <code>engine.evals.run(clarify=True)</code>; Wave B adds the clarification result</td>
+<td>A request to narrow the question (status <code>needs_clarification</code>). This runs only with <code>engine.evals.run(clarify=True)</code>; the <code>outcome</code> scorer passes it when the run asks and returns no rows</td>
 </tr>
 </tbody>
 </table>
@@ -5479,10 +5501,20 @@ routing misses, and the gate allows no other case to start failing. The test
 bed's 1,200-table wide schema has routing cases of its own in the <code>realdb</code>
 job (<code>tests/realdb/test_routing_wide.py</code>), since they need the test bed's
 databases.</p>
+<h2 id="the-clarify-suite">The clarify suite</h2>
+<p><code>suites/clarify.yaml</code> holds five approved cases about "sales", which the demo
+glossary leaves open: two terms list it as a synonym, <code>revenue</code> and
+<code>invoiced total</code>, so a planner that sees both names the phrase and the run
+ends <code>needs_clarification</code>. Each case expects <code>clarify</code> from <code>admin</code> and has
+no SQL: what the asker picks next is a person's choice, not a gold answer.
+The suite is copied by <code>nl2sql init --demo</code> but not named in <code>evals.yaml</code>,
+since its cases run only with clarification on:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">suites</span><span class="o">=</span><span class="p">[</span><span class="s2">"evals/clarify.yaml"</span><span class="p">],</span> <span class="n">clarify</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="regenerating-rows">Regenerating rows</h2>
 <p><code>rows</code> and <code>alt_rows</code> are never typed by hand. After you add or edit a case,
 an alternative or any SQL, run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"evals/mine.yaml"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"evals/mine.yaml"</span><span class="p">)</span>
 </code></pre></div>
 <p>For each approved case with SQL, <code>regenerate</code> asks the case's datasource
 adapter to run <code>sql</code> and every <code>alt_sql</code>. It goes through the engine's

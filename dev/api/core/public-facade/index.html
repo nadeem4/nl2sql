@@ -5599,7 +5599,7 @@ datasource fails.</p>
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">engine</span><span class="o">.</span><span class="n">storage</span>       <span class="c1"># info, purge</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">engine</span><span class="o">.</span><span class="n">events</span>        <span class="c1"># subscribe, catalog</span>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span>         <span class="c1"># load, run, regenerate, scorers</span>
-<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span>     <span class="c1"># sources, show, export, reload, profile; save_choice (0.8; a stub until then)</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span>     <span class="c1"># sources, show, export, reload, profile; save_choice</span>
 <a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="n">engine</span><span class="o">.</span><span class="n">proposals</span>     <span class="c1"># list, get, current, accept, reject, export, apply (the review queue)</span>
 </code></pre></div>
 <table>
@@ -5652,7 +5652,7 @@ datasource fails.</p>
 </tr>
 <tr>
 <td><code>knowledge</code></td>
-<td><a href="../../../configuration/knowledge/">Knowledge</a>: <code>sources</code>, <code>show</code>, <code>export</code>, <code>reload</code> and <code>profile</code> (<a href="../../../schema/profiler/">Schema Profiler</a>). <code>save_choice</code> has its final signature and raises <code>NotImplementedError</code>, naming the change that builds it, until release 0.8. Each read takes <code>user_context</code> as a required keyword.</td>
+<td><a href="../../../configuration/knowledge/">Knowledge</a>: <code>sources</code>, <code>show</code>, <code>export</code>, <code>reload</code> and <code>profile</code> (<a href="../../../schema/profiler/">Schema Profiler</a>). <code>save_choice(choice, *, user_context, term=None)</code> files a clarification pick as a <code>term</code> proposal (<a href="../query/#asking-again">Asking again</a>). Each read takes <code>user_context</code> as a required keyword.</td>
 </tr>
 <tr>
 <td><code>proposals</code></td>

@@ -2274,6 +2274,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#saving-a-clarification-pick" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving a clarification pick
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#accept-the-only-writer" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5264,6 +5275,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#saving-a-clarification-pick" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving a clarification pick
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#accept-the-only-writer" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5330,8 +5352,9 @@ a <em>proposal</em> in one queue, kept in the state store (<code>storage.state</
 thumbs-up on a generated answer files a proposed verified query, and so does a
 checked <a href="../../observability/feedback/#correcting-an-answer-nl2sql-feedback-correct">correction</a>
 (<code>engine.feedback.correct</code>, origin <code>correction</code>); the <a href="../../schema/profiler/">schema profiler</a> files its join candidates and
-column roles the same way (<code>nl2sql profile</code>), and later 0.8 work files drafted
-descriptions and saved clarifications. Nothing in
+column roles the same way (<code>nl2sql profile</code>), a saved
+<a href="#saving-a-clarification-pick">clarification pick</a> files a proposed term, and later 0.8
+work files drafted descriptions. Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">                     </span><span class="c1"># what is waiting</span>
@@ -5471,6 +5494,21 @@ as the caller's <code>UserContext</code> is.</p>
 decided; <code>files_written</code>, each file written once, relative to the folder of
 <code>nl2sql.yaml</code>; <code>warnings</code>; and <code>refused</code>, an id to why it was left as it was:
 unknown, no longer proposed, or a change that failed its checks.</p>
+<h2 id="saving-a-clarification-pick">Saving a clarification pick</h2>
+<p>When a question asked which reading was meant (<a href="../../api/core/query/#asking-again">Asking
+again</a>), the pick can be kept:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">proposal</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span><span class="o">.</span><span class="n">save_choice</span><span class="p">(</span><span class="n">choice</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ana</span><span class="p">)</span>
+</code></pre></div>
+<p>It files a <code>term</code> proposal with origin <code>clarification</code>: the phrase (or <code>term=</code>,
+with the phrase as its synonym) as the term's name, the chosen option's label as
+its definition, and the columns the chosen plan's select items read and the
+tables it reads. Anyone whose scope reaches the option's datasource and tables
+may save a pick (otherwise <code>ReviewError</code> <code>NOT_FOUND</code>); a request that was
+changed, or has no such option, is a <code>ValueError</code>. It reaches the glossary only
+when an admin accepts it. A term of that name that already exists is replaced,
+and <code>nl2sql review show</code> shows it beside the proposed one first. Once accepted,
+the phrase is a term's name or synonym, which settles it: the planner's flag on
+it is dropped and the question is no longer asked.</p>
 <h2 id="accept-the-only-writer">Accept: the only writer</h2>
 <p>Accept is the only code that writes a file a person owns, and it writes two:</p>
 <table>
@@ -5542,18 +5580,18 @@ audit observer keeps <code>proposal.decided</code>. See
 <a href="../../observability/events/">Events</a>.</p>
 <h2 id="the-review-file">The review file</h2>
 <p>The queue's export and import format, for deciding in a pull request:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># review.yaml: written by `nl2sql review export`, read by `nl2sql review apply`</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">proposals</span><span class="p">:</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3f9a0c1e5b7d2a44</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">decision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">accept</span><span class="w">            </span><span class="c1"># accept | reject | (empty: leave proposed)</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">join</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">datasource_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chinook</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Track.MediaTypeId-&gt;MediaType.MediaTypeId</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">Track.MediaTypeId</span><span class="p p-Indicator">,</span><span class="nt"> to</span><span class="p">:</span><span class="w"> </span><span class="nv">MediaType.MediaTypeId</span><span class="p p-Indicator">,</span><span class="nt"> cardinality</span><span class="p">:</span><span class="w"> </span><span class="nv">many-to-one</span><span class="p p-Indicator">}</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name_match</span><span class="p">:</span><span class="w"> </span><span class="nv">exact</span><span class="p p-Indicator">,</span><span class="nt"> types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">number</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">number</span><span class="p p-Indicator">],</span><span class="nt"> sampled</span><span class="p">:</span><span class="w"> </span><span class="nv">347</span><span class="p p-Indicator">,</span><span class="nt"> matched</span><span class="p">:</span><span class="w"> </span><span class="nv">347</span><span class="p p-Indicator">,</span><span class="nt"> overlap</span><span class="p">:</span><span class="w"> </span><span class="nv">1.0</span><span class="p p-Indicator">}</span>
-<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">  </span><span class="nt">origin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">profiler</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># review.yaml: written by `nl2sql review export`, read by `nl2sql review apply`</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">proposals</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3f9a0c1e5b7d2a44</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">decision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">accept</span><span class="w">            </span><span class="c1"># accept | reject | (empty: leave proposed)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">join</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">datasource_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chinook</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Track.MediaTypeId-&gt;MediaType.MediaTypeId</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">from</span><span class="p">:</span><span class="w"> </span><span class="nv">Track.MediaTypeId</span><span class="p p-Indicator">,</span><span class="nt"> to</span><span class="p">:</span><span class="w"> </span><span class="nv">MediaType.MediaTypeId</span><span class="p p-Indicator">,</span><span class="nt"> cardinality</span><span class="p">:</span><span class="w"> </span><span class="nv">many-to-one</span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">evidence</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name_match</span><span class="p">:</span><span class="w"> </span><span class="nv">exact</span><span class="p p-Indicator">,</span><span class="nt"> types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">number</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">number</span><span class="p p-Indicator">],</span><span class="nt"> sampled</span><span class="p">:</span><span class="w"> </span><span class="nv">347</span><span class="p p-Indicator">,</span><span class="nt"> matched</span><span class="p">:</span><span class="w"> </span><span class="nv">347</span><span class="p p-Indicator">,</span><span class="nt"> overlap</span><span class="p">:</span><span class="w"> </span><span class="nv">1.0</span><span class="p p-Indicator">}</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">origin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">profiler</span>
 </code></pre></div>
 <p>A reviewer sets <code>decision</code> and may edit <code>change</code> and <code>reason</code>. <code>apply</code> reads
 back only <code>id</code>, <code>decision</code>, <code>reason</code> and <code>change</code>; it accepts each <code>accept</code>
