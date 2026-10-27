@@ -2,7 +2,8 @@
 
 ``nl2sql profile [--datasource ID ...] --as ROLE`` calls ``engine.knowledge.profile`` as the caller ``--as``
 (repeatable) and ``--user`` build, prints each datasource's report, then the open proposals it left in the
-review queue, as ``nl2sql review list`` shows them. P2 adds ``--draft`` and ``--max-cost``.
+review queue, as ``nl2sql review list`` shows them. ``--draft`` also has the ``profiler`` model draft the missing
+descriptions, and ``--max-cost`` caps what that spends (default: ``settings.profiler.max_cost_usd``).
 """
 from __future__ import annotations
 
@@ -28,13 +29,14 @@ def print_reports(engine: "NL2SQL", who: "UserContext", reports: List["ProfileRe
     for report in reports:
         counts = ", ".join(f"{n} {kind}" for kind, n in report.proposals.items()) or "nothing new"
         bounds = "" if report.stopped_by == "done" else f"; stopped by {report.stopped_by}"
+        drafts = "" if report.cost is None else f"; {report.drafted} descriptions drafted (${report.cost:.4f})"
         console.print(f"[bold]{escape(report.datasource_id)}[/bold]: {escape(counts)}; {report.probes} overlap "
-                      f"probes, {report.skipped_by_budget} candidates proposed without one{escape(bounds)} "
+                      f"probes, {report.skipped_by_budget} candidates proposed without one{escape(drafts)}{escape(bounds)} "
                       f"[dim]({report.seconds:.1f}s)[/dim]", soft_wrap=True)
         for issue in report.issues:
             console.print(f"  [yellow]issue:[/yellow] {escape(issue)}", soft_wrap=True)
     profiled = {r.datasource_id for r in reports if r.schema_version}
-    waiting = [p for p in engine.proposals.list(user_context=who) if p.origin == "profiler"
+    waiting = [p for p in engine.proposals.list(user_context=who) if p.origin in ("profiler", "draft")
                and p.datasource_id in profiled]
     if waiting:
         console.print("\n[bold]Waiting for review[/bold] (nl2sql review list)")
@@ -53,11 +55,13 @@ def caller_or_exit(engine: "NL2SQL", roles: Optional[List[str]], user: Optional[
         raise typer.Exit(1)
 
 
-def profile_datasources(engine: "NL2SQL", who: "UserContext", datasource_ids: Optional[List[str]]) -> None:
-    """Profile as ``who`` and print the result; exit 1 on an unknown datasource."""
+def profile_datasources(engine: "NL2SQL", who: "UserContext", datasource_ids: Optional[List[str]], *,
+                        draft: bool = False, max_cost: Optional[float] = None) -> None:
+    """Profile as ``who`` and print the result; exit 1 on an unknown datasource, a bad cap or an unpriced model."""
     try:
-        reports = engine.knowledge.profile(datasource_ids or None, user_context=who)
-    except ValueError as error:
+        reports = engine.knowledge.profile(datasource_ids or None, user_context=who, draft=draft,
+                                           max_cost_usd=max_cost)
+    except ValueError as error:  # UnknownPriceError and a cap without --draft are ones
         console.print(f"[bold red]Error:[/bold red] {escape(str(error))}", soft_wrap=True)
         raise typer.Exit(1)
     print_reports(engine, who, reports)
@@ -68,6 +72,13 @@ def profile_command(
     datasource: Annotated[Optional[List[str]], typer.Option(
         "--datasource", "-d", help="Only this datasource (repeatable). Without one, every datasource the caller reaches.",
     )] = None,
+    draft: Annotated[bool, typer.Option(
+        "--draft", help="Also have the profiler model draft the table and column descriptions nobody has written, "
+                        "as proposals. Calls the model.",
+    )] = False,
+    max_cost: Annotated[Optional[float], typer.Option(
+        "--max-cost", help="Stop drafting at this many USD (default: settings.profiler.max_cost_usd).",
+    )] = None,
     as_: AsOption = None,
     user: UserOption = None,
 ) -> None:
@@ -76,4 +87,4 @@ def profile_command(
     """
     engine = build_engine(ctx, check=False)
     with engine:
-        profile_datasources(engine, caller_or_exit(engine, as_, user), datasource)
+        profile_datasources(engine, caller_or_exit(engine, as_, user), datasource, draft=draft, max_cost=max_cost)

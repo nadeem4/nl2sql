@@ -19,10 +19,6 @@ if TYPE_CHECKING:
     from nl2sql_sdk.stores import Proposal
 
 
-def _not_built(pr: str) -> NotImplementedError:
-    return NotImplementedError(f"Not built yet: Wave B's {pr} builds it (docs/architecture/wave_b.md, section 16).")
-
-
 HIDDEN_ERROR = "The last reload failed; the previous knowledge is still in use. An admin can see why."
 
 
@@ -168,19 +164,25 @@ class KnowledgeAPI:
         One report per datasource the caller reaches. A datasource that is not indexed yet is reported with an
         issue and skipped: the profiler reads the live build's snapshot and never reflects on its own. The
         bounds are ``settings.profiler`` (``max_probes``, ``time_budget_s``, ...); each finished profile
-        publishes ``profile.finished``. ``draft=True`` (descriptions drafted by the ``profiler`` model under
-        ``max_cost_usd``) is P2's.
+        publishes ``profile.finished``.
+
+        ``draft=True`` also has the ``profiler`` model draft the table and column descriptions (and column
+        synonyms) that neither the glossary nor the database has, as ``origin: draft`` proposals: a draft
+        reaches no prompt and no index until a person accepts it (D38). A column's drafted description and its
+        role are one proposal. The model's calls are capped at ``max_cost_usd`` across the whole call
+        (``settings.profiler.max_cost_usd`` when None); a run that reaches the cap reports
+        ``stopped_by: "cost_cap"`` with what it drafted so far. With no model for the agent, nothing is drafted
+        and each report says so in ``issues``.
 
         Raises:
             TypeError: ``user_context`` is not a ``UserContext``.
-            ValueError: a datasource is not configured.
+            ValueError: a datasource is not configured, or ``max_cost_usd`` is not positive.
+            UnknownPriceError: ``draft`` is set and the ``profiler`` model has no price in ``llm.prices``.
         """
         from nl2sql.profiler.run import profile
 
         caller = _caller(user_context)
-        if draft or max_cost_usd is not None:
-            raise _not_built("P2")
-        return profile(self._ctx, self._ids(datasource_ids), caller)
+        return profile(self._ctx, self._ids(datasource_ids), caller, draft=draft, max_cost_usd=max_cost_usd)
 
     def save_choice(self, choice: "ClarificationChoice", *, user_context: "UserContext",
                     term: Optional[str] = None) -> "Proposal":

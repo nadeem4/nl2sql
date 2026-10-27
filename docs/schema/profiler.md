@@ -3,13 +3,14 @@
 After a datasource is indexed, the profiler reads its live snapshot, asks the
 database a bounded number of cheap questions through the adapter, and files
 what it finds as [proposals](../configuration/review.md). It is deterministic:
-no model runs unless you ask for drafted descriptions (`draft=True`, release
-0.8, not in this change). Nothing it finds reaches a prompt, the index or a file
-until a person with an admin role accepts it.
+no model runs unless you ask for drafted descriptions (`draft=True`, or
+`nl2sql profile --draft`). Nothing it finds or drafts reaches a prompt, the
+index or a file until a person with an admin role accepts it.
 
 ```bash
 nl2sql index                        # the profiler reads the live build's snapshot
 nl2sql profile --as admin           # file joins and column roles for review
+nl2sql profile --as admin --draft --max-cost 0.25   # also draft descriptions with the model
 nl2sql review list --as admin
 nl2sql review accept --all --kind column --as admin   # writes glossary.yaml once
 ```
@@ -27,12 +28,16 @@ returns one `ProfileReport` per datasource the caller reaches:
 | Field | Meaning |
 | --- | --- |
 | `datasource_id`, `schema_version` | What was profiled; the proposals carry the same `schema_version` |
-| `proposals` | Proposals created or updated, by kind (`join`, `column`) |
+| `proposals` | Proposals created or updated, by kind (`join`, `column`, `table`) |
 | `probes` | Overlap probes run |
 | `skipped_by_budget` | Join candidates proposed without a probe because a bound was reached |
-| `stopped_by` | `done`, `max_probes` or `time_budget` (`cost_cap` is for drafting) |
-| `issues` | A probe that failed, an unavailable datasource, or "not indexed yet" |
+| `drafted` | Descriptions the model drafted (`draft=True` only) |
+| `cost` | What the drafting calls cost in USD; `None` when nothing was drafted |
+| `stopped_by` | `done`, `max_probes`, `time_budget`, or `cost_cap` (drafting reached `max_cost_usd`) |
+| `issues` | A probe that failed, a draft that could not be used, no model for drafting, an unavailable datasource, or "not indexed yet" |
 | `seconds` | How long it took |
+
+`max_cost_usd` (`--max-cost`) without `draft=True` (`--draft`) is a `ValueError`.
 
 The caller is required and has no default. The profiler reads and probes only
 the tables the caller's scope reaches, so a table the role denies is never
@@ -99,6 +104,40 @@ temporal column is derived) this is a few hundred proposals at most, and
 `nl2sql review accept --all --kind column --datasource ID --as admin` writes the
 glossary once.
 
+### Drafted descriptions
+
+`draft=True` has the `profiler` agent (see [Per-node models](../configuration/llm.md#per-node-models))
+describe what nobody has: a table or column with no description in the
+glossary (or a knowledge source) and none from the database. It is asked
+about those items only, one call per table the caller reaches, and shown that
+table's evidence (types, statistics, sample values, foreign keys). It never
+sees a table the caller's scope denies. Each answer is cleaned (unknown tables
+and columns dropped, text trimmed, duplicates removed), and a draft longer than
+`knowledge.item_max_chars` is dropped with an issue, since the glossary would
+refuse it on accept.
+
+* A table's draft is a `table` proposal (`change: {description}`).
+* A column's draft is merged with its role: one `column` proposal per column
+  carries `role`, `unit`, `values` and the drafted `description` and `synonyms`
+  together, because the queue keeps one open proposal per target. Its origin is
+  `draft` when it carries a description, `profiler` when it carries only a role.
+* Nothing drafted is written into the schema snapshot or the index. It reaches
+  a prompt only after a person accepts it into the glossary.
+* An item with an open drafted description in the queue counts as described:
+  a repeat `draft=True` run does not ask the model about it again or replace
+  the row. A run that finds only the same role for such a column (a plain
+  `profile`, a run stopped at the cost cap) leaves the open row alone; a changed
+  role still files and supersedes it.
+* A foreign key to a table the caller's scope denies is left out of the
+  evidence, so the model never sees that table's name.
+
+**Cost.** Drafting is capped at `max_cost_usd` for the whole call, across
+datasources (the argument, else `profiler.max_cost_usd`, 0.50). A model with no
+price in `llm.prices` is refused before any call (`UnknownPriceError`). A run
+that reaches the cap stops, files what it drafted so far, and reports
+`stopped_by: cost_cap`. With no model configured for the agent, nothing is
+drafted and the report says so in `issues`; the joins and roles are still filed.
+
 ## Bounds
 
 ```yaml
@@ -109,7 +148,7 @@ profiler:
   time_budget_s: 60     # per datasource; no probe starts after it
   min_overlap: 0.9
   enum_max_distinct: 50
-  max_cost_usd: 0.50    # drafting, per profile call (with drafts)
+  max_cost_usd: 0.50    # drafting, per profile call (profile(draft=True), --draft)
 ```
 
 Probes run one at a time, strongest candidate first (an exact key-name match

@@ -202,5 +202,5 @@ accepted and validated now; the Wave B change named with each reads it.
 | `profiler.time_budget_s` | `60` | Seconds per datasource after which no probe starts (P1). |
 | `profiler.min_overlap` | `0.9` | A measured overlap under this drops a join candidate, between 0 and 1 (P1). |
 | `profiler.enum_max_distinct` | `50` | The most distinct values a column proposed as an `enum` may have (P1). |
-| `profiler.max_cost_usd` | `0.50` | The most one `profile(draft=True)` call may spend drafting descriptions (P2). |
+| `profiler.max_cost_usd` | `0.50` | The most one `profile(draft=True)` call may spend drafting descriptions (`profile(draft=True)`, `nl2sql profile --draft`). |
 | `review.max_age_days` | `365` | Decided proposals older than this are purged by `engine.storage.purge()` (Q1). |

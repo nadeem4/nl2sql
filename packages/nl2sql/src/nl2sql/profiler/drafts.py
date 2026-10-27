@@ -1,16 +1,19 @@
-"""The profiler's drafted descriptions: the evidence a model is shown, the prompt, and the cleaning of its answer.
+"""The profiler's drafted descriptions: the evidence a model is shown, the cleaning of its answer, and the run.
 
-P2 wires these into ``profile(draft=True)`` (docs/architecture/wave_b.md, section 6). They were
-``indexing/enrichment_service.py``'s, moved here unchanged by K3, which stopped the index from
-writing a model's text into the schema snapshot (B31): a draft is a proposal in the review queue
-and reaches nothing until a person accepts it.
+``profile(draft=True)`` (docs/architecture/wave_b.md, section 6) calls :func:`draft_descriptions`. The evidence
+and cleaning functions were ``indexing/enrichment_service.py``'s, moved here unchanged by K3, which stopped the
+index from writing a model's text into the schema snapshot (B31): a draft is a proposal in the review queue
+and reaches nothing until a person accepts it (D38).
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import json
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
+from nl2sql.limits import Budget, LimitReached, describe
 from nl2sql.schema import SchemaSnapshot
 
 # Name of the agent in the llm section of nl2sql.yaml that drafts descriptions (docs/architecture/wave_b.md, D44).
@@ -36,41 +39,9 @@ class ColumnEnrichment(BaseModel):
 
 
 class SchemaEnrichment(BaseModel):
-    datasource: DatasourceEnrichment
+    datasource: DatasourceEnrichment = Field(default_factory=DatasourceEnrichment)  # the profiler never asks
     tables: Dict[str, TableEnrichment] = Field(default_factory=dict)
     columns: Dict[str, ColumnEnrichment] = Field(default_factory=dict)
-
-
-ENRICHMENT_PROMPT = """You are enriching database schema metadata for retrieval.
-Use ONLY the evidence provided. Do not introduce any tables, columns, or facts
-that are not present in evidence. If evidence is insufficient, return empty values.
-
-Return a JSON object that matches this schema:
-SchemaEnrichment = {{
-  "datasource": {{
-    "description": string|null,
-    "domains": [string],
-    "sample_questions": [string],
-    "citations": [string]
-  }},
-  "tables": {{
-    "<table_key>": {{
-      "description": string|null,
-      "citations": [string]
-    }}
-  }},
-  "columns": {{
-    "<table_key>.<column_name>": {{
-      "description": string|null,
-      "synonyms": [string],
-      "citations": [string]
-    }}
-  }}
-}}
-
-Evidence (JSON):
-{evidence_json}
-"""
 
 
 def build_evidence(
@@ -215,3 +186,95 @@ def sanitize_enrichment(
         tables=sanitized_tables,
         columns=sanitized_columns,
     )
+
+
+@dataclass
+class Drafted:
+    """What the model drafted and the cleaning kept: ``tables`` by table key, ``columns`` by ``(table key, column)``."""
+
+    tables: Dict[str, TableEnrichment] = field(default_factory=dict)
+    columns: Dict[Tuple[str, str], ColumnEnrichment] = field(default_factory=dict)
+
+    @property
+    def count(self) -> int:
+        return len(self.tables) + len(self.columns)
+
+
+def draft_descriptions(
+    llm: Any,
+    budget: Budget,
+    snapshot: SchemaSnapshot,
+    *,
+    allows: Callable[[Optional[str], str], bool],
+    has_table_text: Callable[[str], bool],
+    has_column_text: Callable[[str, str], bool],
+    max_chars: int,
+    issues: List[str],
+) -> Drafted:
+    """Ask ``llm`` for the descriptions the glossary and the database leave blank, one call per table.
+
+    A table is shown to the model only when ``allows`` reaches it, and asked about only the items for which
+    ``has_table_text`` / ``has_column_text`` say nobody has written a description. Every call runs under
+    ``budget``; a refused call ends the run with what was drafted so far (``budget.stop`` says why). An answer
+    that cannot be parsed, or a call that fails, is an entry in ``issues``; the next table is still tried. A draft
+    longer than ``max_chars`` is dropped, since accepting it would fail the glossary's own check.
+    """
+    from nl2sql.llm.wires import StructuredOutputError, structured
+    from nl2sql.profiler.prompts import DRAFT_PROMPT
+
+    chain = DRAFT_PROMPT | structured(llm, SchemaEnrichment)
+    drafted = Drafted()
+    too_long = 0
+    for key, table in snapshot.contract.tables.items():
+        if budget.stop is not None:
+            break
+        schema_name, name = table.table.schema_name, table.table.table_name
+        if not allows(schema_name, name):
+            continue
+        asks_table = not has_table_text(key)
+        asks_columns = [c for c in table.columns if not has_column_text(key, c)]
+        if not asks_table and not asks_columns:
+            continue
+        # A foreign key to a table the caller cannot read would put that table's name in the prompt.
+        shown = table.model_copy(update={"foreign_keys": [
+            fk for fk in table.foreign_keys
+            if allows(fk.referred_table.schema_name, fk.referred_table.table_name)]})
+        one = SchemaSnapshot(
+            contract=snapshot.contract.model_copy(update={"tables": {key: shown}}),
+            metadata=snapshot.metadata.model_copy(
+                update={"tables": {k: v for k, v in snapshot.metadata.tables.items() if k == key}}))
+        evidence = build_evidence(one, None, [])
+        evidence["describe"] = {"tables": [key] if asks_table else [],
+                                "columns": [f"{key}.{c}" for c in asks_columns]}
+        try:
+            answer = chain.invoke({"evidence_json": json.dumps(evidence, default=str)},
+                                  config={"callbacks": budget.callbacks()})
+        except LimitReached:
+            break
+        except StructuredOutputError as error:
+            issues.append(f"The model's answer for {key} could not be used: {error}")
+            continue
+        except Exception as error:  # a provider's message can quote the prompt: the class alone
+            issues.append(f"Drafting {key} failed ({type(error).__name__}).")
+            continue
+        clean = sanitize_enrichment(one, answer)
+        if asks_table and (entry := clean.tables.get(key)) is not None and entry.description:
+            if len(entry.description) > max_chars:
+                too_long += 1
+            else:
+                drafted.tables[key] = entry
+        for column in asks_columns:
+            entry = clean.columns.get(f"{key}.{column}")
+            if entry is None or not entry.description:
+                continue
+            if len(entry.description) > max_chars or any(len(s) > max_chars for s in entry.synonyms):
+                too_long += 1
+            else:
+                drafted.columns[(key, column)] = entry
+    if too_long:
+        issues.append(f"{too_long} drafted description{'s were' if too_long != 1 else ' was'} dropped for being "
+                      f"longer than {max_chars} characters (settings.knowledge.item_max_chars).")
+    if budget.stop is not None:
+        issues.append(f"Drafting stopped at the {describe(budget.stop, budget.setting)}; "
+                      f"what it drafted so far is in the review queue.")
+    return drafted
