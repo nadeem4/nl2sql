@@ -88,7 +88,12 @@ for the datasource's knowledge digest.
 All of these hold:
 
 1. The planner named the phrase (`ambiguous_phrase`) and at least one
-   alternative passed the checks and was not merged.
+   alternative passed the checks and was not merged. A phrase the glossary
+   settles is not asked (D48): the flag and the alternatives are dropped and the
+   default plan goes on. A phrase is settled when a term's name equals it, or
+   exactly one term lists it as a synonym (case-insensitive); "sales" listed by
+   two terms stays open. The plan is still never cached, since the planner's
+   answer carried readings (`alternatives_offered`).
 2. `state.clarify` is on: the run's `clarify` (`run_query(clarify=...)`,
    default true; evals pass false) and the run has exactly one sub-query.
 3. `settings.clarify.enabled` is on (the default).

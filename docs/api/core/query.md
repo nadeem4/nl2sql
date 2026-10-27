@@ -25,7 +25,7 @@ Source:
 `packages/nl2sql/src/nl2sql/public_api.py`, `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -> QueryResult`
+`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None) -> QueryResult`
 
 Every argument after the question is keyword-only. `run_query` passes the runtime's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
@@ -41,6 +41,7 @@ Parameters:
 | `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`: `datasource_id`, `sub_query`, `plan`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the plan's own, or the call raises `ValueError` before anything runs. |
 | `approvals` | `Optional[Sequence[Approval]]` | no | Approvals for an earlier run's `approvals_needed`. See [Approval](#approval). |
 | `clarify` | `bool` | no | Default `True`: a question the planner reads two or three ways ends `needs_clarification` with the options instead of running the most likely one. `False` runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See [Clarification](#clarification). |
+| `choice` | `Optional[ClarificationChoice]` | no | The caller's pick from an earlier run's `clarification` (`from nl2sql import ClarificationChoice`: `request`, `option_id`). Ask the same question as the same caller: the chosen option's plan runs through the validator and the generator without routing, decomposing or planning. See [Asking again](#asking-again). Not with `plan` or `approvals`. |
 
 #### Running a plan you hold
 
@@ -221,8 +222,43 @@ one way; it could also mean Invoiced amount."). That happens with
 passed, and on a re-plan after an attempt already executed (a sanity check's
 retry), so the answer is never the flagged attempt's rows. `clarification.requested` (`sub_query_id`, `phrase`, `options`) is
 published on the engine's bus when a run asks; it is an operator event, not
-on the stream. Asking again with the chosen option arrives in L2. Evals run
-with clarification off, so a case measures the most likely reading.
+on the stream. Evals run with clarification off, so a case measures the most
+likely reading; a case may expect `clarify`, and the
+[clarify suite](../../evals/cases.md#the-clarify-suite) does.
+
+### Asking again
+
+```python
+choice = ClarificationChoice(request=result.clarification, option_id="b")
+answer = engine.run_query("What were sales last year?", user_context=ana, choice=choice)
+```
+
+The re-ask is stateless: the caller holds the request and sends it back, and
+nothing is stored. The engine checks, before anything runs:
+
+| Check | Failure |
+| --- | --- |
+| The request's `id` is the hash of its content; its `question` is the question as passed now (before any `run.before` hook); its asker is this caller; `option_id` is one of its options | `CLARIFICATION_INVALID` (`CRITICAL`). The id is an unkeyed hash, a check against mixed-up requests, not tamper evidence: the validator, run on the chosen plan with the caller's scope, is the guard against an edited plan |
+| The datasource is in the caller's scope, the request's `schema_version` is the live one and its `knowledge_digest` the live glossary's | `CLARIFICATION_STALE` (`ERROR`, never retried): the data or the glossary changed since the options were offered; ask again |
+| No `approvals` come with it | `CLARIFICATION_INVALID`: pass the approval alone |
+
+A refused choice ends the run with that one error (`status` `"error"`) and
+calls no model. A `plan` or a `pinned` passed with a `choice` is a `ValueError`
+at the call. Otherwise the run enters at Wave A's pinned entry with one
+sub-query, standalone: no resolver, decomposer or `datasources.after`. The
+planner step returns the chosen plan with `plan_source` `"chosen"` and no model
+call; then it is an ordinary run: `plan.after`, the validator with the
+caller's scope, the generator, `execute.before`. A chosen plan is one person's
+reading and is never cached. The sub-query's `plan_source` is `"chosen"` and
+its explanation says "You chose: Invoiced amount".
+
+If a hook (the cost guard, say) answers `needs_approval` on the chosen plan,
+the run ends `needs_approval` with an `ApprovalRequest` for the chosen plan;
+the approver's re-run passes `approvals` only.
+
+`engine.knowledge.save_choice(choice, user_context=ana)` files the pick as a
+`term` proposal, so an admin can make the phrase part of the glossary: see
+[the review queue](../../configuration/review.md#saving-a-clarification-pick).
 
 ### Warnings
 
@@ -326,7 +362,7 @@ Source:
 `packages/nl2sql/src/nl2sql/events/catalog.py`
 
 Signature:
-`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -> Iterator[Event]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None) -> Iterator[Event]`
 
 The same run as `run_query`, with the same parameters, yielded as it happens:
 the run's own events on the engine's bus ([Events](../../observability/events.md)),

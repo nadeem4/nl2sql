@@ -89,7 +89,7 @@ def test_a_pinned_plan_cannot_skip_plan_after(store):
 # ---------------------------------------------------------------- the SQL agent
 
 
-def _sql_agent(monkeypatch, pinned, hook=lambda ctx: Allow(), role="user"):
+def _sql_agent(monkeypatch, pinned, hook=lambda ctx: Allow(), role="user", source=PinnedSource.SUPPLIED):
     """The real planner and validator, retries on, for a role that may read orders only."""
     from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
     from nl2sql.pipeline.subgraphs.sql_agent import build_sql_agent_graph
@@ -114,7 +114,7 @@ def _sql_agent(monkeypatch, pinned, hook=lambda ctx: Allow(), role="user"):
 
     result = build_sql_agent_graph(ctx, execute=False).invoke(SubgraphExecutionState(
         trace_id="t", user_query="q", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"),
-        user_context=UserContext(roles=[role]), pinned_plan=pinned, pinned_source=PinnedSource.SUPPLIED))
+        user_context=UserContext(roles=[role]), pinned_plan=pinned, pinned_source=source))
     return generated, refined, result
 
 

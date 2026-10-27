@@ -5,8 +5,9 @@ a *proposal* in one queue, kept in the state store (`storage.state`). A
 thumbs-up on a generated answer files a proposed verified query, and so does a
 checked [correction](../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct)
 (`engine.feedback.correct`, origin `correction`); the [schema profiler](../schema/profiler.md) files its join candidates and
-column roles the same way (`nl2sql profile`), and later 0.8 work files drafted
-descriptions and saved clarifications. Nothing in
+column roles the same way (`nl2sql profile`), a saved
+[clarification pick](#saving-a-clarification-pick) files a proposed term, and later 0.8
+work files drafted descriptions. Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.
 
@@ -79,6 +80,26 @@ report.accepted, report.files_written, report.warnings, report.refused
 decided; `files_written`, each file written once, relative to the folder of
 `nl2sql.yaml`; `warnings`; and `refused`, an id to why it was left as it was:
 unknown, no longer proposed, or a change that failed its checks.
+
+## Saving a clarification pick
+
+When a question asked which reading was meant ([Asking
+again](../api/core/query.md#asking-again)), the pick can be kept:
+
+```python
+proposal = engine.knowledge.save_choice(choice, user_context=ana)
+```
+
+It files a `term` proposal with origin `clarification`: the phrase (or `term=`,
+with the phrase as its synonym) as the term's name, the chosen option's label as
+its definition, and the columns the chosen plan's select items read and the
+tables it reads. Anyone whose scope reaches the option's datasource and tables
+may save a pick (otherwise `ReviewError` `NOT_FOUND`); a request that was
+changed, or has no such option, is a `ValueError`. It reaches the glossary only
+when an admin accepts it. A term of that name that already exists is replaced,
+and `nl2sql review show` shows it beside the proposed one first. Once accepted,
+the phrase is a term's name or synonym, which settles it: the planner's flag on
+it is dropped and the question is no longer asked.
 
 ## Accept: the only writer
 

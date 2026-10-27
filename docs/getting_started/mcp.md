@@ -64,7 +64,7 @@ run's trace.
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `ask` | `question`, `datasource_id` (optional: skip routing) | See below. |
+| `ask` | `question`, `datasource_id` (optional: skip routing), `choice` (optional: the pick for a question that asked, see below) | See below. |
 | `list_datasources` | none | `{"datasources": [...]}`: each one's `id`, `type`, `description` and `status`, for the datasources the caller's roles reach. |
 | `describe_table` | `datasource_id`, `table` (its name, or `schema.name`) | `{"status": "ok", "table": {...}}`: its `columns` (`name`, `type`, `nullable`, `primary_key`, `description`), `foreign_keys`, `row_count` and `description`, as [`engine.datasources.schema`](../api/core/datasource.md) gives them. |
 
@@ -72,7 +72,7 @@ run's trace.
 
 | Key | Meaning |
 | --- | --- |
-| `status` | The run's status: `success`, `plan_only`, `error`, `needs_approval`, `stopped` (or, from Wave B, `needs_clarification`). |
+| `status` | The run's status: `success`, `plan_only`, `error`, `needs_approval`, `stopped`, `needs_clarification`. |
 | `answer` | `{"summary", "content"}`, or `null` when no answer was written. |
 | `sub_queries` | Per sub-query: `id`, `datasource_id`, `sql`, `columns`, the first 20 `rows`, `total_rows` and `truncated`. |
 | `truncated` | Whether any sub-query's rows were cut, at the preview or at the row ceiling. |
@@ -82,6 +82,14 @@ run's trace.
 | `errors` | When the run failed: each one's `code`, `node` and `message`. A refusal (`SECURITY_VIOLATION`) always carries the generic "You do not have permission to see the data this question requires.", whatever `refusal_names_tables` says. A hook's denial, a limit, a provider failure or an answer check keeps the engine's message; any other message names only its code and the trace, since it may carry an exception's text. |
 | `approvals_needed` | When `status` is `needs_approval`: what a person must approve, as `run_query` returns it ([Approval](../architecture/wave_a.md#7-approval)). |
 | `stop` | When `status` is `stopped`: which limit stopped the run. |
+| `clarification` | When `status` is `needs_clarification`: the `phrase`, each option's `id`, `label` and plain-English `explanation`, and the `request` itself (the plans stay in it). |
+
+A question that can be read more than one way is not run. The assistant shows the
+options to its user and calls `ask` again with the same question and
+`choice={"request": <the clarification's request>, "option_id": "b"}`; the engine runs that
+option's plan through the same checks as any plan, under the same role. A request that is not
+this question's, or that the data or glossary has outdated, comes back as an error
+(`CLARIFICATION_INVALID`, `CLARIFICATION_STALE`): ask again without a choice.
 
 An exception out of the engine is `{"status": "error", "errors": [{"code":
 "INTERNAL_ERROR", ...}]}`, and logged.

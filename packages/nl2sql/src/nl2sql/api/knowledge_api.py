@@ -184,9 +184,28 @@ class KnowledgeAPI:
 
     def save_choice(self, choice: "ClarificationChoice", *, user_context: "UserContext",
                     term: Optional[str] = None) -> "Proposal":
-        """Turn a clarification pick into a ``term`` proposal; it reaches the glossary only when an admin
-        accepts it (L2)."""
-        raise _not_built("L2")
+        """Turn a clarification pick into a ``term`` proposal (D50): the phrase (or ``term``) as the term's name,
+        the chosen option's label as its definition, and the columns and tables its plan reads.
+
+        It reaches the glossary only when an admin accepts it (``engine.proposals.accept``); a term of that name
+        replaces the existing one, which ``nl2sql review show`` shows first. Once accepted, the phrase is a term's
+        name or synonym, which settles it: the question is no longer asked. Anyone whose scope reaches the
+        option's tables may save a pick.
+
+        Raises:
+            TypeError: ``user_context`` is not a ``UserContext``.
+            ValueError: the request was changed, or has no such option.
+            ReviewError: ``NOT_FOUND``, the caller's scope does not reach the option's datasource and tables.
+        """
+        from nl2sql.clarify.choice import choice_proposal
+        from nl2sql.review.models import ReviewError, ReviewErrorCode
+        from nl2sql.review.queue import propose, visible
+
+        caller = _caller(user_context)
+        proposal = choice_proposal(self._ctx, choice, caller, term)
+        if not visible(self._ctx, caller, proposal):
+            raise ReviewError(ReviewErrorCode.NOT_FOUND, "That clarification is not one this caller's scope reaches.")
+        return propose(self._ctx, proposal)
 
     # ------------------------------------------------------------ helpers
 

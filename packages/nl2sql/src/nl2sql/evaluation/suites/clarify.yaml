@@ -1,0 +1,76 @@
+# The clarify suite: questions about "sales", which the demo glossary (datasources.chinook.terms)
+# leaves open. Two terms list it as a synonym, `revenue` (the sum of invoice lines) and
+# `invoiced total` (the invoice total, tax included), so a planner that sees both flags the phrase and
+# the run ends needs_clarification (docs/architecture/wave_b.md, section 7).
+#
+# Each case expects `clarify`, which runs only with clarification on:
+#   engine.evals.run(suites=["evals/clarify.yaml"], clarify=True)
+# and which the `outcome` scorer passes when the run asks and returns no rows. A case that names `clarify`
+# has no sql: what the asker picks next is a person's choice, not a gold answer.
+version: 1
+cases:
+
+- id: clarify_sales_001
+  question: What were our sales last year?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [clarify, chinook, sales]
+  outcome: {admin: clarify}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: clarify_sales_002
+  question: Show me total sales by country.
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [clarify, chinook, sales]
+  outcome: {admin: clarify}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: clarify_sales_003
+  question: Which customers had the highest sales?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [clarify, chinook, sales]
+  outcome: {admin: clarify}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: clarify_sales_004
+  question: How have sales changed month over month?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [clarify, chinook, sales]
+  outcome: {admin: clarify}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null
+
+- id: clarify_sales_005
+  question: What are the sales for the USA?
+  datasources: [chinook]
+  status: approved
+  origin: hand
+  tags: [clarify, chinook, sales]
+  outcome: {admin: clarify}
+  tables: []
+  columns: []
+  order_matters: false
+  sql: null
+  rows: null

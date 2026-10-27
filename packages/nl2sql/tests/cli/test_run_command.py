@@ -109,3 +109,66 @@ def test_show_perf_prints_each_steps_time(engine_with, capsys):
 
     output = capsys.readouterr().out
     assert "decomposer" in output and "0.25s" in output
+
+
+# ---------------------------------------------------------------- clarification (L2)
+
+
+class AskingEngine(StreamEngine):
+    """Asks which reading on the first run, answers on the second."""
+
+    def __init__(self, config, first, second=None):
+        super().__init__(config, first)
+        self.second, self.runs = second, []
+
+    def stream_query(self, question, **kwargs):
+        self.runs.append(kwargs)
+        yield from (self.events if len(self.runs) == 1 else self.second)
+
+
+def _clarification():
+    from nl2sql import ClarificationOption, ClarificationRequest
+    from nl2sql.explain.render import explain_plan
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+
+    plan = PlanModel.model_validate({"tables": [{"name": "invoice", "alias": "i"}], "select_items": [
+        {"alias": "n", "expr": {"kind": "column", "alias": "i", "column_name": "id"}}]})
+    options = [ClarificationOption(id=i, label=label, plan=plan.model_dump(mode="json"),
+                                   explanation=explain_plan(plan, datasource_id="ds1"))
+               for i, label in (("a", "Gross"), ("b", "Invoiced amount"))]
+    return ClarificationRequest.build(
+        question="What were sales?", phrase="sales", datasource_id="ds1", schema_version="v1",
+        knowledge_digest="d", sub_query={"id": "sq1", "datasource_id": "ds1"}, options=options)
+
+
+def _asks() -> Event:
+    request = _clarification()
+    return _final(status="needs_clarification", clarification=request.model_dump(mode="json"),
+                  final_answer={"summary": "s", "format_type": "text", "content": "Choose one", "warnings": []})
+
+
+def test_run_command_asks_on_a_terminal_and_exits_4_otherwise(engine_with, capsys, monkeypatch):
+    monkeypatch.setattr(run_module, "_is_terminal", lambda: False)
+    engine = engine_with(*_steps(), _asks())
+
+    with pytest.raises(SystemExit) as exc:
+        run_module.run_pipeline(RunConfig(query="What were sales?"), engine)
+
+    assert exc.value.code == 4
+    output = capsys.readouterr().out
+    assert "sales" in output and "1. Gross" in output and "2. Invoiced amount" in output
+    assert len(engine.asked) == 2  # asked once: nothing to pick from without a terminal
+
+
+def test_on_a_terminal_the_pick_runs_the_question_again_with_the_choice(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(run_module, "_is_terminal", lambda: True)
+    monkeypatch.setattr(run_module.typer, "prompt", lambda *args, **kwargs: 2)
+    engine = AskingEngine(make_config(tmp_path, settings={"tenant_id": "acme"}), [*_steps(), _asks()],
+                          [*_steps(), _final(status="success")])
+
+    run_module.run_pipeline(RunConfig(query="What were sales?"), engine)
+
+    first, second = engine.runs
+    assert first.get("choice") is None
+    assert second["choice"].option_id == "b" and second["choice"].request.id == _clarification().id
+    assert second["user_context"] == first["user_context"]

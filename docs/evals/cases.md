@@ -57,7 +57,7 @@ The outcomes:
 | `allowed` | An answer. `result_match` then checks its rows |
 | `refused` | The validator's refusal, with the generic message and no rows |
 | `unanswerable` | The resolver's `QUESTION_NOT_ANSWERABLE` |
-| `clarify` | A request to narrow the question (status `needs_clarification`). This runs only with `engine.evals.run(clarify=True)`; Wave B adds the clarification result |
+| `clarify` | A request to narrow the question (status `needs_clarification`). This runs only with `engine.evals.run(clarify=True)`; the `outcome` scorer passes it when the run asks and returns no rows |
 
 An approved case must have one `alt_rows` entry per `alt_sql`. An
 unanswerable case cannot have an alternative.
@@ -123,6 +123,20 @@ routing misses, and the gate allows no other case to start failing. The test
 bed's 1,200-table wide schema has routing cases of its own in the `realdb`
 job (`tests/realdb/test_routing_wide.py`), since they need the test bed's
 databases.
+
+## The clarify suite
+
+`suites/clarify.yaml` holds five approved cases about "sales", which the demo
+glossary leaves open: two terms list it as a synonym, `revenue` and
+`invoiced total`, so a planner that sees both names the phrase and the run
+ends `needs_clarification`. Each case expects `clarify` from `admin` and has
+no SQL: what the asker picks next is a person's choice, not a gold answer.
+The suite is copied by `nl2sql init --demo` but not named in `evals.yaml`,
+since its cases run only with clarification on:
+
+```python
+engine.evals.run(suites=["evals/clarify.yaml"], clarify=True)
+```
 
 ## Regenerating rows
 

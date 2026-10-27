@@ -81,6 +81,7 @@ class PinnedRun(BaseModel):
     plans: Dict[str, PlanModel] = Field(default_factory=dict)
     verified: Optional[VerifiedRef] = None
     verified_datasource_id: Optional[str] = None
+    chosen_label: Optional[str] = None  # a chosen plan's option label, for "You chose: ..."
 
     @property
     def enters_pinned(self) -> bool:

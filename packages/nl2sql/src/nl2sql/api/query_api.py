@@ -11,14 +11,14 @@ import logging
 import queue
 import threading
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence
+from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence, Tuple
 
 from pydantic import BaseModel, Field
 from nl2sql.runtime import Runtime
 from nl2sql.pipeline.runtime import run_with_graph, usage_prices
 from nl2sql.policies import UserContext
 from nl2sql.common.cancellation import CancellationToken
-from nl2sql.common.errors import ErrorCode, ErrorSeverity, RunWarning
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.events import STREAM_EVENTS, RunScope, RunStatus
 from nl2sql_sdk.events import Event
 from nl2sql.hooks import hooks_of
@@ -30,7 +30,8 @@ from nl2sql.pipeline.events import RunEvents
 from nl2sql.pipeline.pinned import PinnedRun, SuppliedPlan, check_pinned
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
-from nl2sql.clarify.models import ClarificationOption, ClarificationRequest
+from nl2sql.clarify.choice import choice_problem, pinned_from_choice
+from nl2sql.clarify.models import ClarificationChoice, ClarificationOption, ClarificationRequest
 from nl2sql.explain.models import ExplainedStep, Explanation
 from nl2sql.knowledge.models import KnowledgeUsed
 from nl2sql.knowledge.scope import caller_knowledge
@@ -465,6 +466,11 @@ def _pin(plan: Optional[SuppliedPlan], pinned: Optional[PinnedRun], approvals: O
     return pin
 
 
+def _refused(question: str, problem: PipelineError, user: Optional[UserContext], trace_id: str) -> Dict[str, Any]:
+    """The state of a run that ended before the graph, with ``problem`` as its one error."""
+    return {"trace_id": trace_id, "user_query": question, "user_context": user or UserContext(), "errors": [problem]}
+
+
 class QueryAPI:
     """Runs questions for ``NL2SQL.run_query`` and ``stream_query``. Internal: reach it through ``NL2SQL``."""
 
@@ -484,6 +490,7 @@ class QueryAPI:
         approvals: Optional[Sequence[Approval]] = None,
         pinned: Optional[PinnedRun] = None,
         clarify: bool = True,
+        choice: Optional[ClarificationChoice] = None,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -513,6 +520,13 @@ class QueryAPI:
                 most likely one (a run of one sub-query, with
                 ``settings.clarify.enabled`` on). False runs the default
                 reading; the prompts are the same either way.
+            choice: The caller's pick from an earlier run's ``clarification``
+                (same question, same asker): the run takes the chosen
+                option's plan (``plan_source="chosen"``) through the pinned
+                entry and the validator, without routing, decomposing or
+                planning. A request that is not this run's ends the run
+                ``CLARIFICATION_INVALID``; one the data or glossary has
+                outdated, ``CLARIFICATION_STALE``. Not with ``approvals``.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
@@ -520,15 +534,15 @@ class QueryAPI:
         Raises:
             ValueError: at the call, before anything runs: ``datasource_id``
                 is not the plan's datasource, a chosen plan comes with
-                approvals, or both ``plan`` and ``pinned`` are given.
+                approvals, or ``choice`` comes with a ``plan`` or a ``pinned``.
         """
-        pinned = _pin(plan, pinned, approvals, datasource_id)
+        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                          user_context=user_context)
         # Entered here too, not only in the graph's worker, so every log line of the run carries its trace_id.
         with scope.entered():
             try:
-                state = run_with_graph(
+                state = _refused(question, refusal, user_context, scope.trace_id) if refusal else run_with_graph(
                     self._ctx,
                     question,
                     datasource_id=datasource_id,
@@ -552,6 +566,24 @@ class QueryAPI:
                 raise
             self.close_scope(scope, result)
         return result
+
+    def _pin_choice(self, question: str, choice: Optional[ClarificationChoice], plan: Optional[SuppliedPlan],
+                    pinned: Optional[PinnedRun], approvals: Optional[Sequence[Approval]],
+                    datasource_id: Optional[str], user: Optional[UserContext],
+                    ) -> Tuple[Optional[PinnedRun], Optional[PipelineError]]:
+        """The run's pin and, for a ``choice`` that cannot run, the error that ends it before the graph.
+
+        Raises:
+            ValueError: ``choice`` comes with a ``plan`` or a ``pinned``, or the pin breaks ``check_pinned``.
+        """
+        if choice is None:
+            return _pin(plan, pinned, approvals, datasource_id), None
+        if plan is not None or pinned is not None:
+            raise ValueError("Pass a choice, a plan or a pin, not more than one.")
+        problem = choice_problem(choice, question=question, user=user, ctx=self._ctx, approvals=approvals or ())
+        if problem is not None:
+            return None, problem
+        return _pin(None, pinned_from_choice(choice), None, datasource_id), None
 
     def open_scope(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                    user_context: Optional[UserContext] = None) -> RunScope:
@@ -609,6 +641,7 @@ class QueryAPI:
         approvals: Optional[Sequence[Approval]] = None,
         pinned: Optional[PinnedRun] = None,
         clarify: bool = True,
+        choice: Optional[ClarificationChoice] = None,
     ) -> Iterator[Event]:
         """
         Run a question as :meth:`run_query` does, yielding its events as they are published.
@@ -635,20 +668,21 @@ class QueryAPI:
         ``ValueError``, raised at the call. Whatever breaks, the stream ends
         with exactly one terminal event. ``names``
         (internal) is the allow-list; Wave C's conversation stream adds its
-        own events to it. ``plan``, ``approvals`` and ``pinned`` are as for
-        :meth:`run_query`, and refused the same way, at the call; so is ``clarify``.
+        own events to it. ``plan``, ``approvals``, ``pinned`` and ``choice`` are as
+        for :meth:`run_query`, and refused the same way, at the call; so is ``clarify``.
         """
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
-        pinned = _pin(plan, pinned, approvals, datasource_id)
+        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                             token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
-                            pinned=pinned, approvals=approvals, clarify=clarify)
+                            pinned=pinned, approvals=approvals, clarify=clarify, refusal=refusal)
 
     def _stream(self, question: str, *, datasource_id: Optional[str], execute: bool,
                 user_context: Optional[UserContext], token: CancellationToken, opened: Optional[RunScope],
                 allowed: frozenset, pinned: Optional[PinnedRun] = None,
-                approvals: Optional[Sequence[Approval]] = None, clarify: bool = True) -> Iterator[Event]:
+                approvals: Optional[Sequence[Approval]] = None, clarify: bool = True,
+                refusal: Optional[PipelineError] = None) -> Iterator[Event]:
         """:meth:`stream_query`'s run, on a thread of its own, and the events it hands over."""
         events: "queue.Queue[Optional[Event]]" = queue.Queue()
         terminal_sent = threading.Event()
@@ -667,7 +701,7 @@ class QueryAPI:
                 # stream's own run.finished, with the result, is delivered below.
                 scope.follow(deliver, allowed - {"run.finished"})
                 with scope.entered():
-                    state = run_with_graph(
+                    state = _refused(question, refusal, user_context, scope.trace_id) if refusal else run_with_graph(
                         self._ctx,
                         question,
                         datasource_id=datasource_id,

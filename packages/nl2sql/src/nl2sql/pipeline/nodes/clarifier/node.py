@@ -12,6 +12,9 @@ renders each that passed and drops one whose SQL another option already has.
 An option is never offered, nor listed as an assumption, unless the validator
 would pass it, so no option names a table the caller cannot read.
 
+A phrase the glossary settles (a term's name, or a synonym exactly one term lists, D48) is not asked: the flag
+and the alternatives are dropped and the default plan goes on.
+
 When at least one alternative is left, the planner named the phrase, and the
 sub-query may ask (``state.clarify``: the run's ``clarify`` is on and this is
 its only sub-query, D47), ``settings.clarify.enabled`` is on and no attempt of
@@ -91,6 +94,16 @@ class ClarifierNode:
 
         return digest(DatasourceKnowledge())
 
+    def _settled(self, datasource_id: str, phrase: Optional[str]) -> bool:
+        """Whether the glossary settles ``phrase`` (D48): a term's name, or a synonym exactly one term lists."""
+        if self._knowledge is None or not phrase:
+            return False
+        key = phrase.strip().casefold()
+        terms = self._knowledge.get(datasource_id).terms
+        if any(t.term.strip().casefold() == key for t in terms):
+            return True
+        return sum(any(s.strip().casefold() == key for s in t.synonyms) for t in terms) == 1
+
     def _ask(self, state: SubgraphExecutionState, response: ASTPlannerResponse,
              kept: List[PlanAlternative]) -> PipelineError:
         sub_query = state.sub_query
@@ -118,6 +131,11 @@ class ClarifierNode:
         response = state.ast_planner_response
         if response is None or response.plan is None or not response.alternatives:
             return {}
+        if self._settled(state.sub_query.datasource_id, response.ambiguous_phrase):
+            # The glossary already says what the phrase means: the default reading runs, nothing is asked or
+            # listed as an assumption. ``alternatives_offered`` stays (the plan is still never cached, D47).
+            return {"ast_planner_response": response.model_copy(update={"ambiguous_phrase": None,
+                                                                        "alternatives": []})}
         kept = self._options(state, response)
         # Only ``alternatives`` is cut: K2's ``alternatives_offered`` (every reading the planner gave) stays,
         # and the plan cache's "never cache an answer with readings" rule (D47) reads it.

@@ -249,7 +249,9 @@ EVALS_HEADER = """\
 # The eval suites engine.evals.run runs, relative to nl2sql.yaml, and how they are
 # scored. evals/chinook.yaml is the Chinook gold suite. evals/routing.yaml asks
 # which database a question belongs to; run it by name, in mode retrieval or full:
-# nl2sql eval run --mode retrieval --suite evals/routing.yaml. See the Evals docs.
+# nl2sql eval run --mode retrieval --suite evals/routing.yaml. evals/clarify.yaml holds
+# questions the glossary leaves open; run it with engine.evals.run(..., clarify=True).
+# See the Evals docs.
 """
 
 KNOWLEDGE_HEADER = """\

@@ -18,10 +18,9 @@ from typing import get_args
 import pytest
 import typer.main
 import yaml
-from langchain_core.embeddings import DeterministicFakeEmbedding
 from pydantic import ValidationError
 
-from nl2sql import NL2SQL, Config, ConfigError, Embeddings, QueryResult, Registry, Settings, UserContext, load_config
+from nl2sql import Config, ConfigError, QueryResult, Registry, Settings, UserContext, load_config
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.config import CostRule, KnowledgeSourceConfig, Policies, Role
 from nl2sql.config.models import AgentName
@@ -536,28 +535,6 @@ def test_profile_report_and_accept_report_shapes():
 
 
 # ---------------------------------------------------------------- the facade and the CLI
-
-def _engine(tmp_path: Path) -> NL2SQL:
-    tmp_path.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(tmp_path / "shop.db") as connection:
-        connection.execute("CREATE TABLE customers (id INTEGER PRIMARY KEY)")
-    cfg = make_config(tmp_path, datasources=[{"id": "shop", "type": "sqlite", "connection": {"database": "shop.db"}}])
-    return NL2SQL(cfg.model_copy(update={"embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8))}))
-
-
-STUBS = {
-    # K1 built sources, show, export and reload (test_knowledge_sources.py); Q1 the review queue
-    # (test_review_queue.py).
-    ("knowledge", "save_choice"): ("L2", {"choice": None, "user_context": None}),
-}
-
-
-def test_the_new_namespaces_are_stubs_naming_their_pr(tmp_path):
-    with _engine(tmp_path) as engine:
-        for (namespace, method), (pr, kwargs) in STUBS.items():
-            with pytest.raises(NotImplementedError, match=pr):
-                getattr(getattr(engine, namespace), method)(**kwargs)
-
 
 def test_the_cli_has_the_knowledge_review_and_profile_groups():
     from nl2sql.cli.main import app

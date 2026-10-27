@@ -15,7 +15,8 @@ Only ``status: approved`` cases run. A seeded or exported case is a
 The suites the package ships are in ``suites/``: ``chinook.yaml`` is the
 Chinook gold set, moved here unchanged from ``chinook_gold.yaml`` and
 ``chinook_gold_plans.yaml``; ``routing.yaml`` asks which of the demo's three
-databases a question belongs to (Phase R).
+databases a question belongs to (Phase R); ``clarify.yaml`` holds questions about "sales" that the demo glossary
+leaves open, each expecting ``clarify`` (Wave B).
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 SUITES_DIR = pathlib.Path(__file__).parent / "suites"
 CHINOOK_SUITE_PATH = SUITES_DIR / "chinook.yaml"
 ROUTING_SUITE_PATH = SUITES_DIR / "routing.yaml"
+CLARIFY_SUITE_PATH = SUITES_DIR / "clarify.yaml"
 
 # What a role should get. ``clarify``: the engine should ask the caller to
 # narrow the question (Wave B); evals run such a case only with ``clarify=True``.

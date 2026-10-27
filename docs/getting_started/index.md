@@ -77,6 +77,11 @@ connects, or is reported and left out. A datasource with `required: true` that
 cannot connect stops the command. `nl2sql doctor` prints the same report
 without running anything.
 
+When a question can be read more than one way, `nl2sql run` numbers the
+readings. On a terminal it asks which one and runs the question again with
+your choice; with no terminal (a script, a pipe) it prints them and exits 4.
+[Asking again](../api/core/query.md#asking-again) is the same step for code.
+
 ## Set up what the engine knows: connect, index, profile, review
 
 After the first index, let the engine suggest what it cannot read from the
