@@ -37,6 +37,8 @@ returns one `ProfileReport` per datasource the caller reaches:
 | `issues` | A probe that failed, a draft that could not be used, no model for drafting, an unavailable datasource, or "not indexed yet" |
 | `seconds` | How long it took |
 
+`max_cost_usd` (`--max-cost`) without `draft=True` (`--draft`) is a `ValueError`.
+
 The caller is required and has no default. The profiler reads and probes only
 the tables the caller's scope reaches, so a table the role denies is never
 probed and is named in no proposal. A datasource that was never indexed is
@@ -121,9 +123,13 @@ refuse it on accept.
   `draft` when it carries a description, `profiler` when it carries only a role.
 * Nothing drafted is written into the schema snapshot or the index. It reaches
   a prompt only after a person accepts it into the glossary.
-* A later plain `profile` (no `draft`) files the role alone for a column, which
-  supersedes the open merged row; run it with `draft=True` again to get the
-  description back, or accept the merged row first.
+* An item with an open drafted description in the queue counts as described:
+  a repeat `draft=True` run does not ask the model about it again or replace
+  the row. A run that finds only the same role for such a column (a plain
+  `profile`, a run stopped at the cost cap) leaves the open row alone; a changed
+  role still files and supersedes it.
+* A foreign key to a table the caller's scope denies is left out of the
+  evidence, so the model never sees that table's name.
 
 **Cost.** Drafting is capped at `max_cost_usd` for the whole call, across
 datasources (the argument, else `profiler.max_cost_usd`, 0.50). A model with no

@@ -235,8 +235,12 @@ def draft_descriptions(
         asks_columns = [c for c in table.columns if not has_column_text(key, c)]
         if not asks_table and not asks_columns:
             continue
+        # A foreign key to a table the caller cannot read would put that table's name in the prompt.
+        shown = table.model_copy(update={"foreign_keys": [
+            fk for fk in table.foreign_keys
+            if allows(fk.referred_table.schema_name, fk.referred_table.table_name)]})
         one = SchemaSnapshot(
-            contract=snapshot.contract.model_copy(update={"tables": {key: table}}),
+            contract=snapshot.contract.model_copy(update={"tables": {key: shown}}),
             metadata=snapshot.metadata.model_copy(
                 update={"tables": {k: v for k, v in snapshot.metadata.tables.items() if k == key}}))
         evidence = build_evidence(one, None, [])

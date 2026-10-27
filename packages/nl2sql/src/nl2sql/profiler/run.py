@@ -82,6 +82,8 @@ def profile(ctx: Any, datasource_ids: Sequence[str], user: "UserContext", *, dra
         ValueError: ``max_cost_usd`` is not positive.
         UnknownPriceError: ``draft`` is set and the ``profiler`` model has no price.
     """
+    if max_cost_usd is not None and not draft:
+        raise ValueError("max_cost_usd caps drafting: pass draft=True (--draft) with it.")
     if max_cost_usd is not None and max_cost_usd <= 0:
         raise ValueError("max_cost_usd must be a positive number of dollars.")
     drafter = _drafter(ctx, max_cost_usd) if draft else None
@@ -124,6 +126,9 @@ def _profile_datasource(ctx: Any, datasource_id: str, scope: Any, snapshot: Sche
 
     knowledge = ctx.knowledge.get(datasource_id)
     known, said, said_tables = _glossary_facts(knowledge, snapshot, dialect)
+    open_columns = {row.target.casefold(): row for row in ctx.state.list_proposals(
+        kind="column", status="proposed", datasource_id=datasource_id)}
+    waiting_tables, waiting_columns = _waiting_drafts(ctx, datasource_id, snapshot)
 
     def file(proposal: Proposal) -> None:
         row = propose(ctx, proposal)
@@ -160,8 +165,9 @@ def _profile_datasource(ctx: Any, datasource_id: str, scope: Any, snapshot: Sche
         spent = drafter.budget.usage.spent()
         drafted = draft_descriptions(
             drafter.llm, drafter.budget, snapshot, allows=scope.allows,
-            has_table_text=lambda key: _has_table_text(snapshot, said_tables, key),
-            has_column_text=lambda key, column: _has_column_text(snapshot, said, key, column),
+            has_table_text=lambda key: key in waiting_tables or _has_table_text(snapshot, said_tables, key),
+            has_column_text=lambda key, column: ((key, column.lower()) in waiting_columns
+                                                 or _has_column_text(snapshot, said, key, column)),
             max_chars=ctx.config.settings.knowledge.item_max_chars, issues=issues)
         cost = round(drafter.budget.usage.spent() - spent, 6)
         stop = drafter.budget.stop
@@ -182,6 +188,12 @@ def _profile_datasource(ctx: Any, datasource_id: str, scope: Any, snapshot: Sche
         table = snapshot.contract.tables[key[0]]
         change = dict(found.change) if found else {}
         evidence = dict(found.evidence) if found else {}
+        label = f"{table_label(table, snapshot)}.{key[1]}"
+        if text is None:  # a role alone must not retire the open row that also carries a drafted description
+            open_row = open_columns.get(label.casefold())
+            if open_row is not None and "description" in open_row.change and all(
+                    open_row.change.get(k) == v for k, v in change.items()):
+                continue
         if text is not None:  # one proposal per column: the role and the description together
             change["description"] = text.description
             if text.synonyms:
@@ -197,6 +209,25 @@ def _profile_datasource(ctx: Any, datasource_id: str, scope: Any, snapshot: Sche
                          skipped_by_budget=skipped, drafted=drafted.count, cost=cost,
                          seconds=round(_now() - started, 3), stopped_by="cost_cap" if cost_cap else stopped,
                          issues=issues)
+
+
+def _waiting_drafts(ctx: Any, datasource_id: str, snapshot: SchemaSnapshot) -> Tuple[Set[str], Set[Tuple[str, str]]]:
+    """The tables and ``(table, lower-case column)`` pairs with an open drafted description in the queue."""
+    tables: Set[str] = set()
+    columns: Set[Tuple[str, str]] = set()
+    for kind in ("table", "column"):
+        for row in ctx.state.list_proposals(kind=kind, status="proposed", datasource_id=datasource_id):
+            if row.origin != "draft" or not row.change.get("description"):
+                continue
+            if kind == "table":
+                table, _ = resolve_table(row.target, snapshot)
+                if table is not None:
+                    tables.add(table.table.full_name)
+            else:
+                table, column, _ = resolve_column(row.target, snapshot)
+                if table is not None and column is not None:
+                    columns.add((table.table.full_name, column.name.lower()))
+    return tables, columns
 
 
 def _has_table_text(snapshot: SchemaSnapshot, said_tables: Set[str], key: str) -> bool:

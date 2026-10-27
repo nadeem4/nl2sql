@@ -61,7 +61,7 @@ def profile_datasources(engine: "NL2SQL", who: "UserContext", datasource_ids: Op
     try:
         reports = engine.knowledge.profile(datasource_ids or None, user_context=who, draft=draft,
                                            max_cost_usd=max_cost)
-    except ValueError as error:  # UnknownPriceError is one
+    except ValueError as error:  # UnknownPriceError and a cap without --draft are ones
         console.print(f"[bold red]Error:[/bold red] {escape(str(error))}", soft_wrap=True)
         raise typer.Exit(1)
     print_reports(engine, who, reports)

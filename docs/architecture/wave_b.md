@@ -870,10 +870,17 @@ scope denies is never probed. Each finished profile publishes
       single `change` (the role's fields the glossary does not set, plus
       `description` and `synonyms`), `origin` `draft` when it carries a
       description and `profiler` when only a role. `propose`'s supersede rule is
-      unchanged and superseding is not scoped by origin. The id hashes the change,
-      so a later plain `profile` files the role-only row and supersedes the merged
-      one; profile with `draft=True` again to bring the description back.
-      `test_one_column_proposal_carries_both_role_and_description` pins it.
+      unchanged and superseding is not scoped by origin. The id hashes the change, so
+      to keep an open merged row from being retired by a later run that drafts nothing
+      for that column (a plain `profile`, a cost-capped run), the column loop skips a
+      role-only row when an open `column` row for the same target already carries a
+      description and the same role fields; a changed role still files and
+      supersedes. An open `origin: draft` row also counts as already described, so a
+      repeat run neither pays again nor replaces it. Foreign keys to tables the
+      caller's scope denies are dropped before the evidence is built, and
+      `max_cost_usd` without `draft` is a `ValueError`.
+      `test_one_column_proposal_carries_both_role_and_description` and
+      `test_a_plain_profile_keeps_an_open_draft` pin the merge.
     - **Calls and budget.** One call per table the caller reaches that has an item
       without a description, shown only that table's evidence plus a `describe`
       list of the table and columns to describe (the code differs from the page's

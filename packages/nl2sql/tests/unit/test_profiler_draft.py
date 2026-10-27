@@ -66,22 +66,24 @@ def drafter():
     d.server.stop()
 
 
-def _database(folder: Path) -> None:
+def _database(folder: Path, fk: bool = False) -> None:
     if (folder / "shop.db").exists():
         return
+    link = ", secret_ledger_id INTEGER REFERENCES orders(order_id)" if fk else ""
     with sqlite3.connect(folder / "shop.db") as connection:
-        connection.executescript("""
-            CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT);
+        connection.executescript(f"""
+            CREATE TABLE customers (customer_id INTEGER PRIMARY KEY, name TEXT{link});
             CREATE TABLE orders (order_id INTEGER PRIMARY KEY, customer_id INTEGER, total NUMERIC, status TEXT);
-            INSERT INTO customers VALUES (1, 'a'), (2, 'b'), (3, 'c');
+            INSERT INTO customers (customer_id, name) VALUES (1, 'a'), (2, 'b'), (3, 'c');
             INSERT INTO orders VALUES (1, 1, 5.0, 'new'), (2, 2, 7.5, 'paid'), (3, 3, 9.0, 'new');
         """)
     connection.close()
 
 
 def _engine(folder: Path, drafter: Optional[_Drafter] = None, *, comments: bool = False, glossary: Optional[dict] = None,
-            priced: bool = True, settings: Optional[dict] = None, as_cli: bool = False) -> NL2SQL:
-    _database(folder)
+            priced: bool = True, settings: Optional[dict] = None, as_cli: bool = False,
+            fk: bool = False) -> NL2SQL:
+    _database(folder, fk)
     sections: dict = {}
     if drafter is not None:
         sections["llm"] = {"provider": "openai", "model": MODEL, "api_key": "sk-fake-profiler",
@@ -144,7 +146,7 @@ def test_draft_never_overwrites_glossary_or_database_text(tmp_path, drafter):
         tables, columns = _rows(engine, "table"), _rows(engine, "column")
         assert tables == {}  # customers has the database's text, orders the glossary's
         for said in ("customers.name", "orders.status"):  # the glossary's text, the database's text
-            assert "description" not in getattr(columns.get(said), "change", {})
+            assert said in columns and "description" not in columns[said].change
         assert columns["orders.total"].change["description"] == "Drafted [main].[orders].total"
         asked_columns = {c for ask in drafter.asked for c in ask["columns"]}
         assert "[main].[orders].status" not in asked_columns and "[main].[customers].name" not in asked_columns
@@ -257,3 +259,45 @@ def test_the_cli_drafts_under_a_cost_cap(tmp_path, drafter):
     out = ANSI.sub("", result.stdout)
     assert result.exit_code == 0, out
     assert "descriptions drafted" in out and "Waiting for review" in out and "Drafted [main].[customers]" in out
+
+
+def test_a_foreign_key_to_a_denied_table_does_not_reach_the_prompt(tmp_path, drafter):
+    with _engine(tmp_path, drafter, fk=True) as engine:
+        engine.knowledge.profile(user_context=READER, draft=True)
+
+        assert drafter.prompts and all("orders" not in p and "order_id" not in p for p in drafter.prompts)
+
+
+def test_a_plain_profile_keeps_an_open_draft(tmp_path, drafter):
+    with _engine(tmp_path, drafter) as engine:
+        engine.knowledge.profile(user_context=ADMIN, draft=True)
+        engine.knowledge.profile(user_context=ADMIN)
+
+        row = _rows(engine, "column")["orders.total"]
+        assert row.change["role"] == "money" and row.change["description"] and row.status == "proposed"
+
+
+def test_a_repeat_draft_does_not_ask_again_for_what_waits_in_the_queue(tmp_path, drafter):
+    with _engine(tmp_path, drafter) as engine:
+        engine.knowledge.profile(user_context=ADMIN, draft=True)
+        before = {p.id for p in engine.proposals.list(user_context=ADMIN)}
+        calls = len(drafter.server.calls)
+
+        [report] = engine.knowledge.profile(user_context=ADMIN, draft=True)
+
+        assert len(drafter.server.calls) == calls and report.drafted == 0
+        assert {p.id for p in engine.proposals.list(user_context=ADMIN)} == before
+
+
+def test_a_cap_without_draft_is_a_value_error(tmp_path, drafter):
+    with _engine(tmp_path, drafter) as engine:
+        with pytest.raises(ValueError, match="draft"):
+            engine.knowledge.profile(user_context=ADMIN, max_cost_usd=1.0)
+
+
+def test_the_cli_refuses_a_cap_without_draft(tmp_path, drafter):
+    with _engine(tmp_path, drafter, as_cli=True):
+        pass
+    result = runner.invoke(app, ["--config", str(tmp_path / "nl2sql.yaml"), "profile", "--as", "admin",
+                                 "--max-cost", "1"])
+    assert result.exit_code == 1 and "--draft" in ANSI.sub("", result.stdout)
