@@ -40,9 +40,8 @@ declared per module, next to a comment saying which call needs the key. Only
 four modules carry it - `test_ast_planner_real_data.py`,
 `test_decomposer_real_data.py`, `test_logical_validator_real_data.py` and
 `test_answer_synthesizer_real_data.py` - all of them nodes that call a chat
-model directly. Nothing else in the directory needs a key: indexing skips its
-optional enrichment pass when no LLM is available, so tests that index real
-data run key-free.
+model directly. Nothing else in the directory needs a key: indexing calls
+no model, so tests that index real data run key-free.
 
 `.github/workflows/test.yml` has two test jobs over the source tree:
 

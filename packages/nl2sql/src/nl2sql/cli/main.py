@@ -162,18 +162,11 @@ def index(
         "--datasource", "-d",
         help="Re-index only this datasource (repeatable). Other datasources' entries are left untouched.",
     )] = None,
-    curated_only: Annotated[bool, typer.Option(
-        "--curated-only",
+    refresh: Annotated[bool, typer.Option(
+        "--refresh",
         help=(
-            "Re-index only the verified queries from curated.yaml. Each datasource's schema entries "
-            "are kept as they are: no schema read and no enrichment model call."
-        ),
-    )] = False,
-    enrich: Annotated[bool, typer.Option(
-        "--enrich",
-        help=(
-            "Ask the profiler LLM to write table and column descriptions where the "
-            "database has none. Spends tokens; off by default."
+            "Write the entries again after a glossary or curated.yaml change. The schema is not read and no "
+            "model is called: the stored snapshot is used, and only the entries whose text changed are embedded."
         ),
     )] = False,
     check: Annotated[bool, typer.Option(
@@ -206,9 +199,9 @@ def index(
     if ctx.invoked_subcommand is not None:
         return
     if check:
-        if enrich or curated_only or profile:
-            raise typer.BadParameter("--check re-indexes nothing, so it cannot be combined with --enrich, "
-                                     "--curated-only or --profile.")
+        if refresh or profile:
+            raise typer.BadParameter("--check re-indexes nothing, so it cannot be combined with --refresh "
+                                     "or --profile.")
         from nl2sql.cli.common.indexing import run_drift_check
 
         try:
@@ -219,21 +212,19 @@ def index(
             raise typer.Exit(run_drift_check(engine, datasource or None, role or ["admin"], as_json))
     if role or as_json:
         raise typer.BadParameter("--role and --json go with --check.")
-    if enrich and curated_only:
-        raise typer.BadParameter("--enrich and --curated-only cannot be combined.")
-    if profile and curated_only:
-        raise typer.BadParameter("--curated-only reads no schema, so there is nothing to profile.")
+    if profile and refresh:
+        raise typer.BadParameter("--refresh reads no schema, so there is nothing to profile.")
     if (as_ or user) and not profile:
         raise typer.BadParameter("--as and --user go with --profile.")
     engine = build_engine(ctx)
     if not profile:
-        run_indexing(engine, enrich=enrich, datasource_ids=datasource or None, curated_only=curated_only)
+        run_indexing(engine, datasource_ids=datasource or None, refresh=refresh)
         return
     from nl2sql.cli.commands.profile import caller_or_exit, profile_datasources
 
     with engine:
         who = caller_or_exit(engine, as_, user)  # before the build: a bad --as should not cost an index
-        run_indexing(engine, enrich=enrich, datasource_ids=datasource or None)  # exits 1 if a datasource failed
+        run_indexing(engine, datasource_ids=datasource or None)  # exits 1 if a datasource failed
         profile_datasources(engine, who, datasource)
 
 

@@ -56,7 +56,7 @@ def test_a_changed_curated_file_is_a_warning_and_ok_stays_true(tmp_path):
     assert health.problems == []
     [warning] = health.warnings
     assert "curated.yaml changed for 'chinook'" in warning
-    assert "nl2sql index --curated-only" in warning
+    assert "nl2sql index --refresh" in warning
     assert health.to_dict()["warnings"] == [warning]
 
 

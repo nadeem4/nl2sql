@@ -297,7 +297,7 @@ Nothing is retried without the parameter: what the config says is what is sent.
 
 ## Per-node models
 
-The six pipeline nodes that call a model, indexing enrichment and eval
+The six pipeline nodes that call a model, the profiler's drafts and eval
 seeding each have an agent. An agent not under `agents` runs on the top level:
 
 | `agents` key | node |
@@ -308,7 +308,7 @@ seeding each have an agent. An agent not under `agents` runs on the top level:
 | `ast_planner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |
 | `answer_synthesizer` | writes the final answer from the rows |
-| `profiler` | writes missing schema descriptions during `nl2sql index --enrich` (optional, off by default) |
+| `profiler` | drafts table and column descriptions as proposals for review, never written into the index or the schema (optional; `nl2sql index` calls no model) |
 | `eval_seeder` | drafts eval questions with typed plans during `nl2sql eval seed` ([Benchmark your own database](../evals/seeding.md)) |
 
 Any other key is an error with "did you mean". An agent takes every field it
@@ -621,12 +621,12 @@ rates, `verified`, `source` (`table` or `config`) and `citation`.
 
 ## Notes
 
-- `agents` overrides give individual nodes, or indexing enrichment, their own
+- `agents` overrides give individual nodes, or the profiler's drafts, their own
   model and temperature; see [Per-node models](#per-node-models).
-- `profiler` is optional and runs only when asked for
-  (`nl2sql index --enrich`, or `enrich=True` from Python). Omit it, or leave
-  its key unset, and indexing still works - the schema is indexed without
-  LLM-written descriptions. It never replaces a comment read from the database.
+- `profiler` is optional and runs only when asked for. `nl2sql index` and
+  `engine.index.build` call no model, so indexing works without it; what the
+  profiler drafts is a proposal in the review queue and never replaces a comment
+  read from the database or a description in the glossary.
 - `nl2sql init --provider` takes `openai`, `anthropic` or `openrouter`, the
   providers with a default model, and writes no key. For `openai_compatible`
   or `ollama`, edit `llm.yaml` as shown above. `nl2sql demo --api-key`

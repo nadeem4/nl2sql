@@ -3,13 +3,15 @@
 A build, in order (docs/architecture/phase2.md, section 4):
 
 1. The schema snapshot is stored in the state store, as an immutable row. It
-   gets a ``schema_version`` (an unchanged snapshot gets its old one), and
-   nothing reads it yet.
+   holds only what the database said (B31): a model's draft never enters it,
+   and a person's words stay in the glossary. It gets a ``schema_version`` (an
+   unchanged snapshot gets its old one), and nothing reads it yet.
 2. Every entry is embedded by the engine's embedder and written to the index
    store's namespace under a new ``build_id``. Readers do not see them: they
    read only the builds the pointers name.
 3. The datasource's ``BuildPointer`` is switched to the new build and its
-   schema version. That one write is the commit.
+   schema version, recording the hashes of the verified queries and the
+   knowledge it was made with. That one write is the commit.
 4. The datasource's builds other than the new one and the one just replaced
    are deleted, so a run that pinned the previous pointer keeps its entries.
 5. When the new version's structure differs from the version it replaced, the
@@ -23,6 +25,10 @@ A build, in order (docs/architecture/phase2.md, section 4):
 A failure before step 3 leaves the previous pointer, and so the previous
 build and schema version, live. Its stored snapshot and partial entries are
 referenced by no pointer; the next build of the datasource deletes the entries.
+
+``refresh`` makes a build from the live build's stored snapshot, the current
+verified queries and the current knowledge: no schema read, no model call, and
+only the entries whose text changed are embedded.
 
 ``engine.index.build`` runs every build holding the state store's ``index``
 lock (``indexing/rebuild.py``), so two processes sharing a ``storage.path``
@@ -38,15 +44,17 @@ from nl2sql.common.logger import get_logger
 from nl2sql.datasources.protocols import DatasourceAdapter
 from nl2sql.indexing.chunk_builder import SchemaChunkBuilder
 from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash, curated_section
-from nl2sql.indexing.enrichment_service import enrich_schema_snapshot
 from nl2sql.indexing.models import BaseChunk
-from nl2sql.indexing.retrieval import CURATED_TYPE
+from nl2sql.knowledge.merge import Knowledge
+from nl2sql.schema import SchemaSnapshot
 from nl2sql.schema.diff import diff_contracts
 from nl2sql.schema.drift import publish_drift
+from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.schema import IndexIssue, SchemaContract
 from nl2sql_sdk.stores import BuildPointer, Entry, Filter
 
 if TYPE_CHECKING:
+    from nl2sql.config.curated import CuratedDatasource
     from nl2sql.runtime import Runtime
 
 logger = get_logger("indexing_orchestrator")
@@ -65,15 +73,11 @@ def entry_metadata(chunk: BaseChunk) -> Dict[str, Any]:
 class IndexingOrchestrator:
     """Indexes datasources into the engine's index store, one build per datasource."""
 
-    def __init__(self, ctx: "Runtime", enrich: bool = False):
+    def __init__(self, ctx: "Runtime"):
         """
         Args:
             ctx: The engine's runtime.
-            enrich: Whether to ask the ``profiler`` LLM for
-                descriptions. Off by default: enrichment spends tokens, so
-                every caller turns it on only when asked.
         """
-        self.enrich = enrich
         self.index = ctx.index
         self.namespace = ctx.namespace
         self.dimension = ctx.embedding_info.dimension
@@ -81,7 +85,6 @@ class IndexingOrchestrator:
         self.state = ctx.state
         self.max_versions = ctx.settings.schema_.max_versions
         self.ds_registry = ctx.ds_registry
-        self.llm_registry = ctx.llm_registry
         # A build runs outside any question, so its events go on the engine's bus.
         self.bus = ctx.bus
         self.tenant_id = ctx.tenant_id
@@ -98,24 +101,12 @@ class IndexingOrchestrator:
         datasource_id = adapter.datasource_id
         schema_snapshot = adapter.fetch_schema_snapshot(self.ds_registry.get_index_scope(datasource_id))
 
-        questions = self.ds_registry.get_sample_questions(datasource_id)
         datasource_description = self.ds_registry.get_description(datasource_id)
-
-        # Best-effort: enrich_schema_snapshot owns resolving its own LLM and
-        # degrades to the unenriched snapshot when none is usable, so indexing
-        # never depends on an API key being present.
-        if self.enrich:
-            schema_snapshot, questions = enrich_schema_snapshot(
-                snapshot=schema_snapshot,
-                llm_registry=self.llm_registry,
-                datasource_description=datasource_description,
-                existing_questions=questions,
-            )
 
         # The description lives in the datasources config, not the database,
         # so no adapter can report it. It is the operator's own words about
         # what the datasource holds and is what the resolver matches questions
-        # against, so it wins over anything the adapter or enrichment wrote.
+        # against, so it wins over anything the adapter wrote.
         if datasource_description and datasource_description.strip():
             metadata = schema_snapshot.metadata.model_copy(
                 update={"description": datasource_description.strip()}
@@ -125,14 +116,11 @@ class IndexingOrchestrator:
         # Stored first, read by nothing until the pointer names it.
         schema_version = self.state.put_snapshot(schema_snapshot)
 
-        # Verified queries go in the same build: a build replaces every entry
-        # of its datasource, so curated entries written on their own would be
-        # deleted by the next schema re-index.
+        # Verified queries and knowledge go in the same build: a build replaces
+        # every entry of its datasource, so entries written on their own would
+        # be deleted by the next schema re-index.
         curated = curated_section(self.curated, datasource_id)
-        chunks = SchemaChunkBuilder(
-            ds_id=datasource_id, schema_snapshot=schema_snapshot,
-            schema_version=schema_version, questions=questions,
-        ).build() + CuratedChunkBuilder(datasource_id, curated, schema_version).build()
+        chunks = self._chunks(datasource_id, schema_snapshot, schema_version, curated)
 
         for issue in schema_snapshot.issues:
             # The issue only: never the column's statistics or sample values (D15).
@@ -140,7 +128,7 @@ class IndexingOrchestrator:
                                                   "column": issue.column, "stage": issue.stage,
                                                   "message": self._issue_message(issue)})
         previous = self.index.pointers(self.namespace).get(datasource_id)
-        self._commit(datasource_id, schema_version, chunks, [], curated_hash(curated))
+        self._commit(datasource_id, schema_version, chunks, [], curated_hash(curated), self._digest(datasource_id))
         if previous is not None:
             self._record_drift(datasource_id, previous.schema_version, schema_version, schema_snapshot.contract)
         self._keep_snapshots(datasource_id, previous.schema_version if previous else None)
@@ -151,6 +139,31 @@ class IndexingOrchestrator:
             logger.warning(f"Indexed {datasource_id} with {len(schema_snapshot.issues)} issue(s); "
                            f"the first: {schema_snapshot.issues[0].table}: {schema_snapshot.issues[0].message}")
         return stats
+
+    def _knowledge(self, datasource_id: str) -> DatasourceKnowledge:
+        """The datasource's merged knowledge as the engine holds it now; none without a ``knowledge`` section."""
+        knowledge = getattr(self._ctx, "knowledge", None)
+        return knowledge.get(datasource_id) if knowledge is not None else DatasourceKnowledge()
+
+    def _digest(self, datasource_id: str) -> str:
+        """The digest of that knowledge, which the pointer records and health compares."""
+        knowledge = getattr(self._ctx, "knowledge", None) or Knowledge()
+        return knowledge.digest(datasource_id)
+
+    def _dialect(self, datasource_id: str) -> Optional[str]:
+        try:
+            return self.ds_registry.get_dialect(datasource_id)
+        except Exception:
+            return None
+
+    def _chunks(self, datasource_id: str, snapshot: SchemaSnapshot, schema_version: str,
+                curated: Optional["CuratedDatasource"]) -> List[BaseChunk]:
+        """Every entry of the datasource's build: the schema and the knowledge, then the verified queries."""
+        return SchemaChunkBuilder(
+            ds_id=datasource_id, schema_snapshot=snapshot, schema_version=schema_version,
+            questions=self.ds_registry.get_sample_questions(datasource_id),
+            knowledge=self._knowledge(datasource_id), dialect=self._dialect(datasource_id),
+        ).build() + CuratedChunkBuilder(datasource_id, curated, schema_version).build()
 
     def _issue_message(self, issue: IndexIssue) -> str:
         """What ``index.column_failed`` says of ``issue``, never a value from the data (D15).
@@ -209,15 +222,19 @@ class IndexingOrchestrator:
         except Exception as exc:
             logger.warning(f"Could not delete the old schema snapshots of {datasource_id}: {exc}")
 
-    def refresh_curated(self, datasource_id: str) -> Dict[str, Any]:
-        """Re-indexes a datasource's verified queries only.
+    def refresh(self, datasource_id: str) -> Dict[str, Any]:
+        """Writes the datasource's entries again from what is stored and what is configured now.
 
-        Reads no schema and calls no model: the live build's schema entries
-        are copied into the new build with their stored vectors, so only the
-        verified queries are embedded, and the pointer keeps its schema version.
+        Reads no schema and calls no model: every entry's text is rendered
+        from the live build's stored snapshot, the current verified queries and
+        the current knowledge. An entry whose text and metadata equal the live
+        build's keeps its stored vector; only the changed and new entries are
+        embedded. The pointer keeps its schema version and records the current
+        hashes.
 
         Raises:
-            LookupError: If the datasource has never been indexed.
+            LookupError: If the datasource has never been indexed, or its
+                stored snapshot is gone.
         """
         live = self.index.pointers(self.namespace).get(datasource_id)
         if live is None:
@@ -225,16 +242,32 @@ class IndexingOrchestrator:
                 f"Datasource '{datasource_id}' has no index entries to keep; "
                 f"run `nl2sql index --datasource {datasource_id}` first."
             )
-        kept = self.index.get(self.namespace, Filter(eq={"build_id": live.build_id}, ne={"type": CURATED_TYPE}),
-                              with_vectors=True)
+        snapshot = self.state.get_snapshot(datasource_id, live.schema_version)
+        if snapshot is None:
+            raise LookupError(
+                f"The schema snapshot {live.schema_version} of '{datasource_id}' is no longer stored; "
+                f"run `nl2sql index --datasource {datasource_id}`."
+            )
         curated = curated_section(self.curated, datasource_id)
-        chunks = CuratedChunkBuilder(datasource_id, curated, live.schema_version).build()
-        self._commit(datasource_id, live.schema_version, chunks, kept, curated_hash(curated))
+        chunks = self._chunks(datasource_id, snapshot, live.schema_version, curated)
+        stored = {e.metadata.get("id"): e for e in
+                  self.index.get(self.namespace, Filter(eq={"build_id": live.build_id}), with_vectors=True)}
+        kept: List[Entry] = []
+        changed: List[BaseChunk] = []
+        for chunk in chunks:
+            old = stored.get(chunk.id)
+            if (old is not None and old.text == chunk.get_page_content()
+                    and {k: v for k, v in old.metadata.items() if k != "build_id"} == entry_metadata(chunk)):
+                kept.append(old)
+            else:
+                changed.append(chunk)
+        self._commit(datasource_id, live.schema_version, changed, kept, curated_hash(curated),
+                     self._digest(datasource_id))
         return _stats(datasource_id, live.schema_version,
-                      [str(e.metadata.get("type", "unknown")) for e in kept] + [c.type for c in chunks])
+                      [str(e.metadata.get("type", "unknown")) for e in kept] + [c.type for c in changed])
 
     def _commit(self, datasource_id: str, schema_version: str, chunks: List[BaseChunk],
-                copied: List[Entry], hash_: Optional[str]) -> str:
+                copied: List[Entry], hash_: Optional[str], knowledge_hash: Optional[str] = None) -> str:
         """Writes a new build of ``chunks`` (embedded) and ``copied`` (as they are), then switches to it.
 
         Returns the new build id.
@@ -265,6 +298,7 @@ class IndexingOrchestrator:
         self.index.set_pointers(self.namespace, {datasource_id: BuildPointer(
             build_id=build_id, schema_version=schema_version,
             built_at=datetime.now(timezone.utc).replace(microsecond=0), curated_hash=hash_,
+            knowledge_hash=knowledge_hash,
         )})
         logger.info(f"Index pointer for {datasource_id} switched to build {build_id} "
                     f"(schema version {schema_version}) in {self.namespace}")

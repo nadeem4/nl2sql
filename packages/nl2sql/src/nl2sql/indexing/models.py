@@ -142,6 +142,8 @@ class ColumnChunk(BaseChunk):
     description: Optional[str] = None
     column_stats: Dict[str, Any] = Field(default_factory=dict)
     synonyms: Optional[List[str]] = None
+    # The role a person gave the column in the glossary; a role derived from the schema is not written.
+    role: Optional[str] = None
     pii: bool = False
     schema_version: str
 
@@ -152,13 +154,14 @@ class ColumnChunk(BaseChunk):
             if self.synonyms
             else ""
         )
+        role = f"\nRole: {self.role}" if self.role else ""
         return (
             f"Table: {self.column.table.full_name}\n"
             f"Column: {self.column.column_name}\n"
             f"Type: {self.dtype}\n"
             f"{self.description or ''}\n"
             f"{stats}\n"
-            f"{synonyms}"
+            f"{synonyms}{role}"
         )
 
     def get_metadata(self) -> Dict[str, Any]:
@@ -194,14 +197,19 @@ class RelationshipChunk(BaseChunk):
     ] = "unknown"
 
     business_meaning: Optional[str] = None
+    # ``glossary``: a join a person wrote in the glossary (the database declares no such key).
+    origin: Literal["database", "glossary"] = "database"
     schema_version: str
 
     def get_page_content(self) -> str:
-        return (
+        text = (
             f"Relationship between {self.from_table.full_name} "
             f"and {self.to_table.full_name}.\n"
             f"{self.business_meaning or ''}"
         )
+        if self.origin == "glossary":
+            text += f"\nJoin cardinality: {self.cardinality}"
+        return text
 
     def get_metadata(self) -> Dict[str, Any]:
         return {
@@ -214,6 +222,7 @@ class RelationshipChunk(BaseChunk):
             "from_columns": ",".join(self.from_columns or []),
             "to_columns": ",".join(self.to_columns or []),
             "cardinality": self.cardinality,
+            "origin": self.origin,
             "schema_version": self.schema_version,
         }
 
@@ -253,6 +262,40 @@ class VerifiedQueryCandidate(BaseModel):
     query_id: str
     score: float
     text: str
+
+
+class TermChunk(BaseChunk):
+    """One glossary term: its name, synonyms and definition, so a question that never says the word still finds it."""
+
+    type: Literal["knowledge.term"] = Field(
+        default="knowledge.term", frozen=True
+    )
+
+    datasource_id: str
+    term: str
+    synonyms: List[str] = Field(default_factory=list)
+    definition: Optional[str] = None
+    schema_version: str
+
+    def get_page_content(self) -> str:
+        synonyms = f"\nSynonyms: {', '.join(self.synonyms)}" if self.synonyms else ""
+        return f"Term: {self.term}{synonyms}\n{self.definition or ''}"
+
+    def get_metadata(self) -> Dict[str, Any]:
+        return {
+            **super().get_metadata(),
+            "datasource_id": self.datasource_id,
+            "term": self.term,
+            "schema_version": self.schema_version,
+        }
+
+
+class TermCandidate(BaseModel):
+    """A glossary term a question resembles: its name and the cosine similarity of its entry."""
+
+    datasource_id: str
+    term: str
+    score: float
 
 
 class MetricChunk(BaseChunk):

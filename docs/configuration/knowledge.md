@@ -10,7 +10,10 @@ and example questions. It is written in `glossary.yaml` and read by a
     The engine loads, merges, shows and exports knowledge from release 0.8,
     and the planner and refiner read it (Wave B's K2): descriptions, roles,
     units, grains, code values and glossary joins in the schema block, matched
-    terms and rules in `[BUSINESS_CONTEXT]`. It reaches the index with K3. See
+    terms and rules in `[BUSINESS_CONTEXT]`. It reaches the index too (K3): the
+    chosen descriptions, the terms, the joins and the examples are index entries,
+    and `nl2sql index --refresh` brings them up to date after an edit without
+    reading the schema. See
     [Wave B](../architecture/wave_b.md), sections 3 and 4, and
     [the schema retriever](../architecture/nodes/schema_retriever_node.md#knowledge).
 

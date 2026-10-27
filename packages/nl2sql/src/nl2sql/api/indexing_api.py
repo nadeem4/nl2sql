@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 # The entry types the index holds, in the order the inspector lists them.
 ENTRY_TYPES = ["schema.datasource", "schema.datasource_example", "schema.table", "schema.column",
-               "schema.relationship", "schema.metric"]
+               "schema.relationship", "schema.metric", "knowledge.term"]
 
 
 class IndexAPI:
@@ -29,8 +29,6 @@ class IndexAPI:
         self,
         datasource_ids: Optional[Iterable[str]] = None,
         *,
-        curated_only: bool = False,
-        enrich: bool = False,
         on_progress: Optional[Callable[[str], None]] = None,
         on_datasource: Optional[Callable[[IndexProgress], None]] = None,
     ):
@@ -40,9 +38,10 @@ class IndexAPI:
         configured embedding model, and its build pointer is switched to them
         only when all are written, so a failure keeps its previous build and
         schema version answering. Runs in flight keep the build they started
-        with. ``curated_only`` re-indexes the verified queries only.
-        ``enrich`` asks the ``profiler`` LLM for descriptions and
-        spends tokens. ``on_progress`` gets a sentence before each step;
+        with. The entries carry the glossary's descriptions, terms and joins as
+        well as the schema's; descriptions a model drafts are proposals
+        (``engine.knowledge.profile``) and enter nothing until accepted.
+        ``on_progress`` gets a sentence before each step;
         ``on_datasource`` gets an :class:`IndexProgress` as each datasource
         starts, is done (with its entry counts) or fails (with the reason).
 
@@ -53,9 +52,36 @@ class IndexAPI:
 
         return rebuild_index(
             self._ctx,
-            enrich=enrich,
             datasource_ids=list(datasource_ids) if datasource_ids is not None else None,
-            curated_only=curated_only,
+            on_progress=on_progress,
+            on_datasource=on_datasource,
+        )
+
+    def refresh(
+        self,
+        datasource_ids: Optional[Iterable[str]] = None,
+        *,
+        on_progress: Optional[Callable[[str], None]] = None,
+        on_datasource: Optional[Callable[[IndexProgress], None]] = None,
+    ):
+        """Write the entries of ``datasource_ids`` (every datasource when None) again after a glossary or ``curated.yaml`` change.
+
+        Reads no schema and calls no model: each entry's text is rendered from
+        the live build's stored snapshot, the current verified queries and the
+        current knowledge, and only the entries whose text changed are
+        embedded. The build pointer keeps its schema version and records the
+        new knowledge hash, so health stops reporting the index ``stale``. A
+        datasource that has never been indexed fails with the command to run.
+
+        Returns:
+            A ``RebuildResult``, as :meth:`build` does.
+        """
+        from nl2sql.indexing.rebuild import rebuild_index
+
+        return rebuild_index(
+            self._ctx,
+            datasource_ids=list(datasource_ids) if datasource_ids is not None else None,
+            refresh=True,
             on_progress=on_progress,
             on_datasource=on_datasource,
         )
@@ -63,8 +89,8 @@ class IndexAPI:
     def health(self) -> Dict[str, Any]:
         """Health of the vector index of the configured embedding model.
 
-        ``status`` (``ok``, ``empty``, ``stale`` or ``missing``), entry counts
-        by type, when it was built, the embedding model, the namespace, one
+        ``status`` (``ok``, ``empty``, ``stale`` or ``missing``; a glossary
+        changed since the build makes it ``stale``), entry counts by type, when it was built, the embedding model, the namespace, one
         entry per registered datasource, any problems found, and ``warnings``
         that leave ``status`` alone (a ``curated.yaml`` changed since it was
         indexed, a preferred table missing from the indexed schema, a
@@ -72,17 +98,20 @@ class IndexAPI:
         """
         from nl2sql.indexing.curated import curated_hashes
         from nl2sql.indexing.health import index_health
+        from nl2sql.knowledge.merge import Knowledge
 
         ctx = self._ctx
         registry = ctx.ds_registry
         down = [f"Datasource '{ds}' is unavailable: {reason}" for ds, reason in registry.unavailable().items()]
         ids = registry.list_ids()
         info = ctx.embedding_info
+        knowledge = getattr(ctx, "knowledge", None)
         health = index_health(
             ctx.index, ctx.namespace, ctx.state, ids,
             embedding_model=f"{info.provider}/{info.model}",
             curated_hashes=curated_hashes(getattr(ctx, "curated", None), ids),
             preferred_tables={ds: registry.get_preferred_tables(ds) for ds in ids},
+            knowledge_digests={ds: knowledge.digest(ds) for ds in ids} if isinstance(knowledge, Knowledge) else None,
         )
         health.warnings.extend(down)
         return health.to_dict()

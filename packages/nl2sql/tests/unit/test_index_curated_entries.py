@@ -3,9 +3,9 @@
 A build replaces every entry of its datasource, so curated entries written on
 their own would be deleted by the next schema re-index. They are written in
 the same build. A ``curated.yaml`` change needs no schema re-read and no model
-call: ``IndexingOrchestrator.refresh_curated`` copies the live build's schema
-entries, vectors included, into a new build beside fresh curated entries and
-switches the pointer to it, keeping its schema version.
+call: ``IndexingOrchestrator.refresh`` writes the entries again from the stored
+snapshot, keeping the stored vectors of the entries that did not change
+(``test_index_knowledge.py``).
 """
 from __future__ import annotations
 
@@ -17,10 +17,8 @@ import pytest
 from index_helpers import Chunk, TestIndex  # same directory
 from langchain_core.embeddings import Embeddings
 
-from nl2sql.config import Curated
 from nl2sql.config.curated import CuratedDatasource
 from nl2sql.indexing.curated import CuratedChunkBuilder, curated_hash
-from nl2sql.indexing.orchestrator import IndexingOrchestrator
 from nl2sql_sdk.stores import Entry, Filter
 
 VOCAB = ["customer", "revenue", "best", "top", "track", "genre", "artist", "album", "invoice", "employee",
@@ -96,11 +94,6 @@ def _schema_entries(store, ds):
         for e in entries
     )
 
-
-def _refresh(store, ds, section):
-    """The curated-only refresh, as ``nl2sql index --curated-only`` runs it."""
-    store.ctx.curated = Curated.model_validate({"datasources": {ds: section.model_dump()}}) if section else None
-    return IndexingOrchestrator(store.ctx).refresh_curated(ds)
 
 
 def test_curated_entries_are_written_in_the_schema_build(tmp_path):
@@ -192,56 +185,6 @@ def test_the_search_is_recorded_when_asked(tmp_path):
     assert record["search"] == "verified_queries"
     assert record["picks"] == ["curated.verified_query:chinook:top_customers:1"]
     assert record["pool"][0]["similarity"] == pytest.approx(1.0, abs=1e-3)
-
-
-# --- curated-only refresh --------------------------------------------------------
-
-
-def test_a_curated_only_refresh_keeps_schema_entries_and_vectors_and_swaps_curated(tmp_path):
-    store = _store(tmp_path)
-    _index(store, "chinook", _section(TOP_CUSTOMERS))
-    _index(store, "music", _section(TRACKS_BY_GENRE))
-    schema_before = _schema_entries(store, "chinook")
-    music_before = sorted(e.id for e in _all(store, "music"))
-    old = _pointer(store, "chinook")
-
-    new_section = _section(TRACKS_BY_GENRE)
-    stats = _refresh(store, "chinook", new_section)
-
-    new = _pointer(store, "chinook")
-    assert new.build_id != old.build_id and new.schema_version == old.schema_version == "v1"
-    assert _schema_entries(store, "chinook") == schema_before
-    assert sorted(e.text for e in _active(store, "chinook", "curated.verified_query")) == [
-        "How many tracks per genre", "Tracks per genre"]
-    # The other datasource is untouched.
-    assert sorted(e.id for e in _all(store, "music")) == music_before
-    assert new.curated_hash == curated_hash(new_section)
-    assert stats["curated.verified_query"] == 2 and stats["schema.table"] == 2
-    assert stats["schema_version"] == "v1"
-
-
-def test_a_curated_only_refresh_embeds_only_the_curated_entries(tmp_path):
-    embeddings = _Words()
-    store = _store(tmp_path, embeddings)
-    _index(store, "chinook", None)
-
-    texts = []
-    original = embeddings.embed_documents
-
-    def spy(batch):
-        texts.extend(batch)
-        return original(batch)
-
-    embeddings.embed_documents = spy
-    _refresh(store, "chinook", _section(TOP_CUSTOMERS))
-
-    assert sorted(texts) == ["Best customers", "Customers ranked by revenue", "Top customers by revenue"]
-
-
-def test_a_curated_only_refresh_needs_an_indexed_datasource(tmp_path):
-    store = _store(tmp_path)
-    with pytest.raises(LookupError, match="nl2sql index"):
-        _refresh(store, "chinook", None)
 
 
 def test_the_live_schema_version_is_the_pointers(tmp_path):

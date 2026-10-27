@@ -111,6 +111,6 @@ def test_checking_nothing_exits_2(project):
 
 
 def test_check_cannot_be_combined_with_a_build_option(project):
-    result, out = _check(project, "--curated-only")
+    result, out = _check(project, "--refresh")
 
     assert result.exit_code != 0 and "--check" in out

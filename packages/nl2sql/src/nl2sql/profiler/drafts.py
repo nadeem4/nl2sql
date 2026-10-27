@@ -1,19 +1,19 @@
+"""The profiler's drafted descriptions: the evidence a model is shown, the prompt, and the cleaning of its answer.
+
+P2 wires these into ``profile(draft=True)`` (docs/architecture/wave_b.md, section 6). They were
+``indexing/enrichment_service.py``'s, moved here unchanged by K3, which stopped the index from
+writing a model's text into the schema snapshot (B31): a draft is a proposal in the review queue
+and reaches nothing until a person accepts it.
+"""
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
-from langchain_core.prompts import ChatPromptTemplate
 
 from nl2sql.schema import SchemaSnapshot
-from nl2sql_sdk.schema import TableMetadata, ColumnMetadata
-from nl2sql.common.logger import get_logger
-from nl2sql.llm.wires import structured
 
-logger = get_logger("profiler")
-
-# Name of the agent in the llm section of nl2sql.yaml that enrichment calls.
-# The agent drafting descriptions; it moves to nl2sql/profiler/drafts.py with K3 (docs/architecture/wave_b.md, D44).
+# Name of the agent in the llm section of nl2sql.yaml that drafts descriptions (docs/architecture/wave_b.md, D44).
 ENRICHMENT_LLM_NAME = "profiler"
 
 
@@ -215,111 +215,3 @@ def sanitize_enrichment(
         tables=sanitized_tables,
         columns=sanitized_columns,
     )
-
-
-def apply_enrichment(
-    snapshot: SchemaSnapshot,
-    enrichment: SchemaEnrichment,
-) -> SchemaSnapshot:
-    metadata = snapshot.metadata.model_copy(deep=True)
-
-    # Enrichment only fills blanks: a comment read from the database is the
-    # data owner's own words and is never replaced by the model's guess.
-    if enrichment.datasource.description and not _normalize_text(metadata.description):
-        metadata.description = enrichment.datasource.description
-    if enrichment.datasource.domains and not metadata.domains:
-        metadata.domains = enrichment.datasource.domains
-
-    for table_key, table_contract in snapshot.contract.tables.items():
-        table_md = metadata.tables.get(table_key)
-        if not table_md:
-            table_md = TableMetadata(table=table_contract.table, columns={})
-            metadata.tables[table_key] = table_md
-
-        table_enrichment = enrichment.tables.get(table_key)
-        if (
-            table_enrichment
-            and table_enrichment.description
-            and not _normalize_text(table_md.description)
-        ):
-            table_md.description = table_enrichment.description
-
-        for col_name in table_contract.columns.keys():
-            column_md = table_md.columns.get(col_name)
-            if not column_md:
-                column_md = ColumnMetadata()
-                table_md.columns[col_name] = column_md
-
-            column_key = f"{table_key}.{col_name}"
-            column_enrichment = enrichment.columns.get(column_key)
-            if not column_enrichment:
-                continue
-            if column_enrichment.description and not _normalize_text(column_md.description):
-                column_md.description = column_enrichment.description
-            if column_enrichment.synonyms and not column_md.synonyms:
-                column_md.synonyms = column_enrichment.synonyms
-
-    return snapshot.model_copy(update={"metadata": metadata})
-
-
-def enrich_schema_snapshot(
-    snapshot: SchemaSnapshot,
-    llm_registry,
-    datasource_description: Optional[str],
-    existing_questions: List[str],
-    max_questions: int = 100,
-) -> Tuple[SchemaSnapshot, List[str]]:
-    """Adds LLM-written descriptions to a schema snapshot, if an LLM is usable.
-
-    Enrichment is an embellishment, never a prerequisite: indexing has to work
-    without any LLM at all. Every step that can involve the model - resolving
-    the client, binding structured output, the call itself - therefore sits
-    inside one guard, and any failure returns the inputs untouched so the
-    caller indexes an unenriched schema instead of failing.
-
-    Args:
-        snapshot: Schema snapshot to enrich.
-        llm_registry: Registry the ``profiler`` client is built from.
-        datasource_description: Operator-supplied description, if any.
-        existing_questions: Example questions already configured.
-        max_questions: Upper bound on the merged question list.
-
-    Returns:
-        The enriched snapshot and merged questions, or the originals unchanged
-        when enrichment could not run.
-    """
-    datasource_id = snapshot.contract.datasource_id
-
-    try:
-        llm = llm_registry.get_llm(ENRICHMENT_LLM_NAME)
-        evidence = build_evidence(snapshot, datasource_description, existing_questions)
-        prompt = ChatPromptTemplate.from_template(ENRICHMENT_PROMPT)
-        chain = prompt | structured(llm, SchemaEnrichment)
-        enrichment = chain.invoke({"evidence_json": evidence})
-    except ValueError as exc:
-        # No usable LLM is configured - typically no API key. Expected on the
-        # key-free path, so it is reported without a stack trace.
-        logger.info(
-            f"Schema enrichment skipped for '{datasource_id}': {exc} "
-            "Indexing continues without LLM-written descriptions."
-        )
-        return snapshot, existing_questions
-    except Exception as exc:
-        # Anything else (a 401, a timeout, a malformed answer) is reported as
-        # one warning line: the reason is what an operator needs, and a stack
-        # trace in the middle of an index run reads like a crash. It still
-        # must not take indexing down with it.
-        reason = " ".join(str(exc).split()) or type(exc).__name__
-        logger.warning(
-            f"Schema enrichment failed for '{datasource_id}': {reason}. "
-            "Indexing continues without LLM-written descriptions."
-        )
-        logger.debug("Schema enrichment failure detail", exc_info=True)
-        return snapshot, existing_questions
-
-    sanitized = sanitize_enrichment(snapshot, enrichment, max_questions=max_questions)
-    updated_snapshot = apply_enrichment(snapshot, sanitized)
-
-    merged_questions = _dedupe_list(existing_questions + sanitized.datasource.sample_questions)
-    merged_questions = merged_questions[:max_questions]
-    return updated_snapshot, merged_questions

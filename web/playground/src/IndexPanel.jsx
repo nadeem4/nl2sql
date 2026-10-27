@@ -36,7 +36,6 @@ function Fold({ index, error, children }) {
 }
 
 export default function IndexPanel({ index, error, onRebuild, hosted = false }) {
-  const [enrich, setEnrich] = useState(false);
   const [fault, setFault] = useState(null);
   const [sending, setSending] = useState(false);
 
@@ -72,7 +71,7 @@ export default function IndexPanel({ index, error, onRebuild, hosted = false }) 
     setFault(null);
     setSending(true);
     try {
-      await onRebuild(enrich);
+      await onRebuild();
     } catch (err) {
       setFault(err.message);
     } finally {
@@ -126,22 +125,6 @@ export default function IndexPanel({ index, error, onRebuild, hosted = false }) 
 
       {rebuild.available ? (
         <div className={`index-action${broken ? " is-urgent" : ""}`}>
-          <label className="check index-enrich" htmlFor="index-enrich">
-            <input
-              id="index-enrich"
-              type="checkbox"
-              checked={enrich}
-              disabled={!rebuild.enrich_available || running}
-              aria-describedby="index-enrich-help"
-              onChange={(e) => setEnrich(e.target.checked)}
-            />
-            Write descriptions with the LLM
-          </label>
-          <p className="index-help" id="index-enrich-help">
-            {rebuild.enrich_available
-              ? "Spends tokens on your key. Off, the index uses the schema and its statistics only."
-              : rebuild.enrich_reason}
-          </p>
           <button
             id="index-rebuild"
             className={broken ? "index-rebuild is-primary" : "index-rebuild"}

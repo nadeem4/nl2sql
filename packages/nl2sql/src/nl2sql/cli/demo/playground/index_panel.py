@@ -51,7 +51,7 @@ class IndexPanel:
         self.project_dir = Path(project_dir) if project_dir is not None else None
         self._lock = threading.Lock()
         self._job: Dict[str, Any] = {
-            "state": "idle", "steps": [], "error": None, "enrich": False,
+            "state": "idle", "steps": [], "error": None,
             "started_at": None, "finished_at": None,
         }
 
@@ -72,7 +72,6 @@ class IndexPanel:
     def read(self) -> Dict[str, Any]:
         with self._lock:
             job = {**self._job, "steps": list(self._job["steps"])}
-        live = self.settings.mode == "live"
         return {
             "datasource_id": self.datasource_id,
             "health": self.health(),
@@ -81,10 +80,6 @@ class IndexPanel:
                 # Hosted, Rebuild is off in its own words, not the panel's:
                 # nothing there is about saving a key.
                 "reason": REBUILD_MESSAGE if self.settings.hosted else self.settings.reason,
-                "enrich_available": live,
-                "enrich_reason": None if live else (
-                    "Descriptions are written by the LLM, so they need an API key. Add one in Settings."
-                ),
             },
             "job": job,
             "folder": self._folder(),
@@ -92,19 +87,14 @@ class IndexPanel:
 
     # --- rebuilding ------------------------------------------------------------
 
-    def start(self, enrich: bool) -> None:
+    def start(self) -> None:
         """Starts a rebuild in the background; refuses a second one."""
-        if enrich and self.settings.mode != "live":
-            raise HTTPException(
-                status_code=400,
-                detail="Descriptions need an API key. Add one in Settings, or rebuild without them.",
-            )
         with self._lock:
             if self._job["state"] == "running":
                 raise HTTPException(status_code=409, detail="A rebuild is already running.")
-            self._job = {"state": "running", "steps": [], "error": None, "enrich": enrich,
+            self._job = {"state": "running", "steps": [], "error": None,
                          "started_at": _now(), "finished_at": None}
-        threading.Thread(target=self._run, args=(enrich,), name="index-rebuild", daemon=True).start()
+        threading.Thread(target=self._run, name="index-rebuild", daemon=True).start()
 
     def _step(self, message: str) -> None:
         with self._lock:
@@ -114,11 +104,10 @@ class IndexPanel:
         with self._lock:
             self._job.update(state=state, error=error, finished_at=_now())
 
-    def _run(self, enrich: bool) -> None:
+    def _run(self) -> None:
         try:
             result = self.engine.index.build(
                 [self.datasource_id],
-                enrich=enrich,
                 on_progress=self._step,
             )
         except Exception as exc:

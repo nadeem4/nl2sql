@@ -221,7 +221,11 @@ class SchemaRetrieverNode:
         sub_query = state.sub_query
         terms = match_terms(shown.terms, [sub_query.intent, state.user_query],
                             sources={t.term: sources.get(f"terms.{t.term}", "knowledge") for t in shown.terms},
-                            top_k=self.knowledge_settings.top_k)
+                            top_k=self.knowledge_settings.top_k,
+                            similar=(self._similar_terms(sub_query.intent or state.user_query, sub_query.datasource_id,
+                                                          [t.term for t in shown.terms])
+                                     if shown.terms else None),
+                            floor=self.knowledge_settings.match_floor)
         rules = rules_for(shown.rules, {t.name for t in tables}, snapshot,
                           sources={r.id: sources.get(f"rules.{r.id}", "knowledge") for r in shown.rules})
         if not terms and not rules:
@@ -229,6 +233,21 @@ class SchemaRetrieverNode:
         terms, rules, dropped = fit_business_context(terms, rules, max_chars=self.knowledge_settings.block_max_chars)
         return KnowledgeUsed(datasource_id=sub_query.datasource_id, digest=knowledge.digest, terms=terms,
                              rules=rules, dropped=dropped)
+
+    def _similar_terms(self, text: str, datasource_id: str, terms: List[str]) -> Dict[str, float]:
+        """Each term's ``knowledge.term`` entry similarity to ``text``, from the index; nothing when it cannot be asked.
+
+        Only the ``terms`` the caller may see are searched (the best ``top_k``
+        of them), and ``match_terms`` is given only those too. A search that fails leaves the lexical match.
+        """
+        search = getattr(self.vector_store, "retrieve_term_candidates", None)
+        if search is None or not text:
+            return {}
+        try:
+            return {c.term: c.score for c in search(text, datasource_id, self.knowledge_settings.top_k, terms=terms)}
+        except Exception as exc:
+            logger.warning(f"The term search failed; terms match by name only: {exc}")
+            return {}
 
     def _build_semantic_query(self, sub_query: SubQuery) -> str:
         parts: List[str] = []

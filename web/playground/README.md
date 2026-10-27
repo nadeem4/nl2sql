@@ -199,8 +199,8 @@ with `record: clips` runs the same script in CI and opens a pull request.
   leads back to Ask. **Rebuild** (`#index-rebuild`) is
   always offered; it posts to `POST /api/index/rebuild` and the page polls
   `GET /api/index` for its steps (`#index-progress`) until it ends, then
-  re-reads the schema. **Write descriptions with the LLM** (`#index-enrich`) is
-  off by default and disabled without a key. A failure shows `#index-error`.
+  re-reads the schema. A failure shows `#index-error`. Rebuild reads the
+  schema only; descriptions a model drafts are proposals for review, not part of the index.
   Where Rebuild is off (a non-loopback `--host` without `--allow-settings`, or
   the hosted demo) the panel says why in the server's own words
   (`#index-unavailable`, `rebuild.reason` from `/api/index`); hosted, that

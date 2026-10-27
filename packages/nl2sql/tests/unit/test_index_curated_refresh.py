@@ -1,10 +1,9 @@
 """``nl2sql index`` writes curated entries with the schema, and
-``nl2sql index --curated-only`` refreshes them without the schema.
+``nl2sql index --refresh`` refreshes them without the schema.
 
-A full index of a datasource reads its schema and, with enrichment on, calls
-the enrichment model. Editing ``curated.yaml`` needs neither: the curated-only
-refresh copies the active build's schema entries as they are and embeds only
-the verified queries.
+A full index of a datasource reads its schema. Editing ``curated.yaml`` needs
+no such read: the refresh renders the entries again from the stored snapshot,
+keeps the vectors of those that did not change and embeds the verified queries.
 """
 from __future__ import annotations
 
@@ -14,7 +13,6 @@ from index_helpers import TestIndex, memory_state  # same directory
 from langchain_core.embeddings import FakeEmbeddings
 
 from nl2sql.config import Curated
-from nl2sql.indexing import enrichment_service, orchestrator as orchestrator_module
 from nl2sql.indexing.curated import curated_hash
 from nl2sql.indexing.rebuild import rebuild_index
 from nl2sql_sdk.stores import Filter
@@ -94,7 +92,7 @@ def _active(ctx, kind=None):
 def test_a_full_index_writes_the_curated_entries_and_their_hash(tmp_path):
     ctx, _ = _ctx(tmp_path, _curated("Top customers"))
 
-    result = rebuild_index(ctx, enrich=False)
+    result = rebuild_index(ctx)
 
     assert result.ok
     assert _active(ctx, "curated") == ["Customers by revenue", "Top customers"]
@@ -102,20 +100,15 @@ def test_a_full_index_writes_the_curated_entries_and_their_hash(tmp_path):
         ctx.curated.datasources["chinook"])
 
 
-def test_a_curated_only_refresh_makes_no_model_call_and_keeps_the_schema(tmp_path, monkeypatch):
+def test_a_refresh_makes_no_model_call_and_keeps_the_schema(tmp_path):
     ctx, adapter = _ctx(tmp_path, _curated("Top customers"))
-    rebuild_index(ctx, enrich=False)
+    rebuild_index(ctx)
     schema_before = _active(ctx)
     reads_before = adapter.reads
 
-    def _no_enrichment(*_a, **_k):
-        raise AssertionError("enrichment ran")
-
-    monkeypatch.setattr(enrichment_service, "enrich_schema_snapshot", _no_enrichment)
-    monkeypatch.setattr(orchestrator_module, "enrich_schema_snapshot", _no_enrichment)
     ctx.curated = _curated("Top customers", "Best customers")
 
-    result = rebuild_index(ctx, enrich=True, curated_only=True)
+    result = rebuild_index(ctx, refresh=True)
 
     assert result.ok, result.errors
     assert adapter.reads == reads_before
@@ -128,17 +121,17 @@ def test_a_curated_only_refresh_makes_no_model_call_and_keeps_the_schema(tmp_pat
 
 def test_removing_the_curated_file_and_refreshing_drops_the_entries(tmp_path):
     ctx, _ = _ctx(tmp_path, _curated("Top customers"))
-    rebuild_index(ctx, enrich=False)
+    rebuild_index(ctx)
     ctx.curated = None
 
-    assert rebuild_index(ctx, curated_only=True).ok
+    assert rebuild_index(ctx, refresh=True).ok
     assert _active(ctx, "curated") == []
 
 
-def test_a_curated_only_refresh_of_an_unindexed_datasource_fails_for_that_datasource(tmp_path):
+def test_a_refresh_of_an_unindexed_datasource_fails_for_that_datasource(tmp_path):
     ctx, _ = _ctx(tmp_path, _curated("Top customers"))
 
-    result = rebuild_index(ctx, curated_only=True)
+    result = rebuild_index(ctx, refresh=True)
 
     assert not result.ok
     assert "nl2sql index" in result.errors[0]["error"]

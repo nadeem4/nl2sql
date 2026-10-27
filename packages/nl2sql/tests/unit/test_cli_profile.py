@@ -89,12 +89,12 @@ def test_index_profile_indexes_then_profiles(project, monkeypatch):
     result, out = _run(project, "index", "--profile", "--as", "admin", "-d", "shop")
 
     assert result.exit_code == 0, out
-    assert calls == [{"enrich": False, "datasource_ids": ["shop"]}]
+    assert calls == [{"datasource_ids": ["shop"]}]
     assert "Waiting for review" in out
 
 
 def test_index_profile_option_combinations_are_refused(project):
-    for args in (["index", "--profile", "--check"], ["index", "--profile", "--curated-only"],
+    for args in (["index", "--profile", "--check"], ["index", "--profile", "--refresh"],
                  ["index", "--as", "admin"]):
         result, out = _run(project, *args)
         assert result.exit_code == 2, (args, out)

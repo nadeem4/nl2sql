@@ -10,9 +10,8 @@ from nl2sql import IndexProgress
 @handle_cli_errors
 def run_indexing(
     engine,
-    enrich: bool = False,
     datasource_ids: Optional[List[str]] = None,
-    curated_only: bool = False,
+    refresh: bool = False,
 ) -> None:
     """
     Rebuilds the schema index, one datasource at a time.
@@ -26,12 +25,10 @@ def run_indexing(
 
     Args:
         engine: The ``NL2SQL`` engine, built from the config and checked.
-        enrich: Ask the LLM for table and column descriptions (spends tokens).
-            Off by default.
         datasource_ids: Only these datasources; every configured one when None.
-        curated_only: Re-index only the verified queries from
-            the ``curated`` section, keeping the schema entries; reads no schema and
-            calls no model.
+        refresh: Write the entries again from the stored snapshot, the
+            ``curated`` section and the knowledge; reads no schema and calls
+            no model.
 
     Raises:
         SystemExit: With code 1 if any datasource failed to index.
@@ -55,9 +52,8 @@ def run_indexing(
                 presenter.finish_task_line(task, f"{ds_id} failed", success=False)
             presenter.print_error(f"Failed to index {ds_id}: {progress.reason}")
 
-    result = engine.index.build(
-        datasource_ids, enrich=enrich, curated_only=curated_only, on_datasource=on_datasource,
-    )
+    build = engine.index.refresh if refresh else engine.index.build
+    result = build(datasource_ids, on_datasource=on_datasource)
     total_adapters = len(result.stats) + len(result.empty) + len(result.errors)
 
     if result.errors:

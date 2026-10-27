@@ -205,13 +205,13 @@ first with the param's `example`, else its `default`: "Best {n} customers in
 After editing the curated section, re-index its questions:
 
 ```bash
-nl2sql index --curated-only                       # every datasource
-nl2sql index --curated-only --datasource chinook  # one
+nl2sql index --refresh                       # every datasource
+nl2sql index --refresh --datasource chinook  # one
 ```
 
-`--curated-only` keeps each datasource's schema entries exactly as they are
-and embeds only the verified queries: it reads no schema and makes no
-enrichment model call, so it takes seconds. The datasource must have been
+`--refresh` writes the entries again from the stored snapshot and embeds only
+those whose text changed (here, the verified queries): it reads no schema and
+makes no model call, so it takes seconds. The datasource must have been
 indexed once with plain `nl2sql index`. A plain `nl2sql index` also picks up
 the file, and a schema re-index always keeps the verified queries.
 
@@ -219,7 +219,7 @@ Until you re-index, `nl2sql doctor` and the index status (`engine.index.health()
 `GET /api/v1/index/status`) warn:
 
 ```text
-Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --curated-only --datasource chinook`.
+Warning: curated.yaml changed for 'chinook' since it was indexed; run `nl2sql index --refresh --datasource chinook`.
 ```
 
 It is a warning, not a failure: the index stays `ok`, because the stale

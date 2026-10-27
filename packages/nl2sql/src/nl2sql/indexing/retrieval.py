@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, 
 import numpy as np
 from langchain_core.documents import Document
 
-from nl2sql.indexing.models import RouteCandidate, VerifiedQueryCandidate
+from nl2sql.indexing.models import RouteCandidate, TermCandidate, VerifiedQueryCandidate
 from nl2sql_sdk.stores import BuildPointer, Filter, Hit
 
 if TYPE_CHECKING:
@@ -41,6 +41,7 @@ if TYPE_CHECKING:
 _ROUND = 4
 
 CURATED_TYPE = "curated.verified_query"
+TERM_TYPE = "knowledge.term"
 
 # Routing's signals, in the order they are searched and recorded, and the entry
 # type each one searches. Each ranks datasources by their best entry.
@@ -174,6 +175,8 @@ def entry_label(metadata: Mapping[str, Any]) -> str:
         return str(metadata.get("name") or "")
     if kind == CURATED_TYPE:
         return str(metadata.get("query_id") or "")
+    if kind == TERM_TYPE:
+        return str(metadata.get("term") or "")
     return str(metadata.get("table") or metadata.get("id") or "")
 
 
@@ -544,6 +547,39 @@ class Retriever:
                 "dropped": [item["id"] for item in pool if not item["picked"]],
             })
         return ranked
+
+    def retrieve_term_candidates(self, query: str, datasource_id: str, k: int,
+                                 terms: Optional[Sequence[str]] = None) -> List[TermCandidate]:
+        """The glossary terms of ``datasource_id`` whose entries are most like ``query``, best first.
+
+        A plain similarity search over the live build's ``knowledge.term``
+        entries. The caller keeps only the terms its scope shows and the
+        ones at or above ``settings.knowledge.match_floor``. ``terms`` limits the
+        search to those term names (the ones the caller's scope shows), so a
+        visible term is never crowded out of the ``k`` by hidden ones. When the
+        datasource has no term entry, nothing is embedded.
+        """
+        from nl2sql.common.resilience import VECTOR_BREAKER
+
+        if terms is not None and not terms:
+            return []
+        where = Filter(eq={"type": TERM_TYPE, "datasource_id": datasource_id},
+                       **{"in": {**self._live([datasource_id]), **({"term": list(terms)} if terms is not None else {})}})
+        available = len(self.index.get(self.namespace, where))
+        if available == 0:
+            return []
+
+        @VECTOR_BREAKER
+        def _execute():
+            embedding = self.embeddings.embed_query(query)
+            return embedding, self.index.query(self.namespace, embedding, k=min(available, k), where=where,
+                                               with_vectors=True)
+
+        embedding, hits = _execute()
+        scores = cosine_similarity([embedding], [h.vector for h in hits])[0] if hits else []
+        found = [TermCandidate(datasource_id=datasource_id, term=str(hit.metadata.get("term")), score=float(scores[i]))
+                 for i, hit in enumerate(hits)]
+        return sorted(found, key=lambda c: c.score, reverse=True)
 
     def inspect(self, query: str, k: int = 8, lambda_mult: float = LAMBDA_MULT, types: Optional[List[str]] = None,
                 datasource_id: Optional[str] = None, fetch_k: Optional[int] = None) -> Dict[str, Any]:

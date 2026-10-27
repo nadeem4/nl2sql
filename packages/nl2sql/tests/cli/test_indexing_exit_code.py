@@ -47,7 +47,7 @@ def orchestrator(monkeypatch):
     outcomes["_indexed"] = indexed
 
     class _StubOrchestrator:
-        def __init__(self, ctx, enrich=True):
+        def __init__(self, ctx):
             self.ctx = ctx
 
         def index_datasource(self, adapter):
@@ -133,29 +133,13 @@ def test_the_index_command_passes_its_options(monkeypatch):
 
     result = CliRunner().invoke(main.app, ["index", "--datasource", "chinook", "--datasource", "sales"])
     assert result.exit_code == 0, result.output
-    assert seen == {"enrich": False, "datasource_ids": ["chinook", "sales"], "curated_only": False}
+    assert seen == {"datasource_ids": ["chinook", "sales"], "refresh": False}
 
     # A model change needs no special rebuild: each model has its own index.
     assert CliRunner().invoke(main.app, ["index", "--full"]).exit_code != 0
 
-    CliRunner().invoke(main.app, ["index", "--curated-only", "-d", "chinook"])
-    assert seen == {"enrich": False, "datasource_ids": ["chinook"], "curated_only": True}
-
-    # Enrichment spends tokens, so it runs only when asked for.
-    CliRunner().invoke(main.app, ["index", "--enrich"])
-    assert seen == {"enrich": True, "datasource_ids": None, "curated_only": False}
-
-
-def test_enrich_and_curated_only_do_not_combine(monkeypatch):
-    from typer.testing import CliRunner
-
-    from nl2sql.cli import main
-
-    monkeypatch.setattr(main, "build_engine", lambda ctx: "engine")
-    monkeypatch.setattr(main, "run_indexing", lambda ctx, **kw: None)
-
-    result = CliRunner().invoke(main.app, ["index", "--enrich", "--curated-only"])
-    assert result.exit_code != 0
+    CliRunner().invoke(main.app, ["index", "--refresh", "-d", "chinook"])
+    assert seen == {"datasource_ids": ["chinook"], "refresh": True}
 
 
 def test_index_prune_drops_the_other_models_and_says_which(monkeypatch, capsys):

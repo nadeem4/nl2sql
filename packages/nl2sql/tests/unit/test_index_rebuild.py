@@ -183,8 +183,7 @@ def scripted(monkeypatch):
     class _Orchestrator:
         seen = []
 
-        def __init__(self, ctx, enrich=True):
-            _Orchestrator.seen.append(("enrich", enrich))
+        def __init__(self, ctx):
             self.ctx = ctx
 
         def index_datasource(self, adapter):
@@ -240,14 +239,12 @@ def test_an_unknown_datasource_is_an_error_not_a_silent_no_op(tmp_path, scripted
     assert "nope" in result.errors[0]["datasource_id"]
 
 
-def test_rebuild_passes_the_enrichment_choice_and_reports_steps(tmp_path, scripted):
-    _, orchestrator = scripted
+def test_rebuild_reports_its_steps(tmp_path, scripted):
     index = TestIndex(tmp_path, FakeEmbeddings(size=8))
     steps = []
 
-    rebuild_index(_ctx(index, "ds_a"), enrich=False, on_progress=steps.append)
+    rebuild_index(_ctx(index, "ds_a"), on_progress=steps.append)
 
-    assert ("enrich", False) in orchestrator.seen
     assert steps[0].startswith("Loading the embedding model")
     assert any("ds_a" in s for s in steps)
 

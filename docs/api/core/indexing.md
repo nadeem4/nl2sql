@@ -22,7 +22,7 @@ inspect one search of it, and measure schema drift.
 - `packages/nl2sql/src/nl2sql/indexing/retrieval.py`
 - `packages/nl2sql/src/nl2sql/indexing/health.py`
 - `packages/nl2sql/src/nl2sql/storage/chroma.py`
-- `packages/nl2sql/src/nl2sql/indexing/enrichment_service.py`
+- `packages/nl2sql/src/nl2sql/indexing/chunk_builder.py`
 - `packages/nl2sql/src/nl2sql/storage/sqlite.py`
 - `packages/nl2sql/src/nl2sql/schema/drift.py`, `diff.py`, `impact.py` (schema drift)
 
@@ -31,13 +31,11 @@ inspect one search of it, and measure schema drift.
 ### index.build
 
 Signature:
-`build(datasource_ids=None, *, curated_only=False, enrich=False, on_progress=None, on_datasource=None) -> RebuildResult`
+`build(datasource_ids=None, *, on_progress=None, on_datasource=None) -> RebuildResult`
 
 | name | meaning |
 | --- | --- |
 | `datasource_ids` | Only these datasources; every configured one when `None`. |
-| `curated_only` | Re-index only the verified queries, keeping each datasource's schema entries: no schema read, no model call. |
-| `enrich` | Ask the `profiler` LLM for table and column descriptions. Off by default: it spends tokens. |
 | `on_progress` | Called with a sentence before each step. |
 | `on_datasource` | Called with an `IndexProgress` as each datasource starts, is done or fails. |
 
@@ -66,9 +64,23 @@ result = engine.index.build(["shop"], on_datasource=show)
 ```
 
 A failure of one datasource never raises: it is in `errors`, and that
-datasource keeps its previous build and schema version. Enrichment errors are
-never raised: enrichment is best-effort and degrades to the unenriched
-snapshot.
+datasource keeps its previous build and schema version. A build calls no model.
+
+### index.refresh
+
+Signature:
+`refresh(datasource_ids=None, *, on_progress=None, on_datasource=None) -> RebuildResult`
+
+Writes the entries of `datasource_ids` (every datasource when `None`) again
+after a glossary or `curated.yaml` change. It reads no schema and calls no
+model: each entry's text is rendered from the live build's stored snapshot,
+the current verified queries and the current knowledge, an entry whose text and
+metadata did not change keeps its stored vector, and only the others are
+embedded. The pointer keeps its schema version and records the new
+`knowledge_hash` and `curated_hash`, so `health()` stops reporting the index
+`stale`. A datasource that was never indexed (or whose stored snapshot is gone)
+fails with the command to run. The result is a `RebuildResult` as for `build`.
+`nl2sql index --refresh` calls it.
 
 The build goes into the namespace of the configured embedding model. Each
 datasource's new entries are written under a new build id, and its build
@@ -167,15 +179,11 @@ pipeline's own retrieval uses: `k` (8 picks), `lambda_mult` (1 is relevance
 only, 0 is difference only), `fetch_multiplier` (the candidate pool is `k`
 times it) and `types`, every entry type the index holds
 (`schema.datasource`, `schema.datasource_example`, `schema.table`,
-`schema.column`, `schema.relationship`, `schema.metric`). The playground's Retrieval inspector starts from it.
+`schema.column`, `schema.relationship`, `schema.metric`, `knowledge.term`). The playground's Retrieval inspector starts from it.
 
 ## Execution Lifecycle
 - Fetch schema via adapter.
-- Only with `enrich=True`: enrich schema metadata using the `profiler`
-  LLM. Enrichment fills blanks only: a table or column comment read from the
-  database is never replaced. If the client cannot be built (no API key), the
-  endpoint is unreachable, or the call fails, the unenriched snapshot is used
-  and indexing continues.
 - Store the schema snapshot and its version (nothing reads it yet).
-- Build the chunks, embed them, write them as a new build, and switch the
-  datasource's build pointer to it.
+- Build the chunks (the schema's, the knowledge's and the verified queries'),
+  embed them, write them as a new build, and switch the datasource's build
+  pointer to it, recording the `knowledge_hash` and `curated_hash`.

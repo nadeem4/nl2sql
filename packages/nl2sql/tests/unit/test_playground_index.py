@@ -1,9 +1,9 @@
 """The playground's index panel: health on load, and a guarded Rebuild.
 
 The owner's rule: the playground always offers an index action. Rebuild uses
-the settings panel's guard (local only unless ``--allow-settings``), and LLM
-enrichment is an opt-in because it spends tokens. A rebuild does not wait for
-questions in flight: each run pinned the index pointers when it started, and
+the settings panel's guard (local only unless ``--allow-settings``) and offers
+no model-written descriptions: a draft is a proposal, not part of the index
+(wave_b.md, B31). A rebuild does not wait for questions in flight: each run pinned the index pointers when it started, and
 the build a switch replaces is kept for it.
 """
 from __future__ import annotations
@@ -92,11 +92,10 @@ def scripted(monkeypatch):
     """An orchestrator that writes a full chinook entry set at schema v1."""
 
     class _Orchestrator:
-        enrich_seen = []
+        built = []
 
-        def __init__(self, ctx, enrich=True):
-            _Orchestrator.enrich_seen.append(enrich)
-
+        def __init__(self, ctx):
+            _Orchestrator.built.append(ctx)
             self.ctx = ctx
 
         def index_datasource(self, adapter):
@@ -145,24 +144,24 @@ def test_rebuild_is_refused_on_a_non_loopback_host_without_the_flag(tmp_path, sc
     assert read["rebuild"]["available"] is False
     assert "--allow-settings" in read["rebuild"]["reason"]
 
-    response = client.post("/api/index/rebuild", json={"enrich": False})
+    response = client.post("/api/index/rebuild", json={})
 
     assert response.status_code == 403
-    assert scripted.enrich_seen == []
+    assert scripted.built == []
     assert engine._runtime.vector_store.is_empty()
 
 
 def test_rebuild_is_allowed_on_a_non_loopback_host_with_the_flag(tmp_path, scripted):
     _, client = _client(tmp_path, host="0.0.0.0", allow_settings=True)
 
-    assert client.post("/api/index/rebuild", json={"enrich": False}).status_code == 202
+    assert client.post("/api/index/rebuild", json={}).status_code == 202
     assert _wait_for(client, "done")["health"]["status"] == "ok"
 
 
 def test_rebuild_must_come_from_the_page_itself(tmp_path, scripted):
     _, client = _client(tmp_path)
 
-    response = client.post("/api/index/rebuild", json={"enrich": False},
+    response = client.post("/api/index/rebuild", json={},
                            headers={"Origin": "http://evil.example"})
 
     assert response.status_code == 403
@@ -178,33 +177,21 @@ def test_rebuild_replaces_an_empty_index_and_reports_progress(tmp_path, scripted
     assert body["health"]["counts"] == {"schema.datasource": 1, "schema.table": 1}
     assert body["health"]["built_at"]
     assert any(step.startswith("Loading the embedding model") for step in body["job"]["steps"])
-    # Enrichment is off unless asked for.
-    assert scripted.enrich_seen == [False]
+    assert len(scripted.built) == 1
 
 
-def test_enrichment_is_refused_without_a_key(tmp_path, scripted):
-    _, client = _client(tmp_path, mode="replay")
-
-    assert client.get("/api/index").json()["rebuild"]["enrich_available"] is False
-    response = client.post("/api/index/rebuild", json={"enrich": True})
-
-    assert response.status_code == 400
-    assert scripted.enrich_seen == []
-
-
-def test_enrichment_is_passed_through_in_live_mode(tmp_path, scripted):
+def test_the_rebuild_offers_no_model_written_descriptions(tmp_path, scripted):
     _, client = _client(tmp_path, mode="live")
 
+    assert "enrich_available" not in client.get("/api/index").json()["rebuild"]
     assert client.post("/api/index/rebuild", json={"enrich": True}).status_code == 202
     _wait_for(client, "done")
-
-    assert scripted.enrich_seen == [True]
 
 
 def test_a_second_rebuild_while_one_runs_is_refused(tmp_path, monkeypatch):
     release = threading.Event()
 
-    def _slow(ctx, enrich=False, on_progress=None, **_kw):
+    def _slow(ctx, on_progress=None, **_kw):
         release.wait(5)
         return rebuild_module.RebuildResult(ok=True)
 
@@ -230,7 +217,7 @@ def test_a_rebuild_does_not_wait_for_questions_in_flight(tmp_path, scripted):
 
 def test_a_failed_rebuild_is_reported_and_keeps_the_previous_index(tmp_path, monkeypatch):
     class _Failing:
-        def __init__(self, ctx, enrich=True):
+        def __init__(self, ctx):
             pass
 
         def index_datasource(self, adapter):
