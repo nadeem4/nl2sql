@@ -2,9 +2,9 @@
 
 !!! note "Partly built"
     The workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`,
-    `refresh` and `run_scheduled` (D2), and `generate` and `suggest_questions` (D3). `filter_values` and
-    `refresh(filters=...)` (D2b) have their final signatures and raise `NotImplementedError` naming their row. A
-    conversation builds and edits a draft with the `dashboard_edit` and `dashboard_pin` chat tools (D4).
+    `refresh` and `run_scheduled` (D2), `generate` and `suggest_questions` (D3), and `filter_values` and
+    `refresh(filters=...)` (D2b). A conversation builds and edits a draft with the `dashboard_edit` and
+    `dashboard_pin` chat tools (D4).
 
 ## Purpose
 `engine.workspaces` and `engine.dashboards` ([Dashboards](../../dashboards/index.md)).
@@ -76,7 +76,19 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   that no longer validates or parses; the refiner is never asked), `denied`, `needs_approval` (its requests in
   `approvals_needed`; the stored result is kept), `stopped` (a cap; the remaining charts are `stopped` and keep
   theirs) and `error` (returned, not stored: the chart keeps its last good result). It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
-  edited, and `ValueError` for a `tile_id` the dashboard does not have. `filters` is D2b's.
+  edited, and `ValueError` for a `tile_id` the dashboard does not have.
+- **`filters`** maps filter ids to values (D117): `refresh(dashboard_id, filters={"country": ["Brazil"]})`. Each
+  value is checked against the filter's kind first (`number`, `temporal` as ISO text, `boolean`, `text`; `in` takes
+  1 to 100 values, `between` exactly two), and a wrong one, or an id the dashboard does not have, is a
+  `ValueError` naming the filter, raised before any chart runs. The predicate (`between` as `>=` and `<=`, `in` as
+  `OR`s, the values as plan literals) is added to each stored query that reads the filter's table before the
+  plan goes to `run_query`; other queries run unfiltered. `TileRun.filtered` is true when every active filter
+  reached the chart, `DashboardRun.filters` holds the values and `dashboard.refreshed` the ids. A filtered refresh
+  is returned, not stored.
+- **`filter_values(dashboard_id, filter_id, *, user_context, limit=100)`** returns the distinct values of an `in`
+  filter's column (at most `limit`, 1 to 1,000, in order) or `[min, max]` of a `between` one (`[]` when there are
+  none), by a plan built in code and run as the caller through `run_query`, so the caller's scope and policies
+  apply and no model is called. A column the caller cannot read, or an unknown filter, is a `ValueError`.
 - **`run_scheduled(now=None)`** has no caller: it refreshes each dashboard whose schedule is due, as its saved
   identity, and returns the `DashboardRun`s (`trigger="schedule"`). A schedule that fails a check stops, with
   `state="stopped"` and `error={"code", "message"}` on `Dashboard.schedule`, and `dashboard.schedule_stopped`.
@@ -94,7 +106,8 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   choose and runs and saves nothing (`[]` when the caller reaches no table; `NotIndexed` as above).
 - **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`, required with `verified`.
 - **Events.** `dashboard.changed` (the edit kinds, `created`, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`,
-  `dashboard.generated`, `dashboard.refreshed` (the counts per status), `dashboard.schedule_stopped` and `workspace.changed`. They
+  `dashboard.generated`, `dashboard.refreshed` (the counts per status and the filter ids applied),
+  `dashboard.schedule_stopped` and `workspace.changed`. They
   carry no titles, names or values.
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
   saved dashboards are never purged.
@@ -108,8 +121,8 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 | `dashboards.pin(dashboard_id, *, user_context, workspace_id=None, title=None)`, `move(dashboard_id, workspace_id, *, user_context)` | D1 |
 | `dashboards.edit(dashboard_id, edits, *, user_context)` and the named edits `rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule` | D1 |
 | `dashboards.open(dashboard_id, *, user_context, refresh_due=True) -> DashboardView` | D2 |
-| `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2 |
-| `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100)` | D2b |
+| `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2, `filters` D2b |
+| `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100) -> list` | D2b |
 | `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` | D2 |
 | `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None)` | D3 |
 | `dashboards.suggest_questions(datasource_id, *, user_context, n=5) -> list[str]` | D3 |

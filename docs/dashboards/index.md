@@ -2,9 +2,8 @@
 
 !!! note "Partly built (Wave C, 0.9)"
     Workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`, `refresh`,
-    stored results and schedules (D2), and so do `generate` and `suggest_questions`, the starter dashboard (D3),
-    and building in chat (D4). Filter values and `filter_values` (D2b) have their signatures and raise
-    `NotImplementedError` naming the pull request that fills them. The design is
+    stored results and schedules (D2), and so do filters and `filter_values` (D2b), `generate` and
+    `suggest_questions`, the starter dashboard (D3), and building in chat (D4). The design is
     [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
 
 A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
@@ -15,7 +14,8 @@ stored plans as the caller with no model call. The methods are in
 | Row | What it adds |
 |---|---|
 | D1 | Workspaces, the dashboard store, `pin`, `move` and the manual edits |
-| D2 | `open`, `refresh`, stored results, schedules and `nl2sql dashboards refresh` (filter values follow in D2b) |
+| D2 | `open`, `refresh`, stored results, schedules and `nl2sql dashboards refresh` |
+| D2b | Filters: `refresh(filters=...)` and `filter_values` |
 | D3 | The starter dashboard: `generate` and `suggest_questions`, with no model |
 | D4 | Building and editing a dashboard in a conversation (`dashboard_edit`, `dashboard_pin`) and `create_draft` |
 
@@ -51,7 +51,7 @@ Every change a person can make is a typed edit, and no edit calls a model or tak
 | `set_tile_chart` | `set_tile_chart(id, tile_id, chart)` | `auto`, `line`, `bar`, `big_number` or `table`; a kind the last result cannot be drawn as is a `ValueError` naming the ones it can |
 | `remove_tile` | `remove_tile(id, tile_id)` | Removes a chart and its stored result |
 | `arrange` | `arrange(id, layouts)` | Moves or resizes charts on the 4-column grid; the others stay put |
-| `set_filters` | `set_filters(id, filters)` | Stores the filter definitions (their values are applied by refresh, D2b) |
+| `set_filters` | `set_filters(id, filters)` | Stores the filter definitions (their values are passed to `refresh`, see [Filters](#filters)) |
 | `set_schedule` | `set_schedule(id, every_minutes)` | Stores a schedule and a snapshot of your user, tenant and roles; `None` removes it. Below `dashboards.min_refresh_minutes` (15) is `ScheduleTooFrequent` |
 | `move` | `move(id, workspace_id)` | Moves it to another of your workspaces |
 
@@ -128,8 +128,29 @@ run = engine.dashboards.refresh(board.id, tile_id="t3", user_context=me)   # one
 | **Caps** | A chart stopped at a Wave A cap (`stopped`) ends the refresh; the rest are `stopped` too and keep their last result. |
 | **No double runs** | A refresh holds the state store's lock `dashboard-refresh:<id>`. A second `refresh` on the same dashboard raises `DashboardBusy`; `open` leaves the charts due; a schedule skips it. |
 
-Each refresh publishes `dashboard.refreshed` (the counts per status; the trigger is `open`, `manual` or
-`schedule`). Each chart is a run, with its own `run.started` and `run.finished`.
+Each refresh publishes `dashboard.refreshed` (the counts per status and the ids of the filters applied; the
+trigger is `open`, `manual` or `schedule`). Each chart is a run, with its own `run.started` and `run.finished`.
+
+## Filters
+
+A dashboard's filters are definitions (`set_filters`): an id, a label, a column
+`datasource.schema.table.column`, its kind and an operator (`in` for the values of a dimension, `between` for a
+range of a number or a date). A viewer's values are passed to `refresh`:
+
+```python
+engine.dashboards.set_filters(board.id, [DashboardFilter(id="country", label="Country", kind="text", op="in",
+                                                          column="shop.main.customers.country")], user_context=me)
+engine.dashboards.filter_values(board.id, "country", user_context=me)   # ["Brazil", "Canada", ...]
+run = engine.dashboards.refresh(board.id, filters={"country": ["Brazil"]}, user_context=me)
+```
+
+| Rule | What it means |
+|---|---|
+| **A predicate, not text** | Each value becomes a typed literal in a predicate added to the stored plan before it goes to `run_query`, so the hooks, the validator and the generator all see it. `between [a, b]` is `col >= a AND col <= b`; `in` is `col = v1 OR col = v2 ...`. Nothing is added to the question or to SQL text, and the generator escapes the values like any literal. A filter only adds a condition, so it never shows more than the chart already could. |
+| **Checked first** | Before anything runs, each value is checked against the filter's kind: a number takes numbers, a date an ISO date or timestamp (`2024-01-31` or `2024-01-31T12:00:00Z`), a boolean true or false, text a string; `in` takes 1 to 100 values, `between` exactly two. A wrong value, or an id the dashboard does not have, is a `ValueError` naming the filter, and nothing runs. |
+| **Where it applies** | To every stored query whose plan reads the filter's table (on the filter's datasource). A query that does not read it, and a verified query (it has no plan), runs unfiltered. `TileRun.filtered` is true only when every active filter reached the chart, so a page can say which charts a filter did not touch. |
+| **Not stored** | A filtered refresh is returned (`DashboardRun.filters` holds the values) and not stored: the stored results, which `open` serves and a schedule replaces, stay the dashboard's own and unfiltered. |
+| **`filter_values`** | The distinct values of an `in` filter's column (up to `limit`, in order), or `[min, max]` of a `between` one, from a plan built in code and run as the caller through `run_query`: the caller's scope and policies apply, a column they cannot read is a `ValueError`, and no model is called. Dates come back as ISO text. |
 
 ## One access rule
 

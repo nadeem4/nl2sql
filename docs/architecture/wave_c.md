@@ -1849,7 +1849,38 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
 
 ### D2b
 
-Not built yet.
+!!! note "Built (D2b): dashboard filters"
+    - **Files:** `nl2sql/dashboards/filters.py` (pure: `activate` checks the values, `supply` adds the predicates to a
+      chart's stored plans, `values_plan` builds the `filter_values` plan), `run.py` (`TileRunner.run(active=)`,
+      `TileRunner.values`, `Refresher.run(active=)`), `api.py` (`refresh` activates the filters under the lock,
+      `filter_values`), `api/dashboards_api.py` (the public face; the two D2b stubs are gone).
+    - **Tests:** `tests/unit/test_dashboards_d2b.py` (the service with a canned `run_query`, and a render test of the
+      predicate in `postgres`, `tsql` and `mysql`), three e2e tests in `tests/e2e/test_dashboards_fake_llm.py` (a
+      filter reaches the validator and the database; a filter on a missing column is `needs_fixing`;
+      `filter_values` as the caller), and `test_wave_c_stubs.py` no longer lists `filter_values`.
+    - **How it works.** `refresh(filters={id: values})` checks every value against the filter's `kind` (a
+      `ValueError` naming the filter, before any chart runs), then each chart's stored plans are copied and the
+      predicate of each filter is `AND`-ed to the `where` of every plan whose sub-query is on the filter's
+      datasource and reads its table (once per alias of that table). The plan goes to `run_query` as a
+      `SuppliedPlan`, so `plan.after`, the validator and the generator see the predicate, and a filter on a column
+      that does not exist is `needs_fixing` with no refiner. `dashboard.refreshed` carries the filter ids in the
+      dashboard's order, never the values.
+
+    Where the code and the design differ, the code won:
+
+    - **A filtered refresh is not stored.** The design stores every refresh's results; storing a viewer's filtered
+      rows would make `open` serve rows for values nobody can see, and the next scheduled run would replace them with
+      unfiltered ones. The run is returned (`DashboardRun.filters` holds the values, `TileRun.filtered` says which
+      charts every filter reached) and the stored results stay the dashboard's own. A stored `TileRun.filtered` is
+      therefore always `False`.
+    - `TileRun.filtered` is true when each active filter reached at least one of the chart's queries; with no
+      active filter, or on a verified chart (it has no plan to add to), it is `False`.
+    - **Matching a table:** the plan's table name matches ignoring case, and its schema (when it names one) too; a
+      plan that names no schema matches any. `open` takes no filters (the design's signature has none).
+    - `kind="other"` accepts any plain value (text, number or boolean); the design lists four kinds.
+    - `filter_values` rejects a `limit` outside 1 to 1,000 (one page of a saved result), drops `NULL`s, returns dates
+      as ISO text and decimals as numbers, and raises `ValueError` with the run's message when the run is not
+      `ok` or `empty` (a caller without access, an invalid column). A `between` filter on an empty column is `[]`.
 
 ### D3
 

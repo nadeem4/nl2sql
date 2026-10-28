@@ -327,3 +327,64 @@ def test_cost_guard_confirm_makes_a_chart_need_approval_and_a_manual_refresh_wit
         assert server.calls == []
     finally:
         engine.close()
+
+
+# ---------------------------------------------------------------- filters (D2b)
+
+def _filter(filter_id, column, op="in", kind="text"):
+    from nl2sql.dashboards.models import DashboardFilter
+
+    return DashboardFilter(id=filter_id, label=filter_id.title(), column=f"chinook.main.Customer.{column}", kind=kind,
+                           op=op)
+
+
+@pytest.mark.e2e
+def test_a_filter_reaches_the_validator_and_the_database_with_no_model_call(engine):
+    engine, server = engine
+    _seed(engine)
+    engine.dashboards.set_filters("d1", [_filter("country", "Country")], user_context=ANA)
+    engine.dashboards.refresh("d1", user_context=ANA)  # the dashboard's own, unfiltered result
+
+    [brazil] = engine.dashboards.refresh("d1", user_context=ANA, filters={"country": ["Brazil"]}).tiles
+    [two] = engine.dashboards.refresh("d1", user_context=ANA, filters={"country": ["Brazil", "Canada"]}).tiles
+    [none] = engine.dashboards.refresh("d1", user_context=ANA, filters={"country": ["Atlantis"]}).tiles
+    [stored] = engine.dashboards.open("d1", user_context=ANA).runs
+
+    assert brazil.status == "ok" and brazil.filtered is True and brazil.chart.data.rows == [[5]], brazil.error
+    assert two.chart.data.rows == [[13]]
+    assert none.chart.data.rows == [[0]]
+    assert stored.chart.data.rows == [[59]], "a filtered refresh is not stored"
+    assert server.calls == []
+
+
+@pytest.mark.e2e
+def test_a_filter_on_a_column_that_does_not_exist_is_caught_by_the_validator_not_the_database(engine):
+    """Validation before generation: the predicate is in the plan the validator reads, so a bad column is a
+    ``needs_fixing`` chart with no rows and no refiner, never a database error."""
+    engine, server = engine
+    _seed(engine)
+    engine.dashboards.set_filters("d1", [_filter("nope", "NoSuchColumn")], user_context=ANA)
+
+    [run] = engine.dashboards.refresh("d1", user_context=ANA, filters={"nope": ["x"]}).tiles
+
+    assert run.status == "needs_fixing" and run.chart is None and run.error["code"] == "TILE_NEEDS_FIXING"
+    assert server.calls == []
+
+
+@pytest.mark.e2e
+def test_filter_values_runs_as_the_caller_through_the_validator(engine):
+    engine, server = engine
+    _seed(engine)
+    engine.dashboards.set_filters("d1", [_filter("country", "Country"), _filter("id", "CustomerId", "between", "number")],
+                                  user_context=ANA)
+
+    countries = engine.dashboards.filter_values("d1", "country", user_context=ANA, limit=100)
+    few = engine.dashboards.filter_values("d1", "country", user_context=ANA, limit=3)
+    ids = engine.dashboards.filter_values("d1", "id", user_context=ANA)
+
+    assert "Brazil" in countries and countries == sorted(countries) and len(set(countries)) == len(countries)
+    assert few == countries[:3]
+    assert ids == [1, 59]
+    assert server.calls == []
+    with pytest.raises(ValueError, match="could not be read"):
+        engine.dashboards.filter_values("d1", "country", user_context=LOST)  # a role that cannot read customers
