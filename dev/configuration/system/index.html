@@ -6321,7 +6321,7 @@ same <code>Config</code> as a split layout would:</p>
 <td><code>chat_tools</code></td>
 <td>no</td>
 <td><a href="#conversations-chat-tools-dashboards-and-mcp">below</a></td>
-<td>A list of chat tool names. Absent means <code>chart</code> and <code>report</code>, if registered; <code>[]</code> means none (<code>ask</code> stays).</td>
+<td>A list of chat tool names. Absent means <code>chart</code>, <code>diagram</code> and <code>report</code>, if registered; <code>[]</code> means none (<code>ask</code> stays).</td>
 </tr>
 <tr>
 <td><code>dashboards</code></td>
@@ -6530,7 +6530,7 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">        </span><span class="c1"># null keeps conversations; also bounds draft dashboards</span>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># chat_tools.yaml: a list of registered names (the nl2sql.chat_tools entry point group)</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># absent: chart and report (those the registry has); diagram, dashboard_edit and dashboard_pin wait for K2 and D4</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># absent: chart, diagram and report (those the registry has); dashboard_edit and dashboard_pin wait for D4</span>
 <a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chart</span>
 <a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">report</span>
 <a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
@@ -6562,7 +6562,7 @@ is optional, and absent, the defaults shown apply. Chart limits are
 </tr>
 <tr>
 <td><code>chat_tools</code></td>
-<td>A list of names: none twice, each a registered chat tool (<code>registry.add_chat_tool</code>, or an entry point). An unknown name is an error when the engine is built (<code>chat_tools[i]</code> in the report), with the closest registered name; <code>ask</code> and a plugin whose <code>args_model</code> does not forbid extra keys are errors too. Absent means the default tools (<code>chart</code> and <code>report</code>) that the registry has, so an engine on <code>Registry.empty()</code> starts with none and needs no <code>chat_tools: []</code>; a name you list must be registered. <code>[]</code> means none; <code>ask</code> is the conversation's own tool and is always on. Read by <code>engine.conversations</code> and <code>engine.chat_tools</code> (C2); see <a href="../../conversations/tools/">Chat tools</a>.</td>
+<td>A list of names: none twice, each a registered chat tool (<code>registry.add_chat_tool</code>, or an entry point). An unknown name is an error when the engine is built (<code>chat_tools[i]</code> in the report), with the closest registered name; <code>ask</code> and a plugin whose <code>args_model</code> does not forbid extra keys are errors too. Absent means the default tools (<code>chart</code>, <code>diagram</code> and <code>report</code>) that the registry has, so an engine on <code>Registry.empty()</code> starts with none and needs no <code>chat_tools: []</code>; a name you list must be registered. <code>[]</code> means none; <code>ask</code> is the conversation's own tool and is always on. Read by <code>engine.conversations</code> and <code>engine.chat_tools</code> (C2); see <a href="../../conversations/tools/">Chat tools</a>.</td>
 </tr>
 <tr>
 <td><code>dashboards</code></td>

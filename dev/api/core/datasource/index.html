@@ -5918,6 +5918,16 @@ forms, and a test of a datasource before it is added.</p>
 <td><code>dict</code></td>
 <td>The indexed schema as the planner is given it, as <code>user_context</code> may see it: <code>{"datasource_id", "tables": [...]}</code>, tables sorted by name, each with <code>name</code>, <code>schema</code>, <code>row_count</code>, <code>description</code>, <code>columns</code> (<code>name</code>, <code>type</code>, <code>nullable</code>, <code>primary_key</code>, <code>description</code>) and <code>foreign_keys</code> (<code>columns</code>, <code>references_table</code>, <code>references_columns</code>). A table the caller's roles deny is left out, and so is a foreign key that refers to one; a caller whose roles do not reach the datasource gets no tables. <code>user_context</code> is required: there is no default view, so code that forgot it fails instead of showing everything. Pass an admin's <code>UserContext</code> for the whole schema. Read from the snapshot the datasource's live index build was made from, not the database; before the first index <code>tables</code> is empty.</td>
 </tr>
+<tr>
+<td><code>dialect(datasource_id)</code></td>
+<td><code>str</code></td>
+<td>The sqlglot dialect name of the datasource's adapter (<code>postgres</code>, <code>tsql</code>...). Used to read a verified query's SQL for <a href="../../../charts/diagrams/#the-answer-view"><code>diagram_for</code></a>.</td>
+</tr>
+<tr>
+<td><code>diagram(datasource_id, *, user_context, tables=None)</code></td>
+<td><code>str</code></td>
+<td>The schema as a Mermaid <code>erDiagram</code>, drawn from <code>schema(...)</code>, so only what <code>user_context</code> may see: a denied table, and every foreign key or glossary join that names one, is left out. Each table shows its primary and foreign key columns; each foreign key and each glossary join is a relationship. <code>tables</code> draws those tables and the ones one relationship away (a <code>ValueError</code> if none is a table the caller may see); without it, the whole datasource, cut to the 30 tables with the most relationships and a <code>%% N more tables not shown</code> comment. No colour, no <code>%%{init}</code> line, no model call. <code>user_context</code> is required, as for <code>schema</code>. See <a href="../../../charts/diagrams/">Diagrams</a>.</td>
+</tr>
 </tbody>
 </table>
 <p><code>DatasourceInfo</code> is a frozen dataclass, exported from <code>nl2sql</code>:</p>

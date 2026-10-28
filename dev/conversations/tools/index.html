@@ -944,6 +944,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-diagram">
+<span class="md-ellipsis">
+      
+        The diagram
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#the-report">
 <span class="md-ellipsis">
       
@@ -2543,6 +2552,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-diagram">
+<span class="md-ellipsis">
+      
+        The diagram
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#the-report">
 <span class="md-ellipsis">
       
@@ -2569,8 +2587,8 @@
 <article class="md-content__inner md-typeset">
 <h1 id="chat-tools">Chat tools</h1>
 <div class="admonition note">
-<p class="admonition-title">Wave C, 0.9: the runner, <code>chart</code> and <code>report</code> are built</p>
-<p><code>diagram</code> arrives with K2 and <code>dashboard_edit</code> and <code>dashboard_pin</code> with D4; until then each raises
+<p class="admonition-title">Wave C, 0.9: the runner, <code>chart</code>, <code>diagram</code> and <code>report</code> are built</p>
+<p><code>dashboard_edit</code> and <code>dashboard_pin</code> arrive with D4; until then each raises
 <code>NotImplementedError</code>, which a conversation reports as a failed step, so they are off by default. The design is
 <a href="../../architecture/wave_c/#4-chat-tools">Wave C, section 4</a>.</p>
 </div>
@@ -2592,8 +2610,8 @@ own. The five built-ins:</p>
 </tr>
 <tr>
 <td><code>diagram</code></td>
-<td>Draws the tables of an answer, or of a datasource, as Mermaid (<a href="../../charts/diagrams/">Diagrams</a>)</td>
-<td>K2</td>
+<td>Draws the tables of an answer, or of a datasource, as Mermaid (<a href="../../charts/diagrams/">Diagrams</a>); args <code>view</code> (<code>answer</code> or <code>schema</code>), <code>turn</code>, <code>step</code>, <code>datasource_id</code>, <code>tables</code></td>
+<td>K2 (built)</td>
 </tr>
 <tr>
 <td><code>report</code></td>
@@ -2613,9 +2631,9 @@ own. The five built-ins:</p>
 </tbody>
 </table>
 <h2 id="which-tools-are-on">Which tools are on</h2>
-<p><code>chat_tools:</code> in <code>nl2sql.yaml</code> lists registered names. Absent, the default tools are on: <code>chart</code> and <code>report</code>,
-those of them the registry has (an engine built on <code>Registry.empty()</code> has none). <code>diagram</code>, <code>dashboard_edit</code>
-and <code>dashboard_pin</code> are off until K2 and D4 make them real; name them in <code>chat_tools:</code> to try them. <code>[]</code> turns
+<p><code>chat_tools:</code> in <code>nl2sql.yaml</code> lists registered names. Absent, the default tools are on: <code>chart</code>, <code>diagram</code> and
+<code>report</code>, those of them the registry has (an engine built on <code>Registry.empty()</code> has none). <code>dashboard_edit</code>
+and <code>dashboard_pin</code> are off until D4 makes them real; name them in <code>chat_tools:</code> to try them. <code>[]</code> turns
 every registry tool off and leaves <code>ask</code>, the conversation's own tool, which is always on. A name you list
 that the registry does not know is a config error when the engine is built, and so is <code>ask</code> (it is not a
 registry tool). <code>engine.chat_tools.list()</code> returns the enabled tools
@@ -2661,6 +2679,13 @@ and may go on.</p>
 </table>
 <p>Every call, successful or not, publishes <code>chat_tool.called</code> (<code>tool</code>, <code>conversation_id</code>, <code>turn</code>, <code>ok</code>,
 <code>seconds</code>, <code>error_code</code>).</p>
+<h2 id="the-diagram">The diagram</h2>
+<p><code>diagram</code> has two views. <code>answer</code> (the default) draws the tables the chosen answer read, from its stored plans,
+through <code>nl2sql.diagram_for</code>; <code>turn</code> picks the turn and <code>step</code> which of its answers (the latest turn with an
+answer, its first, by default). <code>schema</code> draws <code>datasource_id</code> through <code>engine.datasources.diagram</code> <strong>for the
+conversation's caller</strong>, so a table that caller may not read is not drawn; <code>tables</code> narrows it. No data is in
+either diagram, and a hidden table and a missing one give the same <code>TOOL_NOT_APPLICABLE</code>. See
+<a href="../../charts/diagrams/">Diagrams</a>.</p>
 <h2 id="the-report">The report</h2>
 <p><code>engine.conversations.report(cid, user_context=me, turns=None, title=None)</code> returns Markdown assembled from the
 stored turns, with no model call: for each answered question its summary, the plain-English explanation, the

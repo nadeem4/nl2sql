@@ -6840,7 +6840,42 @@ boundary test's constants.</p>
 </ul>
 </div>
 <h3 id="k2">K2</h3>
-<p>Not built yet.</p>
+<div class="admonition note">
+<p class="admonition-title">Built (K2): diagrams</p>
+<ul>
+<li><strong>Answer view:</strong> <code>nl2sql.diagram_for(result)</code> (<code>nl2sql/charts/diagram.py</code>, exported lazily from <code>nl2sql</code>)
+  is a pure function of the result's <code>sub_queries[].plan</code>, its <code>decomposition</code> and, for a verified query, its
+  SQL. <strong>Schema view:</strong> <code>engine.datasources.diagram(datasource_id, *, user_context, tables=None)</code> draws
+  <code>datasources.schema(...)</code> (so the planner's own scope rule: no new one) with <code>schema_diagram</code>, plus the
+  glossary joins that <code>knowledge.scope.visible</code> leaves the caller. <strong>Tool:</strong> <code>chat_tools/diagram.py</code>, args
+  <code>view</code>, <code>turn</code>, <code>step</code>, <code>datasource_id</code>, <code>tables</code>. <code>diagram</code> joins <code>DEFAULT_CHAT_TOOLS</code>
+  (<code>("chart", "diagram", "report")</code>).</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li>A node's label is <code>schema.table</code> (or the table alone); the datasource is the <code>subgraph</code> title when there
+  are several, not part of every label. A join with no plain column equality is an unlabelled edge.</li>
+<li>A verified query's SQL is read in the datasource adapter's dialect through <code>inspect_verified_sql</code>, as
+  <code>tables_read</code> does: <code>diagram_for(result, dialect_of=...)</code> stays a pure function and takes the lookup as an
+  argument (the tool passes the new <code>engine.datasources.dialect</code>, so no dialect name leaves the adapters).
+  Without <code>dialect_of</code>, or for a datasource it cannot name, sqlglot's generic dialect; SQL that does not
+  parse gives the empty diagram (<code>No tables</code>), never an error.</li>
+<li>Schema-view entities have generated ids (<code>e0</code>...) with the <code>schema.table</code> name as a quoted label, so names
+  that collapse to one identifier stay distinct. A reference resolves to <code>schema.table</code>, or a bare name only
+  when it is unambiguous (a foreign key also tries the referencing table's own schema); <code>tables=</code> keeps the
+  requested tables ahead of their neighbours when the cut bites.</li>
+<li><code>max_tables</code> is the <code>max_tables</code> argument of <code>schema_diagram</code> (default <code>MAX_TABLES = 30</code>), not a setting.
+  <code>tables</code> that match no table the caller may see raise <code>ValueError</code> (the tool reports it as
+  <code>TOOL_NOT_APPLICABLE</code>), so a denied table and a missing one answer alike.</li>
+<li>Policies are table-level, so "denied columns" cannot arise: a column is drawn only if its table is.</li>
+<li>Names are made safe rather than escaped: a label keeps <code>\w</code>, space and <code>. , : $ = -</code> inside quotes, an
+  identifier (an attribute's type or name) is <code>[A-Za-z0-9_]</code> and never starts with a word Mermaid reads (<code>style</code>,
+  <code>click</code>, <code>classDef</code>, <code>PK</code>, <code>FK</code>, <code>UK</code>...) or a digit.
+  A glossary join is drawn with its cardinality; an unknown cardinality is <code>}o--o{</code>.</li>
+<li>Tests: <code>test_diagrams.py</code>; the stub test moves <code>diagram</code> out of its tables; <code>test_public_surface.py</code> lists
+  <code>diagram_for</code>. The no-model-call boundary tests already cover <code>charts/</code> and the tools.</li>
+</ul>
+</div>
 <h3 id="d1">D1</h3>
 <div class="admonition note">
 <p class="admonition-title">Built (D1): workspaces, the dashboard store and manual edits</p>
