@@ -358,6 +358,10 @@ class StateStore(Store, Protocol):
 
     def get_tile_runs(self, dashboard_id: str) -> List[dict]: ...
 
+    def delete_tile_runs(self, dashboard_id: str, tile_ids: List[str]) -> None:
+        """Delete the last result of each chart in ``tile_ids``; the others' are kept."""
+        ...
+
     # -- API keys (version 4). A row has ``id``, ``hash`` and ``revoked_at``; never the secret.
 
     def add_api_key(self, row: dict) -> None:

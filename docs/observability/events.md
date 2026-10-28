@@ -98,7 +98,7 @@ events to its own. The three marked *turn* belong to a conversation turn, which 
 | `chat_tool.called` (turn) | `tool`, `conversation_id`, `turn`, `ok`, `seconds`, `error_code` | a registry chat tool ran (C2) |
 | `dashboard.generated` | `dashboard_id`, `datasource_id`, `tiles`, `skipped` | `engine.dashboards.generate` (D3) |
 | `dashboard.refreshed` | `dashboard_id`, `trigger`, `counts` (charts per status), `filters` (ids, never values) | a refresh, an open that refreshed, or a scheduled run (D2) |
-| `dashboard.changed` | `dashboard_id`, `change` (edit kinds, `pinned`, `moved`, `deleted`), `by` | an edit, a pin or a delete (D1) |
+| `dashboard.changed` | `dashboard_id`, `change` (the edit kinds, a move being the kind `move`; `pinned`; `deleted`), `by` | an edit, a pin or a delete (D1) |
 | `dashboard.schedule_set` | `dashboard_id`, `every_minutes`, `by` | a schedule was set; it saves a role snapshot (audited, D1) |
 | `dashboard.schedule_stopped` | `dashboard_id`, `reason` | a schedule stopped with a visible error (audited, D2) |
 | `workspace.changed` | `workspace_id`, `change` (`created`, `renamed`, `deleted`), `by` | `engine.workspaces` (D1) |

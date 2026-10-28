@@ -688,6 +688,14 @@ class SqliteState:
                                     (dashboard_id,)).fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    @_locked
+    def delete_tile_runs(self, dashboard_id: str, tile_ids: List[str]) -> None:
+        """Deletes the last result of each chart in ``tile_ids``; the others' are kept."""
+        connection = self._conn()
+        with connection:
+            connection.executemany("DELETE FROM tile_runs WHERE dashboard_id = ? AND tile_id = ?;",
+                                   [(dashboard_id, tile_id) for tile_id in tile_ids])
+
     # -- API keys ----------------------------------------------------------------
 
     @_locked

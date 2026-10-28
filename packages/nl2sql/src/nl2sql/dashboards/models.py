@@ -142,6 +142,7 @@ class TileRun(StrictModel):
     trace_id: Optional[str] = None
     chart: Optional[ChartSpec] = None  # holds the rows, at most charts.max_points
     explanation: Optional[str] = None  # Wave B's explanation of the run, for "why"
+    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # the result's columns; D2 fills it
     filtered: bool = False  # every active filter applied to this chart
     error: Optional[Dict[str, Any]] = None  # the QueryResult's first error, client-safe
 

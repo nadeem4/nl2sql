@@ -21,15 +21,15 @@ ADMIN = UserContext(user_id="root", roles=["admin"])
 STUBS = {
     "conversations": {"tool": "C2", "report": "C2"},
     "chat_tools": {"list": "C2"},
-    "workspaces": {"create": "D1", "rename": "D1", "list": "D1", "delete": "D1"},
-    "dashboards": {"get": "D1", "list": "D1", "delete": "D1", "pin": "D1", "move": "D1", "edit": "D1",
-                   "rename": "D1", "rename_tile": "D1", "set_tile_chart": "D1", "remove_tile": "D1",
-                   "arrange": "D1", "set_filters": "D1", "set_schedule": "D1",
-                   "open": "D2", "refresh": "D2", "filter_values": "D2", "run_scheduled": "D2",
+    "workspaces": {},
+    "dashboards": {"open": "D2", "refresh": "D2", "filter_values": "D2", "run_scheduled": "D2",
                    "generate": "D3", "suggest_questions": "D3"},
 }
 # Methods a row has filled since: they are real now and have their own tests.
-FILLED = {"conversations": {"start", "ask", "stream", "retry", "ask_only", "get", "list", "delete"}}
+FILLED = {"conversations": {"start", "ask", "stream", "retry", "ask_only", "get", "list", "delete"},
+          "workspaces": {"create", "rename", "list", "delete"},
+          "dashboards": {"get", "list", "delete", "pin", "move", "edit", "rename", "rename_tile", "set_tile_chart",
+                         "remove_tile", "arrange", "set_filters", "set_schedule"}}
 # Methods added to namespaces that already exist.
 ADDED = {("datasources", "diagram"): "K2", ("datasources", "save"): "L2"}
 

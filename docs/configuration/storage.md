@@ -89,9 +89,10 @@ than its `max_age_days` (90 by default), and the
 [review queue's](review.md) decided proposals (accepted, rejected,
 superseded) decided more than `settings.review.max_age_days` (365) ago, and the
 [conversations](../conversations/index.md#ownership-and-retention) last updated more than
-`conversations.max_age_days` (30) ago, and
-returns the counts, `{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "audit": 1}`
-(no `audit` when the engine runs no audit observer, no `conversations` when `max_age_days` is null). Open
+`conversations.max_age_days` (30) ago, and the [draft dashboards](../dashboards/index.md) last edited
+more than that long ago (saved dashboards are never purged), and
+returns the counts, `{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "dashboards": 1, "audit": 1}`
+(no `audit` when the engine runs no audit observer, no `conversations` or `dashboards` when `max_age_days` is null). Open
 proposals are never purged. It publishes the counts as the
 [`retention.purged` event](../observability/events.md#the-catalog), which the
 audit observer writes. A
