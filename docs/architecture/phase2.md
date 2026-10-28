@@ -1371,6 +1371,17 @@ These are what the Phase 4 form, the terminal app and `nl2sql datasources
 add` will call. Saving the result to a file stays the calling app's job, as
 Phase 1 decided.
 
+!!! note "Superseded by Wave C (L2): the package saves, and the REST routes exist"
+    Wave C ([wave_c.md](wave_c.md), section 7) moved saving into the package:
+    `engine.datasources.save(id, *, by, env_file=False)` writes one
+    `datasources/<id>.yaml` (an admin `by`, a hash check against the file as it
+    was loaded, every secret as a reference), so saving is no longer left to
+    the app. The REST routes for Connect a database are built too:
+    `GET /api/v1/datasource-types`, `POST /api/v1/datasource/test` and
+    `POST /api/v1/datasource` with `save`. `test()` now also takes the
+    datasource's secret literals out of the driver's words, since a form shows
+    them. See [Saving a datasource](../configuration/datasources.md#saving-a-datasource).
+
 ### What changes in existing code
 
 | Today | 0.6 |

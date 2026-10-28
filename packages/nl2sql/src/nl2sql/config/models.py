@@ -749,6 +749,25 @@ class Config(_Model):
     # Where load_config read each section: ("inline", None), ("file", label)
     # or, for a datasources folder, ("folder", [label per datasource]).
     _sources: Dict[str, Tuple[str, Any]] = PrivateAttr(default_factory=dict)
+    # The folder ``datasources`` was read from (None when it is inline or the config was built in code) and the
+    # SHA-256 of each file in it when it was loaded, by file name. ``engine.datasources.save`` checks and updates
+    # them; every copy of this config shares the one dict.
+    _datasources_folder: Optional[Path] = PrivateAttr(default=None)
+    _file_hashes: Dict[str, str] = PrivateAttr(default_factory=dict)
+
+    @property
+    def datasources_folder(self) -> Optional[Path]:
+        """The folder the datasources were read from, one ``<id>.yaml`` each; None when ``datasources`` is inline in
+        ``nl2sql.yaml`` or the config was built in code."""
+        return self._datasources_folder
+
+    def datasource_file_hash(self, name: str) -> Optional[str]:
+        """The SHA-256 of ``datasources/<name>`` when it was loaded or last saved; None when it was not there."""
+        return self._file_hashes.get(name)
+
+    def record_datasource_file(self, name: str, sha256: str) -> None:
+        """Remember the hash of ``datasources/<name>`` as the engine last saw it."""
+        self._file_hashes[name] = sha256
 
     @property
     def folder(self) -> Optional[Path]:

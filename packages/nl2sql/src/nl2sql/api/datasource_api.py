@@ -2,16 +2,26 @@
 
 from __future__ import annotations
 
+import hashlib
+import threading
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, SecretStr
 
 from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
 from nl2sql.common.planned import arrives_with
 from nl2sql.config import Datasource
+from nl2sql.config.models import is_secret_key
 from nl2sql.datasources.registry import mask_connection_args
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
+
+
+# One save at a time in this process, whichever engine: two saves share one ``.env`` and one ``datasources/`` folder.
+_SAVING = threading.Lock()
 
 
 class DatasourcesAPI:
@@ -117,7 +127,7 @@ class DatasourcesAPI:
         """
         if isinstance(datasource, str):
             return self._ctx.check_datasource(datasource)
-        return self._ctx.try_datasource(datasource)
+        return self._scrubbed(self._ctx.try_datasource(datasource), datasource)
 
     def scan(self, folder: Union[str, Path] = ".", *, url: Optional[str] = None, ports: bool = True) -> List[Candidate]:
         """The databases found under ``folder``, at ``url`` and on loopback ports, as connection candidates.
@@ -143,8 +153,92 @@ class DatasourcesAPI:
 
     def save(self, datasource_id: str, *, by: UserContext, env_file: bool = False) -> Path:
         """One datasource as ``datasources/<id>.yaml`` beside the config the engine was loaded from; ``by`` must
-        hold an admin role (L2 fills this; docs/architecture/wave_c.md, section 7)."""
-        raise arrives_with("engine.datasources.save", "L2")
+        hold an admin role. Returns the file.
+
+        Every secret field is written as a reference (D122): a literal in the connection becomes
+        ``${env:NL2SQL_<ID>_<KEY>}`` and, with ``env_file``, its value goes to the ``.env`` beside ``nl2sql.yaml``
+        (the other lines are kept); without it a literal is refused. A reference is written as it is. The
+        engine keeps running on the value it holds. Like an accept, it records each datasource file's SHA-256
+        when the config is loaded and refuses to replace a file that has changed since (a new file must not
+        exist yet). The file is written to a temporary file and renamed. Publishes ``datasource.saved``
+        (audited). Never connects and never calls a model.
+
+        Raises:
+            TypeError: ``by`` is not a ``UserContext``.
+            PermissionError: ``by`` holds none of ``policies.admin_roles``.
+            ValueError: the datasource is not configured; the engine was built in code or its ``datasources``
+                section is not a ``datasources/`` folder; the id cannot be a file name; or two secrets map to
+                one environment variable.
+            SecretValueInConfig: a secret is a literal and ``env_file`` is false.
+            ReviewError: ``FILE_CHANGED``, the file changed on disk since the config was loaded (reload the
+                engine). Nothing is written.
+        """
+        from nl2sql.config.writer import (EnvSecrets, adapter_secret_fields, check_file_name, config_reserved_names,
+                                          datasource_data, dump_yaml, file_sha256, reserved_names, write_atomic,
+                                          write_env_values)
+        from nl2sql.review.models import ReviewError, ReviewErrorCode
+
+        by = self._admin(by)
+        config = self._ctx.config
+        datasource = next((d for d in config.datasources if d.id == datasource_id), None)
+        if datasource is None:
+            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        folder, project = config.datasources_folder, config.folder
+        if folder is None or project is None:
+            raise ValueError("Saving a datasource needs the engine to be loaded from a nl2sql.yaml whose datasources "
+                             "section is a folder (`datasources: { file: datasources/ }`, one <id>.yaml each); this "
+                             "engine was built in code or its datasources are inline.")
+        name = check_file_name(datasource_id)
+        secrets = EnvSecrets(env_file=env_file, reserved={
+            **reserved_names(d for d in config.datasources if d.id != datasource_id), **config_reserved_names(config)})
+        text = dump_yaml(datasource_data(
+            datasource, secrets, adapter_secret_fields(self._ctx.registry, datasource.type)))
+        target = folder / name
+        data = text.encode("utf-8")
+        with _SAVING:  # the check, the .env read-modify-write and the file write are one step
+            if file_sha256(target) != config.datasource_file_hash(name):
+                raise ReviewError(ReviewErrorCode.FILE_CHANGED,
+                                  f"{target.name} changed on disk since the engine loaded it.",
+                                  fix="Reload the engine (build it again from nl2sql.yaml) and save again.")
+            if secrets.values:
+                write_env_values(project, secrets.values)
+            write_atomic(target, data)
+            config.record_datasource_file(name, hashlib.sha256(data).hexdigest())
+        self._ctx.bus.publish("datasource.saved", {
+            "datasource_id": datasource_id, "file": f"{folder.name}/{name}", "by": _who(by)},
+            tenant_id=self._ctx.tenant_id)
+        return target
+
+    def _scrubbed(self, status: DatasourceStatus, datasource: Datasource) -> DatasourceStatus:
+        """``status`` with the datasource's secret literals, and every secret the engine knows, taken out of the
+        driver's words: a driver may echo the password it was given, and a Connect form shows these."""
+        from nl2sql.config.writer import adapter_secret_fields
+        from nl2sql.tracing.trace import collect_secrets
+
+        # Exact values only: a pattern would also eat the words around "password:" in a validation message.
+        known = _secret_literals(datasource.connection, adapter_secret_fields(self._ctx.registry, datasource.type))
+        known += [secret for secret in collect_secrets(self._ctx) if len(secret) >= 6]
+        literals = sorted(set(known), key=len, reverse=True)
+
+        def scrub(text: Optional[str]) -> Optional[str]:
+            if not text:
+                return text
+            for literal in literals:
+                text = text.replace(literal, "***")
+            return text
+
+        return replace(status, reason=scrub(status.reason), fix=scrub(status.fix))
+
+    def _admin(self, by: Any) -> UserContext:
+        if not isinstance(by, UserContext):
+            raise TypeError("by must be a UserContext: saving a datasource needs a caller with an admin role "
+                            "(policies.admin_roles).")
+        policies = self._ctx.config.policies
+        if not (policies.allow_all or set(by.roles) & set(policies.admin_roles)):
+            raise PermissionError(f"Saving a datasource needs one of the admin roles "
+                                  f"({', '.join(policies.admin_roles) or 'none defined'}).")
+        return by
+
     def _info(self, datasource: Datasource) -> DatasourceInfo:
         registry = self._ctx.ds_registry
         reason = registry.unavailable().get(datasource.id)
@@ -158,3 +252,17 @@ class DatasourcesAPI:
         return DatasourceInfo(id=datasource.id, type=kind, description=datasource.description, status=status,
                               capabilities=capabilities, connection=mask_connection_args(datasource.connection),
                               reason=reason)
+
+
+def _secret_literals(connection: Any, secret_fields: Any = ()) -> List[str]:
+    """The secret values written out in ``connection`` (a reference is not one)."""
+    if isinstance(connection, BaseModel):
+        values = [v.get_secret_value() for v in connection.model_dump(mode="python").values() if isinstance(v, SecretStr)]
+    else:
+        values = [v for k, v in (connection or {}).items() if is_secret_key(k) or k in secret_fields]
+    return [v for v in values if isinstance(v, str) and v and not v.startswith("${")]
+
+
+def _who(by: UserContext) -> Optional[str]:
+    """What an event records as the caller: the user id, else the roles."""
+    return by.user_id or (",".join(by.roles) or None)

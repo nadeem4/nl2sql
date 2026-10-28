@@ -17,6 +17,7 @@ The rules are section 2 of docs/architecture/configuration_v2.md:
 from __future__ import annotations
 
 import difflib
+import hashlib
 import os
 import re
 import types
@@ -188,6 +189,9 @@ class _Loader:
         self.sources: Dict[str, Tuple[str, Any]] = {}
         self.included: Dict[Path, str] = {}
         self.resolve_env = True  # False for data that did not come from the operator's files
+        # The datasources folder and the SHA-256 of each file read from it (what datasources.save checks).
+        self.datasources_folder: Optional[Path] = None
+        self.file_hashes: Dict[str, str] = {}
 
     # -- reporting
 
@@ -256,6 +260,8 @@ class _Loader:
         config = self._anchor_storage(config)
         config._folder = self.root
         config._sources = dict(self.sources)
+        config._datasources_folder = self.datasources_folder
+        config._file_hashes = dict(self.file_hashes)
         return config
 
     def _check_version(self, data: Dict[str, Any]) -> None:
@@ -321,10 +327,15 @@ class _Loader:
         loc: Loc = (section,)
         datasources: List[Any] = []
         labels: List[str] = []
+        self.datasources_folder = folder
         for path in sorted(p for p in folder.glob("*.yaml") if p.is_file()):
             file_label = f"{label}/{path.name}"
             if not self._once(path, file_label, loc + ("file",)):
                 continue
+            try:
+                self.file_hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                pass  # _read reports it
             ok, body = self._read(path, file_label, loc)
             body = self._body(body, file_label, loc, as_list=False) if ok else None
             if body is None:

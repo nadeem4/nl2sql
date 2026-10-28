@@ -46,7 +46,9 @@ mount a config folder there, and a volume for `storage.path`.
 - `POST /api/v1/query/stream` - The same, as Server-Sent Events: each step as it runs, the result manifest, the answer as it is written, then the `/query` response
 - `GET /api/v1/health` - Liveness check
 - `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
-- `POST /api/v1/datasource` - Register a datasource in the running process (`config` is one `datasources` entry: `id`, `type`, `connection`, ...)
+- `GET /api/v1/datasource-types` - The adapters the engine can name, each with its connection schema (admin only)
+- `POST /api/v1/datasource/test` - Test a connection without registering it; returns the failed stage and the fix (admin only)
+- `POST /api/v1/datasource` - Register a datasource in the running process (`config` is one `datasources` entry: `id`, `type`, `connection`, ...); `save: true` also writes `datasources/<id>.yaml` with secrets as references; a body that does not validate is a 422 listing each problem by path
 - `GET /api/v1/datasource` - List the datasources, with their status and masked connections
 - `GET /api/v1/datasource/{datasource_id}` - One datasource
 - `DELETE /api/v1/datasource/{datasource_id}` - Take a datasource out of the running process

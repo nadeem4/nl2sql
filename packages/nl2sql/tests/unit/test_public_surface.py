@@ -43,6 +43,7 @@ PUBLIC_SURFACE = {
     "ApiKey",
     "ConversationNotFound", "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound", "NotIndexed", "NoTiles",
     "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
+    "ConnectionInvalid",
 }
 
 

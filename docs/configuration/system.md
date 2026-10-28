@@ -516,7 +516,8 @@ start from.
 ## Source references
 
 - Models and `load_config`: `packages/nl2sql/src/nl2sql/config/`
-- `init_project`, `demo_config`: `packages/nl2sql/src/nl2sql/config/project.py`
+- `init_project`, `write_project`, `starter_config`, `demo_config`: `packages/nl2sql/src/nl2sql/config/project.py`
+- Secrets written as references, `write_env_values`: `packages/nl2sql/src/nl2sql/config/writer.py`
 - The runtime built from a `Config`: `packages/nl2sql/src/nl2sql/runtime.py`
 - The CLI's `--config`: `packages/nl2sql/src/nl2sql/cli/common/engine.py`
 - `nl2sql config check`: `packages/nl2sql/src/nl2sql/config/check.py`, printed by `packages/nl2sql/src/nl2sql/cli/commands/config_check.py`

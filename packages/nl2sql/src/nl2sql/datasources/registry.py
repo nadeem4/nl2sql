@@ -8,6 +8,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from nl2sql_sdk import ConnectionModel, IndexScope
 
 from nl2sql_sdk.capabilities import DatasourceCapability
+from nl2sql.common.errors import ConnectionInvalid
 from nl2sql.common.logger import get_logger
 from nl2sql.datasources.protocols import DatasourceAdapter
 from nl2sql.registry import Registry
@@ -35,23 +36,23 @@ def mask_connection_args(connection_args: Union[Dict[str, Any], BaseModel]) -> D
     }
 
 
-def connection_errors(error: ValidationError, model: Type[BaseModel]) -> str:
-    """One line per problem in ``error``, naming the key; an unknown key suggests the field meant.
+def connection_problems(error: ValidationError, model: Type[BaseModel]) -> List[Dict[str, str]]:
+    """Each problem in ``error`` as ``{"path", "message"}``; an unknown key suggests the field meant.
 
     Built from the error's locations and types only, so it never holds a
     value from the connection.
     """
     fields = list(model.model_fields)
-    lines = []
+    problems = []
     for problem in error.errors(include_input=False, include_url=False):
         path = ".".join(str(part) for part in ("connection", *problem["loc"]))
         if problem["type"] == "extra_forbidden":
             close = difflib.get_close_matches(str(problem["loc"][-1]), fields, n=1, cutoff=0.6)
             hint = f" Did you mean '{close[0]}'?" if close else f" The fields are: {', '.join(fields)}."
-            lines.append(f"{path}: unknown key '{problem['loc'][-1]}'.{hint}")
+            problems.append({"path": path, "message": f"unknown key '{problem['loc'][-1]}'.{hint}"})
         else:
-            lines.append(f"{path}: {problem['msg']}")
-    return " ".join(lines)
+            problems.append({"path": path, "message": problem["msg"]})
+    return problems
 
 
 def with_index_scope(datasource: "Datasource") -> "Datasource":
@@ -141,7 +142,7 @@ class DatasourceRegistry:
         try:
             return model.model_validate(self.resolved_connection(connection))
         except ValidationError as error:
-            raise ValueError(connection_errors(error, model)) from None
+            raise ConnectionInvalid(connection_problems(error, model)) from None
 
     def build(self, adapter_cls: Any, datasource: "Datasource") -> DatasourceAdapter:
         """``adapter_cls`` built for ``datasource``, without connecting and without registering it.

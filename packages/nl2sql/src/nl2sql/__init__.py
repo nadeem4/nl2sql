@@ -32,7 +32,8 @@ _EXPORTS = {
     "nl2sql.pipeline.pinned": ("SuppliedPlan",),
     "nl2sql.common.errors": ("ErrorSeverity", "ErrorCode", "PipelineError", "RunWarning", "ConversationNotFound",
                              "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound", "NotIndexed", "NoTiles",
-                             "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig"),
+                             "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
+                             "ConnectionInvalid"),
     "nl2sql.common.cancellation": ("CancellationToken",),
     "nl2sql_sdk.policy": ("UserContext",),
     "nl2sql.registry": ("Registry",),
@@ -217,4 +218,5 @@ __all__ = [
     "WorkspaceNotEmpty",
     "ScheduleTooFrequent",
     "SecretValueInConfig",
+    "ConnectionInvalid",
 ]
