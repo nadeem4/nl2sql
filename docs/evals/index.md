@@ -284,7 +284,7 @@ nl2sql eval publish demo/eval_full.json --note "slim prompts"
 
 ## In CI
 
-The key-free integration job runs the eval gate on the demo's Chinook suite
+The key-free eval-gates job (parallel to the integration tests) runs the eval gate on the demo's Chinook suite
 and on [the routing suite](cases.md#the-routing-suite), after indexing them:
 
 ```bash
@@ -300,7 +300,7 @@ Each run is gated against the newest record of its mode and database in
 as the `eval-reports` artifact whether the gate passed or not. On the routing
 suite, a case that loses its routing top-1 or a shortlisted datasource is a
 flip, and mode retrieval allows none. A changed suite or schema starts a new
-series, so the gate exits 2 until the baselines are recorded again. The same job also runs `tests/e2e/test_evals_plans.py`, where
+series, so the gate exits 2 until the baselines are recorded again. The `integration` job also runs `tests/e2e/test_evals_plans.py`, where
 every case must pass for every role.
 
 ### Re-recording CI's baselines
@@ -310,7 +310,7 @@ CI's plans and retrieval baselines are recorded **on CI's own runner**
 case only at 100% column recall, which near-tie rankings of the local ONNX
 embedder can move between platforms.
 
-1. Push the change. The integration job's "Eval gate" steps run the three
+1. Push the change. The `eval-gates` job's "Eval gate" steps run the three
    gates and upload `eval_plans.json`, `eval_retrieval.json` and
    `eval_routing.json` as the `eval-reports` artifact, pass or fail.
 2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.

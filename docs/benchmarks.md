@@ -37,7 +37,7 @@ before and after 0.7 read the same; faithfulness is its own column.
 
 `nl2sql eval run --mode plans`: each case's hand-written plan through the validator,
 generator and executor, on a fake LLM, once per role. No key; every case should pass.
-CI's integration job gates on the newest run here.
+CI's eval-gates job gates on the newest run here.
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Roles | Cases | Accuracy (execution, 95% CI) | Δ vs previous | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -49,7 +49,7 @@ CI's integration job gates on the newest run here.
 columns that schema retrieval sends the planner, with the vector search forced on and no
 LLM. Mean over cases; tables and columns sent are means too. Routing top-1 is the share of
 cases routing ranks one of their datasources first, shortlist the share whose datasources
-are all among those it keeps. CI's integration job gates on the newest run of each suite here.
+are all among those it keeps. CI's eval-gates job gates on the newest run of each suite here.
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -65,7 +65,7 @@ are all among those it keeps. CI's integration job gates on the newest run of ea
 columns that schema retrieval sends the planner, with the vector search forced on and no
 LLM. Mean over cases; tables and columns sent are means too. Routing top-1 is the share of
 cases routing ranks one of their datasources first, shortlist the share whose datasources
-are all among those it keeps. CI's integration job gates on the newest run of each suite here.
+are all among those it keeps. CI's eval-gates job gates on the newest run of each suite here.
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

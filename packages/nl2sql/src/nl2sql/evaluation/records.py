@@ -629,7 +629,7 @@ def _plans_section(group: List[Dict[str, Any]], previous) -> str:
           describe_change(r, previous[id(r)], show_flips=True), _status(r)] for r in group])
     return ("`nl2sql eval run --mode plans`: each case's hand-written plan through the validator,\n"
             "generator and executor, on a fake LLM, once per role. No key; every case should pass.\n"
-            "CI's integration job gates on the newest run here.\n\n"
+            "CI's eval-gates job gates on the newest run here.\n\n"
             f"{runs}\n")
 
 
@@ -661,7 +661,7 @@ def _retrieval_section(group: List[Dict[str, Any]], previous) -> str:
             "columns that schema retrieval sends the planner, with the vector search forced on and no\n"
             "LLM. Mean over cases; tables and columns sent are means too. Routing top-1 is the share of\n"
             "cases routing ranks one of their datasources first, shortlist the share whose datasources\n"
-            "are all among those it keeps. CI's integration job gates on the newest run of each suite here.\n\n"
+            "are all among those it keeps. CI's eval-gates job gates on the newest run of each suite here.\n\n"
             f"{runs}\n")
 
 

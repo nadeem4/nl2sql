@@ -65,7 +65,7 @@ CI's plans, retrieval and routing baselines are recorded **on CI's own runner**
 case only at 100% column recall, which near-tie rankings of the local ONNX
 embedder can move between platforms. To record or re-record them:
 
-1. Push the change. The integration job's "Eval gate" steps run the three
+1. Push the change. The `eval-gates` job's "Eval gate" steps run the three
    gates and upload `eval_plans.json`, `eval_retrieval.json` and
    `eval_routing.json` as the `eval-reports` artifact, pass or fail.
 2. Download them: `gh run download <run id> -n eval-reports -D eval-reports`.
