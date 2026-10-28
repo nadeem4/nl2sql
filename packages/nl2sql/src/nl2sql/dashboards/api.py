@@ -3,32 +3,39 @@
 D1 is the store and the manual edits: a dashboard is private to its owner (D118), lives in one of their
 workspaces (D131), is built as a draft and saved whole by ``pin``. D2 runs the charts: ``open`` serves the stored
 results after the access check, ``refresh`` re-runs the stored plans as the caller, ``run_scheduled`` does so for
-each due schedule as its owner (D134). None of it calls a model. The starter dashboard arrives with D3.
+each due schedule as its owner (D134). D3 is the starter dashboard: ``generate`` builds the template charts from the
+column roles, runs each as the caller and saves the ones that answered. None of it calls a model.
 """
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from nl2sql.common.errors import NoTiles
 from nl2sql.conversations.store import Owner
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits
+from nl2sql.dashboards.layout import arrange
 from nl2sql.dashboards.models import (
     Arrange, ChartChoice, Dashboard, DashboardEdit, DashboardFilter, DashboardInfo, DashboardRun, DashboardView,
     MoveDashboard, RemoveTile, RenameDashboard, RenameTile, ScheduleIdentity, SetFilters, SetSchedule, SetTileChart,
-    Tile, TileArrangement, TileRun,
+    SkippedTile, Tile, TileArrangement, TileLayout, TileRun,
 )
 from nl2sql.dashboards import schedule as scheduling
+from nl2sql.dashboards.roles import Source, column_roles
 from nl2sql.dashboards.run import KEEPS_LAST, SERVES, DashboardBusy, Refresher
 from nl2sql.dashboards.store import DashboardStore, owner_for
+from nl2sql.dashboards.templates import Candidate, candidates, filters_for
 from nl2sql.dashboards.workspaces import Workspaces
-from nl2sql.events.catalog import DashboardChanged, DashboardScheduleSet, DashboardScheduleStopped
+from nl2sql.events.catalog import DashboardChanged, DashboardGenerated, DashboardScheduleSet, DashboardScheduleStopped
 from nl2sql.hooks.approval import Approval
 from nl2sql.policies import UserContext
 
 logger = logging.getLogger(__name__)
 
 _STATUSES = ("draft", "saved")
+_PLACE = TileLayout(x=0, y=0, w=1, h=1)  # a starter chart's place until the layout puts it somewhere
 
 
 class Dashboards:
@@ -251,6 +258,72 @@ class Dashboards:
         self._store.put(dashboard.model_copy(update={"schedule": stopped}))
         self._ctx.bus.publish("dashboard.schedule_stopped", DashboardScheduleStopped(
             dashboard_id=dashboard.id, reason=code), tenant_id=dashboard.tenant_id or self._ctx.tenant_id)
+
+    # ------------------------------------------------------------ the starter dashboard (D3)
+
+    def generate(self, source: Source, *, user_context: UserContext, title: Optional[str] = None,
+                 workspace_id: Optional[str] = None, max_tiles: Optional[int] = None) -> Tuple[Dashboard, DashboardRun]:
+        """The no-model starter (D115): the template charts for ``source``, each run as the caller, the ones that
+        answered kept, laid out and saved whole. A generated dashboard is an ordinary one."""
+        owner = self._owner(user_context)
+        if workspace_id is not None:
+            self._store.workspace(workspace_id, owner)  # before anything runs
+        chosen = self._chosen_templates(source, max_tiles)
+        workspace = self._store.workspace(workspace_id, owner) if workspace_id else self._workspaces.default(
+            owner, user_context)
+        now = datetime.now(timezone.utc)
+        by_id = {f"t{n}": c for n, c in enumerate(chosen, 1)}  # ids follow the order they were chosen in
+        tiles = arrange([Tile(id=i, title=c.title, question=c.question, plan=c.plan, layout=_PLACE)
+                         for i, c in by_id.items()], {i: c.kind for i, c in by_id.items()})
+        draft = Dashboard(id=secrets.token_urlsafe(12), title=(title or "").strip() or f"{source.datasource_id} overview",
+                          workspace_id=workspace.id, status="draft", tenant_id=owner[0], user_id=owner[1], tiles=tiles,
+                          created_at=now, updated_at=now)
+        self._store.put(draft)
+        try:
+            with self._refresher.locked(draft.id, len(tiles)):
+                dashboard, run = self._keep(draft, self._refresher.run(draft, draft.tiles, user_context, "generate"),
+                                            by_id)
+        except BaseException:
+            self._store.delete(draft.id)  # nothing half-made is left behind
+            raise
+        self._ctx.bus.publish("dashboard.generated", DashboardGenerated(
+            dashboard_id=dashboard.id, datasource_id=source.datasource_id, tiles=len(dashboard.tiles),
+            skipped=len(run.skipped)), tenant_id=owner[0])
+        return dashboard, run
+
+    def suggest_questions(self, source: Source, *, n: int = 5) -> List[str]:
+        """The questions of the first ``n`` charts ``generate`` would choose. Nothing runs and nothing is saved."""
+        try:
+            return [c.question for c in self._chosen_templates(source, None)][:n]
+        except NoTiles:
+            return []
+
+    def _chosen_templates(self, source: Source, max_tiles: Optional[int]) -> List[Candidate]:
+        if max_tiles is not None and max_tiles < 1:
+            raise ValueError("max_tiles must be at least 1.")
+        tables = column_roles(source)
+        if not tables:
+            raise NoTiles(f"'{source.datasource_id}' has no table you can read, so there is nothing to chart.")
+        return candidates(source.datasource_id, tables)[:max_tiles or self._ctx.config.dashboards.max_tiles]
+
+    def _keep(self, draft: Dashboard, ran: DashboardRun, chosen: Dict[str, Candidate]
+              ) -> Tuple[Dashboard, DashboardRun]:
+        """Keep the charts whose first run answered (``ok``); list the others as skipped and drop their results."""
+        kept = [r for r in ran.tiles if r.status == "ok"]
+        skipped = [SkippedTile(title=t.title, status=r.status, reason=(r.error or {}).get("message") or
+                               f"The chart ended {r.status}.") for t, r in zip(draft.tiles, ran.tiles)
+                   if r.status != "ok"]
+        if not kept:
+            reasons = "; ".join(f"{s.title}: {s.reason}" for s in skipped)
+            raise NoTiles(f"None of the {len(draft.tiles)} starter charts answered ({reasons}).")
+        self._store.drop_runs(draft.id, [r.tile_id for r in ran.tiles if r.status != "ok"])
+        tiles_by_id = {t.id: t for t in draft.tiles}
+        tiles = arrange([tiles_by_id[r.tile_id] for r in kept], {r.tile_id: r.chart.kind for r in kept if r.chart})
+        saved = draft.model_copy(update={
+            "tiles": tiles, "status": "saved", "updated_at": datetime.now(timezone.utc),
+            "filters": filters_for([chosen[t.id] for t in tiles])})
+        self._store.put(saved)
+        return saved, ran.model_copy(update={"tiles": kept, "skipped": skipped})
 
     # ------------------------------------------------------------ events
 

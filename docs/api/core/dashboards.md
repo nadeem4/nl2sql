@@ -2,8 +2,8 @@
 
 !!! note "Partly built"
     The workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`,
-    `refresh` and `run_scheduled` (D2). `filter_values` and `refresh(filters=...)` (D2b) and `generate` and
-    `suggest_questions` (D3) have their final signatures and raise `NotImplementedError` naming their row.
+    `refresh` and `run_scheduled` (D2), and `generate` and `suggest_questions` (D3). `filter_values` and
+    `refresh(filters=...)` (D2b) have their final signatures and raise `NotImplementedError` naming their row.
 
 ## Purpose
 `engine.workspaces` and `engine.dashboards` ([Dashboards](../../dashboards/index.md)).
@@ -13,7 +13,8 @@
 - `packages/nl2sql/src/nl2sql/api/dashboards_api.py` (`DashboardsAPI`, internal)
 - `packages/nl2sql/src/nl2sql/dashboards/models.py` (`Workspace`, `Dashboard`, `Tile`, `DashboardEdit`)
 - `packages/nl2sql/src/nl2sql/dashboards/` `workspaces.py`, `api.py`, `edits.py`, `store.py`, `run.py` (running the
-  charts) and `schedule.py` (the logic behind the two faces)
+  charts), `schedule.py`, and for the starter dashboard `roles.py`, `templates.py` and `layout.py` (the logic
+  behind the two faces)
 
 ## Public Surface
 
@@ -67,9 +68,18 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   The codes are `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED`, `SCHEDULE_ACCESS_DENIED` (a chart the owner
   can no longer read) and `SCHEDULE_HOOK_DENIED` (a hook denied a chart; the message names the chart and the
   hook's reason). A `now` without a timezone is a `ValueError`.
+- **`generate(datasource_id, title=None, workspace_id=None, max_tiles=None)`** builds the no-model starter
+  dashboard and returns `(Dashboard, DashboardRun)` ([how it chooses](../../dashboards/index.md#the-starter-dashboard)).
+  The roles come from the indexed snapshot and the glossary, only for tables the caller can read; each template chart
+  runs as the caller (`trigger="generate"`); the charts whose first run is `ok` are kept and the others are in
+  `DashboardRun.skipped` (`title`, `status`, `reason`). The result is saved, owned by the caller, in `workspace_id`
+  or "General". Raises `NotIndexed` (names `nl2sql index --datasource <id>`), `NoTiles` (no table the caller
+  reaches, or no chart answered), `WorkspaceNotFound`, and `ValueError` for `max_tiles` below 1.
+  **`suggest_questions(datasource_id, n=5)`** returns the questions of the first `n` charts `generate` would
+  choose and runs and saves nothing (`[]` when the caller reaches no table; `NotIndexed` as above).
 - **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`, required with `verified`.
 - **Events.** `dashboard.changed` (the edit kinds, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`,
-  `dashboard.refreshed` (the counts per status), `dashboard.schedule_stopped` and `workspace.changed`. They
+  `dashboard.generated`, `dashboard.refreshed` (the counts per status), `dashboard.schedule_stopped` and `workspace.changed`. They
   carry no titles, names or values.
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
   saved dashboards are never purged.

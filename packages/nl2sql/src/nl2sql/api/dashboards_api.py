@@ -1,15 +1,15 @@
 """``engine.dashboards``: dashboards pinned whole into workspaces (docs/architecture/wave_c.md, section 6).
 
-The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; ``open``,
-``refresh``, ``filter_values`` and ``run_scheduled`` are stubs for D2 (the refresh, the stored results, the
-filters and the schedules) and ``generate`` and ``suggest_questions`` for D3 (the starter dashboard). Every
-method takes the caller keyword-only and required (D130), except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
+The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; D2 ``open``,
+``refresh`` and ``run_scheduled`` (``filter_values`` and the filters of ``refresh`` are D2b's stubs); D3 the
+starter dashboard, ``generate`` and ``suggest_questions``. Every method takes the caller keyword-only and required (D130), except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
 """
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from nl2sql.common.errors import NotIndexed
 from nl2sql.common.planned import arrives_with
 from nl2sql.dashboards.api import Dashboards
 from nl2sql.dashboards.models import (
@@ -22,6 +22,7 @@ from nl2sql.dashboards.models import (
     DashboardView,
     TileArrangement,
 )
+from nl2sql.dashboards.roles import Source
 from nl2sql.hooks.approval import Approval
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
@@ -172,9 +173,52 @@ class DashboardsAPI:
     def generate(self, datasource_id: str, *, user_context: UserContext, title: Optional[str] = None,
                  workspace_id: Optional[str] = None,
                  max_tiles: Optional[int] = None) -> Tuple[Dashboard, DashboardRun]:
-        """The no-model starter (D115): charts chosen from the column roles, run as the caller, laid out and saved."""
-        raise arrives_with("engine.dashboards.generate", "D3")
+        """The no-model starter (D115): charts chosen from the column roles, run as the caller, laid out and saved.
+
+        Needs an index, not a profile. Each column's role comes from Wave B's rules over the indexed snapshot, and a
+        role in the glossary wins. Four templates (key totals, trends, top N, distributions) build typed plans in
+        code; each runs through ``run_query`` as the caller, so only the tables and columns the caller can read are
+        charted and every hook and the validator apply. The charts whose first run is ``ok`` are kept (up to
+        ``max_tiles``, else ``dashboards.max_tiles``); the others are listed in ``DashboardRun.skipped``. The
+        dashboard is saved, owned by the caller, in ``workspace_id`` (else the caller's "General" workspace, created
+        on first use) with a filter on the time column the trends use and on the dimensions the distributions use.
+        No model is called.
+
+        Raises:
+            NotIndexed: the datasource has no index; the message names the command.
+            NoTiles: the caller reaches no table, or no chart answered; the message says what is missing.
+            WorkspaceNotFound: ``workspace_id`` is not one of the caller's.
+            ValueError: ``max_tiles`` is below 1.
+        """
+        return self._service.generate(self._source(datasource_id, user_context), user_context=user_context,
+                                      title=title, workspace_id=workspace_id, max_tiles=max_tiles)
 
     def suggest_questions(self, datasource_id: str, *, user_context: UserContext, n: int = 5) -> List[str]:
-        """The questions of the first ``n`` charts ``generate`` would choose, without running them."""
-        raise arrives_with("engine.dashboards.suggest_questions", "D3")
+        """The questions of the first ``n`` charts ``generate`` would choose, without running them (nothing is
+        saved and no model is called). An empty list when the caller reaches no table.
+
+        Raises:
+            NotIndexed: the datasource has no index; the message names the command.
+        """
+        return self._service.suggest_questions(self._source(datasource_id, user_context), n=n)
+
+    def _source(self, datasource_id: str, user_context: UserContext) -> Source:
+        """What the starter reads, as the caller may see it: the live snapshot, the merged glossary, the caller's scope."""
+        if user_context is None:
+            raise TypeError("user_context is required")
+        ctx = self._ctx
+        snapshot = ctx.vector_store.snapshot(datasource_id)
+        if snapshot is None:
+            raise NotIndexed(f"'{datasource_id}' has no index yet. Index it first: nl2sql index --datasource {datasource_id}")
+        scope = ctx.policy_engine.scope(user_context, datasource_id)
+        try:
+            dialect: Optional[str] = ctx.ds_registry.get_dialect(datasource_id)
+        except ValueError:  # unavailable: the types are read without a dialect
+            dialect = None
+        return Source(datasource_id, snapshot, dialect, scope.allows if scope.reaches_datasource() else _nothing,
+                      ctx.knowledge.get(datasource_id), ctx.config.settings.profiler.enum_max_distinct,
+                      ctx.settings.charts.max_categories)
+
+
+def _nothing(schema: Optional[str], table: str) -> bool:
+    return False

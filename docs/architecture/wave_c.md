@@ -1843,7 +1843,50 @@ Not built yet.
 
 ### D3
 
-Not built yet.
+!!! note "Built (D3): the starter dashboard"
+    `engine.dashboards.generate` and `suggest_questions` work. `nl2sql/dashboards/roles.py` reads each column's role
+    (Wave B's `derived_roles`, then `find_roles`, then the glossary, which wins) and the dashboard's own reading of
+    it; `templates.py` builds the four templates' typed plans and the filters; `layout.py` places the kept charts;
+    `api.py` (`Dashboards.generate`, `suggest_questions`) runs them through `Refresher.run(..., "generate")` under
+    the lock and saves the dashboard; `api/dashboards_api.py` gathers what they read.
+
+    - **Tests:** `tests/unit/test_dashboards_d3.py` (a hand-built snapshot, canned `run_query`), two cases in
+      `tests/e2e/test_dashboards_fake_llm.py` (the real pipeline on the demo databases, as the analyst and as the
+      narrower viewer role: no model call, only readable tables), and `test_wave_c_stubs.py` lists `filter_values`
+      alone now.
+    - **Flow.** The first run is part of `generate`: the chosen charts are saved as a *draft* (ids `t1`, `t2`, ... in
+      the order chosen, so the same snapshot and glossary give the same ids), run once by `Refresher.run`, and the
+      ones whose first run is `ok` are kept; the rest are listed in `DashboardRun.skipped`, their stored results
+      dropped. The kept charts are laid out by the chart kind each one was **drawn** as (a Top N that has more than
+      `charts.max_categories` bars is a table and goes last), then the draft becomes `saved`. If nothing answers the
+      draft is deleted and `NoTiles` is raised; any error also deletes it. `tile.chart` stays `auto`.
+    - **The access rule.** `generate` runs as the caller and reads only the tables the caller's scope allows
+      (`test_a_denied_table_is_never_charted_and_never_run`, and the same on the demo databases for a narrower role).
+      A caller who reaches nothing gets `NoTiles` from `generate` and `[]` from `suggest_questions`.
+
+    Where the code and the design differ, the code won:
+
+    - **`COUNT(1)`, not `COUNT(*)`.** A plan writes a star as the column name `*`, which the validator accepts but the
+      generator quotes (`t1."*"`), so the database refuses it. The row count is `COUNT(1)`, the same number.
+    - **Names only.** A chart's question and title use the columns' names humanised; a glossary description's first
+      clause is not used (no description is needed for a good question, and one could carry text a person did not
+      write for a question).
+    - **The reads are gathered in the facade.** `nl2sql/dashboards/` may not reach `ds_registry` (the boundary
+      test), so `DashboardsAPI._source` builds a `roles.Source` (the snapshot, the adapter's dialect, the caller's
+      `scope.allows`, the merged glossary, `profiler.enum_max_distinct`, `charts.max_categories`) and
+      `Dashboards.generate(source, ...)` and `suggest_questions(source, ...)` take it.
+    - **A roles' kind guard.** A `money` or `quantity` role makes a measure only on a number column, and `date` a time
+      only on a temporal or text column, so a glossary role on a column the chart cannot use is ignored rather than
+      failing at the database.
+    - **The cap is a prefix.** `max_tiles` keeps the first charts in the order key totals, trends, top N,
+      distributions; a chart that fails is skipped, not replaced by the next candidate.
+    - **"General" is made before the first run** (the draft needs a workspace), so a `generate` that ends in
+      `NoTiles` can leave an empty "General" behind.
+    - The filters are defined (`DashboardFilter`) and stored; applying their values is D2b's.
+    - **For L3:** `engine.dashboards.suggest_questions(datasource_id, user_context=..., n=5)` (the question texts,
+      nothing run, `NotIndexed` when the datasource has no index; its message names `nl2sql index --datasource <id>`).
+      **For D4:** nothing new; a generated dashboard is an ordinary one, and `roles.Source` / `column_roles` are the
+      reusable reading of the schema if the chat wants to suggest a chart.
 
 ### D4
 

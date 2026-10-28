@@ -2,9 +2,10 @@
 
 !!! note "Partly built (Wave C, 0.9)"
     Workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`, `refresh`,
-    stored results and schedules (D2). Filter values and `filter_values` (D2b), the starter dashboard (D3)
-    and building in chat (D4) have their signatures and raise `NotImplementedError` naming the pull request
-    that fills them. The design is [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
+    stored results and schedules (D2), and so do `generate` and `suggest_questions`, the starter dashboard (D3).
+    Filter values and `filter_values` (D2b) and building in chat (D4) have their signatures and raise
+    `NotImplementedError` naming the pull request that fills them. The design is
+    [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
 
 A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
 private workspace. Opening one serves stored results after the access check; refreshing re-runs the
@@ -133,8 +134,57 @@ nl2sql dashboards refresh --due                                                 
 `--user` and `--tenant` act as that owner: the command is for the operator, who holds the config and the
 credentials. `--dashboard` needs `--user`, since a dashboard belongs to a user. `--due` runs each schedule as its saved owner, so it refuses `--as`, `--user` and `--tenant`.
 
+## The starter dashboard
+
+`generate` makes a first dashboard from a datasource's schema, with no model and no profile run: it needs an
+index.
+
+```python
+board, run = engine.dashboards.generate("sales", user_context=me)          # saved in your "General" workspace
+engine.dashboards.suggest_questions("sales", user_context=me, n=5)         # the first five questions, nothing run
+```
+
+**What it reads.** Each column gets a role from the indexed snapshot alone (no query): what the schema proves (a
+key is an *identifier*, a date type a *date*), then Wave B's name and statistics rules (`money`, `quantity`,
+`enum`, a date held as text), and a role in `glossary.yaml` for that column wins over both. The dashboard reads
+them as a **measure** (`money`, `quantity`, on a number column), a **time** (`date`), a **dimension** (`enum`, or a
+text column with 2 to `charts.max_categories` (20) distinct values) or an **identifier**, which is never
+charted. A rule's guess only picks a chart; it is never sent to a model. Only the tables **you** can read are
+looked at: a table your roles deny is never charted or run.
+
+**What it builds.** Four templates fill typed plans in code (the questions use the columns' names, humanised):
+
+| Group | Question | Chart | At most |
+|---|---|---|---|
+| Key totals | "How many rows are in orders?"; "What is the total revenue?" | big number | 4 |
+| Trends | "What is the total revenue by month over the last 12 months of data?" | line | 2 |
+| Top N | "Which 10 customers have the highest total revenue?" | bar | 2 |
+| Distributions | "How many orders rows are there per status?" (at most 12 values) | bar | 2 |
+
+Tables rank by row count, then by how many measures they have; measures by their non-null share; dimensions by
+distinct count (fewer first); ties break by name. So **the same snapshot and glossary always give the same
+dashboard**. With no measure there are only row counts and distributions. The size is `max_tiles` (else
+`dashboards.max_tiles`, 10).
+
+**What it keeps.** Each chart is run as you, through the same path as any question (the `plan.after` hooks, the
+validator, the generator, the `execute.before` hooks such as the cost guard), with no model call. The ones whose
+first run is `ok` are kept; the rest are listed in `run.skipped` with their status and the reason, and leave no
+stored result. If none answered, `NoTiles` says why and nothing is saved. A datasource that was never indexed
+raises `NotIndexed` ("Index it first: `nl2sql index --datasource sales`"); a caller who reaches no table gets
+`NoTiles`.
+
+**Where it lands.** The dashboard is saved, owned by you, in `workspace_id` or your "General" workspace (made on
+first use), titled "`<datasource>` overview" unless you pass `title`. It has a `between` filter on the time column
+the trends use and an `in` filter on each dimension the distributions use (their values are applied by refresh,
+D2b). Layout follows the charts that were drawn: big numbers first, one column wide on one row; then lines (the
+first four wide); then bars (two wide); tables last. It is an ordinary dashboard: rename, rearrange, remove, set
+a schedule, refresh, all by hand, exactly as for one built in chat.
+
+Each call publishes `dashboard.generated` (the counts, no titles) and the first run publishes
+`dashboard.refreshed` with the trigger `generate`.
+
 ## Configuration
 
 `dashboards:` in `nl2sql.yaml` (`max_tiles`, `min_refresh_minutes`, `schedule_identity_max_age_days`) is
-accepted; `min_refresh_minutes` is read by `set_schedule` and `schedule_identity_max_age_days` by the
-scheduler.
+accepted; `max_tiles` is read by `generate` and `suggest_questions`, `min_refresh_minutes` by `set_schedule` and
+`schedule_identity_max_age_days` by the scheduler.
