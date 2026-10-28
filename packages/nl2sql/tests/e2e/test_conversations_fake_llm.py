@@ -150,7 +150,8 @@ def test_the_model_charts_the_answer_it_just_got_and_the_report_has_its_rows(mak
     assert [s.call.name for s in turn.steps] == ["ask", "chart"], turn.steps[-1].error
     assert turn.status == "answered", turn.steps[-1].error
     chart = turn.steps[1].output
-    assert chart.kind == "chart" and chart.body["kind"] == "big_number" and chart.body["data"]["rows"] == [[59]]
+    assert chart.kind == "chart" and chart.body["kind"] == "big_number"
+    assert chart.body["data"]["rows"] == [], "a stored chart step carries no rows; the report reads them from the results store"
     seen = json.loads(prompts[2].split("[CONVERSATION]\n", 1)[1].split("\n\n[USER_TEXT]\n", 1)[0])["this_turn"][1]
     assert seen["output"]["chart"]["kind"] == "big_number" and "59" not in json.dumps(seen), "the model sees no chart data"
     report = engine.conversations.tool(conversation.id, "report", {}, user_context=_asker())
