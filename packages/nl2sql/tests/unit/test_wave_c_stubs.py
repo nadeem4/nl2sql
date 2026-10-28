@@ -32,7 +32,7 @@ STUBS = {
 }
 # Methods added to namespaces that already exist.
 ADDED = {("datasources", "scan"): "L1", ("datasources", "diagram"): "K2", ("datasources", "save"): "L2",
-         ("results", "chart"): "K1"}
+         }
 
 
 @pytest.fixture(scope="module")
@@ -87,19 +87,19 @@ def test_stubs_keep_the_signatures_the_design_gives(engine):
     assert list(inspect.signature(engine.dashboards.run_scheduled).parameters) == ["now"]
     assert list(inspect.signature(engine.api_keys.create).parameters) == [
         "user_id", "roles", "by", "tenant_id", "label"]
-    assert list(inspect.signature(engine.results.chart).parameters) == ["result", "result_id", "kind", "tenant_id"]
     scan = inspect.signature(engine.datasources.scan).parameters
     assert list(scan) == ["folder", "url", "ports"] and scan["ports"].default is True
 
 
 # ---------------------------------------------------------------- chat-tool entry points
 
-CHAT_TOOL_ROWS = {"chart": "K1", "diagram": "K2", "report": "C2", "dashboard_edit": "D4", "dashboard_pin": "D4"}
+CHAT_TOOL_ROWS = {"diagram": "K2", "report": "C2", "dashboard_edit": "D4", "dashboard_pin": "D4"}
+FILLED_CHAT_TOOLS = ["chart"]  # K1 filled it; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
 
 
 def test_the_five_chat_tool_entry_points_load_their_stub_modules():
     registry = Registry.default()
-    assert registry.names("chat_tool") == sorted(CHAT_TOOL_ROWS)
+    assert registry.names("chat_tool") == sorted([*CHAT_TOOL_ROWS, *FILLED_CHAT_TOOLS])
     context = ToolContext(conversation=Conversation.model_construct(), user=ADMIN, engine=None)
     for name, row in CHAT_TOOL_ROWS.items():
         cls = registry.load("chat_tool", name)

@@ -1512,6 +1512,30 @@ flowchart TD
       name too common to scan for, so its guard is `by` (held by `test_owned_and_privileged_methods_require_a_caller`)
       and L2's hash check.
 
+!!! note "Built (K1): auto charts"
+    - **Kinds:** `column_kinds(schema)` in `execution/artifacts/results.py` maps a polars schema to the five
+      kinds; the aggregator's `_write_manifest` fills `ResultSummary.column_kinds` from the saved file's schema.
+      The executor's and curated matcher's `execute.after` summaries still carry `{}` (they describe a
+      sub-query, not a saved result).
+    - **Charts:** `nl2sql/charts/choose.py` (`choose(...)`: plan refinements and the five rules),
+      `takeaway.py`, `vega.py`; `ChartSpec.to_vega_lite` delegates to `vega.py`. `ResultReader.head` reads the
+      first rows uncapped by the page size. `engine.results.chart` and `chat_tools/chart.py` are filled; the tool's
+      args are `turn`, `step`, `result_id`, `kind`.
+
+    Where the code and the design differ, the code won:
+
+    - Any read cut at `max_points` is a table, not only a line (a bar over cut rows would drop categories).
+    - A `trace_id` alone has no question, so its chart is titled `Result`; a `QueryResult` with one sub-query
+      is titled with that sub-query's intent, and the `chart` tool retitles it with the step's question.
+    - With a plan, a number that is not an aggregate and not grouped on is a measure; a grouped one is a
+      dimension. A whole-number year axis (`DATE_PART`) exports as an `ordinal` Vega-Lite type, since
+      `temporal` would read it as epoch milliseconds. Several bar measures use `xOffset` on the folded measure.
+    - A run that saved several results needs `result_id` (`ValueError` otherwise). The tool turns
+      `ResultNotFound` (expired rows) and a kind the data cannot draw into `ToolNotApplicable`.
+    - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
+    - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
+      The stub test moves `chart` out of its tables.
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |

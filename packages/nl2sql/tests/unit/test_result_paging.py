@@ -79,7 +79,7 @@ def test_the_aggregator_writes_a_manifest_beside_the_results(store, tmp_path):
 
     assert manifest == {
         "request_id": "run-1",
-        "results": [{"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {}}],
+        "results": [{"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {"id": "number", "name": "text"}}],
     }
     assert (tmp_path / "t1" / "run-1" / "result_combine_g1.parquet").is_file()
 
@@ -96,7 +96,8 @@ def test_a_result_built_from_a_cut_sub_query_is_flagged_truncated(store):
     response = _run(store, truncated=True)["aggregator_response"]
 
     assert response.results == [ResultSummary(node_id="combine_g1", columns=["id", "name"],
-                                              row_count=45, truncated=True)]
+                                              row_count=45, truncated=True,
+                                              column_kinds={"id": "number", "name": "text"})]
 
 
 def test_query_result_exposes_the_manifest_entries(store):
@@ -106,7 +107,7 @@ def test_query_result_exposes_the_manifest_entries(store):
 
     assert isinstance(result, QueryResult)
     assert [r.model_dump() for r in result.result_manifest] == [
-        {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {}}]
+        {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {"id": "number", "name": "text"}}]
 
 
 def test_the_facade_reads_the_manifest(store):

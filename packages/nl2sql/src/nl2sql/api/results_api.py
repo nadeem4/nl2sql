@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Iterator, Optional, Union
 
 from nl2sql.charts.spec import ChartSpec
-from nl2sql.common.planned import arrives_with
 from nl2sql.execution.artifacts.results import (
     DEFAULT_RESULT_PAGE_SIZE,
     ResultManifest,
@@ -16,6 +16,26 @@ from nl2sql.runtime import Runtime
 
 if TYPE_CHECKING:
     from nl2sql.api.query_api import QueryResult
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+
+
+def _single_plan(result: "QueryResult") -> Optional["PlanModel"]:
+    """The plan of a run with exactly one sub-query: it refines the result's column kinds. With several
+    sub-queries (an aggregated result), or none (a verified query), there is none."""
+    if len(result.sub_queries) != 1 or not result.sub_queries[0].plan:
+        return None
+    from pydantic import ValidationError
+
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+
+    try:
+        return PlanModel.model_validate(result.sub_queries[0].plan)
+    except ValidationError:
+        return None
+
+
+def _single_intent(result: "QueryResult") -> str:
+    return (result.sub_queries[0].intent if len(result.sub_queries) == 1 else "") or "Result"
 
 
 class ResultsAPI:
@@ -64,6 +84,31 @@ class ResultsAPI:
 
     def chart(self, result: Union["QueryResult", str], result_id: Optional[str] = None, *, kind: Optional[str] = None,
               tenant_id: Optional[str] = None) -> ChartSpec:
-        """The chart the data of ``result`` (a ``QueryResult``, or a ``trace_id``) is drawn as; ``kind`` forces
-        one the data can draw. K1 fills this (docs/architecture/wave_c.md, section 5)."""
-        raise arrives_with("engine.results.chart", "K1")
+        """The chart the data of ``result`` (a ``QueryResult``, or a ``trace_id``) is drawn as.
+
+        Five rules choose a line, a bar, a big number or a table from the saved result's column kinds, with no
+        model call; a ``QueryResult`` that had one sub-query also lets its plan refine the kinds. The rows are
+        read as ``page`` reads them, by ``trace_id`` and tenant, up to ``settings.charts.max_points``.
+        ``result_id`` names the saved result (a node id) and may be left out when the run saved one.
+        ``kind`` forces a kind the data can draw.
+
+        Raises:
+            ResultNotFound: no such run or result for the tenant.
+            ValueError: ``kind`` is one the data cannot draw (the message names those it can), or the run saved
+                several results and ``result_id`` names none.
+        """
+        from nl2sql.charts.choose import choose
+
+        trace_id, plan, title = (result, None, "Result") if isinstance(result, str) else (
+            result.trace_id, _single_plan(result), _single_intent(result))
+        reader = self._reader(tenant_id)
+        saved = reader.manifest(trace_id).results
+        if result_id is None and len(saved) > 1:
+            raise ValueError(f"Run '{trace_id}' saved several results; name one of: {', '.join(r.node_id for r in saved)}.")
+        wanted = result_id if result_id is not None else (saved[0].node_id if saved else "")
+        settings = self._ctx.settings.charts
+        summary, rows = reader.head(trace_id, wanted, settings.max_points)
+        return choose(columns=summary.columns, kinds=summary.column_kinds,
+                      rows=[[float(v) if isinstance(v, Decimal) else v for v in row] for row in rows],
+                      row_count=summary.row_count, title=title, trace_id=trace_id, result_id=summary.node_id,
+                      settings=settings, plan=plan, kind=kind)

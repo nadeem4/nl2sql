@@ -43,8 +43,10 @@ After saving a run's results the aggregator writes a manifest beside them with `
 
 ```json
 {"request_id": "0f1c...", "results": [
-  {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false, "column_kinds": {}}]}
+  {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false, "column_kinds": {"genre_name": "text"}}]}
 ```
+
+`column_kinds` is each column's type category, read from the saved parquet file's schema: integer, decimal and float are `number`; date, time and timestamp `temporal`; string `text`; bool `boolean`; anything else `other`.
 
 `truncated` is true when a sub-query upstream of that node in the DAG was cut at its row cap. The same entries are `AggregatorResponse.results` and `QueryResult.result_manifest`.
 

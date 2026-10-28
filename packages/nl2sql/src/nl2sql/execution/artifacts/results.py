@@ -14,7 +14,7 @@ another tenant's run, and an id that is not a plain token are all the same
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Mapping, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,25 @@ DEFAULT_RESULT_PAGE_SIZE = 100
 CSV_CHUNK_ROWS = 10_000
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+
+
+def column_kinds(schema: Mapping[str, Any]) -> Dict[str, ColumnKind]:
+    """Each column's kind (Wave A's D30 categories) from a polars schema, i.e. from the saved file's Arrow
+    types: integer, decimal and float are ``number``; date, time and timestamp ``temporal``; string ``text``;
+    bool ``boolean``; anything else ``other`` (docs/architecture/wave_c.md, D112)."""
+    import polars as pl
+
+    def kind(dtype: Any) -> ColumnKind:
+        base = dtype.base_type()
+        if base in (pl.Date, pl.Time, pl.Datetime):
+            return "temporal"
+        if base == pl.Boolean:
+            return "boolean"
+        if base in (pl.String, pl.Categorical, pl.Enum):
+            return "text"
+        return "number" if dtype.is_numeric() else "other"
+
+    return {name: kind(dtype) for name, dtype in schema.items()}
 
 
 class ResultSummary(BaseModel):
@@ -105,6 +124,12 @@ class ResultReader:
             total_rows=summary.row_count,
             next_offset=end if end < summary.row_count else None,
         )
+
+    def head(self, request_id: str, result_id: str, limit: int) -> Tuple[ResultSummary, List[List[Any]]]:
+        """The result's summary and its first ``limit`` rows (not capped at the page size: a chart's read)."""
+        summary, scan = self._open(request_id, result_id)
+        frame = scan.slice(0, limit).collect()
+        return summary, [list(row) for row in frame.rows()]
 
     def csv(self, request_id: str, result_id: str) -> Iterator[bytes]:
         """The whole result as UTF-8 CSV, header first. Checks the ids before the stream starts."""

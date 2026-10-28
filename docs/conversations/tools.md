@@ -10,7 +10,7 @@ own. The five built-ins:
 
 | Tool | Does | Filled by |
 |---|---|---|
-| `chart` | Draws an answer's data as a line, bar, big number or table ([Charts](../charts/index.md)) | K1 |
+| `chart` | Draws an answer's data as a line, bar, big number or table ([Charts](../charts/index.md)); args `turn`, `step`, `result_id`, `kind` | K1 (built) |
 | `diagram` | Draws the tables of an answer, or of a datasource, as Mermaid ([Diagrams](../charts/diagrams.md)) | K2 |
 | `report` | Writes the conversation up as Markdown | C2 |
 | `dashboard_edit` | Builds or changes a dashboard ([Dashboards](../dashboards/index.md)) | D4 |
