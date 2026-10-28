@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, ValidationError, create_model, model_vali
 from nl2sql.api.query_api import tables_read
 from nl2sql.clarify.models import ClarificationRequest
 from nl2sql.common.strict import StrictModel
-from nl2sql.conversations.models import ModelStep, ToolCall, ToolStep, Turn
+from nl2sql.conversations.models import ModelStep, ToolCall, ToolOutput, ToolStep, Turn
 from nl2sql.conversations.prompts import CONVERSATION_PROMPT
 from nl2sql.llm.wires import structured
 
@@ -41,11 +41,28 @@ def _dump(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
 
 
+def _output_view(output: ToolOutput) -> Dict[str, Any]:
+    """A chat tool's output as the model sees it: its kind and title, and no data. A chart is its kind, why that
+    kind and the columns; a diagram is its text (tables and joins); a report or JSON is not shown at all."""
+    view: Dict[str, Any] = {"kind": output.kind, "title": output.title}
+    if output.refs:
+        view["refs"] = output.refs
+    body = output.body
+    if output.kind == "chart" and isinstance(body, dict):
+        view["chart"] = {"kind": body.get("kind"), "reason": body.get("reason"),
+                         "columns": (body.get("data") or {}).get("columns")}
+    elif output.kind == "mermaid" and isinstance(body, str):
+        view["diagram"] = body
+    return view
+
+
 def step_view(step: ToolStep) -> Dict[str, Any]:
     """A step as the model sees it: the call, its status and what it found, never rows."""
     view: Dict[str, Any] = {"tool": step.call.name, "args": step.call.args, "status": step.status}
     if step.question:
         view["question"] = step.question
+    if step.output is not None:
+        view["output"] = _output_view(step.output)
     result = step.result
     if result is not None:
         view["summary"] = (result.final_answer or {}).get("summary")
@@ -81,7 +98,7 @@ def block(turns: Sequence[Turn], text: str, *, context_turns: int, pending: Opti
     return f"[CONVERSATION]\n{_dump(state)}\n\n[USER_TEXT]\n{_dump(text)}"
 
 
-def _check_call(call: ToolCall, tools: Mapping[str, type], option_ids: Sequence[str], *, offered: bool) -> None:
+def check_call(call: ToolCall, tools: Mapping[str, type], option_ids: Sequence[str], *, offered: bool) -> None:
     try:
         if call.name == "ask" and not offered:
             args = AskArgs.model_validate(call.args)
@@ -106,9 +123,9 @@ def checked_step(tools: Mapping[str, type], option_ids: Sequence[str], calls_lef
         if self.call is not None:
             if calls_left <= 0:
                 raise ValueError("No tool calls are left in this turn: reply to the user.")
-            _check_call(self.call, tools, option_ids, offered=False)
+            check_call(self.call, tools, option_ids, offered=False)
         for offer in self.offers:
-            _check_call(offer, tools, option_ids, offered=True)
+            check_call(offer, tools, option_ids, offered=True)
         return self
 
     return create_model("ModelStep", __base__=ModelStep,

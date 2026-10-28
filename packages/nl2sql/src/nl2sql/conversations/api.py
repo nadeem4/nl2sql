@@ -11,21 +11,25 @@ import contextvars
 import queue
 import secrets
 import threading
+import time
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence
 
 from nl2sql.api.query_api import QueryAPI, QueryResult
+from nl2sql.api.results_api import ResultsAPI
 from nl2sql.clarify.models import ClarificationChoice, ClarificationRequest
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.context import current_conversation_id
 from nl2sql.common.errors import ConversationBusy, DashboardNotFound, ErrorCode
-from nl2sql.conversations.agent import ConversationAgent, block, checked_step, ASK_SPEC, AskArgs
+from nl2sql.conversations.agent import ConversationAgent, block, check_call, checked_step, ASK_SPEC, AskArgs
 from nl2sql.conversations.models import Conversation, ConversationInfo, ToolCall, ToolStep, Turn, TurnKind, TurnStatus
-from nl2sql.conversations.store import ConversationStore, owner_of, strip_rows
+from nl2sql.conversations.report import build_report
+from nl2sql.conversations.store import ConversationStore, owner_of, strip_output_rows, strip_rows
+from nl2sql.conversations.tools import ChatToolRunner
 from nl2sql.events import STREAM_EVENTS, RunScope
-from nl2sql.events.catalog import ConversationStarted, ConversationStep, ConversationTurn
+from nl2sql.events.catalog import ChatToolCalled, ConversationStarted, ConversationStep, ConversationTurn
 from nl2sql.hooks.approval import Approval
 from nl2sql.limits import Budget, LimitReached
 from nl2sql.llm.failures import classify_provider_error
@@ -73,11 +77,12 @@ def _step_error(result: QueryResult) -> Optional[Dict[str, Any]]:
 class Conversations:
     """What ``engine.conversations`` does. ``ConversationsAPI`` is its public face."""
 
-    def __init__(self, ctx: Any) -> None:
+    def __init__(self, ctx: Any, engine: Any) -> None:
         self._ctx = ctx
         self._store = ConversationStore(ctx.state)
         self._queries = QueryAPI(ctx)
         self._agent = ConversationAgent(ctx)
+        self._chat = ChatToolRunner(ctx.chat_tools, engine)  # a tool is handed the public facade, never ctx
 
     @property
     def _settings(self):
@@ -85,10 +90,6 @@ class Conversations:
 
     def _owner(self, user: UserContext):
         return owner_of(user, self._ctx.tenant_id)
-
-    def _enabled_tools(self) -> Dict[str, type]:
-        """The registry chat tools the loop may call, by name: none until C2."""
-        return {}
 
     # ------------------------------------------------------------ the plain methods
 
@@ -142,6 +143,28 @@ class Conversations:
             return self._finish(run)
 
         return self._turn(conversation_id, user_context, "retry", question, True, CancellationToken(), body)
+
+    def tool(self, conversation_id: str, name: str, args: Optional[Dict[str, Any]] = None, *,
+             user_context: UserContext) -> Turn:
+        """One registry chat tool, by name, as a turn of kind ``tool`` with no model call. Arguments that do not
+        validate raise ``ValueError`` and store nothing; a tool that is not enabled is a stored error step."""
+        call = ToolCall(name=name, args=dict(args or {}))
+        conversation = self.get(conversation_id, user_context=user_context)
+        if name in self._chat.names:
+            check_call(call, self._chat.args_models(), [], offered=False)
+        self._check_length(conversation)
+
+        def body(run: _Run) -> Turn:
+            self._tool(run, call)
+            return self._finish(run)
+
+        return self._turn(conversation_id, user_context, "tool", name, True, CancellationToken(), body)
+
+    def report(self, conversation_id: str, *, user_context: UserContext, turns: Optional[Sequence[int]] = None,
+               title: Optional[str] = None, include_rows: bool = True) -> str:
+        """The Markdown report of the stored turns, with no model call."""
+        return build_report(self.get(conversation_id, user_context=user_context), ResultsAPI(self._ctx),
+                            turns=turns, title=title, include_rows=include_rows)
 
     def ask_only(self, conversation_id: str, question: str, *, user_context: UserContext,
                  choice: Optional[str] = None) -> QueryResult:
@@ -241,7 +264,7 @@ class Conversations:
         return self._finish(run)
 
     def _by_model(self, run: _Run, _choice: Optional[str] = None) -> Turn:
-        settings, tools = self._settings, self._enabled_tools()
+        settings, chat = self._settings, self._chat
         pending = run.conversation.pending
         option_ids = [o.id for o in pending.options] if pending else []
         reply, offers, error, status = None, [], None, None
@@ -252,14 +275,17 @@ class Conversations:
                     break  # the step in flight was the last; _finish stores the turn as cancelled
                 left = settings.max_tool_calls - used
                 message = block(run.conversation.turns, run.text, context_turns=settings.context_turns,
-                                pending=pending, tools=[ASK_SPEC], calls_left=left, this_turn=run.steps)
+                                pending=pending, tools=[ASK_SPEC, *chat.specs()], calls_left=left,
+                                this_turn=run.steps)
                 with run.scope.entered():
-                    step = self._agent.decide(message, checked_step(tools, option_ids, left),
+                    step = self._agent.decide(message, checked_step(chat.args_models(), option_ids, left),
                                               run.scope.callbacks())
                 if step.reply is not None:
                     reply, offers = step.reply, step.offers
                     break
-                if self._ask(run, step.call).status in _STOPPING:
+                if step.call.name != "ask":
+                    self._tool(run, step.call)
+                elif self._ask(run, step.call).status in _STOPPING:
                     break
         except StructuredOutputError as exc:
             reply, status = _INVALID_REPLY, "error"
@@ -314,6 +340,27 @@ class Conversations:
         run.scope.publish("conversation.step", ConversationStep(
             conversation_id=conversation.id, turn=len(conversation.turns) + 1, tool=call.name,
             status=step.status, trace_id=step.trace_id, args=sorted(call.args)))
+        return step
+
+    def _tool(self, run: _Run, call: ToolCall) -> ToolStep:
+        """One registry chat-tool step: the tool sees the conversation with this turn's steps so far, makes no
+        model call, and whatever it does is a step the model can read."""
+        conversation = run.conversation
+        index = len(conversation.turns) + 1
+        now = datetime.now(timezone.utc)
+        in_flight = Turn(index=index, at=now, kind=run.kind, text=run.text, steps=list(run.steps),
+                         status="answered", trace_id=run.scope.trace_id)
+        began = time.monotonic()
+        step = self._chat.run(conversation.model_copy(update={"turns": [*conversation.turns, in_flight]}),
+                              run.user, call)
+        step = strip_output_rows(step)  # stored without rows (D106)
+        run.steps.append(step)
+        run.scope.publish("chat_tool.called", ChatToolCalled(
+            tool=call.name, conversation_id=conversation.id, turn=index, ok=step.status == "ok",
+            seconds=round(time.monotonic() - began, 3), error_code=(step.error or {}).get("code")))
+        run.scope.publish("conversation.step", ConversationStep(
+            conversation_id=conversation.id, turn=index, tool=call.name, status=step.status,
+            args=sorted(call.args)))
         return step
 
     def _finish(self, run: _Run, *, reply: Optional[str] = None, offers: Sequence[ToolCall] = (),

@@ -95,7 +95,7 @@ events to its own. The three marked *turn* belong to a conversation turn, which 
 | `conversation.started` | `conversation_id`, `user_id`, `datasource_id` | `engine.conversations.start` (C1) |
 | `conversation.step` (turn) | `conversation_id`, `turn`, `tool`, `status`, `trace_id` (an `ask` step's), `args` (argument names only) | the model's loop finished one tool call (C1) |
 | `conversation.turn` (turn) | `conversation_id`, `turn`, `kind`, `status`, `trace_id`, `steps`, `stored` (the stored `Turn` as JSON, on the conversation stream only) | a turn was stored (C1) |
-| `chat_tool.called` (turn) | `tool`, `conversation_id`, `turn`, `ok`, `seconds`, `error_code` | a registry chat tool ran (C2) |
+| `chat_tool.called` (turn) | `tool`, `conversation_id`, `turn`, `ok`, `seconds`, `error_code` | a registry chat tool ran, in the model's loop or by name; in the turn's scope (C2) |
 | `dashboard.generated` | `dashboard_id`, `datasource_id`, `tiles`, `skipped` | `engine.dashboards.generate` (D3) |
 | `dashboard.refreshed` | `dashboard_id`, `trigger`, `counts` (charts per status), `filters` (ids, never values) | a refresh, an open that refreshed, or a scheduled run (D2) |
 | `dashboard.changed` | `dashboard_id`, `change` (the edit kinds, a move being the kind `move`; `pinned`; `deleted`), `by` | an edit, a pin or a delete (D1) |

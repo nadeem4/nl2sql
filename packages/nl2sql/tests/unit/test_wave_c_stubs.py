@@ -19,15 +19,12 @@ ADMIN = UserContext(user_id="root", roles=["admin"])
 
 # namespace -> method -> the row that fills it. Every public method of a stub class is listed.
 STUBS = {
-    "conversations": {"tool": "C2", "report": "C2"},
-    "chat_tools": {"list": "C2"},
     "workspaces": {},
     "dashboards": {"open": "D2", "refresh": "D2", "filter_values": "D2", "run_scheduled": "D2",
                    "generate": "D3", "suggest_questions": "D3"},
 }
 # Methods a row has filled since: they are real now and have their own tests.
-FILLED = {"conversations": {"start", "ask", "stream", "retry", "ask_only", "get", "list", "delete"},
-          "workspaces": {"create", "rename", "list", "delete"},
+FILLED = {"workspaces": {"create", "rename", "list", "delete"},
           "dashboards": {"get", "list", "delete", "pin", "move", "edit", "rename", "rename_tile", "set_tile_chart",
                          "remove_tile", "arrange", "set_filters", "set_schedule"}}
 # Methods added to namespaces that already exist.
@@ -85,8 +82,8 @@ def test_stubs_keep_the_signatures_the_design_gives(engine):
 
 # ---------------------------------------------------------------- chat-tool entry points
 
-CHAT_TOOL_ROWS = {"diagram": "K2", "report": "C2", "dashboard_edit": "D4", "dashboard_pin": "D4"}
-FILLED_CHAT_TOOLS = ["chart"]  # K1 filled it; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
+CHAT_TOOL_ROWS = {"diagram": "K2", "dashboard_edit": "D4", "dashboard_pin": "D4"}
+FILLED_CHAT_TOOLS = ["chart", "report"]  # K1 and C2 filled them; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
 
 
 def test_the_five_chat_tool_entry_points_load_their_stub_modules():

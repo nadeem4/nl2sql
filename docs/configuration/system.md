@@ -94,7 +94,7 @@ storage:    { path: .nl2sql }
 | `evals` | no | [below](#observers-hooks-and-evals) | The eval suites, scorers and regression gate. |
 | `knowledge` | no | [below](#knowledge) | A list of knowledge sources, in precedence order. Absent (or `[]`) means no knowledge. |
 | `conversations` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | How a model-led turn is bounded and kept. Every field has a default. |
-| `chat_tools` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | A list of chat tool names. Absent means the five built-ins; `[]` means none (`ask` stays). |
+| `chat_tools` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | A list of chat tool names. Absent means `chart` and `report`, if registered; `[]` means none (`ask` stays). |
 | `dashboards` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | The starter dashboard's size and the refresh limits. Every field has a default. |
 | `mcp` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | `nl2sql mcp --http`: where it listens and how it authenticates. Every field has a default. |
 
@@ -229,11 +229,9 @@ max_turns: 50           # the 51st turn is refused
 max_age_days: 30        # null keeps conversations; also bounds draft dashboards
 
 # chat_tools.yaml: a list of registered names (the nl2sql.chat_tools entry point group)
+# absent: chart and report (those the registry has); diagram, dashboard_edit and dashboard_pin wait for K2 and D4
 - chart
-- diagram
 - report
-- dashboard_edit
-- dashboard_pin
 
 # dashboards.yaml (every value shown is the default)
 max_tiles: 10                        # the starter dashboard's size
@@ -253,7 +251,7 @@ auth: api_keys            # api_keys | none (none: loopback only)
 | Section | Rule |
 | --- | --- |
 | `conversations` | `Conversations`: strict keys; every count is at least 1, and `max_age_days: null` keeps conversations. Read by `engine.conversations` (C1). The `conversation` agent that leads a turn is one of the [LLM agents](llm.md#per-node-models). |
-| `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built, naming the registered ones (C2). `ask` is the conversation's own tool and is always on. |
+| `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built (`chat_tools[i]` in the report), with the closest registered name; `ask` and a plugin whose `args_model` does not forbid extra keys are errors too. Absent means the default tools (`chart` and `report`) that the registry has, so an engine on `Registry.empty()` starts with none and needs no `chat_tools: []`; a name you list must be registered. `[]` means none; `ask` is the conversation's own tool and is always on. Read by `engine.conversations` and `engine.chat_tools` (C2); see [Chat tools](../conversations/tools.md). |
 | `dashboards` | `Dashboards`: strict keys; every value is at least 1. Read by `engine.dashboards` (D1 to D3). |
 | `mcp` | `Mcp`: strict keys. `http.port` is 1 to 65535 and `http.path` starts with `/`. `auth: none` is for loopback only: the server refuses to start on any other host. Read by `nl2sql mcp --http` (M2). |
 

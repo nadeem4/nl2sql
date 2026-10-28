@@ -1,8 +1,5 @@
 # Conversations API
 
-!!! note "C1 is built; `tool`, `report` and `engine.chat_tools.list` arrive with C2"
-    The three C2 methods have their final signatures and raise `NotImplementedError` naming their row.
-
 ## Purpose
 `engine.conversations`: model-led conversations over the database ([Conversations](../../conversations/index.md)),
 and `engine.chat_tools` ([Chat tools](../../conversations/tools.md)).
@@ -11,6 +8,7 @@ and `engine.chat_tools` ([Chat tools](../../conversations/tools.md)).
 - `packages/nl2sql/src/nl2sql/api/conversations_api.py` (`ConversationsAPI`, internal)
 - `packages/nl2sql/src/nl2sql/conversations/` (`api.py` the turn and its loop, `agent.py` the `[CONVERSATION]`
   block and the step checks, `prompts.py`, `store.py` ownership and stored rows)
+- `packages/nl2sql/src/nl2sql/conversations/tools.py` (the chat-tool runner), `report.py` (the Markdown report)
 - `packages/nl2sql/src/nl2sql/api/chat_tools_api.py` (`ChatToolsAPI`, internal)
 - `packages/nl2sql/src/nl2sql/conversations/models.py` (`Conversation`, `Turn`, `ToolStep`, `ModelStep`)
 
@@ -33,7 +31,7 @@ earlier question.
 | `list(*, user_context, limit=20) -> list[ConversationInfo]` | C1 |
 | `delete(conversation_id, *, user_context) -> None` (`ConversationBusy` while a turn runs) | C1 |
 | `tool(conversation_id, name, args=None, *, user_context) -> Turn` | C2 |
-| `report(conversation_id, *, user_context, turns=None, title=None) -> str` | C2 |
+| `report(conversation_id, *, user_context, turns=None, title=None, include_rows=True) -> str` | C2 |
 | `engine.chat_tools.list() -> list[ChatToolInfo]` | C2 |
 
 - `start(dashboard_id=...)` needs a dashboard the caller owns (`DashboardNotFound` otherwise).
@@ -43,3 +41,13 @@ earlier question.
   `CANCELLED` after the step in flight.
 - `stream` ends with `conversation.turn`; see [Streaming](../../conversations/index.md#streaming).
 - `ask_only` returns the run's `QueryResult` with its rows; the stored turn has none.
+- `tool` runs one enabled [chat tool](../../conversations/tools.md) as a turn of kind `tool` and makes no model
+  call. Arguments the tool's `args_model` rejects are a `ValueError` and store nothing; a tool that is not
+  enabled, raises or cannot apply is a stored step with `error.code` `UNKNOWN_CHAT_TOOL`, `TOOL_FAILED` or
+  `TOOL_NOT_APPLICABLE`.
+- `report` returns Markdown for the stored answered turns (or `turns`, a list of turn numbers). A turn number
+  that does not exist, or a conversation with nothing answered, is a `ValueError`. `include_rows=False` leaves
+  the row tables and chart takeaways out, which is how the `report` tool stores its output.
+- Every method needs a caller: `user_context=None`, or a context with no `user_id`, is a `TypeError`, not a
+  shared anonymous owner.
+- `engine.chat_tools.list()` takes no caller: it lists the enabled tools' names.

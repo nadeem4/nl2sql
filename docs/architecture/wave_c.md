@@ -1710,6 +1710,50 @@ flowchart TD
       methods), `EditEnv`, `Applied` and `apply_edits` (`nl2sql.dashboards.edits`; D4 adds the two chat-only
       handlers to its `_HANDLERS` table).
 
+!!! note "Built (C2): chat tools"
+    - **Files:** `nl2sql/conversations/tools.py` (`build_chat_tools`, `describe`, `ChatToolRunner`),
+      `report.py` (`build_report`), the tool branch of the loop and `Conversations.tool` / `report` in
+      `conversations/api.py`, `agent.py` (`step_view` shows a tool's output without data), `chat_tools/report.py`,
+      `api/chat_tools_api.py`. The runner's tools are built once in `Runtime.components` as `runtime.chat_tools`
+      (name to instance), so an unknown name is a `ConfigError` at `chat_tools[i]`. `ConversationsAPI` and
+      `Conversations` now take the facade (`engine`) as their second argument: that is what a tool is handed.
+    - **Tests:** `tests/unit/test_chat_tools.py`, one e2e test in `tests/e2e/test_conversations_fake_llm.py`,
+      `test_registry_tools_and_the_report_make_no_model_call` (architecture); the stub tests lose `tool`, `report`,
+      `chat_tools.list` and the three tool codes from `DECLARED_AHEAD`.
+
+    Where the code and the design differ, the code won:
+
+    - A tool is handed the conversation **with the turn in flight** appended (its steps so far, status
+      `answered`), so `chart` after `ask` works in one turn. The `report` tool covers stored turns only: it
+      calls `conversations.report`, which reads the store, so it cannot include the turn it is called in.
+    - The model sees a tool step as `output`: a chart is `{kind, reason, columns}`, a diagram is its text, and
+      a `markdown` or `json` body (a report, a dashboard change) is not shown, only its kind, title and `refs`.
+      The chart's takeaway is withheld too (it quotes values). D4 should show the model what it needs of a
+      dashboard through the `[CONVERSATION]` block, as its row says.
+    - `conversations.tool` validates the arguments before it opens a turn: an invalid call is a `ValueError`
+      and stores nothing; only an unknown or disabled name is stored, as an `UNKNOWN_CHAT_TOOL` step. A tool
+      turn's `text` is the tool's name.
+    - **A K1 bug fixed here:** a run saves its results under the engine's tenant (`settings.tenant_id`),
+      whoever asked, so the `chart` tool no longer reads the conversation's or the caller's tenant (it found
+      nothing for a caller with a `tenant_id`). The report reads the engine's tenant too.
+    - Review fixes: a stored tool output holds no rows (D106). A chart output's `data.rows` is emptied before
+      the step is stored (a client draws again through `engine.results.chart`), and the `report` tool stores
+      the report without row tables and chart takeaways (`conversations.report(include_rows=False)`); asked
+      for directly, the report still reads the rows from `engine.results`. `engine.results` does not check the
+      caller (it reads by tenant and trace id); that gap is a separate row.
+    - `chat_tools:` absent means the default tools **the registry has**, so an engine on `Registry.empty()`
+      builds. The defaults are `("chart", "report")` only: `diagram`, `dashboard_edit` and `dashboard_pin` are
+      still stubs and **stay off by default. K2 and D4 each add their own name to `DEFAULT_CHAT_TOOLS`
+      (`conversations/tools.py`) and to the docs when they land.** A name listed explicitly must be registered;
+      `ask` and a plugin whose `args_model` does not forbid extra keys are config errors.
+    - `user_context=None`, or a context with no `user_id`, is a `TypeError` in every `conversations` method (a
+      shared anonymous owner would see everyone's anonymous conversations). `TOOL_FAILED` shows the model the
+      exception type only; the log has the full error. The report considers every turn and keeps each
+      successful `ask` step, so an answer in a turn whose later tool failed is still reported.
+    - Names later rows use: `ChatToolRunner`, `build_chat_tools`, `describe` (`nl2sql.conversations.tools`),
+      `build_report` (`nl2sql.conversations.report`), `Conversations._tool(run, call)`, `runtime.chat_tools`,
+      `check_call` (renamed from `_check_call` in `agent.py`).
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |
