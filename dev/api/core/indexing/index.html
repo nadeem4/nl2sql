@@ -5658,11 +5658,20 @@ refresh an index, build it instead, which never leaves it empty.</p>
 names. The current model's namespace is kept. <code>nl2sql index prune</code> calls it.</p>
 <h3 id="indexinspect">index.inspect</h3>
 <p>Signature:
-<code>inspect(query, k=8, lambda_mult=None, types=None, datasource_id=None) -&gt; dict</code></p>
+<code>inspect(query, k=8, lambda_mult=None, types=None, datasource_id=None, *, user_context) -&gt; dict</code></p>
 <p>One MMR search of the live index, as the engine runs it: the candidate pool
 with scores, the picks in order and what was dropped. <code>types</code> limits the
 entry types (<code>schema.table</code>, ...). It reads index metadata only and needs no
 LLM.</p>
+<p><code>user_context</code> is required (a missing one is a <code>TypeError</code>): the pool holds
+only the entries the caller's scope reaches. A denied table's entries, a
+glossary term <code>knowledge.show</code> would hide from the caller, an entry whose text
+names a denied table, and every entry of a datasource the caller cannot reach
+or that is not indexed are left out; verified-query entries are never shown.
+The hiding happens after the search, from a pool four times larger than
+usual, so a caller for whom most matches are hidden can get a short pool. The
+playground and REST API take the role from the request without verifying it;
+see <a href="../../../security/model/">the security model</a>.</p>
 <h3 id="indexcheck">index.check</h3>
 <p>Signature:
 <code>check(datasource_ids=None, *, user_context) -&gt; list[DriftReport]</code></p>

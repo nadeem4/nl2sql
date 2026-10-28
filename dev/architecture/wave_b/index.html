@@ -6395,6 +6395,42 @@ holds.</p>
   tests are deleted with the code.</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built (follow-up K3b): the inspector is scoped by caller</p>
+<p>Origin: finding 4 of the K3 review. <code>engine.index.inspect(..., *, user_context)</code>
+now takes the caller as a required keyword (D60): no default, a missing one is
+a <code>TypeError</code>. Its pool holds only what the caller's scope reaches, from the
+same <code>policy_engine.scope</code> the query path reads, and the same visibility
+<code>engine.knowledge.show</code> applies; there is no second scope implementation.</p>
+<ul>
+<li><strong>Rules</strong>, per hit, in <code>IndexAPI._reachable</code>: a datasource the caller does
+  not reach, or that has no snapshot, shows nothing; a <code>schema.table</code> or
+  <code>schema.column</code> entry needs its table allowed, a <code>schema.relationship</code>
+  both ends; a <code>knowledge.term</code> needs the term to be in
+  <code>knowledge.scope.visible(...)</code> (so a term on a denied table is hidden);
+  datasource, example and metric entries pass; any other type
+  (<code>curated.verified_query</code>) is not shown. Last, an entry whose text names a
+  denied table (<code>knowledge.scope.mentions</code>) is dropped, so a table entry
+  whose glossary description names a denied table is hidden whole, though
+  <code>show</code> would hide only the description.</li>
+<li><strong>Recall.</strong> The store cannot filter by an allowed set per datasource, so
+  <code>Retriever.mmr(..., allow=)</code> asks for <code>SCOPE_OVERFETCH</code> (4) times the
+  candidates, keeps the first <code>fetch_k</code> allowed ones, then runs MMR. A caller
+  for whom most matches are hidden can still get a short pool; one for whom
+  few are hidden gets a full one.</li>
+<li><strong>The playground.</strong> <code>RetrievalRequest.role</code> is required (no default view,
+  as <code>/api/schema</code>, D33: a request without it is a 422), and <code>/api/retrieval</code>
+  searches as <code>UserContext(roles=[role])</code>; <code>Retrieval.jsx</code> sends the role
+  chosen in "Ask as", and the committed bundle is rebuilt. The playground
+  trusts the role the page sends (see
+  <a href="../../security/model/">the security model</a>), as the Ask page does.</li>
+<li><strong>Tests.</strong> <code>tests/unit/test_index_inspect_scope.py</code> (denied tables, hidden
+  terms, relationships needing both ends, verified queries never shown, an
+  unindexed datasource, the over-fetch at <code>Retriever</code> level) and
+  <code>test_a_search_is_made_as_the_role_asked_and_shows_only_what_it_may_read</code>
+  in <code>tests/unit/test_playground_retrieval.py</code>.</li>
+</ul>
+</div>
 <p>The waves, with at most four PRs at once:</p>
 <table>
 <thead>

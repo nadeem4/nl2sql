@@ -4201,8 +4201,8 @@ turn's body (Wave C's D104).</p>
 </tr>
 <tr>
 <td><code>GET /index/inspect</code>, <code>POST /index/inspect</code></td>
-<td><code>index.inspect_defaults()</code>, <code>index.inspect(...)</code></td>
-<td>The Retrieval inspector (the playground's <code>/api/retrieval</code>)</td>
+<td><code>index.inspect_defaults()</code>, <code>index.inspect(..., user_context=)</code></td>
+<td>The Retrieval inspector (the playground's <code>/api/retrieval</code>). Searches as the caller: the pool holds only what the caller's scope reaches (K3b).</td>
 </tr>
 </tbody>
 </table>

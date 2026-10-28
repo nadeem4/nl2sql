@@ -2988,7 +2988,9 @@ it in their run trace (see <a href="../../observability/debugging/#retrieval">De
 and the playground's Retrieval inspector (<code>engine.index.inspect</code>) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
-search the same text, and diff the <strong>Copy as text</strong> output.</p>
+search the same text, and diff the <strong>Copy as text</strong> output. It is run as a
+caller (<code>user_context</code> is required): entries the caller's scope hides are left
+out of the pool.</p>
 <h2 id="routing-five-signals-fused">Routing: five signals, fused</h2>
 <p><code>Retriever.route(question, datasource_ids, explain, *, limit, floor_ratio, allows)</code>
 ranks the datasources a question most likely needs, as a list of
