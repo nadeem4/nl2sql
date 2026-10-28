@@ -43,7 +43,7 @@ four modules carry it - `test_ast_planner_real_data.py`,
 model directly. Nothing else in the directory needs a key: indexing calls
 no model, so tests that index real data run key-free.
 
-`.github/workflows/test.yml` has two test jobs over the source tree:
+`.github/workflows/test.yml` has three test jobs over the source tree:
 
 - **`test`** runs `pytest -m "not integration and not realdb"` across Python 3.12 and 3.13.
   This is the fast job and must stay fast.
@@ -54,6 +54,9 @@ no model, so tests that index real data run key-free.
   subset covers schema indexing, datasource resolution, schema retrieval,
   aggregation and the local embedder against the real Chinook database; run
   it with `--collect-only -q` for the current list.
+- **`eval-gates`** runs in parallel with `integration`: the same demo project and model cache, then the three key-free eval gates (plans, retrieval, routing; see [Evals](../evals/index.md#in-ci)) and the upload of their reports.
+
+`integration` and `eval-gates` are skipped, and count as passing, on a pull request that changes only documentation (`docs/**` or Markdown files); the `code-changes` job decides.
 
 A separate workflow, `.github/workflows/realdb.yml`, runs `pytest -m realdb`
 against the [test bed](test-bed.md) on GitHub's runners: on pull requests that
