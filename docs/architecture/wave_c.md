@@ -3,7 +3,7 @@
 !!! note "Status: design"
     This page is the design for Wave C of the product redesign, which ships
     as release 0.9. Nothing on it is built yet. Each pull request in
-    [the PR plan](#13-pr-plan) adds a "Built" note to the sections it builds,
+    [the PR plan](#13-pr-plan) replaces its row's `Not built yet.` line in [Built notes](#131-built-notes),
     as Phase 1 and Phase 2 did. Phase 1 is
     [Configuration v2 and the extension registry](configuration_v2.md);
     Phase 2 is [Phase 2: test bed, storage, providers, policies and adapter
@@ -1056,32 +1056,6 @@ URL `sqlite`), DuckDB (`.duckdb`, URL `duckdb`), PostgreSQL (5432,
 `postgresql`, `postgres`), MySQL (3306, `mysql`, `mariadb`) and SQL Server
 (1433, `mssql`, `sqlserver`).
 
-!!! note "Built (L1)"
-    `engine.datasources.scan` is `nl2sql/datasources/discovery.py`'s `scan(registry, folder, *, url, ports,
-    skip)`; the five built-ins declare the class variables above and a `connection_for` classmethod (SQLite and
-    DuckDB read the first 16 and 12 bytes of a file, the server databases split a `make_url` URL or a
-    `host:port`). Where the code and the design differ, the code won:
-
-    - `Found` and `DiscoverableAdapter` are imported from `nl2sql_sdk.discovery`, not the SDK's top level.
-    - **Order:** the adapters are walked sorted by registry name, so findings of one kind come in name order
-      (files in sorted path order, ports by adapter name, then each adapter's port order).
-    - **Depth:** "two levels deep" is two folders below `folder` (`folder/a/b/x.db` is found, `folder/a/b/c/x.db`
-      is not). The 50 is files that carry a declared suffix, counted before `connection_for` confirms them.
-    - **Duplicates** are one server (type, host, port) or one file (type, resolved path), the first finding wins.
-      A missing port counts as the adapter's default and `localhost` as `127.0.0.1`, so a URL naming either
-      hides the open-port finding for the same server.
-    - **The password:** `connection` keeps the URL's password (a form needs it), `Candidate`'s repr masks it
-      (`model_dump` does not, so a Candidate is never logged or serialised), and `found.value` is the URL with
-      the password replaced by `***` and its query and fragment dropped (a password can sit in the query).
-      The adapter is given the real URL.
-    - An adapter whose `connection_for` raises or returns something `Candidate` rejects is skipped, not fatal,
-      and its error text is dropped (it could hold a password); a missing folder finds nothing; `scan` takes
-      `storage.path` from the engine's config to skip. Each port is probed once.
-    - A DuckDB file is confirmed by the `DUCK` magic at byte 8 (the design names only SQLite's header).
-    - The probe is `socket.create_connection(("127.0.0.1", port), timeout=0.2)`; the tests replace it with a fake.
-    - L3 uses `Candidate.type`, `.connection` and `.missing` to fill the form and `.found` to say where a
-      finding came from; `scan` never connects, so L3 calls `datasources.test` on the filled form.
-
 ### Writing the config
 
 Three writers, all in the package, all named in the amended invariant
@@ -1429,6 +1403,33 @@ flowchart TD
 | M1 | **API keys.** `engine.api_keys` (`create`, `list`, `revoke`, `verify`), the audit events, `nl2sql keys`. Files: `nl2sql/policies/keys.py` (new), `api/api_keys_api.py`, `cli/commands/keys.py`. | C0 | `test_token_is_returned_once_and_only_its_hash_is_stored`, `test_verify_returns_the_keys_user_context`, `test_revoked_key_does_not_verify`, `test_malformed_token_does_not_verify`, `test_api_keys_require_a_caller`, `test_only_admins_manage_keys`, `test_key_roles_must_be_configured`, `test_key_events_never_carry_the_token` | `security/api-keys.md`, `security/model.md` |
 | M2 | **MCP over HTTP.** `nl2sql mcp --http`; stateless streamable HTTP; `TransportSecuritySettings`; bearer auth through `engine.api_keys.verify`; per-request identity (`build_server(engine, identity)`, built in Wave A); the loopback rule; `ask` with `conversation_id` and an option-id `choice` (replacing Wave B's); `mcp.denied`. Files: `nl2sql/mcp/http.py` (new), `nl2sql/mcp/server.py`, `cli/commands/mcp.py`. | M1, C1 (Wave A's MCP server, Wave B's L2) | In-process HTTP client, fake LLM: `test_http_ask_needs_a_bearer_key`, `test_revoked_key_is_401_and_audited`, `test_tools_run_as_the_keys_roles`, `test_two_keys_concurrently_run_with_their_own_roles`, `test_foreign_host_or_origin_is_refused`, `test_public_bind_without_keys_refuses_to_start`, `test_ask_returns_a_conversation_id_and_continues_it`, `test_choice_is_an_option_id_of_the_pending_request`, `test_stdio_is_still_the_default` | `getting_started/mcp.md` (HTTP, keys, TLS behind a proxy, client set-up) |
 
+The waves, with at most four PRs at once:
+
+| Wave | PRs | Notes |
+|---|---|---|
+| 1 | C0 | Alone; everything else branches from it |
+| 2 | C1, K1, L1, M1 | The four tracks start |
+| 3 | C2, K2, D1, L2 | |
+| 4 | D2, M2 | |
+| 5 | D3, D4 | Both build on D2 |
+| 6 | L3 | Needs D3 |
+
+Files more than one PR touches, all in wave order or in different waves:
+`api/datasource_api.py` (K2's `diagram` in wave 3 and L2's `save` in wave
+3 fill separate stub methods C0 wrote; L1's `scan` in wave 2),
+`nl2sql/conversations/api.py` and `agent.py` (C1, then C2),
+`nl2sql/dashboards/api.py` (D1, D2, then D3), `nl2sql/dashboards/edits.py`
+(D1, then D4), `api/dashboards_api.py` (D1, D2, D3), `nl2sql/mcp/server.py`
+(Wave B's L2, then M2). C0's stubs mean no two PRs add to `public_api.py`,
+`pyproject.toml`, `cli/main.py`, `mkdocs.yml`, `nl2sql/__init__.py` or the
+boundary test's constants.
+
+## 13.1 Built notes
+
+Each row's PR replaces its own `Not built yet.` line and edits only under its own heading.
+
+### C0
+
 !!! note "Built (C0a): C0 was split, and this is its first half"
     Row C0 is too big for one PR, so it is two. **C0a** is the shared shapes, with no behaviour:
 
@@ -1475,6 +1476,7 @@ flowchart TD
 
     **C0b** is the rest of row C0, built below. C0a's tests are `tests/unit/test_wave_c_shapes.py` and
     `tests/unit/test_wave_c_store.py`, and `test_sdk_discovery_imports_only_pydantic` in the architecture test.
+
 
 !!! note "Built (C0b): the rest of row C0"
     - **`SuppliedPlan`** (`pipeline/pinned.py`) is a whole run, as A1 says: `decomposition` (a
@@ -1541,40 +1543,8 @@ flowchart TD
       name too common to scan for, so its guard is `by` (held by `test_owned_and_privileged_methods_require_a_caller`)
       and L2's hash check.
 
-!!! note "Built (K1): auto charts"
-    - **Kinds:** `column_kinds(schema)` in `execution/artifacts/results.py` maps a polars schema to the five
-      kinds; the aggregator's `_write_manifest` fills `ResultSummary.column_kinds` from the saved file's schema.
-      The executor's and curated matcher's `execute.after` summaries still carry `{}` (they describe a
-      sub-query, not a saved result).
-    - **Charts:** `nl2sql/charts/choose.py` (`choose(...)`: plan refinements and the five rules),
-      `takeaway.py`, `vega.py`; `ChartSpec.to_vega_lite` delegates to `vega.py`. `ResultReader.head` reads the
-      first rows uncapped by the page size. `engine.results.chart` and `chat_tools/chart.py` are filled; the tool's
-      args are `turn`, `step`, `result_id`, `kind`.
 
-    Where the code and the design differ, the code won:
-
-    - Any read cut at `max_points`, or a result cut at the datasource row limit (`ResultSummary.truncated`), is a
-      table, not only a line (a bar over cut rows would drop categories).
-    - A `trace_id` alone has no question, so its chart is titled `Result`; a `QueryResult` with one sub-query
-      is titled with that sub-query's intent, and the `chart` tool retitles it with the step's question.
-    - With a plan, a number that is not an aggregate and not grouped on is a measure, unless the plan has
-      an aggregate: then a plain column is a dimension (so `[customer_id, name]` is not a bar of ids). A
-      grouped one is a dimension. A whole-number year axis (`DATE_PART`) and a time of day export as an
-      `ordinal` Vega-Lite type, since `temporal` would read years as epoch milliseconds and cannot parse
-      `01:00:00`. Several bar measures use `xOffset` on the folded measure. A takeaway keeps a data value's
-      case ("iPhone"); only template text is capitalised.
-    - A run that saved several results needs `result_id` (`ValueError` otherwise). For a `QueryResult` the
-      result ids come from its `result_manifest`: an empty one (a run a hook withheld, whose files stay on
-      disk) or an id outside it is `ResultNotFound`. The tool turns `ResultNotFound` (expired or withheld
-      rows) and a kind the data cannot draw into `ToolNotApplicable`, and reads the conversation's tenant
-      (`conversation.tenant_id`, else the caller's).
-    - A bare `trace_id` is checked like `engine.results.page`: tenant and run id only. A withheld run's files
-      were once readable this way; that gap is closed (C-W1): while a hook is attached at `answer.after` the
-      manifest every read goes through is written only once those hooks allowed, so a withheld run has none
-      and every read path answers `ResultNotFound` (see `docs/configuration/hooks.md`).
-    - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
-    - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
-      The stub test moves `chart` out of its tables.
+### C1
 
 !!! note "Built (C1): conversations core, model-led"
     - **Files:** `nl2sql/conversations/{api,agent,prompts,store}.py` (the turn and its loop; the `[CONVERSATION]`
@@ -1623,45 +1593,97 @@ flowchart TD
       `conversation.started`, carry the conversation's tenant. The stream worker runs in a copy of the
       caller's context.
 
-!!! note "Built (M1): API keys"
-    - **Token:** `nl2sql/policies/keys.py` holds the format (`nl2sql_<id>_<secret>`, `id` 8 hex characters,
-      `secret` 43 URL-safe characters from `secrets.token_urlsafe(32)`, matched with `fullmatch`), `hash_secret`
-      (SHA-256 hex) and `matches` (`hmac.compare_digest`). The store row is `id`, `hash`, `label`, `user_id`,
-      `tenant_id`, `roles`, `created_at`, `created_by`, `revoked_at`; the token and the secret are never stored.
-    - **Facade:** `api/api_keys_api.py` fills `create`, `list`, `revoke` and `verify`. `create` and `revoke`
-      publish `api_key.created` and `api_key.revoked` with `key_id`, `user_id`, `tenant_id`, `roles` and `by`
-      (the audit observer keeps both through the catalog's `audit` flag). `nl2sql keys create|list|revoke`
-      (`cli/commands/keys.py`) call them as the `--as` admin.
-    - **Docs:** `security/api-keys.md` (written), `security/model.md`, `observability/events.md` and the README's
-      command table.
+
+### C2
+
+!!! note "Built (C2): chat tools"
+    - **Files:** `nl2sql/conversations/tools.py` (`build_chat_tools`, `describe`, `ChatToolRunner`),
+      `report.py` (`build_report`), the tool branch of the loop and `Conversations.tool` / `report` in
+      `conversations/api.py`, `agent.py` (`step_view` shows a tool's output without data), `chat_tools/report.py`,
+      `api/chat_tools_api.py`. The runner's tools are built once in `Runtime.components` as `runtime.chat_tools`
+      (name to instance), so an unknown name is a `ConfigError` at `chat_tools[i]`. `ConversationsAPI` and
+      `Conversations` now take the facade (`engine`) as their second argument: that is what a tool is handed.
+    - **Tests:** `tests/unit/test_chat_tools.py`, one e2e test in `tests/e2e/test_conversations_fake_llm.py`,
+      `test_registry_tools_and_the_report_make_no_model_call` (architecture); the stub tests lose `tool`, `report`,
+      `chat_tools.list` and the three tool codes from `DECLARED_AHEAD`.
 
     Where the code and the design differ, the code won:
 
-    - `revoke` of an unknown id raises `ValueError` (the design says `None`); revoking a key that is already
-      revoked changes nothing and publishes nothing.
-    - `list` is newest first and includes revoked keys, which `nl2sql keys list` marks `revoked`.
-    - `create` retries a clash of ids (the store's `add_api_key` raises `ValueError`) with a new id, up to eight
-      times, then raises `RuntimeError`; it never overwrites. `user_id` must not be blank.
-    - Roles are checked against `policies.roles`, with no `allow_all` exemption: keys outlive the policy, so a
-      key minted with `roles=["admin"]` under `allow_all` would become a real admin key once roles are
-      configured. Under `allow_all` a key carries `roles=[]` (a role name is a `ValueError`), which reads
-      everything now and nothing once roles are configured. Under `allow_all` every caller may still manage
-      keys, as for `engine.knowledge.reload` and the review queue; the CLI leaves out `--as` and `--role` there
-      (`caller()` refuses every role name when none is defined), so `--role` is optional.
-    - A `by` that is not a `UserContext` is a `TypeError`, one without an admin role a `PermissionError`
-      (the engine's usual pair), not an `ErrorCode`.
-    - `verify` checks only the key: it does not check that the key's roles are still configured (the policy
-      engine does that on every run).
-    - Tests: `test_api_keys.py`, `test_cli_keys.py`. The stub tests moved `api_keys` and the `keys` commands out
-      of their tables.
-    - **For M2:** call `engine.api_keys.verify(token)` with the bearer token (the text after `Bearer `); `None`
-      is a 401. `verify` does not say why, and `mcp.denied` carries a `reason` (`missing`, `malformed`,
-      `unknown`, `revoked`). `missing` is M2's own (no header). To tell the others apart without reaching into
-      the runtime, M2 adds a method to `ApiKeysAPI` that returns the reason. Constraints: it compares the
-      secret before reporting `revoked` (right id with a wrong secret is `unknown`, so an id alone cannot
-      probe a key's state and the audit log never records a forged token as a revoked key); `verify` becomes a
-      thin wrapper over it, so there is one code path; and `nl2sql.policies.keys.parse` stays behind
-      `ApiKeysAPI`, not imported by `mcp/http.py`. Not built in M1.
+    - A tool is handed the conversation **with the turn in flight** appended (its steps so far, status
+      `answered`), so `chart` after `ask` works in one turn. The `report` tool covers stored turns only: it
+      calls `conversations.report`, which reads the store, so it cannot include the turn it is called in.
+    - The model sees a tool step as `output`: a chart is `{kind, reason, columns}`, a diagram is its text, and
+      a `markdown` or `json` body (a report, a dashboard change) is not shown, only its kind, title and `refs`.
+      The chart's takeaway is withheld too (it quotes values). D4 should show the model what it needs of a
+      dashboard through the `[CONVERSATION]` block, as its row says.
+    - `conversations.tool` validates the arguments before it opens a turn: an invalid call is a `ValueError`
+      and stores nothing; only an unknown or disabled name is stored, as an `UNKNOWN_CHAT_TOOL` step. A tool
+      turn's `text` is the tool's name.
+    - **A K1 bug fixed here:** a run saves its results under the engine's tenant (`settings.tenant_id`),
+      whoever asked, so the `chart` tool no longer reads the conversation's or the caller's tenant (it found
+      nothing for a caller with a `tenant_id`). The report reads the engine's tenant too.
+    - Review fixes: a stored tool output holds no rows (D106). A chart output's `data.rows` is emptied before
+      the step is stored (a client draws again through `engine.results.chart`), and the `report` tool stores
+      the report without row tables and chart takeaways (`conversations.report(include_rows=False)`); asked
+      for directly, the report still reads the rows from `engine.results`. `engine.results` does not check the
+      caller (it reads by tenant and trace id); that gap is a separate row.
+    - `chat_tools:` absent means the default tools **the registry has**, so an engine on `Registry.empty()`
+      builds. The defaults are `("chart", "report")` only: `diagram`, `dashboard_edit` and `dashboard_pin` are
+      still stubs and **stay off by default. K2 and D4 each add their own name to `DEFAULT_CHAT_TOOLS`
+      (`conversations/tools.py`) and to the docs when they land.** A name listed explicitly must be registered;
+      `ask` and a plugin whose `args_model` does not forbid extra keys are config errors.
+    - `user_context=None`, or a context with no `user_id`, is a `TypeError` in every `conversations` method (a
+      shared anonymous owner would see everyone's anonymous conversations). `TOOL_FAILED` shows the model the
+      exception type only; the log has the full error. The report considers every turn and keeps each
+      successful `ask` step, so an answer in a turn whose later tool failed is still reported.
+    - Names later rows use: `ChatToolRunner`, `build_chat_tools`, `describe` (`nl2sql.conversations.tools`),
+      `build_report` (`nl2sql.conversations.report`), `Conversations._tool(run, call)`, `runtime.chat_tools`,
+      `check_call` (renamed from `_check_call` in `agent.py`).
+
+
+### K1
+
+!!! note "Built (K1): auto charts"
+    - **Kinds:** `column_kinds(schema)` in `execution/artifacts/results.py` maps a polars schema to the five
+      kinds; the aggregator's `_write_manifest` fills `ResultSummary.column_kinds` from the saved file's schema.
+      The executor's and curated matcher's `execute.after` summaries still carry `{}` (they describe a
+      sub-query, not a saved result).
+    - **Charts:** `nl2sql/charts/choose.py` (`choose(...)`: plan refinements and the five rules),
+      `takeaway.py`, `vega.py`; `ChartSpec.to_vega_lite` delegates to `vega.py`. `ResultReader.head` reads the
+      first rows uncapped by the page size. `engine.results.chart` and `chat_tools/chart.py` are filled; the tool's
+      args are `turn`, `step`, `result_id`, `kind`.
+
+    Where the code and the design differ, the code won:
+
+    - Any read cut at `max_points`, or a result cut at the datasource row limit (`ResultSummary.truncated`), is a
+      table, not only a line (a bar over cut rows would drop categories).
+    - A `trace_id` alone has no question, so its chart is titled `Result`; a `QueryResult` with one sub-query
+      is titled with that sub-query's intent, and the `chart` tool retitles it with the step's question.
+    - With a plan, a number that is not an aggregate and not grouped on is a measure, unless the plan has
+      an aggregate: then a plain column is a dimension (so `[customer_id, name]` is not a bar of ids). A
+      grouped one is a dimension. A whole-number year axis (`DATE_PART`) and a time of day export as an
+      `ordinal` Vega-Lite type, since `temporal` would read years as epoch milliseconds and cannot parse
+      `01:00:00`. Several bar measures use `xOffset` on the folded measure. A takeaway keeps a data value's
+      case ("iPhone"); only template text is capitalised.
+    - A run that saved several results needs `result_id` (`ValueError` otherwise). For a `QueryResult` the
+      result ids come from its `result_manifest`: an empty one (a run a hook withheld, whose files stay on
+      disk) or an id outside it is `ResultNotFound`. The tool turns `ResultNotFound` (expired or withheld
+      rows) and a kind the data cannot draw into `ToolNotApplicable`, and reads the conversation's tenant
+      (`conversation.tenant_id`, else the caller's).
+    - A bare `trace_id` is checked like `engine.results.page`: tenant and run id only. A withheld run's files
+      were once readable this way; that gap is closed (C-W1): while a hook is attached at `answer.after` the
+      manifest every read goes through is written only once those hooks allowed, so a withheld run has none
+      and every read path answers `ResultNotFound` (see `docs/configuration/hooks.md`).
+    - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
+    - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
+      The stub test moves `chart` out of its tables.
+
+
+### K2
+
+Not built yet.
+
+### D1
 
 !!! note "Built (D1): workspaces, the dashboard store and manual edits"
     - **Files:** `nl2sql/dashboards/{store,workspaces,edits,api}.py` (the owner-scoped store over the state store;
@@ -1711,116 +1733,8 @@ flowchart TD
       methods), `EditEnv`, `Applied` and `apply_edits` (`nl2sql.dashboards.edits`; D4 adds the two chat-only
       handlers to its `_HANDLERS` table).
 
-!!! note "Built (C2): chat tools"
-    - **Files:** `nl2sql/conversations/tools.py` (`build_chat_tools`, `describe`, `ChatToolRunner`),
-      `report.py` (`build_report`), the tool branch of the loop and `Conversations.tool` / `report` in
-      `conversations/api.py`, `agent.py` (`step_view` shows a tool's output without data), `chat_tools/report.py`,
-      `api/chat_tools_api.py`. The runner's tools are built once in `Runtime.components` as `runtime.chat_tools`
-      (name to instance), so an unknown name is a `ConfigError` at `chat_tools[i]`. `ConversationsAPI` and
-      `Conversations` now take the facade (`engine`) as their second argument: that is what a tool is handed.
-    - **Tests:** `tests/unit/test_chat_tools.py`, one e2e test in `tests/e2e/test_conversations_fake_llm.py`,
-      `test_registry_tools_and_the_report_make_no_model_call` (architecture); the stub tests lose `tool`, `report`,
-      `chat_tools.list` and the three tool codes from `DECLARED_AHEAD`.
 
-    Where the code and the design differ, the code won:
-
-    - A tool is handed the conversation **with the turn in flight** appended (its steps so far, status
-      `answered`), so `chart` after `ask` works in one turn. The `report` tool covers stored turns only: it
-      calls `conversations.report`, which reads the store, so it cannot include the turn it is called in.
-    - The model sees a tool step as `output`: a chart is `{kind, reason, columns}`, a diagram is its text, and
-      a `markdown` or `json` body (a report, a dashboard change) is not shown, only its kind, title and `refs`.
-      The chart's takeaway is withheld too (it quotes values). D4 should show the model what it needs of a
-      dashboard through the `[CONVERSATION]` block, as its row says.
-    - `conversations.tool` validates the arguments before it opens a turn: an invalid call is a `ValueError`
-      and stores nothing; only an unknown or disabled name is stored, as an `UNKNOWN_CHAT_TOOL` step. A tool
-      turn's `text` is the tool's name.
-    - **A K1 bug fixed here:** a run saves its results under the engine's tenant (`settings.tenant_id`),
-      whoever asked, so the `chart` tool no longer reads the conversation's or the caller's tenant (it found
-      nothing for a caller with a `tenant_id`). The report reads the engine's tenant too.
-    - Review fixes: a stored tool output holds no rows (D106). A chart output's `data.rows` is emptied before
-      the step is stored (a client draws again through `engine.results.chart`), and the `report` tool stores
-      the report without row tables and chart takeaways (`conversations.report(include_rows=False)`); asked
-      for directly, the report still reads the rows from `engine.results`. `engine.results` does not check the
-      caller (it reads by tenant and trace id); that gap is a separate row.
-    - `chat_tools:` absent means the default tools **the registry has**, so an engine on `Registry.empty()`
-      builds. The defaults are `("chart", "report")` only: `diagram`, `dashboard_edit` and `dashboard_pin` are
-      still stubs and **stay off by default. K2 and D4 each add their own name to `DEFAULT_CHAT_TOOLS`
-      (`conversations/tools.py`) and to the docs when they land.** A name listed explicitly must be registered;
-      `ask` and a plugin whose `args_model` does not forbid extra keys are config errors.
-    - `user_context=None`, or a context with no `user_id`, is a `TypeError` in every `conversations` method (a
-      shared anonymous owner would see everyone's anonymous conversations). `TOOL_FAILED` shows the model the
-      exception type only; the log has the full error. The report considers every turn and keeps each
-      successful `ask` step, so an answer in a turn whose later tool failed is still reported.
-    - Names later rows use: `ChatToolRunner`, `build_chat_tools`, `describe` (`nl2sql.conversations.tools`),
-      `build_report` (`nl2sql.conversations.report`), `Conversations._tool(run, call)`, `runtime.chat_tools`,
-      `check_call` (renamed from `_check_call` in `agent.py`).
-
-!!! note "Built (L2): the config writers and the Connect routes"
-    - **Files:** `config/writer.py` (new: `EnvSecrets`, `env_name`, `datasource_data`, `write_env_values`,
-      `write_atomic`, `update_gitignore`, `dump_yaml`), `config/project.py` (`write_project`, `starter_config`;
-      `init_project` builds a `Config` and calls `write_project`), `config/loader.py` and `config/models.py`
-      (a datasources folder's file hashes: `Config.datasources_folder`, `datasource_file_hash`,
-      `record_datasource_file`), `api/datasource_api.py` (`save`), and in `nl2sql-api` `routes/datasource.py`,
-      `services/datasource.py`, `models/datasource.py` and `auth.is_fresh_local_install`. `nl2sql.config`
-      exports `write_project`, `starter_config` and `write_env_values`.
-    - **Tests:** `test_config_writer.py`, `test_datasources_save.py`, `packages/api/tests/test_connect_routes.py`;
-      the Connect routes are also in `test_admin_auth.py`'s admin-only table. `test_wave_c_stubs.py` lost `save`;
-      the boundary test's `PERSONS_FILE_WRITERS` lets `config/project.py` call `write_env_values`, and a new
-      test keeps the list from going stale.
-
-    Where the code and the design differ, the code won:
-
-    - **`write_project(config, folder, *, env_file=False, extra=None)`.** `env_file` is the design's "where the
-      writer may write `.env`" (launch passes true). `extra` maps a path to text to write or a file to copy: it
-      is how `init_project` keeps its example datasource's comments and copies the demo's databases, suites and
-      glossary. The existing-file refusal covers `extra` too. A section at its default is left out, as `init`
-      always did; `curated`, `observers: []` and every set optional section are written.
-    - **Env names follow the field's path.** `NL2SQL_` plus the path: a connection secret is
-      `NL2SQL_<DATASOURCE_ID>_<KEY>` (`NL2SQL_SALES_PASSWORD`), `llm.api_key` is `NL2SQL_LLM_API_KEY`, an agent's key is
-      `NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY` (the design's `NL2SQL_AGENTS_PLANNER_API_KEY` was an example that did
-      not follow its own rule), then `NL2SQL_EMBEDDINGS_API_KEY`, `NL2SQL_SECRETS_<PROVIDER_ID>_<KEY>`; header values
-      of the LLM and its agents are written the same way (`NL2SQL_LLM_HEADERS_<NAME>`). A connection field is a
-      secret by its key (`password`, `secret`, `token`, `api_key`, the same hints that mask it), because a
-      `ConnectionModel` instance holds it as `SecretStr`, or (D122) because its adapter's connection model declares
-      it (`adapter_secret_fields`: `format: password` in the schema), so a plugin's `private_key` is written as a
-      reference too. `write_project` takes the registry to find the adapters in (default `Registry.default()`).
-    - **A collision is two fields mapping to one name,** inside one write (compared by field, not by path, so a
-      datasource `llm` with an `api_key` collides with the LLM's) or against a name another configured
-      datasource's connection already references (`${env:NL2SQL_...}`) or the writer gives the rest of the config
-      (`config_reserved_names`: LLM, agents, embeddings, secret providers); the message names both fields. A name
-      already in `.env` is replaced (it is the same field written again), as the design says for the same names;
-      the engine cannot know which field wrote a line it did not write.
-    - **`save` refuses with the review queue's error:** `ReviewError` with `FILE_CHANGED` and the fix "reload the
-      engine"; the hash record lives on the `Config` (shared by its copies, updated after a save), recorded by the
-      loader for a folder include. `by` is checked as `engine.api_keys` does (`TypeError`, `PermissionError`; any
-      caller under `allow_all`). The file is `datasources/<id>.yaml` in the folder the loader read, and the event's
-      `file` is `<that folder>/<id>.yaml`.
-    - **`test(Datasource)` scrubs the status.** The design says the route never echoes a value; the driver's
-      words are the one place one could be, so the facade takes the datasource's secret literals and every
-      secret the engine knows out of `reason` and `fix` (`***`), for every caller. It replaces those exact values
-      only, not the redactor's patterns, which also ate the words around `password:` in a validation message.
-    - **REST bodies are read as plain JSON and validated by the service,** so FastAPI's own 422 (which echoes the
-      input) is never used, not even for a body that is not JSON or not an object (read from the raw request, answered
-      `[{"path": "", "message": ...}]`): every problem is `{path, message}` with the path in the body
-      (`config.limits.row_limit`), the body's own keys are strict (a `sav` typo is found; `user_context` stays allowed
-      for the dev flag). A connection that does not validate is raised by the engine as `ConnectionInvalid` (a
-      `ValueError` with `problems`, exported from `nl2sql`) and is the same list (`config.connection.port`). Any
-      other `ValueError` from `add` or `save` (an id taken, `SecretValueInConfig`) is a 422 with its text,
-      `ReviewError` a 409 and anything else the generic 500.
-    - **Review fixes (L2).** A save holds one process-wide lock around the hash check, the `.env` rewrite and the
-      file write; `.env` values refuse every character `str.splitlines` splits on and the file is read back split on
-      `\n` only; a datasource id is allow-listed as a file name (letters, digits, `_`, `-`, `.`; no Windows device
-      name); `is_fresh_local_install` also needs no `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header; the
-      demo's `settings.yaml` keeps its comment (`write_project(headers=...)`).
-      `POST /datasource/test` takes the same `{config}` body (no `save`); `GET /datasource-types` answers
-      `{"types": [...]}`. A `save` that fails after the `add` removes the datasource again.
-    - **`env_file` over REST** is `auth.is_fresh_local_install`: no role source (`api.role_header`, `api.role`,
-      `api.trust_body_role`) and a loopback client, the one case `require_admin` lets through unauthenticated.
-    - **For L3:** `write_project(starter_config(llm=default_llm(provider), path=DIR/".nl2sql"), DIR, env_file=True)`
-      writes a new project (the glossary lands at `DIR/glossary.yaml`, and an engine with no datasources builds
-      and checks); an existing project takes `engine.datasources.add(...)` then
-      `engine.datasources.save(id, by=admin, env_file=True)`; `write_env_values(folder, {...})` for the model key.
-      `Config.with_datasource` adds datasources before writing. All three are in `nl2sql.config`.
+### D2
 
 !!! note "Built (D2): refresh, stored results and schedules; filters are D2b"
     Row D2 is split, as the row allows: this PR is refresh, stored results, `open` and schedules; the filters
@@ -1892,26 +1806,166 @@ flowchart TD
       `Refresher.locked`), `TileRunner.run(tile, user, execute=False)` for D4's no-execute check of `add_tile` and
       `replace_plan`, and `DashboardBusy`.
 
-The waves, with at most four PRs at once:
+### D2b
 
-| Wave | PRs | Notes |
-|---|---|---|
-| 1 | C0 | Alone; everything else branches from it |
-| 2 | C1, K1, L1, M1 | The four tracks start |
-| 3 | C2, K2, D1, L2 | |
-| 4 | D2, M2 | |
-| 5 | D3, D4 | Both build on D2 |
-| 6 | L3 | Needs D3 |
+Not built yet.
 
-Files more than one PR touches, all in wave order or in different waves:
-`api/datasource_api.py` (K2's `diagram` in wave 3 and L2's `save` in wave
-3 fill separate stub methods C0 wrote; L1's `scan` in wave 2),
-`nl2sql/conversations/api.py` and `agent.py` (C1, then C2),
-`nl2sql/dashboards/api.py` (D1, D2, then D3), `nl2sql/dashboards/edits.py`
-(D1, then D4), `api/dashboards_api.py` (D1, D2, D3), `nl2sql/mcp/server.py`
-(Wave B's L2, then M2). C0's stubs mean no two PRs add to `public_api.py`,
-`pyproject.toml`, `cli/main.py`, `mkdocs.yml`, `nl2sql/__init__.py` or the
-boundary test's constants.
+### D3
+
+Not built yet.
+
+### D4
+
+Not built yet.
+
+### L1
+
+!!! note "Built (L1)"
+    `engine.datasources.scan` is `nl2sql/datasources/discovery.py`'s `scan(registry, folder, *, url, ports,
+    skip)`; the five built-ins declare the class variables above and a `connection_for` classmethod (SQLite and
+    DuckDB read the first 16 and 12 bytes of a file, the server databases split a `make_url` URL or a
+    `host:port`). Where the code and the design differ, the code won:
+
+    - `Found` and `DiscoverableAdapter` are imported from `nl2sql_sdk.discovery`, not the SDK's top level.
+    - **Order:** the adapters are walked sorted by registry name, so findings of one kind come in name order
+      (files in sorted path order, ports by adapter name, then each adapter's port order).
+    - **Depth:** "two levels deep" is two folders below `folder` (`folder/a/b/x.db` is found, `folder/a/b/c/x.db`
+      is not). The 50 is files that carry a declared suffix, counted before `connection_for` confirms them.
+    - **Duplicates** are one server (type, host, port) or one file (type, resolved path), the first finding wins.
+      A missing port counts as the adapter's default and `localhost` as `127.0.0.1`, so a URL naming either
+      hides the open-port finding for the same server.
+    - **The password:** `connection` keeps the URL's password (a form needs it), `Candidate`'s repr masks it
+      (`model_dump` does not, so a Candidate is never logged or serialised), and `found.value` is the URL with
+      the password replaced by `***` and its query and fragment dropped (a password can sit in the query).
+      The adapter is given the real URL.
+    - An adapter whose `connection_for` raises or returns something `Candidate` rejects is skipped, not fatal,
+      and its error text is dropped (it could hold a password); a missing folder finds nothing; `scan` takes
+      `storage.path` from the engine's config to skip. Each port is probed once.
+    - A DuckDB file is confirmed by the `DUCK` magic at byte 8 (the design names only SQLite's header).
+    - The probe is `socket.create_connection(("127.0.0.1", port), timeout=0.2)`; the tests replace it with a fake.
+    - L3 uses `Candidate.type`, `.connection` and `.missing` to fill the form and `.found` to say where a
+      finding came from; `scan` never connects, so L3 calls `datasources.test` on the filled form.
+
+### L2
+
+!!! note "Built (L2): the config writers and the Connect routes"
+    - **Files:** `config/writer.py` (new: `EnvSecrets`, `env_name`, `datasource_data`, `write_env_values`,
+      `write_atomic`, `update_gitignore`, `dump_yaml`), `config/project.py` (`write_project`, `starter_config`;
+      `init_project` builds a `Config` and calls `write_project`), `config/loader.py` and `config/models.py`
+      (a datasources folder's file hashes: `Config.datasources_folder`, `datasource_file_hash`,
+      `record_datasource_file`), `api/datasource_api.py` (`save`), and in `nl2sql-api` `routes/datasource.py`,
+      `services/datasource.py`, `models/datasource.py` and `auth.is_fresh_local_install`. `nl2sql.config`
+      exports `write_project`, `starter_config` and `write_env_values`.
+    - **Tests:** `test_config_writer.py`, `test_datasources_save.py`, `packages/api/tests/test_connect_routes.py`;
+      the Connect routes are also in `test_admin_auth.py`'s admin-only table. `test_wave_c_stubs.py` lost `save`;
+      the boundary test's `PERSONS_FILE_WRITERS` lets `config/project.py` call `write_env_values`, and a new
+      test keeps the list from going stale.
+
+    Where the code and the design differ, the code won:
+
+    - **`write_project(config, folder, *, env_file=False, extra=None)`.** `env_file` is the design's "where the
+      writer may write `.env`" (launch passes true). `extra` maps a path to text to write or a file to copy: it
+      is how `init_project` keeps its example datasource's comments and copies the demo's databases, suites and
+      glossary. The existing-file refusal covers `extra` too. A section at its default is left out, as `init`
+      always did; `curated`, `observers: []` and every set optional section are written.
+    - **Env names follow the field's path.** `NL2SQL_` plus the path: a connection secret is
+      `NL2SQL_<DATASOURCE_ID>_<KEY>` (`NL2SQL_SALES_PASSWORD`), `llm.api_key` is `NL2SQL_LLM_API_KEY`, an agent's key is
+      `NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY` (the design's `NL2SQL_AGENTS_PLANNER_API_KEY` was an example that did
+      not follow its own rule), then `NL2SQL_EMBEDDINGS_API_KEY`, `NL2SQL_SECRETS_<PROVIDER_ID>_<KEY>`; header values
+      of the LLM and its agents are written the same way (`NL2SQL_LLM_HEADERS_<NAME>`). A connection field is a
+      secret by its key (`password`, `secret`, `token`, `api_key`, the same hints that mask it), because a
+      `ConnectionModel` instance holds it as `SecretStr`, or (D122) because its adapter's connection model declares
+      it (`adapter_secret_fields`: `format: password` in the schema), so a plugin's `private_key` is written as a
+      reference too. `write_project` takes the registry to find the adapters in (default `Registry.default()`).
+    - **A collision is two fields mapping to one name,** inside one write (compared by field, not by path, so a
+      datasource `llm` with an `api_key` collides with the LLM's) or against a name another configured
+      datasource's connection already references (`${env:NL2SQL_...}`) or the writer gives the rest of the config
+      (`config_reserved_names`: LLM, agents, embeddings, secret providers); the message names both fields. A name
+      already in `.env` is replaced (it is the same field written again), as the design says for the same names;
+      the engine cannot know which field wrote a line it did not write.
+    - **`save` refuses with the review queue's error:** `ReviewError` with `FILE_CHANGED` and the fix "reload the
+      engine"; the hash record lives on the `Config` (shared by its copies, updated after a save), recorded by the
+      loader for a folder include. `by` is checked as `engine.api_keys` does (`TypeError`, `PermissionError`; any
+      caller under `allow_all`). The file is `datasources/<id>.yaml` in the folder the loader read, and the event's
+      `file` is `<that folder>/<id>.yaml`.
+    - **`test(Datasource)` scrubs the status.** The design says the route never echoes a value; the driver's
+      words are the one place one could be, so the facade takes the datasource's secret literals and every
+      secret the engine knows out of `reason` and `fix` (`***`), for every caller. It replaces those exact values
+      only, not the redactor's patterns, which also ate the words around `password:` in a validation message.
+    - **REST bodies are read as plain JSON and validated by the service,** so FastAPI's own 422 (which echoes the
+      input) is never used, not even for a body that is not JSON or not an object (read from the raw request, answered
+      `[{"path": "", "message": ...}]`): every problem is `{path, message}` with the path in the body
+      (`config.limits.row_limit`), the body's own keys are strict (a `sav` typo is found; `user_context` stays allowed
+      for the dev flag). A connection that does not validate is raised by the engine as `ConnectionInvalid` (a
+      `ValueError` with `problems`, exported from `nl2sql`) and is the same list (`config.connection.port`). Any
+      other `ValueError` from `add` or `save` (an id taken, `SecretValueInConfig`) is a 422 with its text,
+      `ReviewError` a 409 and anything else the generic 500.
+    - **Review fixes (L2).** A save holds one process-wide lock around the hash check, the `.env` rewrite and the
+      file write; `.env` values refuse every character `str.splitlines` splits on and the file is read back split on
+      `\n` only; a datasource id is allow-listed as a file name (letters, digits, `_`, `-`, `.`; no Windows device
+      name); `is_fresh_local_install` also needs no `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header; the
+      demo's `settings.yaml` keeps its comment (`write_project(headers=...)`).
+      `POST /datasource/test` takes the same `{config}` body (no `save`); `GET /datasource-types` answers
+      `{"types": [...]}`. A `save` that fails after the `add` removes the datasource again.
+    - **`env_file` over REST** is `auth.is_fresh_local_install`: no role source (`api.role_header`, `api.role`,
+      `api.trust_body_role`) and a loopback client, the one case `require_admin` lets through unauthenticated.
+    - **For L3:** `write_project(starter_config(llm=default_llm(provider), path=DIR/".nl2sql"), DIR, env_file=True)`
+      writes a new project (the glossary lands at `DIR/glossary.yaml`, and an engine with no datasources builds
+      and checks); an existing project takes `engine.datasources.add(...)` then
+      `engine.datasources.save(id, by=admin, env_file=True)`; `write_env_values(folder, {...})` for the model key.
+      `Config.with_datasource` adds datasources before writing. All three are in `nl2sql.config`.
+
+
+### L3
+
+Not built yet.
+
+### M1
+
+!!! note "Built (M1): API keys"
+    - **Token:** `nl2sql/policies/keys.py` holds the format (`nl2sql_<id>_<secret>`, `id` 8 hex characters,
+      `secret` 43 URL-safe characters from `secrets.token_urlsafe(32)`, matched with `fullmatch`), `hash_secret`
+      (SHA-256 hex) and `matches` (`hmac.compare_digest`). The store row is `id`, `hash`, `label`, `user_id`,
+      `tenant_id`, `roles`, `created_at`, `created_by`, `revoked_at`; the token and the secret are never stored.
+    - **Facade:** `api/api_keys_api.py` fills `create`, `list`, `revoke` and `verify`. `create` and `revoke`
+      publish `api_key.created` and `api_key.revoked` with `key_id`, `user_id`, `tenant_id`, `roles` and `by`
+      (the audit observer keeps both through the catalog's `audit` flag). `nl2sql keys create|list|revoke`
+      (`cli/commands/keys.py`) call them as the `--as` admin.
+    - **Docs:** `security/api-keys.md` (written), `security/model.md`, `observability/events.md` and the README's
+      command table.
+
+    Where the code and the design differ, the code won:
+
+    - `revoke` of an unknown id raises `ValueError` (the design says `None`); revoking a key that is already
+      revoked changes nothing and publishes nothing.
+    - `list` is newest first and includes revoked keys, which `nl2sql keys list` marks `revoked`.
+    - `create` retries a clash of ids (the store's `add_api_key` raises `ValueError`) with a new id, up to eight
+      times, then raises `RuntimeError`; it never overwrites. `user_id` must not be blank.
+    - Roles are checked against `policies.roles`, with no `allow_all` exemption: keys outlive the policy, so a
+      key minted with `roles=["admin"]` under `allow_all` would become a real admin key once roles are
+      configured. Under `allow_all` a key carries `roles=[]` (a role name is a `ValueError`), which reads
+      everything now and nothing once roles are configured. Under `allow_all` every caller may still manage
+      keys, as for `engine.knowledge.reload` and the review queue; the CLI leaves out `--as` and `--role` there
+      (`caller()` refuses every role name when none is defined), so `--role` is optional.
+    - A `by` that is not a `UserContext` is a `TypeError`, one without an admin role a `PermissionError`
+      (the engine's usual pair), not an `ErrorCode`.
+    - `verify` checks only the key: it does not check that the key's roles are still configured (the policy
+      engine does that on every run).
+    - Tests: `test_api_keys.py`, `test_cli_keys.py`. The stub tests moved `api_keys` and the `keys` commands out
+      of their tables.
+    - **For M2:** call `engine.api_keys.verify(token)` with the bearer token (the text after `Bearer `); `None`
+      is a 401. `verify` does not say why, and `mcp.denied` carries a `reason` (`missing`, `malformed`,
+      `unknown`, `revoked`). `missing` is M2's own (no header). To tell the others apart without reaching into
+      the runtime, M2 adds a method to `ApiKeysAPI` that returns the reason. Constraints: it compares the
+      secret before reporting `revoked` (right id with a wrong secret is `unknown`, so an id alone cannot
+      probe a key's state and the audit log never records a forged token as a revoked key); `verify` becomes a
+      thin wrapper over it, so there is one code path; and `nl2sql.policies.keys.parse` stays behind
+      `ApiKeysAPI`, not imported by `mcp/http.py`. Not built in M1.
+
+
+### M2
+
+Not built yet.
 
 ## 14. Bugs Wave C fixes
 
