@@ -1583,6 +1583,16 @@ flowchart TD
     - Names later rows use: `Conversations` (`nl2sql.conversations.api`), `checked_step`, `block`, `step_view`,
       `ASK_SPEC` and `AskArgs` (`nl2sql.conversations.agent`), `ConversationStore`, `owner_of`, `strip_rows`
       (`nl2sql.conversations.store`), `current_conversation_id`.
+    - `max_turns` is checked under the conversation's lock for every turn (`ask`, `stream`, `retry`, `ask_only`).
+      A pending choice is checked again under the lock; if another turn cleared it meanwhile, the call raises
+      the same `ValueError` as for a choice with nothing pending.
+    - A cancelled token stops the loop before the next model call, so the turn ends after the step in flight and
+      is stored as `error` with `CANCELLED`. A provider failure in a model step (auth, rate limit, timeout)
+      ends the turn as `error` with the classified `PROVIDER_*` code and stores it; the scope still closes with
+      `conversation.turn`.
+    - `delete` takes the lock and raises `ConversationBusy` while a turn runs. A turn's scope, and
+      `conversation.started`, carry the conversation's tenant. The stream worker runs in a copy of the
+      caller's context.
 
 The waves, with at most four PRs at once:
 

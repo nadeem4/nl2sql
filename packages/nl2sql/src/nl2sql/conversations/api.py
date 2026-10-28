@@ -7,6 +7,7 @@ finishes.
 """
 from __future__ import annotations
 
+import contextvars
 import queue
 import secrets
 import threading
@@ -27,6 +28,7 @@ from nl2sql.events import STREAM_EVENTS, RunScope
 from nl2sql.events.catalog import ConversationStarted, ConversationStep, ConversationTurn
 from nl2sql.hooks.approval import Approval
 from nl2sql.limits import Budget, LimitReached
+from nl2sql.llm.failures import classify_provider_error
 from nl2sql.llm.wires import StructuredOutputError
 from nl2sql.pipeline.runtime import usage_prices
 from nl2sql.policies import UserContext
@@ -114,7 +116,8 @@ class Conversations:
 
     def delete(self, conversation_id: str, *, user_context: UserContext) -> None:
         self.get(conversation_id, user_context=user_context)
-        self._store.delete(conversation_id)
+        with self._locked(conversation_id):  # a running turn would store the conversation again
+            self._store.delete(conversation_id)
 
     # ------------------------------------------------------------ turns
 
@@ -174,10 +177,13 @@ class Conversations:
             raise ValueError("Say what you want to ask.")
         else:
             shown = text
+        self._check_length(conversation)
+        return ("choice" if choice is not None else "message"), shown
+
+    def _check_length(self, conversation: Conversation) -> None:
         if len(conversation.turns) >= self._settings.max_turns:
             raise ValueError(f"{ErrorCode.CONVERSATION_TOO_LONG.value}: this conversation has "
                              f"{self._settings.max_turns} turns. Start a new conversation.")
-        return ("choice" if choice is not None else "message"), shown
 
     @staticmethod
     def _pending_option(conversation: Conversation, choice: str):
@@ -202,9 +208,11 @@ class Conversations:
 
     def _open(self, conversation: Conversation, user: UserContext, kind: TurnKind, text: str, execute: bool,
               token: CancellationToken, **options: Any) -> _Run:
+        """A turn's run; call it under the conversation's lock, with the conversation read under it."""
+        self._check_length(conversation)
         usage = TokenUsageCallback(prices=usage_prices(self._ctx))
         scope = RunScope(self._ctx.bus, question=text, user_context=user, datasource_id=conversation.datasource_id,
-                         execute=execute, tenant_id=self._ctx.tenant_id, usage=usage)
+                         execute=execute, tenant_id=conversation.tenant_id, usage=usage)
         budget = Budget.for_question(self._ctx.settings.pipeline, usage)
         if budget is not None:
             scope.attach(budget)
@@ -227,6 +235,7 @@ class Conversations:
             raise
 
     def _by_choice(self, run: _Run, option_id: str) -> Turn:
+        self._pending_option(run.conversation, option_id)  # read under the lock: it may have gone since _prepare
         pending = run.conversation.pending
         self._ask(run, ToolCall(name="ask", args={"question": pending.question, "choice": option_id}))
         return self._finish(run)
@@ -239,6 +248,8 @@ class Conversations:
         try:
             for used in range(settings.max_tool_calls + 1):
                 self._check_cancelled(run)
+                if run.token.is_cancelled():
+                    break  # the step in flight was the last; _finish stores the turn as cancelled
                 left = settings.max_tool_calls - used
                 message = block(run.conversation.turns, run.text, context_turns=settings.context_turns,
                                 pending=pending, tools=[ASK_SPEC], calls_left=left, this_turn=run.steps)
@@ -256,6 +267,12 @@ class Conversations:
         except LimitReached as exc:
             status = "stopped"
             error = {"code": ErrorCode.RUN_LIMIT_REACHED.value, "message": str(exc)}
+        except Exception as exc:
+            failure = classify_provider_error(exc)
+            if failure is None:
+                raise
+            status = "error"
+            error = {"code": failure.code.value, "message": failure.message}
         return self._finish(run, reply=reply, offers=offers, error=error, status=status)
 
     @staticmethod
@@ -270,6 +287,7 @@ class Conversations:
         choice = None
         question = args.question
         if args.choice is not None:
+            self._pending_option(conversation, args.choice)  # still pending now that the lock is held
             pending = conversation.pending
             choice = ClarificationChoice(request=pending, option_id=args.choice)
             question = pending.question  # Wave B refuses a choice unless the question is the request's own
@@ -354,7 +372,8 @@ class Conversations:
             finally:
                 events.put(None)
 
-        threading.Thread(target=work, name="nl2sql-conversation", daemon=True).start()
+        threading.Thread(target=contextvars.copy_context().run, args=(work,), name="nl2sql-conversation",
+                         daemon=True).start()
         finished = False
         try:
             while (item := events.get()) is not None:

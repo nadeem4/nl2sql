@@ -12,9 +12,13 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional
 
+import httpx
+import openai
 import pytest
 
 from nl2sql import NL2SQL, UserContext
+from nl2sql.common.cancellation import CancellationToken
+from nl2sql.conversations.agent import ConversationAgent
 from nl2sql.api.query_api import QueryAPI, QueryResult, RowSample, SubQueryResult
 from nl2sql.clarify.models import ClarificationOption, ClarificationRequest
 from nl2sql.common.errors import ConversationBusy, ConversationNotFound
@@ -459,7 +463,7 @@ def _approval_request() -> ApprovalRequest:
                                  approver_roles=["admin"])
 
 
-def test_approval_ends_the_turn_and_retry_runs_the_last_ask_question_with_the_approvals(engine, model, server, runs):
+def test_retry_with_approvals_runs_the_last_ask_question(engine, model, server, runs):
     need = _approval_request()
     runs.respond = lambda question, kwargs: result(question, status="needs_approval", approvals_needed=[need])
     conversation = started(engine)
@@ -718,10 +722,10 @@ def test_closing_the_stream_early_stores_no_turn(engine, model, runs):
     next(stream)
     stream.close()
     first_event.set()
-    engine.conversations.ask  # the worker winds down; the lock frees
-    for _ in range(100):
+    model.script.clear()  # the closed stream's worker asks the model nothing more
+    model.say(reply("again"))
+    for _ in range(100):  # the worker winds down; the lock frees
         try:
-            model.say(reply("again"))
             engine.conversations.ask(conversation.id, "later", user_context=ANA)
             break
         except ConversationBusy:
@@ -744,3 +748,129 @@ def test_stream_on_a_busy_conversation_raises_on_the_first_event(engine, model, 
         next(engine.conversations.stream(conversation.id, "again", user_context=ANA))
     release.set()
     worker.join(10)
+
+
+# ------------------------------------------------------------------ review fixes (C1)
+
+def _auth_error() -> Exception:
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    body = {"message": "Incorrect API key provided.", "type": "invalid_request_error", "param": None,
+            "code": "invalid_api_key"}
+    response = httpx.Response(401, request=request, json={"error": body})
+    return openai.OpenAI(api_key="unused-in-this-test")._make_status_error(
+        "Error code: 401", body={"error": body}, response=response)
+
+
+def test_a_cancelled_ask_stops_the_loop_after_the_step_in_flight(engine, model, server, runs):
+    conversation = started(engine)
+    token = CancellationToken()
+    runs.gate = token.cancel
+    model.fallback = lambda prompt: ask("q")
+
+    turn = engine.conversations.ask(conversation.id, "q", user_context=ANA, cancellation_token=token)
+
+    assert len(runs.calls) == 1 and len(server.calls) == 1, "no model call and no run after the cancel"
+    assert turn.status == "error" and turn.error["code"] == "CANCELLED"
+    assert engine.conversations.get(conversation.id, user_context=ANA).turns == [turn]
+
+
+def test_max_turns_holds_for_retry_and_ask_only_too(make, runs):
+    engine = make(conversations={"max_turns": 1})
+    conversation = started(engine)
+    engine.conversations.ask_only(conversation.id, "q", user_context=ANA)
+
+    with pytest.raises(ValueError, match="CONVERSATION_TOO_LONG"):
+        engine.conversations.ask_only(conversation.id, "q2", user_context=ANA)
+    with pytest.raises(ValueError, match="CONVERSATION_TOO_LONG"):
+        engine.conversations.retry(conversation.id, user_context=ANA)
+
+    assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 1
+    assert runs.questions == ["q"]
+
+
+def test_a_choice_whose_pending_question_went_away_before_the_lock_is_refused(engine, model, runs, monkeypatch):
+    conversation, _ = _pending(engine, model, runs)
+    service = engine.conversations._service
+    prepare = service._prepare
+
+    def prepare_then_another_turn_clears_pending(*args: Any, **kwargs: Any):
+        found = prepare(*args, **kwargs)
+        stored = service._store.get(conversation.id, service._owner(ANA))
+        stored.pending = None
+        service._store.put(stored)
+        return found
+
+    monkeypatch.setattr(service, "_prepare", prepare_then_another_turn_clears_pending)
+
+    with pytest.raises(ValueError, match="Nothing in this conversation is waiting for a choice."):
+        engine.conversations.ask(conversation.id, user_context=ANA, choice="a")
+
+    assert runs.calls == []
+
+
+def test_a_provider_failure_ends_the_turn_in_error_and_closes_the_scope_once(engine, model, monkeypatch):
+    seen: List[Any] = []
+    engine.events.subscribe(seen.append)
+    conversation = started(engine)
+
+    def refused(self, *args: Any, **kwargs: Any):
+        raise _auth_error()
+
+    monkeypatch.setattr(ConversationAgent, "decide", refused)
+
+    turn = engine.conversations.ask(conversation.id, "Hi", user_context=ANA)
+
+    assert turn.status == "error" and turn.error["code"] == "PROVIDER_AUTH_FAILED"
+    assert "OpenAI" in turn.error["message"] and "sk-" not in turn.error["message"]
+    assert engine.conversations.get(conversation.id, user_context=ANA).turns == [turn]
+    names = [e.name for e in seen if e.trace_id == turn.trace_id]
+    assert names.count("conversation.turn") == 1 and names[-1] == "conversation.turn" and "run.failed" not in names
+
+
+def test_deleting_a_conversation_whose_turn_is_running_is_busy_and_the_turn_still_stores(engine, model, runs):
+    conversation = started(engine)
+    inside, release = threading.Event(), threading.Event()
+    runs.gate = lambda: (inside.set(), release.wait(10))
+    model.say(ask("q"), reply("ok"))
+    worker = threading.Thread(target=lambda: engine.conversations.ask(conversation.id, "q", user_context=ANA))
+    worker.start()
+    assert inside.wait(10)
+
+    with pytest.raises(ConversationBusy):
+        engine.conversations.delete(conversation.id, user_context=ANA)
+    release.set()
+    worker.join(10)
+
+    assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 1
+    engine.conversations.delete(conversation.id, user_context=ANA)
+    with pytest.raises(ConversationNotFound):
+        engine.conversations.get(conversation.id, user_context=ANA)
+
+
+def test_started_and_the_turn_use_the_conversations_tenant(engine, model, runs):
+    seen: List[Any] = []
+    engine.events.subscribe(seen.append, names=["conversation.started", "conversation.turn"])
+    conversation = started(engine)
+    model.say(reply("ok"))
+
+    engine.conversations.ask(conversation.id, "Hi", user_context=ANA)
+
+    assert [(e.name, e.tenant_id) for e in seen] == [("conversation.started", "acme"),
+                                                    ("conversation.turn", "acme")]
+
+
+def test_the_stream_worker_runs_in_the_callers_context(engine, model, runs):
+    from nl2sql.common.context import current_conversation_id  # any context var the caller has set
+    conversation = started(engine)
+    model.say(reply("ok"))
+    marker = current_conversation_id.set("caller-context")
+    try:
+        seen: List[Any] = []
+        runs_in_worker = engine.conversations._service
+        original = runs_in_worker._open
+        runs_in_worker._open = lambda *a, **k: (seen.append(current_conversation_id.get()), original(*a, **k))[1]
+        list(engine.conversations.stream(conversation.id, "Hi", user_context=ANA))
+    finally:
+        current_conversation_id.reset(marker)
+
+    assert seen == ["caller-context"]

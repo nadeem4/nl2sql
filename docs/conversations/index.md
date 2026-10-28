@@ -79,7 +79,7 @@ iterator early cancels the turn and stores nothing.
 | **Roles** | Never stored. Each turn runs with the `user_context` passed to that call, so a role taken away applies at the next turn. |
 | **No `user_id`** | Allowed, and owned by "no user": every caller without one in that tenant sees those conversations. Fine for a script, not for a server. |
 | **One turn at a time** | A turn holds the state store's lock `conversation:<id>`; a second `ask`, `retry` or `stream` raises `ConversationBusy`. |
-| **Limits** | `conversations.max_turns` (50): the next turn is a `ValueError` naming `CONVERSATION_TOO_LONG` and the fix, "Start a new conversation." |
+| **Limits** | `conversations.max_turns` (50): the next turn, whichever of `ask`, `stream`, `retry` or `ask_only` it is, is a `ValueError` naming `CONVERSATION_TOO_LONG` and the fix, "Start a new conversation." |
 | **Results** | A stored step keeps its question, plan, SQL, explanation and summary, never the rows. Read them with `engine.results.page(step.trace_id, ...)` until they are purged. |
 | **Retention** | `engine.storage.purge()` deletes conversations last updated more than `conversations.max_age_days` (30; `null` keeps them) ago and reports `conversations` in `retention.purged`. |
 
