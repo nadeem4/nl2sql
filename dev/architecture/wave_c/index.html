@@ -5878,7 +5878,7 @@ default. The server is its own process, built on the same
 </tr>
 <tr>
 <td><strong>CLI</strong></td>
-<td><code>nl2sql keys create --as ROLE --user NAME --role analyst [--tenant T] [--label L]</code> prints the token once; <code>nl2sql keys list --as ROLE</code>; <code>nl2sql keys revoke ID --as ROLE</code>. <code>--as</code> builds the admin <code>by</code>, as Wave B's <code>nl2sql review --as ROLE</code> does.</td>
+<td><code>nl2sql keys create --as ROLE --user NAME --role analyst [--tenant T] [--label L]</code> prints the token once; <code>nl2sql keys list --as ROLE</code>; <code>nl2sql keys revoke ID --as ROLE</code>. <code>--as</code> builds the admin <code>by</code>, as Wave B's <code>nl2sql review --as ROLE</code> does. Under <code>allow_all</code> no roles exist: leave out <code>--as</code> and <code>--role</code>.</td>
 </tr>
 <tr>
 <td><strong>OAuth later</strong></td>
@@ -6462,6 +6462,49 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
 <li><code>delete</code> takes the lock and raises <code>ConversationBusy</code> while a turn runs. A turn's scope, and
   <code>conversation.started</code>, carry the conversation's tenant. The stream worker runs in a copy of the
   caller's context.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built (M1): API keys</p>
+<ul>
+<li><strong>Token:</strong> <code>nl2sql/policies/keys.py</code> holds the format (<code>nl2sql_&lt;id&gt;_&lt;secret&gt;</code>, <code>id</code> 8 hex characters,
+  <code>secret</code> 43 URL-safe characters from <code>secrets.token_urlsafe(32)</code>, matched with <code>fullmatch</code>), <code>hash_secret</code>
+  (SHA-256 hex) and <code>matches</code> (<code>hmac.compare_digest</code>). The store row is <code>id</code>, <code>hash</code>, <code>label</code>, <code>user_id</code>,
+  <code>tenant_id</code>, <code>roles</code>, <code>created_at</code>, <code>created_by</code>, <code>revoked_at</code>; the token and the secret are never stored.</li>
+<li><strong>Facade:</strong> <code>api/api_keys_api.py</code> fills <code>create</code>, <code>list</code>, <code>revoke</code> and <code>verify</code>. <code>create</code> and <code>revoke</code>
+  publish <code>api_key.created</code> and <code>api_key.revoked</code> with <code>key_id</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code> and <code>by</code>
+  (the audit observer keeps both through the catalog's <code>audit</code> flag). <code>nl2sql keys create|list|revoke</code>
+  (<code>cli/commands/keys.py</code>) call them as the <code>--as</code> admin.</li>
+<li><strong>Docs:</strong> <code>security/api-keys.md</code> (written), <code>security/model.md</code>, <code>observability/events.md</code> and the README's
+  command table.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><code>revoke</code> of an unknown id raises <code>ValueError</code> (the design says <code>None</code>); revoking a key that is already
+  revoked changes nothing and publishes nothing.</li>
+<li><code>list</code> is newest first and includes revoked keys, which <code>nl2sql keys list</code> marks <code>revoked</code>.</li>
+<li><code>create</code> retries a clash of ids (the store's <code>add_api_key</code> raises <code>ValueError</code>) with a new id, up to eight
+  times, then raises <code>RuntimeError</code>; it never overwrites. <code>user_id</code> must not be blank.</li>
+<li>Roles are checked against <code>policies.roles</code>, with no <code>allow_all</code> exemption: keys outlive the policy, so a
+  key minted with <code>roles=["admin"]</code> under <code>allow_all</code> would become a real admin key once roles are
+  configured. Under <code>allow_all</code> a key carries <code>roles=[]</code> (a role name is a <code>ValueError</code>), which reads
+  everything now and nothing once roles are configured. Under <code>allow_all</code> every caller may still manage
+  keys, as for <code>engine.knowledge.reload</code> and the review queue; the CLI leaves out <code>--as</code> and <code>--role</code> there
+  (<code>caller()</code> refuses every role name when none is defined), so <code>--role</code> is optional.</li>
+<li>A <code>by</code> that is not a <code>UserContext</code> is a <code>TypeError</code>, one without an admin role a <code>PermissionError</code>
+  (the engine's usual pair), not an <code>ErrorCode</code>.</li>
+<li><code>verify</code> checks only the key: it does not check that the key's roles are still configured (the policy
+  engine does that on every run).</li>
+<li>Tests: <code>test_api_keys.py</code>, <code>test_cli_keys.py</code>. The stub tests moved <code>api_keys</code> and the <code>keys</code> commands out
+  of their tables.</li>
+<li><strong>For M2:</strong> call <code>engine.api_keys.verify(token)</code> with the bearer token (the text after <code>Bearer</code>); <code>None</code>
+  is a 401. <code>verify</code> does not say why, and <code>mcp.denied</code> carries a <code>reason</code> (<code>missing</code>, <code>malformed</code>,
+  <code>unknown</code>, <code>revoked</code>). <code>missing</code> is M2's own (no header). To tell the others apart without reaching into
+  the runtime, M2 adds a method to <code>ApiKeysAPI</code> that returns the reason. Constraints: it compares the
+  secret before reporting <code>revoked</code> (right id with a wrong secret is <code>unknown</code>, so an id alone cannot
+  probe a key's state and the audit log never records a forged token as a revoked key); <code>verify</code> becomes a
+  thin wrapper over it, so there is one code path; and <code>nl2sql.policies.keys.parse</code> stays behind
+  <code>ApiKeysAPI</code>, not imported by <code>mcp/http.py</code>. Not built in M1.</li>
 </ul>
 </div>
 <p>The waves, with at most four PRs at once:</p>

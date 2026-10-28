@@ -6136,7 +6136,7 @@ events to its own. The three marked <em>turn</em> belong to a conversation turn,
 <tr>
 <td><code>api_key.created</code>, <code>api_key.revoked</code></td>
 <td><code>key_id</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code>, <code>by</code> (on revoke, <code>user_id</code> is whose key it was); never the token</td>
-<td><code>engine.api_keys</code> (audited, M1)</td>
+<td><code>engine.api_keys.create</code> and <code>revoke</code> (audited); revoking an already revoked key publishes nothing</td>
 </tr>
 <tr>
 <td><code>mcp.denied</code></td>

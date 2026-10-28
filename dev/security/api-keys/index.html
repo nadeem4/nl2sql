@@ -3695,6 +3695,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API keys
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -3711,6 +3729,69 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The token
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#events-and-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events and logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-key-does-and-does-not-give" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a key does and does not give
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -5661,6 +5742,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-token" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The token
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#from-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#events-and-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events and logs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-key-does-and-does-not-give" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a key does and does not give
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -5677,19 +5810,74 @@
 
 
 <h1 id="api-keys">API keys</h1>
-<div class="admonition note">
-<p class="admonition-title">Arrives with M1 (Wave C, 0.9)</p>
-<p>This page is a stub. <code>engine.api_keys</code> and <code>nl2sql keys</code> are registered with their final signatures
-and name M1. The design is <a href="../../architecture/wave_c/#9-mcp-over-http-with-auth">Wave C, section 9</a>.</p>
-</div>
-<p>An API key authenticates a client of MCP over HTTP. A key carries the user, tenant and roles its holder
-runs as; the token (<code>nl2sql_&lt;id&gt;_&lt;secret&gt;</code>) is shown once and only its hash is stored. Managing keys
-needs an admin caller (<code>by</code>, required, no default); <code>verify</code> takes the token alone and returns the key's
-<code>UserContext</code>, or <code>None</code> for a malformed, unknown or revoked one.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql keys create --as admin --user ana --role analyst
+<p>An API key authenticates a client of MCP over HTTP (arriving with Wave C's M2). It carries the user,
+tenant and roles its holder runs as, so a key per person or per app is the unit of revocation. Nothing
+is inferred from the client. The design is <a href="../../architecture/wave_c/#9-mcp-over-http-with-auth">Wave C, section 9</a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql keys create --as admin --user ana --role analyst --tenant acme --label laptop
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nl2sql keys list --as admin
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nl2sql keys revoke &lt;id&gt; --as admin
 </code></pre></div>
+<p>On a project with <code>policies.allow_all</code> (the starter, <code>nl2sql launch</code>) no roles exist: leave out <code>--as</code>
+and <code>--role</code>, as in <code>nl2sql keys create --user ana</code>. Any <code>--as</code> or <code>--role</code> is refused as an unknown role.</p>
+<p><code>create</code> prints the token once. Keep it in the client's secret store: only its hash is kept here, so a
+lost token is replaced by a new key, not recovered.</p>
+<h2 id="the-token">The token</h2>
+<p><code>nl2sql_&lt;id&gt;_&lt;secret&gt;</code>: <code>id</code> is 8 hex characters, shown in lists, logs and events; <code>secret</code> is 32
+random bytes, URL-safe (43 characters). The state store keeps <code>sha256(secret)</code> and the key's fields,
+never the token. SHA-256 with no salt is deliberate: the secret is 256 bits of randomness, so there is
+nothing to guess and a slow hash would only cost time on every request. The comparison uses
+<code>hmac.compare_digest</code>.</p>
+<h2 id="from-python">From Python</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">admin</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"root"</span><span class="p">,</span> <span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">key</span><span class="p">,</span> <span class="n">token</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">api_keys</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"ana"</span><span class="p">,</span> <span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">],</span> <span class="n">by</span><span class="o">=</span><span class="n">admin</span><span class="p">,</span> <span class="n">tenant_id</span><span class="o">=</span><span class="s2">"acme"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"laptop"</span><span class="p">)</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">api_keys</span><span class="o">.</span><span class="n">list</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">admin</span><span class="p">)</span>            <span class="c1"># [ApiKey, ...], newest first, revoked ones included; no secret</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">engine</span><span class="o">.</span><span class="n">api_keys</span><span class="o">.</span><span class="n">revoke</span><span class="p">(</span><span class="n">key</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="n">admin</span><span class="p">)</span>  <span class="c1"># stops verifying at once</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">engine</span><span class="o">.</span><span class="n">api_keys</span><span class="o">.</span><span class="n">verify</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>             <span class="c1"># UserContext(user_id="ana", tenant_id="acme", roles=["analyst"]) or None</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create(*, user_id, roles, by, tenant_id=None, label="")</code></td>
+<td>Returns the <code>ApiKey</code> and its token, once. <code>roles</code> must be configured in <code>policies.roles</code>; <code>user_id</code> must not be empty. An id that is already taken is retried with a new one and never replaces another key. Publishes <code>api_key.created</code>.</td>
+</tr>
+<tr>
+<td><code>list(*, by)</code></td>
+<td>Every key, newest first. <code>ApiKey</code> has no secret and no hash.</td>
+</tr>
+<tr>
+<td><code>revoke(key_id, *, by)</code></td>
+<td>Sets <code>revoked_at</code>; revoking a revoked key changes nothing. An unknown id is a <code>ValueError</code>. Publishes <code>api_key.revoked</code>.</td>
+</tr>
+<tr>
+<td><code>verify(token)</code></td>
+<td>The key's <code>UserContext</code>, or <code>None</code> for a malformed, unknown or revoked token, or a wrong secret. It takes no caller: it is how a caller is found.</td>
+</tr>
+</tbody>
+</table>
+<p><code>by</code> is required and has no default. A call without one is a <code>TypeError</code>, a <code>by</code> that is not a
+<code>UserContext</code> is a <code>TypeError</code>, and a <code>by</code> holding none of <code>policies.admin_roles</code> is a
+<code>PermissionError</code>. Under <code>policies.allow_all</code> every caller is an admin, as for the rest of the engine,
+but a key still cannot carry a role name: with no roles defined, <code>roles=[]</code> is the only value, and a role
+name is a <code>ValueError</code>. Keys outlive the policy, so an <code>admin</code> key minted under <code>allow_all</code> would become a
+real admin key once roles are configured. A key with no roles reads everything under <code>allow_all</code> and
+nothing once roles are configured; create new keys then.</p>
+<h2 id="events-and-logs">Events and logs</h2>
+<p><code>api_key.created</code> and <code>api_key.revoked</code> carry <code>key_id</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code> and <code>by</code>, and
+the audit observer keeps both. Neither the token nor any part of the secret appears in an event, a log
+line or an error. See <a href="../../observability/events/">Events</a>.</p>
+<h2 id="what-a-key-does-and-does-not-give">What a key does and does not give</h2>
+<p>A key proves that the holder has the token; it does not prove who the holder is, and it does not expire.
+Revoke a key when a person leaves or a token leaks. A key's roles are checked against the policies at
+every request, so removing a role from <code>policies.roles</code> stops what the key can read, though not the key.</p>
 
 
 
