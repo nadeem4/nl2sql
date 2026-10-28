@@ -52,7 +52,7 @@ Run events (they carry the run's `trace_id`):
 | `node.started` | `node`, `sub_query_id` | yes |
 | `node.finished` | `node`, `sub_query_id`, `seconds`, `ok` | yes |
 | `answer.delta` | `field` (`summary`, `content`), `text` | yes |
-| `result.manifest` | `results`: each saved result's `node_id`, `columns`, `row_count`, `truncated` | yes |
+| `result.manifest` | `results`: each saved result's `node_id`, `columns`, `row_count`, `truncated`, `column_kinds` | yes |
 | `sanity.flagged` | `code`, `sub_query_id`, `retry` | yes |
 | `run.limit_reached` | `limit`, `value`, `spent` | yes |
 | `run.finished` | a summary, never rows: `status`, `duration_s`, `usage`, `error_codes`, `source`, `datasources`, `tables` (`datasource.schema.table`), `result_manifest`, `user_id`, `roles` | yes, with `result` added |
@@ -84,6 +84,27 @@ on the engine's bus directly.
 | `profile.finished` | `datasource_id`, the report's counts, `stopped_by`, `cost`, `seconds` | `engine.knowledge.profile` finished one datasource (counts only, never a name or a value). See [Schema Profiler](../schema/profiler.md) |
 | `proposal.created` | `id`, `kind`, `datasource_id`, `origin` | a new proposal entered the review queue (a thumbs-up, or another track's finding) |
 | `proposal.decided` | `id`, `kind`, `datasource_id`, `decision`, `by`, `wrote` | `engine.proposals.accept` or `reject` decided one (audited) |
+
+Release 0.9 ([Wave C](../architecture/wave_c.md)) adds the events below. They are catalogued now; the change named
+with each publishes it. None is on `stream_query`'s allow-list: `conversations.stream` adds the two conversation
+events to its own. The three marked *turn* belong to a conversation turn, which opens a scope of its own and so has a
+`trace_id`; none carries rows, a value of an argument, or a token.
+
+| Name | Data | Published when |
+| --- | --- | --- |
+| `conversation.started` | `conversation_id`, `user_id`, `datasource_id` | `engine.conversations.start` (C1) |
+| `conversation.step` (turn) | `conversation_id`, `turn`, `tool`, `status`, `trace_id` (an `ask` step's), `args` (argument names only) | the model's loop finished one tool call (C1) |
+| `conversation.turn` (turn) | `conversation_id`, `turn`, `kind`, `status`, `trace_id`, `steps`, `stored` (the stored `Turn` as JSON, on the conversation stream only) | a turn was stored (C1) |
+| `chat_tool.called` (turn) | `tool`, `conversation_id`, `turn`, `ok`, `seconds`, `error_code` | a registry chat tool ran (C2) |
+| `dashboard.generated` | `dashboard_id`, `datasource_id`, `tiles`, `skipped` | `engine.dashboards.generate` (D3) |
+| `dashboard.refreshed` | `dashboard_id`, `trigger`, `counts` (charts per status), `filters` (ids, never values) | a refresh, an open that refreshed, or a scheduled run (D2) |
+| `dashboard.changed` | `dashboard_id`, `change` (edit kinds, `pinned`, `moved`, `deleted`), `by` | an edit, a pin or a delete (D1) |
+| `dashboard.schedule_set` | `dashboard_id`, `every_minutes`, `by` | a schedule was set; it saves a role snapshot (audited, D1) |
+| `dashboard.schedule_stopped` | `dashboard_id`, `reason` | a schedule stopped with a visible error (audited, D2) |
+| `workspace.changed` | `workspace_id`, `change` (`created`, `renamed`, `deleted`), `by` | `engine.workspaces` (D1) |
+| `datasource.saved` | `datasource_id`, `file`, `by` | `engine.datasources.save` wrote one datasource file (audited, L2) |
+| `api_key.created`, `api_key.revoked` | `key_id`, `user_id`, `tenant_id`, `roles`, `by`; never the token | `engine.api_keys` (audited, M1) |
+| `mcp.denied` | `reason` (`missing`, `malformed`, `unknown`, `revoked`), `key_id` | `nl2sql mcp --http` refused a bearer token (audited, M2) |
 
 The driver and exception text in `datasource.failed` (`message`, `fix`),
 `index.failed` (`reason`) and `index.column_failed` (`message`) is redacted

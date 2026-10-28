@@ -38,7 +38,7 @@ Loc = Tuple[Union[str, int], ...]
 _UNIONS = (Union, getattr(types, "UnionType", Union))
 
 # The sections whose body is a list, in nl2sql.yaml or in their own file.
-LIST_SECTIONS = ("datasources", "observers", "hooks", "knowledge")
+LIST_SECTIONS = ("datasources", "observers", "hooks", "knowledge", "chat_tools")
 
 # Keys a release renamed: still an error (no alias), with a message that names the new key.
 RENAMED_KEYS = {"indexing_enrichment": "profiler"}  # llm.agents, 0.8 (docs/architecture/wave_b.md, D44)

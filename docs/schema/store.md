@@ -34,7 +34,9 @@ Snapshots are kept by the engine's **state store**, the `storage.state` slot
 (see [Storage](../configuration/storage.md)). The built-in one is `sqlite`, a
 file at `<storage.path>/state.db`; any store implementing
 `nl2sql_sdk.stores.StateStore` can take its place. The same store holds the
-plan cache, the playground's answer ratings and the index build lock.
+plan cache, the playground's answer ratings, the review queue, conversations,
+workspaces, dashboards with their last chart results, API keys and the index
+build lock. The interface is version 4.
 
 ### Snapshots are immutable
 
@@ -100,7 +102,30 @@ table, and the engine applies the pending ones when it starts
 `state.db` is adopted as it is; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the `locks` table;
 migration 4 adds the `schema_diffs` table; migration 5 adds the `proposals`
-table, the review queue (release 0.8, [Wave B](../architecture/wave_b.md#5-the-review-queue)).
+table, the review queue (release 0.8, [Wave B](../architecture/wave_b.md#5-the-review-queue));
+migration 6 adds Wave C's five tables, below. A 0.8 `state.db` is migrated in
+place and keeps its rows.
+
+### Conversations, dashboards and API keys
+
+Release 0.9 ([Wave C](../architecture/wave_c.md#10-the-registry-and-the-state-store-after-wave-c)).
+`StateStore` version 4 adds these methods. Each takes and returns a plain JSON
+document (`dict`), because the SDK holds none of the engine's models; the
+document carries the fields the store filters on. The engine methods that use
+them arrive in C1 and D1 to D4.
+
+| Table (migration 6) | Methods | Filtered on | Notes |
+| --- | --- | --- | --- |
+| `conversations` | `put_conversation`, `get_conversation`, `list_conversations(tenant_id, user_id, limit)`, `delete_conversation`, `purge_conversations(older_than)` | owner, `updated_at` | One document per conversation, rewritten each turn, read whole. Stored without result rows. `None` is an owner of its own in `list_*`, not a wildcard. |
+| `workspaces` | `put_workspace`, `get_workspace`, `list_workspaces(tenant_id, user_id)`, `delete_workspace` | owner | |
+| `dashboards` | `put_dashboard`, `get_dashboard`, `list_dashboards(tenant_id, user_id)`, `delete_dashboard`, `purge_dashboards(drafts_older_than)`, `list_scheduled_dashboards()` | owner, `status`, `updated_at`, whether it has a `schedule` | `purge_dashboards` deletes drafts only; saved dashboards are never purged. `list_scheduled_dashboards` serves the scheduler across owners. |
+| `tile_runs` | `put_tile_runs(dashboard_id, docs)`, `get_tile_runs(dashboard_id)` | dashboard, chart (`tile_id`), `at` | The last result of each chart, rows included. `put_tile_runs` replaces only the charts it lists. Deleted with the dashboard. |
+| `api_keys` | `put_api_key`, `get_api_key`, `list_api_keys` | `id`, `hash`, `revoked_at` | A hash, never a secret. Revoking a key is a put with `revoked_at`. |
+
+Stored chart results hold rows, so they sit in the owner's private state store
+and open only after the access check.
+
+Each document's timestamps are ISO 8601; a stamp with no zone is read as UTC.
 
 ### The lock
 

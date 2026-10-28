@@ -1,12 +1,20 @@
-"""The values the facade's namespaces return, as plain dataclasses.
+"""The values the facade's namespaces return: plain dataclasses, and (Wave C) two pydantic models.
 
 They import nothing heavy, so ``from nl2sql import DatasourceInfo`` costs
 nothing at import (docs/architecture/invariants.md, the import rule).
+``Candidate`` and ``ApiKey`` are pydantic models as the Wave C design writes them
+(docs/architecture/wave_c.md, sections 7 and 9): both are also JSON on the wire.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from datetime import datetime
+from typing import Any, Dict, Iterator, List, Literal, Optional, Tuple
+
+from pydantic import Field
+
+from nl2sql.common.strict import StrictModel
+from nl2sql_sdk.discovery import Found
 
 
 @dataclass(frozen=True)
@@ -60,3 +68,36 @@ class IndexProgress:
     state: Literal["started", "done", "failed"]
     counts: Dict[str, int] = field(default_factory=dict)
     reason: Optional[str] = None
+
+
+class Candidate(StrictModel):
+    """A database `engine.datasources.scan()` found, with the connection fields it could fill in (D120)."""
+
+    type: str  # the adapter's registry name
+    title: str
+    found: Found
+    connection: Dict[str, Any]  # what was filled in; repr masks secret fields
+    missing: List[str]  # required fields the form still needs
+    installed: bool
+    install_hint: str
+
+    def __repr_args__(self) -> Iterator[Tuple[str, Any]]:
+        from nl2sql.config.models import is_secret_key, masked
+
+        for key, value in super().__repr_args__():
+            if key == "connection" and isinstance(value, dict):
+                value = {k: masked(v) if is_secret_key(k) else v for k, v in value.items()}
+            yield key, value
+
+
+class ApiKey(StrictModel):
+    """An API key as `engine.api_keys` lists it: never the secret (D127)."""
+
+    id: str  # 8 characters, shown in lists and logs
+    label: str
+    user_id: str
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    created_at: datetime
+    created_by: Optional[str] = None
+    revoked_at: Optional[datetime] = None

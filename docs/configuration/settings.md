@@ -58,6 +58,10 @@ profiler:
   max_cost_usd: 0.50
 review:
   max_age_days: 365
+charts:                       # read from release 0.9 (Wave C)
+  max_points: 1000
+  max_categories: 20
+  max_series: 5
 ```
 
 Unknown keys are errors, as everywhere in the config. The demo
@@ -69,7 +73,7 @@ trace).
 In Python, the groups are `Settings`, `PipelineSettings`, `RetrySettings`,
 `RetrievalSettings`, `RoutingSettings`, `ResultSettings`, `TraceSettings`,
 `SchemaSettings`, `CuratedSettings`, `FeedbackSettings`, `KnowledgeSettings`,
-`ClarifySettings`, `ProfilerSettings` and `ReviewSettings` in `nl2sql.config`.
+`ClarifySettings`, `ProfilerSettings`, `ReviewSettings` and `ChartSettings` in `nl2sql.config`.
 
 Where the engine's events, logs and metrics go is not a setting: it is the
 [`observers` section](observers.md) of
@@ -204,3 +208,30 @@ accepted and validated now; the Wave B change named with each reads it.
 | `profiler.enum_max_distinct` | `50` | The most distinct values a column proposed as an `enum` may have (P1). |
 | `profiler.max_cost_usd` | `0.50` | The most one `profile(draft=True)` call may spend drafting descriptions (`profile(draft=True)`, `nl2sql profile --draft`). |
 | `review.max_age_days` | `365` | Decided proposals older than this are purged by `engine.storage.purge()` (Q1). |
+
+## `charts`
+
+Release 0.9 ([Wave C](../architecture/wave_c.md)). It is accepted and validated
+now; the auto charts change (K1) reads it.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `charts.max_points` | `1000` | The most rows charted. A longer result is read up to this and flagged `truncated`; a line chart becomes a table rather than drop points silently. |
+| `charts.max_categories` | `20` | The most categories a bar chart draws; more is a table. |
+| `charts.max_series` | `5` | The most lines in one line chart (measures, or values of a category split into lines). |
+
+## `conversations` and `dashboards`
+
+These two are sections of `nl2sql.yaml` of their own, not groups of
+`settings`: see
+[Conversations, chat tools, dashboards and MCP](system.md#conversations-chat-tools-dashboards-and-mcp).
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `conversations.context_turns` | `3` | Turns of history the model sees. |
+| `conversations.max_tool_calls` | `12` | Tool calls the model may make in one turn; after the last it makes one more call with the tools off and must reply. |
+| `conversations.max_turns` | `50` | Turns in one conversation; the next is refused with `CONVERSATION_TOO_LONG`. |
+| `conversations.max_age_days` | `30` | Conversations, and draft dashboards, not updated for this long are deleted by `engine.storage.purge()`. `null` keeps them. |
+| `dashboards.max_tiles` | `10` | Charts in the starter dashboard. |
+| `dashboards.min_refresh_minutes` | `15` | The shortest refresh schedule; a shorter one is refused. |
+| `dashboards.schedule_identity_max_age_days` | `30` | A schedule stops when the owner identity saved with it is older than this, until the owner sets it again. |

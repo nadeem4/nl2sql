@@ -125,4 +125,4 @@ def test_the_query_response_carries_the_result_manifest_not_rows(api_client):
     body = client.post("/api/v1/query", json={"natural_language": "q"}).json()
 
     assert body["result_manifest"] == [
-        {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": True}]
+        {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": True, "column_kinds": {}}]

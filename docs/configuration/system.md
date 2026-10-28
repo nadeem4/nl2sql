@@ -56,6 +56,10 @@ observers:   { file: observers.yaml }    # optional: where events, logs and metr
 hooks:       { file: hooks.yaml }        # optional
 evals:       { file: evals.yaml }        # optional
 knowledge:   { file: knowledge.yaml }    # optional: where the glossary comes from (0.8)
+conversations: { file: conversations.yaml }  # optional: follow-up questions (0.9)
+chat_tools:  { file: chat_tools.yaml }   # optional: which chat tools are on (0.9)
+dashboards:  { file: dashboards.yaml }   # optional (0.9)
+mcp:         { file: mcp.yaml }          # optional: nl2sql mcp --http (0.9)
 ```
 
 A small project can write every section inline instead. This file builds the
@@ -89,6 +93,10 @@ storage:    { path: .nl2sql }
 | `hooks` | no | [below](#observers-hooks-and-evals) | A list, run in its order. |
 | `evals` | no | [below](#observers-hooks-and-evals) | The eval suites, scorers and regression gate. |
 | `knowledge` | no | [below](#knowledge) | A list of knowledge sources, in precedence order. Absent (or `[]`) means no knowledge. |
+| `conversations` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | How a model-led turn is bounded and kept. Every field has a default. |
+| `chat_tools` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | A list of chat tool names. Absent means the five built-ins; `[]` means none (`ask` stays). |
+| `dashboards` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | The starter dashboard's size and the refresh limits. Every field has a default. |
+| `mcp` | no | [below](#conversations-chat-tools-dashboards-and-mcp) | `nl2sql mcp --http`: where it listens and how it authenticates. Every field has a default. |
 
 From Python:
 
@@ -112,7 +120,7 @@ See [Public Facade → Creating an engine](../api/core/public-facade.md#creating
 | No `version` | Only `nl2sql.yaml` has `version:`. |
 | Datasource folder | `datasources: {file: datasources/}` names a folder. Every `*.yaml` in it, sorted by name and not recursive, holds one datasource. `id` may be left out and defaults to the file name; if it is given, it must equal the file name. |
 | Datasource file | `datasources: {file: datasources.yaml}` names a file whose body is the list. |
-| List sections | `observers`, `hooks` and `knowledge` are lists too: their file's body is the list. |
+| List sections | `observers`, `hooks`, `knowledge` and `chat_tools` are lists too: their file's body is the list. |
 | Literal paths | `file:` values are never interpolated. |
 | Each file once | Including the same file twice is an error. |
 
@@ -204,6 +212,56 @@ the glossary, precedence and who sees what.
 from nl2sql import Config, KnowledgeSourceConfig
 
 Config(..., knowledge=[KnowledgeSourceConfig(type="yaml", path="glossary.yaml"), MySource()])
+```
+
+### Conversations, chat tools, dashboards and MCP
+
+Four sections for release 0.9 ([Wave C](../architecture/wave_c.md)). They are
+accepted and validated now; the Wave C change named with each reads it. Each
+is optional, and absent, the defaults shown apply. Chart limits are
+`settings.charts` ([Settings](settings.md#charts)).
+
+```yaml
+# conversations.yaml (every value shown is the default)
+context_turns: 3        # turns the model sees
+max_tool_calls: 12      # tool calls per turn; the model then makes one last call, tools off
+max_turns: 50           # the 51st turn is refused
+max_age_days: 30        # null keeps conversations; also bounds draft dashboards
+
+# chat_tools.yaml: a list of registered names (the nl2sql.chat_tools entry point group)
+- chart
+- diagram
+- report
+- dashboard_edit
+- dashboard_pin
+
+# dashboards.yaml (every value shown is the default)
+max_tiles: 10                        # the starter dashboard's size
+min_refresh_minutes: 15              # a schedule below this is refused
+schedule_identity_max_age_days: 30   # a schedule stops when its saved identity is older
+
+# mcp.yaml (every value shown is the default)
+http:
+  host: 127.0.0.1
+  port: 8765
+  path: /mcp
+  allowed_hosts: ["127.0.0.1:*", "localhost:*"]   # Host headers accepted
+  allowed_origins: []                              # browser Origins accepted
+auth: api_keys            # api_keys | none (none: loopback only)
+```
+
+| Section | Rule |
+| --- | --- |
+| `conversations` | `Conversations`: strict keys; every count is at least 1, and `max_age_days: null` keeps conversations. Read by `engine.conversations` (C1). The `conversation` agent that leads a turn is one of the [LLM agents](llm.md#per-node-models). |
+| `chat_tools` | A list of names: none twice, each a registered chat tool (`registry.add_chat_tool`, or an entry point). An unknown name is an error when the engine is built, naming the registered ones (C2). `ask` is the conversation's own tool and is always on. |
+| `dashboards` | `Dashboards`: strict keys; every value is at least 1. Read by `engine.dashboards` (D1 to D3). |
+| `mcp` | `Mcp`: strict keys. `http.port` is 1 to 65535 and `http.path` starts with `/`. `auth: none` is for loopback only: the server refuses to start on any other host. Read by `nl2sql mcp --http` (M2). |
+
+```python
+from nl2sql import Config
+from nl2sql.config import Conversations
+
+Config(..., conversations=Conversations(context_turns=5), chat_tools=["chart", "report"])
 ```
 
 ### Strict keys and errors

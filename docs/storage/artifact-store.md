@@ -43,7 +43,7 @@ After saving a run's results the aggregator writes a manifest beside them with `
 
 ```json
 {"request_id": "0f1c...", "results": [
-  {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false}]}
+  {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false, "column_kinds": {}}]}
 ```
 
 `truncated` is true when a sub-query upstream of that node in the DAG was cut at its row cap. The same entries are `AggregatorResponse.results` and `QueryResult.result_manifest`.
@@ -113,7 +113,7 @@ class S3ResultsConfig(BaseModel):
 
 
 class S3Results:
-    interface_version: ClassVar[int] = 3
+    interface_version: ClassVar[int] = 4
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type] = S3ResultsConfig
 

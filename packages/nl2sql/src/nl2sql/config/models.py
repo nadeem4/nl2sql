@@ -98,6 +98,7 @@ AgentName = Literal[
     "answer_synthesizer",
     "profiler",  # drafting table and column descriptions, only with profile(draft=True) (Wave B, D44)
     "eval_seeder",  # seeding a draft eval suite (V3)
+    "conversation",  # the model-led turn of engine.conversations (Wave C, D101)
 ]
 
 
@@ -545,6 +546,14 @@ class ReviewSettings(_Model):
     max_age_days: PositiveInt = 365  # decided proposals are purged after this
 
 
+class ChartSettings(_Model):
+    """How a result becomes a chart (read from K1; docs/architecture/wave_c.md, section 5)."""
+
+    max_points: PositiveInt = 1000  # rows charted; a longer line becomes a table
+    max_categories: PositiveInt = 20  # bars
+    max_series: PositiveInt = 5  # lines
+
+
 class Settings(_Model):
     """Tuning knobs. Every field has a default, so the section is optional."""
 
@@ -564,6 +573,7 @@ class Settings(_Model):
     clarify: ClarifySettings = Field(default_factory=ClarifySettings)
     profiler: ProfilerSettings = Field(default_factory=ProfilerSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
+    charts: ChartSettings = Field(default_factory=ChartSettings)
 
 
 # ---------------------------------------------------------------- observers, hooks, evals
@@ -654,6 +664,47 @@ class EvalsConfig(_Model):
     gate: EvalGate = Field(default_factory=EvalGate)
 
 
+# ---------------------------------------------------------------- Wave C sections (docs/architecture/wave_c.md)
+
+class Conversations(_Model):
+    """The ``conversations`` section: how a model-led turn is bounded and kept (read from C1)."""
+
+    context_turns: PositiveInt = 3  # turns the model sees
+    max_tool_calls: PositiveInt = 12  # tool calls per turn; the model then makes one last call, tools off
+    max_turns: PositiveInt = 50
+    max_age_days: Optional[PositiveInt] = 30  # None keeps them; also bounds draft dashboards
+
+
+class Dashboards(_Model):
+    """The ``dashboards`` section (read from D1 to D3)."""
+
+    max_tiles: PositiveInt = 10  # the starter dashboard's size
+    min_refresh_minutes: PositiveInt = 15
+    schedule_identity_max_age_days: PositiveInt = 30
+
+
+class McpHttp(_Model):
+    host: str = "127.0.0.1"
+    port: int = Field(8765, ge=1, le=65535)
+    path: str = "/mcp"
+    allowed_hosts: List[str] = Field(default_factory=lambda: ["127.0.0.1:*", "localhost:*"])  # Host headers accepted
+    allowed_origins: List[str] = Field(default_factory=list)  # browser Origins accepted
+
+    @field_validator("path")
+    @classmethod
+    def _rooted(cls, path: str) -> str:
+        if not path.startswith("/"):
+            raise ValueError("must start with /")
+        return path
+
+
+class Mcp(_Model):
+    """The ``mcp`` section: ``nl2sql mcp --http`` (read from M2)."""
+
+    http: McpHttp = Field(default_factory=McpHttp)
+    auth: Literal["api_keys", "none"] = "api_keys"  # none: loopback only
+
+
 # ---------------------------------------------------------------- api
 
 class Api(_Model):
@@ -686,6 +737,11 @@ class Config(_Model):
     evals: EvalsConfig = Field(default_factory=EvalsConfig)
     # The knowledge sources, in precedence order; [] (no section) means no knowledge.
     knowledge: List[KnowledgeEntry] = Field(default_factory=list)
+    conversations: Conversations = Field(default_factory=Conversations)
+    # The chat tools by registered name; None (no section) means the five built-ins, [] means none (ask stays).
+    chat_tools: Optional[List[str]] = None
+    dashboards: Dashboards = Field(default_factory=Dashboards)
+    mcp: Mcp = Field(default_factory=Mcp)
 
     # The folder of the nl2sql.yaml this config was loaded from, set by
     # load_config and kept by every copy; None when it was built in code.
@@ -726,6 +782,14 @@ class Config(_Model):
     def __eq__(self, other: Any) -> bool:
         # Where a config was loaded from is not part of it: equal sections are an equal config.
         return type(other) is type(self) and self.__dict__ == other.__dict__
+
+    @field_validator("chat_tools")
+    @classmethod
+    def _unique_tools(cls, names: Optional[List[str]]) -> Optional[List[str]]:
+        duplicates = sorted({n for n in names or [] if (names or []).count(n) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate chat tools: {duplicates}")
+        return names
 
     @field_validator("datasources")
     @classmethod

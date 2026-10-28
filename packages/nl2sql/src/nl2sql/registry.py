@@ -18,7 +18,7 @@ from importlib.metadata import EntryPoint, entry_points
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 Kind = Literal["adapter", "llm", "embeddings", "secrets", "store", "policy_check", "observer", "hook", "scorer",
-               "knowledge_source"]
+               "knowledge_source", "chat_tool"]
 
 # The entry point group each kind is installed under.
 GROUPS: Dict[str, str] = {
@@ -32,13 +32,14 @@ GROUPS: Dict[str, str] = {
     "hook": "nl2sql.hooks",
     "scorer": "nl2sql.scorers",
     "knowledge_source": "nl2sql.knowledge_sources",
+    "chat_tool": "nl2sql.chat_tools",
 }
 
 # The interface version this engine was built for, per kind. Anything else is
 # a load error: there are no minor versions and no window for old ones.
-INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 3,
+INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 4,
                                    "policy_check": 1, "observer": 1, "hook": 1, "scorer": 1,
-                                   "knowledge_source": 1}
+                                   "knowledge_source": 1, "chat_tool": 1}
 
 # How a kind reads in a message.
 _LABELS: Dict[str, str] = {
@@ -52,6 +53,7 @@ _LABELS: Dict[str, str] = {
     "hook": "hook",
     "scorer": "scorer",
     "knowledge_source": "knowledge source",
+    "chat_tool": "chat tool",
 }
 
 # The attribute naming the modules a kind needs before it can be built.
@@ -98,7 +100,7 @@ def missing_modules(kind: str, target: Any) -> List[str]:
 
 class Registry:
     """Name -> code, per kind: adapters, LLM providers, embeddings providers, secret providers, stores, policy
-    checks, observers, hooks, scorers and knowledge sources."""
+    checks, observers, hooks, scorers, knowledge sources and chat tools."""
 
     def __init__(self) -> None:
         self._installed: Dict[str, Dict[str, List[_Entry]]] = {kind: {} for kind in GROUPS}
@@ -155,6 +157,9 @@ class Registry:
     def add_knowledge_source(self, name: str, cls: type, *, replace: bool = False) -> None:
         self._add("knowledge_source", name, cls, replace)
 
+    def add_chat_tool(self, name: str, cls: type, *, replace: bool = False) -> None:
+        self._add("chat_tool", name, cls, replace)
+
     def adapter(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("adapter", name)
 
@@ -184,6 +189,9 @@ class Registry:
 
     def knowledge_source(self, name: str) -> Callable[[Any], Any]:
         return self._decorator("knowledge_source", name)
+
+    def chat_tool(self, name: str) -> Callable[[Any], Any]:
+        return self._decorator("chat_tool", name)
 
     def _decorator(self, kind: str, name: str) -> Callable[[Any], Any]:
         def register(target: Any) -> Any:

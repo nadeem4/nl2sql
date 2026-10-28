@@ -370,7 +370,7 @@ Every store class has the same four members, whatever its slot:
 
 | Member | Description |
 | :--- | :--- |
-| `interface_version` | `3`. The engine accepts exactly the version it was built for. Version 2 added `StateStore.put_schema_diff` and `get_schema_diff` (schema drift); version 3 the review queue's proposal methods and `BuildPointer.knowledge_hash`. The version is one per kind, so a store of any slot declares `3`. |
+| `interface_version` | `4`. The engine accepts exactly the version it was built for. Version 2 added `StateStore.put_schema_diff` and `get_schema_diff` (schema drift); version 3 the review queue's proposal methods and `BuildPointer.knowledge_hash`; version 4 the conversation, workspace, dashboard, stored chart result and API key methods. The version is one per kind, so a store of any slot declares `4`. |
 | `slot` | `"index"`, `"state"`, `"traces"` or `"results"`: the sub-block it fills. The engine refuses a store in another slot. |
 | `config_model` | A pydantic model for the store's sub-block apart from `type`. Set `extra="forbid"`, so a misspelt key is an error, and hold credentials as `SecretStr`. |
 | `from_config(cfg, *, folder)` | Builds the store from a validated `config_model` instance, after the engine has resolved any `${provider:key}` in it. `folder` is `storage.path`. It should write nothing: `nl2sql config check` builds the stores too. |
@@ -380,7 +380,7 @@ The slots' methods:
 | Interface | Methods |
 | :--- | :--- |
 | `IndexStore` | `open(namespace, dimension)`, `add(namespace, entries)`, `query(namespace, vector, k, where=None, with_vectors=False)`, `get(namespace, where, with_vectors=False)`, `delete(namespace, where)`, `pointers(namespace)`, `set_pointers(namespace, updates)` (atomic), `namespaces()`, `drop(namespace)`, `close()` |
-| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)` (also deletes the diffs of the snapshots it deletes), `put_schema_diff(diff)` (keyed by `diff.datasource_id` and `diff.to_version`, which it requires; replaces one stored before), `get_schema_diff(datasource_id, schema_version)` (or `None`), `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `put_proposal(proposal)` (replaces the row with its id), `get_proposal(id)`, `list_proposals(kind=None, status=None, datasource_id=None, limit=None)` (newest first), `decide_proposal(id, status, *, by, reason=None, wrote=None, at=None)`, `purge_proposals(older_than)` (decided rows only), `lock(name, ttl_s)`, `close()` |
+| `StateStore` | `migrate()`, `put_snapshot(snapshot)`, `get_snapshot(datasource_id, schema_version)`, `list_versions(datasource_id)` (newest first), `keep_snapshots(datasource_id, keep)` (also deletes the diffs of the snapshots it deletes), `put_schema_diff(diff)` (keyed by `diff.datasource_id` and `diff.to_version`, which it requires; replaces one stored before), `get_schema_diff(datasource_id, schema_version)` (or `None`), `get_plan`, `put_plan`, `clear_plans()`, `add_feedback(row)`, `list_feedback(limit=None)`, `clear_feedback()`, `put_proposal(proposal)` (replaces the row with its id), `get_proposal(id)`, `list_proposals(kind=None, status=None, datasource_id=None, limit=None)` (newest first), `decide_proposal(id, status, *, by, reason=None, wrote=None, at=None)`, `purge_proposals(older_than)` (decided rows only), the version 4 methods on JSON documents (`dict`; see [The state store](../schema/store.md#conversations-dashboards-and-api-keys)): `put_conversation`, `get_conversation`, `list_conversations(tenant_id, user_id, limit)`, `delete_conversation`, `purge_conversations(older_than)`, `put_dashboard`, `get_dashboard`, `list_dashboards(tenant_id, user_id)`, `delete_dashboard`, `purge_dashboards(drafts_older_than)`, `list_scheduled_dashboards()`, `put_workspace`, `get_workspace`, `list_workspaces(tenant_id, user_id)`, `delete_workspace`, `put_tile_runs(dashboard_id, docs)`, `get_tile_runs(dashboard_id)`, `put_api_key(row)`, `get_api_key(key_id)`, `list_api_keys()`, then `lock(name, ttl_s)`, `close()` |
 | `TraceStore` | `write(trace_id, document)`, `get(trace_id)`, `purge(older_than)` |
 | `ResultStore` | `write(key, chunks)`, `open(key)`, `exists(key)`, `purge(older_than)`. Bytes only: the engine writes the Parquet. |
 
@@ -411,7 +411,7 @@ class BucketConfig(BaseModel):
 
 
 class BucketResults:
-    interface_version: ClassVar[int] = 3
+    interface_version: ClassVar[int] = 4
     slot: ClassVar[str] = "results"
     config_model: ClassVar[type[BaseModel]] = BucketConfig
 
@@ -494,6 +494,26 @@ source in the `nl2sql.knowledge_sources` entry point group, or register it
 in code with `registry.add_knowledge_source(name, cls)` or
 `@registry.knowledge_source(name)`. The built-in `yaml` source arrives
 with release 0.8.
+
+---
+
+## Optional: `DiscoverableAdapter`
+
+An adapter can declare what it is found by, so `engine.datasources.scan()`
+(release 0.9, [Wave C](../architecture/wave_c.md#finding-a-database-scan))
+can offer it without the engine naming any database. It lives in
+`nl2sql_sdk.discovery`, which imports only pydantic and the standard
+library, with `Found` (`kind`: `url`, `file` or `port`, and its `value`). The
+engine tests for it with `isinstance`, so an adapter without it is never found,
+only chosen by name, and the adapter interface stays at version 2. The `scan()`
+method itself arrives with L1.
+
+| Member | Description |
+| :--- | :--- |
+| `file_suffixes` | File suffixes it opens, such as `(".sqlite", ".sqlite3", ".db")`. |
+| `default_ports` | TCP ports it listens on by default, such as `(5432,)`. Probed on `127.0.0.1` only. |
+| `url_schemes` | Connection URL schemes, up to any `+driver`, such as `("postgresql", "postgres")`. |
+| `connection_for(found)` | A classmethod: the connection fields this `Found` fills in, or `None` when it is not this adapter's (a `.db` file that is not SQLite). It never connects. |
 
 ---
 

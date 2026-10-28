@@ -195,20 +195,26 @@ WAVE_B_EVENTS = {
     "knowledge.loaded", "knowledge.used", "clarification.requested", "cost.estimated", "profile.finished",
     "proposal.created", "proposal.decided",
 }
+WAVE_C_EVENTS = {
+    "conversation.started", "conversation.step", "conversation.turn", "chat_tool.called", "dashboard.generated",
+    "dashboard.refreshed", "dashboard.changed", "dashboard.schedule_set", "dashboard.schedule_stopped",
+    "workspace.changed", "datasource.saved", "api_key.created", "api_key.revoked", "mcp.denied",
+}
 
 
 def test_the_catalog_lists_every_wave_a_and_wave_b_event():
-    assert set(CATALOG) == WAVE_A_EVENTS | WAVE_B_EVENTS
+    assert set(CATALOG) == WAVE_A_EVENTS | WAVE_B_EVENTS | WAVE_C_EVENTS
     assert RUN_EVENTS == {"run.started", "run.finished", "run.failed", "node.started", "node.finished",
                           "answer.delta", "result.manifest", "llm.call", "llm.parse_retry",
                           "plan_cache.lookup", "policy.decision", "hook.decision", "run.limit_reached",
-                          "sanity.flagged", "knowledge.used", "clarification.requested", "cost.estimated"}
+                          "sanity.flagged", "knowledge.used", "clarification.requested", "cost.estimated",
+                          "conversation.step", "conversation.turn", "chat_tool.called"}
 
 
 def test_catalog_describes_each_event_with_its_json_schema():
     infos = {info.name: info for info in catalog()}
 
-    assert set(infos) == WAVE_A_EVENTS | WAVE_B_EVENTS
+    assert set(infos) == WAVE_A_EVENTS | WAVE_B_EVENTS | WAVE_C_EVENTS
     finished = infos["run.finished"]
     assert finished.description
     assert "status" in finished.data_schema["properties"]

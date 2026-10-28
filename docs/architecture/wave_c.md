@@ -1400,6 +1400,57 @@ flowchart TD
 | M1 | **API keys.** `engine.api_keys` (`create`, `list`, `revoke`, `verify`), the audit events, `nl2sql keys`. Files: `nl2sql/policies/keys.py` (new), `api/api_keys_api.py`, `cli/commands/keys.py`. | C0 | `test_token_is_returned_once_and_only_its_hash_is_stored`, `test_verify_returns_the_keys_user_context`, `test_revoked_key_does_not_verify`, `test_malformed_token_does_not_verify`, `test_api_keys_require_a_caller`, `test_only_admins_manage_keys`, `test_key_roles_must_be_configured`, `test_key_events_never_carry_the_token` | `security/api-keys.md`, `security/model.md` |
 | M2 | **MCP over HTTP.** `nl2sql mcp --http`; stateless streamable HTTP; `TransportSecuritySettings`; bearer auth through `engine.api_keys.verify`; per-request identity (`build_server(engine, identity)`, built in Wave A); the loopback rule; `ask` with `conversation_id` and an option-id `choice` (replacing Wave B's); `mcp.denied`. Files: `nl2sql/mcp/http.py` (new), `nl2sql/mcp/server.py`, `cli/commands/mcp.py`. | M1, C1 (Wave A's MCP server, Wave B's L2) | In-process HTTP client, fake LLM: `test_http_ask_needs_a_bearer_key`, `test_revoked_key_is_401_and_audited`, `test_tools_run_as_the_keys_roles`, `test_two_keys_concurrently_run_with_their_own_roles`, `test_foreign_host_or_origin_is_refused`, `test_public_bind_without_keys_refuses_to_start`, `test_ask_returns_a_conversation_id_and_continues_it`, `test_choice_is_an_option_id_of_the_pending_request`, `test_stdio_is_still_the_default` | `getting_started/mcp.md` (HTTP, keys, TLS behind a proxy, client set-up) |
 
+!!! note "Built (C0a): C0 was split, and this is its first half"
+    Row C0 is too big for one PR, so it is two. **C0a** is the shared shapes, with no behaviour:
+
+    - **Models:** `nl2sql/conversations/models.py` (`Conversation`, `Turn`, `ToolStep`, `ToolCall`, `ToolOutput`,
+      `ModelStep`, `ConversationInfo`); `nl2sql/charts/spec.py` (`ChartSpec`, `Encoding`, `ChartData`,
+      `ColumnKind`; `to_vega_lite` raises `NotImplementedError` naming K1); `nl2sql/dashboards/models.py`
+      (`Workspace`, `ChartPlan`, `StoredQuery`, `TileLayout`, `Tile`, `DashboardFilter`, `ScheduleIdentity`,
+      `Schedule`, `Dashboard`, `TileRun`, `SkippedTile`, `DashboardRun`, `DashboardView`, `DashboardInfo`,
+      `StepRef`, `TileArrangement`, the ten edit classes `RenameDashboard`, `RenameTile`, `SetTileChart`,
+      `RemoveTile`, `Arrange`, `SetFilters`, `SetSchedule`, `MoveDashboard`, `AddTile`, `ReplacePlan`, the
+      `DashboardEdit` union discriminated on `kind`, `EDIT_KINDS` and `DEFAULT_WORKSPACE_NAME`);
+      `nl2sql/chat_tools/__init__.py` (`ChatTool`, `ToolContext`, `ToolOutput`, `ToolNotApplicable`,
+      `ChatToolInfo`); `nl2sql_sdk/discovery.py` (`Found`, `DiscoverableAdapter`); `Candidate` and `ApiKey` in
+      `nl2sql/api/types.py`. Every one forbids unknown keys (`nl2sql.common.strict.StrictModel`).
+    - **Config:** `Config.conversations` (`Conversations`), `Config.chat_tools` (`Optional[List[str]]`, a list
+      section), `Config.dashboards` (`Dashboards`), `Config.mcp` (`Mcp`, `McpHttp`), `Settings.charts`
+      (`ChartSettings`), and `conversation` in `AgentName`; all exported from `nl2sql.config`.
+    - **Codes and events:** the six `ErrorCode`s of section 11, the nine facade exceptions (in
+      `nl2sql/common/errors.py`), and fourteen events in the catalog: the ones of sections 3, 4 and 6, plus
+      `datasource.saved`, `api_key.created`, `api_key.revoked` and `mcp.denied` (need A5), whose data fields are
+      this PR's to name. The `chat_tool` registry kind (`GROUPS`, `INTERFACE_VERSIONS`, `add_chat_tool`,
+      `@registry.chat_tool`; the entry points come in C0b).
+    - **Results:** `ResultSummary.column_kinds` (the field only; the run events carry it too) and
+      `QueryResult.decomposition`.
+    - **Store:** `StateStore` version 4 (the methods of section 10), the `sqlite` store's migration
+      `0006_conversations_dashboards_and_keys`, and the registry's store version.
+
+    Where the code and the design differ, the code won:
+
+    - `ToolOutput` is defined in `nl2sql/conversations/models.py` and re-exported from `nl2sql.chat_tools`,
+      because a stored step holds one and `chat_tools` imports `Conversation`; defining it in `chat_tools`
+      would be a circular import.
+    - `ToolContext.engine` is typed `Any`: the facade cannot be imported by name here without a cycle.
+    - `StoredQuery` is not defined in the design. It is one sub-query of an `ask` step as stored
+      (`sub_query_id`, `datasource_id`, and its `plan` or its `verified` ref).
+    - `ChartPlan` checks that it holds exactly one of a decomposition with its plans and a verified query.
+    - `dashboards` has an `updated_at` column in migration 6, which section 10 does not list, so
+      `purge_dashboards` can find old drafts.
+    - `QueryResult.decomposition` is `None` on a run a hook ended, as `explanation` and the data are.
+    - `ConversationBusy` is a `LookupError` as section 11 says, though a 404 is a poor answer for "busy"; Wave D's
+      routes may map it differently.
+    - `Candidate` and `ApiKey` are pydantic models (the design's shape), though the rest of `api/types.py` is
+      dataclasses.
+
+    **C0b** is the rest of row C0: `SuppliedPlan` widened and its callers, `run_query(answer=)` and
+    `stream_query(answer=)`, the five facade namespaces and their stub modules, the stub methods on
+    `engine.datasources` and `engine.results`, the chat-tool entry points and `uvicorn` in `pyproject.toml`,
+    the `keys`, `launch` and `dashboards` commands, the stub docs pages and nav, the boundary test's
+    constants, and the exports in `nl2sql/__init__.py`. Tests: `tests/unit/test_wave_c_shapes.py` and
+    `tests/unit/test_wave_c_store.py`, and `test_sdk_discovery_imports_only_pydantic` in the architecture test.
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |
