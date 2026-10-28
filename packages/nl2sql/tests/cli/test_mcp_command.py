@@ -148,3 +148,87 @@ def test_a_client_talks_to_nl2sql_mcp_over_stdio(project, tmp_path):
                     return (await session.call_tool("list_datasources", {})).structuredContent
 
     assert anyio.run(go) == {"datasources": []}
+
+
+# ------------------------------------------------------------------ --http (docs/architecture/wave_c.md, section 9)
+
+@pytest.fixture
+def served_http(monkeypatch):
+    """Stands in for the HTTP server: records ``(identity, host, port)`` and serves nothing."""
+    from nl2sql.mcp import http
+
+    seen = []
+    monkeypatch.setattr(http, "_run", lambda application, host, port: seen.append((host, port)))
+    real = http.build_app
+    monkeypatch.setattr(http, "build_app", lambda engine, identity: seen.append(identity) or real(engine, identity))
+    return seen
+
+
+def _http_project(tmp_path, monkeypatch, mcp=None, **policies):
+    monkeypatch.setenv("NL2SQL_CONFIG", str(tmp_path / "nl2sql.yaml"))
+    make_config(tmp_path, policies={"roles": ROLES, **policies}, **({"mcp": mcp} if mcp else {}))
+
+
+def test_stdio_is_still_the_default(project, served, monkeypatch):
+    from nl2sql.mcp import http
+
+    monkeypatch.setattr(http, "serve", lambda *a, **k: pytest.fail("HTTP is opt-in"))
+    project()
+
+    result = runner.invoke(app, ["mcp", "--role", "analyst"])
+
+    assert result.exit_code == 0, result.output
+    assert served[1] == "stdio"
+
+
+def test_http_with_api_keys_needs_no_role_and_serves_the_configured_address(tmp_path, monkeypatch, served_http):
+    _http_project(tmp_path, monkeypatch, {"http": {"port": 9123}})
+
+    result = runner.invoke(app, ["mcp", "--http"])
+
+    assert result.exit_code == 0, result.output
+    assert served_http == [None, ("127.0.0.1", 9123)]
+
+
+def test_http_host_and_port_flags_override_the_config(tmp_path, monkeypatch, served_http):
+    _http_project(tmp_path, monkeypatch)
+
+    result = runner.invoke(app, ["mcp", "--http", "--host", "0.0.0.0", "--port", "9000"])
+
+    assert result.exit_code == 0, result.output
+    assert served_http[1] == ("0.0.0.0", 9000)
+
+
+def test_http_with_api_keys_refuses_a_role_or_user(tmp_path, monkeypatch, served_http):
+    _http_project(tmp_path, monkeypatch)
+
+    result = runner.invoke(app, ["mcp", "--http", "--role", "analyst"])
+
+    assert result.exit_code == 1 and "key" in result.stderr and served_http == []
+
+
+def test_http_with_auth_none_serves_as_the_role_given(tmp_path, monkeypatch, served_http):
+    _http_project(tmp_path, monkeypatch, {"auth": "none"})
+
+    result = runner.invoke(app, ["mcp", "--http", "--role", "analyst", "--user", "ana"])
+
+    assert result.exit_code == 0, result.output
+    assert served_http[0].roles == ["analyst"] and served_http[0].user_id == "ana"
+
+
+def test_http_with_auth_none_still_needs_a_role(tmp_path, monkeypatch, served_http):
+    _http_project(tmp_path, monkeypatch, {"auth": "none"})
+
+    result = runner.invoke(app, ["mcp", "--http"])
+
+    assert result.exit_code == 1 and "--role" in result.stderr and served_http == []
+
+
+def test_public_bind_without_keys_refuses_to_start(tmp_path, monkeypatch, served_http):
+    _http_project(tmp_path, monkeypatch, {"auth": "none"})
+
+    result = runner.invoke(app, ["mcp", "--http", "--role", "analyst", "--host", "0.0.0.0"])
+
+    assert result.exit_code == 1
+    assert "auth: api_keys" in result.stderr and "0.0.0.0" in result.stderr
+    assert served_http[1:] == [], "nothing was served"

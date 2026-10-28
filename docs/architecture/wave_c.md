@@ -1965,7 +1965,38 @@ Not built yet.
 
 ### M2
 
-Not built yet.
+!!! note "Built (M2): MCP over HTTP"
+    - **Files:** `nl2sql/mcp/http.py` (new: `build_app`, `serve`, the bearer middleware, the context variable),
+      `nl2sql/mcp/server.py` (`build_server(..., over_http=True)`, the new `ask`), `cli/commands/mcp.py` and
+      `cli/main.py` (`--http`, `--host`, `--port`), `api/api_keys_api.py` (`check`, `record_denied`, `KeyCheck`).
+    - **Tests:** `tests/unit/test_mcp_http.py` (Starlette's in-process client over a real engine; `run_query`
+      answers with the caller it ran as, so no model or database is involved), `test_mcp_server.py` (the new
+      `ask`), `tests/cli/test_mcp_command.py` (`--http`), `test_api_keys.py` (`check`, `record_denied`).
+
+    Where the code and the design differ, the code won:
+
+    - **`engine.api_keys.check(token) -> KeyCheck` and `record_denied(reason, key_id=None)`**, as M1's note asked:
+      `check` compares the secret before it reports `revoked` (right id, wrong secret is `unknown`, and then
+      `key_id` is `None`), `verify` is `check(token).user`, and `nl2sql.policies.keys.parse` stays behind
+      `ApiKeysAPI`. `mcp/` has no way to publish an event through the facade, so `record_denied` publishes
+      `mcp.denied` (all four reasons, `missing` included); a later `nl2sql-api` that wants its own event
+      would add its own method.
+    - **`ask` takes `conversation_id` and an option-id `choice`**, and returns `conversation_id`, `turn` and
+      `question` (what ran: for a choice, the request's own question) beside Wave A's keys. `datasource_id`
+      applies when a conversation starts (it is the conversation's, as in C1) and is refused with a
+      `conversation_id`. A `choice` without a `conversation_id` is `CLARIFICATION_INVALID` and starts nothing.
+      The clarification no longer carries `request` (the conversation holds it; the client sends back an id),
+      only `phrase` and the options. New codes in the tool's output, not `ErrorCode`s: `CONVERSATION_NOT_FOUND`
+      (missing or someone else's), `CONVERSATION_BUSY`, `INVALID_REQUEST`.
+    - **`auth: none` takes an identity.** `nl2sql mcp --http` with `auth: none` runs every request as the
+      `--role`/`--user` identity (as stdio does) and needs a role; with `api_keys` a `--role` or `--user` is
+      an error. The bind rule is the design's: `auth: none` on a non-loopback host refuses to start. A public
+      bind with `api_keys` and no keys created yet starts (no key can be used, so nothing is exposed).
+    - The bearer middleware is plain ASGI (not Starlette's `BaseHTTPMiddleware`), so the context variable
+      reaches the stateless transport's task. Only an `Authorization` header with the `Bearer` scheme and a
+      token counts: no header is `missing`, anything else that is not `Bearer <token>` is `malformed`. A
+      failing key check (the state store is down) is a 500 and a log line.
+    - `cli/main.py` changed (the options), which C0's list of untouched files did not expect.
 
 ## 14. Bugs Wave C fixes
 
