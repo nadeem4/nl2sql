@@ -144,3 +144,15 @@ def test_query_event_is_gone():
     assert "QueryEvent" not in nl2sql.__all__
     with pytest.raises(AttributeError):
         nl2sql.QueryEvent
+
+
+def test_a_failed_llm_call_clears_its_answer_even_when_langchain_passes_the_partial_response():
+    # langchain-core 1.7 hands on_llm_error the partial result as response=;
+    # a handler that aliases on_llm_end takes it twice and the error is swallowed.
+    cb, _seen = _events()
+    run = uuid.uuid4()
+    cb._answers[run] = object()
+
+    cb.on_llm_error(RuntimeError("boom"), run_id=run, response=None)
+
+    assert run not in cb._answers
