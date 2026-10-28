@@ -6407,9 +6407,10 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   disk) or an id outside it is <code>ResultNotFound</code>. The tool turns <code>ResultNotFound</code> (expired or withheld
   rows) and a kind the data cannot draw into <code>ToolNotApplicable</code>, and reads the conversation's tenant
   (<code>conversation.tenant_id</code>, else the caller's).</li>
-<li>A bare <code>trace_id</code> is checked like <code>engine.results.page</code>: tenant and run id only. The withheld rows' files
-  are on disk, so anyone holding the trace id for that tenant can page them; withholding is enforced on
-  <code>QueryResult</code>, not on the disk.</li>
+<li>A bare <code>trace_id</code> is checked like <code>engine.results.page</code>: tenant and run id only. A withheld run's files
+  were once readable this way; that gap is closed (C-W1): while a hook is attached at <code>answer.after</code> the
+  manifest every read goes through is written only once those hooks allowed, so a withheld run has none
+  and every read path answers <code>ResultNotFound</code> (see <code>docs/configuration/hooks.md</code>).</li>
 <li><code>Decimal</code> values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.</li>
 <li>Tests: <code>test_charts_choose.py</code>, <code>test_charts_api.py</code>, <code>test_charts_make_no_model_call</code> (architecture).
   The stub test moves <code>chart</code> out of its tables.</li>

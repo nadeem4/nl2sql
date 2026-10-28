@@ -2727,7 +2727,14 @@ user who produced it is left to a multi-user deployment.</p>
   of datasources is checked against the role again. After the validator a
   hook may only stop the run. Hooks <strong>fail closed</strong>: an exception denies
   with <code>HOOK_FAILED</code> unless that hook is configured <code>on_error: open</code>. See
-  <a href="../../configuration/hooks/">Hooks</a>.</li>
+  <a href="../../configuration/hooks/">Hooks</a>. A run a hook ended is <strong>withheld</strong>: its
+  returned result is blank and its saved results are unreadable by trace id
+  (<code>engine.results</code> and the REST results routes raise <code>ResultNotFound</code>). Every
+  read goes through the run's manifest, which is written only once no hook
+  can end the run any more (after <code>answer.after</code> allowed, while a hook sits
+  there), so a deny cannot be bypassed by paging the run's files, during the
+  run or after it. See
+  <a href="../../configuration/hooks/#what-withholding-guarantees">What withholding guarantees</a>.</li>
 <li><strong>Cost rule</strong> (optional, <code>policies.cost</code>): the built-in <code>policy.cost</code> hook
   asks the database for the rows a query is estimated to read, before it
   runs, and allows it, asks a person to approve it or refuses it

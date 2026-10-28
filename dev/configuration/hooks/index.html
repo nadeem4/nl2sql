@@ -1109,6 +1109,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#what-withholding-guarantees">
+<span class="md-ellipsis">
+      
+        What withholding guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#built-in-hooks">
 <span class="md-ellipsis">
       
@@ -2534,6 +2543,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#what-withholding-guarantees">
+<span class="md-ellipsis">
+      
+        What withholding guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#built-in-hooks">
 <span class="md-ellipsis">
       
@@ -2678,11 +2696,14 @@ the run; it does not fall back to the generated path. <strong>A plan-only run</s
   <code>NeedsApproval</code>) ends the point; later hooks are not asked.</li>
 <li><strong>A deny</strong> ends the run with the error <code>HOOK_DENIED</code> (never retried), whose
   message is the hook's <code>reason</code>. A run a hook ended carries none of its
-  data: no answer, no rows, no artifact references, no result manifest.
-  While any hook is attached at <code>answer.after</code>, <code>stream_query</code> does not
-  stream the answer as it is written (no <code>answer.delta</code> events), and holds
-  the <code>result.manifest</code> event until the hooks allowed the answer; on a deny
-  it is never sent. The answer arrives whole in <code>run.finished</code>. At a per-sub-query point (<code>plan.after</code>,
+  data: no answer, no rows, no artifact references, no result manifest, and
+  its saved results cannot be read by its <code>trace_id</code> either (see
+  <a href="#what-withholding-guarantees">What withholding guarantees</a>).</li>
+<li><strong>Streaming.</strong> While any hook is attached at <code>answer.after</code>, <code>stream_query</code>
+  does not stream the answer as it is written (no <code>answer.delta</code> events), and
+  holds the <code>result.manifest</code> event until the hooks allowed the answer; on a
+  deny it is never sent. The answer arrives whole in <code>run.finished</code>.</li>
+<li><strong>A sub-query deny.</strong> At a per-sub-query point (<code>plan.after</code>,
   <code>execute.before</code>, <code>execute.after</code>), <code>Deny(reason, scope="sub_query")</code> drops
   only that sub-query: the run goes on without it and the answer's warnings
   say what went unanswered. A sub-query that feeds a <code>join</code> or <code>compare</code>
@@ -2716,6 +2737,35 @@ the run; it does not fall back to the generated path. <strong>A plan-only run</s
   <code>plan.after</code> runs on every cache hit, so a change applies afresh on each
   run and stops the moment the hook config changes.</li>
 </ul>
+<h2 id="what-withholding-guarantees">What withholding guarantees</h2>
+<p>A run a hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>,
+<code>COST_LIMIT_EXCEEDED</code>) returns none of its data, and its saved results cannot
+be read by its <code>trace_id</code>: <code>engine.results.manifest</code>, <code>page</code>, <code>csv</code> and
+<code>chart</code> and the REST results routes answer <code>ResultNotFound</code> (404), from
+<code>run_query</code>, <code>stream_query</code>, <code>nl2sql eval</code> and trace replay alike. This holds
+while the run is still going too, although a streaming caller has the
+<code>trace_id</code> from <code>run.started</code>.</p>
+<p>Every read of a run's results goes through its manifest, and the manifest is
+written only once no hook can end the run any more:</p>
+<ul>
+<li>While a hook is attached at <code>answer.after</code>, the aggregator saves the
+  results but not the manifest. The node that asks <code>answer.after</code> writes it
+  when the hooks allow. A run they deny, or that ends earlier, never has one.
+  If that write fails, the run fails.</li>
+<li>Without such a hook, nothing can end the run after the aggregator, so the
+  aggregator writes the manifest itself, as soon as the results are saved.</li>
+<li>A hook at any earlier point that ends the run ends it before the
+  aggregator runs, so there is no manifest.</li>
+</ul>
+<p>The parquet files of a run with no manifest stay until retention purges
+them, but nothing reads them. With a hook at <code>answer.after</code>, a run that
+crashed or timed out before the hooks ruled has no manifest either, and
+neither has a run whose answer model failed: the hooks never saw its
+results, so it returns no <code>result_manifest</code>, no <code>artifact_refs</code> and no rows,
+and <code>stream_query</code> sends no <code>result.manifest</code> event. Without such a hook
+that run keeps its results, as nothing was left to withhold them for. The
+run's trace records the error that ended it, without rows. An approved
+re-run is a new run with a new <code>trace_id</code>, read as any other.</p>
 <h2 id="built-in-hooks">Built-in hooks</h2>
 <p>One hook is built in: <code>policy.cost</code>, the <a href="../policies/#cost">cost rule</a>. The
 engine builds it from <code>policies.cost</code> (or a role's <code>cost</code>), not from the

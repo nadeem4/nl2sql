@@ -6818,6 +6818,9 @@ the keyless tests stream too.</p>
 <p>The aggregator saves each terminal result of a run as
 <code>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet</code> and writes <code>manifest.json</code>
 beside them (see <a href="../../../storage/artifact-store/#the-result-manifest">Artifact Store → The result manifest</a>).
+While a hook is attached at <code>answer.after</code>, the manifest is written only once
+those hooks allowed, so a run's results are not readable before that, and never
+for a run a hook ended (<a href="../../../configuration/hooks/#what-withholding-guarantees">What withholding guarantees</a>).
 <code>engine.results</code> reads them back by the run's <code>trace_id</code> (its <code>run_id</code>, the
 <code>request_id</code> of the REST routes). They read lazily from the
 parquet file: a page reads only its slice, and the CSV export reads and yields a
