@@ -1267,7 +1267,7 @@ class ApiKey(BaseModel):              # never the secret
 | **Who may manage keys** | `by` must hold a `policies.admin_roles` role, else `PermissionError`. There is no default: a caller that forgot it fails closed. `roles` must name configured roles. |
 | **Identity to role** | Each key carries the roles its holder runs as. Nothing is inferred from the client; a key per person or per app is the unit of revocation. |
 | **On the wire** | `Authorization: Bearer <token>`. Missing or invalid: 401 with `WWW-Authenticate: Bearer`, and `mcp.denied` (`reason`: `missing`, `malformed`, `unknown`, `revoked`; the key id when there is one; never the token), which the audit observer keeps. |
-| **CLI** | `nl2sql keys create --as ROLE --user NAME --role analyst [--tenant T] [--label L]` prints the token once; `nl2sql keys list --as ROLE`; `nl2sql keys revoke ID --as ROLE`. `--as` builds the admin `by`, as Wave B's `nl2sql review --as ROLE` does. |
+| **CLI** | `nl2sql keys create --as ROLE --user NAME --role analyst [--tenant T] [--label L]` prints the token once; `nl2sql keys list --as ROLE`; `nl2sql keys revoke ID --as ROLE`. `--as` builds the admin `by`, as Wave B's `nl2sql review --as ROLE` does. Under `allow_all` no roles exist: leave out `--as` and `--role`. |
 | **OAuth later** | A client that lets its user set a header (a desktop assistant's config file, an IDE, a script using a model provider's remote MCP tool with headers) works with keys. A chat app's connector screen that offers only OAuth does not, which is why OAuth is the next step after 0.9. |
 
 `engine.api_keys` is the engine's and not MCP's, so Wave D's `nl2sql-api`
@@ -1619,6 +1619,46 @@ flowchart TD
     - `delete` takes the lock and raises `ConversationBusy` while a turn runs. A turn's scope, and
       `conversation.started`, carry the conversation's tenant. The stream worker runs in a copy of the
       caller's context.
+
+!!! note "Built (M1): API keys"
+    - **Token:** `nl2sql/policies/keys.py` holds the format (`nl2sql_<id>_<secret>`, `id` 8 hex characters,
+      `secret` 43 URL-safe characters from `secrets.token_urlsafe(32)`, matched with `fullmatch`), `hash_secret`
+      (SHA-256 hex) and `matches` (`hmac.compare_digest`). The store row is `id`, `hash`, `label`, `user_id`,
+      `tenant_id`, `roles`, `created_at`, `created_by`, `revoked_at`; the token and the secret are never stored.
+    - **Facade:** `api/api_keys_api.py` fills `create`, `list`, `revoke` and `verify`. `create` and `revoke`
+      publish `api_key.created` and `api_key.revoked` with `key_id`, `user_id`, `tenant_id`, `roles` and `by`
+      (the audit observer keeps both through the catalog's `audit` flag). `nl2sql keys create|list|revoke`
+      (`cli/commands/keys.py`) call them as the `--as` admin.
+    - **Docs:** `security/api-keys.md` (written), `security/model.md`, `observability/events.md` and the README's
+      command table.
+
+    Where the code and the design differ, the code won:
+
+    - `revoke` of an unknown id raises `ValueError` (the design says `None`); revoking a key that is already
+      revoked changes nothing and publishes nothing.
+    - `list` is newest first and includes revoked keys, which `nl2sql keys list` marks `revoked`.
+    - `create` retries a clash of ids (the store's `add_api_key` raises `ValueError`) with a new id, up to eight
+      times, then raises `RuntimeError`; it never overwrites. `user_id` must not be blank.
+    - Roles are checked against `policies.roles`, with no `allow_all` exemption: keys outlive the policy, so a
+      key minted with `roles=["admin"]` under `allow_all` would become a real admin key once roles are
+      configured. Under `allow_all` a key carries `roles=[]` (a role name is a `ValueError`), which reads
+      everything now and nothing once roles are configured. Under `allow_all` every caller may still manage
+      keys, as for `engine.knowledge.reload` and the review queue; the CLI leaves out `--as` and `--role` there
+      (`caller()` refuses every role name when none is defined), so `--role` is optional.
+    - A `by` that is not a `UserContext` is a `TypeError`, one without an admin role a `PermissionError`
+      (the engine's usual pair), not an `ErrorCode`.
+    - `verify` checks only the key: it does not check that the key's roles are still configured (the policy
+      engine does that on every run).
+    - Tests: `test_api_keys.py`, `test_cli_keys.py`. The stub tests moved `api_keys` and the `keys` commands out
+      of their tables.
+    - **For M2:** call `engine.api_keys.verify(token)` with the bearer token (the text after `Bearer `); `None`
+      is a 401. `verify` does not say why, and `mcp.denied` carries a `reason` (`missing`, `malformed`,
+      `unknown`, `revoked`). `missing` is M2's own (no header). To tell the others apart without reaching into
+      the runtime, M2 adds a method to `ApiKeysAPI` that returns the reason. Constraints: it compares the
+      secret before reporting `revoked` (right id with a wrong secret is `unknown`, so an id alone cannot
+      probe a key's state and the audit log never records a forged token as a revoked key); `verify` becomes a
+      thin wrapper over it, so there is one code path; and `nl2sql.policies.keys.parse` stays behind
+      `ApiKeysAPI`, not imported by `mcp/http.py`. Not built in M1.
 
 The waves, with at most four PRs at once:
 

@@ -20,10 +20,6 @@ def _out(result) -> str:
 
 
 @pytest.mark.parametrize("command, row", [
-    (["keys", "create", "--as", "admin", "--user", "ana", "--role", "analyst", "--tenant", "acme",
-      "--label", "laptop"], "M1"),
-    (["keys", "list", "--as", "admin"], "M1"),
-    (["keys", "revoke", "abc12345", "--as", "admin"], "M1"),
     (["launch", ".", "--provider", "openai", "--as", "admin", "--draft", "--yes", "--no-ports"], "L3"),
     (["dashboards", "refresh", "--due"], "D2"),
     (["dashboards", "refresh", "--dashboard", "abc", "--as", "admin"], "D2"),

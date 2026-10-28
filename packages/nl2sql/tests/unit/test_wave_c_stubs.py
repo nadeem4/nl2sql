@@ -27,7 +27,6 @@ STUBS = {
                    "arrange": "D1", "set_filters": "D1", "set_schedule": "D1",
                    "open": "D2", "refresh": "D2", "filter_values": "D2", "run_scheduled": "D2",
                    "generate": "D3", "suggest_questions": "D3"},
-    "api_keys": {"create": "M1", "list": "M1", "revoke": "M1", "verify": "M1"},
 }
 # Methods a row has filled since: they are real now and have their own tests.
 FILLED = {"conversations": {"start", "ask", "stream", "retry", "ask_only", "get", "list", "delete"}}
