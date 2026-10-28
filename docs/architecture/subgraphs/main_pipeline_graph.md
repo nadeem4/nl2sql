@@ -51,7 +51,7 @@ Partial completion behavior:
 ## Internal Node Composition
 
 Execution order (nominal path):
-- `curated_matcher` — `CuratedMatcherNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py` — only when curated answers are configured and the run executes: answer with a verified query (`curated_route` → `verified` → `layer_router`), or fall back (`generated` → `datasource_resolver`). Without curated answers the node is not in the graph and `datasource_resolver` is the entry point.
+- `curated_matcher` — `CuratedMatcherNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/node.py` — only when curated answers are configured and the run executes (or pins a supplied verified query, which with `execute=False` is checked and not run): answer with a verified query (`curated_route` → `verified` → `layer_router`), or fall back (`generated` → `datasource_resolver`). Without curated answers the node is not in the graph and `datasource_resolver` is the entry point.
 - `datasource_resolver` — `DatasourceResolverNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/datasource_resolver/node.py` — resolve candidate datasources, RBAC, and the answerability check (an LLM call).
 - `decomposer` — `DecomposerNode` — `packages/nl2sql/src/nl2sql/pipeline/nodes/decomposer/node.py` — decompose query into sub-queries, and build the `ExecutionDAG` from them (`decomposer/dag.py`).
 - `layer_router` — inline lambda + `routes.build_scan_layer_router` — `packages/nl2sql/src/nl2sql/pipeline/routes.py` — route each scan layer to a subgraph or aggregator.

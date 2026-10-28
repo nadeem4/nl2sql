@@ -109,9 +109,11 @@ class DashboardsAPI:
     def open(self, dashboard_id: str, *, user_context: UserContext, refresh_due: bool = True) -> DashboardView:
         """Checks access first, then returns the stored results of the charts that passed.
 
-        Each stored plan is checked under the caller's current scope (a generated plan is validated and generated,
-        not run; a verified query is run, where the matcher is). A chart the caller can no longer read comes back
-        ``denied`` and one whose plan no longer validates ``needs_fixing``, both without rows. With
+        Each stored plan is checked under the caller's current scope, running no query (a generated plan is
+        validated and generated; a verified query is checked by the curated matcher). Rows are served only when
+        the check ends ``ok``, ``empty``, or ``needs_approval`` with nothing else wrong. A chart the caller can no
+        longer read (any part of it) comes back ``denied`` and one whose plan no longer validates ``needs_fixing``,
+        both without rows. Only charts this call checked or refreshed are served. With
         ``refresh_due`` (the default) the charts older than the schedule are then refreshed, as the caller and
         never with approvals; an app that wants an instant open passes ``False`` and refreshes the ids in ``due``
         itself. A dashboard being refreshed by someone else leaves its charts due.
@@ -130,7 +132,8 @@ class DashboardsAPI:
         A chart whose plan no longer validates is ``needs_fixing`` (no rows, the refiner is never asked); one the
         caller cannot read is ``denied``; one a hook wants approved is ``needs_approval`` with its requests in
         ``approvals_needed`` and keeps its last result; pass an ``Approval`` for each in ``approvals`` to run it.
-        A chart stopped at a cap ends the refresh.
+        A chart whose run fails (``error``) keeps its last good result too. A chart stopped at a cap ends the
+        refresh.
 
         Raises:
             DashboardNotFound: it does not exist or is not the caller's.
@@ -153,10 +156,14 @@ class DashboardsAPI:
 
         Each dashboard is refreshed under its lock (one being refreshed is skipped). Before it runs, the saved
         identity is checked: a schedule older than ``dashboards.schedule_identity_max_age_days``, or one that
-        names a role the policies no longer define, stops; so does one with a chart its owner can no longer read.
+        names a role the policies no longer define, stops; so does one with a chart its owner can no longer read
+        (``SCHEDULE_ACCESS_DENIED``) or a hook denied (``SCHEDULE_HOOK_DENIED``).
         A stopped schedule has ``state="stopped"`` and an ``error`` (``code`` and ``message``) the owner sees on
         the dashboard, ``dashboard.schedule_stopped`` is published, and nothing retries it: setting the schedule
         again saves a fresh snapshot. A scheduled run never approves. Returns the dashboards that ran.
+
+        Raises:
+            ValueError: ``now`` has no timezone.
         """
         return self._service.run_scheduled(now=now)
 

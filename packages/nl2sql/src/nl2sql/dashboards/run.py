@@ -31,8 +31,11 @@ from nl2sql.policies import UserContext
 # What an error code says about a chart: the caller may not read it, or the stored plan no longer validates.
 _DENIED = {ErrorCode.SECURITY_VIOLATION.value, ErrorCode.HOOK_DENIED.value}
 _VALIDATOR = "logical_validator"
-# Results a refresh does not store: the chart keeps its last one.
-KEEPS_LAST = ("needs_approval", "stopped")
+# Results a refresh does not store: the chart keeps its last one (a failed run, such as a database outage, never
+# wipes good rows; the error is in the refresh's result).
+KEEPS_LAST = ("needs_approval", "stopped", "error")
+# A check that ends in one of these lets ``open`` serve the chart's stored rows; anything else fails closed.
+SERVES = ("ok", "empty", "needs_approval")
 
 
 class DashboardBusy(ValueError):
@@ -77,23 +80,12 @@ class TileRunner:
                        explanation=_why(result) if status in ("ok", "empty") else None, column_kinds=kinds,
                        error=error, approvals_needed=list(result.approvals_needed))
 
-    def _supplied(self, plan: ChartPlan) -> SuppliedPlan:
+    @staticmethod
+    def _supplied(plan: ChartPlan) -> SuppliedPlan:
         if plan.verified is not None:
-            return SuppliedPlan(verified=plan.verified, verified_datasource_id=self._datasource_of(plan))
+            return SuppliedPlan(verified=plan.verified, verified_datasource_id=plan.verified_datasource_id)
         return SuppliedPlan(decomposition=DecomposerResponse.model_validate(plan.decomposition),
                             plans={sub_query: PlanModel.model_validate(body) for sub_query, body in plan.plans.items()})
-
-    def _datasource_of(self, plan: ChartPlan) -> str:
-        """The datasource a verified chart belongs to: stored with it, else the one datasource holding its id."""
-        if plan.verified_datasource_id:
-            return plan.verified_datasource_id
-        curated = getattr(self._ctx, "curated", None)
-        holders = [ds_id for ds_id, section in (curated.datasources.items() if curated else [])
-                   if any(query.id == plan.verified.id for query in section.verified_queries)]
-        if len(holders) != 1:
-            raise ValueError(f"The verified query '{plan.verified.id}' is "
-                             f"{'in more than one datasource' if holders else 'not in the curated answers'}.")
-        return holders[0]
 
     def _draw(self, tile: Tile, result: QueryResult) -> ChartSpec:
         node_id = result.result_manifest[0].node_id
@@ -121,8 +113,17 @@ def _why(result: QueryResult) -> Optional[str]:
 
 
 def _classify(result: QueryResult) -> Tuple[TileStatus, Optional[Dict[str, Any]]]:
-    """A chart's status and its error from the run's result."""
-    if result.status == "needs_approval":
+    """A chart's status and its error from the run's result. A denial comes first, whatever else the run says: a
+    sub-query refused while another waits for approval, or one a hook dropped while the rest ran, is ``denied``."""
+    denied = next((e for e in result.errors if e.get("error_code") in _DENIED), None)
+    if denied is not None:
+        return "denied", {"code": denied["error_code"], "message": denied.get("message", "")}
+    dropped = next((w for w in result.warnings if w.code == ErrorCode.HOOK_DENIED.value
+                    and not w.detail.get("recovered")), None)
+    if dropped is not None:
+        return "denied", {"code": dropped.code, "message": dropped.message}
+    others = [e for e in result.errors if e.get("error_code") != ErrorCode.NEEDS_APPROVAL.value]
+    if result.status == "needs_approval" and not others:
         return "needs_approval", None
     if result.status == "stopped":
         return "stopped", ({"code": ErrorCode.RUN_LIMIT_REACHED.value, "message": describe(result.stop)}
@@ -130,10 +131,7 @@ def _classify(result: QueryResult) -> Tuple[TileStatus, Optional[Dict[str, Any]]
     if result.status in ("success", "plan_only") and not result.errors:
         rows = [summary.row_count for summary in result.result_manifest]
         return ("empty" if rows and not any(rows) else "ok"), None
-    first = result.errors[0] if result.errors else {}
-    if any(e.get("error_code") in _DENIED for e in result.errors):
-        denied = next(e for e in result.errors if e.get("error_code") in _DENIED)
-        return "denied", {"code": denied["error_code"], "message": denied.get("message", "")}
+    first = others[0] if others else (result.errors[0] if result.errors else {})
     invalid = next((e for e in result.errors if e.get("node") == _VALIDATOR), None)
     if invalid is not None:
         return "needs_fixing", {"code": ErrorCode.TILE_NEEDS_FIXING.value, "message": invalid.get("message", "")}
@@ -161,15 +159,15 @@ class Refresher:
             yield
 
     def check(self, tiles: Sequence[Tile], user: UserContext) -> Dict[str, TileRun]:
-        """The access check of each chart under the caller's current scope: a run that does not execute a
-        generated plan (a verified query is run, where the matcher is). Nothing is stored."""
-        return {tile.id: self._runner.run(tile, user, execute=tile.plan.verified is not None, draw=False)
-                for tile in tiles}
+        """The access check of each chart under the caller's current scope: a run that executes nothing (D135). A
+        generated plan is validated and generated; a verified query is checked by the curated matcher. Nothing is
+        stored."""
+        return {tile.id: self._runner.run(tile, user, execute=False, draw=False) for tile in tiles}
 
     def run(self, dashboard: Dashboard, tiles: Sequence[Tile], user: UserContext, trigger: str,
             approvals: Sequence[Approval] = ()) -> DashboardRun:
-        """Refresh ``tiles`` in layout order as ``user``; call it under the lock. A chart that needs approval keeps
-        its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too."""
+        """Refresh ``tiles`` in layout order as ``user``; call it under the lock. A chart that needs approval or
+        fails keeps its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too."""
         runs: List[TileRun] = []
         stopped = False
         for tile in tiles:

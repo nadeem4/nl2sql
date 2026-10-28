@@ -45,9 +45,12 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **Stored results.** `remove_tile` discards that chart's stored result and `set_filters` (when the filters
   change) every chart's; renaming, redrawing, arranging, moving and scheduling keep them.
 - **`open(dashboard_id, refresh_due=True)`** checks access first: each stored plan is checked under the caller's
-  current roles (a generated plan is validated and generated, not run; a verified query is run). It returns
-  `DashboardView(dashboard, runs, refreshed_at, due)`. `runs` holds the stored result of each chart that has one:
-  as stored when the check passed; `denied`, `needs_fixing` or `error`, without rows, when it did not. With
+  current roles, running no query (a generated plan is validated and generated; a verified query is checked by
+  the curated matcher). It returns `DashboardView(dashboard, runs, refreshed_at, due)`. `runs` holds the stored
+  result of each chart this `open` checked: as stored when the check ended `ok`, `empty`, or `needs_approval` with
+  no other error; otherwise the check's result (`denied`, `needs_fixing`, `error`, ...) without rows. A denial
+  wins: a chart with one query refused, or one a hook dropped, is `denied`. A result another process stored after
+  the check is not served; the chart stays in `due`. With
   `refresh_due`, the charts with no result or one older than the schedule are then refreshed (`trigger="open"`,
   as the caller, never approving); `due` lists the ids still due (an app that passed `False`, a chart waiting for
   approval, or a dashboard another process is refreshing).
@@ -56,14 +59,15 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   `column_kinds`, the plain-English `explanation`, the `error`). Statuses: `ok`, `empty`, `needs_fixing` (a plan
   that no longer validates or parses; the refiner is never asked), `denied`, `needs_approval` (its requests in
   `approvals_needed`; the stored result is kept), `stopped` (a cap; the remaining charts are `stopped` and keep
-  theirs) and `error`. It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
+  theirs) and `error` (returned, not stored: the chart keeps its last good result). It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
   edited, and `ValueError` for a `tile_id` the dashboard does not have. `filters` is D2b's.
 - **`run_scheduled(now=None)`** has no caller: it refreshes each dashboard whose schedule is due, as its saved
   identity, and returns the `DashboardRun`s (`trigger="schedule"`). A schedule that fails a check stops, with
   `state="stopped"` and `error={"code", "message"}` on `Dashboard.schedule`, and `dashboard.schedule_stopped`.
-  The codes are `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED` and `SCHEDULE_ACCESS_DENIED`.
-- **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`; without one, the refresh
-  uses the only datasource whose curated section holds the query's id, else the chart is `needs_fixing`.
+  The codes are `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED`, `SCHEDULE_ACCESS_DENIED` (a chart the owner
+  can no longer read) and `SCHEDULE_HOOK_DENIED` (a hook denied a chart; the message names the chart and the
+  hook's reason). A `now` without a timezone is a `ValueError`.
+- **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`, required with `verified`.
 - **Events.** `dashboard.changed` (the edit kinds, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`,
   `dashboard.refreshed` (the counts per status), `dashboard.schedule_stopped` and `workspace.changed`. They
   carry no titles, names or values.

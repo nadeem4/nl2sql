@@ -28,12 +28,19 @@ ANA = _user("analyst")
 LOST = _user("viewer")  # the same owner, with a role that cannot read customers
 
 
-def _build(demo_project, fake_llm, monkeypatch, hooks=()):
+def _build(demo_project, fake_llm, monkeypatch, hooks=(), curated=None):
+    import yaml
+
     from nl2sql import NL2SQL
     from nl2sql.config import load_config
 
     server, env = fake_llm(RULES_COUNT_CUSTOMERS)
-    config = load_config(_env(monkeypatch, demo_project, env))
+    path = _env(monkeypatch, demo_project, env)
+    if curated:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        document["curated"] = curated
+        path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    config = load_config(path)
     return NL2SQL(config.model_copy(update={"hooks": list(hooks)}) if hooks else config), server
 
 
@@ -44,13 +51,13 @@ def engine(demo_project, fake_llm, monkeypatch):
     built.close()
 
 
-def _seed(engine, plan=None, did="d1"):
+def _seed(engine, plan=None, did="d1", chart_plan=None):
     from nl2sql.dashboards.models import ChartPlan, Dashboard, Tile, TileLayout
     from nl2sql.dashboards.store import DashboardStore
 
     supplied = plan or _supplied()
-    chart_plan = ChartPlan(decomposition=supplied.decomposition.model_dump(mode="json"),
-                           plans={k: v.model_dump(mode="json") for k, v in supplied.plans.items()})
+    chart_plan = chart_plan or ChartPlan(decomposition=supplied.decomposition.model_dump(mode="json"),
+                                         plans={k: v.model_dump(mode="json") for k, v in supplied.plans.items()})
     now = datetime.now(timezone.utc)
     tile = Tile(id="t1", title="Customers", question=COUNT, plan=chart_plan, layout=TileLayout(x=0, y=0, w=2, h=1))
     DashboardStore(engine._runtime.state).put(Dashboard(
@@ -85,6 +92,38 @@ def test_stored_results_are_denied_once_access_is_lost(engine):
 
     assert kept.status == "ok" and kept.chart.data.rows == [[59]]
     assert lost.status == "denied" and lost.chart is None and lost.error["code"] == "SECURITY_VIOLATION"
+    assert server.calls == []
+
+
+@pytest.mark.e2e
+def test_open_checks_a_verified_chart_without_running_it(demo_project, fake_llm, monkeypatch):
+    """D135: the access check executes nothing, a verified chart's included; it still denies once access is lost."""
+    from nl2sql import VerifiedRef
+    from nl2sql.dashboards.models import ChartPlan
+    from nl2sql.execution.executor import SqlExecutorService
+
+    from .test_curated_fake_llm import CURATED
+
+    engine, server = _build(demo_project, fake_llm, monkeypatch, curated=CURATED)
+    try:
+        _seed(engine, chart_plan=ChartPlan(verified=VerifiedRef(id="top_customers_by_revenue",
+                                                                params={"n": 5, "year": 2012}),
+                                           verified_datasource_id="chinook"))
+        [refreshed] = engine.dashboards.refresh("d1", user_context=ANA).tiles
+        executed = []
+        execute = SqlExecutorService.execute
+        monkeypatch.setattr(SqlExecutorService, "execute",
+                            lambda self, request: executed.append(request) or execute(self, request))
+
+        kept = engine.dashboards.open("d1", user_context=ANA).runs[0]
+        lost = engine.dashboards.open("d1", user_context=LOST).runs[0]
+    finally:
+        engine.close()
+
+    assert refreshed.status == "ok" and len(refreshed.chart.data.rows) == 5
+    assert kept == refreshed, "the stored rows are served after the check"
+    assert lost.status == "denied" and lost.chart is None and lost.error["code"] == "SECURITY_VIOLATION"
+    assert executed == [], "the check ran no query"
     assert server.calls == []
 
 

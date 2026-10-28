@@ -19,7 +19,7 @@ CURATED = Curated.model_validate({"datasources": {"ds": {"verified_queries": [
     {"id": "q", "description": "d", "questions": ["How many?"], "sql": "SELECT 1"}]}}})
 
 
-def _blank(_ctx=None):
+def _blank(_ctx=None, **_flags):
     """A node that does nothing: the graph's shape is what is under test."""
     return lambda state: {}
 

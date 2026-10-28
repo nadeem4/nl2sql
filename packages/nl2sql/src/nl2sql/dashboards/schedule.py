@@ -10,11 +10,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
+from nl2sql.common.errors import ErrorCode
 from nl2sql.dashboards.models import Dashboard, Schedule, ScheduleIdentity, Tile, TileRun
 from nl2sql.policies import UserContext
 
 ROLE_REMOVED = "SCHEDULE_ROLE_REMOVED"
 ACCESS_DENIED = "SCHEDULE_ACCESS_DENIED"
+HOOK_DENIED = "SCHEDULE_HOOK_DENIED"
 IDENTITY_EXPIRED = "SCHEDULE_IDENTITY_EXPIRED"
 
 
@@ -51,9 +53,15 @@ def identity_problem(schedule: Schedule, policies, now: datetime, max_age_days: 
     return None
 
 
-def denied_message(denied: List[Tile]) -> str:
-    return (f"The owner can no longer read {', '.join(t.title for t in denied)}. "
-            "Fix the access or the chart, then set the schedule again.")
+def denied(charts: List[Tuple[Tile, TileRun]]) -> Tuple[str, str]:
+    """``(code, message)`` for a run whose ``charts`` came back ``denied``: ``SCHEDULE_ACCESS_DENIED`` when the
+    owner's scope refused one (``SECURITY_VIOLATION``), else ``SCHEDULE_HOOK_DENIED`` with the hook's reason."""
+    lost = [t.title for t, r in charts if (r.error or {}).get("code") == ErrorCode.SECURITY_VIOLATION.value]
+    if lost:
+        return ACCESS_DENIED, (f"The owner can no longer read {', '.join(lost)}. "
+                               "Fix the access or the chart, then set the schedule again.")
+    reasons = "; ".join(f"{t.title}: {((r.error or {}).get('message') or 'denied').rstrip('.')}" for t, r in charts)
+    return HOOK_DENIED, f"A hook denied {reasons}. Set the schedule again once the hook allows it."
 
 
 def ran(schedule: Schedule, now: datetime) -> Schedule:

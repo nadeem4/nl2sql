@@ -1530,7 +1530,8 @@ flowchart TD
       file is loaded, or `datasource_id` is not `verified_datasource_id`; and the matcher ends the run with an
       error where an approved pin would fall back: `SECURITY_VIOLATION` (the role may not read the datasource
       or a table), `EXECUTION_FAILED` (the query failed) or `INVALID_STATE` (an unknown query, a bad or
-      missing value). D2's access check on open must run verified charts with `execute=True`.
+      missing value). (D2 lifted the `execute` refusal: with `execute=False` the matcher checks and runs nothing;
+      see D2's note.)
     - `choice` on the conversation methods is an option id (`str`), as the design's prose says; the design's
       table leaves its type open.
     - `ToolOutput`-returning tool stubs import `ToolContext` and `ToolOutput` from `nl2sql.chat_tools`, and
@@ -1838,30 +1839,41 @@ flowchart TD
       `tests/unit/test_cli_dashboards.py`, `packages/api/tests/test_startup.py`, and in the boundary test
       `test_dashboards_make_no_model_call` and `test_every_entry_point_reaches_data_through_run_query`.
     - **Statuses.** A run is `needs_fixing` when the validator rejected the plan (the error is
-      `TILE_NEEDS_FIXING` with the validator's message), the stored plan no longer parses, or a verified chart's
-      query cannot be found; `denied` for `SECURITY_VIOLATION` or `HOOK_DENIED`; `needs_approval` and `stopped` are
-      the run's; `empty` is a run with no rows; anything else is `error`. `needs_approval` and `stopped` are
-      returned but **not stored**: the chart keeps its last result. Every other status is stored, so a `denied`,
-      `needs_fixing` or `error` run replaces the rows.
-    - **Open** checks only the charts that have a stored result. A generated plan is checked with `execute=False`;
-      a verified one with `execute=True`, as C0b's note says it must be, which means opening a dashboard with a
-      verified chart runs that query. A check that ends `denied`, `needs_fixing` or `error` serves no rows for
-      that chart (an `error` is treated as a failed check, never as a pass).
+      `TILE_NEEDS_FIXING` with the validator's message) or the stored plan no longer parses. A denial is checked
+      first: `denied` for any `SECURITY_VIOLATION` or `HOOK_DENIED` error, or a `HOOK_DENIED` warning (a hook that
+      dropped one sub-query; the run itself succeeded), whatever else the run says. `needs_approval` is the run's
+      only when no other error came with it; `stopped` is the run's; `empty` is a run with no rows; anything else is
+      `error`. `needs_approval`, `stopped` and `error` are returned but **not stored**: the chart keeps its last
+      result, so a database outage never wipes good rows. `denied` and `needs_fixing` are stored and replace the
+      rows.
+    - **Open** checks only the charts that have a stored result, and the check executes nothing (D135): a
+      generated plan runs with `execute=False`, and so does a verified one. C0b refused a supplied verified plan
+      with `execute=False`; that refusal is gone. A run that pins a supplied verified query keeps the curated
+      matcher in its graph without `execute` (`build_graph(verified=True)`), and the matcher
+      (`CuratedMatcherNode(ctx, execute=False)`) ends after its scope, values, table-policy and capability checks:
+      the sub-query is done with its SQL and no result, so the run is `plan_only`. It still never falls back to a
+      model run and makes no model call. Rows are served on an allow-list: a check that ends `ok`, `empty`, or
+      `needs_approval` with no other error; anything else fails closed. Only charts this `open` checked, or
+      refreshed itself (from the returned `DashboardRun`), are served: a result another process stored between
+      the check and the refresh is not, and the chart stays in `due`.
     - **The lock** `dashboard-refresh:<id>` is held by `refresh`, by the scheduled run, by the refresh that `open`
       starts, and by `edit`, `pin` and `delete` (D1's note asked for `edit`), so a refresh cannot finish after
       `set_filters` and store results that ignore it. A held lock is `DashboardBusy` (a `ValueError`) from
       `refresh` and the edits; `open` leaves the charts due and a schedule skips the dashboard.
     - **Schedules** run each due dashboard as the owner saved on it. The stop codes are
       `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED` (a role of the snapshot is not in `policies.roles`,
-      unless `allow_all`) and `SCHEDULE_ACCESS_DENIED` (a chart came back `denied`; the run is still stored, then
-      the schedule stops). A schedule that stops sets `state="stopped"`, `next_at=None` and `error`.
+      unless `allow_all`), `SCHEDULE_ACCESS_DENIED` (a chart came back `denied` with `SECURITY_VIOLATION`) and
+      `SCHEDULE_HOOK_DENIED` (a chart a hook denied; the message names the chart and the hook's reason). The run
+      is still stored, then the schedule stops. A schedule that stops sets `state="stopped"`, `next_at=None` and
+      `error`. `run_scheduled(now=)` without a timezone is a `ValueError`, before any dashboard runs.
+    - `nl2sql dashboards refresh --due` refuses `--as`, `--user` and `--tenant`; with `--dashboard`, `--user` and
+      `--tenant` act as that owner (operator use, as the help says).
 
     Where the code and the design differ, the code won:
 
     - The lifespan hook is in `packages/api/src/nl2sql_api/main.py`; the package has no `app.py`.
-    - `ChartPlan` gains `verified_datasource_id` (optional): `SuppliedPlan(verified=...)` needs the datasource and
-      the design's `ChartPlan.verified` (a `VerifiedRef`) has none. Without it the refresh uses the only datasource
-      whose curated section holds the query's id.
+    - `ChartPlan` gains `verified_datasource_id`, required whenever `verified` is set: `SuppliedPlan(verified=...)`
+      needs the datasource and the design's `ChartPlan.verified` (a `VerifiedRef`) has none.
     - `TileRun` gains `approvals_needed` (the `ApprovalRequest`s of a `needs_approval` chart, never stored), or a
       caller of `refresh(approvals=)` would have no request to approve.
     - `DashboardRun.usage` stays empty: a refresh makes no model call, so the sum is zero.

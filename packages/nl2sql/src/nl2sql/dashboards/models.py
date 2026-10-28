@@ -40,8 +40,7 @@ class ChartPlan(StrictModel):
     decomposition: Optional[Dict[str, Any]] = None  # DecomposerResponse as JSON: sub-queries, combine groups
     plans: Dict[str, Dict[str, Any]] = Field(default_factory=dict)  # sub_query_id -> PlanModel as JSON
     verified: Optional[VerifiedRef] = None  # a verified query's id and bound params
-    # The datasource the verified query belongs to. A refresh needs it (``SuppliedPlan.verified_datasource_id``);
-    # left out, the refresh looks for the one datasource whose curated section holds the query's id.
+    # The datasource the verified query belongs to; required with ``verified`` (``SuppliedPlan.verified_datasource_id``).
     verified_datasource_id: Optional[str] = None
 
     @model_validator(mode="after")
@@ -55,6 +54,8 @@ class ChartPlan(StrictModel):
             raise ValueError("Plans belong to a decomposition; a verified query has none.")
         if whole and self.verified_datasource_id is not None:
             raise ValueError("verified_datasource_id goes with a verified query.")
+        if not whole and not self.verified_datasource_id:
+            raise ValueError("A verified query needs verified_datasource_id.")
         return self
 
 

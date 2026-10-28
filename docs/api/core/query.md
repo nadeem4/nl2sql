@@ -78,9 +78,11 @@ the approved re-run (`"approved"`) and, in Wave B, a plan the asker chose
 
 A supplied verified query is run by the curated matcher with its values, and
 it never falls back to a model run (a dashboard refresh uses no tokens). The
-call raises `ValueError`, before anything runs, when `execute` is `False`, no
-curated file with a verified query is loaded, or `datasource_id` is not
-`verified_datasource_id`. Where an approved pin would fall back to
+call raises `ValueError`, before anything runs, when no curated file with a
+verified query is loaded, or `datasource_id` is not `verified_datasource_id`.
+With `execute=False` the matcher checks the query (the caller's scope, its
+values, every table it reads) and runs nothing: the run ends `plan_only`, or
+with the error below (a dashboard's access check). Where an approved pin would fall back to
 generation, a supplied one ends the run with an error and makes no model call:
 `SECURITY_VIOLATION` (the role may not read the datasource or a table the query
 reads), `EXECUTION_FAILED` (the query failed) or `INVALID_STATE` (an unknown

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 from typing import Any, Callable, Dict, List
 
 import pytest
@@ -18,7 +17,7 @@ from nl2sql import NL2SQL, SuppliedPlan, UserContext
 from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.api.results_api import ResultsAPI
 from nl2sql.charts.spec import ChartData, ChartSpec, Encoding
-from nl2sql.common.errors import DashboardNotFound
+from nl2sql.common.errors import DashboardNotFound, RunWarning
 from nl2sql.dashboards.models import ChartPlan, Dashboard, Tile, TileLayout, TileRun
 from nl2sql.dashboards.store import DashboardStore
 from nl2sql.execution.artifacts.results import ResultSummary
@@ -50,6 +49,21 @@ def good(rows: int = 2, trace: str = "tr-1") -> QueryResult:
 def failed(code: str, node: str = "executor", message: str = "It failed.") -> QueryResult:
     return QueryResult(status="error", trace_id="tr-x",
                        errors=[{"node": node, "error_code": code, "message": message, "severity": "ERROR"}])
+
+
+def _partly_denied() -> QueryResult:
+    """A two-sub-query run where a hook denied one sub-query: it is dropped as a warning, the run succeeds."""
+    result = good()
+    warning = RunWarning(code="HOOK_DENIED", node="sql_agent", sub_query_id="sq2",
+                         message="Sub-query 'sq2' (Count orders 2) was not run: Not for you.")
+    return result.model_copy(update={"warnings": [warning]})
+
+
+def _denied_and_asking() -> QueryResult:
+    """A two-sub-query run: one sub-query refused for access, the other waiting for approval."""
+    return QueryResult(status="needs_approval", trace_id="tr-m", approvals_needed=[request()], errors=[
+        {"node": "logical_validator", "error_code": "SECURITY_VIOLATION", "message": "No access.", "severity": "ERROR"},
+        {"node": "hooks", "error_code": "NEEDS_APPROVAL", "message": "Reads a lot.", "severity": "ERROR"}])
 
 
 def spec(trace: str) -> ChartSpec:
@@ -357,24 +371,20 @@ def test_a_verified_chart_refreshes_through_supplied_plan(engine, runs):
     assert run.tiles[0].status == "ok"
 
 
-def test_a_verified_chart_with_no_datasource_is_found_in_the_curated_section(engine, runs):
-    engine._runtime.curated = SimpleNamespace(datasources={
-        "ds1": SimpleNamespace(verified_queries=[SimpleNamespace(id="top_cities")]),
-        "ds2": SimpleNamespace(verified_queries=[SimpleNamespace(id="other")])})
-    seed(engine, tiles=[tile("t1", plan=ChartPlan(verified=VerifiedRef(id="top_cities")))])
-
-    run = engine.dashboards.refresh("d1", user_context=ANA)
-
-    assert runs.calls[0]["plan"].verified_datasource_id == "ds1" and run.tiles[0].status == "ok"
+def test_a_verified_chart_plan_names_its_datasource():
+    with pytest.raises(ValueError, match="verified_datasource_id"):
+        ChartPlan(verified=VerifiedRef(id="top_cities"))
 
 
-def test_a_verified_chart_nobody_can_place_is_needs_fixing(engine, runs):
-    seed(engine, tiles=[tile("t1", plan=ChartPlan(verified=VerifiedRef(id="gone")))])
+def test_a_check_failure_from_a_hook_denied_sub_query_is_denied_and_never_stored_as_ok(engine, runs):
+    """A hook's deny scoped to one sub-query drops it as a warning: the run is a success with part of the data."""
+    seed(engine, tiles=[tile("t1", plan=chart_plan(queries=2))])
+    runs.respond = lambda call: _partly_denied()
 
-    run = engine.dashboards.refresh("d1", user_context=ANA)
+    [chart] = engine.dashboards.refresh("d1", user_context=ANA).tiles
 
-    assert run.tiles[0].status == "needs_fixing" and "gone" in run.tiles[0].error["message"]
-    assert runs.calls == []
+    assert chart.status == "denied" and chart.chart is None and chart.error["code"] == "HOOK_DENIED"
+    assert stored(engine)["t1"].status == "denied" and stored(engine)["t1"].chart is None
 
 
 def test_refresh_publishes_the_counts_per_status(engine, runs):
@@ -442,9 +452,52 @@ def test_open_serves_stored_results_after_the_access_check(engine, runs):
     generated, verified = runs.calls
     assert generated["execute"] is False and generated["plan"].decomposition is not None, \
         "a generated plan is checked without running"
-    assert verified["execute"] is True and verified["plan"].verified is not None, \
-        "a verified query is checked where the matcher is, which means executing it"
+    assert verified["execute"] is False and verified["plan"].verified is not None, \
+        "a verified query is checked by the matcher without running it (D135)"
     assert all(c["answer"] is False and c["user_context"] == ANA for c in runs.calls)
+
+
+@pytest.mark.parametrize("shape", ["denied_and_asking", "partly_denied"])
+def test_open_serves_no_rows_when_any_part_of_a_chart_is_denied(engine, runs, shape):
+    seed(engine, tiles=[tile("t1", plan=chart_plan(queries=2))])
+    put_run(engine, "t1")
+    runs.respond = lambda call: _denied_and_asking() if shape == "denied_and_asking" else _partly_denied()
+
+    [served] = engine.dashboards.open("d1", user_context=ANA).runs
+
+    assert served.status == "denied" and served.chart is None and served.column_kinds == {}
+
+
+def test_open_serves_a_chart_waiting_for_approval_only_when_nothing_else_failed(engine, runs):
+    seed(engine)
+    kept = put_run(engine, "t1")
+    put_run(engine, "t2")
+    asking = QueryResult(status="needs_approval", trace_id="tr-n", approvals_needed=[request()], errors=[
+        {"node": "hooks", "error_code": "NEEDS_APPROVAL", "message": "Reads a lot.", "severity": "ERROR"}])
+    broken = asking.model_copy(update={"errors": [
+        *asking.errors,
+        {"node": "logical_validator", "error_code": "COLUMN_NOT_FOUND", "message": "Gone.", "severity": "ERROR"}]})
+    runs.respond = lambda call: asking if call["question"] == "What is t1?" else broken
+
+    one, two = engine.dashboards.open("d1", user_context=ANA).runs
+
+    assert one == kept, "waiting for approval, nothing else wrong: the stored rows are served"
+    assert two.chart is None and two.status != "ok"
+
+
+def test_open_never_serves_a_result_stored_by_another_process_after_its_check(engine, runs):
+    seed(engine, schedule=_due_schedule(every=60))
+    put_run(engine, "t1")
+
+    def another_process_stores_t2():
+        put_run(engine, "t2")
+
+    runs.gate = another_process_stores_t2
+    with engine._runtime.state.lock("dashboard-refresh:d1", 60):  # the refresh is skipped: the lock is held
+        view = engine.dashboards.open("d1", user_context=ANA)
+
+    assert [r.tile_id for r in view.runs] == ["t1"], "t2 was never checked, so its rows are not served"
+    assert view.due == ["t2"]
 
 
 def test_stored_dashboard_results_are_denied_after_access_is_lost(engine, runs):
@@ -650,6 +703,55 @@ def test_a_chart_the_owner_can_no_longer_read_stops_the_schedule(engine, runs):
     assert schedule.state == "stopped" and schedule.error["code"] == "SCHEDULE_ACCESS_DENIED"
     assert "Chart t2" in schedule.error["message"]
     assert [e.data["reason"] for e in seen] == ["SCHEDULE_ACCESS_DENIED"]
+
+
+def test_a_chart_denied_while_another_part_waits_for_approval_stops_the_schedule(engine, runs):
+    seed(engine, tiles=[tile("t1", plan=chart_plan(queries=2))], schedule=_due_schedule())
+    put_run(engine, "t1")
+    runs.respond = lambda call: _denied_and_asking()
+
+    [done] = engine.dashboards.run_scheduled(now=NOW + timedelta(hours=2))
+
+    assert done.tiles[0].status == "denied" and done.tiles[0].error["code"] == "SECURITY_VIOLATION"
+    assert stored(engine)["t1"].status == "denied" and stored(engine)["t1"].chart is None, "the old rows are gone"
+    assert engine.dashboards.get("d1", user_context=ANA).schedule.error["code"] == "SCHEDULE_ACCESS_DENIED"
+
+
+def test_a_deny_from_another_hook_stops_the_schedule_with_its_own_code_and_message(engine, runs):
+    seed(engine, schedule=_due_schedule())
+    runs.respond = lambda call: (failed("HOOK_DENIED", "hooks", "Closed for the audit.")
+                                 if call["question"] == "What is t2?" else good())
+    seen = listen(engine, "dashboard.schedule_stopped")
+
+    engine.dashboards.run_scheduled(now=NOW + timedelta(hours=2))
+
+    schedule = engine.dashboards.get("d1", user_context=ANA).schedule
+    assert schedule.state == "stopped" and schedule.error["code"] == "SCHEDULE_HOOK_DENIED"
+    assert "Chart t2" in schedule.error["message"] and "Closed for the audit." in schedule.error["message"]
+    assert "can no longer read" not in schedule.error["message"]
+    assert [e.data["reason"] for e in seen] == ["SCHEDULE_HOOK_DENIED"]
+
+
+def test_run_scheduled_refuses_a_naive_now(engine, runs):
+    seed(engine, schedule=_due_schedule())
+
+    with pytest.raises(ValueError, match="timezone"):
+        engine.dashboards.run_scheduled(now=datetime.now())
+    assert runs.calls == []
+
+
+def test_a_failed_refresh_keeps_the_last_good_result_and_returns_the_error(engine, runs):
+    seed(engine, schedule=_due_schedule())
+    kept = put_run(engine, "t1")
+    runs.respond = lambda call: failed("EXECUTION_FAILED", "executor", "The database is down.")
+
+    manual = engine.dashboards.refresh("d1", user_context=ANA)
+    [scheduled] = engine.dashboards.run_scheduled(now=NOW + timedelta(hours=2))
+
+    for run in (manual, scheduled):
+        assert [t.status for t in run.tiles] == ["error", "error"]
+        assert run.tiles[0].error == {"code": "EXECUTION_FAILED", "message": "The database is down."}
+    assert stored(engine) == {"t1": kept}, "a transient failure never wipes good rows"
 
 
 def test_schedule_stops_when_the_identity_snapshot_expires(engine, runs):

@@ -249,6 +249,27 @@ def test_only_a_pinned_run_enters_at_the_pinned_entry(monkeypatch):
     assert first(False) == ["datasource_resolver"]
 
 
+def test_without_execute_only_a_supplied_verified_query_keeps_the_matcher(monkeypatch):
+    """A dashboard's access check of a verified chart (wave_c.md, D135): the matcher checks it and runs nothing."""
+    from nl2sql.config import Curated
+    from nl2sql.pipeline import graph as control
+
+    built = []
+    for name in ("DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode", "AnswerSynthesizerNode"):
+        monkeypatch.setattr(control, name, lambda ctx: (lambda state: {}))
+    monkeypatch.setattr(control, "CuratedMatcherNode", lambda ctx, **flags: built.append(flags) or (lambda s: {}))
+    monkeypatch.setattr(control, "build_sql_agent_graph", lambda ctx, execute=True: (lambda state: {}))
+    ctx = fake_runtime(curated=Curated.model_validate({"datasources": {"ds": {"verified_queries": [
+        {"id": "q", "description": "d", "questions": ["How many?"], "sql": "SELECT 1"}]}}}))
+
+    def first(**flags):
+        graph = control.build_graph(ctx, execute=False, **flags).get_graph()
+        return [e.target for e in graph.edges if e.source == "__start__"]
+
+    assert first(verified=True) == ["curated_matcher"] and built == [{"execute": False}]
+    assert first() == ["datasource_resolver"], "any other run without execute never reaches the matcher"
+
+
 # ---------------------------------------------------------------- from approvals
 
 

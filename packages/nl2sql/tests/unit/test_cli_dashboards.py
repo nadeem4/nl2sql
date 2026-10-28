@@ -83,11 +83,20 @@ def test_refresh_due_with_nothing_due_says_so(project, monkeypatch):
     (["--dashboard", "d1", "--due"], "--dashboard"),
     (["--dashboard", "d1", "--as", "nobody"], "Unknown role"),
     (["--dashboard", "missing", "--as", "analyst"], "No dashboard 'missing'"),
+    (["--due", "--as", "analyst"], "--due runs each schedule as its owner"),
+    (["--due", "--user", "ana"], "--due runs each schedule as its owner"),
+    (["--due", "--tenant", "acme"], "--due runs each schedule as its owner"),
 ])
 def test_a_bad_call_is_an_error(project, runs, args, message):
     result, out = _run(project, "refresh", *args)
 
     assert result.exit_code == 1 and message in out
+
+
+def test_the_help_says_user_and_tenant_act_as_that_owner(project):
+    result, out = _run(project, "refresh", "--help")
+
+    assert result.exit_code == 0 and "operator" in out
 
 
 def test_a_dashboard_being_refreshed_is_an_error(project, runs):

@@ -161,16 +161,18 @@ def pinned_from_approvals(approvals: Sequence[Approval], *, question: str, user:
 
 
 def check_pinned(pinned: Optional[PinnedRun], approvals: Sequence[Approval],
-                 datasource_id: Optional[str] = None, *, execute: bool = True, curated: bool = True) -> None:
+                 datasource_id: Optional[str] = None, *, curated: bool = True) -> None:
     """Refuse, at the call and before the run's scope opens, a pin the run cannot take.
 
     A chosen plan (Wave B's clarification re-ask) is a new question, not an
     approved one, so it cannot come with approvals. A ``datasource_id``
     passed with a pinned plan must be the plan's own datasource. A supplied
-    verified query runs only where the curated matcher is in the graph
-    (``execute`` on, a curated file with a verified query loaded) and never
-    falls back to a model run, so without those it is refused here
-    (wave_c.md, D132: a refresh uses no tokens).
+    verified query runs only where the curated matcher is in the graph (a
+    curated file with a verified query loaded) and never falls back to a
+    model run, so without one it is refused here (wave_c.md, D132: a refresh
+    uses no tokens). With ``execute`` off the matcher checks it (the caller's
+    scope, its values, every table it reads) and runs nothing: a dashboard's
+    access check (D135).
 
     Raises:
         ValueError: a rule is broken.
@@ -180,8 +182,6 @@ def check_pinned(pinned: Optional[PinnedRun], approvals: Sequence[Approval],
     if pinned.source == PinnedSource.CHOSEN and approvals:
         raise ValueError("A chosen plan cannot be run with approvals; ask again without them.")
     if pinned.source == PinnedSource.SUPPLIED and pinned.verified is not None:
-        if not execute:
-            raise ValueError("A supplied verified query is run, not planned: it needs execute=True.")
         if not curated:
             raise ValueError("A supplied verified query needs a curated file with verified queries loaded.")
         if datasource_id is not None and datasource_id != pinned.verified_datasource_id:

@@ -90,8 +90,10 @@ class CuratedMatcherNode:
     call, and the hooks ask again.
     """
 
-    def __init__(self, ctx: Runtime):
+    def __init__(self, ctx: Runtime, execute: bool = True):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
+        # Off only in a run that pins a supplied verified query with execute=False: the query is checked, not run.
+        self.execute = execute
         self.curated = ctx.curated
         self.vector_store = ctx.vector_store
         self.policy_engine = ctx.policy_engine
@@ -283,9 +285,33 @@ class CuratedMatcherNode:
                   for schema, table in parsed.tables]
         if query.params and not self.ds_registry.supports(ds_id, DatasourceCapability.SUPPORTS_BOUND_PARAMETERS):
             raise _Fallback("capability_missing", f"The adapter for '{ds_id}' cannot bind parameters.")
+        if not self.execute:
+            return self._checked(state, ds_id, query, params)
 
         # 6. Run it, under the row ceiling, with the values bound.
         return self._run(state, ds_id, query, params, tables)
+
+    def _checked(self, state: GraphState, ds_id: str, query: VerifiedQuery, params: Dict[str, Any]) -> Dict[str, Any]:
+        """A verified query that passed every check, not run (``execute`` off): its one sub-query is done with its
+        SQL and no result, so the run ends ``plan_only`` (wave_c.md, D135: a dashboard's access check)."""
+        sub_query = SubQuery(id=f"verified_{query.id}", datasource_id=ds_id, intent=state.user_query,
+                             schema_version=self.vector_store.schema_version(ds_id))
+        decomposition = DecomposerResponse(
+            sub_queries=[sub_query],
+            combine_groups=[CombineGroup(group_id="verified", operation="standalone",
+                                         inputs=[CombineInput(subquery_id=sub_query.id)])])
+        output = SubgraphOutput(sub_query=sub_query, subgraph_id=f"{NODE}:{sub_query.id}:{state.trace_id}",
+                                subgraph_name=NODE, plan_source="verified", sql_draft=query.sql.strip(),
+                                status="success")
+        return {
+            "verified_match": VerifiedMatch(datasource_id=ds_id, query_id=query.id, description=query.description,
+                                            params=params),
+            "decomposer_response": decomposition,
+            "execution_dag": build_execution_dag(decomposition),
+            "subgraph_outputs": {output.subgraph_id: output},
+            "reasoning": [{"node": self.node_name,
+                           "content": f"Checked verified query '{ds_id}.{query.id}' without running it."}],
+        }
 
     @staticmethod
     def _hook_fields(state: GraphState, sub_query: SubQuery, query: VerifiedQuery, params: Dict[str, Any],

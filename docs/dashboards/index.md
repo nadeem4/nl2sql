@@ -84,8 +84,8 @@ run = engine.dashboards.refresh(board.id, tile_id="t3", user_context=me)   # one
 
 | Rule | What it means |
 |---|---|
-| **Stored with a time** | The last result of each chart (its rows, at most `charts.max_points`, and the columns' kinds) is saved with an `at` time, replaced by each run and deleted with the dashboard. `open` serves it at once and `refreshed_at` is the oldest `at`. |
-| **Open checks access first** | Before any stored row is served, each stored plan is checked under the caller's current roles: a generated plan is validated and generated but not run, a verified query is run (the matcher is where its access check lives). A chart the caller can no longer read comes back `denied`, one whose plan no longer validates `needs_fixing`, and a check that fails otherwise `error`, all without rows. |
+| **Stored with a time** | The last result of each chart (its rows, at most `charts.max_points`, and the columns' kinds) is saved with an `at` time, replaced by each run and deleted with the dashboard. `open` serves it at once and `refreshed_at` is the oldest `at`. A run that fails (`error`, such as a database outage) does not replace it: the chart keeps its last good result and the refresh returns the error. |
+| **Open checks access first** | Before any stored row is served, each stored plan is checked under the caller's current roles, and the check runs no query: a generated plan is validated and generated, a verified query is checked by the curated matcher (the caller's scope, its values, every table it reads). Rows are served only when the check ends `ok` or `empty`, or `needs_approval` with nothing else wrong. A chart the caller can no longer read comes back `denied` (also when only one of its queries is refused, or a hook dropped one of them), one whose plan no longer validates `needs_fixing`, and a check that fails otherwise `error`, all without rows. Only charts this `open` checked, or refreshed itself, are served: a result another process stored meanwhile waits in `due`. |
 | **Only what is old** | With `refresh_due=True` (the default) `open` then refreshes the charts older than the schedule's `every_minutes` (or never run), as the caller. A dashboard with no schedule has nothing due. An app that wants an instant open passes `False` and refreshes the ids in `view.due`. |
 | **`needs_fixing`** | A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is `needs_fixing` with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn (D4). |
 | **Cost guard** | A hook that wants a person's yes makes the chart `needs_approval`: it is not run, keeps its last result, and the request is in the run's `approvals_needed`. Pass an `Approval` for it to a **manual** `refresh(approvals=[...])`. `open` and a schedule never approve. |
@@ -115,9 +115,12 @@ nothing refreshes.
 - **It stops, visibly.** The schedule becomes `stopped`, with a `code` and `message` in `schedule.error` (shown
   on the dashboard that `open` and `get` return), and `dashboard.schedule_stopped` is published (audited) when
   the saved identity is older than `dashboards.schedule_identity_max_age_days` (30,
-  `SCHEDULE_IDENTITY_EXPIRED`), a role in it is gone from the policies (`SCHEDULE_ROLE_REMOVED`) or a chart
-  can no longer be read by its owner (`SCHEDULE_ACCESS_DENIED`). Nothing retries it. Setting the schedule
-  again saves a fresh snapshot and starts it again.
+  `SCHEDULE_IDENTITY_EXPIRED`), a role in it is gone from the policies (`SCHEDULE_ROLE_REMOVED`), a chart
+  can no longer be read by its owner (`SCHEDULE_ACCESS_DENIED`) or a hook denied a chart (`SCHEDULE_HOOK_DENIED`,
+  with the hook's reason). Nothing retries it. Setting the schedule again saves a fresh snapshot and starts it
+  again.
+- **A failure is not a stop.** A chart whose run fails (`error`) keeps its last good result and the schedule goes
+  on.
 - **It never approves.** A chart that needs a person's yes is skipped and keeps its last result; the schedule goes on.
 - **One run at a time.** A dashboard another process is refreshing is skipped, so two runners (or a runner and
   cron) do not double up.
@@ -126,6 +129,9 @@ nothing refreshes.
 nl2sql dashboards refresh --dashboard sales --as analyst --user ana --tenant acme   # one dashboard, as that caller
 nl2sql dashboards refresh --due                                                      # every schedule that is due
 ```
+
+`--user` and `--tenant` act as that owner: the command is for the operator, who holds the config and the
+credentials. `--due` runs each schedule as its saved owner, so it refuses `--as`, `--user` and `--tenant`.
 
 ## Configuration
 

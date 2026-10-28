@@ -475,12 +475,12 @@ def _source(match: Any) -> AnswerSource:
 
 
 def _pin(plan: Optional[SuppliedPlan], pinned: Optional[PinnedRun], approvals: Optional[Sequence[Approval]],
-         datasource_id: Optional[str], *, execute: bool, curated: bool) -> Optional[PinnedRun]:
+         datasource_id: Optional[str], *, curated: bool) -> Optional[PinnedRun]:
     """The run's pin from ``plan`` or ``pinned``, checked before the run's scope opens (``check_pinned``)."""
     if plan is not None and pinned is not None:
         raise ValueError("Pass a plan or a pin, not both.")
     pin = PinnedRun.supplied(plan) if plan is not None else pinned
-    check_pinned(pin, list(approvals or []), datasource_id, execute=execute, curated=curated)
+    check_pinned(pin, list(approvals or []), datasource_id, curated=curated)
     return pin
 
 
@@ -558,8 +558,7 @@ class QueryAPI:
                 is not the plan's datasource, a chosen plan comes with
                 approvals, or ``choice`` comes with a ``plan`` or a ``pinned``.
         """
-        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context,
-                                           execute)
+        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                          user_context=user_context)
         # Entered here too, not only in the graph's worker, so every log line of the run carries its trace_id.
@@ -593,7 +592,7 @@ class QueryAPI:
 
     def _pin_choice(self, question: str, choice: Optional[ClarificationChoice], plan: Optional[SuppliedPlan],
                     pinned: Optional[PinnedRun], approvals: Optional[Sequence[Approval]],
-                    datasource_id: Optional[str], user: Optional[UserContext], execute: bool = True,
+                    datasource_id: Optional[str], user: Optional[UserContext],
                     ) -> Tuple[Optional[PinnedRun], Optional[PipelineError]]:
         """The run's pin and, for a ``choice`` that cannot run, the error that ends it before the graph.
 
@@ -602,13 +601,13 @@ class QueryAPI:
         """
         curated = curated_answers_on(self._ctx)
         if choice is None:
-            return _pin(plan, pinned, approvals, datasource_id, execute=execute, curated=curated), None
+            return _pin(plan, pinned, approvals, datasource_id, curated=curated), None
         if plan is not None or pinned is not None:
             raise ValueError("Pass a choice, a plan or a pin, not more than one.")
         problem = choice_problem(choice, question=question, user=user, ctx=self._ctx, approvals=approvals or ())
         if problem is not None:
             return None, problem
-        return _pin(None, pinned_from_choice(choice), None, datasource_id, execute=execute, curated=curated), None
+        return _pin(None, pinned_from_choice(choice), None, datasource_id, curated=curated), None
 
     def open_scope(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                    user_context: Optional[UserContext] = None) -> RunScope:
@@ -700,8 +699,7 @@ class QueryAPI:
         """
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
-        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context,
-                                           execute)
+        pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                             token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
                             pinned=pinned, approvals=approvals, clarify=clarify, answer=answer, refusal=refusal)

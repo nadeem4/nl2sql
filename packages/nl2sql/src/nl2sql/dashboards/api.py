@@ -19,7 +19,7 @@ from nl2sql.dashboards.models import (
     Tile, TileArrangement, TileRun,
 )
 from nl2sql.dashboards import schedule as scheduling
-from nl2sql.dashboards.run import DashboardBusy, Refresher
+from nl2sql.dashboards.run import KEEPS_LAST, SERVES, DashboardBusy, Refresher
 from nl2sql.dashboards.store import DashboardStore, owner_for
 from nl2sql.dashboards.workspaces import Workspaces
 from nl2sql.events.catalog import DashboardChanged, DashboardScheduleSet, DashboardScheduleStopped
@@ -29,8 +29,6 @@ from nl2sql.policies import UserContext
 logger = logging.getLogger(__name__)
 
 _STATUSES = ("draft", "saved")
-# A check that ends in one of these serves none of the chart's stored rows.
-_BLOCKED = ("denied", "needs_fixing", "error")
 
 
 class Dashboards:
@@ -155,25 +153,32 @@ class Dashboards:
         owner = self._owner(user_context)
         dashboard = self._store.get(dashboard_id, owner)
         last = self._last_runs(dashboard)
-        # Stored results are served only after the check passes: a chart the caller can no longer read, or whose
-        # plan no longer validates, comes back without its rows.
+        # Stored results are served only after the check passes (an allow-list: ``SERVES``): a chart the caller can
+        # no longer read, or whose plan no longer validates, comes back without its rows.
         checked = self._refresher.check([t for t in dashboard.tiles if t.id in last], user_context)
-        blocked = {tile_id: run for tile_id, run in checked.items() if run.status in _BLOCKED}
-        due = [tile_id for tile_id in scheduling.due_tiles(dashboard, last, datetime.now(timezone.utc))
-               if tile_id not in blocked]
+        blocked = {tile_id: run for tile_id, run in checked.items() if run.status not in SERVES}
+        # Only what this open checked, or refreshed itself, is served: a result another process stored meanwhile was
+        # never checked for this caller.
+        passed = {tile_id: run for tile_id, run in last.items() if tile_id not in blocked}
+        due = self._due(dashboard, passed, blocked)
         if refresh_due and due:
             try:
                 with self._refresher.locked(dashboard_id, len(dashboard.tiles)):
                     current = self._store.get(dashboard_id, owner)  # as it is now, under the lock
-                    self._refresher.run(current, [t for t in current.tiles if t.id in due], user_context, "open")
+                    run = self._refresher.run(current, [t for t in current.tiles if t.id in due], user_context,
+                                              "open")
+                passed.update({r.tile_id: r for r in run.tiles if r.status not in KEEPS_LAST})
             except DashboardBusy:
                 pass  # someone else is refreshing it; the charts stay due
-            last = self._last_runs(dashboard)
-            due = [tile_id for tile_id in scheduling.due_tiles(dashboard, last, datetime.now(timezone.utc))
-                   if tile_id not in blocked]
-        served = [blocked.get(t.id) or last[t.id] for t in dashboard.tiles if t.id in blocked or t.id in last]
-        passed = [run.at for run in served if run.tile_id not in blocked]
-        return DashboardView(dashboard=dashboard, runs=served, refreshed_at=min(passed) if passed else None, due=due)
+            due = self._due(dashboard, passed, blocked)
+        served = [blocked.get(t.id) or passed[t.id] for t in dashboard.tiles if t.id in blocked or t.id in passed]
+        ats = [run.at for run in served if run.tile_id not in blocked]
+        return DashboardView(dashboard=dashboard, runs=served, refreshed_at=min(ats) if ats else None, due=due)
+
+    @staticmethod
+    def _due(dashboard: Dashboard, passed: Dict[str, TileRun], blocked: Dict[str, TileRun]) -> List[str]:
+        return [tile_id for tile_id in scheduling.due_tiles(dashboard, passed, datetime.now(timezone.utc))
+                if tile_id not in blocked]
 
     def refresh(self, dashboard_id: str, *, user_context: UserContext, tile_id: Optional[str] = None,
                 filters: Optional[Dict[str, List[Any]]] = None, approvals: Sequence[Approval] = ()) -> DashboardRun:
@@ -200,6 +205,8 @@ class Dashboards:
     # ------------------------------------------------------------ schedules (D2)
 
     def run_scheduled(self, *, now: Optional[datetime] = None) -> List[DashboardRun]:
+        if now is not None and now.utcoffset() is None:
+            raise ValueError("now must carry a timezone, such as datetime.now(timezone.utc).")
         now = now or datetime.now(timezone.utc)
         done: List[DashboardRun] = []
         for doc in self._ctx.state.list_scheduled_dashboards():
@@ -232,9 +239,9 @@ class Dashboards:
             return None
         run = self._refresher.run(dashboard, dashboard.tiles, scheduling.owner_as_saved(schedule.identity),
                                   "schedule")
-        denied = [t for t, r in zip(dashboard.tiles, run.tiles) if r.status == "denied"]
+        denied = [(t, r) for t, r in zip(dashboard.tiles, run.tiles) if r.status == "denied"]
         if denied:
-            self._stop(dashboard, scheduling.ACCESS_DENIED, scheduling.denied_message(denied))
+            self._stop(dashboard, *scheduling.denied(denied))
         else:
             self._store.put(dashboard.model_copy(update={"schedule": scheduling.ran(schedule, now)}))
         return run

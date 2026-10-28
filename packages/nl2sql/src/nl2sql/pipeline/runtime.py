@@ -213,7 +213,7 @@ def run_with_graph(
     """
     approvals = list(approvals or [])
     # QueryAPI checks this first, before the run's scope opens; a direct caller is held to it here.
-    check_pinned(pinned, approvals, datasource_id, execute=execute, curated=curated_answers_on(ctx))
+    check_pinned(pinned, approvals, datasource_id, curated=curated_answers_on(ctx))
     token = cancellation_token or CancellationToken()
     run_done = threading.Event()
     restore_signals = _install_signal_handlers(token)
@@ -228,7 +228,8 @@ def run_with_graph(
         # A pinned decomposition has a graph of its own; every other run's is the usual one.
         # Only a run that differs from the usual one says so.
         return build_graph(ctx, execute=execute, **({"pinned": True} if pin is not None and pin.enters_pinned
-                                                     else {}), **({} if answer else {"answer": False}))
+                                                     else {}), **({} if answer else {"answer": False}),
+                           **({"verified": True} if pin is not None and pin.verified is not None else {}))
 
     try:
         graph = _graph(pinned)

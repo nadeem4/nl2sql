@@ -18,6 +18,7 @@ def build_graph(
     execute: bool = True,
     pinned: bool = False,
     answer: bool = True,
+    verified: bool = False,
 ) -> StateGraph:
     """Builds the main LangGraph pipeline.
 
@@ -45,6 +46,9 @@ def build_graph(
         answer (bool): False builds the graph without the answer synthesizer: the run ends at the
             aggregator and writes no prose (a dashboard refresh; wave_c.md, D119). While a hook is attached
             at ``answer.after`` a model-free ``answer_gate`` runs it first, so a deny still withholds the data.
+        verified (bool): The run pins a supplied verified query. With ``execute`` off the curated matcher is still
+            the entry: it checks the query under the caller's scope and runs nothing (a dashboard's access check;
+            wave_c.md, D135). Any other run with ``execute`` off has no matcher.
 
     Returns:
         StateGraph: The compiled LangGraph runnable.
@@ -71,8 +75,8 @@ def build_graph(
         graph.add_node("pinned_entry", PinnedEntryNode(ctx))
         graph.set_entry_point("pinned_entry")
         graph.add_conditional_edges("pinned_entry", pinned_route, {"continue": "layer_router", "end": END})
-    elif execute and curated_answers_on(ctx):
-        graph.add_node("curated_matcher", CuratedMatcherNode(ctx))
+    elif (execute or verified) and curated_answers_on(ctx):
+        graph.add_node("curated_matcher", CuratedMatcherNode(ctx, execute=execute))
         graph.set_entry_point("curated_matcher")
         graph.add_conditional_edges(
             "curated_matcher",
