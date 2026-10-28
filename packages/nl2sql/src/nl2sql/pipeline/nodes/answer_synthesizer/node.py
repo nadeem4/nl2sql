@@ -15,6 +15,7 @@ from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
 from nl2sql.llm.failures import provider_error
 from nl2sql.llm.wires import streaming_structured, structured
+from nl2sql.pipeline.nodes.aggregator.node import write_manifest
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
 from .prompts import ANSWER_SYNTHESIZER_PROMPT, VERIFIED_QUERY_SECTION
 
@@ -93,6 +94,7 @@ class AnswerGateNode:
 
     def __init__(self, ctx: Runtime):
         self.node_name = "answer_gate"
+        self.ctx = ctx
         self.hooks = hooks_of(ctx)
 
     def __call__(self, state: GraphState) -> Dict[str, Any]:
@@ -100,7 +102,22 @@ class AnswerGateNode:
         verdict = self.hooks.call("answer.after", trace_id=state.trace_id, question=state.user_query,
                                   user=state.user_context, datasource_id=state.datasource_id,
                                   final_answer=None, results=results)
-        return {} if verdict.allowed else {"errors": [verdict.error(self.node_name)]}
+        if not verdict.allowed:
+            return {"errors": [verdict.error(self.node_name)]}
+        release_results(self.ctx, state)
+        return {"results_released": True}
+
+
+def release_results(ctx: Runtime, state: GraphState) -> None:
+    """Writes the run's result manifest once its ``answer.after`` hooks allowed; until then nothing is readable.
+
+    The aggregator leaves it unwritten while a hook is attached at ``answer.after``
+    (``EngineAggregatorNode._write_manifest``); a run such a hook ends never has one. Without such a hook the
+    aggregator has written it already and this does nothing. A failed write fails the run.
+    """
+    hooks = hooks_of(ctx)
+    if hooks.attached("answer.after") and state.aggregator_response is not None:
+        write_manifest(ctx, state.trace_id, list(state.aggregator_response.results))
 
 
 class AnswerSynthesizerNode:
@@ -108,6 +125,7 @@ class AnswerSynthesizerNode:
 
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
+        self.ctx = ctx
         self.preview_rows = ctx.settings.results.preview_rows
         self.hooks = hooks_of(ctx)
         self.llm = ctx.llm_registry.get_llm(self.node_name)
@@ -147,6 +165,14 @@ class AnswerSynthesizerNode:
             return str(result)
 
     def __call__(self, state: GraphState, config: Optional[RunnableConfig] = None) -> Dict[str, Any]:
+        out = self._answer(state, config)
+        if not out.get("errors"):
+            # Outside the answer's own error handling: a failed write fails the run, as a crash.
+            release_results(self.ctx, state)
+            out["results_released"] = True
+        return out
+
+    def _answer(self, state: GraphState, config: Optional[RunnableConfig]) -> Dict[str, Any]:
         aggregated_result = None
         saved = None
         if state.aggregator_response:

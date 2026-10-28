@@ -323,7 +323,11 @@ def result_from_state(
 
     # A hook that ended the run withholds its data as well as its answer:
     # no rows, no artifact references, no result manifest.
-    withheld = any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
+    # So does a run whose results were saved but never released (the answer failed while a hook sits at
+    # answer.after): the hook never reviewed them. A state without the field is a released one.
+    unreleased = (state.get("results_released", True) is False
+                  and bool(_field(state.get("aggregator_response"), "results", None)))
+    withheld = unreleased or any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
     sub_queries = _sub_query_results(state, None if withheld else artifact_store, sample_rows, warnings)
     usage = QuestionUsage.model_validate(state.get("usage") or {})
     usage.plan_cache_hits = sum(1 for sq in sub_queries if sq.plan_source == "cache")

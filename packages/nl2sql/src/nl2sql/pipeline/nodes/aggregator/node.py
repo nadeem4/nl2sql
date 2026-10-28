@@ -11,12 +11,18 @@ from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary, co
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.common.logger import get_logger
+from nl2sql.hooks import hooks_of
 from nl2sql.runtime import Runtime
 from nl2sql.aggregation import AggregationService
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
 from nl2sql.aggregation.join_keys import DTYPE_PLURAL
 
 logger = get_logger("aggregator")
+
+
+def write_manifest(ctx: Runtime, trace_id: str, results: List[ResultSummary]) -> None:
+    """Writes a run's result manifest, which makes its results readable by its trace id (``engine.results``)."""
+    ctx.artifact_store.write_manifest(ctx.tenant_id, trace_id, ResultManifest(request_id=trace_id, results=results))
 
 # A capped input to these is refused: missing rows mean missing matches, so the
 # answer may be wrong. A union of a capped input is still right, only incomplete.
@@ -29,6 +35,7 @@ class EngineAggregatorNode:
     def __init__(self, ctx: Runtime):
         self.node_name = self.__class__.__name__.lower().replace("node", "")
         self.ctx = ctx
+        self.hooks = hooks_of(ctx)
         self.service = AggregationService(PolarsDuckdbEngine(ctx.artifact_store))
         self.preview_rows = ctx.settings.results.preview_rows
 
@@ -78,6 +85,8 @@ class EngineAggregatorNode:
             )
             return {
                 "aggregator_response": aggregator_response,
+                # Written above unless a hook at answer.after is yet to rule.
+                "results_released": not self.hooks.attached("answer.after"),
                 "reasoning": [{"node": self.node_name, "content": "ExecutionDAG aggregation executed successfully."}],
                 "warnings": [
                     RunWarning(
@@ -173,7 +182,12 @@ class EngineAggregatorNode:
 
     def _write_manifest(self, state: GraphState, saved: Dict[str, ArtifactRef]) -> List[ResultSummary]:
         """Writes the run's ``manifest.json`` beside its results: each result's columns, their kinds,
-        row count and whether a sub-query feeding it was cut at its row ceiling."""
+        row count and whether a sub-query feeding it was cut at its row ceiling.
+
+        Not while a hook is attached at ``answer.after``: every read goes through the manifest, so the
+        results stay unreadable until those hooks allowed, and the node that asks them writes it
+        (:func:`write_manifest`). Without one, nothing can end the run after this point.
+        """
         cut = {
             output.sub_query.id
             for output in (getattr(state, "subgraph_outputs", None) or {}).values()
@@ -186,8 +200,8 @@ class EngineAggregatorNode:
                           column_kinds=column_kinds(store.scan_parquet(ref).collect_schema()))
             for node_id, ref in saved.items()
         ]
-        store.write_manifest(
-            self._tenant_id(), state.trace_id, ResultManifest(request_id=state.trace_id, results=results))
+        if not self.hooks.attached("answer.after"):
+            write_manifest(self.ctx, state.trace_id, results)
         return results
 
     @staticmethod
