@@ -167,6 +167,11 @@ def completion_chunks(body: Dict[str, Any], mode: str, name: str, payload: Any,
 DEFAULT_ANTHROPIC_USAGE: Dict[str, Any] = {"input_tokens": 1, "output_tokens": 1}
 
 
+def _sent_key(headers) -> Optional[str]:
+    """The API key a request carried: `x-api-key` (anthropic 1.x) or `Authorization: Bearer` (anthropic 2.x)."""
+    return headers.get("x-api-key") or (headers.get("Authorization") or "").removeprefix("Bearer ") or None
+
+
 def classify_anthropic_request(body: Dict[str, Any]) -> tuple:
     """``(name, prompt_text)`` for an Anthropic ``/v1/messages`` request body.
 
@@ -244,7 +249,8 @@ class FakeLLMServer:
 
     Each entry in ``calls`` keeps the request ``body``, and the ``authorization``
     header of a matched or unmatched call, so tests can check what was actually
-    sent and with which key.
+    sent and with which key. Anthropic calls record `api_key`, taken from either
+    `x-api-key` or `Authorization: Bearer`.
     """
 
     rules: List[Rule]
@@ -300,7 +306,7 @@ class FakeLLMServer:
 
             def _anthropic(self, body: Dict[str, Any]) -> None:
                 name, text = classify_anthropic_request(body)
-                call = {"name": name, "mode": "anthropic", "body": body, "api_key": self.headers.get("x-api-key")}
+                call = {"name": name, "mode": "anthropic", "body": body, "api_key": _sent_key(self.headers)}
                 if outer.reject_temperature and "temperature" in body:
                     outer.calls.append({**call, "matched": False})
                     self._send(400, {"type": "error", "error": {
