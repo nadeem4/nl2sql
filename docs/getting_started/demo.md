@@ -269,7 +269,7 @@ so the page looked fine while every question failed with
 - **Rebuilds never leave an empty index.** A datasource's new entries are
   written beside its current ones and switched in only when all are written;
   a failure keeps the previous entries answering questions. See
-  [Indexing](../architecture/indexing.md#rebuilding-without-an-empty-index).
+  [Indexing](../architecture/indexing.md#the-build-pointer-is-the-commit).
 - **Actionable errors.** With an empty index the resolver says
   "The vector index is empty ... Re-index with `nl2sql index`", and
   `nl2sql doctor` prints the engine's check, the index status included.

@@ -194,7 +194,7 @@ for view in engine.knowledge.show(user_context=analyst):
 | `nl2sql knowledge show [--datasource ID] --as ROLE` | `show`: a readable listing, each item with its origin; problems last, exit 1 when there are any |
 | `nl2sql knowledge export [--datasource ID] [--out FILE] --as ROLE` | `export`, to stdout or `--out` |
 | `nl2sql knowledge sources --as ROLE` | `sources` |
-| `nl2sql profile [--datasource ID] --as ROLE` | `profile`, then the open profiler proposals; `nl2sql index --profile --as ROLE` indexes first |
+| `nl2sql profile [--datasource ID] [--draft [--max-cost USD]] --as ROLE` | `profile` (`--draft` also has the `profiler` model draft missing descriptions, capped by `--max-cost`), then the open profiler and draft proposals; `nl2sql index --profile --as ROLE` indexes first |
 
 `--as` (repeatable) and `--user` build the caller. Without `--as` the role is
 `policies.default_role`; with neither the command refuses. Under `allow_all`
