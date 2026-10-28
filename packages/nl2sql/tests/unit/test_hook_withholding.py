@@ -41,10 +41,13 @@ def _bind(fn, points):
     return HookBinding(name="review", hook=fn, points=frozenset(points))
 
 
-def _graph(denied):
+def _graph(denied, held=False):
+    # The fakes release results as the real nodes do: the aggregator when no hook sits at answer.after,
+    # otherwise the answer node once its hooks allowed.
     def answer(state):
         if not denied:
-            return {"answer_synthesizer_response": AnswerSynthesizerResponse(final_answer={"summary": "3"})}
+            return {"answer_synthesizer_response": AnswerSynthesizerResponse(final_answer={"summary": "3"}),
+                    "results_released": True}
         verdict = HookRunner([_bind(lambda ctx: Deny(reason="Answers are reviewed first"), ["answer.after"])]).call(
             "answer.after", trace_id="t", question="q", user=UserContext())
         return {"answer_synthesizer_response": AnswerSynthesizerResponse(),
@@ -55,7 +58,8 @@ def _graph(denied):
     graph = StateGraph(GraphState)
     graph.add_node("executed", lambda state: {"subgraph_outputs": {output.subgraph_id: output},
                                               "artifact_refs": {"sq1": ARTIFACT}})
-    graph.add_node("aggregator", lambda state: {"aggregator_response": AggregatorResponse(results=[SUMMARY])})
+    graph.add_node("aggregator", lambda state: {"aggregator_response": AggregatorResponse(results=[SUMMARY]),
+                                                "results_released": not held})
     graph.add_node("answer_synthesizer", answer)
     graph.set_entry_point("executed")
     graph.add_edge("executed", "aggregator")
@@ -65,7 +69,7 @@ def _graph(denied):
 
 
 def _api(monkeypatch, denied, hooks=None):
-    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _graph(denied))
+    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", lambda ctx, execute=True: _graph(denied, held=hooks is not None))
     return QueryAPI(fake_runtime(artifact_store=_Store(), **({"hooks": hooks} if hooks is not None else {})))
 
 
