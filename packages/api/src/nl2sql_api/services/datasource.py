@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Type
 
 from pydantic import BaseModel, ValidationError
 
-from nl2sql import NL2SQL, Datasource, UserContext
+from nl2sql import NL2SQL, ConnectionInvalid, Datasource, UserContext
 from nl2sql_api.models.datasource import DatasourceRequest, DatasourceResponse, DatasourceTestRequest
 
 
@@ -20,8 +20,10 @@ def _problems(error: ValidationError, prefix: Sequence[str] = ()) -> List[Dict[s
             for problem in error.errors(include_input=False, include_url=False)]
 
 
-def _request(model: Type[BaseModel], body: Dict[str, Any]) -> Tuple[Any, Datasource]:
+def _request(model: Type[BaseModel], body: Any) -> Tuple[Any, Datasource]:
     """The request and its datasource, or a ``BadRequest`` listing every problem by its path in the body."""
+    if not isinstance(body, dict):
+        raise BadRequest([{"path": "", "message": "The body must be a JSON object."}])
     try:
         request = model.model_validate(body)
     except ValidationError as error:
@@ -36,7 +38,7 @@ class DatasourceService:
     def __init__(self, engine: NL2SQL):
         self.engine = engine
 
-    def add_datasource(self, body: Dict[str, Any], *, by: UserContext, env_file: bool) -> DatasourceResponse:
+    def add_datasource(self, body: Any, *, by: UserContext, env_file: bool) -> DatasourceResponse:
         """Add a datasource; ``config`` has the shape of one ``datasources`` entry in ``nl2sql.yaml``.
 
         With ``save`` it is also written to ``datasources/<id>.yaml`` as ``by``; when that fails the datasource is
@@ -46,7 +48,10 @@ class DatasourceService:
             BadRequest: the body does not validate.
         """
         request, datasource = _request(DatasourceRequest, body)
-        self.engine.datasources.add(datasource)
+        try:
+            self.engine.datasources.add(datasource)
+        except ConnectionInvalid as error:
+            raise BadRequest([{"path": f"config.{p['path']}", "message": p["message"]} for p in error.problems]) from None
         file = None
         if request.save:
             try:
@@ -62,7 +67,7 @@ class DatasourceService:
             file=file,
         )
 
-    def test_datasource(self, body: Dict[str, Any]) -> Dict[str, Any]:
+    def test_datasource(self, body: Any) -> Dict[str, Any]:
         """Connect to a datasource that is not added and report the stage that failed, if one did.
 
         Raises:

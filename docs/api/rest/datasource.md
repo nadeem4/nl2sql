@@ -55,8 +55,9 @@ Execution flow:
 
 Response: the status, `{"id", "status", "required", "stage", "reason", "fix", "warnings"}`. A failure is a
 `200` with `status: "failed"`, the `stage` it failed at (`config`, `driver`, `network`, `auth`, `database` or
-`permission`), the `reason` and the `fix`. No value is echoed: the datasource's secret literals and every secret
-the engine knows are taken out of the driver's words.
+`permission`), the `reason` and the `fix`. No value is echoed: the datasource's secret literals (a plugin's secret
+fields included) and every secret the engine knows are replaced by `***` in the driver's words, and only those
+exact values: a validation message such as `connection.password: Field required` stays readable.
 
 Errors:
 - A body that does not validate -> `HTTP 422`, as for `POST /datasource`.
@@ -77,18 +78,20 @@ Execution flow:
   `datasources/<id>.yaml` beside `nl2sql.yaml` (see [Saving a datasource](../../configuration/datasources.md#saving-a-datasource)).
   **A secret is never written into the YAML.** A reference (`${env:VAR}`, `${vault:path}`) is written as it is.
   A literal is written to the `.env` beside `nl2sql.yaml` as `${env:NL2SQL_<ID>_<KEY>}` only on a fresh local
-  install: no role source is configured (`api.role_header`, `api.role`, `api.trust_body_role`) and the client is
-  on loopback. Anywhere else a literal secret with `save: true` is a `422` that asks for a `${env:...}` reference.
+  install: no role source is configured (`api.role_header`, `api.role`, `api.trust_body_role`), the client is
+  on loopback and the request carries no `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header (a reverse proxy on
+  the same host would make every client look local). Anywhere else a literal secret with `save: true` is a `422` that asks for a `${env:...}` reference.
   If the save fails, the datasource is taken out again: nothing is left running that was not saved.
 
 Errors:
 - No role -> `HTTP 401`; a role not in `policies.admin_roles` -> `HTTP 403`.
 - A body that does not validate, a typo included -> `HTTP 422` and `detail` is a list of
   `{"path": "config.sampel_questions", "message": "Extra inputs are not permitted"}`, one per problem, each
-  naming its path in the body and never a value.
-- An id that is already taken, a connection that does not validate, a literal secret that cannot be written, or
-  two secrets that map to one environment variable -> `HTTP 422` with the reason as text (it names fields,
-  never values).
+  naming its path in the body and never a value. That includes a body that is not a JSON object or not JSON at
+  all (`[{"path": "", "message": "The body must be a JSON object."}]`, no input echoed), and a `connection` that
+  does not validate against the adapter's model (`config.connection.passwrd`, `config.connection.port`).
+- An id that is already taken, a literal secret that cannot be written, or two secrets that map to one
+  environment variable -> `HTTP 422` with the reason as text (it names fields, never values).
 - `save` found `datasources/<id>.yaml` changed on disk since the engine loaded it, or a new file that already
   exists -> `HTTP 409`; reload the engine and try again.
 - Any other failure to add -> `HTTP 500` with a generic message. The exception, which can hold the connection

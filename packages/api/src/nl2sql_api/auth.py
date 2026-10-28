@@ -134,14 +134,19 @@ async def require_admin(request: Request, engine: NL2SQL = Depends(get_engine)) 
     return user_context
 
 
+FORWARDING_HEADERS = ("x-forwarded-for", "forwarded", "x-real-ip")
+
+
 def is_fresh_local_install(request: Request, engine: NL2SQL) -> bool:
-    """Whether this is the fresh local install: no role source is configured and the client is on loopback.
+    """Whether this is the fresh local install: no role source is configured, the client is on loopback and the
+    request was not forwarded (no ``X-Forwarded-For``, ``Forwarded`` or ``X-Real-IP``: a same-host reverse proxy
+    makes every remote client look like loopback).
 
     That is the one case ``require_admin`` lets through without a role, and the one case where a secret
     typed into a Connect form may be written to the ``.env`` beside ``nl2sql.yaml`` (D122). Anywhere else a
     literal secret is refused and the form must send a ``${env:...}`` reference.
     """
-    if _role_source_configured(engine.config.api):
+    if _role_source_configured(engine.config.api) or any(h in request.headers for h in FORWARDING_HEADERS):
         return False
     return _is_loopback(request.client.host if request.client else "")
 

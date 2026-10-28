@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from pydantic import BaseModel
 
@@ -37,6 +37,7 @@ from nl2sql.config.models import (
 )
 from nl2sql.config.writer import (
     EnvSecrets,
+    adapter_secret_fields,
     check_file_name,
     datasource_data,
     dump_model,
@@ -47,6 +48,9 @@ from nl2sql.config.writer import (
     update_gitignore,
     write_env_values,
 )
+
+if TYPE_CHECKING:
+    from nl2sql.registry import Registry
 
 PathLike = Union[str, "os.PathLike[str]"]
 
@@ -159,10 +163,11 @@ def init_project(
             id="example", type="sqlite", connection={"database": "example.db"},
             description="An example SQLite database. Describe what is in yours; the resolver reads it."))
         extra = {"datasources/example.yaml": EXAMPLE_DATASOURCE}
+    headers = {"settings": DEMO_SETTINGS_HEADER} if demo else None
     if force:
-        for name in _plan(config, folder, False, extra)[0]:
+        for name in _plan(config, folder, False, extra, headers=headers)[0]:
             (folder / name).unlink(missing_ok=True)
-    return write_project(config, folder, extra=extra)
+    return write_project(config, folder, extra=extra, headers=headers)
 
 
 def starter_config(*, llm: LLM, path: PathLike = STORAGE_PATH) -> Config:
@@ -181,16 +186,21 @@ def write_project(
     *,
     env_file: bool = False,
     extra: Optional[Dict[str, Union[str, Path]]] = None,
+    registry: Optional[Registry] = None,
+    headers: Optional[Dict[str, str]] = None,
 ) -> List[Path]:
     """Write ``config`` as a new project in ``folder``, load what was written with ``load_config``, and return the files.
 
     The layout is ``init_project``'s: ``nl2sql.yaml`` and a file per section, ``datasources/<id>.yaml``,
     ``knowledge.yaml`` and an empty ``glossary.yaml`` (one block per datasource) for a ``yaml`` knowledge source
     whose file is not given in ``extra``, and the ``.gitignore`` lines it is missing. A section the config leaves
-    at its default is left out. ``extra`` maps a path in ``folder`` to the text to write there, or the file to copy.
+    at its default is left out. ``extra`` maps a path in ``folder`` to the text to write there, or the file to copy;
+    ``headers`` maps a section (``settings``, ``curated``, ``evals``) to the comment its file starts with.
 
     A secret field is written as a reference (D122): a literal becomes ``${env:NL2SQL_<PATH>}`` with its value in
-    ``folder/.env`` when ``env_file`` is set, and is refused otherwise.
+    ``folder/.env`` when ``env_file`` is set, and is refused otherwise. A datasource connection key is a secret when
+    its name says so or its adapter's connection model declares it so; ``registry`` (default ``Registry.default()``)
+    is where the adapter is found.
 
     Raises:
         FileExistsError: a file it would write exists (it never overwrites). Nothing is written.
@@ -200,7 +210,7 @@ def write_project(
         ConfigError: what was written does not load.
     """
     folder = Path(folder)
-    files, env_values, ignore = _plan(config, folder, env_file, extra)
+    files, env_values, ignore = _plan(config, folder, env_file, extra, registry, headers)
     existing = sorted(name for name in files if (folder / name).exists())
     if existing:
         raise FileExistsError(f"{folder.as_posix()} already has {', '.join(existing)}. write_project never "
@@ -223,13 +233,20 @@ def write_project(
     return written
 
 
-def _plan(config: Config, folder: Path, env_file: bool,
-          extra: Optional[Dict[str, Union[str, Path]]]) -> Tuple[Dict[str, Union[str, Path]], Dict[str, str], List[str]]:
+def _plan(config: Config, folder: Path, env_file: bool, extra: Optional[Dict[str, Union[str, Path]]],
+          registry: Optional[Registry] = None, headers: Optional[Dict[str, str]] = None,
+          ) -> Tuple[Dict[str, Union[str, Path]], Dict[str, str], List[str]]:
     """The files ``write_project`` would write (path to text or source), the ``.env`` values, and the ``.gitignore`` lines."""
     secrets = EnvSecrets(env_file=env_file)
+    section_headers = {**_SECTION_HEADERS, **(headers or {})}
     files: Dict[str, Union[str, Path]] = {}
+    if config.datasources and registry is None:
+        from nl2sql.registry import Registry
+
+        registry = Registry.default()
     for datasource in config.datasources:
-        files[f"datasources/{check_file_name(datasource.id)}"] = _dump(datasource_data(datasource, secrets))
+        files[f"datasources/{check_file_name(datasource.id)}"] = _dump(datasource_data(
+            datasource, secrets, adapter_secret_fields(registry, datasource.type)))
     llm = config.llm
     llm_dump = dump_model(llm, "The llm section")
     files["llm.yaml"] = _llm_header(llm) + _dump(llm_data(
@@ -247,7 +264,7 @@ def _plan(config: Config, folder: Path, env_file: bool,
     for section in OPTIONAL_SECTIONS:
         data = _optional(config, section, secrets)
         if data is not None:
-            files[f"{section}.yaml"] = _SECTION_HEADERS.get(section, "") + _dump(data)
+            files[f"{section}.yaml"] = section_headers.get(section, "") + _dump(data)
             sections.append(section)
     files["nl2sql.yaml"] = TOC_HEADER + "version: 2\n" + "".join(
         f"{section + ':':<13}{{ file: {_section_file(section)} }}\n" for section in sections)
@@ -379,6 +396,12 @@ KNOWLEDGE_HEADER = """\
 
 SETTINGS_HEADER = """\
 # The tuning knobs; every other setting keeps its default. See configuration/settings.
+"""
+
+DEMO_SETTINGS_HEADER = """\
+# The demo's tuning knobs; every other setting keeps its default. A live run
+# makes six model calls, so a question may take 300 s, and every run writes a
+# trace for the playground's Debug drill-down. See configuration/settings.
 """
 
 _SECTION_HEADERS = {"curated": CURATED_HEADER, "evals": EVALS_HEADER, "settings": SETTINGS_HEADER}

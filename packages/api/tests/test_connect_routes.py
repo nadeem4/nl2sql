@@ -230,6 +230,71 @@ def test_save_over_a_file_changed_since_load_is_a_409(connect):
     assert (folder / "datasources" / "shop.yaml").read_text(encoding="utf-8") == "type: sqlite\n"
 
 
+@pytest.mark.parametrize("path", ["/api/v1/datasource", "/api/v1/datasource/test"])
+def test_a_body_that_is_not_an_object_is_our_422_and_echoes_nothing(connect, path):
+    client, _, _ = connect()
+
+    for content in (b'["PWLEAK-77"]', b'"PWLEAK-77"', b"42", b"null"):
+        response = client.post(path, content=content, headers={"Content-Type": "application/json"})
+
+        assert response.status_code == 422, response.text
+        detail = response.json()["detail"]
+        assert [set(problem) for problem in detail] == [{"path", "message"}]
+        assert detail[0]["path"] == "" and "object" in detail[0]["message"]
+        assert "PWLEAK-77" not in response.text and "input" not in response.text
+
+
+@pytest.mark.parametrize("path", ["/api/v1/datasource", "/api/v1/datasource/test"])
+def test_a_body_that_is_not_json_is_our_422_and_echoes_nothing(connect, path):
+    client, _, _ = connect()
+
+    response = client.post(path, content=b'{"config": {"connection": {"password": "PWLEAK-77"',
+                           headers={"Content-Type": "application/json"})
+
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert [set(problem) for problem in detail] == [{"path", "message"}]
+    assert "PWLEAK-77" not in response.text and "input" not in response.text
+
+
+def test_a_connection_that_does_not_validate_is_the_same_path_message_list(connect):
+    client, engine, _ = connect()
+
+    response = client.post("/api/v1/datasource", json={"config": _postgres(passwrd="PWLEAK-77", port="not-a-port")})
+
+    assert response.status_code == 422, response.text
+    problems = {problem["path"]: problem["message"] for problem in response.json()["detail"]}
+    assert {"config.connection.passwrd", "config.connection.port"} <= set(problems)
+    assert "passwrd" in problems["config.connection.passwrd"] and "password" in problems["config.connection.passwrd"]
+    assert "PWLEAK-77" not in response.text and "not-a-port" not in response.text
+    assert engine.datasources.list() == []
+
+
+def test_a_forwarded_request_is_not_the_fresh_local_install(connect):
+    client, engine, folder = connect()
+
+    for header in ({"X-Forwarded-For": "203.0.113.7"}, {"Forwarded": "for=203.0.113.7"}, {"X-Real-IP": "203.0.113.7"}):
+        response = client.post("/api/v1/datasource", json={"config": _postgres(password=PASSWORD), "save": True},
+                               headers=header)
+
+        assert response.status_code == 422, (header, response.text)
+        assert PASSWORD not in response.text
+    assert engine.datasources.list() == []
+    assert not (folder / ".env").exists()
+
+
+def test_the_test_route_keeps_a_validation_message_readable(connect):
+    client, _, _ = connect()
+
+    response = client.post("/api/v1/datasource/test", json={"config": _postgres(passwrd=PASSWORD)})
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "failed" and body["stage"] == "config"
+    assert "connection.password: Field required" in body["reason"]
+    assert PASSWORD not in response.text
+
+
 def test_save_of_a_taken_env_name_is_a_422(connect, monkeypatch):
     monkeypatch.setenv("NL2SQL_MY_DB_PASSWORD", "already-set")
     client, engine, folder = connect()

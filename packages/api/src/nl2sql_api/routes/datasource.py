@@ -1,11 +1,11 @@
 import logging
 
-from fastapi import APIRouter, Body, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Dict, Any, Annotated
 
 from nl2sql import NL2SQL, ReviewError, UserContext
 from nl2sql_api import auth
-from nl2sql_api.models.datasource import DatasourceResponse
+from nl2sql_api.models.datasource import DatasourceRequest, DatasourceResponse, DatasourceTestRequest
 from nl2sql_api.dependencies import get_datasource_service, get_engine
 from nl2sql_api.services import DatasourceService
 from nl2sql_api.services.datasource import BadRequest
@@ -22,6 +22,22 @@ ADD_EXAMPLE = {
                               "password": "${env:SALES_DB_PASSWORD}"}},
     "save": True,
 }
+
+
+async def _json_body(request: Request) -> Any:
+    """The request's JSON, whatever it is. Not FastAPI's own body model, whose 422 echoes the input: a body that is
+    not JSON or not an object is answered with this project's `{path, message}` list, no input in it."""
+    try:
+        return await request.json()
+    except Exception:
+        raise HTTPException(status_code=422, detail=[{"path": "", "message": "The body is not valid JSON."}]) from None
+
+
+def _body_docs(model: Any, example: Dict[str, Any]) -> Dict[str, Any]:
+    return {"requestBody": {"required": True, "content": {"application/json": {
+        "schema": model.model_json_schema(), "examples": {"postgres": {"value": example}}}}}}
+
+
 PROBLEMS_422 = {422: {"description": "The body does not validate: `detail` lists each problem as `{path, message}` "
                                      "(never a value), or says why the datasource could not be added or saved."}}
 
@@ -43,10 +59,11 @@ def datasource_types(
 
 
 @router.post("/datasource/test", response_model=Dict[str, Any], summary="Test a datasource",
-             dependencies=[Depends(auth.require_admin)], responses={**auth.ADMIN_RESPONSES, **PROBLEMS_422})
+             dependencies=[Depends(auth.require_admin)], responses={**auth.ADMIN_RESPONSES, **PROBLEMS_422},
+             openapi_extra=_body_docs(DatasourceTestRequest, {"config": ADD_EXAMPLE["config"]}))
 def test_datasource(
     service: DatasourceSvc,
-    payload: Annotated[Dict[str, Any], Body(openapi_examples={"postgres": {"value": {"config": ADD_EXAMPLE["config"]}}})],
+    payload: Annotated[Any, Depends(_json_body)],
 ):
     """Connect to the datasource in `config` and say whether it works: `{"id", "status": "ready"|"failed",
     "stage", "reason", "fix", "warnings"}`. A failure is a 200 with `status: failed`, its `stage` (`config`,
@@ -64,13 +81,14 @@ def test_datasource(
 @router.post("/datasource", response_model=DatasourceResponse, summary="Add a datasource",
              responses={**auth.ADMIN_RESPONSES, **PROBLEMS_422,
                         409: {"description": "`save` found the datasource's file changed on disk since the "
-                                             "engine loaded it."}})
+                                             "engine loaded it."}},
+             openapi_extra=_body_docs(DatasourceRequest, ADD_EXAMPLE))
 def add_datasource(
     request: Request,
     service: DatasourceSvc,
-    payload: Annotated[Dict[str, Any], Body(openapi_examples={"postgres": {"value": ADD_EXAMPLE}})],
     user: UserContext = Depends(auth.require_admin),
     engine: NL2SQL = Depends(get_engine),
+    payload: Any = Depends(_json_body),
 ):
     """Register a datasource in this process from `config`, shaped like one entry of
     `datasources` in `nl2sql.yaml` (`id`, `type`, `connection`, ...). It is not indexed: call

@@ -5,13 +5,17 @@ Temp folders only: nothing here reads or writes a real ``.env``.
 from __future__ import annotations
 
 import os
+import threading
+import time
 from pathlib import Path
+from typing import Optional
 
 import pytest
 import yaml
 from dotenv import dotenv_values
+from pydantic import BaseModel, ConfigDict, SecretStr
 
-from nl2sql import NL2SQL, SecretValueInConfig, UserContext
+from nl2sql import NL2SQL, Registry, SecretValueInConfig, UserContext
 from nl2sql.config import (Datasource, Policies, Role, default_llm, load_config, starter_config, write_project)
 from nl2sql.review.models import ReviewError, ReviewErrorCode
 from nl2sql.testing.config import make_config
@@ -236,6 +240,147 @@ def test_testing_a_datasource_never_echoes_its_secret(project):
     assert status.status == "failed" and status.stage == "auth"
     assert PASSWORD not in f"{status.reason} {status.fix}"
     assert engine.datasources.list() == [], "testing registers nothing"
+
+
+# ---------------------------------------------------------------- review fixes
+
+class VaultConnection(BaseModel):
+    """A plugin's connection: its secret fields are not named like secrets."""
+
+    model_config = ConfigDict(extra="forbid")
+    host: str
+    private_key: Optional[SecretStr] = None
+    api_key: Optional[SecretStr] = None
+
+
+class VaultAdapter:
+    interface_version = 2
+    title = "Vault DB"
+    connection_model = VaultConnection
+    driver_modules = ()
+    install_hint = ""
+
+    def __init__(self, datasource_id=None, connection=None, limits=None, *, folder=None):
+        self.datasource_id = datasource_id
+
+    def capabilities(self):
+        return set()
+
+    def close(self):
+        pass
+
+
+class EchoingVaultAdapter(VaultAdapter):
+    def test_connection(self):
+        from nl2sql_sdk import ConnectionCheck
+
+        return ConnectionCheck(ok=False, stage="auth", message="bad key PK-LITERAL-0001", fix=None)
+
+
+@pytest.fixture
+def plugin_project(tmp_path):
+    registry = Registry.default()
+    registry.add_adapter("vaultdb", VaultAdapter)
+    registry.add_adapter("echo", EchoingVaultAdapter)
+    config = starter_config(llm=default_llm("openai"), path=tmp_path / ".nl2sql").model_copy(
+        update={"policies": _roles()})
+    write_project(config, tmp_path)
+    engine = NL2SQL.from_config(tmp_path / "nl2sql.yaml", registry=registry)
+    yield tmp_path, engine
+    engine.close()
+
+
+def test_a_plugin_secret_field_not_named_like_a_secret_goes_to_env(plugin_project):
+    folder, engine = plugin_project
+    engine.datasources.add(Datasource(id="vault", type="vaultdb", connection={
+        "host": "h", "private_key": "PK-LITERAL-0001"}))
+
+    path = engine.datasources.save("vault", by=ADMIN, env_file=True)
+
+    text = path.read_text(encoding="utf-8")
+    assert "PK-LITERAL-0001" not in text
+    assert yaml.safe_load(text)["connection"]["private_key"] == "${env:NL2SQL_VAULT_PRIVATE_KEY}"
+    assert dotenv_values(folder / ".env") == {"NL2SQL_VAULT_PRIVATE_KEY": "PK-LITERAL-0001"}
+
+
+def test_a_plugin_secret_field_literal_is_refused_without_env_file(plugin_project):
+    folder, engine = plugin_project
+    engine.datasources.add(Datasource(id="vault", type="vaultdb", connection={
+        "host": "h", "private_key": "PK-LITERAL-0001"}))
+
+    with pytest.raises(SecretValueInConfig) as raised:
+        engine.datasources.save("vault", by=ADMIN)
+
+    assert "private_key" in str(raised.value) and "PK-LITERAL-0001" not in str(raised.value)
+    assert list((folder / "datasources").iterdir()) == []
+
+
+def test_testing_a_plugin_datasource_never_echoes_its_secret_field(plugin_project):
+    folder, engine = plugin_project
+
+    status = engine.datasources.test(Datasource(id="e", type="echo", connection={
+        "host": "h", "private_key": "PK-LITERAL-0001"}))
+
+    assert "PK-LITERAL-0001" not in f"{status.reason} {status.fix}"
+
+
+def test_two_concurrent_saves_both_keep_their_env_line(project, monkeypatch):
+    import nl2sql.config.writer as writer
+
+    folder, engine = project
+    engine.datasources.add(_postgres("sales", password="pw-sales-0001"))
+    engine.datasources.add(_postgres("stock", password="pw-stock-0002"))
+    real = writer.write_atomic
+
+    def slow(path, data):
+        time.sleep(0.3)  # both saves are inside the read-modify-write at once, unless one waits for the other
+        real(path, data)
+
+    monkeypatch.setattr(writer, "write_atomic", slow)
+    errors = []
+
+    def save(name):
+        try:
+            engine.datasources.save(name, by=ADMIN, env_file=True)
+        except BaseException as error:  # noqa: BLE001 - reported below
+            errors.append(error)
+
+    threads = [threading.Thread(target=save, args=(name,)) for name in ("sales", "stock")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert dotenv_values(folder / ".env") == {"NL2SQL_SALES_PASSWORD": "pw-sales-0001",
+                                              "NL2SQL_STOCK_PASSWORD": "pw-stock-0002"}
+
+
+def test_a_datasource_named_like_the_llm_cannot_replace_its_key(plugin_project):
+    folder, engine = plugin_project
+    engine.datasources.add(Datasource(id="llm", type="vaultdb", connection={"host": "h", "api_key": "K-LITERAL-0009"}))
+
+    with pytest.raises(ValueError, match="NL2SQL_LLM_API_KEY"):
+        engine.datasources.save("llm", by=ADMIN, env_file=True)
+
+    assert not (folder / ".env").exists()
+    assert list((folder / "datasources").iterdir()) == []
+
+
+def test_the_test_text_keeps_a_validation_message_readable_but_hides_the_value(project):
+    from nl2sql_sdk import ConnectionCheck
+
+    class Complaining:
+        def test_connection(self):
+            return ConnectionCheck(ok=False, stage="config", message=f"password: Field required (got {PASSWORD})",
+                                   fix="Set connection.password")
+
+    _, engine = project
+
+    status = engine.datasources.test(Datasource(id="sales", adapter=Complaining(), connection={"password": PASSWORD}))
+
+    assert status.reason == "password: Field required (got ***)"
+    assert status.fix == "Set connection.password"
 
 
 def test_the_saved_datasource_wins_after_a_reload(tmp_path, monkeypatch):

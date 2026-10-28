@@ -248,13 +248,22 @@ publishes `datasource.saved` (audited), and never connects to the database or ca
 | A literal, with `save(..., env_file=True)` | `${env:NL2SQL_<ID>_<KEY>}` in the YAML and `NL2SQL_<ID>_<KEY>=value` in the `.env` beside `nl2sql.yaml` |
 | A literal, otherwise | Refused: `SecretValueInConfig` naming the field, with the fix "pass `${env:VAR}` or a secret provider reference" |
 
-A connection field is a secret when its key says so (`password`, `secret`, `token`, `api_key`) or its connection model
-declares it a `SecretStr`. The name is `NL2SQL_` plus the datasource id and the key in upper case, every character
-that is not a letter or digit as `_`: `NL2SQL_SALES_PASSWORD`. Two fields that map to one name, or a name another
-datasource's reference already uses, are refused with both fields named: a value is never overwritten.
-`.env` keeps every other line, is created when needed, and `.gitignore` is made to list it. Nothing is read from
-or written to `os.environ`: the entry points load the `.env` (`nl2sql.load_env_file`), and it never overrides a
-variable that is already set.
+A connection field is a secret when its key says so (`password`, `secret`, `token`, `api_key`) or its adapter's
+connection model declares it secret (`SecretStr`, `"format": "password"` in the schema): a plugin's `private_key` or
+`credentials` field goes to the `.env` too, whatever its name. The name is `NL2SQL_` plus the datasource id and the key
+in upper case, every character that is not a letter or digit as `_`: `NL2SQL_SALES_PASSWORD`. Two fields that map to
+one name are refused with both fields named: a value is never overwritten. That covers another datasource's
+reference and the names the writer gives the rest of the config, so a datasource called `llm` with an `api_key`
+field cannot replace `NL2SQL_LLM_API_KEY` (the LLM's and each agent's key and headers, the embeddings key and each
+secret provider's settings). `.env` keeps every other line, is created when needed, and `.gitignore` is made to list
+it. A value that holds a line break (`\n`, `\r`, `\x0b`, `\x0c`, `\x1c` to `\x1e`, `\x85`, ` `, ` `) is
+refused, as it could start a line of its own. Saves run one at a time, so two at once both keep their `.env`
+line. Nothing is read from or written to `os.environ`: the entry points load the `.env` (`nl2sql.load_env_file`), and
+it never overrides a variable that is already set.
+
+The id becomes a file name, so it is limited to letters, digits, `_`, `-` and `.` (up to 128 characters, starting with
+a letter or digit, not ending in a dot) and may not be a Windows device name (`con`, `prn`, `aux`, `nul`,
+`com1`-`com9`, `lpt1`-`lpt9`, with or without an extension); anything else is a `ValueError` naming the id.
 
 The same rules write a whole new project: `nl2sql.config.write_project(config, folder, env_file=False)` writes
 any data `Config` as `nl2sql init` lays it out (a file per section, `datasources/<id>.yaml`, `knowledge.yaml` and

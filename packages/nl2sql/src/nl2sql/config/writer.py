@@ -15,7 +15,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import yaml
 from pydantic import BaseModel, SecretStr
@@ -27,6 +27,10 @@ _REFERENCE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_-]*:[^{}]+\}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _ENV_LINE = re.compile(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
 _PLAIN_VALUE = re.compile(r"[A-Za-z0-9_@%+=:,./-]*")
+# Every character ``str.splitlines`` ends a line at: a value holding one could start a line of its own.
+_LINE_BREAK = re.compile("[\n\r\x0b\x0c\x1c\x1d\x1e\x85  ]")
+_FILE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
+_WINDOWS_DEVICES = {"con", "prn", "aux", "nul", *(f"com{n}" for n in range(1, 10)), *(f"lpt{n}" for n in range(1, 10))}
 
 
 def env_name(path: str) -> str:
@@ -63,7 +67,7 @@ class EnvSecrets:
                 "Pass ${env:VAR} or a secret provider reference instead.")
         name = env_name(path)
         owner = self._owners.get(name)
-        if owner is not None and owner[0] != path:
+        if owner is not None and owner[1] != where:
             raise ValueError(f"{where} and {owner[1]} both map to the environment variable {name}. "
                              "Rename one of the datasources or fields; a value is never overwritten.")
         self._owners[name] = (path, where)
@@ -82,6 +86,52 @@ def reserved_names(datasources: Iterable[Datasource]) -> Dict[str, Tuple[str, st
             if match:
                 reserved[match.group(1)] = (f"{datasource.id}.{key}", f"datasources/{datasource.id}.yaml connection.{key}")
     return reserved
+
+
+def config_reserved_names(config: Any) -> Dict[str, Tuple[str, str]]:
+    """The ``NL2SQL_...`` names the writer gives the config outside the datasources: the LLM's, each agent's and the
+    embeddings' ``api_key`` and headers, and each secret provider's secret settings. A datasource never takes one."""
+    reserved: Dict[str, Tuple[str, str]] = {}
+
+    def add(path: str, where: str) -> None:
+        reserved[env_name(path)] = (path, where)
+
+    def llm(block: Any, path: str) -> None:
+        add(f"{path}api_key", f"llm.yaml {path}api_key")
+        for header in (getattr(block, "headers", None) or {}):
+            add(f"{path}headers.{header}", f"llm.yaml {path}headers.{header}")
+
+    llm(config.llm, "llm.")
+    for agent, block in (getattr(config.llm, "agents", None) or {}).items():
+        llm(block, f"llm.agents.{agent}.")
+    add("embeddings.api_key", "embeddings.yaml api_key")
+    for provider in getattr(config.secrets, "providers", None) or []:
+        data = provider.model_dump(mode="python") if isinstance(provider, BaseModel) else dict(provider)
+        for key in data:
+            if is_secret_key(key):
+                add(f"secrets.{provider.id}.{key}", f"secrets.yaml provider '{provider.id}' {key}")
+    return reserved
+
+
+def adapter_secret_fields(registry: Any, type_name: Optional[str]) -> Set[str]:
+    """The connection fields the adapter's connection model declares secret (``format: password``, D122).
+
+    Empty for a datasource with no ``type``, a type the registry does not know, or an adapter that fails to import:
+    the key-name hints still apply to those.
+    """
+    if not type_name or registry is None:
+        return set()
+    try:
+        model = registry.load("adapter", type_name, require_installed=False).connection_model
+        properties = model.model_json_schema().get("properties", {})
+    except Exception:  # an unknown type, a plugin that fails to import or an unusual model: the hints still apply
+        return set()
+
+    def secret(schema: Mapping[str, Any]) -> bool:  # an Optional[SecretStr] holds it in anyOf
+        return schema.get("format") == "password" or any(
+            secret(option) for option in (*schema.get("anyOf", ()), *schema.get("oneOf", ())))
+
+    return {name for name, schema in properties.items() if secret(schema)}
 
 
 def dump_model(model: BaseModel, what: str, **kwargs: Any) -> Any:
@@ -112,19 +162,26 @@ def dump_yaml(data: Any) -> str:
 
 def check_file_name(datasource_id: str) -> str:
     """``datasource_id`` as a file name in ``datasources/``, or a ``ValueError``."""
-    if not datasource_id or datasource_id in {".", ".."} or "/" in datasource_id or "\\" in datasource_id:
-        raise ValueError(f"The datasource id '{datasource_id}' cannot be a file name in datasources/.")
+    if (not _FILE_ID.fullmatch(datasource_id) or datasource_id.endswith(".")
+            or datasource_id.split(".")[0].lower() in _WINDOWS_DEVICES):
+        raise ValueError(f"The datasource id '{datasource_id}' cannot be a file name in datasources/: use letters, "
+                         "digits, '_', '-' and '.', start with a letter or digit, and avoid a Windows device name "
+                         "such as con or aux.")
     return f"{datasource_id}.yaml"
 
 
-def datasource_data(datasource: Datasource, secrets: EnvSecrets) -> Dict[str, Any]:
-    """One datasource as its file holds it (no ``id``: the file name is it), its connection's secrets as references."""
+def datasource_data(datasource: Datasource, secrets: EnvSecrets, secret_fields: Iterable[str] = ()) -> Dict[str, Any]:
+    """One datasource as its file holds it (no ``id``: the file name is it), its connection's secrets as references.
+
+    A connection key is a secret when its name says so (``password``, ``token``, ...) or it is one of
+    ``secret_fields``, the fields the adapter's connection model declares secret (``adapter_secret_fields``).
+    """
     where = f"datasources/{datasource.id}.yaml"
     connection = datasource.connection
-    secret_keys = set()
+    secret_keys = set(secret_fields)
     if isinstance(connection, BaseModel):
         plain = connection.model_dump(mode="python", exclude_defaults=True)
-        secret_keys = {key for key, value in plain.items() if isinstance(value, SecretStr)}
+        secret_keys |= {key for key, value in plain.items() if isinstance(value, SecretStr)}
         plain = {key: value.get_secret_value() if isinstance(value, SecretStr) else value
                  for key, value in plain.items()}
         datasource = datasource.model_copy(update={"connection": plain})
@@ -222,14 +279,16 @@ def write_env_values(folder: Any, values: Mapping[str, str]) -> Path:
     for name, value in values.items():
         if not _ENV_NAME.fullmatch(name):
             raise ValueError(f"'{name}' is not an environment variable name.")
-        if "\n" in value or "\r" in value:
+        if _LINE_BREAK.search(value):
             raise ValueError(f"The value of {name} spans lines; a .env line holds one.")
     path = folder / ".env"
     if not values:
         return path
     written: List[str] = []
     out: List[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines() if path.exists() else []:
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    # Split on "\n" only: splitlines also splits at   and the like, which dotenv does not treat as a line end.
+    for line in (text[:-1] if text.endswith("\n") else text).split("\n") if text else []:
         match = _ENV_LINE.match(line)
         if match and match.group(1) in values:
             if match.group(1) not in written:

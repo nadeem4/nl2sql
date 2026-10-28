@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -17,6 +18,10 @@ from nl2sql.config.models import is_secret_key
 from nl2sql.datasources.registry import mask_connection_args
 from nl2sql.policies import UserContext
 from nl2sql.runtime import Runtime
+
+
+# One save at a time in this process, whichever engine: two saves share one ``.env`` and one ``datasources/`` folder.
+_SAVING = threading.Lock()
 
 
 class DatasourcesAPI:
@@ -168,8 +173,9 @@ class DatasourcesAPI:
             ReviewError: ``FILE_CHANGED``, the file changed on disk since the config was loaded (reload the
                 engine). Nothing is written.
         """
-        from nl2sql.config.writer import (EnvSecrets, check_file_name, datasource_data, dump_yaml, file_sha256,
-                                          reserved_names, write_atomic, write_env_values)
+        from nl2sql.config.writer import (EnvSecrets, adapter_secret_fields, check_file_name, config_reserved_names,
+                                          datasource_data, dump_yaml, file_sha256, reserved_names, write_atomic,
+                                          write_env_values)
         from nl2sql.review.models import ReviewError, ReviewErrorCode
 
         by = self._admin(by)
@@ -183,19 +189,21 @@ class DatasourcesAPI:
                              "section is a folder (`datasources: { file: datasources/ }`, one <id>.yaml each); this "
                              "engine was built in code or its datasources are inline.")
         name = check_file_name(datasource_id)
-        secrets = EnvSecrets(env_file=env_file,
-                             reserved=reserved_names(d for d in config.datasources if d.id != datasource_id))
-        text = dump_yaml(datasource_data(datasource, secrets))
+        secrets = EnvSecrets(env_file=env_file, reserved={
+            **reserved_names(d for d in config.datasources if d.id != datasource_id), **config_reserved_names(config)})
+        text = dump_yaml(datasource_data(
+            datasource, secrets, adapter_secret_fields(self._ctx.registry, datasource.type)))
         target = folder / name
-        if file_sha256(target) != config.datasource_file_hash(name):
-            raise ReviewError(ReviewErrorCode.FILE_CHANGED,
-                              f"{target.name} changed on disk since the engine loaded it.",
-                              fix="Reload the engine (build it again from nl2sql.yaml) and save again.")
-        if secrets.values:
-            write_env_values(project, secrets.values)
         data = text.encode("utf-8")
-        write_atomic(target, data)
-        config.record_datasource_file(name, hashlib.sha256(data).hexdigest())
+        with _SAVING:  # the check, the .env read-modify-write and the file write are one step
+            if file_sha256(target) != config.datasource_file_hash(name):
+                raise ReviewError(ReviewErrorCode.FILE_CHANGED,
+                                  f"{target.name} changed on disk since the engine loaded it.",
+                                  fix="Reload the engine (build it again from nl2sql.yaml) and save again.")
+            if secrets.values:
+                write_env_values(project, secrets.values)
+            write_atomic(target, data)
+            config.record_datasource_file(name, hashlib.sha256(data).hexdigest())
         self._ctx.bus.publish("datasource.saved", {
             "datasource_id": datasource_id, "file": f"{folder.name}/{name}", "by": _who(by)},
             tenant_id=self._ctx.tenant_id)
@@ -204,16 +212,20 @@ class DatasourcesAPI:
     def _scrubbed(self, status: DatasourceStatus, datasource: Datasource) -> DatasourceStatus:
         """``status`` with the datasource's secret literals, and every secret the engine knows, taken out of the
         driver's words: a driver may echo the password it was given, and a Connect form shows these."""
-        from nl2sql.tracing.trace import redact_for
+        from nl2sql.config.writer import adapter_secret_fields
+        from nl2sql.tracing.trace import collect_secrets
 
-        literals = sorted(_secret_literals(datasource.connection), key=len, reverse=True)
+        # Exact values only: a pattern would also eat the words around "password:" in a validation message.
+        known = _secret_literals(datasource.connection, adapter_secret_fields(self._ctx.registry, datasource.type))
+        known += [secret for secret in collect_secrets(self._ctx) if len(secret) >= 6]
+        literals = sorted(set(known), key=len, reverse=True)
 
         def scrub(text: Optional[str]) -> Optional[str]:
             if not text:
                 return text
             for literal in literals:
                 text = text.replace(literal, "***")
-            return redact_for(self._ctx, text)
+            return text
 
         return replace(status, reason=scrub(status.reason), fix=scrub(status.fix))
 
@@ -242,12 +254,12 @@ class DatasourcesAPI:
                               reason=reason)
 
 
-def _secret_literals(connection: Any) -> List[str]:
+def _secret_literals(connection: Any, secret_fields: Any = ()) -> List[str]:
     """The secret values written out in ``connection`` (a reference is not one)."""
     if isinstance(connection, BaseModel):
         values = [v.get_secret_value() for v in connection.model_dump(mode="python").values() if isinstance(v, SecretStr)]
     else:
-        values = [v for k, v in (connection or {}).items() if is_secret_key(k)]
+        values = [v for k, v in (connection or {}).items() if is_secret_key(k) or k in secret_fields]
     return [v for v in values if isinstance(v, str) and v and not v.startswith("${")]
 
 

@@ -1779,10 +1779,14 @@ flowchart TD
       `NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY` (the design's `NL2SQL_AGENTS_PLANNER_API_KEY` was an example that did
       not follow its own rule), then `NL2SQL_EMBEDDINGS_API_KEY`, `NL2SQL_SECRETS_<PROVIDER_ID>_<KEY>`; header values
       of the LLM and its agents are written the same way (`NL2SQL_LLM_HEADERS_<NAME>`). A connection field is a
-      secret by its key (`password`, `secret`, `token`, `api_key`, the same hints that mask it) or because a
-      `ConnectionModel` instance holds it as `SecretStr`.
-    - **A collision is two fields mapping to one name,** inside one write or against a name another configured
-      datasource's connection already references (`${env:NL2SQL_...}`); the message names both fields. A name
+      secret by its key (`password`, `secret`, `token`, `api_key`, the same hints that mask it), because a
+      `ConnectionModel` instance holds it as `SecretStr`, or (D122) because its adapter's connection model declares
+      it (`adapter_secret_fields`: `format: password` in the schema), so a plugin's `private_key` is written as a
+      reference too. `write_project` takes the registry to find the adapters in (default `Registry.default()`).
+    - **A collision is two fields mapping to one name,** inside one write (compared by field, not by path, so a
+      datasource `llm` with an `api_key` collides with the LLM's) or against a name another configured
+      datasource's connection already references (`${env:NL2SQL_...}`) or the writer gives the rest of the config
+      (`config_reserved_names`: LLM, agents, embeddings, secret providers); the message names both fields. A name
       already in `.env` is replaced (it is the same field written again), as the design says for the same names;
       the engine cannot know which field wrote a line it did not write.
     - **`save` refuses with the review queue's error:** `ReviewError` with `FILE_CHANGED` and the fix "reload the
@@ -1792,12 +1796,21 @@ flowchart TD
       `file` is `<that folder>/<id>.yaml`.
     - **`test(Datasource)` scrubs the status.** The design says the route never echoes a value; the driver's
       words are the one place one could be, so the facade takes the datasource's secret literals and every
-      secret the engine knows out of `reason` and `fix` (`***`), for every caller.
+      secret the engine knows out of `reason` and `fix` (`***`), for every caller. It replaces those exact values
+      only, not the redactor's patterns, which also ate the words around `password:` in a validation message.
     - **REST bodies are read as plain JSON and validated by the service,** so FastAPI's own 422 (which echoes the
-      input) is never used: every problem is `{path, message}` with the path in the body (`config.limits.row_limit`),
-      the body's own keys are strict (a `sav` typo is found; `user_context` stays allowed for the dev flag), and
-      a `ValueError` from `add` or `save` (an id taken, a connection that does not validate,
-      `SecretValueInConfig`) is a 422 with its text, `ReviewError` a 409 and anything else the generic 500.
+      input) is never used, not even for a body that is not JSON or not an object (read from the raw request, answered
+      `[{"path": "", "message": ...}]`): every problem is `{path, message}` with the path in the body
+      (`config.limits.row_limit`), the body's own keys are strict (a `sav` typo is found; `user_context` stays allowed
+      for the dev flag). A connection that does not validate is raised by the engine as `ConnectionInvalid` (a
+      `ValueError` with `problems`, exported from `nl2sql`) and is the same list (`config.connection.port`). Any
+      other `ValueError` from `add` or `save` (an id taken, `SecretValueInConfig`) is a 422 with its text,
+      `ReviewError` a 409 and anything else the generic 500.
+    - **Review fixes (L2).** A save holds one process-wide lock around the hash check, the `.env` rewrite and the
+      file write; `.env` values refuse every character `str.splitlines` splits on and the file is read back split on
+      `\n` only; a datasource id is allow-listed as a file name (letters, digits, `_`, `-`, `.`; no Windows device
+      name); `is_fresh_local_install` also needs no `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header; the
+      demo's `settings.yaml` keeps its comment (`write_project(headers=...)`).
       `POST /datasource/test` takes the same `{config}` body (no `save`); `GET /datasource-types` answers
       `{"types": [...]}`. A `save` that fails after the `add` removes the datasource again.
     - **`env_file` over REST** is `auth.is_fresh_local_install`: no role source (`api.role_header`, `api.role`,

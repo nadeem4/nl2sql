@@ -297,6 +297,76 @@ def test_env_file_refuses_a_bad_name_or_value_and_writes_nothing(tmp_path, name,
     assert not (tmp_path / ".env").exists()
 
 
+LINE_BREAKS = ["\n", "\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "]
+
+
+@pytest.mark.parametrize("character", LINE_BREAKS)
+def test_env_file_refuses_every_character_splitlines_splits_on(tmp_path, character):
+    for value in (f"a{character}OPENAI_BASE_URL=http://evil", f"abc{character}", character):
+        with pytest.raises(ValueError, match="spans lines"):
+            write_env_values(tmp_path, {"NL2SQL_A": value})
+
+    assert not (tmp_path / ".env").exists()
+
+
+def test_env_file_does_not_split_a_kept_line_on_a_unicode_separator(tmp_path):
+    (tmp_path / ".env").write_text("KEEP=a OPENAI_BASE_URL=x\n", encoding="utf-8")
+
+    write_env_values(tmp_path, {"NL2SQL_A": "1"})
+
+    assert (tmp_path / ".env").read_text(encoding="utf-8") == "KEEP=a OPENAI_BASE_URL=x\nNL2SQL_A=1\n"
+
+
+@pytest.mark.parametrize("datasource_id", ["a:b", "a:b.yaml", "con", "CON", "Nul", "aux", "prn", "com1", "LPT9",
+                                           "con.v2", "a.", "a ", "-lead", ".hidden", "a b", "a*b", "a?b", "a\x00b", "é", "x" * 129])
+def test_check_file_name_refuses_what_is_not_on_the_allow_list(datasource_id):
+    from nl2sql.config.writer import check_file_name
+
+    with pytest.raises(ValueError, match="file name"):
+        check_file_name(datasource_id)
+
+
+@pytest.mark.parametrize("datasource_id", ["sales", "my-db", "my_db", "Sales2", "a.b", "com10", "console"])
+def test_check_file_name_accepts_a_plain_id(datasource_id):
+    from nl2sql.config.writer import check_file_name
+
+    assert check_file_name(datasource_id) == f"{datasource_id}.yaml"
+
+
+def test_a_datasource_named_like_the_llm_cannot_take_its_env_name(tmp_path):
+    config = _config(
+        datasources=[Datasource(id="llm", type="postgres", connection={"api_key": "ds-key-1111"})],
+        llm=LLM(provider="openai", model="gpt-test", api_key=LLM_KEY))
+
+    with pytest.raises(ValueError, match="NL2SQL_LLM_API_KEY") as raised:
+        write_project(config, tmp_path, env_file=True)
+
+    assert "ds-key-1111" not in str(raised.value) and LLM_KEY not in str(raised.value)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_config_reserved_names_cover_every_non_datasource_secret():
+    from nl2sql.config.writer import config_reserved_names
+
+    config = _with_every_secret().model_copy(update={"llm": LLM(
+        provider="openai", model="m", api_key="${env:K}", headers={"X-Org": "o"},
+        agents={"ast_planner": AgentLLM(api_key="${env:A}", headers={"X-Agent": "a"})})})
+
+    suffixes = [
+        "LLM_API_KEY", "LLM_HEADERS_X_ORG", "LLM_AGENTS_AST_PLANNER_API_KEY",
+        "LLM_AGENTS_AST_PLANNER_HEADERS_X_AGENT", "EMBEDDINGS_API_KEY", "SECRETS_VAULT_TOKEN"]
+    assert set(config_reserved_names(config)) == {"NL2SQL_" + s for s in suffixes}
+
+
+def test_init_project_demo_keeps_the_settings_comment(tmp_path):
+    from nl2sql.config import init_project
+
+    init_project(tmp_path, demo=True)
+
+    text = (tmp_path / "settings.yaml").read_text(encoding="utf-8")
+    assert "six model calls" in text and "300 s" in text and "Debug drill-down" in text
+
+
 def test_the_env_writer_never_touches_the_process_environment(tmp_path, monkeypatch):
     import os
 

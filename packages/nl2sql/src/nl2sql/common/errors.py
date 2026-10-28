@@ -256,3 +256,15 @@ class ScheduleTooFrequent(ValueError):
 
 class SecretValueInConfig(ValueError):
     """A secret value would be written into YAML; secrets are written as references (D122)."""
+
+
+class ConnectionInvalid(ValueError):
+    """A datasource's ``connection`` does not validate against its adapter's connection model.
+
+    ``str()`` is one line per problem; ``problems`` lists each as ``{"path", "message"}`` (``connection.port``),
+    never a value, for a caller that shows them per field.
+    """
+
+    def __init__(self, problems: "list[dict[str, str]]"):
+        self.problems = problems
+        super().__init__(" ".join(f"{p['path']}: {p['message']}" for p in problems))
