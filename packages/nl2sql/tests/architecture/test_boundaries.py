@@ -405,7 +405,11 @@ DIALECT_SCAN = ["pipeline", "execution", "indexing", "evaluation", "api", "llm",
                 "public_api.py",
                 # Wave B (docs/architecture/wave_b.md, section 14): the profiler's probe and the cost
                 # estimate are adapter methods, so none of these names a dialect either.
-                "knowledge", "review", "profiler", "clarify", "explain"]
+                "knowledge", "review", "profiler", "clarify", "explain",
+                # Wave C (docs/architecture/wave_c.md, section 12): the conversation agent's prompt, the chart
+                # rules, the dashboard templates and the chat tools name no dialect either; a column's role
+                # and a chart's kind come from the plan and the result's types.
+                "conversations", "charts", "dashboards", "chat_tools"]
 
 DIALECT_NAMES = re.compile(r"(?i)\b(sqlite|postgres|postgresql|mysql|mssql|tsql|duckdb|snowflake|bigquery)\b")
 
@@ -640,6 +644,50 @@ def test_mcp_uses_only_the_public_api():
     assert not offenders, _broke(
         "nl2sql/mcp/ imports only the top-level nl2sql: what the server needs is a facade method "
         "every caller can use. Nothing outside it imports mcp, the mcp extra.", offenders)
+
+
+CHAT_TOOLS = ENGINE / "chat_tools"
+
+# What `chat_tools/__init__.py`, the interface module, imports besides the top-level nl2sql: the strict model
+# base and the conversation shapes a tool sees. `ToolOutput` lives in conversations/models.py because a stored
+# step holds one (importing it the other way round would be a cycle).
+CHAT_TOOLS_INIT_MAY_IMPORT = {"nl2sql.common.strict", "nl2sql.conversations.models"}
+
+
+def test_chat_tools_use_only_the_public_api():
+    """A chat tool gets the ``NL2SQL`` facade, not the runtime (wave_c.md, D109).
+
+    Each tool module imports the top-level ``nl2sql`` and its own interface module (``nl2sql.chat_tools``)
+    and nothing else of the engine; the runner that builds tools lives in ``nl2sql/conversations/``.
+    """
+    offenders = []
+    for path in python_files(CHAT_TOOLS):
+        allowed = {"nl2sql", "nl2sql.chat_tools"}
+        if path.name == "__init__.py":
+            allowed |= CHAT_TOOLS_INIT_MAY_IMPORT
+        offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name in _engine_imports(path)
+                      if name not in allowed]
+        offenders += [f"{_where(path)}:{node.lineno} .{node.attr}" for node in ast.walk(_tree(path))
+                      if isinstance(node, ast.Attribute) and node.attr in {"_runtime", "_ctx"}]
+    assert not offenders, _broke(
+        "nl2sql/chat_tools/ imports only the top-level nl2sql and its own interface module (its __init__ may "
+        "also import CHAT_TOOLS_INIT_MAY_IMPORT), and never reaches engine._runtime: a tool uses the public "
+        "facade, as an SDK caller does.", offenders)
+
+
+# Only these serve HTTP, and so only these import a web framework or server.
+WEB_SERVER_LIBRARIES = {"starlette", "uvicorn", "fastapi"}
+WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/", "nl2sql/src/nl2sql/cli/commands/demo.py")
+
+
+def test_only_mcp_and_the_demo_import_starlette_or_uvicorn():
+    offenders = [f"{_where(path)}:{lineno} {name}"
+                 for path in python_files(ENGINE, SDK) if not _where(path).startswith(WEB_SERVER_MODULES)
+                 for lineno, name, _ in imports(path) if name.partition(".")[0] in WEB_SERVER_LIBRARIES]
+    assert not offenders, _broke(
+        "Only nl2sql/mcp/ (MCP over HTTP), nl2sql/cli/demo/ and nl2sql/cli/commands/demo.py import Starlette, "
+        "FastAPI or Uvicorn: the engine and the SDK stay free of a web framework. nl2sql-api is its own "
+        "package.", offenders)
 
 
 # --------------------------------------------------------------------------
@@ -882,26 +930,111 @@ def test_wave_b_read_methods_require_a_caller():
         "keyword (D60): an app that forgot the caller fails rather than seeing everything.", offenders)
 
 
-# The writers of a file a person owns (D42): the glossary's and the curated section's. Each is called only by
-# the review queue's accept.
-PERSONS_FILE_WRITERS = {"write_glossary", "write_curated"}
-ACCEPT = ENGINE / "review" / "accept.py"
+# Wave C's methods that read or write something owned, scoped or privileged (docs/architecture/wave_c.md, D130),
+# by file and class: the caller is a required keyword-only argument, `user_context` (or `by`, for a writer or a
+# manager of keys) with no default, so an app that forgot it fails closed. Every other public method of these
+# classes is listed in WAVE_C_WITHOUT_A_CALLER, so a method added later must say which kind it is.
+WAVE_C_CALLER_METHODS = {
+    ("api/conversations_api.py", "ConversationsAPI"): ("user_context", (
+        "start", "ask", "stream", "retry", "tool", "ask_only", "report", "get", "list", "delete")),
+    ("api/workspaces_api.py", "WorkspacesAPI"): ("user_context", ("create", "rename", "list", "delete")),
+    ("api/dashboards_api.py", "DashboardsAPI"): ("user_context", (
+        "get", "list", "open", "refresh", "edit", "rename", "rename_tile", "set_tile_chart", "remove_tile",
+        "arrange", "set_filters", "set_schedule", "move", "pin", "delete", "generate", "filter_values",
+        "suggest_questions")),
+    ("api/api_keys_api.py", "ApiKeysAPI"): ("by", ("create", "list", "revoke")),
+    ("api/datasource_api.py", "DatasourcesAPI"): ("user_context", ("diagram",)),
+}
+# `save` writes a datasource file: `by` must hold an admin role.
+WAVE_C_WRITERS = {("api/datasource_api.py", "DatasourcesAPI"): ("by", ("save",))}
+# The few that take no caller, and why: a list of names, a hash lookup, and the scheduler, which runs each
+# dashboard as its stored owner (D134).
+WAVE_C_WITHOUT_A_CALLER = {
+    ("api/chat_tools_api.py", "ChatToolsAPI"): ("list",),
+    ("api/api_keys_api.py", "ApiKeysAPI"): ("verify",),
+    ("api/dashboards_api.py", "DashboardsAPI"): ("run_scheduled",),
+}
+
+
+def _methods(relative: str, class_name: str) -> dict:
+    cls = next(n for n in _tree(ENGINE / relative).body if isinstance(n, ast.ClassDef) and n.name == class_name)
+    return {n.name: n for n in cls.body if isinstance(n, ast.FunctionDef) and not n.name.startswith("_")}
+
+
+def _caller_problem(node: ast.FunctionDef, parameter: str):
+    names = [a.arg for a in node.args.kwonlyargs]
+    if parameter not in names:
+        return f"has no keyword-only {parameter}"
+    if node.args.kw_defaults[names.index(parameter)] is not None:
+        return f"gives {parameter} a default"
+    annotation = node.args.kwonlyargs[names.index(parameter)].annotation
+    text = ast.unparse(annotation) if annotation is not None else ""
+    if "UserContext" not in text or re.search(r"\bOptional\b|\bNone\b|\|", text):
+        return f"annotates {parameter} as {text!r}; it is a UserContext, never Optional or None"
+    return None
+
+
+def test_owned_and_privileged_methods_require_a_caller():
+    offenders = []
+    for table in (WAVE_C_CALLER_METHODS, WAVE_C_WRITERS):
+        for (relative, class_name), (parameter, methods) in table.items():
+            found = _methods(relative, class_name)
+            for method in methods:
+                if method not in found:
+                    offenders.append(f"{relative}: {class_name}.{method} is missing")
+                elif (problem := _caller_problem(found[method], parameter)):
+                    offenders.append(f"{relative}: {class_name}.{method} {problem}")
+    for (relative, class_name), methods in WAVE_C_WITHOUT_A_CALLER.items():
+        found = _methods(relative, class_name)
+        for method in methods:
+            if method not in found:
+                offenders.append(f"{relative}: {class_name}.{method} is missing")
+            elif {a.arg for a in found[method].args.kwonlyargs} & {"user_context", "by"}:
+                offenders.append(f"{relative}: {class_name}.{method} takes a caller, but is listed as having none")
+    # Nothing public is unclassified.
+    classified = {}
+    for table in (WAVE_C_CALLER_METHODS, WAVE_C_WRITERS):
+        for key, (_, methods) in table.items():
+            classified.setdefault(key, set()).update(methods)
+    for key, methods in WAVE_C_WITHOUT_A_CALLER.items():
+        classified.setdefault(key, set()).update(methods)
+    for (relative, class_name) in {k for k in classified if k[1] != "DatasourcesAPI"}:
+        extra = set(_methods(relative, class_name)) - classified[(relative, class_name)]
+        offenders += [f"{relative}: {class_name}.{m} is not classified as taking a caller or not" for m in sorted(extra)]
+    assert not offenders, _broke(
+        "Every Wave C method that reads or writes something owned, scoped or privileged takes the caller as a "
+        "required keyword (user_context, or by for a writer), with no default and no Optional (D130): an app "
+        "that forgot the caller fails rather than seeing or changing everything. Only run_scheduled, verify and "
+        "chat_tools.list take none.", offenders)
+
+
+# The writers of a file a person owns (D42, amended by Wave C's D123), and the only modules that may call each.
+# The glossary's and the curated section's are written by the review queue's accept alone. A new project is
+# written once, by `nl2sql init` and `nl2sql launch` (new files only); the `.env` by `nl2sql launch` and by
+# `datasources.save(env_file=True)`. `datasources.save` itself checks `by` and the hash of the file it replaces.
+_ACCEPT = "nl2sql/src/nl2sql/review/accept.py"
+PERSONS_FILE_WRITERS = {
+    "write_glossary": {_ACCEPT},
+    "write_curated": {_ACCEPT},
+    "write_project": {"nl2sql/src/nl2sql/config/project.py", "nl2sql/src/nl2sql/cli/commands/launch.py"},
+    "write_env_values": {"nl2sql/src/nl2sql/api/datasource_api.py", "nl2sql/src/nl2sql/cli/commands/launch.py"},
+}
 
 
 def test_only_accept_writes_a_persons_file():
     offenders = []
     for path in python_files(ENGINE):
-        if path == ACCEPT:
-            continue
         for node in ast.walk(_tree(path)):
             if isinstance(node, ast.Call):
                 func = node.func
                 name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
-                if name in PERSONS_FILE_WRITERS:
+                if name in PERSONS_FILE_WRITERS and _where(path) not in PERSONS_FILE_WRITERS[name]:
                     offenders.append(f"{_where(path)}:{node.lineno} calls {name}")
     assert not offenders, _broke(
-        "Only an accept writes a person's file: write_glossary and write_curated are called from "
-        "nl2sql/review/accept.py alone, under its lock, after its admin check and hash check (D42).", offenders)
+        "Only an accept writes a person's glossary or curated file (write_glossary and write_curated are "
+        "called from nl2sql/review/accept.py alone, under its lock, after its admin check and hash check, "
+        "D42). write_project and write_env_values (D123) are called from nl2sql init and launch, and from "
+        "datasources.save, alone.", offenders)
 
 
 # --------------------------------------------------------------------------
@@ -958,6 +1091,8 @@ READS_THE_ENVIRONMENT = {
     "nl2sql/src/nl2sql/common/logger.py": "NL2SQL_LOG_LEVEL and NL2SQL_LOG_FORMAT",
     "nl2sql/src/nl2sql/tracing/trace.py": "the redactor masks every value the environment holds",
     "nl2sql/src/nl2sql/cli/commands/eval.py": "CI detection, not configuration: mode full never runs in CI",
+    "nl2sql/src/nl2sql/cli/commands/launch.py": "DATABASE_URL, the one URL nl2sql launch offers as a candidate "
+                                                "(wave_c.md, section 7)",
 }
 
 # The one function that loads a .env file, and the entry points that call it.
@@ -965,6 +1100,7 @@ LOADS_DOTENV = "nl2sql/src/nl2sql/config/loader.py"
 ENTRY_POINTS_LOADING_DOTENV = {
     "nl2sql/src/nl2sql/cli/main.py",
     "nl2sql/src/nl2sql/cli/commands/demo.py",
+    "nl2sql/src/nl2sql/cli/commands/launch.py",  # reloads the .env it has just written (wave_c.md, section 7)
     "api/src/nl2sql_api/main.py",
 }
 

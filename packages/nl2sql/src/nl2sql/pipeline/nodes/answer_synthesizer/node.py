@@ -83,6 +83,26 @@ def _cut_results(state: GraphState) -> List[str]:
     return notes
 
 
+class AnswerGateNode:
+    """What a run with ``answer=False`` has in place of the synthesizer: ``answer.after`` and nothing else.
+
+    No model call and no prose (``final_answer`` stays None), but the hook still sees the run
+    (``final_answer=None`` in its context) and a ``Deny`` still withholds the data, as it does after an
+    answer. It is in the graph only while a hook is attached at ``answer.after``.
+    """
+
+    def __init__(self, ctx: Runtime):
+        self.node_name = "answer_gate"
+        self.hooks = hooks_of(ctx)
+
+    def __call__(self, state: GraphState) -> Dict[str, Any]:
+        results = state.aggregator_response.results if state.aggregator_response else None
+        verdict = self.hooks.call("answer.after", trace_id=state.trace_id, question=state.user_query,
+                                  user=state.user_context, datasource_id=state.datasource_id,
+                                  final_answer=None, results=results)
+        return {} if verdict.allowed else {"errors": [verdict.error(self.node_name)]}
+
+
 class AnswerSynthesizerNode:
     """Summarizes aggregated results into a user-facing answer."""
 

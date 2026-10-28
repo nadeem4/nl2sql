@@ -30,6 +30,9 @@ from nl2sql.cli.commands.eval import app as eval_app
 from nl2sql.cli.commands.storage import app as storage_app
 from nl2sql.cli.commands.knowledge import app as knowledge_app
 from nl2sql.cli.commands.review import app as review_app
+from nl2sql.cli.commands.keys import app as keys_app
+from nl2sql.cli.commands.dashboards import app as dashboards_app
+from nl2sql.cli.commands.launch import launch_command
 from nl2sql.cli.commands.profile import profile_command
 from nl2sql.cli.common.engine import build_engine
 from nl2sql.cli.console import configure_output_encoding
@@ -53,6 +56,9 @@ app.add_typer(eval_app, name="eval",
               help="Evals: `nl2sql eval run` (with the regression gate), `regenerate`, `seed`, `publish`.")
 app.add_typer(knowledge_app, name="knowledge", help="The glossary as the engine uses it (from 0.8).")
 app.add_typer(review_app, name="review", help="The review queue: proposed knowledge and verified queries to accept or reject.")
+app.add_typer(keys_app, name="keys", help="API keys for MCP over HTTP (from 0.9).")
+app.add_typer(dashboards_app, name="dashboards", help="Dashboards: `nl2sql dashboards refresh` (from 0.9).")
+app.command("launch", help="Find a database, connect it, index it and look at what was found (from 0.9).")(launch_command)
 app.command("profile", help="Profile the indexed schema and file what it finds for review (from 0.8).")(profile_command)
 
 

@@ -163,7 +163,7 @@ def _compiled(ctx: Any, datasource_id: str, proposed: SeedCase, user_context: An
     except ValidationError:
         return None
     result = QueryAPI(ctx).run_query(
-        proposed.question, plan=SuppliedPlan(datasource_id=datasource_id, sub_query=sub_query, plan=proposed.plan),
+        proposed.question, plan=SuppliedPlan.for_sub_query(sub_query, proposed.plan),
         execute=False, user_context=user_context)
     done = result.sub_queries[0] if result.sub_queries else None
     if done is None or not (done.sql or "").strip() or not done.plan:

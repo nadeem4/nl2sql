@@ -42,9 +42,13 @@ def curated_route(state: GraphState) -> str:
 
     A verified run has its scan done already, so it goes to the layer router,
     which sends it on to the aggregator. Any fallback continues at the
-    datasource resolver as if the matcher were not there.
+    datasource resolver as if the matcher were not there; except a verified
+    query the caller supplied, which ends the run with the matcher's error
+    instead of a model run (``end``).
     """
-    return "verified" if state.verified_match is not None else "generated"
+    if state.verified_match is not None:
+        return "verified"
+    return "end" if state.errors else "generated"
 
 
 def aggregator_route(state: GraphState) -> str:

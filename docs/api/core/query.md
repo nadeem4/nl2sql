@@ -25,7 +25,7 @@ Source:
 `packages/nl2sql/src/nl2sql/public_api.py`, `packages/nl2sql/src/nl2sql/api/query_api.py`
 
 Signature:
-`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None) -> QueryResult`
+`run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True) -> QueryResult`
 
 Every argument after the question is keyword-only. `run_query` passes the runtime's artifact store to `result_from_state`, so each
 sub-query carries a capped row sample alongside its artifact reference.
@@ -38,21 +38,33 @@ Parameters:
 | `execute` | `bool` | no | Whether to execute SQL against datasource. |
 | `user_context` | `Optional[UserContext]` | no | RBAC context. Omitted (or `None`), the run starts with an empty `UserContext`, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
 | `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The playground cancels it when the browser drops the request. |
-| `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`: `datasource_id`, `sub_query`, `plan`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the plan's own, or the call raises `ValueError` before anything runs. |
+| `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`): a whole run (`decomposition` and `plans`), or a verified query (`verified` and `verified_datasource_id`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the datasource of every sub-query of the plan, or the call raises `ValueError` before anything runs. |
 | `approvals` | `Optional[Sequence[Approval]]` | no | Approvals for an earlier run's `approvals_needed`. See [Approval](#approval). |
 | `clarify` | `bool` | no | Default `True`: a question the planner reads two or three ways ends `needs_clarification` with the options instead of running the most likely one. `False` runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See [Clarification](#clarification). |
 | `choice` | `Optional[ClarificationChoice]` | no | The caller's pick from an earlier run's `clarification` (`from nl2sql import ClarificationChoice`: `request`, `option_id`). Ask the same question as the same caller: the chosen option's plan runs through the validator and the generator without routing, decomposing or planning. See [Asking again](#asking-again). Not with `plan` or `approvals`. |
+| `answer` | `bool` | no | Default `True`. `False` skips the answer synthesizer: the run ends at the aggregator, `final_answer` is `None` and no model is called to write prose. With `plan=` that is a run with no model call at all, which is how a dashboard refresh re-runs a stored plan. The rows, the SQL and the explanation are the same. See [Running without an answer](#running-without-an-answer). |
 
 #### Running a plan you hold
 
-`run_query(question, plan=SuppliedPlan(datasource_id=..., sub_query=..., plan=...))`
-runs one sub-query's plan without routing or planning: the curated matcher,
-the datasource resolver, the decomposer and the planner's model call are
-skipped. What is not skipped:
+`run_query(question, plan=SuppliedPlan(...))` runs a plan without routing or
+planning: the curated matcher, the datasource resolver, the decomposer and
+the planner's model call are skipped. A `SuppliedPlan` is a whole run, shaped
+on the pinned run the approval re-run uses, and is exactly one of:
 
-- The datasource is checked against `user_context`'s scope, as the resolver
-  would; a datasource the caller may not read ends the run with
-  `SECURITY_VIOLATION` before anything runs.
+- `decomposition` (a `DecomposerResponse`, its combine groups and post-combine
+  steps included) and `plans`, the plan of **every** sub-query keyed by its
+  id; or
+- `verified` (a `VerifiedRef`: the verified query's id and its bound `params`)
+  and `verified_datasource_id`.
+
+`SuppliedPlan.for_sub_query(sub_query, plan)` is the common case, one
+sub-query run standalone. A plan missing for a sub-query, a plan for a
+sub-query that is not there, or both forms at once is a `ValidationError`
+when the `SuppliedPlan` is built. What is not skipped:
+
+- Every datasource of the decomposition is checked against `user_context`'s
+  scope, as the resolver would; a datasource the caller may not read ends the
+  run with `SECURITY_VIOLATION` before anything runs.
 - The plan passes the `plan.after` hooks, the logical validator (so a table
   outside the caller's scope is refused) and the generator, like any plan.
 - It is never written to the plan cache, and a validator failure ends the
@@ -60,8 +72,35 @@ skipped. What is not skipped:
   different plan. A database error is not retried either.
 
 The sub-query's `plan_source` is `"supplied"`. The question is still asked:
-the answer is written for it. The same entry serves the approved re-run
-(`"approved"`) and, in Wave B, a plan the asker chose (`"chosen"`).
+the answer is written for it (unless `answer=False`). The same entry serves
+the approved re-run (`"approved"`) and, in Wave B, a plan the asker chose
+(`"chosen"`).
+
+A supplied verified query is run by the curated matcher with its values, and
+it never falls back to a model run (a dashboard refresh uses no tokens). The
+call raises `ValueError`, before anything runs, when `execute` is `False`, no
+curated file with a verified query is loaded, or `datasource_id` is not
+`verified_datasource_id`. Where an approved pin would fall back to
+generation, a supplied one ends the run with an error and makes no model call:
+`SECURITY_VIOLATION` (the role may not read the datasource or a table the query
+reads), `EXECUTION_FAILED` (the query failed) or `INVALID_STATE` (an unknown
+query id, or a value that is missing or out of bounds).
+
+#### Running without an answer
+
+`run_query(question, plan=plan, answer=False, user_context=...)` is a run with
+no model call. It is how a stored plan is re-run to refresh a chart: the graph
+is built without the answer synthesizer, so the run ends at the aggregator and
+`final_answer` is `None` (a stopped or timed-out run too: it has no stop text),
+`timings` has no `answer_synthesizer` and a streamed run emits no
+`answer.delta`. `answer` is recorded in the trace's `request`, so a replay runs
+the same graph. On its own, `answer=False` still routes, decomposes and plans
+with the models; pair it with `plan=` for a run that calls none.
+
+Hooks still apply. While a hook is attached at `answer.after`, a model-free step
+runs it with `final_answer=None`, so a `Deny` withholds the rows and the result
+manifest as it does after an answer, and `stream_query` sends the
+`result.manifest` event only once the hook has allowed it.
 
 #### Approval
 
@@ -363,7 +402,7 @@ Source:
 `packages/nl2sql/src/nl2sql/events/catalog.py`
 
 Signature:
-`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None) -> Iterator[Event]`
+`stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True) -> Iterator[Event]`
 
 The same run as `run_query`, with the same parameters, yielded as it happens:
 the run's own events on the engine's bus ([Events](../../observability/events.md)),

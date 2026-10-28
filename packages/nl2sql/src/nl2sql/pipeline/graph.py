@@ -3,7 +3,8 @@ from langgraph.graph import END, StateGraph
 from nl2sql.runtime import Runtime
 from nl2sql.pipeline.graph_utils import SQL_AGENT_SUBGRAPH, wrap_subgraph
 from nl2sql.pipeline.nodes.aggregator import EngineAggregatorNode
-from nl2sql.pipeline.nodes.answer_synthesizer import AnswerSynthesizerNode
+from nl2sql.hooks import hooks_of
+from nl2sql.pipeline.nodes.answer_synthesizer import AnswerGateNode, AnswerSynthesizerNode
 from nl2sql.pipeline.nodes.curated_matcher import CuratedMatcherNode, curated_answers_on
 from nl2sql.pipeline.nodes.datasource_resolver import DatasourceResolverNode
 from nl2sql.pipeline.nodes.decomposer import DecomposerNode
@@ -16,6 +17,7 @@ def build_graph(
     ctx: Runtime,
     execute: bool = True,
     pinned: bool = False,
+    answer: bool = True,
 ) -> StateGraph:
     """Builds the main LangGraph pipeline.
 
@@ -40,16 +42,19 @@ def build_graph(
         ctx (Runtime): The application context containing registries and services.
         execute (bool): Whether to allow execution against real databases.
         pinned (bool): Build the pinned run's graph.
+        answer (bool): False builds the graph without the answer synthesizer: the run ends at the
+            aggregator and writes no prose (a dashboard refresh; wave_c.md, D119). While a hook is attached
+            at ``answer.after`` a model-free ``answer_gate`` runs it first, so a deny still withholds the data.
 
     Returns:
         StateGraph: The compiled LangGraph runnable.
     """
     graph = StateGraph(GraphState)
+    hooks = hooks_of(ctx)
 
     resolver_node = DatasourceResolverNode(ctx)
     decomposer_node = DecomposerNode(ctx)
     aggregator_node = EngineAggregatorNode(ctx)
-    synthesizer_node = AnswerSynthesizerNode(ctx)
 
     sql_agent_subgraph = build_sql_agent_graph(ctx, execute=execute)
 
@@ -60,7 +65,6 @@ def build_graph(
         wrap_subgraph(sql_agent_subgraph, SQL_AGENT_SUBGRAPH, ctx, execute=execute),
     )
     graph.add_node("aggregator", aggregator_node)
-    graph.add_node("answer_synthesizer", synthesizer_node)
     graph.add_node("layer_router", lambda state: {})
 
     if pinned:
@@ -73,7 +77,7 @@ def build_graph(
         graph.add_conditional_edges(
             "curated_matcher",
             curated_route,
-            {"verified": "layer_router", "generated": "datasource_resolver"},
+            {"verified": "layer_router", "generated": "datasource_resolver", "end": END},
         )
     else:
         graph.set_entry_point("datasource_resolver")
@@ -96,11 +100,24 @@ def build_graph(
     )
 
     graph.add_edge(SQL_AGENT_SUBGRAPH, "layer_router")
-    graph.add_conditional_edges(
-        "aggregator",
-        aggregator_route,
-        {"answer_synthesizer": "answer_synthesizer", END: END},
-    )
-    graph.add_edge("answer_synthesizer", END)
+    if answer:
+        graph.add_node("answer_synthesizer", AnswerSynthesizerNode(ctx))
+        graph.add_conditional_edges(
+            "aggregator",
+            aggregator_route,
+            {"answer_synthesizer": "answer_synthesizer", END: END},
+        )
+        graph.add_edge("answer_synthesizer", END)
+    elif hooks.attached("answer.after"):
+        # No answer to write, but a hook at answer.after may still withhold the data: a model-free gate runs it.
+        graph.add_node("answer_gate", AnswerGateNode(ctx))
+        graph.add_conditional_edges(
+            "aggregator",
+            lambda state: END if aggregator_route(state) == END else "answer_gate",
+            {"answer_gate": "answer_gate", END: END},
+        )
+        graph.add_edge("answer_gate", END)
+    else:
+        graph.add_edge("aggregator", END)
 
     return graph.compile()

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Union
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
-from nl2sql.api.types import DatasourceInfo, DatasourceType
+from nl2sql.api.types import Candidate, DatasourceInfo, DatasourceType
 from nl2sql.check import DatasourceStatus
+from nl2sql.common.planned import arrives_with
 from nl2sql.config import Datasource
 from nl2sql.datasources.registry import mask_connection_args
 from nl2sql.policies import UserContext
@@ -117,6 +119,22 @@ class DatasourcesAPI:
             return self._ctx.check_datasource(datasource)
         return self._ctx.try_datasource(datasource)
 
+    def scan(self, folder: Union[str, Path] = ".", *, url: Optional[str] = None, ports: bool = True) -> List[Candidate]:
+        """The databases found under ``folder``, at ``url`` and on loopback ports, as connection candidates.
+
+        Opens no database session (L1 fills this; docs/architecture/wave_c.md, section 7).
+        """
+        raise arrives_with("engine.datasources.scan", "L1")
+
+    def diagram(self, datasource_id: str, *, user_context: UserContext, tables: Optional[List[str]] = None) -> str:
+        """The datasource's tables and relationships the caller's scope reaches, as Mermaid text (K2 fills this;
+        docs/architecture/wave_c.md, section 4)."""
+        raise arrives_with("engine.datasources.diagram", "K2")
+
+    def save(self, datasource_id: str, *, by: UserContext, env_file: bool = False) -> Path:
+        """One datasource as ``datasources/<id>.yaml`` beside the config the engine was loaded from; ``by`` must
+        hold an admin role (L2 fills this; docs/architecture/wave_c.md, section 7)."""
+        raise arrives_with("engine.datasources.save", "L2")
     def _info(self, datasource: Datasource) -> DatasourceInfo:
         registry = self._ctx.ds_registry
         reason = registry.unavailable().get(datasource.id)

@@ -1079,6 +1079,13 @@ fails with the validator's error). The run's state carries the pin as a
 section's re-run) or `chosen` (Wave B's clarification re-ask, which may not
 be combined with approvals). `SuppliedPlan` is exported from `nl2sql`.
 
+!!! note "Changed in Wave C (C0b)"
+    `SuppliedPlan` is no longer `(datasource_id, sub_query, plan)`. It is a whole run, shaped on `PinnedRun`:
+    a `decomposition` with the `plans` of every sub-query, or a `verified` query with its
+    `verified_datasource_id`; exactly one. `SuppliedPlan.for_sub_query(sub_query, plan)` builds the old
+    one-sub-query case. `run_query` and `stream_query` also take `answer=False`, which skips the answer
+    synthesizer. See [Query API](../api/core/query.md) and [Wave C](wave_c.md#13-pr-plan).
+
 !!! note "Built: approval and the pinned-plan entry (H2)"
     - **The entry.** `nl2sql/pipeline/pinned.py`: `PinnedSource`,
       `SuppliedPlan`, `PinnedRun` (`source`, `decomposition`, `plans` keyed

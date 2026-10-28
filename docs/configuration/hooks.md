@@ -37,7 +37,7 @@ flowchart TD
 | `plan.after` | Per sub-query and attempt, on the planner's or the plan cache's plan | `sub_query`, `plan` | `Allow`, `Modify(plan=...)`, `Deny` |
 | `execute.before` | Per sub-query, before the adapter runs the SQL | `datasource_id`, `sql`, `params`, `tables` | `Allow`, `Deny`, `NeedsApproval` |
 | `execute.after` | Per sub-query, after it ran | `result`: columns, row count, truncated; never rows | `Allow`, `Deny` |
-| `answer.after` | The answer is written, before it is returned | `final_answer`, `results` (summaries) | `Allow`, `Deny` |
+| `answer.after` | The answer is written, before it is returned; with `answer=False` there is no answer and `final_answer` is `None`, but the point still runs | `final_answer`, `results` (summaries) | `Allow`, `Deny` |
 
 `tables` are `datasource.schema.table`. A field a point does not have is
 `None`. The context is frozen and holds copies of the run's plan, caller and

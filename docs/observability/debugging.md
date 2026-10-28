@@ -70,7 +70,8 @@ by time.
   "failed": true,
   "error": null,
   "request": {"question": "How many customers are there?", "roles": ["admin"],
-              "tenant_id": "default_tenant", "datasource_id": null, "execute": true},
+              "tenant_id": "default_tenant", "datasource_id": null, "execute": true, "clarify": true, "answer": true,
+              "today": "2026-09-21"},
   "engine": {"version": "0.1.2", "git_sha": "2cfe121", "python": "3.13.14"},
   "llm": {"configured": {"default": {"provider": "openai", "model": "gpt-5.4", "temperature": 0.0}},
           "by_node": {"decomposer": "gpt-5.4", "ast_planner": "gpt-5.4", "refiner": "gpt-5.4",
@@ -82,6 +83,10 @@ by time.
   "result": {"...": "the QueryResult, rows capped"}
 }
 ```
+
+`request` holds what a replay needs to ask the same question again: the
+`question`, caller (`roles`, `tenant_id`), `datasource_id`, and the `execute`,
+`clarify` and `answer` flags, plus `today`, the date the prompts were told.
 
 `events` lists the run's own [events](events.md) in the order they were
 published (`run.started`, each `node.started` and `node.finished` with its

@@ -176,8 +176,7 @@ def _sql_of_plan(ctx: Any, run: _Run, plan: Any, question: str, user: Any) -> Tu
     except ValidationError as error:
         raise CorrectionRefused("invalid_plan", f"The question cannot be asked: {error}") from None
     result = QueryAPI(ctx).run_query(
-        question, plan=SuppliedPlan(datasource_id=run.datasource_id, sub_query=sub_query, plan=model),
-        execute=False, user_context=user)
+        question, plan=SuppliedPlan.for_sub_query(sub_query, model), execute=False, user_context=user)
     done = result.sub_queries[0] if result.sub_queries else None
     errors = [e for e in result.errors if isinstance(e, dict)]
     approval = next((e for e in errors if str(e.get("error_code")) in ("NEEDS_APPROVAL", "ErrorCode.NEEDS_APPROVAL")),

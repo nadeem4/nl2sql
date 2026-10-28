@@ -23,6 +23,7 @@ from nl2sql.hooks import hooks_of
 from nl2sql.limits import Budget, RunStop, describe, stop_answer
 from nl2sql.llm.failures import provider_error
 from nl2sql.pipeline.graph import build_graph
+from nl2sql.pipeline.nodes.curated_matcher import curated_answers_on
 from nl2sql.pipeline.pinned import PinnedRun, check_pinned, pinned_from_approvals
 from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.timing import NodeTimingCallback
@@ -175,6 +176,7 @@ def run_with_graph(
     pinned: Optional[PinnedRun] = None,
     approvals: Optional[Sequence["Approval"]] = None,
     clarify: bool = True,
+    answer: bool = True,
 ) -> Dict:
     """Convenience function to run the full pipeline.
 
@@ -204,10 +206,14 @@ def run_with_graph(
     ``clarify`` off runs the default reading where the planner saw two
     (``settings.clarify.enabled`` must be on too for the run to ask); the
     prompts are the same either way (docs/architecture/wave_b.md, D58).
+
+    ``answer`` off builds the graph without the answer synthesizer: the run
+    ends at the aggregator, ``final_answer`` is None and no model call is made
+    for prose (docs/architecture/wave_c.md, D119).
     """
     approvals = list(approvals or [])
     # QueryAPI checks this first, before the run's scope opens; a direct caller is held to it here.
-    check_pinned(pinned, approvals, datasource_id)
+    check_pinned(pinned, approvals, datasource_id, execute=execute, curated=curated_answers_on(ctx))
     token = cancellation_token or CancellationToken()
     run_done = threading.Event()
     restore_signals = _install_signal_handlers(token)
@@ -220,8 +226,9 @@ def run_with_graph(
     run_llms = _begin_run(ctx)
     def _graph(pin: Optional[PinnedRun]):
         # A pinned decomposition has a graph of its own; every other run's is the usual one.
+        # Only a run that differs from the usual one says so.
         return build_graph(ctx, execute=execute, **({"pinned": True} if pin is not None and pin.enters_pinned
-                                                     else {}))
+                                                     else {}), **({} if answer else {"answer": False}))
 
     try:
         graph = _graph(pinned)
@@ -270,6 +277,7 @@ def run_with_graph(
                 "datasource_id": datasource_id,
                 "execute": execute,
                 "clarify": clarify,
+                "answer": answer,
                 "today": today,
             },
             started_at=started_at,
@@ -294,7 +302,7 @@ def run_with_graph(
     def _stopped(stop: RunStop) -> Dict:
         """A run a ``Budget`` stopped at a limit: ``stopped``, with the limit and the setting named."""
         message = f"The question reached its {describe(stop)}."
-        answer = stop_answer(stop)
+        text = stop_answer(stop)
         return _done({
             "errors": [
                 PipelineError(
@@ -305,9 +313,10 @@ def run_with_graph(
                 )
             ],
             "stop": stop,
-            # Where the answer synthesizer would have written it, as the timeout's answer is.
-            "answer_synthesizer_response": {"final_answer": {
-                "summary": answer, "format_type": "text", "content": answer, "warnings": []}},
+            # Where the answer synthesizer would have written it, as the timeout's answer is;
+            # a run that asked for no answer (answer=False) has none.
+            **({"answer_synthesizer_response": {"final_answer": {
+                "summary": text, "format_type": "text", "content": text, "warnings": []}}} if answer else {}),
             **_telemetry(),
         }, "stopped", message)
 
@@ -400,12 +409,12 @@ def run_with_graph(
                 # `answer_synthesizer_response` and nowhere else, so a
                 # top-level key never reached the caller, who saw only the
                 # error code. The shape is `AggregatedResponse`'s.
-                "answer_synthesizer_response": {"final_answer": {
+                **({"answer_synthesizer_response": {"final_answer": {
                     "summary": TIMEOUT_ANSWER,
                     "format_type": "text",
                     "content": TIMEOUT_ANSWER,
                     "warnings": [],
-                }},
+                }}} if answer else {}),
                 **_telemetry(),
             }, "timeout", error_msg)
 

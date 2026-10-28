@@ -118,8 +118,7 @@ def _supplied(datasource_id="chinook"):
 
     sub_query = SubQuery.model_validate({**COUNT_CUSTOMERS_DECOMPOSER["sub_queries"][0],
                                          "datasource_id": datasource_id})
-    return SuppliedPlan(datasource_id=datasource_id, sub_query=sub_query,
-                        plan=PlanModel.model_validate(COUNT_CUSTOMERS_PLAN))
+    return SuppliedPlan.for_sub_query(sub_query, PlanModel.model_validate(COUNT_CUSTOMERS_PLAN))
 
 
 @pytest.mark.e2e

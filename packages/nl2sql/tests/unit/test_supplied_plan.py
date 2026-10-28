@@ -23,24 +23,73 @@ from nl2sql.common.errors import ErrorCode
 from nl2sql.hooks import Allow, Deny, Modify
 from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlannerAnswer
-from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+from nl2sql.hooks.approval import VerifiedRef
+from nl2sql.pipeline.nodes.decomposer.schemas import CombineGroup, CombineInput, DecomposerResponse, ExpectedColumn, JoinKeyPair, SubQuery
 from nl2sql.pipeline.pinned import PinnedEntryNode, PinnedRun, PinnedSource, SuppliedPlan, pinned_from_approvals
 from nl2sql.pipeline.state import GraphState, SubgraphExecutionState
 from nl2sql.policies import UserContext
 from nl2sql.testing.runtime import fake_runtime
 
 
-def test_supplied_plan_is_public_and_its_datasource_is_its_sub_querys():
+def test_supplied_plan_is_public_and_one_sub_query_has_one_plan():
     import nl2sql
 
     assert nl2sql.SuppliedPlan is SuppliedPlan
-    with pytest.raises(ValidationError):
-        SuppliedPlan(datasource_id="hr", sub_query=_sq(ds="chinook"), plan=_plan())
+    plan = SuppliedPlan.for_sub_query(_sq(), _plan())
+    assert [sq.id for sq in plan.decomposition.sub_queries] == ["sq1"] and plan.plans == {"sq1": _plan()}
+    assert plan.verified is None
 
+
+def _two_sub_queries() -> DecomposerResponse:
+    keys = [ExpectedColumn(name="CustomerId", dtype="int")]
+    first = _sq().model_copy(update={"expected_schema": keys})
+    second = _sq(ds="hr").model_copy(update={"id": "sq2", "expected_schema": keys})
+    return DecomposerResponse(
+        sub_queries=[first, second],
+        combine_groups=[CombineGroup(group_id="g1", operation="join", inputs=[
+            CombineInput(subquery_id="sq1", role="left"), CombineInput(subquery_id="sq2", role="right")],
+            join_keys=[JoinKeyPair(left="CustomerId", right="CustomerId")])])
+
+
+def test_supplied_plan_is_a_whole_run_or_a_verified_query_exactly_one():
+    both = {"decomposition": _two_sub_queries(), "plans": {"sq1": _plan(), "sq2": _plan()},
+            "verified": VerifiedRef(id="v1"), "verified_datasource_id": "chinook"}
+    for bad in (
+        {},                                                                                   # neither
+        both,                                                                                 # both
+        {"decomposition": _two_sub_queries()},                                                # no plans
+        {"decomposition": _two_sub_queries(), "plans": {"sq1": _plan()}},                     # sq2 has no plan
+        {"decomposition": _two_sub_queries(), "plans": {"sq1": _plan(), "sq2": _plan(), "x": _plan()}},
+        {"verified": VerifiedRef(id="v1")},                                                   # no datasource
+        {"verified": VerifiedRef(id="v1"), "verified_datasource_id": "chinook", "plans": {"sq1": _plan()}},
+    ):
+        with pytest.raises(ValidationError):
+            SuppliedPlan(**bad)
+    SuppliedPlan(decomposition=_two_sub_queries(), plans={"sq1": _plan(), "sq2": _plan()})
+    SuppliedPlan(verified=VerifiedRef(id="v1", params={"year": 2024}), verified_datasource_id="chinook")
+
+
+def test_a_whole_run_pins_its_combine_groups_and_every_plan():
+    decomposition = _two_sub_queries()
+    pinned = PinnedRun.supplied(SuppliedPlan(decomposition=decomposition, plans={"sq1": _plan(), "sq2": _plan("b")}))
+
+    assert pinned.source == PinnedSource.SUPPLIED and pinned.enters_pinned
+    assert pinned.decomposition == decomposition
+    assert pinned.plans == {"sq1": _plan(), "sq2": _plan("b")}
+    assert pinned.verified is None
+
+
+def test_a_verified_query_pins_its_ref_and_does_not_enter_pinned():
+    pinned = PinnedRun.supplied(SuppliedPlan(verified=VerifiedRef(id="v1", params={"year": 2024}),
+                                             verified_datasource_id="chinook"))
+
+    assert pinned.source == PinnedSource.SUPPLIED and not pinned.enters_pinned
+    assert pinned.verified == VerifiedRef(id="v1", params={"year": 2024})
+    assert pinned.verified_datasource_id == "chinook" and pinned.decomposition is None
 
 def test_the_three_sources_of_a_pinned_plan():
     assert {s.value for s in PinnedSource} == {"supplied", "approved", "chosen"}
-    pinned = PinnedRun.supplied(SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan()))
+    pinned = PinnedRun.supplied(SuppliedPlan.for_sub_query(_sq(), _plan()))
     assert pinned.source == PinnedSource.SUPPLIED and pinned.plans == {"sq1": _plan()}
     [group] = pinned.decomposition.combine_groups
     assert group.operation == "standalone"
@@ -161,7 +210,7 @@ def _entry(allow):
 
 
 def _pinned_state(ds="chinook", user=UserContext(roles=["user"])):
-    plan = SuppliedPlan(datasource_id=ds, sub_query=_sq(ds=ds), plan=_plan())
+    plan = SuppliedPlan.for_sub_query(_sq(ds=ds), _plan())
     return GraphState(user_query="q", user_context=user, pinned=PinnedRun.supplied(plan))
 
 
@@ -222,7 +271,7 @@ def test_a_forged_approval_pins_nothing(approval, question, user):
 def test_chosen_plan_with_approvals_is_refused():
     from nl2sql.pipeline.runtime import run_with_graph
 
-    chosen = PinnedRun.supplied(SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan()))
+    chosen = PinnedRun.supplied(SuppliedPlan.for_sub_query(_sq(), _plan()))
     chosen = chosen.model_copy(update={"source": PinnedSource.CHOSEN})
 
     with pytest.raises(ValueError, match="approvals"):
@@ -244,7 +293,7 @@ def test_the_facade_passes_the_plan_and_the_approvals_to_the_run(monkeypatch, ho
 
     monkeypatch.setattr("nl2sql.api.query_api.run_with_graph", fake_run)
     api = QueryAPI(fake_runtime())
-    supplied = SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan())
+    supplied = SuppliedPlan.for_sub_query(_sq(), _plan())
     approvals = [_approval(by=DBA)]
 
     if how == "run_query":
@@ -281,7 +330,7 @@ def test_a_datasource_id_that_disagrees_with_the_supplied_plan_is_refused_at_the
     api = QueryAPI(fake_runtime())
     started = []
     api._ctx.bus.subscribe(started.append)
-    supplied = SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan())
+    supplied = SuppliedPlan.for_sub_query(_sq(), _plan())
 
     with pytest.raises(ValueError, match="datasource"):
         api.run_query("q", datasource_id="support", plan=supplied)
@@ -297,7 +346,7 @@ def test_a_chosen_plan_with_approvals_is_refused_before_the_scope_opens(how):
     api = QueryAPI(fake_runtime())
     started = []
     api._ctx.bus.subscribe(started.append)
-    chosen = PinnedRun.supplied(SuppliedPlan(datasource_id="chinook", sub_query=_sq(), plan=_plan()))
+    chosen = PinnedRun.supplied(SuppliedPlan.for_sub_query(_sq(), _plan()))
     chosen = chosen.model_copy(update={"source": PinnedSource.CHOSEN})
 
     with pytest.raises(ValueError, match="approvals"):
@@ -310,3 +359,75 @@ def test_the_rest_schema_lists_the_plan_sources():
 
     schema = SubQueryResult.model_json_schema()["properties"]["plan_source"]
     assert set(schema["enum"]) == {"llm", "cache", "verified", "supplied", "approved", "chosen"}
+
+
+# ---------------------------------------------------------------- answer=False (wave_c.md, D119)
+
+
+def _graph_edges(monkeypatch, **flags):
+    from nl2sql.pipeline import graph as control
+
+    for name in ("CuratedMatcherNode", "DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode",
+                 "AnswerSynthesizerNode"):
+        monkeypatch.setattr(control, name, lambda ctx: (lambda state: {}))
+    monkeypatch.setattr(control, "build_sql_agent_graph", lambda ctx, execute=True: (lambda state: {}))
+    graph = control.build_graph(fake_runtime(), **flags).get_graph()
+    return set(graph.nodes), {(e.source, e.target) for e in graph.edges}
+
+
+def test_answer_false_skips_the_synthesizer(monkeypatch):
+    nodes, edges = _graph_edges(monkeypatch)
+    assert "answer_synthesizer" in nodes and ("aggregator", "answer_synthesizer") in edges, "the default writes one"
+
+    nodes, edges = _graph_edges(monkeypatch, answer=False)
+    assert "answer_synthesizer" not in nodes
+    assert ("aggregator", "__end__") in edges, "the run ends at the aggregator"
+
+
+class _AtAnswerAfter:
+    name = "gate"
+    points = frozenset({"answer.after"})
+
+    def __call__(self, ctx):
+        return Allow()
+
+
+def test_answer_false_keeps_a_model_free_gate_only_while_a_hook_is_at_answer_after(monkeypatch):
+    from nl2sql.pipeline import graph as control
+
+    for name in ("CuratedMatcherNode", "DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode",
+                 "AnswerSynthesizerNode"):
+        monkeypatch.setattr(control, name, lambda ctx: (lambda state: {}))
+    monkeypatch.setattr(control, "build_sql_agent_graph", lambda ctx, execute=True: (lambda state: {}))
+
+    graph = control.build_graph(fake_runtime(), answer=False).get_graph()
+    assert "answer_gate" not in graph.nodes, "no hook there: the run ends at the aggregator"
+
+    from nl2sql.hooks import HookRunner
+
+    ctx = fake_runtime(hooks=HookRunner([_AtAnswerAfter()], admin_roles=("admin",)))
+    graph = control.build_graph(ctx, answer=False).get_graph()
+    edges = {(e.source, e.target) for e in graph.edges}
+    assert "answer_gate" in graph.nodes and "answer_synthesizer" not in graph.nodes
+    assert ("aggregator", "answer_gate") in edges and ("answer_gate", "__end__") in edges
+
+
+def test_the_curated_route_ends_a_run_the_matcher_ended_with_an_error():
+    from nl2sql.pipeline.routes import curated_route
+
+    assert curated_route(GraphState(user_query="q")) == "generated"
+    assert curated_route(GraphState(user_query="q", errors=[
+        __import__("nl2sql.common.errors", fromlist=["PipelineError"]).PipelineError(
+            node="curated_matcher", message="m", severity="ERROR", error_code=ErrorCode.INVALID_STATE)])) == "end"
+
+
+def test_the_facade_and_the_query_api_take_answer(monkeypatch):
+    import inspect
+
+    from nl2sql import NL2SQL
+    from nl2sql.api.query_api import QueryAPI
+
+    for cls in (NL2SQL, QueryAPI):
+        for method in ("run_query", "stream_query"):
+            parameter = inspect.signature(getattr(cls, method)).parameters["answer"]
+            assert parameter.default is True and parameter.kind is inspect.Parameter.KEYWORD_ONLY, (cls, method)
