@@ -6932,8 +6932,16 @@ can offer it without the engine naming any database. It lives in
 <code>nl2sql_sdk.discovery</code>, which imports only pydantic and the standard
 library, with <code>Found</code> (<code>kind</code>: <code>url</code>, <code>file</code> or <code>port</code>, and its <code>value</code>). The
 engine tests for it with <code>isinstance</code>, so an adapter without it is never found,
-only chosen by name, and the adapter interface stays at version 2. The <code>scan()</code>
-method itself arrives with L1.</p>
+only chosen by name, and the adapter interface stays at version 2. All four
+members are required together: leave a tuple empty for a way of being found
+the adapter does not use. The five built-ins declare it.</p>
+<p><code>scan()</code> hands <code>connection_for</code> one <code>Found</code> at a time: the URL the caller
+passed (whose scheme, up to any <code>+driver</code>, is in your <code>url_schemes</code>), a file
+under the scanned folder with one of your <code>file_suffixes</code>, or <code>"127.0.0.1:port"</code>
+for an open port in your <code>default_ports</code>. Return the <code>connection</code> fields it
+fills in (the keys of your <code>connection_model</code>), or <code>None</code> when it is not yours.
+Do not connect: read a file's first bytes at most. <code>scan()</code> lists the required
+fields you did not fill as <code>missing</code>.</p>
 <table>
 <thead>
 <tr>

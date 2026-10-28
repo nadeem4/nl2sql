@@ -5449,6 +5449,34 @@ the same ones.</p>
 URL <code>sqlite</code>), DuckDB (<code>.duckdb</code>, URL <code>duckdb</code>), PostgreSQL (5432,
 <code>postgresql</code>, <code>postgres</code>), MySQL (3306, <code>mysql</code>, <code>mariadb</code>) and SQL Server
 (1433, <code>mssql</code>, <code>sqlserver</code>).</p>
+<div class="admonition note">
+<p class="admonition-title">Built (L1)</p>
+<p><code>engine.datasources.scan</code> is <code>nl2sql/datasources/discovery.py</code>'s <code>scan(registry, folder, *, url, ports,
+skip)</code>; the five built-ins declare the class variables above and a <code>connection_for</code> classmethod (SQLite and
+DuckDB read the first 16 and 12 bytes of a file, the server databases split a <code>make_url</code> URL or a
+<code>host:port</code>). Where the code and the design differ, the code won:</p>
+<ul>
+<li><code>Found</code> and <code>DiscoverableAdapter</code> are imported from <code>nl2sql_sdk.discovery</code>, not the SDK's top level.</li>
+<li><strong>Order:</strong> the adapters are walked sorted by registry name, so findings of one kind come in name order
+  (files in sorted path order, ports by adapter name, then each adapter's port order).</li>
+<li><strong>Depth:</strong> "two levels deep" is two folders below <code>folder</code> (<code>folder/a/b/x.db</code> is found, <code>folder/a/b/c/x.db</code>
+  is not). The 50 is files that carry a declared suffix, counted before <code>connection_for</code> confirms them.</li>
+<li><strong>Duplicates</strong> are one server (type, host, port) or one file (type, resolved path), the first finding wins.
+  A missing port counts as the adapter's default and <code>localhost</code> as <code>127.0.0.1</code>, so a URL naming either
+  hides the open-port finding for the same server.</li>
+<li><strong>The password:</strong> <code>connection</code> keeps the URL's password (a form needs it), <code>Candidate</code>'s repr masks it
+  (<code>model_dump</code> does not, so a Candidate is never logged or serialised), and <code>found.value</code> is the URL with
+  the password replaced by <code>***</code> and its query and fragment dropped (a password can sit in the query).
+  The adapter is given the real URL.</li>
+<li>An adapter whose <code>connection_for</code> raises or returns something <code>Candidate</code> rejects is skipped, not fatal,
+  and its error text is dropped (it could hold a password); a missing folder finds nothing; <code>scan</code> takes
+  <code>storage.path</code> from the engine's config to skip. Each port is probed once.</li>
+<li>A DuckDB file is confirmed by the <code>DUCK</code> magic at byte 8 (the design names only SQLite's header).</li>
+<li>The probe is <code>socket.create_connection(("127.0.0.1", port), timeout=0.2)</code>; the tests replace it with a fake.</li>
+<li>L3 uses <code>Candidate.type</code>, <code>.connection</code> and <code>.missing</code> to fill the form and <code>.found</code> to say where a
+  finding came from; <code>scan</code> never connects, so L3 calls <code>datasources.test</code> on the filled form.</li>
+</ul>
+</div>
 <h3 id="writing-the-config">Writing the config</h3>
 <p>Three writers, all in the package, all named in the amended invariant
 (D123):</p>

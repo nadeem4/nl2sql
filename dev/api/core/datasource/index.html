@@ -5848,13 +5848,15 @@ forms, and a test of a datasource before it is added.</p>
 <li>List every configured datasource with its status, capabilities and masked connection.</li>
 <li>List every adapter type the registry can name, installed or not, with its connection model's JSON Schema.</li>
 <li>Test a configured datasource, as <code>check()</code> does, or a <code>Datasource</code> that is not added, registering nothing.</li>
+<li>Find databases to connect: scan a URL, a folder and the local ports for what the adapters declare they open.</li>
 <li>Add a <code>Datasource</code> (validated, built, not connected) and remove one.</li>
 <li>Return the indexed schema as the planner is given it, as one caller may see it.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/datasource_api.py</code> (<code>DatasourcesAPI</code>, internal)</li>
-<li><code>packages/nl2sql/src/nl2sql/api/types.py</code> (<code>DatasourceInfo</code>, <code>DatasourceType</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/types.py</code> (<code>DatasourceInfo</code>, <code>DatasourceType</code>, <code>Candidate</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/datasources/discovery.py</code> (<code>scan</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/datasources/registry.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>Datasource</code>)</li>
 </ul>
@@ -5887,6 +5889,11 @@ forms, and a test of a datasource before it is added.</p>
 <td><code>test(datasource)</code></td>
 <td><code>DatasourceStatus</code></td>
 <td>See <a href="#testing-a-datasource">Testing a datasource</a>.</td>
+</tr>
+<tr>
+<td><code>scan(folder=".", *, url=None, ports=True)</code></td>
+<td><code>list[Candidate]</code></td>
+<td>The databases found, as connection candidates, in this order and each once: the <code>url</code> (its scheme, up to any <code>+driver</code>, picks the adapter), database files under <code>folder</code> (suffixes the adapters declare; two folders down, at most 50, no hidden folder, not <code>storage.path</code>), and with <code>ports</code> the adapters' default ports on <code>127.0.0.1</code> only (0.2 s each). Every adapter in the registry takes part, installed or not, if it declares <a href="../../../adapters/sdk/#optional-discoverableadapter"><code>DiscoverableAdapter</code></a>. Opens no database session and builds no adapter; <code>test()</code> connects. <code>Candidate.connection</code> carries the URL's password: <code>repr</code> and <code>str</code> mask it, <code>model_dump</code> and <code>model_dump_json</code> do not, so never log or serialise a Candidate. <code>found.value</code> of a URL has the password masked and its query and fragment dropped.</td>
 </tr>
 <tr>
 <td><code>add(datasource)</code></td>
