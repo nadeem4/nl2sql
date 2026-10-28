@@ -36,6 +36,8 @@ from nl2sql.tracing.recorder import sub_query_from
 # The graph node whose model call writes the answer, and the answer fields a
 # reader sees grow.
 ANSWER_NODE = "answer_synthesizer"
+# What stands in for it when the run asks for no answer (answer=False) but a hook still sits at answer.after.
+ANSWER_GATE_NODE = "answer_gate"
 ANSWER_FIELDS = ("summary", "content")
 # What a hook ends a run with: a held manifest is then never sent.
 _HOOK_ENDINGS = {"HOOK_DENIED", "HOOK_FAILED", "NEEDS_APPROVAL", "COST_LIMIT_EXCEEDED"}
@@ -138,7 +140,7 @@ class RunEvents(BaseCallbackHandler):
                     self._held = manifest
                 else:
                     self._publish("result.manifest", manifest)
-        elif node == ANSWER_NODE and self._held is not None:
+        elif node in (ANSWER_NODE, ANSWER_GATE_NODE) and self._held is not None:
             manifest, self._held = self._held, None
             stopped = any(str(getattr(_get(e, "error_code"), "value", _get(e, "error_code"))) in _HOOK_ENDINGS
                           for e in (_get(outputs, "errors") or []))

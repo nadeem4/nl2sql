@@ -76,19 +76,31 @@ the answer is written for it (unless `answer=False`). The same entry serves
 the approved re-run (`"approved"`) and, in Wave B, a plan the asker chose
 (`"chosen"`).
 
-A supplied verified query is pinned for the curated matcher, which runs it
-with its values, so it needs `execute=True` (with `execute=False` the matcher
-is not in the graph).
+A supplied verified query is run by the curated matcher with its values, and
+it never falls back to a model run (a dashboard refresh uses no tokens). The
+call raises `ValueError`, before anything runs, when `execute` is `False`, no
+curated file with a verified query is loaded, or `datasource_id` is not
+`verified_datasource_id`. Where an approved pin would fall back to
+generation, a supplied one ends the run with an error and makes no model call:
+`SECURITY_VIOLATION` (the role may not read the datasource or a table the query
+reads), `EXECUTION_FAILED` (the query failed) or `INVALID_STATE` (an unknown
+query id, or a value that is missing or out of bounds).
 
 #### Running without an answer
 
 `run_query(question, plan=plan, answer=False, user_context=...)` is a run with
 no model call. It is how a stored plan is re-run to refresh a chart: the graph
 is built without the answer synthesizer, so the run ends at the aggregator and
-`final_answer` is `None`, `timings` has no `answer_synthesizer` and a streamed
-run emits no `answer.delta`. `answer` is recorded in the trace's `request`, so
-a replay runs the same graph. On its own, `answer=False` still routes, decomposes
-and plans with the models; pair it with `plan=` for a run that calls none.
+`final_answer` is `None` (a stopped or timed-out run too: it has no stop text),
+`timings` has no `answer_synthesizer` and a streamed run emits no
+`answer.delta`. `answer` is recorded in the trace's `request`, so a replay runs
+the same graph. On its own, `answer=False` still routes, decomposes and plans
+with the models; pair it with `plan=` for a run that calls none.
+
+Hooks still apply. While a hook is attached at `answer.after`, a model-free step
+runs it with `final_answer=None`, so a `Deny` withholds the rows and the result
+manifest as it does after an answer, and `stream_query` sends the
+`result.manifest` event only once the hook has allowed it.
 
 #### Approval
 

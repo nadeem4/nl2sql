@@ -1,4 +1,4 @@
-from .node import AnswerSynthesizerNode
+from .node import AnswerGateNode, AnswerSynthesizerNode
 from .schemas import AggregatedResponse, AnswerSynthesizerResponse
 
-__all__ = ["AnswerSynthesizerNode", "AggregatedResponse", "AnswerSynthesizerResponse"]
+__all__ = ["AnswerGateNode", "AnswerSynthesizerNode", "AggregatedResponse", "AnswerSynthesizerResponse"]

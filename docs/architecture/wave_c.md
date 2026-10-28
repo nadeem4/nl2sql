@@ -105,7 +105,7 @@ design; each is marked so and listed under
 | D127 | **Authentication is API keys first (bearer); OAuth later.** Keys are made by `engine.api_keys` (an admin caller required), stored hashed in the state store, and each carries the `user_id`, `tenant_id` and roles its holder runs as. Binding to anything but loopback without keys is refused. | confirmed 2026-10-28 | [Authentication](#authentication-api-keys-d127) |
 | D128 | **The hosted demo does not expose MCP in 0.9.** MCP is a delivery channel, like the package and the REST API, not a demo feature. The hosted demo serves recorded answers with no key, so an MCP client could ask nothing new; exposing it waits for OAuth and a decision on whose key pays. | confirmed 2026-10-28 | [MCP over HTTP](#9-mcp-over-http-with-auth) |
 | D129 | **The first PR adds every Wave C shape at once,** and the stubs the tracks share: the five facade namespaces (conversations, chat tools, dashboards, workspaces, API keys), the workspace, dashboard-edit, refresh and schedule models, the dashboard edit tools' entry points, the chat-tool entry points, the `keys`, `launch` and `dashboards` commands, the docs pages in the nav and the boundary test's constants, so the parallel PRs touch different files. | revised 2026-10-28 (owner) | [PR plan](#13-pr-plan) |
-| D130 | **Every Wave C method that reads or writes something owned, scoped or privileged requires the caller** (`user_context`, or `by` for a writer), keyword-only with no default, and fails closed: the conversations, workspaces, dashboards (edits, refresh and schedule included) and API-key methods, `datasources.diagram`, `datasources.save` and `dashboards.suggest_questions`. The one exception is `dashboards.run_scheduled`, which has no caller and runs each dashboard as its stored owner (D134). The CLI builds an explicit context (`--as ROLE`), as Wave B's `nl2sql review` does. | revised 2026-10-28 (owner) | Every section |
+| D130 | **Every Wave C method that reads or writes something owned, scoped or privileged requires the caller** (`user_context`, or `by` for a writer), keyword-only with no default, and fails closed: the conversations, workspaces, dashboards (edits, refresh and schedule included) and API-key methods, `datasources.diagram`, `datasources.save` and `dashboards.suggest_questions`. Three methods take no caller: `dashboards.run_scheduled`, which runs each dashboard as its stored owner (D134); `api_keys.verify`, a lookup by token that has no caller yet; and `chat_tools.list`, a list of public tool names. The CLI builds an explicit context (`--as ROLE`), as Wave B's `nl2sql review` does. | revised 2026-10-28 (owner) | Every section |
 | D131 | **Workspaces are named, local groups that categorise dashboards** ("Sales", "Ops"). A dashboard lives in exactly one workspace. A user creates, renames, moves dashboards between, and deletes (when empty) their workspaces. In 0.9 a workspace is private to its owner, as D118 says. | new 2026-10-28 (owner) | [Workspaces and ownership](#workspaces-and-ownership) |
 | D132 | **Refresh uses no tokens.** It comes in three forms: one chart, the whole dashboard, and a schedule. It re-runs the stored plans with `answer=False` (D119); there is no model call. The last results are stored with a timestamp, so a dashboard opens instantly and says "refreshed 2 h ago". On open, a chart older than the dashboard's schedule refreshes. The cost rule applies to every refresh. A schedule runs only inside a long-running process (`nl2sql-api`, or a local app process); with nothing running, nothing refreshes, and laptops accept that. `nl2sql dashboards refresh` serves cron. The minimum interval is `dashboards.min_refresh_minutes` (15; *builder's call*). | new 2026-10-28 (owner) | [Refresh and stored results](#refresh-and-stored-results) |
 | D133 | **Manual edits need no model call, and every one has chat parity.** Reorder or resize charts, rename the dashboard or a chart, change a chart's type, remove a chart, set filters (D117), set the refresh schedule and move to another workspace are public facade methods. The model calls the same edits through the `dashboard_edit` tool. Changing *what data* a chart shows (a new question or plan) goes only through chat. | new 2026-10-28 (owner) | [Manual edits and chat parity](#manual-edits-and-chat-parity) |
@@ -1149,7 +1149,7 @@ name.
 | A5 | The `audit` observer's audited set extended with `datasource.saved`, `api_key.created`, `api_key.revoked`, `mcp.denied`, `dashboard.schedule_set` and `dashboard.schedule_stopped` | Audit | E2 |
 | A6 | Built in Wave A: `build_server(engine, identity)`. Nothing to add. | | |
 | A7 | The store interface version: Wave A sets 2 (migration 4), Wave B 3 (migration 5); Wave C sets 4 (migration 6) | C0 | D1 |
-| A8 | `run_query(answer=False)` is Wave C's own (C0, `pipeline/routes.py`); nothing to add | | |
+| A8 | `run_query(answer=False)` is Wave C's own (C0, `pipeline/graph.py` and `runtime.py`); nothing to add | | |
 
 Used as stated: the bus, the catalog and `engine.events`; `approvals_needed`,
 `Approval(request, by)` and `run_query(approvals=)`; the `needs_approval`
@@ -1457,8 +1457,11 @@ flowchart TD
       ref. The old `(datasource_id, sub_query, plan)` fields are gone, with no alias.
     - **`answer=`** is a keyword on `NL2SQL.run_query` and `stream_query`, `QueryAPI`, `run_with_graph` and
       `build_graph`. `answer=False` builds the graph without the `answer_synthesizer` node and ends it at the
-      aggregator, so `final_answer` is `None` and the run makes no model call for prose. It is recorded in the
-      trace's `request`, and replay passes it back.
+      aggregator, so `final_answer` is `None` (also for a stopped or timed-out run) and the run makes no model
+      call for prose. While a hook is attached at `answer.after`, a model-free `answer_gate` node runs it
+      (`final_answer=None` in its context) before the end, so a `Deny` still withholds the rows and the
+      `result.manifest` is released or withheld there. It is recorded in the trace's `request`, and replay
+      passes it back.
     - **Stubs.** `engine.conversations`, `chat_tools`, `workspaces`, `dashboards` and `api_keys`
       (`public_api.py`; `api/conversations_api.py`, `chat_tools_api.py`, `workspaces_api.py`, `dashboards_api.py`,
       `api_keys_api.py`), and `datasources.scan`, `diagram` and `save` and `results.chart`, have their final
@@ -1475,7 +1478,7 @@ flowchart TD
       error. `uvicorn>=0.20.0` is in the `mcp` extra.
     - **CLI.** `nl2sql keys create|list|revoke` (`--as`, `--user`, `--role`, `--tenant`, `--label`), `nl2sql
       launch [DIR]` (`--provider`, `--as`, `--draft`, `--yes`, `--no-ports`) and `nl2sql dashboards refresh
-      [ID] [--due] [--as]` print which row fills them and exit 1 (`cli/common/planned.py`).
+      [--dashboard ID] [--due] [--as]` print which row fills them and exit 1 (`cli/common/planned.py`).
     - **Docs and exports.** The ten stub pages and their `mkdocs.yml` nav entries (`api/core/results.md` was new,
       not extended), `api/core/query.md` (`answer=`, `SuppliedPlan`) and `invariants.md`. `nl2sql` exports the
       Wave C models, `ChatTool` and its shapes, `Candidate`, `Found`, `DiscoverableAdapter`, `ApiKey` and the nine
@@ -1486,15 +1489,20 @@ flowchart TD
       `test_only_mcp_and_the_demo_import_starlette_or_uvicorn` (new); `test_owned_and_privileged_methods_require_a_caller`;
       and `PERSONS_FILE_WRITERS` as a map from each writer to the modules that may call it (`write_project`,
       `write_env_values` added; L2 builds them). Other tests: `test_wave_c_stubs.py`, `test_wave_c_commands.py`,
-      `test_answer_flag_fake_llm.py`, and the widened `SuppliedPlan` in `test_supplied_plan.py`.
+      `test_answer_flag_fake_llm.py`, `test_c0b_review_fake_llm.py` (the review's fixes), and the widened `SuppliedPlan` in `test_supplied_plan.py`.
 
     Where the code and the design differ, the code won:
 
-    - `answer=False` is wired in `pipeline/graph.py` (the node is not added) and `pipeline/runtime.py`, not in
-      `pipeline/routes.py`: `aggregator_route` is unchanged, since a graph without the node needs no route.
-    - A verified `SuppliedPlan` is pinned for the curated matcher, which is in the graph only when `execute` is
-      true, so a verified chart needs `execute=True` (D2's access check on open must run verified charts another
-      way, or the matcher must join the graph for a pinned verified run).
+    - `answer=False` is wired in `pipeline/graph.py` (the synthesizer is not added; `answer_gate` takes its
+      place while a hook is at `answer.after`) and `pipeline/runtime.py`, not in `pipeline/routes.py`:
+      `aggregator_route` is unchanged.
+    - A verified `SuppliedPlan` is run by the curated matcher, which is in the graph only when `execute` is true
+      and a curated file with a verified query is loaded. It never falls back to a model run (a refresh uses no
+      tokens, D132): `check_pinned` refuses it at the call (`ValueError`) when `execute` is false, no curated
+      file is loaded, or `datasource_id` is not `verified_datasource_id`; and the matcher ends the run with an
+      error where an approved pin would fall back: `SECURITY_VIOLATION` (the role may not read the datasource
+      or a table), `EXECUTION_FAILED` (the query failed) or `INVALID_STATE` (an unknown query, a bad or
+      missing value). D2's access check on open must run verified charts with `execute=True`.
     - `choice` on the conversation methods is an option id (`str`), as the design's prose says; the design's
       table leaves its type open.
     - `ToolOutput`-returning tool stubs import `ToolContext` and `ToolOutput` from `nl2sql.chat_tools`, and

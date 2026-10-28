@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from nl2sql.common.errors import ErrorCode, PipelineError, RunWarning
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.common.logger import get_logger
 from nl2sql.events import publish
 from nl2sql.execution.artifacts.results import ResultSummary
@@ -29,6 +29,7 @@ from nl2sql.execution.executor import SqlExecutorService
 from nl2sql.llm.wires import structured
 from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
 from nl2sql.pipeline.nodes.decomposer.schemas import CombineGroup, CombineInput, DecomposerResponse, SubQuery
+from nl2sql.pipeline.pinned import PinnedSource
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
 from nl2sql.policies.cost import take_record
@@ -180,14 +181,37 @@ class CuratedMatcherNode:
                 out["warnings"] = [RunWarning(code="CURATED_FALLBACK", node=self.node_name,
                                               message=fallback.detail)]
             logger.info(f"Curated answers fell back ({fallback.reason}): {fallback.detail}")
+            if self._supplied(state):
+                out["errors"] = [self._supplied_error(fallback)]
         except Exception as exc:  # never an error of the run
             logger.warning(f"Curated matcher failed, falling back: {exc}")
             record["reason"], record["detail"] = "execution_failed", f"Matcher crashed: {exc}"
             out = {}
+            if self._supplied(state):
+                out["errors"] = [self._supplied_error(_Fallback("execution_failed", record["detail"]))]
         out["curated_match"] = record
         if searches:
             out["retrieval"] = {"skipped": False, "query": state.user_query, "searches": searches}
         return out
+
+    @staticmethod
+    def _supplied(state: GraphState) -> bool:
+        """Whether the run's verified query was supplied by the caller (``SuppliedPlan(verified=...)``)."""
+        pinned = getattr(state, "pinned", None)
+        return pinned is not None and pinned.verified is not None and pinned.source == PinnedSource.SUPPLIED
+
+    def _supplied_error(self, fallback: _Fallback) -> PipelineError:
+        """The error a supplied verified query ends the run with, in place of a fallback to a model run.
+
+        A caller that supplied the query asked for that query: a refresh must not spend tokens on a
+        different one (wave_c.md, D132). A role that may not read it is ``SECURITY_VIOLATION``, a failed
+        run of it ``EXECUTION_FAILED``, and an unknown query or a bad value ``INVALID_STATE``.
+        """
+        codes = {"policy_denied": ErrorCode.SECURITY_VIOLATION, "execution_failed": ErrorCode.EXECUTION_FAILED}
+        return PipelineError(
+            node=self.node_name, severity=ErrorSeverity.ERROR,
+            message=f"The supplied verified query could not run ({fallback.reason}): {fallback.detail or fallback.reason}",
+            error_code=codes.get(fallback.reason, ErrorCode.INVALID_STATE))
 
     def _match(self, state: GraphState, record: Dict[str, Any],
                searches: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -234,8 +258,11 @@ class CuratedMatcherNode:
     def _run_pinned(self, state: GraphState, ds_id: Optional[str], verified: VerifiedRef,
                     record: Dict[str, Any]) -> Dict[str, Any]:
         """An approved verified query, with its values: no search and no model call; checked as a match is."""
-        if ds_id not in self._searchable(state) or verified.id not in self._queries(ds_id):
-            raise _Fallback("unknown_query", f"The approved verified query '{ds_id}.{verified.id}' is not available.")
+        if ds_id not in self.ds_registry.list_ids() or not self.policy_engine.scope(
+                state.user_context, ds_id).reaches_datasource():
+            raise _Fallback("policy_denied", f"This role may not read the datasource '{ds_id}'.")
+        if verified.id not in self._queries(ds_id):
+            raise _Fallback("unknown_query", f"The pinned verified query '{ds_id}.{verified.id}' is not available.")
         query = self._queries(ds_id)[verified.id]
         try:
             params = resolve_params(query, [ParamValue(name=k, value=str(v)) for k, v in verified.params.items()])

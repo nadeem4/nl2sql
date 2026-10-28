@@ -1,6 +1,6 @@
 """``nl2sql dashboards``: dashboards from the terminal (docs/architecture/wave_c.md, section 6).
 
-* ``refresh`` -- re-run the stored plans of one dashboard (as ``--as``), or with ``--due`` every dashboard whose
+* ``refresh`` -- re-run the stored plans of one dashboard (``--dashboard ID``, as ``--as``), or with ``--due`` every dashboard whose
   schedule is due, each as its stored owner. No model call.
 
 A stub: D2 fills it.
@@ -20,7 +20,7 @@ app = typer.Typer(help="Dashboards: `refresh`.", no_args_is_help=True)
 @app.command("refresh")
 def refresh(
     ctx: typer.Context,
-    dashboard_id: Annotated[Optional[str], typer.Argument(help="The dashboard to refresh")] = None,
+    dashboard_id: Annotated[Optional[str], typer.Option("--dashboard", help="The dashboard to refresh")] = None,
     due: Annotated[bool, typer.Option("--due", help="Refresh every dashboard whose schedule is due")] = False,
     as_: Annotated[Optional[List[str]], typer.Option(
         "--as", help="A role to refresh as (repeatable). Without one, policies.default_role.")] = None,

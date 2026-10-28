@@ -161,20 +161,32 @@ def pinned_from_approvals(approvals: Sequence[Approval], *, question: str, user:
 
 
 def check_pinned(pinned: Optional[PinnedRun], approvals: Sequence[Approval],
-                 datasource_id: Optional[str] = None) -> None:
+                 datasource_id: Optional[str] = None, *, execute: bool = True, curated: bool = True) -> None:
     """Refuse, at the call and before the run's scope opens, a pin the run cannot take.
 
     A chosen plan (Wave B's clarification re-ask) is a new question, not an
     approved one, so it cannot come with approvals. A ``datasource_id``
-    passed with a pinned plan must be the plan's own datasource.
+    passed with a pinned plan must be the plan's own datasource. A supplied
+    verified query runs only where the curated matcher is in the graph
+    (``execute`` on, a curated file with a verified query loaded) and never
+    falls back to a model run, so without those it is refused here
+    (wave_c.md, D132: a refresh uses no tokens).
 
     Raises:
-        ValueError: either rule is broken.
+        ValueError: a rule is broken.
     """
     if pinned is None:
         return
     if pinned.source == PinnedSource.CHOSEN and approvals:
         raise ValueError("A chosen plan cannot be run with approvals; ask again without them.")
+    if pinned.source == PinnedSource.SUPPLIED and pinned.verified is not None:
+        if not execute:
+            raise ValueError("A supplied verified query is run, not planned: it needs execute=True.")
+        if not curated:
+            raise ValueError("A supplied verified query needs a curated file with verified queries loaded.")
+        if datasource_id is not None and datasource_id != pinned.verified_datasource_id:
+            raise ValueError(f"The verified query belongs to the datasource '{pinned.verified_datasource_id}', "
+                             f"not datasource_id '{datasource_id}': pass one or the other, or the same one.")
     if datasource_id is not None and pinned.decomposition is not None:
         others = sorted({sq.datasource_id for sq in pinned.decomposition.sub_queries} - {datasource_id})
         if others:

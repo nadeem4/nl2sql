@@ -384,6 +384,43 @@ def test_answer_false_skips_the_synthesizer(monkeypatch):
     assert ("aggregator", "__end__") in edges, "the run ends at the aggregator"
 
 
+class _AtAnswerAfter:
+    name = "gate"
+    points = frozenset({"answer.after"})
+
+    def __call__(self, ctx):
+        return Allow()
+
+
+def test_answer_false_keeps_a_model_free_gate_only_while_a_hook_is_at_answer_after(monkeypatch):
+    from nl2sql.pipeline import graph as control
+
+    for name in ("CuratedMatcherNode", "DatasourceResolverNode", "DecomposerNode", "EngineAggregatorNode",
+                 "AnswerSynthesizerNode"):
+        monkeypatch.setattr(control, name, lambda ctx: (lambda state: {}))
+    monkeypatch.setattr(control, "build_sql_agent_graph", lambda ctx, execute=True: (lambda state: {}))
+
+    graph = control.build_graph(fake_runtime(), answer=False).get_graph()
+    assert "answer_gate" not in graph.nodes, "no hook there: the run ends at the aggregator"
+
+    from nl2sql.hooks import HookRunner
+
+    ctx = fake_runtime(hooks=HookRunner([_AtAnswerAfter()], admin_roles=("admin",)))
+    graph = control.build_graph(ctx, answer=False).get_graph()
+    edges = {(e.source, e.target) for e in graph.edges}
+    assert "answer_gate" in graph.nodes and "answer_synthesizer" not in graph.nodes
+    assert ("aggregator", "answer_gate") in edges and ("answer_gate", "__end__") in edges
+
+
+def test_the_curated_route_ends_a_run_the_matcher_ended_with_an_error():
+    from nl2sql.pipeline.routes import curated_route
+
+    assert curated_route(GraphState(user_query="q")) == "generated"
+    assert curated_route(GraphState(user_query="q", errors=[
+        __import__("nl2sql.common.errors", fromlist=["PipelineError"]).PipelineError(
+            node="curated_matcher", message="m", severity="ERROR", error_code=ErrorCode.INVALID_STATE)])) == "end"
+
+
 def test_the_facade_and_the_query_api_take_answer(monkeypatch):
     import inspect
 
