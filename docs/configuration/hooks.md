@@ -82,17 +82,14 @@ the run; it does not fall back to the generated path. **A plan-only run**
   `NeedsApproval`) ends the point; later hooks are not asked.
 - **A deny** ends the run with the error `HOOK_DENIED` (never retried), whose
   message is the hook's `reason`. A run a hook ended carries none of its
-  data: no answer, no rows, no artifact references, no result manifest.
-  The same holds for the run's stored results: the run is marked withheld in
-  the results store, so `engine.results.manifest`, `page`, `csv` and `chart`
-  and the REST results routes answer `ResultNotFound` (404) for its
-  `trace_id`, from `run_query` and `stream_query` alike. The files stay until
-  retention purges them, but nothing reads them. A deny, `HOOK_FAILED`,
-  `NEEDS_APPROVAL` and `COST_LIMIT_EXCEEDED` all withhold. The run's trace
-  still records that it was withheld (the error), without rows. While any hook is attached at `answer.after`, `stream_query` does not
-  stream the answer as it is written (no `answer.delta` events), and holds
-  the `result.manifest` event until the hooks allowed the answer; on a deny
-  it is never sent. The answer arrives whole in `run.finished`. At a per-sub-query point (`plan.after`,
+  data: no answer, no rows, no artifact references, no result manifest, and
+  its saved results cannot be read by its `trace_id` either (see
+  [What withholding guarantees](#what-withholding-guarantees)).
+- **Streaming.** While any hook is attached at `answer.after`, `stream_query`
+  does not stream the answer as it is written (no `answer.delta` events), and
+  holds the `result.manifest` event until the hooks allowed the answer; on a
+  deny it is never sent. The answer arrives whole in `run.finished`.
+- **A sub-query deny.** At a per-sub-query point (`plan.after`,
   `execute.before`, `execute.after`), `Deny(reason, scope="sub_query")` drops
   only that sub-query: the run goes on without it and the answer's warnings
   say what went unanswered. A sub-query that feeds a `join` or `compare`
@@ -125,6 +122,34 @@ the run; it does not fall back to the generated path. **A plan-only run**
 - **The plan cache keeps the planner's plan**, never a hook's change of it;
   `plan.after` runs on every cache hit, so a change applies afresh on each
   run and stops the moment the hook config changes.
+
+## What withholding guarantees
+
+A run a hook ended (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`,
+`COST_LIMIT_EXCEEDED`) returns none of its data, and its saved results cannot
+be read by its `trace_id`: `engine.results.manifest`, `page`, `csv` and
+`chart` and the REST results routes answer `ResultNotFound` (404), from
+`run_query`, `stream_query`, `nl2sql eval` and trace replay alike. This holds
+while the run is still going too, although a streaming caller has the
+`trace_id` from `run.started`.
+
+Every read of a run's results goes through its manifest, and the manifest is
+written only once no hook can end the run any more:
+
+- While a hook is attached at `answer.after`, the aggregator saves the
+  results but not the manifest. The node that asks `answer.after` writes it
+  when the hooks allow. A run they deny, or that ends earlier, never has one.
+  If that write fails, the run fails.
+- Without such a hook, nothing can end the run after the aggregator, so the
+  aggregator writes the manifest itself, as soon as the results are saved.
+- A hook at any earlier point that ends the run ends it before the
+  aggregator runs, so there is no manifest.
+
+The parquet files of a run with no manifest stay until retention purges
+them, but nothing reads them. With a hook at `answer.after`, a run that
+crashed or timed out before the hooks ruled has no manifest either. The run's trace records the error that
+ended it, without rows. An approved re-run is a new run with a new
+`trace_id`, read as any other.
 
 ## Built-in hooks
 

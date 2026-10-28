@@ -109,17 +109,70 @@ def test_an_unknown_foreign_or_crafted_id_is_404(client, path):
     assert "secret" not in response.text
 
 
+def _ran(monkeypatch, client, decision):
+    """POSTs a question that runs the real aggregator and answer node, with a hook at answer.after deciding."""
+    from langgraph.graph import END, StateGraph
+    from unittest.mock import MagicMock
+
+    from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
+    from nl2sql.hooks import HookBinding, HookRunner
+    from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
+    from nl2sql.pipeline.nodes.answer_synthesizer.node import AnswerSynthesizerNode
+    from nl2sql.pipeline.nodes.answer_synthesizer.schemas import AggregatedResponse
+    from nl2sql.pipeline.state import GraphState
+    from nl2sql.testing.runtime import fake_runtime
+
+    def graph(ctx, execute=True, **_):
+        def executed(state):
+            ref = ctx.artifact_store.write_lazy(pl.LazyFrame(ROWS),
+                                                ctx.artifact_store.run_metadata("t1", state.trace_id, "sq1"))
+            dag = ExecutionDAG(nodes=[LogicalNode(node_id="sq1", kind="scan", inputs=[]),
+                                      LogicalNode(node_id="combine_g1", kind="combine", inputs=["sq1"],
+                                                  attributes={"operation": "standalone", "join_keys": []})],
+                               edges=[LogicalEdge(edge_id="e1", from_id="sq1", to_id="combine_g1")])
+            return {"execution_dag": dag, "artifact_refs": {"sq1": ref}}
+
+        answer = AnswerSynthesizerNode(ctx)
+        answer.chain = SimpleNamespace(invoke=lambda inputs: AggregatedResponse(
+            summary="45.", format_type="text", content="45 rows.", warnings=[]))
+        builder = StateGraph(GraphState)
+        builder.add_node("executed", executed)
+        builder.add_node("aggregator", EngineAggregatorNode(ctx))
+        builder.add_node("answer_synthesizer", answer)
+        builder.set_entry_point("executed")
+        builder.add_edge("executed", "aggregator")
+        builder.add_edge("aggregator", "answer_synthesizer")
+        builder.add_edge("answer_synthesizer", END)
+        return builder.compile()
+
+    monkeypatch.setattr("nl2sql.pipeline.runtime.build_graph", graph)
+    engine = app.dependency_overrides[get_engine]()
+    hook = HookBinding(name="review", hook=decision, points=frozenset({"answer.after"}))
+    engine._runtime = fake_runtime(settings={"tenant_id": "t1"}, artifact_store=engine._runtime.artifact_store,
+                                   hooks=HookRunner([hook]), llm_registry=MagicMock(), closed=False)
+    response = client.post("/api/v1/query", json={"natural_language": "How many?"})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 @pytest.mark.parametrize("suffix", ["", ".csv"])
-def test_a_withheld_run_is_404_by_its_trace_id(client, suffix):
-    # What a hook that ended the run leaves behind: its results are on disk, but withheld.
-    store = app.dependency_overrides[get_engine]()._runtime.artifact_store
-    assert client.get(f"/api/v1/query/run-1/results/combine_g1{suffix}").status_code == 200
+def test_a_run_a_hook_denied_is_404_by_its_trace_id(monkeypatch, client, suffix):
+    from nl2sql.hooks import Deny
 
-    store.withhold("t1", "run-1")
+    body = _ran(monkeypatch, client, lambda ctx: Deny(reason="Reviewed first"))
 
-    response = client.get(f"/api/v1/query/run-1/results/combine_g1{suffix}")
+    assert body["errors"][0]["error_code"] == "HOOK_DENIED"
+    response = client.get(f"/api/v1/query/{body['trace_id']}/results/combine_g1{suffix}")
     assert response.status_code == 404
     assert "n1" not in response.text
+
+
+def test_a_run_a_hook_allowed_is_readable_by_its_trace_id(monkeypatch, client):
+    from nl2sql.hooks import Allow
+
+    body = _ran(monkeypatch, client, lambda ctx: Allow())
+
+    assert client.get(f"/api/v1/query/{body['trace_id']}/results/combine_g1").json()["total_rows"] == 45
 
 
 def test_the_routes_need_a_role_like_query_does(client):

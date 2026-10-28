@@ -147,37 +147,22 @@ class ArtifactStore:
         self.results.write(key, [manifest.model_dump_json().encode("utf-8")])
         return key
 
-    def withhold(self, tenant_id: str, request_id: str) -> None:
-        """Makes a run's saved results unreadable: writes a marker beside its manifest.
-
-        A hook ended the run, so its data is withheld from the caller; the files stay (a
-        ``ResultStore`` has no delete, and a marker works the same on every store), but
-        :meth:`read_manifest` and :meth:`scan_result` act as if the run had saved nothing.
-        """
-        self.results.write(self._withheld_key(tenant_id, request_id), [b"withheld"])
-
-    def _withheld(self, tenant_id: str, request_id: str) -> bool:
-        return self.results.exists(self._withheld_key(tenant_id, request_id))
-
-    def _withheld_key(self, tenant_id: str, request_id: str) -> str:
-        return self._manifest_key(tenant_id, request_id)[: -len(".json")] + ".withheld"
-
     def read_manifest(self, tenant_id: str, request_id: str) -> Optional[Dict[str, Any]]:
-        """A run's result manifest as a dict, or None when there is none, or the run was withheld."""
+        """A run's result manifest as a dict, or None when there is none."""
         key = self._manifest_key(tenant_id, request_id)
-        if self._withheld(tenant_id, request_id) or not self.results.exists(key):
+        if not self.results.exists(key):
             return None
         with self.results.open(key) as stream:
             return json.loads(stream.read().decode("utf-8"))
 
     def scan_result(self, tenant_id: str, request_id: str, node_id: str) -> Optional[pl.LazyFrame]:
-        """A run's saved result as a polars scan, or None when the store has no such file or the run was withheld.
+        """A run's saved result as a polars scan, or None when the store has no such file.
 
         The key is rendered from the template, exactly as the aggregator wrote it.
         """
         metadata = self.run_metadata(tenant_id, request_id, f"result_{node_id}")
         key = self._key(self._template_for(metadata), metadata)
-        if self._withheld(tenant_id, request_id) or not self.results.exists(key):
+        if not self.results.exists(key):
             return None
         return scan_parquet(self._source(key))
 

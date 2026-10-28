@@ -39,7 +39,7 @@ A combined result has no subgraph or schema version of its own: a template that 
 
 ## The result manifest
 
-After saving a run's results the aggregator writes a manifest beside them with `ArtifactStore.write_manifest`: which results the run produced, never their rows.
+After saving a run's results the aggregator writes a manifest beside them with `ArtifactStore.write_manifest`: which results the run produced, never their rows. While a hook is attached at `answer.after`, it is written later, once those hooks allowed (see *Withheld runs* below).
 
 ```json
 {"request_id": "0f1c...", "results": [
@@ -63,15 +63,19 @@ A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, a
 `ResultReader` (`execution/artifacts/results.py`), behind `engine.results` (`manifest`, `page` and `csv`) (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
 
 1. The request id and the result id must be plain tokens (letters, digits, `_`, `-`; up to 128 characters). Anything else is `ResultNotFound`, before any path is built.
-2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused. A withheld run (below) is not found either.
+2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused. A run a hook ended has no manifest, so it is not found either (below).
 3. The result id must be a `node_id` the manifest lists. The parquet key is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a key.
 4. A page is `scan.slice(offset, limit).collect()` on a polars scan, so only that slice is read. A CSV export collects one `CSV_CHUNK_ROWS` (10,000) slice at a time and yields it as CSV text, header first.
 
 ### Withheld runs
 
-When a hook ends a run (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`, `COST_LIMIT_EXCEEDED`), `run_query` and `stream_query` call `ArtifactStore.withhold(tenant_id, request_id)`, which writes a marker beside the manifest, `<tenant_id>/<request_id>/manifest.withheld` by default (the manifest's key with `.withheld` for `.json`). `read_manifest` and `scan_result` act as if the run had saved nothing while the marker exists, so every read path, `ResultReader.head` and the REST routes included, raises `ResultNotFound`.
+Every read goes through the manifest (step 2), so a run's results are readable exactly when its manifest exists. A run a hook ended (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`, `COST_LIMIT_EXCEEDED`) never has one:
 
-The files are not deleted, because the `ResultStore` protocol has no delete: a marker uses only `write` and `exists`, so it works the same on the `local` store and on any store of your own, with no protocol change. The marker is newer than the files and is purged with them by retention. If the marker cannot be written, the run fails rather than leave its results readable.
+- While a hook is attached at `answer.after`, the aggregator saves the parquet files but not the manifest. The node that asks `answer.after` (`answer_synthesizer`, or `answer_gate` for a run with no answer) writes it once the hooks allowed (`release_results`). Until then nothing is readable, not even from inside the run; a deny, or a run that crashes first, leaves no manifest. A failed write fails the run.
+- Without such a hook, no hook can end the run after the aggregator, which writes the manifest as soon as the results are saved, with no extra write.
+- A hook that ends the run at an earlier point ends it before the aggregator runs.
+
+The parquet files are not deleted, because the `ResultStore` protocol has no delete; retention purges them with the rest of the run's folder. Since the manifest is written in the graph, every caller that runs it is covered: `run_query`, `stream_query`, `nl2sql eval` and trace replay. See [What withholding guarantees](../configuration/hooks.md#what-withholding-guarantees).
 
 ## Where the files go
 

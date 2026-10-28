@@ -128,8 +128,12 @@ user who produced it is left to a multi-user deployment.
   with `HOOK_FAILED` unless that hook is configured `on_error: open`. See
   [Hooks](../configuration/hooks.md). A run a hook ended is **withheld**: its
   returned result is blank and its saved results are unreadable by trace id
-  (`engine.results` and the REST results routes raise `ResultNotFound`), so a
-  deny cannot be bypassed by paging the run's files.
+  (`engine.results` and the REST results routes raise `ResultNotFound`). Every
+  read goes through the run's manifest, which is written only once no hook
+  can end the run any more (after `answer.after` allowed, while a hook sits
+  there), so a deny cannot be bypassed by paging the run's files, during the
+  run or after it. See
+  [What withholding guarantees](../configuration/hooks.md#what-withholding-guarantees).
 - **Cost rule** (optional, `policies.cost`): the built-in `policy.cost` hook
   asks the database for the rows a query is estimated to read, before it
   runs, and allows it, asks a person to approve it or refuses it
