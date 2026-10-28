@@ -2677,7 +2677,7 @@ four modules carry it - <code>test_ast_planner_real_data.py</code>,
 <code>test_answer_synthesizer_real_data.py</code> - all of them nodes that call a chat
 model directly. Nothing else in the directory needs a key: indexing calls
 no model, so tests that index real data run key-free.</p>
-<p><code>.github/workflows/test.yml</code> has two test jobs over the source tree:</p>
+<p><code>.github/workflows/test.yml</code> has three test jobs over the source tree:</p>
 <ul>
 <li><strong><code>test</code></strong> runs <code>pytest -m "not integration and not realdb"</code> across Python 3.12 and 3.13.
   This is the fast job and must stay fast.</li>
@@ -2688,7 +2688,9 @@ no model, so tests that index real data run key-free.</p>
   subset covers schema indexing, datasource resolution, schema retrieval,
   aggregation and the local embedder against the real Chinook database; run
   it with <code>--collect-only -q</code> for the current list.</li>
+<li><strong><code>eval-gates</code></strong> runs in parallel with <code>integration</code>: the same demo project and model cache, then the three key-free eval gates (plans, retrieval, routing; see <a href="../../evals/#in-ci">Evals</a>) and the upload of their reports.</li>
 </ul>
+<p><code>integration</code> and <code>eval-gates</code> are skipped, and count as passing, on a pull request that changes only documentation (<code>docs/**</code> or Markdown files); the <code>code-changes</code> job decides.</p>
 <p>A separate workflow, <code>.github/workflows/realdb.yml</code>, runs <code>pytest -m realdb</code>
 against the <a href="../test-bed/">test bed</a> on GitHub's runners: on pull requests that
 change database-facing code, nightly on <code>main</code>, and on demand before a

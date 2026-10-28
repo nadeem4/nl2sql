@@ -6403,7 +6403,7 @@ not the time it publishes.</p>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>publish<span class="w"> </span>demo/eval_full.json<span class="w"> </span>--note<span class="w"> </span><span class="s2">"slim prompts"</span>
 </code></pre></div>
 <h2 id="in-ci">In CI</h2>
-<p>The key-free integration job runs the eval gate on the demo's Chinook suite
+<p>The key-free eval-gates job (parallel to the integration tests) runs the eval gate on the demo's Chinook suite
 and on <a href="cases/#the-routing-suite">the routing suite</a>, after indexing them:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>plans<span class="w"> </span>--baseline<span class="w"> </span>benchmarks
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>demo-ci/nl2sql.yaml<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--baseline<span class="w"> </span>benchmarks
@@ -6416,7 +6416,7 @@ and on <a href="cases/#the-routing-suite">the routing suite</a>, after indexing 
 as the <code>eval-reports</code> artifact whether the gate passed or not. On the routing
 suite, a case that loses its routing top-1 or a shortlisted datasource is a
 flip, and mode retrieval allows none. A changed suite or schema starts a new
-series, so the gate exits 2 until the baselines are recorded again. The same job also runs <code>tests/e2e/test_evals_plans.py</code>, where
+series, so the gate exits 2 until the baselines are recorded again. The <code>integration</code> job also runs <code>tests/e2e/test_evals_plans.py</code>, where
 every case must pass for every role.</p>
 <h3 id="re-recording-cis-baselines">Re-recording CI's baselines</h3>
 <p>CI's plans and retrieval baselines are recorded <strong>on CI's own runner</strong>
@@ -6424,7 +6424,7 @@ every case must pass for every role.</p>
 case only at 100% column recall, which near-tie rankings of the local ONNX
 embedder can move between platforms.</p>
 <ol>
-<li>Push the change. The integration job's "Eval gate" steps run the three
+<li>Push the change. The <code>eval-gates</code> job's "Eval gate" steps run the three
    gates and upload <code>eval_plans.json</code>, <code>eval_retrieval.json</code> and
    <code>eval_routing.json</code> as the <code>eval-reports</code> artifact, pass or fail.</li>
 <li>Download them: <code>gh run download &lt;run id&gt; -n eval-reports -D eval-reports</code>.</li>
