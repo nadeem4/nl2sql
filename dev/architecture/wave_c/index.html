@@ -6348,6 +6348,43 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   and L2's hash check.</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built (K1): auto charts</p>
+<ul>
+<li><strong>Kinds:</strong> <code>column_kinds(schema)</code> in <code>execution/artifacts/results.py</code> maps a polars schema to the five
+  kinds; the aggregator's <code>_write_manifest</code> fills <code>ResultSummary.column_kinds</code> from the saved file's schema.
+  The executor's and curated matcher's <code>execute.after</code> summaries still carry <code>{}</code> (they describe a
+  sub-query, not a saved result).</li>
+<li><strong>Charts:</strong> <code>nl2sql/charts/choose.py</code> (<code>choose(...)</code>: plan refinements and the five rules),
+  <code>takeaway.py</code>, <code>vega.py</code>; <code>ChartSpec.to_vega_lite</code> delegates to <code>vega.py</code>. <code>ResultReader.head</code> reads the
+  first rows uncapped by the page size. <code>engine.results.chart</code> and <code>chat_tools/chart.py</code> are filled; the tool's
+  args are <code>turn</code>, <code>step</code>, <code>result_id</code>, <code>kind</code>.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li>Any read cut at <code>max_points</code>, or a result cut at the datasource row limit (<code>ResultSummary.truncated</code>), is a
+  table, not only a line (a bar over cut rows would drop categories).</li>
+<li>A <code>trace_id</code> alone has no question, so its chart is titled <code>Result</code>; a <code>QueryResult</code> with one sub-query
+  is titled with that sub-query's intent, and the <code>chart</code> tool retitles it with the step's question.</li>
+<li>With a plan, a number that is not an aggregate and not grouped on is a measure, unless the plan has
+  an aggregate: then a plain column is a dimension (so <code>[customer_id, name]</code> is not a bar of ids). A
+  grouped one is a dimension. A whole-number year axis (<code>DATE_PART</code>) and a time of day export as an
+  <code>ordinal</code> Vega-Lite type, since <code>temporal</code> would read years as epoch milliseconds and cannot parse
+  <code>01:00:00</code>. Several bar measures use <code>xOffset</code> on the folded measure. A takeaway keeps a data value's
+  case ("iPhone"); only template text is capitalised.</li>
+<li>A run that saved several results needs <code>result_id</code> (<code>ValueError</code> otherwise). For a <code>QueryResult</code> the
+  result ids come from its <code>result_manifest</code>: an empty one (a run a hook withheld, whose files stay on
+  disk) or an id outside it is <code>ResultNotFound</code>. The tool turns <code>ResultNotFound</code> (expired or withheld
+  rows) and a kind the data cannot draw into <code>ToolNotApplicable</code>, and reads the conversation's tenant
+  (<code>conversation.tenant_id</code>, else the caller's).</li>
+<li>A bare <code>trace_id</code> is checked like <code>engine.results.page</code>: tenant and run id only. The withheld rows' files
+  are on disk, so anyone holding the trace id for that tenant can page them; withholding is enforced on
+  <code>QueryResult</code>, not on the disk.</li>
+<li><code>Decimal</code> values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.</li>
+<li>Tests: <code>test_charts_choose.py</code>, <code>test_charts_api.py</code>, <code>test_charts_make_no_model_call</code> (architecture).
+  The stub test moves <code>chart</code> out of its tables.</li>
+</ul>
+</div>
 <p>The waves, with at most four PRs at once:</p>
 <table>
 <thead>

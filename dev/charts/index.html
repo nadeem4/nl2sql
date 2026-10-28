@@ -2115,6 +2115,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -2131,6 +2149,102 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#column-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column kinds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-five-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#takeaways" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Takeaways
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vega-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vega-Lite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-chart-chat-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The chart chat tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -5661,6 +5775,91 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#column-kinds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column kinds
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-five-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#takeaways" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Takeaways
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vega-lite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Vega-Lite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-chart-chat-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The chart chat tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -5677,17 +5876,142 @@
 
 
 <h1 id="charts">Charts</h1>
-<div class="admonition note">
-<p class="admonition-title">Arrives with K1 (Wave C, 0.9)</p>
-<p>This page is a stub. The shapes (<code>ChartSpec</code>, <code>Encoding</code>, <code>ChartData</code>, <code>ColumnKind</code>) exist and
-<code>ChartSpec.to_vega_lite</code> and <code>engine.results.chart</code> raise <code>NotImplementedError</code> naming K1. The
-design is <a href="../architecture/wave_c/#5-auto-charts">Wave C, section 5</a>.</p>
-</div>
-<p>An answer's rows become a chart without a model call: five rules choose a line, a bar, a big number or
-a table from the result's column kinds (<code>number</code>, <code>text</code>, <code>temporal</code>, <code>boolean</code>, <code>other</code>) and, for a
-single-sub-query run, the typed plan. The chart is data (<code>ChartSpec</code>); <code>to_vega_lite()</code> renders it for a
-browser. See <a href="../api/core/results/">Results API</a>.</p>
-<p><code>settings.charts</code> already accepts <code>max_points</code>, <code>max_categories</code> and <code>max_series</code>.</p>
+<p>An answer's rows become a chart without a model call. <code>engine.results.chart(result)</code> reads the saved
+result and returns a <code>ChartSpec</code>: our own small typed chart (a line, a bar, a big number or a table),
+which <code>to_vega_lite()</code> exports for a browser. See <a href="../api/core/results/">Results API</a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">chart</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>          <span class="c1"># a QueryResult, or a trace_id</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">spec</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span> <span class="n">spec</span><span class="o">.</span><span class="n">reason</span><span class="p">,</span> <span class="n">spec</span><span class="o">.</span><span class="n">takeaway</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">vega</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">to_vega_lite</span><span class="p">()</span>                   <span class="c1"># None for a table</span>
+</code></pre></div>
+<h2 id="the-spec">The spec</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>line</code>, <code>bar</code>, <code>big_number</code> or <code>table</code></td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>The question that ran (a run with one sub-query: its intent; a <code>trace_id</code> alone: <code>Result</code>)</td>
+</tr>
+<tr>
+<td><code>x</code>, <code>y</code>, <code>series</code>, <code>value</code></td>
+<td><code>Encoding</code>s (<code>field</code>, <code>kind</code>, a humanised <code>title</code>) the kind uses: <code>x</code> the time or category, <code>y</code> one or more measures, <code>series</code> a category split into lines, <code>value</code> the big number</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>ChartData</code>: <code>trace_id</code>, <code>result_id</code>, <code>columns</code>, <code>rows</code> (at most <code>charts.max_points</code>), <code>truncated</code></td>
+</tr>
+<tr>
+<td><code>takeaway</code></td>
+<td>One sentence from a template, or <code>None</code> for a table</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>Why this kind, for example "one date column and 1 number"</td>
+</tr>
+</tbody>
+</table>
+<h2 id="column-kinds">Column kinds</h2>
+<p>The artifact writer records each column's kind in the run's manifest from the saved file's types:
+integer, decimal and float are <code>number</code>; date, time and timestamp <code>temporal</code>; string <code>text</code>; bool
+<code>boolean</code>; anything else <code>other</code>. When the run had one sub-query, its plan refines them: a
+<code>DATE_TRUNC</code> select item is <code>temporal</code>, a grouped <code>DATE_PART('year', x)</code> is <code>temporal</code> (a year axis),
+an aggregate is a measure, and a number that is grouped on is a dimension. In a plan that has an aggregate,
+a plain column that is not grouped on (an id) is a dimension too. With several sub-queries or
+no plan, every <code>number</code> is a measure and everything else a dimension.</p>
+<h2 id="the-five-rules">The five rules</h2>
+<p>First match wins.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Shape of the result</th>
+<th>Chart</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>One row, one measure, at most one text column</td>
+<td><code>big_number</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>One temporal dimension, one to <code>max_series</code> measures, at least two rows</td>
+<td><code>line</code>, x ascending</td>
+</tr>
+<tr>
+<td>3</td>
+<td>One temporal and one text dimension (at most <code>max_series</code> distinct values), one measure</td>
+<td><code>line</code> with <code>series</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>One text or boolean dimension, one to three measures, two to <code>max_categories</code> rows</td>
+<td><code>bar</code>, in the plan's order if it ordered, else by the first measure descending</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Anything else</td>
+<td><code>table</code></td>
+</tr>
+</tbody>
+</table>
+<p>At most <code>max_points</code> rows are read. When the result has more, or was cut at the datasource row limit
+(<code>ResultSummary.truncated</code>), <code>data.truncated</code> is true and the chart is a table, so no point is dropped silently. <code>kind=</code> forces a kind the data can draw; any other is a
+<code>ValueError</code> naming the ones it can.</p>
+<h2 id="takeaways">Takeaways</h2>
+<table>
+<thead>
+<tr>
+<th>Chart</th>
+<th>Sentence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>line</code></td>
+<td>"Revenue went from 100 in 2024-01-01 to 150 in 2024-03-01 (+50%)." For a series, the one with the largest last value. No change is given when an end is null or the start is zero.</td>
+</tr>
+<tr>
+<td><code>bar</code></td>
+<td>"Books has the highest sales: 50." (the category is written as the data has it) After a <code>SUM</code> or <code>COUNT</code> with no negative value: "..., 50% of the total shown."</td>
+</tr>
+<tr>
+<td><code>big_number</code></td>
+<td>"Total: 1,234.5."</td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>Numbers have thousands separators and at most three digits after the point.</p>
+<h2 id="vega-lite">Vega-Lite</h2>
+<p><code>to_vega_lite()</code> returns a Vega-Lite v5 spec with the rows inline (<code>data.values</code>): a <code>line</code> or <code>bar</code>
+mark, a temporal, ordinal (whole-number years, times of day) or nominal <code>x</code>, a quantitative <code>y</code>, several measures
+folded with a <code>fold</code> transform and told apart by a <code>color</code> field, and a <code>color</code> field for <code>series</code>.
+It sets no colour, scheme, font or size: the renderer's theme decides.</p>
+<h2 id="settings">Settings</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># settings.yaml</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">charts</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">max_points</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">max_categories</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">max_series</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+</code></pre></div>
+<h2 id="the-chart-chat-tool">The <code>chart</code> chat tool</h2>
+<p>In a <a href="../conversations/tools/">conversation</a> the <code>chart</code> tool charts the rows of an answer: <code>turn</code>
+(the latest turn with an answer when absent), <code>step</code> (the nth answer of the turn, from 1), <code>result_id</code>
+and <code>kind</code>. Its output is a <code>chart</code> whose body is the <code>ChartSpec</code> as JSON, titled with the question.
+It raises <code>ToolNotApplicable</code> when there is no answer with data, or its rows have expired.</p>
 
 
 
