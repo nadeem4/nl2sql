@@ -15,9 +15,9 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, GroupByItem, OrderIt
 SETTINGS = ChartSettings()
 
 
-def _draw(columns, kinds, rows, *, plan=None, kind=None, settings=SETTINGS, row_count=None):
+def _draw(columns, kinds, rows, *, plan=None, kind=None, settings=SETTINGS, row_count=None, cut=False):
     return choose(columns=columns, kinds=kinds, rows=rows, row_count=len(rows) if row_count is None else row_count,
-                  title="Revenue", trace_id="t1", result_id="sq1", settings=settings, plan=plan, kind=kind)
+                  title="Revenue", trace_id="t1", result_id="sq1", settings=settings, plan=plan, kind=kind, cut=cut)
 
 
 def _col(name):
@@ -225,10 +225,10 @@ def test_takeaway_line_change_and_bar_share():
                       SelectItem(expr=_func("SUM", _col("amt"), aggregate=True), alias="sales")],
         group_by=[GroupByItem(expr=_col("category"))])
     bar = _draw(["category", "sales"], {"category": "text", "sales": "number"}, CATEGORIES, plan=plan)
-    assert bar.takeaway == "Books has the highest sales: 50, 50% of the total shown."
+    assert bar.takeaway == "books has the highest sales: 50, 50% of the total shown."
     # Without a plan the measure is not known to be a sum or a count: no share.
     plain = _draw(["category", "sales"], {"category": "text", "sales": "number"}, CATEGORIES)
-    assert plain.takeaway == "Books has the highest sales: 50."
+    assert plain.takeaway == "books has the highest sales: 50."
 
 
 def test_takeaway_numbers_have_separators_and_at_most_three_decimals():
@@ -252,7 +252,7 @@ def test_a_bar_with_a_negative_value_has_no_share():
         group_by=[GroupByItem(expr=_col("category"))])
     spec = _draw(["category", "sales"], {"category": "text", "sales": "number"},
                  [["a", 10], ["b", -5]], plan=plan)
-    assert spec.takeaway == "A has the highest sales: 10."
+    assert spec.takeaway == "a has the highest sales: 10."
 
 
 # ---------------------------------------------------------------- Vega-Lite
@@ -296,3 +296,38 @@ def test_vega_lite_sets_no_colour():
             assert forbidden not in text, forbidden
         color = spec.to_vega_lite()["encoding"].get("color")
         assert color is None or set(color) <= {"field", "type", "title"}  # a field, never a value
+
+
+# ---------------------------------------------------------------- review fixes
+
+def test_a_result_cut_at_the_datasource_limit_is_truncated():
+    spec = _draw(["month", "revenue"], {"month": "temporal", "revenue": "number"}, MONTHS, cut=True)
+    assert spec.data.truncated is True and spec.kind == "table"
+
+
+def test_a_time_of_day_axis_is_ordinal_in_vega_lite():
+    import datetime as dt
+
+    rows = [[dt.time(1, 0), 5], [dt.time(2, 0), 7]]
+    spec = _draw(["at", "n"], {"at": "temporal", "n": "number"}, rows)
+    assert spec.kind == "line" and spec.to_vega_lite()["encoding"]["x"]["type"] == "ordinal"
+    day = _draw(["d", "n"], {"d": "temporal", "n": "number"}, [[dt.date(2024, 1, 1), 1], [dt.date(2024, 1, 2), 2]])
+    assert day.to_vega_lite()["encoding"]["x"]["type"] == "temporal"
+
+
+def test_with_an_aggregate_plan_a_plain_number_column_is_a_dimension():
+    plan = PlanModel(select_items=[
+        SelectItem(expr=_col("name"), alias="name"),
+        SelectItem(expr=_col("customer_id"), alias="customer_id"),
+        SelectItem(expr=_func("COUNT", aggregate=True), alias="orders")])
+    rows = [["a", 1, 5], ["b", 2, 3]]
+    kinds = {"name": "text", "customer_id": "number", "orders": "number"}
+    assert _draw(["name", "customer_id", "orders"], kinds, rows, plan=plan).kind == "table"
+    # without a plan every number is a measure, as before
+    assert _draw(["name", "customer_id", "orders"], kinds, rows).kind == "bar"
+
+
+def test_a_takeaway_keeps_the_case_of_a_data_value():
+    spec = _draw(["brand", "sales"], {"brand": "text", "sales": "number"}, [["iPhone", 50], ["android", 30]])
+    assert spec.takeaway.startswith("iPhone has the highest sales: 50")
+    assert _draw(["total"], {"total": "number"}, [[5]]).takeaway == "Total: 5."

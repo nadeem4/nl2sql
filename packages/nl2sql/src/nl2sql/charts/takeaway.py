@@ -18,7 +18,9 @@ def number(value: Any) -> str:
 
 
 def _sentence(text: str) -> str:
-    return text[:1].upper() + text[1:] + "."
+    """``text`` as a sentence. It is not re-cased: it may open with a data value ("iPhone"), and the other
+    templates open with a humanised column title, already capitalised."""
+    return text + "."
 
 
 def _numeric(value: Any) -> bool:

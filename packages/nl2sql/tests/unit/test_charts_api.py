@@ -14,6 +14,7 @@ from nl2sql.chat_tools import ToolContext, ToolNotApplicable
 from nl2sql.chat_tools.chart import ChartArgs, ChartTool
 from nl2sql.conversations.models import Conversation, ToolCall, ToolStep, Turn
 from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.execution.artifacts.results import ResultManifest
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, GroupByItem, PlanModel, SelectItem
@@ -207,3 +208,47 @@ def test_chart_tool_says_when_the_results_have_expired(store):
     context = _context(_turn(1, _ask(result)), engine=_engine(store))
     with pytest.raises(ToolNotApplicable, match="no longer"):
         ChartTool()(context, ChartArgs())
+
+
+# ---------------------------------------------------------------- review fixes
+
+def test_withheld_result_is_not_charted(store):
+    """A run a hook withheld has an empty ``result_manifest`` though its files are on disk: no chart."""
+    update = _run(store, MONTHS)
+    engine = _engine(store)
+    with pytest.raises(ResultNotFound):
+        engine.results.chart(QueryResult(trace_id="run-1", result_manifest=[]))
+    kept = update["aggregator_response"].results
+    with pytest.raises(ResultNotFound):
+        engine.results.chart(QueryResult(trace_id="run-1", result_manifest=kept), "other")
+    assert engine.results.chart(QueryResult(trace_id="run-1", result_manifest=kept), "combine_g1").kind == "line"
+
+
+def test_chart_tool_does_not_chart_a_withheld_run(store):
+    _run(store, MONTHS)
+    context = _context(_turn(1, _ask(QueryResult(trace_id="run-1", result_manifest=[]))), engine=_engine(store))
+    with pytest.raises(ToolNotApplicable):
+        ChartTool()(context, ChartArgs())
+
+
+def test_chart_tool_reads_the_conversations_tenant(store):
+    update = _run(store, MONTHS, tenant="t2")
+    result = _query_result([SubQueryResult(id="sq1")], update["aggregator_response"].results)
+    engine = _engine(store, tenant="t1")  # the engine's default tenant is not the conversation's
+    now = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
+    conversation = Conversation(id="c1", title="t", created_at=now, updated_at=now, tenant_id="t2",
+                                turns=[_turn(1, _ask(result))])
+    assert ChartTool()(ToolContext(conversation=conversation, user=USER, engine=engine), ChartArgs()).body["kind"] == "line"
+    # without a tenant on the conversation, the caller's own is used
+    bare = conversation.model_copy(update={"tenant_id": None})
+    caller = UserContext(user_id="u", roles=["admin"], tenant_id="t2")
+    assert ChartTool()(ToolContext(conversation=bare, user=caller, engine=engine), ChartArgs()).body["kind"] == "line"
+
+
+def test_a_result_cut_upstream_is_a_truncated_chart(store):
+    update = _run(store, MONTHS)
+    (summary,) = update["aggregator_response"].results
+    cut = summary.model_copy(update={"truncated": True})
+    store.write_manifest("t1", "run-1", ResultManifest(request_id="run-1", results=[cut]))
+    spec = _engine(store).results.chart(QueryResult(trace_id="run-1", result_manifest=[cut]))
+    assert spec.data.truncated is True and spec.kind == "table"

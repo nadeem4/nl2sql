@@ -36,6 +36,9 @@ def _refine(columns: List[str], kinds: Dict[str, ColumnKind],
     sums: Set[str] = set()
     if plan is None:
         return kinds, measures, sums
+    # In a plan that aggregates, a plain column that is not grouped on is a dimension (an id, a name), not a measure.
+    aggregated = any(i.expr.is_aggregate or (i.expr.kind == "func" and (i.expr.func_name or "").upper() in AGGREGATE_FUNCTIONS)
+                     for i in plan.select_items)
     grouped = [item.expr.model_dump() for item in plan.group_by]
     for item in plan.select_items:
         expr = item.expr
@@ -53,7 +56,7 @@ def _refine(columns: List[str], kinds: Dict[str, ColumnKind],
                 measures.add(name)
                 if func in _SUMS:
                     sums.add(name)
-        elif is_grouped:
+        elif is_grouped or (aggregated and expr.kind == "column"):
             measures.discard(name)
     return kinds, measures, sums
 
@@ -74,15 +77,16 @@ def _sorted(rows: List[List[Any]], index: int, descending: bool = False) -> List
 
 def choose(*, columns: List[str], kinds: Dict[str, ColumnKind], rows: List[List[Any]], row_count: int,
            title: str, trace_id: str, result_id: str, settings: ChartSettings,
-           plan: Optional[PlanModel] = None, kind: Optional[str] = None) -> ChartSpec:
+           plan: Optional[PlanModel] = None, kind: Optional[str] = None, cut: bool = False) -> ChartSpec:
     """The chart for ``rows`` (at most ``settings.max_points``, the first rows of a result of ``row_count``).
 
+    ``cut`` says the result was cut at the datasource row limit: it counts as truncated, like a ``max_points`` cut.
     ``kind`` forces one the data can draw, else ``ValueError`` names the ones it can.
     """
     kinds, measures, sums = _refine(columns, kinds, plan)
     dims = [c for c in columns if c not in measures]
     ms = [c for c in columns if c in measures]
-    truncated = row_count > len(rows)
+    truncated = cut or row_count > len(rows)
     n = len(rows)
     index = {c: i for i, c in enumerate(columns)}
     drafts: Dict[str, Dict[str, Any]] = {}

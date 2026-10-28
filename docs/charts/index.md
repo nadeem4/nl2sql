@@ -27,7 +27,8 @@ The artifact writer records each column's kind in the run's manifest from the sa
 integer, decimal and float are `number`; date, time and timestamp `temporal`; string `text`; bool
 `boolean`; anything else `other`. When the run had one sub-query, its plan refines them: a
 `DATE_TRUNC` select item is `temporal`, a grouped `DATE_PART('year', x)` is `temporal` (a year axis),
-an aggregate is a measure and a number that is grouped on is a dimension. With several sub-queries or
+an aggregate is a measure, and a number that is grouped on is a dimension. In a plan that has an aggregate,
+a plain column that is not grouped on (an id) is a dimension too. With several sub-queries or
 no plan, every `number` is a measure and everything else a dimension.
 
 ## The five rules
@@ -42,8 +43,8 @@ First match wins.
 | 4 | One text or boolean dimension, one to three measures, two to `max_categories` rows | `bar`, in the plan's order if it ordered, else by the first measure descending |
 | 5 | Anything else | `table` |
 
-At most `max_points` rows are read. When the result has more, `data.truncated` is true and the chart
-is a table, so no point is dropped silently. `kind=` forces a kind the data can draw; any other is a
+At most `max_points` rows are read. When the result has more, or was cut at the datasource row limit
+(`ResultSummary.truncated`), `data.truncated` is true and the chart is a table, so no point is dropped silently. `kind=` forces a kind the data can draw; any other is a
 `ValueError` naming the ones it can.
 
 ## Takeaways
@@ -51,7 +52,7 @@ is a table, so no point is dropped silently. `kind=` forces a kind the data can 
 | Chart | Sentence |
 |---|---|
 | `line` | "Revenue went from 100 in 2024-01-01 to 150 in 2024-03-01 (+50%)." For a series, the one with the largest last value. No change is given when an end is null or the start is zero. |
-| `bar` | "Books has the highest sales: 50." After a `SUM` or `COUNT` with no negative value: "..., 50% of the total shown." |
+| `bar` | "Books has the highest sales: 50." (the category is written as the data has it) After a `SUM` or `COUNT` with no negative value: "..., 50% of the total shown." |
 | `big_number` | "Total: 1,234.5." |
 | `table` | none |
 
@@ -60,7 +61,7 @@ Numbers have thousands separators and at most three digits after the point.
 ## Vega-Lite
 
 `to_vega_lite()` returns a Vega-Lite v5 spec with the rows inline (`data.values`): a `line` or `bar`
-mark, a temporal, ordinal (whole-number years) or nominal `x`, a quantitative `y`, several measures
+mark, a temporal, ordinal (whole-number years, times of day) or nominal `x`, a quantitative `y`, several measures
 folded with a `fold` transform and told apart by a `color` field, and a `color` field for `series`.
 It sets no colour, scheme, font or size: the renderer's theme decides.
 

@@ -24,10 +24,12 @@ def _json(value: Any) -> Any:
 
 def _type(encoding: Encoding, spec: ChartSpec) -> str:
     if encoding.kind == "temporal":
-        # A year axis (DATE_PART) is whole numbers; Vega-Lite would read them as epoch milliseconds.
+        # A year axis (DATE_PART) is whole numbers, which Vega-Lite would read as epoch milliseconds, and a
+        # time of day ("01:00:00") is not a date it can parse: both are ordinal.
         index = spec.data.columns.index(encoding.field)
         first = next((row[index] for row in spec.data.rows if row[index] is not None), None)
-        return "ordinal" if isinstance(first, (int, float)) and not isinstance(first, bool) else "temporal"
+        whole = isinstance(first, (int, float)) and not isinstance(first, bool)
+        return "ordinal" if whole or isinstance(first, dt.time) else "temporal"
     return "quantitative" if encoding.kind == "number" else "nominal"
 
 

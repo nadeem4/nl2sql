@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Iterator, Optional, Union
 from nl2sql.charts.spec import ChartSpec
 from nl2sql.execution.artifacts.results import (
     DEFAULT_RESULT_PAGE_SIZE,
+    ResultNotFound,
     ResultManifest,
     ResultPage,
     ResultReader,
@@ -99,16 +100,23 @@ class ResultsAPI:
         """
         from nl2sql.charts.choose import choose
 
-        trace_id, plan, title = (result, None, "Result") if isinstance(result, str) else (
-            result.trace_id, _single_plan(result), _single_intent(result))
         reader = self._reader(tenant_id)
-        saved = reader.manifest(trace_id).results
+        if isinstance(result, str):
+            trace_id, plan, title = result, None, "Result"
+            saved = [r.node_id for r in reader.manifest(trace_id).results]
+        else:
+            # A run a hook withheld has an empty `result_manifest` though its files are on disk: only the
+            # results the caller was given may be charted.
+            trace_id, plan, title = result.trace_id, _single_plan(result), _single_intent(result)
+            saved = [r.node_id for r in result.result_manifest]
+            if not saved or (result_id is not None and result_id not in saved):
+                raise ResultNotFound(f"No result '{result_id or ''}' for request '{trace_id}'.")
         if result_id is None and len(saved) > 1:
-            raise ValueError(f"Run '{trace_id}' saved several results; name one of: {', '.join(r.node_id for r in saved)}.")
-        wanted = result_id if result_id is not None else (saved[0].node_id if saved else "")
+            raise ValueError(f"Run '{trace_id}' saved several results; name one of: {', '.join(saved)}.")
+        wanted = result_id if result_id is not None else (saved[0] if saved else "")
         settings = self._ctx.settings.charts
         summary, rows = reader.head(trace_id, wanted, settings.max_points)
         return choose(columns=summary.columns, kinds=summary.column_kinds,
                       rows=[[float(v) if isinstance(v, Decimal) else v for v in row] for row in rows],
                       row_count=summary.row_count, title=title, trace_id=trace_id, result_id=summary.node_id,
-                      settings=settings, plan=plan, kind=kind)
+                      settings=settings, plan=plan, kind=kind, cut=summary.truncated)
