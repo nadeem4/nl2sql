@@ -1694,14 +1694,22 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
 
     - A node's label is `schema.table` (or the table alone); the datasource is the `subgraph` title when there
       are several, not part of every label. A join with no plain column equality is an unlabelled edge.
-    - A verified query's SQL is parsed with sqlglot's generic dialect, since a pure function has no adapter: SQL
-      that does not parse gives the empty diagram (`No tables`), never an error.
+    - A verified query's SQL is read in the datasource adapter's dialect through `inspect_verified_sql`, as
+      `tables_read` does: `diagram_for(result, dialect_of=...)` stays a pure function and takes the lookup as an
+      argument (the tool passes the new `engine.datasources.dialect`, so no dialect name leaves the adapters).
+      Without `dialect_of`, or for a datasource it cannot name, sqlglot's generic dialect; SQL that does not
+      parse gives the empty diagram (`No tables`), never an error.
+    - Schema-view entities have generated ids (`e0`...) with the `schema.table` name as a quoted label, so names
+      that collapse to one identifier stay distinct. A reference resolves to `schema.table`, or a bare name only
+      when it is unambiguous (a foreign key also tries the referencing table's own schema); `tables=` keeps the
+      requested tables ahead of their neighbours when the cut bites.
     - `max_tables` is the `max_tables` argument of `schema_diagram` (default `MAX_TABLES = 30`), not a setting.
       `tables` that match no table the caller may see raise `ValueError` (the tool reports it as
       `TOOL_NOT_APPLICABLE`), so a denied table and a missing one answer alike.
     - Policies are table-level, so "denied columns" cannot arise: a column is drawn only if its table is.
     - Names are made safe rather than escaped: a label keeps `\w`, space and `. , : $ = -` inside quotes, an
-      identifier is `[A-Za-z0-9_]` and never starts with a word Mermaid reads (`style`, `click`, `classDef`...).
+      identifier (an attribute's type or name) is `[A-Za-z0-9_]` and never starts with a word Mermaid reads (`style`,
+      `click`, `classDef`, `PK`, `FK`, `UK`...) or a digit.
       A glossary join is drawn with its cardinality; an unknown cardinality is `}o--o{`.
     - Tests: `test_diagrams.py`; the stub test moves `diagram` out of its tables; `test_public_surface.py` lists
       `diagram_for`. The no-model-call boundary tests already cover `charts/` and the tools.

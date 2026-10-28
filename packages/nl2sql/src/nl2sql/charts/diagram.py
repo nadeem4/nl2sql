@@ -5,13 +5,13 @@ draws a schema view that ``datasources.schema`` has already cut to the caller's 
 no ``%%{init}`` line and no ``style``, ``classDef``, ``linkStyle`` or ``click``: the reader picks the theme.
 
 Every name that reaches the text is a database's or a model's, so none is trusted. A label keeps letters, digits and a few
-marks and is always quoted; an identifier is ASCII letters, digits and ``_`` and never starts with a word Mermaid reads; and neither can hold a newline, so a name
+marks and is always quoted; an attribute's identifier is ASCII letters, digits and ``_`` and never starts with a word Mermaid reads or a digit; a schema view's entity id is generated (``e0``); and no name can hold a newline, so a name
 cannot start a line of its own.
 """
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 if TYPE_CHECKING:
     from nl2sql.api.query_api import QueryResult
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 MAX_TABLES = 30
 _LABEL_MAX = 60
 # Words Mermaid reads at the start of a line.
-_RESERVED = {"style", "classdef", "class", "click", "linkstyle", "direction", "title", "subgraph", "end", "erdiagram",
+_RESERVED = {"pk", "fk", "uk", "style", "classdef", "class", "click", "linkstyle", "direction", "title", "subgraph", "end", "erdiagram",
              "flowchart", "graph", "acctitle", "accdescr", "callback", "link"}
 _LEFT_ROLES = {"left", "base", "primary"}
 _ER_LINK = {"one-to-one": "||--||", "one-to-many": "||--o{", "many-to-one": "}o--||", "many-to-many": "}o--o{",
@@ -35,7 +35,7 @@ def _label(value: Any) -> str:
 def _ident(value: Any) -> str:
     """A Mermaid identifier: ASCII letters, digits and ``_``, never one of the words Mermaid reads at a line's start."""
     text = re.sub(r"[^A-Za-z0-9_]", "_", str(value if value is not None else ""))[:_LABEL_MAX].strip("_") or "_"
-    return f"_{text}" if text.split("_")[0].lower() in _RESERVED else text
+    return f"_{text}" if text.split("_")[0].lower() in _RESERVED or text[0].isdigit() else text
 
 
 # ---------------------------------------------------------------- the answer view
@@ -56,9 +56,17 @@ def _equalities(expr: Optional[Dict[str, Any]], left: str, right: str) -> List[T
     return []
 
 
-def _sql_tables(sql: str) -> List[Tuple[Optional[str], str]]:
-    """The tables a verified query's SQL reads, as (schema, name); none if it does not parse."""
+def _sql_tables(sql: str, dialect: Optional[str] = None) -> List[Tuple[Optional[str], str]]:
+    """The tables a verified query's SQL reads, as (schema, name); none if it does not parse.
+
+    With ``dialect`` (the datasource adapter's), the SQL is read the way the verified-query checks read it
+    (``inspect_verified_sql``); without one, in sqlglot's generic dialect.
+    """
     try:
+        if dialect:
+            from nl2sql.config.curated import inspect_verified_sql
+
+            return [(schema or None, name) for schema, name in inspect_verified_sql(sql, dialect).tables]
         import sqlglot
         from sqlglot import exp
 
@@ -70,12 +78,16 @@ def _sql_tables(sql: str) -> List[Tuple[Optional[str], str]]:
         return []
 
 
-def diagram_for(result: "QueryResult") -> str:
+def diagram_for(result: "QueryResult", *, dialect_of: Optional[Callable[[str], str]] = None) -> str:
     """The tables ``result`` read, as a Mermaid ``flowchart LR``.
 
     One node per table, one edge per join labelled with its columns, and a ``subgraph`` per datasource when the
     answer read several, with the combine step's join keys between them. A verified query has no plan: its tables
     are read from its SQL and left unconnected. Only the result's plans are read, never its rows.
+
+    ``dialect_of`` maps a datasource id to its sqlglot dialect (``engine.datasources.dialect``); with it a verified
+    query's SQL is read in its own dialect (``TOP``, ``[dbo].[x]``, backticks), without it or for a datasource it
+    cannot name, in sqlglot's generic one.
     """
     nodes: Dict[Tuple[str, Optional[str], str], str] = {}
     members: Dict[str, List[str]] = {}
@@ -101,7 +113,13 @@ def diagram_for(result: "QueryResult") -> str:
                     pairs = _equalities(join.get("condition"), join["left_alias"], join["right_alias"])
                     edges.append((left, right, ", ".join(f"{a} = {b}" for a, b in pairs)))
         elif sub.sql:
-            for schema, name in _sql_tables(sub.sql):
+            dialect = None
+            if dialect_of is not None and sub.datasource_id:
+                try:
+                    dialect = dialect_of(sub.datasource_id)
+                except Exception:  # a datasource the engine no longer has: read the SQL generically
+                    dialect = None
+            for schema, name in _sql_tables(sub.sql, dialect):
                 node(datasource, schema, name)
 
     names = {key: (f"{key[1]}.{key[2]}" if key[1] else key[2]) for key in nodes}
@@ -137,9 +155,9 @@ def diagram_for(result: "QueryResult") -> str:
 # ---------------------------------------------------------------- the schema view
 
 def _parts(name: str) -> Tuple[str, str]:
-    """(table, column) of ``table.column`` or ``schema.table.column``; the table part is its last segment."""
+    """(table, column) of ``table.column`` or ``schema.table.column``, the table lower-cased and kept qualified."""
     table, _, column = name.strip().rpartition(".")
-    return table.rpartition(".")[2].lower(), column
+    return table.lower(), column
 
 
 def schema_diagram(view: Dict[str, Any], tables: Optional[Sequence[str]] = None, *, joins: Iterable[Any] = (),
@@ -155,30 +173,45 @@ def schema_diagram(view: Dict[str, Any], tables: Optional[Sequence[str]] = None,
         ValueError: ``tables`` names no table of the view.
     """
     schema_tables: List[Dict[str, Any]] = view.get("tables") or []
-    by_name: Dict[str, Dict[str, Any]] = {}
+    # An entity id is generated, so two names that look alike to Mermaid never share one; the name is its label.
+    ids = {id(t): f"e{i}" for i, t in enumerate(schema_tables)}
+    qualified: Dict[str, Dict[str, Any]] = {}
+    by_bare: Dict[str, List[Dict[str, Any]]] = {}
     for table in schema_tables:
-        by_name.setdefault(table["name"].lower(), table)
-    clashes = {n for n in (t["name"] for t in schema_tables) if sum(t["name"] == n for t in schema_tables) > 1}
+        qualified.setdefault(f"{table.get('schema')}.{table['name']}".lower(), table)
+        by_bare.setdefault(table["name"].lower(), []).append(table)
 
     def entity(table: Dict[str, Any]) -> str:
-        return _ident(f"{table.get('schema')}_{table['name']}" if table["name"] in clashes else table["name"])
+        return ids[id(table)]
+
+    def find(reference: str, schema: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """The table a reference names: ``schema.table`` exactly; a bare name only if one table has it, or if
+        ``schema`` (the referencing table's own) holds one."""
+        reference = reference.strip().lower()
+        if reference in qualified:
+            return qualified[reference]
+        candidates = by_bare.get(reference.rpartition(".")[2], []) if "." not in reference else []
+        if len(candidates) > 1 and schema is not None:
+            candidates = [t for t in candidates if str(t.get("schema")).lower() == str(schema).lower()]
+        return candidates[0] if len(candidates) == 1 else None
 
     # (referenced, referencing, link, label), over every table in the view.
     links: List[Tuple[str, str, str, str]] = []
     for table in schema_tables:
         for fk in table.get("foreign_keys") or []:
-            target = by_name.get(str(fk["references_table"]).lower())
+            target = find(str(fk["references_table"]), table.get("schema"))
             if target is not None:
                 label = f'{", ".join(fk["columns"])} = {", ".join(fk["references_columns"])}'
                 links.append((entity(target), entity(table), "||--o{", label))
     for join in joins:
         sides = [[_parts(n) for n in ([s] if isinstance(s, str) else s)] for s in (join.from_, join.to)]
-        source, target = (by_name.get(sides[0][0][0]), by_name.get(sides[1][0][0]))
+        source, target = (find(sides[0][0][0]), find(sides[1][0][0]))
         if source is not None and target is not None:
             label = f'{", ".join(c for _, c in sides[0])} = {", ".join(c for _, c in sides[1])}'
             links.append((entity(source), entity(target), _ER_LINK.get(join.cardinality, _ER_LINK["unknown"]), label))
 
     chosen = list(schema_tables)
+    asked: Set[str] = set()
     if tables:
         wanted = {t.strip().lower() for t in tables}
         asked = {entity(t) for t in schema_tables
@@ -192,13 +225,15 @@ def schema_diagram(view: Dict[str, Any], tables: Optional[Sequence[str]] = None,
         if a in degree and b in degree:
             degree[a] += 1
             degree[b] += 1
-    kept = sorted(chosen, key=lambda t: (-degree[entity(t)], t["name"]))[:max_tables]
+    # The tables asked for come first, then the rest by relationships.
+    kept = sorted(chosen, key=lambda t: (entity(t) not in asked, -degree[entity(t)], t["name"]))[:max_tables]
     drawn = {entity(t) for t in kept}
 
     lines = ["erDiagram"]
-    for table in sorted(kept, key=lambda t: t["name"]):
+    for table in sorted(kept, key=lambda t: (t["name"], str(t.get("schema")))):
         foreign = {c for fk in table.get("foreign_keys") or [] for c in fk["columns"]}
-        lines.append(f"    {entity(table)} {{")
+        name = f"{table['schema']}.{table['name']}" if table.get("schema") else table["name"]
+        lines.append(f'    {entity(table)}["{_label(name)}"] {{')
         for column in table.get("columns") or []:
             keys = [k for k, on in (("PK", column.get("primary_key")), ("FK", column["name"] in foreign)) if on]
             if keys:

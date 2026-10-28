@@ -146,6 +146,10 @@ class DatasourcesAPI:
 
         return scan(self._ctx.registry, Path(folder), url=url, ports=ports, skip=self._ctx.config.storage.path)
 
+    def dialect(self, datasource_id: str) -> str:
+        """The sqlglot dialect name of the datasource's adapter (``postgres``, ``tsql``...); raises for a datasource the engine does not have."""
+        return self._ctx.ds_registry.get_dialect(datasource_id)
+
     def diagram(self, datasource_id: str, *, user_context: UserContext, tables: Optional[List[str]] = None) -> str:
         """The datasource's tables and relationships ``user_context`` may see, as a Mermaid ``erDiagram``.
 

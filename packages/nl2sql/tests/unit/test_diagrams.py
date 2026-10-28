@@ -164,7 +164,8 @@ def test_the_schema_view_is_an_er_diagram_of_keys_and_relationships(tmp_path):
 
     assert text.splitlines()[0] == "erDiagram"
     assert re.search(r"INTEGER AlbumId PK", text) and re.search(r"INTEGER ArtistId FK", text)
-    assert re.search(r'Artist \|\|--o\{ Album : "ArtistId = ArtistId"', text)
+    ids = _entities(text)
+    assert f'{ids["main.Artist"]} ||--o{{ {ids["main.Album"]} : "ArtistId = ArtistId"' in text
     _no_directives(text)
 
 
@@ -176,7 +177,7 @@ def test_the_schema_view_requires_a_caller(tmp_path):
 def test_a_denied_table_and_its_relationships_are_not_drawn(tmp_path):
     text = _engine(_Context(tmp_path, snapshot=_snapshot())).datasources.diagram("chinook", user_context=VIEWER)
 
-    assert "Album" in text and "Artist" not in text
+    assert "main.Album" in _entities(text) and "Artist" not in text
 
 
 def test_a_caller_with_no_role_sees_an_empty_diagram(tmp_path):
@@ -192,7 +193,8 @@ def test_a_glossary_join_is_a_relationship_too(tmp_path):
 
     text = _engine(ctx).datasources.diagram("chinook", user_context=ADMIN)
 
-    assert 'Album }o--|| Artist : "AlbumId = ArtistId"' in text
+    ids = _entities(text)
+    assert f'{ids["main.Album"]} }}o--|| {ids["main.Artist"]} : "AlbumId = ArtistId"' in text
 
 
 def test_a_glossary_join_to_a_denied_table_is_not_drawn(tmp_path):
@@ -217,7 +219,7 @@ def test_tables_picks_those_and_their_neighbours():
 
     text = schema_diagram(view, tables=["a"])
 
-    assert "a {" in text and "b {" in text and "c {" not in text and "d {" not in text
+    assert set(_entities(text)) == {"main.a", "main.b"}
 
 
 def test_more_than_max_tables_is_cut_to_those_with_the_most_relationships_and_says_so():
@@ -227,7 +229,7 @@ def test_more_than_max_tables_is_cut_to_those_with_the_most_relationships_and_sa
 
     text = schema_diagram({"datasource_id": "d", "tables": tables}, max_tables=3)
 
-    assert text.count(" {") == 3 and "t3 {" in text
+    assert len(_entities(text)) == 3 and "main.t3" in _entities(text)
     assert "%% 3 more tables not shown" in text
 
 
@@ -251,11 +253,136 @@ def test_hostile_names_cannot_inject_a_directive_into_the_schema_view(name):
     assert "%%{" not in text and "<" not in text and text.count("\n") < 40
 
 
-def _table(name: str, *, column: str = "id", kind: str = "INTEGER", fk: str = "") -> Dict[str, Any]:
+def _table(name: str, *, column: str = "id", kind: str = "INTEGER", fk: str = "", schema: str = "main",
+           primary_key: bool = True) -> Dict[str, Any]:
     keys = [{"columns": [column], "references_table": fk, "references_columns": [column]}] if fk else []
-    return {"name": name, "schema": "main", "row_count": None, "description": "",
-            "columns": [{"name": column, "type": kind, "nullable": False, "primary_key": True, "description": ""}],
+    return {"name": name, "schema": schema, "row_count": None, "description": "",
+            "columns": [{"name": column, "type": kind, "nullable": False, "primary_key": primary_key, "description": ""}],
             "foreign_keys": keys}
+
+
+def _entities(text: str) -> Dict[str, str]:
+    """label -> entity id, from the ``e0["main.orders"] {`` lines of an erDiagram."""
+    return {label: ident for ident, label in re.findall(r'^\s*(\w+)\["([^"]*)"\] \{$', text, re.M)}
+
+
+def _links(text: str) -> List[tuple]:
+    """(left label, right label) of each relationship line of an erDiagram."""
+    ids = {ident: label for label, ident in _entities(text).items()}
+    return [(ids[a], ids[b]) for a, b in re.findall(r"^\s*(\w+) [|}o{-]+ (\w+) :", text, re.M)]
+
+
+def test_tables_whose_names_collapse_to_the_same_identifier_stay_distinct():
+    names = ["order-items", "order_items", "订单", "订单2", "1st"]
+    view = {"datasource_id": "d", "tables": [_table(n) for n in names]}
+
+    text = schema_diagram(view)
+    entities = _entities(text)
+
+    assert set(entities) == {f"main.{n}" for n in names}
+    assert len(set(entities.values())) == len(names)
+    assert all(re.fullmatch(r"e\d+", ident) for ident in entities.values())
+
+
+def test_a_relationship_joins_the_entities_by_id_even_when_names_collapse():
+    view = {"datasource_id": "d", "tables": [_table("order-items", fk="order_items"), _table("order_items")]}
+
+    assert _links(schema_diagram(view)) == [("main.order_items", "main.order-items")]
+
+
+def test_diagram_structure():
+    # The answer view: header, one node line per table, quoted labels, balanced subgraph/end.
+    one, two = _plan([("o", "public", "orders"), ("c", None, "customers")], [_join("o", "c", ("a", "b"))]), _plan([("x", None, "x")])
+    answer = nl2sql.diagram_for(QueryResult(sub_queries=[_sub("sq1", "sales", one), _sub("sq2", "crm", two)]))
+    lines = _lines(answer)
+
+    assert lines[0] == "flowchart LR"
+    nodes = [line for line in lines if re.fullmatch(r't\d+\["[^"]*"\]', line)]
+    assert len(nodes) == 3
+    assert sum(line.startswith("subgraph") for line in lines) == sum(line == "end" for line in lines) == 2
+    assert all(re.fullmatch(r'subgraph g\d+\["[^"]*"\]', line) for line in lines if line.startswith("subgraph"))
+
+    # The schema view: header, one entity line per table, quoted labels.
+    view = {"datasource_id": "d", "tables": [_table("a", fk="b"), _table("b"), _table("c")]}
+    er = _lines(schema_diagram(view))
+
+    assert er[0] == "erDiagram"
+    assert len([line for line in er if re.fullmatch(r'e\d+\["[^"]*"\] \{', line)]) == 3
+    assert er.count("}") == 3
+
+
+@pytest.mark.parametrize("name", ["PK", "FK", "UK", "pk", "1col"])
+def test_a_column_named_like_a_key_marker_is_still_a_parseable_attribute(name):
+    text = schema_diagram({"datasource_id": "d", "tables": [_table("t", column=name)]})
+
+    [line] = [line for line in _lines(text) if line.endswith(" PK")]
+    type_, attribute, *keys = line.split()
+    assert keys == ["PK"] and attribute not in {"PK", "FK", "UK"} and not attribute[0].isdigit()
+
+
+def test_requested_tables_are_kept_before_their_neighbours_when_the_cut_bites():
+    def fks(*targets):
+        return [{"columns": ["id"], "references_table": t, "references_columns": ["id"]} for t in targets]
+
+    tables = [_table("r"), _table("n1"), _table("n2"), _table("n3")]
+    for table, targets in zip(tables, [("n1", "n2", "n3"), ("n2", "n3"), ("n3",), ("n1",)]):
+        table["foreign_keys"] = fks(*targets)
+
+    text = schema_diagram({"datasource_id": "d", "tables": tables}, tables=["r"], max_tables=2)
+
+    assert "main.r" in _entities(text) and len(_entities(text)) == 2
+
+
+def test_same_named_tables_in_different_schemas_link_to_the_right_one():
+    tables = [_table("orders", schema="a"), _table("orders", schema="b"), _table("items", schema="b", fk="orders")]
+    text = schema_diagram({"datasource_id": "d", "tables": tables})
+
+    assert _links(text) == [("b.orders", "b.items")]
+
+
+def test_a_qualified_glossary_join_picks_its_schema():
+    tables = [_table("orders", schema="a"), _table("orders", schema="b"), _table("items", schema="b")]
+    join = SimpleNamespace(from_="a.orders.id", to="b.items.oid", cardinality="one-to-many")
+
+    text = schema_diagram({"datasource_id": "d", "tables": tables}, joins=[join])
+
+    assert _links(text) == [("a.orders", "b.items")]
+
+
+# ---------------------------------------------------------------- verified SQL in the adapter's dialect
+
+@pytest.mark.parametrize("sql, dialect, label", [
+    ("SELECT TOP 5 * FROM [dbo].[orders] o", "tsql", "dbo.orders"),
+    ("SELECT * FROM `shop`.`orders` LIMIT 5", "mysql", "shop.orders"),
+])
+def test_verified_sql_is_read_in_the_datasources_dialect(sql, dialect, label):
+    result = QueryResult(sub_queries=[_sub("sq1", "shop", plan=None, sql=sql)])
+
+    text = nl2sql.diagram_for(result, dialect_of=lambda ds: {"shop": dialect}[ds])
+
+    assert f'["{label}"]' in text and "No tables" not in text
+
+
+def test_verified_sql_that_the_dialect_rejects_gives_the_empty_diagram():
+    result = QueryResult(sub_queries=[_sub("sq1", "shop", plan=None, sql="DROP TABLE orders")])
+
+    assert "No tables" in nl2sql.diagram_for(result, dialect_of=lambda ds: "postgres")
+
+
+def test_an_unknown_datasource_falls_back_to_the_generic_parse():
+    result = QueryResult(sub_queries=[_sub("sq1", "gone", plan=None, sql="SELECT * FROM orders")])
+
+    def dialect_of(ds):
+        raise KeyError(ds)
+
+    assert '["orders"]' in nl2sql.diagram_for(result, dialect_of=dialect_of)
+
+
+def test_the_facade_names_a_datasources_dialect(tmp_path):
+    ctx = _Context(tmp_path, snapshot=_snapshot())
+    ctx.ds_registry.get_dialect = lambda ds: "tsql"
+
+    assert _engine(ctx).datasources.dialect("chinook") == "tsql"
 
 
 # ---------------------------------------------------------------- the chat tool
@@ -272,6 +399,9 @@ def _ask_turn(index: int, result: QueryResult) -> Turn:
 class _Datasources:
     def __init__(self):
         self.calls: List[tuple] = []
+
+    def dialect(self, datasource_id):
+        return {"shop": "tsql"}[datasource_id]
 
     def diagram(self, datasource_id, *, user_context, tables=None):
         self.calls.append((datasource_id, user_context, tables))
@@ -291,6 +421,13 @@ def test_the_tool_draws_the_latest_answer_by_default():
     out = DiagramTool()(ctx, DiagramArgs())
 
     assert out.kind == "mermaid" and out.body.startswith("flowchart LR") and "orders" in out.body
+
+
+def test_the_tool_reads_verified_sql_in_the_datasources_dialect():
+    sub = _sub("sq1", "shop", plan=None, sql="SELECT TOP 1 * FROM [dbo].[orders]")
+    ctx, _ = _context(_conversation(_ask_turn(1, QueryResult(sub_queries=[sub]))))
+
+    assert '"dbo.orders"' in DiagramTool()(ctx, DiagramArgs()).body
 
 
 def test_the_tool_picks_a_turn_and_a_step():

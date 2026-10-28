@@ -51,7 +51,7 @@ class DiagramTool:
         if position >= len(asks):
             raise ToolNotApplicable(f"Turn {turn.index} has {len(asks)} answer(s); there is no step {args.step}.")
         step = asks[position]
-        return ToolOutput(kind="mermaid", title=step.question or "Tables read", body=diagram_for(step.result))
+        return ToolOutput(kind="mermaid", title=step.question or "Tables read", body=diagram_for(step.result, dialect_of=ctx.engine.datasources.dialect))
 
     @staticmethod
     def _schema(ctx: ToolContext, args: DiagramArgs) -> ToolOutput:
