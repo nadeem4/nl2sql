@@ -42,16 +42,17 @@ class StorageAPI:
         return info
 
     def purge(self) -> Dict[str, int]:
-        """Delete the traces, results and audit files older than their ``max_age_days``; return the counts.
+        """Delete the traces, results, conversations and audit files older than their ``max_age_days``; return the counts.
 
-        ``{"traces": 3, "results": 12, "proposals": 4, "audit": 1}``: traces deleted, result
+        ``{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "audit": 1}``: traces deleted, result
         files deleted (a run has its manifest and one file per saved result),
         and the audit observer's day files deleted. A store with no
         ``max_age_days`` keeps everything and is left out, and so is
         ``audit`` when the engine runs no ``audit`` observer. ``proposals``
         counts the decided proposals (accepted, rejected, superseded) of the
         review queue decided more than ``settings.review.max_age_days`` ago;
-        open ones are never purged.
+        open ones are never purged. ``conversations`` counts the conversations last updated more than
+        ``conversations.max_age_days`` ago (left out when that is null).
         ``nl2sql storage purge`` calls this, and ``nl2sql-api`` calls it at
         startup and once a day. It publishes ``retention.purged`` with the
         counts on the engine's bus, which the audit observer writes.
@@ -65,6 +66,9 @@ class StorageAPI:
                 counts[slot] = store.purge(now - timedelta(days=days))
         counts["proposals"] = self._ctx.state.purge_proposals(
             now - timedelta(days=self._ctx.settings.review.max_age_days))
+        days = self._ctx.config.conversations.max_age_days
+        if days is not None:
+            counts["conversations"] = self._ctx.state.purge_conversations(now - timedelta(days=days))
         audits = [o for o in getattr(self._ctx, "observers", ()) if isinstance(o, AuditObserver)]
         if audits:
             counts["audit"] = sum(audit.purge(now) for audit in audits)

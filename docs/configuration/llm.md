@@ -310,7 +310,7 @@ seeding and the conversation each have an agent. An agent not under `agents` run
 | `answer_synthesizer` | writes the final answer from the rows |
 | `profiler` | drafts table and column descriptions as proposals for review, never written into the index or the schema (optional; `nl2sql index` calls no model; only `nl2sql profile --draft` or `profile(draft=True)` runs it, under `profiler.max_cost_usd`, and its model must have a price in `llm.prices`) |
 | `eval_seeder` | drafts eval questions with typed plans during `nl2sql eval seed` ([Benchmark your own database](../evals/seeding.md)) |
-| `conversation` | leads a conversation turn: reads the history and either replies or calls a tool, one call per step (release 0.9, [Wave C](../architecture/wave_c.md); `engine.conversations` arrives with C1). A small model is enough. A config that pins every agent's model should add it. |
+| `conversation` | leads a conversation turn: reads the history and either replies or calls a tool, one call per step ([Conversations](../conversations/index.md)): it chooses a reply or the `ask` tool, never writes SQL and never sees rows. A small model is enough. A config that pins every agent's model should add it. |
 
 Any other key is an error with "did you mean". An agent takes every field it
 sets (`provider`, `model`, `temperature`, `api_key`, `base_url`,

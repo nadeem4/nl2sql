@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Callable, FrozenSet, Literal, Optional, S
 
 from pydantic import ValidationError
 
+from nl2sql.common.context import current_conversation_id
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
 from nl2sql.common.logger import get_logger
 from nl2sql.config.models import HookConfig, HookPoint
@@ -150,6 +151,7 @@ class HookRunner:
         the plan cache). ``Modify`` is the only way a hook changes anything.
         """
         rule = HOOK_POINTS[point]
+        fields = {"conversation_id": current_conversation_id.get(), **fields}
         attached = [binding for binding in self.bindings if point in binding.points]
         if not attached:
             # Nothing to ask: the values go on as given, unchecked.

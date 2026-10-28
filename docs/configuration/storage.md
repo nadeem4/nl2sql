@@ -87,10 +87,12 @@ results: { type: local, max_age_days: 2 }
 before that age, and the [audit observer's](observers.md#audit) day files older
 than its `max_age_days` (90 by default), and the
 [review queue's](review.md) decided proposals (accepted, rejected,
-superseded) decided more than `settings.review.max_age_days` (365) ago, and
-returns the counts, `{"traces": 3, "results": 12, "proposals": 4, "audit": 1}`
-(no `audit` when the engine runs no audit observer). Open proposals are never
-purged. It publishes the counts as the
+superseded) decided more than `settings.review.max_age_days` (365) ago, and the
+[conversations](../conversations/index.md#ownership-and-retention) last updated more than
+`conversations.max_age_days` (30) ago, and
+returns the counts, `{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "audit": 1}`
+(no `audit` when the engine runs no audit observer, no `conversations` when `max_age_days` is null). Open
+proposals are never purged. It publishes the counts as the
 [`retention.purged` event](../observability/events.md#the-catalog), which the
 audit observer writes. A
 plugin trace or results store is purged when it has a `max_age_days`
