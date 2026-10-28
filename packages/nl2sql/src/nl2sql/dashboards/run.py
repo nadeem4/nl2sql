@@ -165,7 +165,7 @@ class Refresher:
         return {tile.id: self._runner.run(tile, user, execute=False, draw=False) for tile in tiles}
 
     def run(self, dashboard: Dashboard, tiles: Sequence[Tile], user: UserContext, trigger: str,
-            approvals: Sequence[Approval] = ()) -> DashboardRun:
+            approvals: Sequence[Approval] = (), announce: bool = True) -> DashboardRun:
         """Refresh ``tiles`` in layout order as ``user``; call it under the lock. A chart that needs approval or
         fails keeps its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too."""
         runs: List[TileRun] = []
@@ -178,8 +178,14 @@ class Refresher:
                 stopped = run.status == "stopped"
             runs.append(run)
         self._store.put_runs(dashboard.id, [r for r in runs if r.status not in KEEPS_LAST])
-        counts = Counter(run.status for run in runs)
+        done = DashboardRun(dashboard_id=dashboard.id, at=datetime.now(timezone.utc), trigger=trigger, tiles=runs)
+        if announce:
+            self.announce(dashboard, done)
+        return done
+
+    def announce(self, dashboard: Dashboard, done: DashboardRun) -> None:
+        """Publish ``dashboard.refreshed`` for ``done``. ``run(..., announce=False)`` leaves it to the caller, who
+        may drop the dashboard before it is ever shown."""
         self._ctx.bus.publish("dashboard.refreshed", DashboardRefreshed(
-            dashboard_id=dashboard.id, trigger=trigger, counts=dict(counts), filters=[]),
-            tenant_id=dashboard.tenant_id or self._ctx.tenant_id)
-        return DashboardRun(dashboard_id=dashboard.id, at=datetime.now(timezone.utc), trigger=trigger, tiles=runs)
+            dashboard_id=dashboard.id, trigger=done.trigger, counts=dict(Counter(r.status for r in done.tiles)),
+            filters=[]), tenant_id=dashboard.tenant_id or self._ctx.tenant_id)

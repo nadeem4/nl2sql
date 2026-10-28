@@ -1862,7 +1862,9 @@ Not built yet.
       draft is deleted and `NoTiles` is raised; any error also deletes it. `tile.chart` stays `auto`.
     - **The access rule.** `generate` runs as the caller and reads only the tables the caller's scope allows
       (`test_a_denied_table_is_never_charted_and_never_run`, and the same on the demo databases for a narrower role).
-      A caller who reaches nothing gets `NoTiles` from `generate` and `[]` from `suggest_questions`.
+      A caller who reaches the datasource but no table in it gets `NoTiles` from `generate` and `[]` from
+      `suggest_questions`; a caller who cannot reach the datasource gets `NotIndexed`, as for a datasource never
+      indexed, and its snapshot is not read.
 
     Where the code and the design differ, the code won:
 
@@ -1876,12 +1878,15 @@ Not built yet.
       `scope.allows`, the merged glossary, `profiler.enum_max_distinct`, `charts.max_categories`) and
       `Dashboards.generate(source, ...)` and `suggest_questions(source, ...)` take it.
     - **A roles' kind guard.** A `money` or `quantity` role makes a measure only on a number column, and `date` a time
-      only on a temporal or text column, so a glossary role on a column the chart cannot use is ignored rather than
+      only on a temporal column, so a glossary role on a column the chart cannot use is ignored rather than
       failing at the database.
+    - **Events.** `dashboard.refreshed` is published only for a dashboard that is kept, not for a draft that is
+      deleted. `suggest_questions` with `n` below 1 is a `ValueError`. Every template plan is held to the validator
+      and generator for postgres, tsql and mysql (`test_every_template_plan_validates_and_renders_without_a_star`).
     - **The cap is a prefix.** `max_tiles` keeps the first charts in the order key totals, trends, top N,
       distributions; a chart that fails is skipped, not replaced by the next candidate.
-    - **"General" is made before the first run** (the draft needs a workspace), so a `generate` that ends in
-      `NoTiles` can leave an empty "General" behind.
+    - **"General" is made before the first run** (the draft needs a workspace); a `generate` that made it and then
+      keeps nothing deletes it again.
     - The filters are defined (`DashboardFilter`) and stored; applying their values is D2b's.
     - **For L3:** `engine.dashboards.suggest_questions(datasource_id, user_context=..., n=5)` (the question texts,
       nothing run, `NotIndexed` when the datasource has no index; its message names `nl2sql index --datasource <id>`).

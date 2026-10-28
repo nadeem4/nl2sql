@@ -87,7 +87,7 @@ def column_roles(source: Source) -> List[Table]:
                 f"{table_label(contract, snapshot)}.{column.name}") or proposed.get((contract.full_name, column.name))
             if role in ("money", "quantity") and kind == "number":
                 measures.append(col)
-            elif role == "date" and kind in ("temporal", "text"):
+            elif role == "date" and kind == "temporal":
                 times.append(col)
             elif role == "enum" or (role in (None, "text") and kind == "text"
                                     and 2 <= col.distinct <= source.max_categories):

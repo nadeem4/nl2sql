@@ -185,7 +185,8 @@ class DashboardsAPI:
         No model is called.
 
         Raises:
-            NotIndexed: the datasource has no index; the message names the command.
+            NotIndexed: the datasource has no index, or the caller cannot reach it (the same error, so the answer says
+                nothing about a datasource the caller may not see); the message names the command.
             NoTiles: the caller reaches no table, or no chart answered; the message says what is missing.
             WorkspaceNotFound: ``workspace_id`` is not one of the caller's.
             ValueError: ``max_tiles`` is below 1.
@@ -195,10 +196,11 @@ class DashboardsAPI:
 
     def suggest_questions(self, datasource_id: str, *, user_context: UserContext, n: int = 5) -> List[str]:
         """The questions of the first ``n`` charts ``generate`` would choose, without running them (nothing is
-        saved and no model is called). An empty list when the caller reaches no table.
+        saved and no model is called). An empty list when the caller reaches the datasource but no table in it.
 
         Raises:
-            NotIndexed: the datasource has no index; the message names the command.
+            NotIndexed: the datasource has no index, or the caller cannot reach it; the message names the command.
+            ValueError: ``n`` is below 1.
         """
         return self._service.suggest_questions(self._source(datasource_id, user_context), n=n)
 
@@ -207,18 +209,17 @@ class DashboardsAPI:
         if user_context is None:
             raise TypeError("user_context is required")
         ctx = self._ctx
-        snapshot = ctx.vector_store.snapshot(datasource_id)
+        scope = ctx.policy_engine.scope(user_context, datasource_id)
+        # A datasource the caller cannot reach answers as one that was never indexed, so the answer says nothing
+        # about it and its snapshot is not read.
+        snapshot = ctx.vector_store.snapshot(datasource_id) if scope.reaches_datasource() else None
         if snapshot is None:
             raise NotIndexed(f"'{datasource_id}' has no index yet. Index it first: nl2sql index --datasource {datasource_id}")
-        scope = ctx.policy_engine.scope(user_context, datasource_id)
         try:
             dialect: Optional[str] = ctx.ds_registry.get_dialect(datasource_id)
         except ValueError:  # unavailable: the types are read without a dialect
             dialect = None
-        return Source(datasource_id, snapshot, dialect, scope.allows if scope.reaches_datasource() else _nothing,
+        return Source(datasource_id, snapshot, dialect, scope.allows,
                       ctx.knowledge.get(datasource_id), ctx.config.settings.profiler.enum_max_distinct,
                       ctx.settings.charts.max_categories)
 
-
-def _nothing(schema: Optional[str], table: str) -> bool:
-    return False

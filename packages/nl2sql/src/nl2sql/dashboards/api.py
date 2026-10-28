@@ -13,7 +13,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from nl2sql.common.errors import NoTiles
+from nl2sql.common.errors import NoTiles, WorkspaceNotEmpty
 from nl2sql.conversations.store import Owner
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits
 from nl2sql.dashboards.layout import arrange
@@ -269,8 +269,10 @@ class Dashboards:
         if workspace_id is not None:
             self._store.workspace(workspace_id, owner)  # before anything runs
         chosen = self._chosen_templates(source, max_tiles)
+        had = {w.id for w in self._store.workspaces(owner)}
         workspace = self._store.workspace(workspace_id, owner) if workspace_id else self._workspaces.default(
             owner, user_context)
+        made = workspace.id not in had  # this call made "General": a call that keeps nothing takes it away again
         now = datetime.now(timezone.utc)
         by_id = {f"t{n}": c for n, c in enumerate(chosen, 1)}  # ids follow the order they were chosen in
         tiles = arrange([Tile(id=i, title=c.title, question=c.question, plan=c.plan, layout=_PLACE)
@@ -281,10 +283,15 @@ class Dashboards:
         self._store.put(draft)
         try:
             with self._refresher.locked(draft.id, len(tiles)):
-                dashboard, run = self._keep(draft, self._refresher.run(draft, draft.tiles, user_context, "generate"),
-                                            by_id)
+                dashboard, run = self._keep(draft, self._refresher.run(draft, draft.tiles, user_context, "generate",
+                                                                      announce=False), by_id)
         except BaseException:
             self._store.delete(draft.id)  # nothing half-made is left behind
+            if made:
+                try:
+                    self._workspaces.delete(workspace.id, user_context=user_context)
+                except WorkspaceNotEmpty:  # someone filed a dashboard there meanwhile
+                    pass
             raise
         self._ctx.bus.publish("dashboard.generated", DashboardGenerated(
             dashboard_id=dashboard.id, datasource_id=source.datasource_id, tiles=len(dashboard.tiles),
@@ -293,6 +300,8 @@ class Dashboards:
 
     def suggest_questions(self, source: Source, *, n: int = 5) -> List[str]:
         """The questions of the first ``n`` charts ``generate`` would choose. Nothing runs and nothing is saved."""
+        if n < 1:
+            raise ValueError("n must be at least 1.")
         try:
             return [c.question for c in self._chosen_templates(source, None)][:n]
         except NoTiles:
@@ -316,6 +325,7 @@ class Dashboards:
         if not kept:
             reasons = "; ".join(f"{s.title}: {s.reason}" for s in skipped)
             raise NoTiles(f"None of the {len(draft.tiles)} starter charts answered ({reasons}).")
+        self._refresher.announce(draft, ran)  # only a dashboard that is kept is announced
         self._store.drop_runs(draft.id, [r.tile_id for r in ran.tiles if r.status != "ok"])
         tiles_by_id = {t.id: t for t in draft.tiles}
         tiles = arrange([tiles_by_id[r.tile_id] for r in kept], {r.tile_id: r.chart.kind for r in kept if r.chart})

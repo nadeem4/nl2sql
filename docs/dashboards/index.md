@@ -170,8 +170,10 @@ dashboard**. With no measure there are only row counts and distributions. The si
 validator, the generator, the `execute.before` hooks such as the cost guard), with no model call. The ones whose
 first run is `ok` are kept; the rest are listed in `run.skipped` with their status and the reason, and leave no
 stored result. If none answered, `NoTiles` says why and nothing is saved. A datasource that was never indexed
-raises `NotIndexed` ("Index it first: `nl2sql index --datasource sales`"); a caller who reaches no table gets
-`NoTiles`.
+raises `NotIndexed` ("Index it first: `nl2sql index --datasource sales`"), and so does one you cannot reach
+(the same error, so it tells you nothing about it); a caller who reaches the datasource but no table gets `NoTiles`.
+If no chart is kept, a "General" workspace this call made is removed again. `suggest_questions` needs `n` of at
+least 1.
 
 **Where it lands.** The dashboard is saved, owned by you, in `workspace_id` or your "General" workspace (made on
 first use), titled "`<datasource>` overview" unless you pass `title`. It has a `between` filter on the time column

@@ -36,8 +36,11 @@ from nl2sql.testing.fake_llm import FakeLLMServer
 ANA = UserContext(user_id="ana", tenant_id="acme", roles=["analyst"])
 BOB = UserContext(user_id="bob", tenant_id="acme", roles=["analyst"])
 LIMITED = UserContext(user_id="lee", tenant_id="acme", roles=["limited"])
+NOTHING = UserContext(user_id="nia", tenant_id="acme", roles=["blind"])
 ROLES = {"analyst": {"description": "Reads", "allow": ["*"]},
-         "limited": {"description": "Reads orders only", "allow": ["ds1"], "deny": ["ds1.main.customers"]}}
+         "limited": {"description": "Reads orders only", "allow": ["ds1"], "deny": ["ds1.main.customers"]},
+         "blind": {"description": "Reaches ds1, no table", "allow": ["ds1"],
+                   "deny": ["ds1.main.customers", "ds1.main.orders"]}}
 
 
 # ------------------------------------------------------------------ a hand-built snapshot
@@ -283,9 +286,21 @@ def test_a_denied_table_is_never_charted_and_never_run(engine, runs):
     assert engine.dashboards.suggest_questions("ds1", user_context=LIMITED)[0] == "How many rows are in orders?"
 
 
-def test_a_caller_who_reaches_no_table_gets_nothing(engine, runs):
-    with pytest.raises(NoTiles, match="no table"):  # the limited role reaches only ds1
+def test_a_caller_who_cannot_reach_the_datasource_learns_nothing_about_it(engine, runs, monkeypatch):
+    read: List[str] = []
+    monkeypatch.setattr(Retriever, "snapshot", lambda self, datasource_id: read.append(datasource_id) or SNAPSHOT)
+
+    with pytest.raises(NotIndexed, match="nl2sql index --datasource other"):  # the limited role reaches only ds1
         engine.dashboards.generate("other", user_context=LIMITED)
+    with pytest.raises(NotIndexed, match="nl2sql index --datasource other"):
+        engine.dashboards.suggest_questions("other", user_context=LIMITED)
+
+    assert read == [] and runs.calls == [], "the snapshot was not even read"
+
+
+def test_a_caller_who_reaches_the_datasource_but_no_table_gets_nothing(engine, runs):
+    with pytest.raises(NoTiles, match="no table"):
+        engine.dashboards.generate("ds1", user_context=NOTHING)
     assert runs.calls == []
 
 
@@ -446,3 +461,92 @@ def test_the_generated_layout_follows_the_charts_that_were_drawn(engine, runs):
     assert big == [], "the canned chart is a bar: nothing was drawn as a big number"
     assert all(t.layout.w == 2 for t in dashboard.tiles)
     assert [(t.layout.x, t.layout.y) for t in dashboard.tiles][:3] == [(0, 0), (2, 0), (0, 2)]
+
+
+# ------------------------------------------------------------------ review fixes
+
+def test_a_generate_that_answers_nothing_leaves_no_workspace_it_made(engine, runs):
+    runs.respond = lambda call: failed()
+
+    with pytest.raises(NoTiles):
+        engine.dashboards.generate("ds1", user_context=ANA)
+
+    assert engine.workspaces.list(user_context=ANA) == []
+
+
+def test_a_generate_that_answers_nothing_keeps_a_workspace_that_was_there(engine, runs):
+    general = engine.workspaces.create("General", user_context=ANA)
+    runs.respond = lambda call: failed()
+
+    with pytest.raises(NoTiles):
+        engine.dashboards.generate("ds1", user_context=ANA)
+
+    assert [w.id for w in engine.workspaces.list(user_context=ANA)] == [general.id]
+
+
+def test_suggest_questions_wants_at_least_one(engine, runs):
+    for n in (0, -1):
+        with pytest.raises(ValueError, match="at least 1"):
+            engine.dashboards.suggest_questions("ds1", user_context=ANA, n=n)
+
+
+def test_a_draft_that_is_deleted_is_not_announced_as_refreshed(engine, runs):
+    seen: List[Any] = []
+    engine.events.subscribe(seen.append, names=["dashboard.refreshed", "dashboard.generated"])
+    runs.respond = lambda call: failed()
+
+    with pytest.raises(NoTiles):
+        engine.dashboards.generate("ds1", user_context=ANA)
+
+    assert seen == []
+
+
+def test_a_date_role_on_a_text_column_makes_no_trend(engine, runs, monkeypatch):
+    snapshot = snapshot_of(_table("orders", 1000, [
+        ("OrderId", "INTEGER", True, None), ("Revenue", "DECIMAL(10,2)", False, _stats(900)),
+        ("PlacedOn", "TEXT", False, _stats(300))]))
+    index(engine, monkeypatch, snapshot)
+    say(engine, monkeypatch, **{"orders.PlacedOn": "date"})
+
+    dashboard, _ = engine.dashboards.generate("ds1", user_context=ANA)
+
+    assert not any("by month" in q for q in questions(dashboard))
+
+
+# ------------------------------------------------------------------ every template renders
+
+@pytest.mark.parametrize("dialect", ["postgres", "tsql", "mysql"])
+def test_every_template_plan_validates_and_renders_without_a_star(dialect):
+    from types import SimpleNamespace
+
+    from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse
+    from nl2sql.pipeline.nodes.generator.node import GeneratorNode
+    from nl2sql.pipeline.nodes.schema_retriever.schema import Column, Table
+    from nl2sql.pipeline.nodes.validator.node import LogicalValidatorNode
+    from nl2sql.pipeline.state import SubgraphExecutionState
+    from nl2sql.testing.runtime import fake_runtime, stub_ds_registry
+    from nl2sql_sdk import Limits
+
+    from nl2sql.dashboards.roles import Source, column_roles
+    from nl2sql.dashboards.templates import candidates
+
+    source = Source("ds1", SNAPSHOT, dialect, lambda schema, table: True, DatasourceKnowledge(), 20, 12)
+    found = candidates("ds1", column_roles(source))
+    assert len(found) == 9
+    tables = [Table(name=c.table.table_name, columns=[Column(name=n, type=col.data_type)
+                                                      for n, col in c.columns.items()])
+              for c in SNAPSHOT.contract.tables.values()]
+    adapter = SimpleNamespace(get_dialect=lambda: dialect)
+    validator = LogicalValidatorNode(fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True}))
+    generator = GeneratorNode(fake_runtime(ds_registry=stub_ds_registry(adapter, limits=Limits(row_limit=1000))))
+    for candidate in found:
+        for sub_query_id, body in candidate.plan.plans.items():
+            state = SubgraphExecutionState(
+                trace_id="t", sub_query=DecomposerResponse.model_validate(candidate.plan.decomposition).sub_queries[0],
+                relevant_tables=tables, user_context=UserContext(roles=["admin"]),
+                ast_planner_response=ASTPlannerResponse(plan=PlanModel.model_validate(body)))
+            assert not validator(state).get("errors"), (candidate.title, validator(state)["errors"])
+            made = generator(state)
+            assert not made.get("errors"), (candidate.title, made["errors"])
+            sql = made["generator_response"].sql_draft
+            assert sql and '"*"' not in sql and "[*]" not in sql and "`*`" not in sql, (dialect, sql)
