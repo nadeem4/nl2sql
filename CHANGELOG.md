@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.8.0](https://github.com/nadeem4/nl2sql/compare/v0.7.0...v0.8.0) (2026-10-28)
+
+
+### Features
+
+* **adapters:** estimate (rows read) and probe_overlap (C1) ([#332](https://github.com/nadeem4/nl2sql/issues/332)) ([a9f9890](https://github.com/nadeem4/nl2sql/commit/a9f9890a2779d8c22b22db0d6e32a03ca5677e9e))
+* **clarify:** re-ask with a choice, save a pick, settled phrases (L2) ([#345](https://github.com/nadeem4/nl2sql/issues/345)) ([bf7e3b7](https://github.com/nadeem4/nl2sql/commit/bf7e3b715d0407458bafe900941872587c97085c))
+* **clarify:** the clarifier and the needs_clarification result (L1) ([#339](https://github.com/nadeem4/nl2sql/issues/339)) ([5498605](https://github.com/nadeem4/nl2sql/commit/549860530b394c400689fc5e8ed2cdbe2784dae6))
+* **explain:** why this answer, rendered from the typed plan (X1) ([#335](https://github.com/nadeem4/nl2sql/issues/335)) ([da43eba](https://github.com/nadeem4/nl2sql/commit/da43eba7c2cbff244154d6223819947d7c09466d))
+* **feedback:** corrections, a checked fix filed as a verified-query proposal (F1) ([#341](https://github.com/nadeem4/nl2sql/issues/341)) ([bfe1b10](https://github.com/nadeem4/nl2sql/commit/bfe1b108c27320ccc173df24ad91ea6e7c783fae))
+* **index:** glossary in the index, refresh, no model text (K3) ([#344](https://github.com/nadeem4/nl2sql/issues/344)) ([9e9a5b6](https://github.com/nadeem4/nl2sql/commit/9e9a5b60974b187ffc35fd01ff83ce75acdb5244))
+* **index:** scope the retrieval inspector by caller (B-K3b) ([#348](https://github.com/nadeem4/nl2sql/issues/348)) ([bbba233](https://github.com/nadeem4/nl2sql/commit/bbba2330f78a05d189f6977c07f2c7c69653521d))
+* **knowledge:** knowledge in the prompts and PlannerAnswer (K2) ([#340](https://github.com/nadeem4/nl2sql/issues/340)) ([55aef12](https://github.com/nadeem4/nl2sql/commit/55aef1210261af25cd0355c08ec1dd468c0afc2a))
+* **knowledge:** knowledge sources, merge, scope filter, show and export (K1) ([#336](https://github.com/nadeem4/nl2sql/issues/336)) ([9092eac](https://github.com/nadeem4/nl2sql/commit/9092eacd277598c48656709d8761c69fa9e1792a))
+* **policies:** the cost rule, refuse or confirm before an expensive query runs (C2) ([#342](https://github.com/nadeem4/nl2sql/issues/342)) ([2c2bd00](https://github.com/nadeem4/nl2sql/commit/2c2bd00040b9ed394ed49023e1b914210ff4ee46))
+* **profiler:** drafted descriptions under a cost cap, filed for review (P2) ([#347](https://github.com/nadeem4/nl2sql/issues/347)) ([4bec3e1](https://github.com/nadeem4/nl2sql/commit/4bec3e1c278075bc9db9e1163ca36ab8b33563b3))
+* **profiler:** joins and column roles from bounded probes (P1) ([#343](https://github.com/nadeem4/nl2sql/issues/343)) ([916815a](https://github.com/nadeem4/nl2sql/commit/916815acecc7549bb1311e5fd882d3dfcb9cc0d2))
+* **review:** the review queue, accept as the only writer, thumbs-up proposals (Q1) ([#337](https://github.com/nadeem4/nl2sql/issues/337)) ([13567e7](https://github.com/nadeem4/nl2sql/commit/13567e7c41a1ae9fb636632f79db77afd5709063))
+* **wave-b:** the shared shapes for knowledge, review, profiler, clarify, explain and cost (B0) ([#329](https://github.com/nadeem4/nl2sql/issues/329)) ([1b56cd8](https://github.com/nadeem4/nl2sql/commit/1b56cd82345a957acd967429ae253fab2025ee7d))
+
+
+### Bug Fixes
+
+* **llm:** read the key from Bearer too, and stop aliasing on_llm_error ([#351](https://github.com/nadeem4/nl2sql/issues/351)) ([581c9dc](https://github.com/nadeem4/nl2sql/commit/581c9dc9246ef1cc9358e30bd6a2cf6d32b3ba01))
+
+
+### Documentation
+
+* **release:** notes for 0.8.0 ([#349](https://github.com/nadeem4/nl2sql/issues/349)) ([2292cca](https://github.com/nadeem4/nl2sql/commit/2292cca2c4db14a98433e841d2b31a61b946cfcd))
+
 ## [0.7.0](https://github.com/nadeem4/nl2sql/compare/v0.6.0...v0.7.0) (2026-10-15)
 
 

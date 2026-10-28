@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-sdk"
-version = "0.7.0" # x-release-please-version
+version = "0.8.0" # x-release-please-version
 description = "Interfaces for nl2sql extensions: adapters, secret providers, stores and policy checks"
 readme = "README.md"
 license = "MIT"
