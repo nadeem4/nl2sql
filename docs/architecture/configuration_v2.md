@@ -1543,6 +1543,21 @@ users, yanking it adds nothing.
       against the config's folder, as it does `storage.path`.
       `demo_config()` points at the packaged files instead.
 
+!!! note "Changed by Wave C (L2): `init_project` calls `write_project`"
+    `init_project` builds its `Config` (the demo's, or `starter_config(...)` plus
+    the example datasource) and writes it with `nl2sql.config.write_project(config,
+    folder, env_file=False, extra=...)`, which writes any data `Config` in the
+    same layout, never overwrites a file, and loads what it wrote.
+    `init_project(force=True)` deletes the files it would write, then calls it.
+    The files are the ones written above; a section left at its default is
+    still left out, and `settings.yaml` of the demo now carries a generic
+    header comment. `write_project` also writes every secret as a reference
+    (`${env:NL2SQL_...}` with the value in `.env` where the caller allows it, else
+    `SecretValueInConfig`), which `init` never needs, as it writes no key. See
+    [Saving a datasource](../configuration/datasources.md#saving-a-datasource).
+    `datasources` sections the loader reads from a folder also record each file's
+    SHA-256 (`Config.datasource_file_hash`), for `engine.datasources.save`.
+
 | Change | Detail |
 |---|---|
 | **One global `--config PATH`** | On the app callback, before the subcommand: `nl2sql --config prod/nl2sql.yaml index`. Without it, `NL2SQL_CONFIG`, then `./nl2sql.yaml`. |

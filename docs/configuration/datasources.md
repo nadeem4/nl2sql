@@ -216,12 +216,66 @@ datasource as `UNAVAILABLE`.
 
 A secret provider that cannot start is different: it fails startup. See [Secrets → When a provider fails to start](secrets.md#when-a-provider-fails-to-start).
 
+## Saving a datasource
+
+`engine.datasources.add(...)` changes the running engine only. To keep a datasource, save it:
+
+```python
+engine.datasources.add(Datasource(id="sales", type="postgres", connection={"host": "db.internal",
+                                  "database": "sales", "user": "app", "password": "${env:SALES_DB_PASSWORD}"}))
+engine.datasources.save("sales", by=admin)          # -> <folder>/datasources/sales.yaml
+```
+
+`save` writes that one datasource as `datasources/<id>.yaml` beside the `nl2sql.yaml` the engine was loaded
+from, and nothing else. It needs:
+
+- an admin `by` (`policies.admin_roles`; under `allow_all` any caller) - a caller without one gets `PermissionError`;
+- an engine loaded from a `nl2sql.yaml` whose `datasources` section is a folder (`datasources: { file: datasources/ }`,
+  one `<id>.yaml` each, as `nl2sql init` writes it). An engine built in code, or with the datasources inline in
+  `nl2sql.yaml`, raises `ValueError`.
+
+**The file is checked before it is replaced.** The engine records each datasource file's SHA-256 when it loads the
+config, as an accept does for the glossary. If the file changed on disk since (somebody edited it), `save` raises
+`ReviewError` with code `FILE_CHANGED` and the fix "reload the engine", and writes nothing. A datasource that is
+new to the engine must not have a file yet. The file is written to a temporary file beside it and renamed; it
+publishes `datasource.saved` (audited), and never connects to the database or calls a model.
+
+**A secret is never written into YAML.** Every secret field is written as a reference:
+
+| Its value | Written as |
+|---|---|
+| A reference (`${env:VAR}`, `${vault:path}`) | The reference, unchanged |
+| A literal, with `save(..., env_file=True)` | `${env:NL2SQL_<ID>_<KEY>}` in the YAML and `NL2SQL_<ID>_<KEY>=value` in the `.env` beside `nl2sql.yaml` |
+| A literal, otherwise | Refused: `SecretValueInConfig` naming the field, with the fix "pass `${env:VAR}` or a secret provider reference" |
+
+A connection field is a secret when its key says so (`password`, `secret`, `token`, `api_key`) or its connection model
+declares it a `SecretStr`. The name is `NL2SQL_` plus the datasource id and the key in upper case, every character
+that is not a letter or digit as `_`: `NL2SQL_SALES_PASSWORD`. Two fields that map to one name, or a name another
+datasource's reference already uses, are refused with both fields named: a value is never overwritten.
+`.env` keeps every other line, is created when needed, and `.gitignore` is made to list it. Nothing is read from
+or written to `os.environ`: the entry points load the `.env` (`nl2sql.load_env_file`), and it never overrides a
+variable that is already set.
+
+The same rules write a whole new project: `nl2sql.config.write_project(config, folder, env_file=False)` writes
+any data `Config` as `nl2sql init` lays it out (a file per section, `datasources/<id>.yaml`, `knowledge.yaml` and
+an empty `glossary.yaml`), with the secrets of the `llm`, `embeddings` and `secrets` sections and of every
+connection handled as above (`NL2SQL_LLM_API_KEY`, `NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY`,
+`NL2SQL_EMBEDDINGS_API_KEY`, `NL2SQL_SECRETS_VAULT_TOKEN`). It never overwrites a file, refuses a section that holds
+an object instead of data (an adapter, store, hook or chat model object) and loads what it wrote before it returns.
+`nl2sql.config.starter_config(llm=..., path=...)` is a config with no datasources, `allow_all` policies, local
+embeddings and a `yaml` knowledge source; `nl2sql.config.write_env_values(folder, values)` writes the `.env`.
+
+Over REST, `POST /api/v1/datasource` with `"save": true` calls the same method; see
+[Datasource API](../api/rest/datasource.md).
+
 ## Notes
 
 - Use `${env:VAR}` for environment variables, or `${provider:key}` for a secret
   from a provider in the [`secrets` section](secrets.md).
 - The keys under `connection` are the adapter's; see [Connection](#connection).
 - From Python, `engine.datasources.add(Datasource(...))` adds one to a running
-  engine (built, not connected), and `engine.datasources.remove(id)` takes one
+  engine (built, not connected), `engine.datasources.save(id, by=admin)` writes it to `datasources/<id>.yaml`
+  ([Saving a datasource](#saving-a-datasource)), and `engine.datasources.remove(id)` takes one
   out; `nl2sql-api`'s `POST /api/v1/datasource` takes
-  the same shape as JSON.
+  the same shape as JSON, and `POST /api/v1/datasource/test` and `GET /api/v1/datasource-types` are the Connect a
+  database form's other two calls.

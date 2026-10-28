@@ -134,6 +134,18 @@ async def require_admin(request: Request, engine: NL2SQL = Depends(get_engine)) 
     return user_context
 
 
+def is_fresh_local_install(request: Request, engine: NL2SQL) -> bool:
+    """Whether this is the fresh local install: no role source is configured and the client is on loopback.
+
+    That is the one case ``require_admin`` lets through without a role, and the one case where a secret
+    typed into a Connect form may be written to the ``.env`` beside ``nl2sql.yaml`` (D122). Anywhere else a
+    literal secret is refused and the form must send a ``${env:...}`` reference.
+    """
+    if _role_source_configured(engine.config.api):
+        return False
+    return _is_loopback(request.client.host if request.client else "")
+
+
 ADMIN_RESPONSES = {
     401: {"description": "No role for this request (see the auth settings)."},
     403: {"description": "The request has no role listed in policies.admin_roles, or no role source "

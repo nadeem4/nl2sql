@@ -1,21 +1,23 @@
-"""A new config folder (``init_project``) and the demo's config (``demo_config``).
+"""A new config folder (``write_project``, ``init_project``), the starter's config (``starter_config``) and the demo's
+config (``demo_config``).
 
-``nl2sql init`` calls ``init_project``; ``NL2SQL.demo()`` builds on
-``demo_config``. ``init_project(demo=True)`` writes ``demo_config`` out as
-files, so the two cannot drift apart. See
-docs/architecture/configuration_v2.md, section 10.
+``write_project`` writes any data ``Config`` as the split layout ``nl2sql init`` has always written: ``nl2sql.yaml``
+and one file per section, ``datasources/<id>.yaml``, ``knowledge.yaml`` and a ``glossary.yaml`` for the ``yaml``
+knowledge source. ``init_project`` builds the config and calls it; so will ``nl2sql launch``. ``NL2SQL.demo()``
+builds on ``demo_config``, and ``init_project(demo=True)`` writes ``demo_config`` out as files, so the two cannot
+drift apart. See docs/architecture/configuration_v2.md, section 10, and docs/architecture/wave_c.md, section 7.
 
-No key is ever written: ``llm.yaml`` names none, and the provider's standard
-variable is the fallback.
+A secret is never written into YAML (``nl2sql.config.writer``): ``init_project`` writes none, and the provider's
+standard variable is the fallback.
 """
 from __future__ import annotations
 
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-import yaml
+from pydantic import BaseModel
 
 from nl2sql.config.loader import load_config
 from nl2sql.config.models import (
@@ -33,6 +35,18 @@ from nl2sql.config.models import (
     Storage,
     TraceSettings,
 )
+from nl2sql.config.writer import (
+    EnvSecrets,
+    check_file_name,
+    datasource_data,
+    dump_model,
+    dump_yaml,
+    embeddings_data,
+    llm_data,
+    secrets_data,
+    update_gitignore,
+    write_env_values,
+)
 
 PathLike = Union[str, "os.PathLike[str]"]
 
@@ -42,8 +56,10 @@ DATA_FOLDER = "data"
 EVALS_FOLDER = "evals"
 # The suites the package ships; found by path, so building the demo's config loads no evaluation code.
 PACKAGED_SUITES = Path(__file__).resolve().parents[1] / "evaluation" / "suites"
-GITIGNORE_LINES = (f"{STORAGE_PATH}/", ".env")
 GLOSSARY_FILE = "glossary.yaml"
+# The sections beyond the six every project has: written when the config sets them.
+OPTIONAL_SECTIONS = ("curated", "secrets", "settings", "api", "observers", "hooks", "evals", "conversations",
+                     "chat_tools", "dashboards", "mcp")
 
 
 def default_llm(provider: str) -> LLM:
@@ -124,67 +140,168 @@ def init_project(
     are copied into ``data/``, the eval suites into ``evals/`` and the demo glossary into ``glossary.yaml``;
     otherwise ``glossary.yaml`` holds one empty block for the example datasource. Either way
     ``knowledge.yaml`` names it as the one ``yaml`` knowledge source. A file that already exists is an error
-    naming it, and nothing is written, unless ``force`` is set. ``.gitignore`` is
-    never overwritten: the lines it is missing are added.
+    naming it, and nothing is written, unless ``force`` is set: it deletes the files it would write first.
+    ``.gitignore`` is never overwritten: the lines it is missing are added.
     """
     folder = Path(folder)
     llm = default_llm(provider)
-    files: Dict[str, str] = {}
-    copies: Dict[str, Path] = {}
-
-    sections = ["datasources", "llm", "embeddings", "policies", "storage", "knowledge",
-                *(["curated", "settings", "evals"] if demo else [])]
-    files["nl2sql.yaml"] = TOC_HEADER + "version: 2\n" + "".join(
-        f"{section + ':':<13}{{ file: {_section_file(section)} }}\n" for section in sections)
-    files["llm.yaml"] = _llm_file(llm)
-    files["embeddings.yaml"] = EMBEDDINGS_HEADER + _dump({"provider": "local"})
-    files["storage.yaml"] = STORAGE_HEADER + _dump({"path": STORAGE_PATH})
-    files["knowledge.yaml"] = KNOWLEDGE_HEADER + _dump([{"type": "yaml", "path": GLOSSARY_FILE}])
+    extra: Dict[str, Union[str, Path]]
     if demo:
         from nl2sql.datasets import DEMO_GLOSSARY_PATH
 
         config = demo_config(llm=llm, path=STORAGE_PATH, data_dir=DATA_FOLDER, evals_dir=EVALS_FOLDER,
                              glossary=GLOSSARY_FILE)
-        copies[GLOSSARY_FILE] = DEMO_GLOSSARY_PATH
-        for datasource in config.datasources:
-            files[f"datasources/{datasource.id}.yaml"] = _datasource_file(datasource)
-        for source in _packaged_databases():
-            copies[f"{DATA_FOLDER}/{source.name}"] = source
-        for suite in sorted(PACKAGED_SUITES.glob("*.yaml")):
-            copies[f"{EVALS_FOLDER}/{suite.name}"] = suite
-        files["evals.yaml"] = EVALS_HEADER + _dump(config.evals.model_dump(mode="json", exclude_defaults=True))
-        files["policies.yaml"] = _dump(config.policies.model_dump(mode="json", exclude_defaults=True))
-        files["curated.yaml"] = CURATED_HEADER + _dump(config.curated.model_dump(mode="json", exclude_defaults=True))
-        files["settings.yaml"] = DEMO_SETTINGS_HEADER + _dump(
-            config.settings.model_dump(mode="json", by_alias=True, exclude_defaults=True))
+        extra = {GLOSSARY_FILE: DEMO_GLOSSARY_PATH}
+        extra.update({f"{DATA_FOLDER}/{source.name}": source for source in _packaged_databases()})
+        extra.update({f"{EVALS_FOLDER}/{suite.name}": suite for suite in sorted(PACKAGED_SUITES.glob("*.yaml"))})
     else:
-        files["datasources/example.yaml"] = EXAMPLE_DATASOURCE
-        files[GLOSSARY_FILE] = _empty_glossary(["example"])
-        files["policies.yaml"] = POLICIES_HEADER + _dump({"allow_all": True})
+        config = starter_config(llm=llm, path=STORAGE_PATH).with_datasource(Datasource(
+            id="example", type="sqlite", connection={"database": "example.db"},
+            description="An example SQLite database. Describe what is in yours; the resolver reads it."))
+        extra = {"datasources/example.yaml": EXAMPLE_DATASOURCE}
+    if force:
+        for name in _plan(config, folder, False, extra)[0]:
+            (folder / name).unlink(missing_ok=True)
+    return write_project(config, folder, extra=extra)
 
-    if not force:
-        existing = sorted(name for name in [*files, *copies] if (folder / name).exists())
-        if existing:
-            raise FileExistsError(
-                f"{folder.as_posix()} already has {', '.join(existing)}. Overwriting them needs force."
-            )
 
+def starter_config(*, llm: LLM, path: PathLike = STORAGE_PATH) -> Config:
+    """The config a project starts with: no datasources, ``allow_all`` policies, local embeddings, and one ``yaml``
+    knowledge source, ``glossary.yaml`` beside ``path`` (the storage folder). Add datasources with
+    ``Config.with_datasource``; ``write_project`` writes it with the glossary."""
+    path = Path(path)
+    return Config(datasources=[], llm=llm, embeddings=Embeddings(provider="local"), policies=Policies(allow_all=True),
+                  storage=Storage(path=path),
+                  knowledge=[KnowledgeSourceConfig(type="yaml", path=(path.parent / GLOSSARY_FILE).as_posix())])
+
+
+def write_project(
+    config: Config,
+    folder: PathLike,
+    *,
+    env_file: bool = False,
+    extra: Optional[Dict[str, Union[str, Path]]] = None,
+) -> List[Path]:
+    """Write ``config`` as a new project in ``folder``, load what was written with ``load_config``, and return the files.
+
+    The layout is ``init_project``'s: ``nl2sql.yaml`` and a file per section, ``datasources/<id>.yaml``,
+    ``knowledge.yaml`` and an empty ``glossary.yaml`` (one block per datasource) for a ``yaml`` knowledge source
+    whose file is not given in ``extra``, and the ``.gitignore`` lines it is missing. A section the config leaves
+    at its default is left out. ``extra`` maps a path in ``folder`` to the text to write there, or the file to copy.
+
+    A secret field is written as a reference (D122): a literal becomes ``${env:NL2SQL_<PATH>}`` with its value in
+    ``folder/.env`` when ``env_file`` is set, and is refused otherwise.
+
+    Raises:
+        FileExistsError: a file it would write exists (it never overwrites). Nothing is written.
+        ValueError: a section holds an object, not data (an adapter, store, hook, observer or chat model), or two
+            secrets map to one environment variable. Nothing is written.
+        SecretValueInConfig: a secret is a literal and ``env_file`` is not set. Nothing is written.
+        ConfigError: what was written does not load.
+    """
+    folder = Path(folder)
+    files, env_values, ignore = _plan(config, folder, env_file, extra)
+    existing = sorted(name for name in files if (folder / name).exists())
+    if existing:
+        raise FileExistsError(f"{folder.as_posix()} already has {', '.join(existing)}. write_project never "
+                              "overwrites a file.")
     written: List[Path] = []
-    for name, text in files.items():
+    for name, content in files.items():
         target = folder / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8")
+        if isinstance(content, Path):
+            shutil.copyfile(content, target)
+        else:
+            target.write_text(content, encoding="utf-8")
         written.append(target)
-    for name, source in copies.items():
-        target = folder / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, target)
-        written.append(target)
-    if _update_gitignore(folder / ".gitignore"):
+    (folder / "datasources").mkdir(exist_ok=True)
+    if update_gitignore(folder / ".gitignore", ignore):
         written.append(folder / ".gitignore")
-
+    if env_values:
+        written.append(write_env_values(folder, env_values))
     load_config(folder / "nl2sql.yaml")
     return written
+
+
+def _plan(config: Config, folder: Path, env_file: bool,
+          extra: Optional[Dict[str, Union[str, Path]]]) -> Tuple[Dict[str, Union[str, Path]], Dict[str, str], List[str]]:
+    """The files ``write_project`` would write (path to text or source), the ``.env`` values, and the ``.gitignore`` lines."""
+    secrets = EnvSecrets(env_file=env_file)
+    files: Dict[str, Union[str, Path]] = {}
+    for datasource in config.datasources:
+        files[f"datasources/{check_file_name(datasource.id)}"] = _dump(datasource_data(datasource, secrets))
+    llm = config.llm
+    llm_dump = dump_model(llm, "The llm section")
+    files["llm.yaml"] = _llm_header(llm) + _dump(llm_data(
+        {"provider": llm.provider, "model": llm.model, "temperature": llm.temperature, **llm_dump}, secrets))
+    files["embeddings.yaml"] = EMBEDDINGS_HEADER + _dump(embeddings_data(
+        dump_model(config.embeddings, "The embeddings section"), secrets))
+    policies = dump_model(config.policies, "The policies section")
+    files["policies.yaml"] = (POLICIES_HEADER if config.policies.allow_all else "") + _dump(policies)
+    storage = dump_model(config.storage, "The storage section")
+    storage["path"] = _relative(config.storage.path, folder)
+    files["storage.yaml"] = STORAGE_HEADER + _dump(storage)
+    knowledge = [_entry(entry, "The knowledge section", folder) for entry in config.knowledge]
+    files["knowledge.yaml"] = KNOWLEDGE_HEADER + _dump(knowledge)
+    sections = ["datasources", "llm", "embeddings", "policies", "storage", "knowledge"]
+    for section in OPTIONAL_SECTIONS:
+        data = _optional(config, section, secrets)
+        if data is not None:
+            files[f"{section}.yaml"] = _SECTION_HEADERS.get(section, "") + _dump(data)
+            sections.append(section)
+    files["nl2sql.yaml"] = TOC_HEADER + "version: 2\n" + "".join(
+        f"{section + ':':<13}{{ file: {_section_file(section)} }}\n" for section in sections)
+
+    ids = [d.id for d in config.datasources]
+    for source in knowledge:
+        name = source.get("path") if source.get("type") == "yaml" else None
+        if isinstance(name, str) and not Path(name).is_absolute() and not name.startswith(".."):
+            files.setdefault(name, _empty_glossary(ids))
+    files.update(extra or {})
+    ignore = [f"{storage['path']}/"] if not Path(storage["path"]).is_absolute() else []
+    return files, secrets.values, [*ignore, ".env"]
+
+
+def _optional(config: Config, section: str, secrets: EnvSecrets) -> Any:
+    """A section the config may leave out, as data; None when it is at its default (``curated`` when it is absent)."""
+    value = getattr(config, section)
+    what = f"The {section} section"
+    if value is None:
+        return None
+    if isinstance(value, list):
+        if not value and section != "observers":  # observers: [] means none, not the default observers
+            return None
+        return [_entry(item, what, None) if isinstance(item, BaseModel) else _plain(item, what) for item in value]
+    data = dump_model(value, what)
+    if section == "secrets":
+        data = secrets_data(data, secrets)
+    return data if data or section == "curated" else None
+
+
+def _entry(item: Any, what: str, folder: Optional[Path]) -> Dict[str, Any]:
+    """One list item as data; a knowledge source's file is written relative to the project when it is inside it."""
+    if not isinstance(item, BaseModel):
+        raise ValueError(f"{what} holds an object, not data. write_project writes data only.")
+    data = dump_model(item, what)
+    if folder is not None and data.get("type") == "yaml" and isinstance(data.get("path"), str):
+        data["path"] = _relative(Path(data["path"]), folder)
+    return data
+
+
+def _plain(item: Any, what: str) -> Any:
+    if isinstance(item, (str, int, float, bool)):
+        return item
+    raise ValueError(f"{what} holds an object, not data. write_project writes data only.")
+
+
+def _relative(path: Path, folder: Path) -> str:
+    """``path`` as the files write it: relative to ``folder`` when it is inside it, else as given (posix)."""
+    if path.is_absolute():
+        try:
+            return path.relative_to(folder.absolute()).as_posix()
+        except ValueError:
+            pass
+    return path.as_posix()
 
 
 # ---------------------------------------------------------------- the files
@@ -260,28 +377,25 @@ KNOWLEDGE_HEADER = """\
 # business terms and rules. See docs/configuration/knowledge.md.
 """
 
-DEMO_SETTINGS_HEADER = """\
-# The demo's tuning knobs; every other setting keeps its default. A live run
-# makes six model calls, so a question may take 300 s, and every run writes a
-# trace for the playground's Debug drill-down. See configuration/settings.
+SETTINGS_HEADER = """\
+# The tuning knobs; every other setting keeps its default. See configuration/settings.
 """
 
+_SECTION_HEADERS = {"curated": CURATED_HEADER, "evals": EVALS_HEADER, "settings": SETTINGS_HEADER}
 
-def _llm_file(llm: LLM) -> str:
+
+def _llm_header(llm: LLM) -> str:
+    """The comment on top of ``llm.yaml``: which variable the key is read from when ``api_key`` is not set."""
     from nl2sql.llm.providers import env_var_for_provider
 
+    if llm.api_key is not None or not isinstance(llm.provider, str):
+        return ""
     variable = env_var_for_provider(llm.provider)
-    header = (
+    return (
         "# The LLM every agent uses. No key is written here: without api_key, the\n"
         f"# provider's standard variable, {variable}, is read. To read another one:\n"
         f'#   api_key: "${{env:MY_{variable}}}"\n'
     )
-    return header + _dump({"provider": llm.provider, "model": llm.model, "temperature": llm.temperature})
-
-
-def _datasource_file(datasource: Datasource) -> str:
-    """One datasource file: the datasource without its id, which is the file name."""
-    return _dump(datasource.model_dump(mode="json", exclude_defaults=True, exclude={"id"}))
 
 
 def _empty_glossary(datasource_ids: List[str]) -> str:
@@ -302,28 +416,4 @@ def _packaged_databases() -> List[Path]:
     return [CHINOOK_DB_PATH, SUPPORT_DB_PATH, WEBANALYTICS_DB_PATH]
 
 
-def _update_gitignore(path: Path) -> bool:
-    """Add the lines ``.gitignore`` is missing. Returns whether the file changed."""
-    text = path.read_text(encoding="utf-8") if path.exists() else ""
-    missing = [line for line in GITIGNORE_LINES if line not in text.splitlines()]
-    if not missing:
-        return False
-    if text and not text.endswith("\n"):
-        text += "\n"
-    path.write_text(text + "".join(f"{line}\n" for line in missing), encoding="utf-8")
-    return True
-
-
-class _Dumper(yaml.SafeDumper):
-    """Writes multi-line strings (the SQL) as ``|`` blocks, so a file reads as written."""
-
-
-_Dumper.add_representer(
-    str,
-    lambda dumper, value: dumper.represent_scalar(
-        "tag:yaml.org,2002:str", value, style="|" if "\n" in value else None),
-)
-
-
-def _dump(data: Any) -> str:
-    return yaml.dump(data, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100)
+_dump = dump_yaml

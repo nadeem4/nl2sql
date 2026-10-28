@@ -101,4 +101,6 @@ nothing it proposes reaches a prompt or the index until an admin accepts it
 From Python, `nl2sql.config.init_project(folder, demo=..., provider=..., force=...)`
 writes the same files, and `nl2sql.config.demo_config()` builds the demo's
 `Config` in code, with the databases opened read-only from the installed
-package.
+package. `nl2sql.config.write_project(config, folder)` writes any `Config` made of data the same way, never over
+an existing file, with every secret written as a `${env:...}` reference (see
+[Saving a datasource](../configuration/datasources.md#saving-a-datasource)).

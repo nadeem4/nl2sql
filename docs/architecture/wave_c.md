@@ -1754,6 +1754,60 @@ flowchart TD
       `build_report` (`nl2sql.conversations.report`), `Conversations._tool(run, call)`, `runtime.chat_tools`,
       `check_call` (renamed from `_check_call` in `agent.py`).
 
+!!! note "Built (L2): the config writers and the Connect routes"
+    - **Files:** `config/writer.py` (new: `EnvSecrets`, `env_name`, `datasource_data`, `write_env_values`,
+      `write_atomic`, `update_gitignore`, `dump_yaml`), `config/project.py` (`write_project`, `starter_config`;
+      `init_project` builds a `Config` and calls `write_project`), `config/loader.py` and `config/models.py`
+      (a datasources folder's file hashes: `Config.datasources_folder`, `datasource_file_hash`,
+      `record_datasource_file`), `api/datasource_api.py` (`save`), and in `nl2sql-api` `routes/datasource.py`,
+      `services/datasource.py`, `models/datasource.py` and `auth.is_fresh_local_install`. `nl2sql.config`
+      exports `write_project`, `starter_config` and `write_env_values`.
+    - **Tests:** `test_config_writer.py`, `test_datasources_save.py`, `packages/api/tests/test_connect_routes.py`;
+      the Connect routes are also in `test_admin_auth.py`'s admin-only table. `test_wave_c_stubs.py` lost `save`;
+      the boundary test's `PERSONS_FILE_WRITERS` lets `config/project.py` call `write_env_values`, and a new
+      test keeps the list from going stale.
+
+    Where the code and the design differ, the code won:
+
+    - **`write_project(config, folder, *, env_file=False, extra=None)`.** `env_file` is the design's "where the
+      writer may write `.env`" (launch passes true). `extra` maps a path to text to write or a file to copy: it
+      is how `init_project` keeps its example datasource's comments and copies the demo's databases, suites and
+      glossary. The existing-file refusal covers `extra` too. A section at its default is left out, as `init`
+      always did; `curated`, `observers: []` and every set optional section are written.
+    - **Env names follow the field's path.** `NL2SQL_` plus the path: a connection secret is
+      `NL2SQL_<DATASOURCE_ID>_<KEY>` (`NL2SQL_SALES_PASSWORD`), `llm.api_key` is `NL2SQL_LLM_API_KEY`, an agent's key is
+      `NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY` (the design's `NL2SQL_AGENTS_PLANNER_API_KEY` was an example that did
+      not follow its own rule), then `NL2SQL_EMBEDDINGS_API_KEY`, `NL2SQL_SECRETS_<PROVIDER_ID>_<KEY>`; header values
+      of the LLM and its agents are written the same way (`NL2SQL_LLM_HEADERS_<NAME>`). A connection field is a
+      secret by its key (`password`, `secret`, `token`, `api_key`, the same hints that mask it) or because a
+      `ConnectionModel` instance holds it as `SecretStr`.
+    - **A collision is two fields mapping to one name,** inside one write or against a name another configured
+      datasource's connection already references (`${env:NL2SQL_...}`); the message names both fields. A name
+      already in `.env` is replaced (it is the same field written again), as the design says for the same names;
+      the engine cannot know which field wrote a line it did not write.
+    - **`save` refuses with the review queue's error:** `ReviewError` with `FILE_CHANGED` and the fix "reload the
+      engine"; the hash record lives on the `Config` (shared by its copies, updated after a save), recorded by the
+      loader for a folder include. `by` is checked as `engine.api_keys` does (`TypeError`, `PermissionError`; any
+      caller under `allow_all`). The file is `datasources/<id>.yaml` in the folder the loader read, and the event's
+      `file` is `<that folder>/<id>.yaml`.
+    - **`test(Datasource)` scrubs the status.** The design says the route never echoes a value; the driver's
+      words are the one place one could be, so the facade takes the datasource's secret literals and every
+      secret the engine knows out of `reason` and `fix` (`***`), for every caller.
+    - **REST bodies are read as plain JSON and validated by the service,** so FastAPI's own 422 (which echoes the
+      input) is never used: every problem is `{path, message}` with the path in the body (`config.limits.row_limit`),
+      the body's own keys are strict (a `sav` typo is found; `user_context` stays allowed for the dev flag), and
+      a `ValueError` from `add` or `save` (an id taken, a connection that does not validate,
+      `SecretValueInConfig`) is a 422 with its text, `ReviewError` a 409 and anything else the generic 500.
+      `POST /datasource/test` takes the same `{config}` body (no `save`); `GET /datasource-types` answers
+      `{"types": [...]}`. A `save` that fails after the `add` removes the datasource again.
+    - **`env_file` over REST** is `auth.is_fresh_local_install`: no role source (`api.role_header`, `api.role`,
+      `api.trust_body_role`) and a loopback client, the one case `require_admin` lets through unauthenticated.
+    - **For L3:** `write_project(starter_config(llm=default_llm(provider), path=DIR/".nl2sql"), DIR, env_file=True)`
+      writes a new project (the glossary lands at `DIR/glossary.yaml`, and an engine with no datasources builds
+      and checks); an existing project takes `engine.datasources.add(...)` then
+      `engine.datasources.save(id, by=admin, env_file=True)`; `write_env_values(folder, {...})` for the model key.
+      `Config.with_datasource` adds datasources before writing. All three are in `nl2sql.config`.
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |

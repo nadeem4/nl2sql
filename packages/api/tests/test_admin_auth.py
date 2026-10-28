@@ -5,12 +5,13 @@ The role comes from the same sources as ``/query`` (``nl2sql_api.auth``, the
 in ``policies.admin_roles`` (default ``admin``). With no role source configured
 at all, admin routes answer loopback clients only.
 """
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
-from nl2sql import LLMChange
+from nl2sql import DatasourceStatus, LLMChange
 
 from nl2sql.testing.config import make_config
 from nl2sql_api.dependencies import get_engine
@@ -20,6 +21,9 @@ DATASOURCE = {"id": "ds", "type": "sqlite", "connection": {"database": "ds.db"}}
 
 ADMIN_ROUTES = [
     ("post", "/api/v1/datasource", {"config": DATASOURCE}),
+    ("post", "/api/v1/datasource", {"config": DATASOURCE, "save": True}),
+    ("post", "/api/v1/datasource/test", {"config": DATASOURCE}),
+    ("get", "/api/v1/datasource-types", None),
     ("delete", "/api/v1/datasource/ds", None),
     ("put", "/api/v1/settings/llm", {"provider": "openai", "model": "gpt-test"}),
     ("post", "/api/v1/index/ds", None),
@@ -54,7 +58,9 @@ class AdminEngine:
     def __init__(self, config):
         self.config = config
         self.calls = []
-        self.datasources = _Recorder(self, {"add": None, "remove": None, "list": list})
+        self.datasources = _Recorder(self, {
+            "add": None, "remove": None, "list": list, "types": list, "save": Path("datasources/ds.yaml"),
+            "test": DatasourceStatus(id="ds", status="ready")})
         self.llm = _Recorder(self, {"replace": lambda: LLMChange()})
         self.index = _Recorder(self, {"build": lambda: SimpleNamespace(ok=True, stats=[], empty=[], errors=[]),
                                       "clear": None, "health": lambda: {"status": "ok"}})

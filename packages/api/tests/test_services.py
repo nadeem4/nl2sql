@@ -1,7 +1,6 @@
 """Service-layer tests (ported from packages/api/test_services_updates.py)."""
 
 from nl2sql import DatasourceInfo, LLMChange, UserContext
-from nl2sql_api.models.datasource import DatasourceRequest
 from nl2sql_api.services.datasource import DatasourceService
 from nl2sql_api.services.llm import LLMService
 
@@ -42,8 +41,8 @@ def test_datasource_service_live_update():
     engine = FakeEngine()
     service = DatasourceService(engine)
 
-    service.add_datasource(DatasourceRequest(config={"id": "ds-1", "type": "sqlite",
-                                                     "connection": {"database": "ds.db"}}))
+    service.add_datasource({"config": {"id": "ds-1", "type": "sqlite", "connection": {"database": "ds.db"}}},
+                           by=UserContext(roles=["admin"]), env_file=False)
 
     assert [d["id"] for d in service.list_datasources()] == ["ds-1"]
 

@@ -71,9 +71,10 @@ Datasource and delete endpoints, and `GET /api/v1/llm/{agent}`, map `ValueError`
 `POST /api/v1/query` is the exception: pipeline errors are returned as a normal
 `HTTP 200` inside `QueryResponse.errors`, and an unexpected failure returns a
 generic `HTTP 500` with the traceback logged server-side rather than returned.
-`POST /api/v1/datasource` does the same: its exception can carry a connection
+`POST /api/v1/datasource` does the same for an unexpected failure: its exception can carry a connection
 string, password included, so the response says only that it failed and the
-cause goes to the server log.
+cause goes to the server log. A body that does not validate is a `HTTP 422` that lists each problem by its
+path, never a value (the Connect routes, see [Datasources](datasource.md)).
 
 Route handlers that call blocking engine code are declared with `def` rather than
 `async def`, so Starlette runs them in its threadpool instead of blocking the
@@ -147,6 +148,7 @@ The routes that change the running process need an admin role, checked by the
 `require_admin` dependency in `nl2sql_api/auth.py`:
 
 - `POST /api/v1/datasource` and `DELETE /api/v1/datasource/{datasource_id}`
+- The Connect routes `GET /api/v1/datasource-types` and `POST /api/v1/datasource/test`
 - `PUT /api/v1/settings/llm`
 - `POST /api/v1/index/{datasource_id}`, `POST /api/v1/index-all` and `DELETE /api/v1/index`
 

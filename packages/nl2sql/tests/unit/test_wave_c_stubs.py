@@ -28,7 +28,7 @@ FILLED = {"workspaces": {"create", "rename", "list", "delete"},
           "dashboards": {"get", "list", "delete", "pin", "move", "edit", "rename", "rename_tile", "set_tile_chart",
                          "remove_tile", "arrange", "set_filters", "set_schedule"}}
 # Methods added to namespaces that already exist.
-ADDED = {("datasources", "diagram"): "K2", ("datasources", "save"): "L2"}
+ADDED = {("datasources", "diagram"): "K2"}
 
 
 @pytest.fixture(scope="module")

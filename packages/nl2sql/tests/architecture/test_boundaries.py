@@ -1040,14 +1040,19 @@ def test_owned_and_privileged_methods_require_a_caller():
 
 # The writers of a file a person owns (D42, amended by Wave C's D123), and the only modules that may call each.
 # The glossary's and the curated section's are written by the review queue's accept alone. A new project is
-# written once, by `nl2sql init` and `nl2sql launch` (new files only); the `.env` by `nl2sql launch` and by
-# `datasources.save(env_file=True)`. `datasources.save` itself checks `by` and the hash of the file it replaces.
+# written once, by `nl2sql init` (`init_project`) and `nl2sql launch` (new files only: `write_project` refuses
+# an existing one); the `.env` by `write_project` (for a literal secret, when its caller allows it), by
+# `nl2sql launch` and by `datasources.save(env_file=True)`. `datasources.save` is a method name too common to
+# scan for: it checks `by` (held by test_owned_and_privileged_methods_require_a_caller) and the hash of the
+# file it replaces (held by test_datasources_save.py).
 _ACCEPT = "nl2sql/src/nl2sql/review/accept.py"
+_PROJECT = "nl2sql/src/nl2sql/config/project.py"
+_LAUNCH = "nl2sql/src/nl2sql/cli/commands/launch.py"
 PERSONS_FILE_WRITERS = {
     "write_glossary": {_ACCEPT},
     "write_curated": {_ACCEPT},
-    "write_project": {"nl2sql/src/nl2sql/config/project.py", "nl2sql/src/nl2sql/cli/commands/launch.py"},
-    "write_env_values": {"nl2sql/src/nl2sql/api/datasource_api.py", "nl2sql/src/nl2sql/cli/commands/launch.py"},
+    "write_project": {_PROJECT, _LAUNCH},
+    "write_env_values": {_PROJECT, "nl2sql/src/nl2sql/api/datasource_api.py", _LAUNCH},
 }
 
 
@@ -1063,8 +1068,24 @@ def test_only_accept_writes_a_persons_file():
     assert not offenders, _broke(
         "Only an accept writes a person's glossary or curated file (write_glossary and write_curated are "
         "called from nl2sql/review/accept.py alone, under its lock, after its admin check and hash check, "
-        "D42). write_project and write_env_values (D123) are called from nl2sql init and launch, and from "
-        "datasources.save, alone.", offenders)
+        "D42). write_project (new files only) and write_env_values (D123) are called from init_project, "
+        "nl2sql launch and datasources.save, alone.", offenders)
+
+
+def test_the_writers_of_a_persons_file_are_still_called_where_the_list_says():
+    """A writer the list names but nobody calls is a stale entry; one called nowhere has lost its caller."""
+    called = {name: set() for name in PERSONS_FILE_WRITERS}
+    for path in python_files(ENGINE):
+        for node in ast.walk(_tree(path)):
+            if isinstance(node, ast.Call):
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+                if name in called:
+                    called[name].add(_where(path))
+    # nl2sql launch (L3) is not built yet: its callers are allowed but need not exist.
+    missing = [f"{name} has no caller in {sorted(PERSONS_FILE_WRITERS[name] - {_LAUNCH})}"
+               for name in PERSONS_FILE_WRITERS if not called[name] & (PERSONS_FILE_WRITERS[name] - {_LAUNCH})]
+    assert not missing, _broke("PERSONS_FILE_WRITERS lists a writer none of its callers calls.", missing)
 
 
 # --------------------------------------------------------------------------
