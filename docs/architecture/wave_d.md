@@ -206,7 +206,7 @@ LookupError` still works:
 |---|---|---|
 | `ConversationNotFound`, `DashboardNotFound` (Wave C), `ResultNotFound`, `JobNotFound`, `DatasourceNotFound`, `ApprovalNotFound` (new) | 404 | `NOT_FOUND` |
 | `ConversationBusy` (Wave C); `ReviewError(FILE_CHANGED)` (Wave B) and Wave C's `save` that reuses it | 409 | `CONFLICT`, `FILE_CHANGED` |
-| `NoTiles`, `WorkspaceNotEmpty`, `ScheduleTooFrequent`, `TileNotSavable`, `NotIndexed`, `SecretValueInConfig` (Wave C); `MissingProviderKey` (G2); a facade argument check that raises its own subclass | 422 | the exception's code |
+| `NoTiles`, `WorkspaceNotEmpty`, `ScheduleTooFrequent`, `NotIndexed`, `SecretValueInConfig` (Wave C); `MissingProviderKey` (G2); a facade argument check that raises its own subclass | 422 | the exception's code |
 | `ReviewError(NOT_AUTHORIZED, NOT_WRITABLE)` (Wave B); a caller without an admin or approver role where the facade checks it (`NotAuthorized`, new) | 403 | the exception's code |
 
 | Raised | Status | Code |
