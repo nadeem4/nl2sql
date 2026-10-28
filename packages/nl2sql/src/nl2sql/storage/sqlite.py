@@ -1,9 +1,10 @@
 """The ``sqlite`` state store: ``<storage.path>/state.db``.
 
 Schema snapshots and the diffs between them, the plan cache, answer feedback,
-the review queue's proposals, the migrations that build them, and a lock
+the review queue's proposals, conversations, workspaces, dashboards with their
+stored chart results and API keys, the migrations that build them, and a lock
 (docs/architecture/phase2.md, section 4; the diffs, docs/architecture/wave_a.md,
-section 10; proposals, wave_b.md, section 5).
+section 10; proposals, wave_b.md, section 5; the rest, wave_c.md, section 10).
 
 * **Snapshots are immutable.** A row is keyed by ``(datasource_id,
   schema_version)`` and never updated: new content is a new version, and
@@ -161,12 +162,62 @@ def _proposals(connection: sqlite3.Connection) -> None:
     """)
 
 
+def _conversations_dashboards_and_keys(connection: sqlite3.Connection) -> None:
+    """Wave C: each owned document as JSON beside the columns it is filtered on (wave_c.md, section 10).
+
+    ``tile_runs`` holds the last result of each chart, rows included, so it sits beside its dashboard and is
+    deleted with it. ``api_keys`` holds a hash, never a secret.
+    """
+    _script(connection, """
+        CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT,
+            user_id TEXT,
+            updated_at TEXT NOT NULL,
+            doc_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_conversations_owner ON conversations (tenant_id, user_id, updated_at);
+        CREATE TABLE IF NOT EXISTS workspaces (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT,
+            user_id TEXT,
+            created_at TEXT NOT NULL,
+            doc_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces (tenant_id, user_id, created_at);
+        CREATE TABLE IF NOT EXISTS dashboards (
+            id TEXT PRIMARY KEY,
+            tenant_id TEXT,
+            user_id TEXT,
+            status TEXT NOT NULL,
+            scheduled INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            doc_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_dashboards_owner ON dashboards (tenant_id, user_id, updated_at);
+        CREATE TABLE IF NOT EXISTS tile_runs (
+            dashboard_id TEXT NOT NULL,
+            tile_id TEXT NOT NULL,
+            at TEXT NOT NULL,
+            doc_json TEXT NOT NULL,
+            PRIMARY KEY (dashboard_id, tile_id)
+        );
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id TEXT PRIMARY KEY,
+            hash TEXT NOT NULL,
+            revoked_at TEXT,
+            row_json TEXT NOT NULL
+        );
+    """)
+
+
 MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0001_adopt_0_5_tables", _adopt_0_5),
     ("0002_feedback_datasources_and_source", _feedback_datasources_and_source),
     ("0003_immutable_snapshots_and_locks", _immutable_snapshots_and_locks),
     ("0004_schema_diffs", _schema_diffs),
     ("0005_proposals", _proposals),
+    ("0006_conversations_dashboards_and_keys", _conversations_dashboards_and_keys),
 ]
 
 # -- feedback columns --------------------------------------------------------------
@@ -203,6 +254,11 @@ def _utc(moment: Optional[datetime]) -> Optional[str]:
     return moment.astimezone(timezone.utc).isoformat(timespec="microseconds")
 
 
+def _stamp(value: Union[str, datetime]) -> str:
+    """A document's ISO 8601 ``value`` as sortable text in UTC, the form ``_utc`` writes; no zone is UTC."""
+    return _utc(datetime.fromisoformat(value) if isinstance(value, str) else value)
+
+
 def _locked(method):
     @functools.wraps(method)
     def wrapper(self, *args, **kwargs):
@@ -214,7 +270,7 @@ def _locked(method):
 class SqliteState:
     """The built-in ``StateStore``, on one SQLite file (or ``:memory:``, for tests)."""
 
-    interface_version: ClassVar[int] = 3
+    interface_version: ClassVar[int] = 4
     slot: ClassVar[str] = "state"
     config_model: ClassVar[type] = NoKeys
 
@@ -498,6 +554,178 @@ class SqliteState:
             return connection.execute(
                 "DELETE FROM proposals WHERE status != 'proposed' AND decided_at < ?;",
                 (_utc(older_than),)).rowcount
+
+    # -- conversations -----------------------------------------------------------
+
+    @_locked
+    def put_conversation(self, doc: Dict[str, Any]) -> None:
+        """Stores ``doc``, replacing the conversation with its ``id``."""
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO conversations (id, tenant_id, user_id, updated_at, doc_json) "
+                "VALUES (?, ?, ?, ?, ?);",
+                (doc["id"], doc.get("tenant_id"), doc.get("user_id"), _stamp(doc["updated_at"]), json.dumps(doc)))
+
+    @_locked
+    def get_conversation(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn().execute("SELECT doc_json FROM conversations WHERE id = ?;", (conversation_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    @_locked
+    def list_conversations(self, tenant_id: Optional[str], user_id: Optional[str], limit: int) -> List[Dict[str, Any]]:
+        """The owner's conversations, newest first; ``None`` matches only a missing tenant or user."""
+        rows = self._conn().execute(
+            "SELECT doc_json FROM conversations WHERE tenant_id IS ? AND user_id IS ? "
+            "ORDER BY updated_at DESC, id LIMIT ?;", (tenant_id, user_id, int(limit))).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def delete_conversation(self, conversation_id: str) -> bool:
+        connection = self._conn()
+        with connection:
+            return connection.execute("DELETE FROM conversations WHERE id = ?;", (conversation_id,)).rowcount > 0
+
+    @_locked
+    def purge_conversations(self, older_than: datetime) -> int:
+        connection = self._conn()
+        with connection:
+            return connection.execute("DELETE FROM conversations WHERE updated_at < ?;",
+                                      (_utc(older_than),)).rowcount
+
+    # -- workspaces --------------------------------------------------------------
+
+    @_locked
+    def put_workspace(self, doc: Dict[str, Any]) -> None:
+        """Stores ``doc``, replacing the workspace with its ``id``; it keeps its place in the list."""
+        created = _stamp(doc["created_at"]) if doc.get("created_at") else _utc(datetime.now(timezone.utc))
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT INTO workspaces (id, tenant_id, user_id, created_at, doc_json) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET tenant_id = excluded.tenant_id, user_id = excluded.user_id, "
+                "doc_json = excluded.doc_json;",
+                (doc["id"], doc.get("tenant_id"), doc.get("user_id"), created, json.dumps(doc)))
+
+    @_locked
+    def get_workspace(self, workspace_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn().execute("SELECT doc_json FROM workspaces WHERE id = ?;", (workspace_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    @_locked
+    def list_workspaces(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[Dict[str, Any]]:
+        rows = self._conn().execute(
+            "SELECT doc_json FROM workspaces WHERE tenant_id IS ? AND user_id IS ? "
+            "ORDER BY created_at, id;",
+            (tenant_id, user_id)).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def delete_workspace(self, workspace_id: str) -> bool:
+        connection = self._conn()
+        with connection:
+            return connection.execute("DELETE FROM workspaces WHERE id = ?;", (workspace_id,)).rowcount > 0
+
+    # -- dashboards and their stored chart results -------------------------------
+
+    @_locked
+    def put_dashboard(self, doc: Dict[str, Any]) -> None:
+        """Stores ``doc``, replacing the dashboard with its ``id``."""
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO dashboards (id, tenant_id, user_id, status, scheduled, updated_at, "
+                "doc_json) VALUES (?, ?, ?, ?, ?, ?, ?);",
+                (doc["id"], doc.get("tenant_id"), doc.get("user_id"), doc["status"],
+                 1 if doc.get("schedule") else 0, _stamp(doc["updated_at"]), json.dumps(doc)))
+
+    @_locked
+    def get_dashboard(self, dashboard_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn().execute("SELECT doc_json FROM dashboards WHERE id = ?;", (dashboard_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    @_locked
+    def list_dashboards(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[Dict[str, Any]]:
+        rows = self._conn().execute(
+            "SELECT doc_json FROM dashboards WHERE tenant_id IS ? AND user_id IS ? "
+            "ORDER BY updated_at DESC, id;", (tenant_id, user_id)).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def delete_dashboard(self, dashboard_id: str) -> bool:
+        connection = self._conn()
+        with connection:
+            connection.execute("DELETE FROM tile_runs WHERE dashboard_id = ?;", (dashboard_id,))
+            return connection.execute("DELETE FROM dashboards WHERE id = ?;", (dashboard_id,)).rowcount > 0
+
+    @_locked
+    def purge_dashboards(self, drafts_older_than: datetime) -> int:
+        connection = self._conn()
+        with connection:
+            cutoff = _utc(drafts_older_than)
+            connection.execute("DELETE FROM tile_runs WHERE dashboard_id IN "
+                               "(SELECT id FROM dashboards WHERE status = 'draft' AND updated_at < ?);", (cutoff,))
+            return connection.execute("DELETE FROM dashboards WHERE status = 'draft' AND updated_at < ?;",
+                                      (cutoff,)).rowcount
+
+    @_locked
+    def list_scheduled_dashboards(self) -> List[Dict[str, Any]]:
+        rows = self._conn().execute("SELECT doc_json FROM dashboards WHERE scheduled = 1 ORDER BY id;").fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def put_tile_runs(self, dashboard_id: str, docs: List[Dict[str, Any]]) -> None:
+        """Replaces the last result of each chart in ``docs``; the others' are kept."""
+        connection = self._conn()
+        with connection:
+            connection.executemany(
+                "INSERT OR REPLACE INTO tile_runs (dashboard_id, tile_id, at, doc_json) VALUES (?, ?, ?, ?);",
+                [(dashboard_id, doc["tile_id"], _stamp(doc["at"]), json.dumps(doc)) for doc in docs])
+
+    @_locked
+    def get_tile_runs(self, dashboard_id: str) -> List[Dict[str, Any]]:
+        rows = self._conn().execute("SELECT doc_json FROM tile_runs WHERE dashboard_id = ? ORDER BY tile_id;",
+                                    (dashboard_id,)).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    # -- API keys ----------------------------------------------------------------
+
+    @_locked
+    def add_api_key(self, row: Dict[str, Any]) -> None:
+        """Stores a new key ``row`` (its ``hash``, never a secret).
+
+        Raises:
+            ValueError: a key with this ``id`` exists; the caller picks another id.
+        """
+        connection = self._conn()
+        try:
+            with connection:
+                connection.execute("INSERT INTO api_keys (id, hash, revoked_at, row_json) VALUES (?, ?, ?, ?);",
+                                   (row["id"], row["hash"], row.get("revoked_at"), json.dumps(row)))
+        except sqlite3.IntegrityError:
+            raise ValueError(f"An API key with id '{row['id']}' already exists.") from None
+
+    @_locked
+    def revoke_api_key(self, key_id: str, revoked_at: str) -> bool:
+        """Marks the key revoked at ``revoked_at`` (ISO 8601) and changes nothing else; False when there is none."""
+        connection = self._conn()
+        with connection:
+            found = connection.execute("SELECT row_json FROM api_keys WHERE id = ?;", (key_id,)).fetchone()
+            if found is None:
+                return False
+            row = {**json.loads(found[0]), "revoked_at": revoked_at}
+            connection.execute("UPDATE api_keys SET revoked_at = ?, row_json = ? WHERE id = ?;",
+                               (revoked_at, json.dumps(row), key_id))
+            return True
+
+    @_locked
+    def get_api_key(self, key_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn().execute("SELECT row_json FROM api_keys WHERE id = ?;", (key_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    @_locked
+    def list_api_keys(self) -> List[Dict[str, Any]]:
+        return [json.loads(row[0]) for row in self._conn().execute("SELECT row_json FROM api_keys ORDER BY id;")]
 
     # -- the lock ----------------------------------------------------------------
 

@@ -28,6 +28,7 @@ from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import RunEvents
 from nl2sql.pipeline.pinned import PinnedRun, SuppliedPlan, check_pinned
+from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
 from nl2sql.pipeline.nodes.validator.schemas import ValidationCheck
 from nl2sql.services.callbacks.token_handler import QuestionUsage, TokenUsageCallback
 from nl2sql.clarify.choice import choice_problem, pinned_from_choice
@@ -143,6 +144,9 @@ class QueryResult(BaseModel):
     # The run's plan in plain English, rendered from the typed plans with no model call: one step per
     # sub-query with a plan or a verified answer; None when the run has neither.
     explanation: Optional[Explanation] = None
+    # The run's whole decomposition (sub-queries and combine groups), set on every run that has one, so a
+    # stored turn can rebuild the run: a dashboard chart keeps it with each sub-query's plan (Wave C, D116).
+    decomposition: Optional[DecomposerResponse] = None
 
 
 def _field(source: Any, name: str, default: Any = None) -> Any:
@@ -346,7 +350,16 @@ def result_from_state(
         approvals_needed=list(state.get("approvals_needed") or []),
         clarification=clarification,
         explanation=None if withheld else _explanation(state, warnings, knowledge),
+        decomposition=None if withheld else _decomposition(state),
     )
+
+
+def _decomposition(state: Dict[str, Any]) -> Optional[DecomposerResponse]:
+    """The run's decomposition, which LangGraph may hand back as a model or as a plain dict."""
+    found = state.get("decomposer_response")
+    if found is None or isinstance(found, DecomposerResponse):
+        return found
+    return DecomposerResponse.model_validate(found)
 
 
 def _explanation(state: Dict[str, Any], warnings: List[RunWarning],

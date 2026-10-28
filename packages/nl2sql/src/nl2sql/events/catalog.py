@@ -31,6 +31,7 @@ from typing import Any, Dict, FrozenSet, List, Literal, Optional, Type
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from nl2sql.charts.spec import ColumnKind
 from nl2sql.config.models import HookPoint
 
 # How a run ended. ``needs_clarification``: the run asked which reading of the question was meant
@@ -65,6 +66,7 @@ class ResultSummaryData(EventData):
     columns: List[str] = Field(default_factory=list)
     row_count: int = 0
     truncated: bool = False
+    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # a column's type category, never values
 
 
 # ---------------------------------------------------------------- run events
@@ -327,6 +329,108 @@ class ProposalDecided(EventData):
     wrote: Optional[str] = None
 
 
+# ---------------------------------------------------------------- Wave C (docs/architecture/wave_c.md)
+# None carries rows or a secret (D15): a step names its arguments, never their values, and a key is named
+# by its id, never its token.
+
+class ConversationStarted(EventData):
+    conversation_id: str
+    user_id: Optional[str] = None
+    datasource_id: Optional[str] = None
+
+
+class ConversationStep(EventData):
+    conversation_id: str
+    turn: int
+    tool: str
+    status: str
+    trace_id: Optional[str] = None  # an ask step's own run
+    args: List[str] = Field(default_factory=list)  # argument names, never values
+
+
+class ConversationTurn(EventData):
+    conversation_id: str
+    turn: int
+    kind: str
+    status: str
+    trace_id: Optional[str] = None
+    steps: int = 0
+    stored: Optional[Dict[str, Any]] = None  # the stored Turn as JSON; on the conversation stream only
+
+
+class ChatToolCalled(EventData):
+    tool: str
+    conversation_id: str
+    turn: int
+    ok: bool = True
+    seconds: float = 0.0
+    error_code: Optional[str] = None
+
+
+class DashboardGenerated(EventData):
+    dashboard_id: str
+    datasource_id: str
+    tiles: int = 0
+    skipped: int = 0
+
+
+class DashboardRefreshed(EventData):
+    dashboard_id: str
+    trigger: Literal["generate", "open", "manual", "schedule"]
+    counts: Dict[str, int] = Field(default_factory=dict)  # charts per status
+    filters: List[str] = Field(default_factory=list)  # filter ids applied, never values
+
+
+class DashboardChanged(EventData):
+    dashboard_id: str
+    change: List[str] = Field(default_factory=list)  # the edit kinds, "pinned", "moved" or "deleted"
+    by: Optional[str] = None
+
+
+class DashboardScheduleSet(EventData):
+    dashboard_id: str
+    every_minutes: Optional[int] = None  # None: the schedule was removed
+    by: Optional[str] = None
+
+
+class DashboardScheduleStopped(EventData):
+    dashboard_id: str
+    reason: str  # a code
+
+
+class WorkspaceChanged(EventData):
+    workspace_id: str
+    change: Literal["created", "renamed", "deleted"]
+    by: Optional[str] = None
+
+
+class DatasourceSaved(EventData):
+    datasource_id: str
+    file: str
+    by: Optional[str] = None
+
+
+class ApiKeyCreated(EventData):
+    key_id: str
+    user_id: str
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    by: Optional[str] = None
+
+
+class ApiKeyRevoked(EventData):
+    key_id: str
+    user_id: str  # whose key it was, so the audit log says so
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
+    by: Optional[str] = None
+
+
+class McpDenied(EventData):
+    reason: Literal["missing", "malformed", "unknown", "revoked"]
+    key_id: Optional[str] = None
+
+
 # ---------------------------------------------------------------- the catalog
 
 class EventSpec(BaseModel):
@@ -439,6 +543,35 @@ CATALOG: Dict[str, EventSpec] = {
     "proposal.created": _spec(ProposalCreated, "A proposal entered the review queue (Q1).", run=False),
     "proposal.decided": _spec(ProposalDecided, "A proposal was accepted or rejected, by whom and into which "
                                                "file (Q1).", run=False, audit=True),
+    # Wave C. The run stream stays as it is: conversations.stream adds the two conversation events to its own
+    # allow-list (A4). The three of a turn have the turn's scope; the rest are engine events.
+    "conversation.started": _spec(ConversationStarted, "A conversation was started. Published by "
+                                                       "engine.conversations.start.", run=False),
+    "conversation.step": _spec(ConversationStep, "A conversation turn finished one step (a tool call): the "
+                                                 "tool, its status and its argument names, never values.",
+                               run=True),
+    "conversation.turn": _spec(ConversationTurn, "A conversation turn was stored. The conversation stream's "
+                                                 "last event.", run=True),
+    "chat_tool.called": _spec(ChatToolCalled, "A registry chat tool ran, from the model's loop or by name.",
+                              run=True),
+    "dashboard.generated": _spec(DashboardGenerated, "A starter dashboard was generated "
+                                                     "(engine.dashboards.generate).", run=False),
+    "dashboard.refreshed": _spec(DashboardRefreshed, "A dashboard's charts were re-run: counts per status and "
+                                                     "the filter ids applied, never values.", run=False),
+    "dashboard.changed": _spec(DashboardChanged, "A dashboard was edited, pinned, moved or deleted: the kinds "
+                                                 "of change, never values.", run=False),
+    "dashboard.schedule_set": _spec(DashboardScheduleSet, "A refresh schedule was set; it saves a snapshot of "
+                                                          "the caller's roles (D134).", run=False, audit=True),
+    "dashboard.schedule_stopped": _spec(DashboardScheduleStopped, "A schedule stopped with a visible error "
+                                                                  "(D134).", run=False, audit=True),
+    "workspace.changed": _spec(WorkspaceChanged, "A workspace was created, renamed or deleted.", run=False),
+    "datasource.saved": _spec(DatasourceSaved, "One datasource's file was written "
+                                               "(engine.datasources.save, D123).", run=False, audit=True),
+    "api_key.created": _spec(ApiKeyCreated, "An API key was created; its id, never its token (D127).",
+                             run=False, audit=True),
+    "api_key.revoked": _spec(ApiKeyRevoked, "An API key was revoked.", run=False, audit=True),
+    "mcp.denied": _spec(McpDenied, "The MCP server refused a request's bearer token; never the token.",
+                        run=False, audit=True),
 }
 
 RUN_EVENTS: FrozenSet[str] = frozenset(name for name, spec in CATALOG.items() if spec.run)

@@ -4,12 +4,15 @@ A store is named by ``type`` in one of the four ``storage`` sub-blocks, for
 example ``index: {type: qdrant, url: ...}``. Every store class has:
 
 * ``interface_version``: the version of these interfaces it was written for
-  (``3``). The engine accepts exactly the version it was built for. Version 2
+  (``4``). The engine accepts exactly the version it was built for. Version 2
   added ``StateStore.put_schema_diff`` and ``get_schema_diff``; version 3 the
   review queue's methods (``put_proposal``, ``get_proposal``,
   ``list_proposals``, ``decide_proposal``, ``purge_proposals``, typed with
-  ``Proposal``) and ``BuildPointer.knowledge_hash``. The version is one per
-  kind, so every store class declares it, whatever its slot.
+  ``Proposal``) and ``BuildPointer.knowledge_hash``; version 4 the
+  conversation, workspace, dashboard, stored chart result and API key
+  methods, which take and return plain JSON documents (``dict``), since this
+  module holds no engine model. The version is one per kind, so every store
+  class declares it, whatever its slot.
 * ``slot``: the sub-block it fills, ``"index"``, ``"state"``, ``"traces"`` or
   ``"results"``. Store names share one entry point group, ``nl2sql.stores``,
   and the engine refuses a store in the wrong slot.
@@ -21,8 +24,9 @@ example ``index: {type: qdrant, url: ...}``. Every store class has:
   write anything: ``nl2sql config check`` builds the stores too.
 
 This module imports only pydantic and the standard library. See
-docs/architecture/phase2.md, section 4, and, for proposals,
-docs/architecture/wave_b.md, section 5.
+docs/architecture/phase2.md, section 4, for proposals,
+docs/architecture/wave_b.md, section 5, and for conversations, dashboards and
+API keys, docs/architecture/wave_c.md, section 10.
 """
 from __future__ import annotations
 
@@ -209,8 +213,12 @@ class IndexStore(Store, Protocol):
 
 
 class StateStore(Store, Protocol):
-    """Schema snapshots and their diffs, the plan cache, feedback, the review queue's proposals, migrations
-    and a lock."""
+    """Schema snapshots and their diffs, the plan cache, feedback, the review queue's proposals, conversations,
+    workspaces, dashboards with their stored chart results, API keys, migrations and a lock.
+
+    The conversation, workspace, dashboard and key methods take and return JSON documents: the engine owns
+    their models. A document carries the fields the store filters on, which the methods below name.
+    """
 
     slot: ClassVar[Literal["state"]]
 
@@ -283,6 +291,87 @@ class StateStore(Store, Protocol):
     def purge_proposals(self, older_than: datetime) -> int:
         """Delete the decided proposals (not ``proposed``) decided before ``older_than``; return how many."""
         ...
+
+    # -- conversations (version 4). A document has ``id``, ``tenant_id``, ``user_id`` and ``updated_at``
+    # (ISO 8601; a stamp with no zone is UTC).
+
+    def put_conversation(self, doc: dict) -> None:
+        """Store ``doc``, replacing the conversation with its ``id``."""
+        ...
+
+    def get_conversation(self, conversation_id: str) -> Optional[dict]: ...
+
+    def list_conversations(self, tenant_id: Optional[str], user_id: Optional[str], limit: int) -> List[dict]:
+        """The conversations of the owner ``(tenant_id, user_id)``, newest ``updated_at`` first. ``None`` is an
+        owner of its own, not a wildcard."""
+        ...
+
+    def delete_conversation(self, conversation_id: str) -> bool:
+        """Delete it; False when there is no such id."""
+        ...
+
+    def purge_conversations(self, older_than: datetime) -> int:
+        """Delete the conversations last updated before ``older_than``; return how many."""
+        ...
+
+    # -- dashboards (version 4). A document has ``id``, ``tenant_id``, ``user_id``, ``status`` (``draft`` or
+    # ``saved``), ``updated_at`` and ``schedule`` (a mapping, or None for no schedule).
+
+    def put_dashboard(self, doc: dict) -> None:
+        """Store ``doc``, replacing the dashboard with its ``id``."""
+        ...
+
+    def get_dashboard(self, dashboard_id: str) -> Optional[dict]: ...
+
+    def list_dashboards(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[dict]:
+        """The owner's dashboards of every status, newest ``updated_at`` first."""
+        ...
+
+    def delete_dashboard(self, dashboard_id: str) -> bool:
+        """Delete it and its stored chart results; False when there is no such id."""
+        ...
+
+    def purge_dashboards(self, drafts_older_than: datetime) -> int:
+        """Delete the drafts last updated before ``drafts_older_than``, with their results; saved
+        dashboards are never purged. Return how many."""
+        ...
+
+    def list_scheduled_dashboards(self) -> List[dict]:
+        """Every dashboard with a schedule, whatever its owner."""
+        ...
+
+    # -- workspaces (version 4). A document has ``id``, ``tenant_id`` and ``user_id``.
+
+    def put_workspace(self, doc: dict) -> None: ...
+
+    def get_workspace(self, workspace_id: str) -> Optional[dict]: ...
+
+    def list_workspaces(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[dict]: ...
+
+    def delete_workspace(self, workspace_id: str) -> bool: ...
+
+    # -- stored chart results (version 4). A document has ``tile_id`` and ``at``; it holds rows.
+
+    def put_tile_runs(self, dashboard_id: str, docs: List[dict]) -> None:
+        """Replace the last result of each chart in ``docs``; the others' are kept."""
+        ...
+
+    def get_tile_runs(self, dashboard_id: str) -> List[dict]: ...
+
+    # -- API keys (version 4). A row has ``id``, ``hash`` and ``revoked_at``; never the secret.
+
+    def add_api_key(self, row: dict) -> None:
+        """Store a new key ``row``. Raises ``ValueError`` when a key with its ``id`` exists, so a clash never
+        replaces another holder's key; the caller picks another id."""
+        ...
+
+    def revoke_api_key(self, key_id: str, revoked_at: str) -> bool:
+        """Set the key's ``revoked_at`` (ISO 8601) and change nothing else. False when there is no such key."""
+        ...
+
+    def get_api_key(self, key_id: str) -> Optional[dict]: ...
+
+    def list_api_keys(self) -> List[dict]: ...
 
     def lock(self, name: str, ttl_s: int) -> ContextManager[None]:
         """A lease on ``name``, held for the ``with`` block. It expires after ``ttl_s`` if its holder dies.

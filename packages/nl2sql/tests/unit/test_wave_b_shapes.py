@@ -162,8 +162,8 @@ def store():
     state.close()
 
 
-def test_a_0_7_state_file_upgrades_to_migration_5_keeping_its_rows(tmp_path):
-    """A state.db that ran migrations 1 to 4 (release 0.7) gains only the proposals table."""
+def test_a_0_7_state_file_upgrades_to_the_latest_migration_keeping_its_rows(tmp_path):
+    """A state.db that ran migrations 1 to 4 (release 0.7) gains the proposals table (and, since 0.9, Wave C's)."""
     from nl2sql.storage.sqlite import MIGRATIONS
 
     path = tmp_path / "state.db"
@@ -176,7 +176,7 @@ def test_a_0_7_state_file_upgrades_to_migration_5_keeping_its_rows(tmp_path):
         connection.execute("INSERT INTO plan_cache VALUES ('q', 'ds', 'v1', '{}', 0);")
 
     state = SqliteState(path)
-    assert state.migrate() == ["0005_proposals"]
+    assert state.migrate() == [name for name, _ in MIGRATIONS[4:]]
     assert state.get_plan("q", "ds", "v1") == "{}", "0.7's rows are kept"
     state.put_proposal(_proposal())
     assert state.get_proposal(_proposal().id) is not None
@@ -237,10 +237,10 @@ def test_the_build_pointer_records_the_knowledge_hash():
     assert BuildPointer(**{**pointer.model_dump(), "knowledge_hash": "abc"}).knowledge_hash == "abc"
 
 
-def test_every_built_in_store_is_interface_3():
-    assert INTERFACE_VERSIONS["store"] == 3
+def test_every_built_in_store_is_interface_4():
+    assert INTERFACE_VERSIONS["store"] == 4
     for name in ("chroma", "sqlite", "files", "local"):
-        assert Registry.default().load("store", name).interface_version == 3
+        assert Registry.default().load("store", name).interface_version == 4
 
 
 # ---------------------------------------------------------------- the adapter's optional methods (SDK)

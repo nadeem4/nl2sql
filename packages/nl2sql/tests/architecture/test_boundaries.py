@@ -228,6 +228,19 @@ def test_the_sdk_knowledge_module_imports_only_pydantic():
         "plugin compiles against it without the engine.", offenders)
 
 
+def test_sdk_discovery_imports_only_pydantic():
+    """An adapter author installs the SDK for ``nl2sql_sdk.discovery`` (``DiscoverableAdapter``), not the
+    engine (docs/architecture/wave_c.md, D120)."""
+    path = SDK / "discovery.py"
+    allowed = {"pydantic", "nl2sql_sdk"} | set(sys.stdlib_module_names)
+    assert path.is_file(), "nl2sql_sdk/discovery.py holds Found and DiscoverableAdapter."
+    offenders = [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                 if name.partition(".")[0] not in allowed]
+    assert not offenders, _broke(
+        "nl2sql_sdk.discovery imports only pydantic and the standard library: an adapter "
+        "declares what it can be found by without the engine.", offenders)
+
+
 def test_no_file_imports_the_sdk_by_its_old_name():
     """The SDK is ``nl2sql_sdk``; ``nl2sql_adapter_sdk`` is never published again."""
     roots = [PACKAGES, PACKAGES.parent / "scripts"]

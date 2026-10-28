@@ -81,6 +81,19 @@ class ErrorCode(str, Enum):
     CLARIFICATION_STALE = "CLARIFICATION_STALE"
     # The query is estimated to read more rows than the caller's cost rule allows, with over_limit: refuse.
     COST_LIMIT_EXCEEDED = "COST_LIMIT_EXCEEDED"
+    # Wave C (docs/architecture/wave_c.md, section 11). The conversation agent's step did not validate after
+    # its parse retries; the turn ends in error.
+    MODEL_STEP_INVALID = "MODEL_STEP_INVALID"
+    # A conversation already has settings conversations.max_turns turns.
+    CONVERSATION_TOO_LONG = "CONVERSATION_TOO_LONG"
+    # A chat tool raised or returned something that is not a ToolOutput.
+    TOOL_FAILED = "TOOL_FAILED"
+    # A chat tool raised ToolNotApplicable: it cannot apply to that turn (a warning).
+    TOOL_NOT_APPLICABLE = "TOOL_NOT_APPLICABLE"
+    # A tool name that is not enabled.
+    UNKNOWN_CHAT_TOOL = "UNKNOWN_CHAT_TOOL"
+    # A dashboard chart's stored plan no longer validates (the schema changed); fixing it is a chat turn.
+    TILE_NEEDS_FIXING = "TILE_NEEDS_FIXING"
 
 
 
@@ -113,6 +126,11 @@ FATAL_ERRORS = {
     ErrorCode.CLARIFICATION_INVALID,
     ErrorCode.CLARIFICATION_STALE,
     ErrorCode.COST_LIMIT_EXCEEDED,
+    # Wave C: a step the model cannot make, a conversation that is full, and a stored plan that does not
+    # validate are not helped by planning again.
+    ErrorCode.MODEL_STEP_INVALID,
+    ErrorCode.CONVERSATION_TOO_LONG,
+    ErrorCode.TILE_NEEDS_FIXING,
 }
 
 SAFE_ERROR_MESSAGES = {
@@ -198,3 +216,43 @@ class RunWarning(BaseModel):
         return cls(code=getattr(error.error_code, "value", str(error.error_code)), node=error.node,
                    message=error.message, sub_query_id=sub_query_id,
                    detail={"recovered": True} if recovered else {})
+
+
+# ---------------------------------------------------------------- Wave C facade exceptions
+# (docs/architecture/wave_c.md, section 11). On nl2sql-api a LookupError is a 404 and a ValueError a 422.
+
+
+class ConversationNotFound(LookupError):
+    """No such conversation, or it is not the caller's: the two are the same (D105)."""
+
+
+class ConversationBusy(LookupError):
+    """The conversation is already running a turn (its state-store lock is held)."""
+
+
+class DashboardNotFound(LookupError):
+    """No such dashboard, or it is not the caller's."""
+
+
+class WorkspaceNotFound(LookupError):
+    """No such workspace, or it is not the caller's."""
+
+
+class NotIndexed(ValueError):
+    """A datasource has no live index build; the message names the command that builds it."""
+
+
+class NoTiles(ValueError):
+    """The starter dashboard has nothing to chart; the message names what is missing."""
+
+
+class WorkspaceNotEmpty(ValueError):
+    """A workspace that still holds dashboards cannot be deleted."""
+
+
+class ScheduleTooFrequent(ValueError):
+    """A schedule below dashboards.min_refresh_minutes."""
+
+
+class SecretValueInConfig(ValueError):
+    """A secret value would be written into YAML; secrets are written as references (D122)."""

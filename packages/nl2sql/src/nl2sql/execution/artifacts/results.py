@@ -14,9 +14,11 @@ another tenant's run, and an id that is not a plain token are all the same
 from __future__ import annotations
 
 import re
-from typing import Any, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from pydantic import BaseModel, Field
+
+from nl2sql.charts.spec import ColumnKind
 
 # The most rows one page returns; a larger page size is cut to this.
 MAX_RESULT_PAGE_SIZE = 1000
@@ -35,6 +37,9 @@ class ResultSummary(BaseModel):
     row_count: int = 0
     # True when a sub-query feeding it was cut at its row ceiling, so rows may be missing.
     truncated: bool = False
+    # Each column's type category (Wave A's D30), from the saved file's schema, so a chart can be chosen
+    # without reading rows. Empty until the artifact writer fills it (docs/architecture/wave_c.md, D112).
+    column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)
 
 
 class ResultManifest(BaseModel):

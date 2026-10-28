@@ -79,7 +79,7 @@ def test_the_aggregator_writes_a_manifest_beside_the_results(store, tmp_path):
 
     assert manifest == {
         "request_id": "run-1",
-        "results": [{"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False}],
+        "results": [{"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {}}],
     }
     assert (tmp_path / "t1" / "run-1" / "result_combine_g1.parquet").is_file()
 
@@ -106,7 +106,7 @@ def test_query_result_exposes_the_manifest_entries(store):
 
     assert isinstance(result, QueryResult)
     assert [r.model_dump() for r in result.result_manifest] == [
-        {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False}]
+        {"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {}}]
 
 
 def test_the_facade_reads_the_manifest(store):

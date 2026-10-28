@@ -125,7 +125,9 @@ def test_catalog_lists_every_event_with_its_schema_and_audiences():
 def test_the_audited_events_are_the_catalogs():
     assert AUDIT_EVENTS == {"run.finished", "run.failed", "llm.changed", "hook.decision", "policy.decision",
                             "run.limit_reached", "index.swapped", "retention.purged", "schema.drifted",
-                            "cost.estimated", "proposal.decided"}
+                            "cost.estimated", "proposal.decided", "datasource.saved", "api_key.created",
+                            "api_key.revoked", "mcp.denied", "dashboard.schedule_set",
+                            "dashboard.schedule_stopped"}
     assert AUDIT_EVENTS == {name for name, spec in CATALOG.items() if spec.audit}
 
 
