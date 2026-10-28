@@ -2632,8 +2632,11 @@ depends on the client:</p>
 <p>API keys: <code>engine.api_keys</code> makes bearer tokens that each carry the user,
   tenant and roles their holder runs as, and <code>verify(token)</code> turns a token
   back into that <code>UserContext</code>. This is the one place the engine itself
-  checks who is asking; MCP over HTTP is the first transport to use it, and the
-  other clients above still do not. See <a href="../api-keys/">API keys</a>.</p>
+  checks who is asking; MCP over HTTP (<code>nl2sql mcp --http</code>) is the first
+  transport to use it, and the other clients above still do not. Every
+  request there needs a valid key, and runs as that key's user, tenant and
+  roles. See <a href="../api-keys/">API keys</a> and
+  <a href="../../getting_started/mcp/#over-http">MCP over HTTP</a>.</p>
 </li>
 <li>
 <p>Playground: the page sends the role chosen in "Ask as" with each request
@@ -2755,8 +2758,17 @@ user who produced it is left to a multi-user deployment.</p>
   SHA-256 of its 256-bit secret is stored; <code>verify</code> compares in constant time
   and answers <code>None</code> for a malformed, unknown or revoked token. Managing keys
   needs a <code>policies.admin_roles</code> caller, a key's roles must be configured
-  roles, and neither an event nor a log line carries the token. See
-  <a href="../api-keys/">API keys</a>.</li>
+  roles, and neither an event nor a log line carries the token.</li>
+<li><strong>MCP over HTTP</strong> (<code>nl2sql mcp --http</code>): a missing, malformed, unknown or
+  revoked bearer key is a <code>401</code> and an audited <code>mcp.denied</code> event (the reason
+  and, for a revoked key, its id; never the token). Each request carries its own
+  caller, so two keys in flight never share an identity. A <code>Host</code> or <code>Origin</code>
+  that <code>mcp.http.allowed_hosts</code> and <code>allowed_origins</code> do not list is refused
+  (DNS-rebinding protection). <code>mcp.auth: none</code> runs every request as one
+  identity, so it is for loopback only and the server refuses to bind any other
+  address with it. The server speaks plain HTTP: put a reverse proxy or a
+  tunnel in front for TLS, since a bearer token sent in the clear is readable.
+  See <a href="../api-keys/">API keys</a>.</li>
 <li><strong>Audit logging</strong> records <code>llm.changed</code> events only: each <code>engine.llm.replace</code>
   (the Python API, <code>PUT /api/v1/settings/llm</code>, the playground's model switch),
   with who made it and each agent's old and new model, never a key. Queries

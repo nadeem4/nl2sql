@@ -6064,7 +6064,7 @@ default. The server is its own process, built on the same
 <a href="#__codelineno-12-6" id="__codelineno-12-6" name="__codelineno-12-6"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
 <a href="#__codelineno-12-7" id="__codelineno-12-7" name="__codelineno-12-7"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8765</span>
 <a href="#__codelineno-12-8" id="__codelineno-12-8" name="__codelineno-12-8"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mcp</span>
-<a href="#__codelineno-12-9" id="__codelineno-12-9" name="__codelineno-12-9"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
+<a href="#__codelineno-12-9" id="__codelineno-12-9" name="__codelineno-12-9"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"127.0.0.1"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
 <a href="#__codelineno-12-10" id="__codelineno-12-10" name="__codelineno-12-10"></a><span class="w">  </span><span class="nt">allowed_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                              </span><span class="c1"># browser Origins accepted</span>
 <a href="#__codelineno-12-11" id="__codelineno-12-11" name="__codelineno-12-11"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span><span class="w">            </span><span class="c1"># api_keys | none (none: loopback only)</span>
 </code></pre></div>
@@ -7154,7 +7154,51 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a <c
 </ul>
 </div>
 <h3 id="m2">M2</h3>
-<p>Not built yet.</p>
+<div class="admonition note">
+<p class="admonition-title">Built (M2): MCP over HTTP</p>
+<ul>
+<li><strong>Files:</strong> <code>nl2sql/mcp/http.py</code> (new: <code>build_app</code>, <code>serve</code>, the bearer middleware, the context variable),
+  <code>nl2sql/mcp/server.py</code> (<code>build_server(..., over_http=True)</code>, the new <code>ask</code>), <code>cli/commands/mcp.py</code> and
+  <code>cli/main.py</code> (<code>--http</code>, <code>--host</code>, <code>--port</code>), <code>api/api_keys_api.py</code> (<code>check</code>, <code>record_denied</code>, <code>KeyCheck</code>).</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_mcp_http.py</code> (Starlette's in-process client over a real engine; <code>run_query</code>
+  answers with the caller it ran as, so no model or database is involved), <code>test_mcp_server.py</code> (the new
+  <code>ask</code>), <code>tests/cli/test_mcp_command.py</code> (<code>--http</code>), <code>test_api_keys.py</code> (<code>check</code>, <code>record_denied</code>).</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><strong><code>engine.api_keys.check(token) -&gt; KeyCheck</code> and <code>record_denied(reason, key_id=None)</code></strong>, as M1's note asked:
+  <code>check</code> compares the secret before it reports <code>revoked</code> (right id, wrong secret is <code>unknown</code>, and then
+  <code>key_id</code> is <code>None</code>), <code>verify</code> is <code>check(token).user</code>, and <code>nl2sql.policies.keys.parse</code> stays behind
+  <code>ApiKeysAPI</code>. <code>mcp/</code> has no way to publish an event through the facade, so <code>record_denied</code> publishes
+  <code>mcp.denied</code> (all four reasons, <code>missing</code> included); a later <code>nl2sql-api</code> that wants its own event
+  would add its own method.</li>
+<li><strong><code>ask</code> takes <code>conversation_id</code> and an option-id <code>choice</code></strong>, and returns <code>conversation_id</code>, <code>turn</code> and
+  <code>question</code> (what ran: for a choice, the request's own question) beside Wave A's keys. <code>datasource_id</code>
+  applies when a conversation starts (it is the conversation's, as in C1) and is refused with a
+  <code>conversation_id</code>. A <code>choice</code> without a <code>conversation_id</code> is <code>CLARIFICATION_INVALID</code> and starts nothing.
+  The clarification no longer carries <code>request</code> (the conversation holds it; the client sends back an id),
+  only <code>phrase</code> and the options. New codes in the tool's output, not <code>ErrorCode</code>s: <code>CONVERSATION_NOT_FOUND</code>
+  (missing or someone else's), <code>CONVERSATION_BUSY</code>, <code>INVALID_REQUEST</code>.</li>
+<li><strong><code>auth: none</code> takes an identity.</strong> <code>nl2sql mcp --http</code> with <code>auth: none</code> runs every request as the
+  <code>--role</code>/<code>--user</code> identity (as stdio does) and needs a role; with <code>api_keys</code> a <code>--role</code> or <code>--user</code> is
+  an error. The bind rule is the design's: <code>auth: none</code> on a non-loopback host refuses to start. A public
+  bind with <code>api_keys</code> and no keys created yet starts (no key can be used, so nothing is exposed).</li>
+<li>The bearer middleware is plain ASGI (not Starlette's <code>BaseHTTPMiddleware</code>), so the context variable
+  reaches the stateless transport's task. Only an <code>Authorization</code> header with the <code>Bearer</code> scheme and a
+  token counts: no header is <code>missing</code>, anything else that is not <code>Bearer &lt;token&gt;</code> is <code>malformed</code>. A
+  failing key check (the state store is down) is a 500 and a log line.</li>
+<li><code>cli/main.py</code> changed (the options), which C0's list of untouched files did not expect.</li>
+<li><strong>Review fixes.</strong> A fixed identity with no <code>user_id</code> (stdio without <code>--user</code>, <code>auth: none</code>) asks as
+  <code>mcp</code> (<code>DEFAULT_USER</code> in <code>server.py</code>, applied where the tool resolves its caller), since a conversation
+  needs an owner; a missing caller still fails closed. <code>auth: none</code> also refuses to start when
+  <code>allowed_hosts</code> lists a non-loopback name (a proxy would expose the one identity). <code>CONVERSATION_TOO_LONG</code>
+  has its own code; another <code>ValueError</code> is <code>CLARIFICATION_INVALID</code> with a <code>choice</code> and <code>INVALID_REQUEST</code>
+  without. <code>question</code> is optional with a <code>choice</code> (the pending question is used). The returned turn is
+  matched by the run's <code>trace_id</code>, not read as the conversation's last. <code>record_denied</code> raises for an
+  unknown reason; <code>check</code> hashes a dummy for an unknown id; only <code>lifespan</code> scopes skip the key check and a
+  websocket is closed. The default <code>allowed_hosts</code> adds <code>[::1]</code> and the bare names.</li>
+</ul>
+</div>
 <h2 id="14-bugs-wave-c-fixes">14. Bugs Wave C fixes</h2>
 <table>
 <thead>

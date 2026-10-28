@@ -6141,7 +6141,7 @@ events to its own. The three marked <em>turn</em> belong to a conversation turn,
 <tr>
 <td><code>mcp.denied</code></td>
 <td><code>reason</code> (<code>missing</code>, <code>malformed</code>, <code>unknown</code>, <code>revoked</code>), <code>key_id</code></td>
-<td><code>nl2sql mcp --http</code> refused a bearer token (audited, M2)</td>
+<td><code>nl2sql mcp --http</code> refused a bearer token: no header, a malformed token, an unknown key or a revoked one (audited; never the token)</td>
 </tr>
 </tbody>
 </table>

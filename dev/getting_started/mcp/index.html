@@ -1986,6 +1986,56 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#over-http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over HTTP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Over HTTP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host-origin-and-tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host, Origin and TLS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-a-client_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect a client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5814,6 +5864,56 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#over-http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over HTTP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Over HTTP">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host-origin-and-tls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host, Origin and TLS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connect-a-client_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connect a client
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5833,9 +5933,10 @@
 
 <h1 id="mcp-server">MCP server</h1>
 <p><code>nl2sql mcp</code> serves the engine to an MCP client, such as a desktop assistant or
-an IDE, over stdio. The client gets three tools: <code>ask</code>, <code>list_datasources</code> and
+an IDE, over stdio, or with <code>--http</code> over HTTP behind <a href="#over-http">API keys</a>.
+The client gets three tools: <code>ask</code>, <code>list_datasources</code> and
 <code>describe_table</code>. It is built on the official <code>mcp</code> Python SDK and uses only
-the engine's public API, so it answers exactly as <code>engine.run_query</code> does.</p>
+the engine's public API, so it answers as <code>engine.run_query</code> does.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nl2sql-engine[mcp]"</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>my-project/nl2sql.yaml<span class="w"> </span>mcp<span class="w"> </span>--role<span class="w"> </span>analyst
 </code></pre></div>
@@ -5858,7 +5959,7 @@ and every tool call runs as the role they name.</p>
 </tr>
 <tr>
 <td><code>--user ID</code></td>
-<td>The user id runs are recorded under (traces, the audit log, approvals). Optional.</td>
+<td>The user id runs are recorded under (traces, the audit log, approvals) and conversations belong to. Optional: without it the user id is <code>mcp</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -5901,7 +6002,7 @@ run's trace.</p>
 <tbody>
 <tr>
 <td><code>ask</code></td>
-<td><code>question</code>, <code>datasource_id</code> (optional: skip routing), <code>choice</code> (optional: the pick for a question that asked, see below)</td>
+<td><code>question</code> (it must stand alone; optional only when sending a <code>choice</code>, which answers the pending question), <code>conversation_id</code> (optional: continue that conversation), <code>datasource_id</code> (optional: skip routing; only when starting one), <code>choice</code> (optional: the option id for a question that asked, see below)</td>
 <td>See below.</td>
 </tr>
 <tr>
@@ -5925,6 +6026,10 @@ run's trace.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>conversation_id</code>, <code>turn</code>, <code>question</code></td>
+<td>The conversation this ask belongs to (a new one without a <code>conversation_id</code>), the turn's number in it, and the question that ran.</td>
+</tr>
 <tr>
 <td><code>status</code></td>
 <td>The run's status: <code>success</code>, <code>plan_only</code>, <code>error</code>, <code>needs_approval</code>, <code>stopped</code>, <code>needs_clarification</code>.</td>
@@ -5967,16 +6072,23 @@ run's trace.</p>
 </tr>
 <tr>
 <td><code>clarification</code></td>
-<td>When <code>status</code> is <code>needs_clarification</code>: the <code>phrase</code>, each option's <code>id</code>, <code>label</code> and plain-English <code>explanation</code>, and the <code>request</code> itself (the plans stay in it).</td>
+<td>When <code>status</code> is <code>needs_clarification</code>: the <code>phrase</code>, and each option's <code>id</code>, <code>label</code> and plain-English <code>explanation</code>. The request itself stays in the conversation.</td>
 </tr>
 </tbody>
 </table>
+<p>Each <code>ask</code> is a turn of a conversation owned by the caller: without <code>conversation_id</code> one starts, with
+it the question continues that conversation. The client's own model leads, so <code>ask</code> runs only the
+question, with no model call of its own; write each question so it stands alone. A conversation that
+is another user's, or does not exist, is <code>CONVERSATION_NOT_FOUND</code>; one running another turn is
+<code>CONVERSATION_BUSY</code>; one that has reached <code>conversations.max_turns</code> is <code>CONVERSATION_TOO_LONG</code>: start a new one.
+A <code>datasource_id</code> on a follow-up (it is set when the conversation starts), or no <code>question</code> and no <code>choice</code>, is
+<code>INVALID_REQUEST</code>.</p>
 <p>A question that can be read more than one way is not run. The assistant shows the
-options to its user and calls <code>ask</code> again with the same question and
-<code>choice={"request": &lt;the clarification's request&gt;, "option_id": "b"}</code>; the engine runs that
-option's plan through the same checks as any plan, under the same role. A request that is not
-this question's, or that the data or glossary has outdated, comes back as an error
-(<code>CLARIFICATION_INVALID</code>, <code>CLARIFICATION_STALE</code>): ask again without a choice.</p>
+options to its user and calls <code>ask</code> again with the same <code>conversation_id</code> and
+<code>choice="b"</code>, the id of the option picked; the engine runs that option's plan through the same
+checks as any plan, under the same role. A choice with no <code>conversation_id</code>, an id that is not an
+option of the pending question, or nothing pending is <code>CLARIFICATION_INVALID</code>; a request that the
+data or glossary has outdated is <code>CLARIFICATION_STALE</code>: ask again without a choice.</p>
 <p>An exception out of the engine is <code>{"status": "error", "errors": [{"code":
 "INTERNAL_ERROR", ...}]}</code>, and logged.</p>
 <h2 id="what-a-role-cannot-see">What a role cannot see</h2>
@@ -6023,7 +6135,80 @@ is built, so neither can change it.</p>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">with</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span> <span class="k">as</span> <span class="n">engine</span><span class="p">:</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">build_server</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">]))</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"stdio"</span><span class="p">)</span>
 </code></pre></div>
-<p>MCP over HTTP, with authentication, is planned for Wave C.</p>
+<p>For HTTP, <code>build_server(engine, identity, over_http=True)</code> sets the server up for
+<code>streamable_http_app()</code>, and <code>nl2sql.mcp.http.build_app(engine, identity)</code> wraps it in the key
+check; <code>nl2sql.mcp.http.serve(engine, identity)</code> runs it with Uvicorn. <code>identity</code> is only used
+with <code>mcp.auth: none</code>.</p>
+<h2 id="over-http">Over HTTP</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nl2sql<span class="w"> </span>keys<span class="w"> </span>create<span class="w"> </span>--as<span class="w"> </span>admin<span class="w"> </span>--user<span class="w"> </span>ana<span class="w"> </span>--role<span class="w"> </span>analyst<span class="w"> </span>--label<span class="w"> </span>laptop<span class="w">   </span><span class="c1"># prints the token once</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>nl2sql<span class="w"> </span>--config<span class="w"> </span>my-project/nl2sql.yaml<span class="w"> </span>mcp<span class="w"> </span>--http<span class="w">                        </span><span class="c1"># http://127.0.0.1:8765/mcp</span>
+</code></pre></div>
+<p><code>nl2sql mcp --http [--host H] [--port P]</code> serves the same three tools at <code>/mcp</code> over the MCP SDK's
+streamable HTTP transport, stateless with JSON responses: each request stands alone, and a
+follow-up names its <code>conversation_id</code>. stdio stays the default. Without <code>--host</code> and <code>--port</code> the
+server uses <code>mcp.http</code> in <code>mcp.yaml</code> (see <a href="../../configuration/system/">the <code>mcp</code> section</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># nl2sql.yaml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">mcp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mcp.yaml</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># mcp.yaml (every value shown is the default)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="nt">http</span><span class="p">:</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8765</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mcp</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"127.0.0.1"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"[::1]"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">  </span><span class="nt">allowed_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                              </span><span class="c1"># browser Origins accepted</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span><span class="w">            </span><span class="c1"># api_keys | none (none: loopback only)</span>
+</code></pre></div>
+<h3 id="keys">Keys</h3>
+<p>With <code>auth: api_keys</code> every request carries <code>Authorization: Bearer &lt;token&gt;</code>, a token from
+<a href="../../security/api-keys/"><code>nl2sql keys create</code></a>. The request runs as that key's user, tenant and roles;
+nothing is taken from the client, and <code>--role</code> and <code>--user</code> do not apply. Two keys in flight at once
+each get their own identity. A missing, malformed, unknown or revoked key is a <code>401</code> with
+<code>WWW-Authenticate: Bearer</code>, and an <code>mcp.denied</code> event the audit observer keeps (the reason and a
+revoked key's id; never the token). Revoke a key and its next request fails.</p>
+<p><code>auth: none</code> runs every request as the one identity <code>--role</code> and <code>--user</code> name, as stdio does. It is
+for trying things out on your own machine: the server refuses to bind any address but loopback with it,
+and refuses to start when <code>allowed_hosts</code> lists a name that is not loopback (see below).</p>
+<h3 id="host-origin-and-tls">Host, Origin and TLS</h3>
+<p>The SDK's DNS-rebinding protection refuses a request whose <code>Host</code> is not in <code>allowed_hosts</code>
+(entries are <code>host</code> or <code>host:*</code>) or whose <code>Origin</code> is present and not in <code>allowed_origins</code>. The
+default allows the loopback names only, so a server reached under another name needs that name:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">http</span><span class="p">:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"mcp.example.com"</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>The server speaks plain HTTP and the key is a bearer token, so anything that is not on your own machine
+needs TLS from a reverse proxy or a tunnel, and a remote chat app requires <code>https</code>. Keep the server on
+<code>127.0.0.1</code> and let the proxy face the network:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a># Caddy: terminates TLS, forwards to the server
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>mcp.example.com {
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    reverse_proxy 127.0.0.1:8765
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>}
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a># or a tunnel
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>cloudflared tunnel --url http://127.0.0.1:8765
+</code></pre></div>
+<p>The proxy or tunnel passes the public name as <code>Host</code>, so list it in <code>allowed_hosts</code>. Binding a public
+address directly (<code>--host 0.0.0.0</code>) is allowed with <code>auth: api_keys</code> only. For the same reason a proxy or
+tunnel needs <code>auth: api_keys</code> too: with <code>auth: none</code> the server refuses to start when <code>allowed_hosts</code> lists
+any name that is not loopback, since anyone who could reach that name would read as the one identity.</p>
+<h3 id="connect-a-client_1">Connect a client</h3>
+<p>A client that lets its user set a header works with keys: a desktop assistant's or IDE's config file, or
+a script using a model provider's remote MCP tool. For example, in a client's JSON config:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">"nl2sql"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"http"</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="nt">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"https://mcp.example.com/mcp"</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">"headers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"Authorization"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Bearer nl2sql_&lt;id&gt;_&lt;secret&gt;"</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="p">}</span>
+</code></pre></div>
+<p>Keep the token in the client's secret store, not in a file you share. A chat app whose connector screen
+offers only OAuth does not work with keys; OAuth is the next step after 0.9. The hosted demo is not
+exposed over MCP.</p>
+<p>Logs go to stderr. A request that fails to check a key (the state store is down) is a <code>500</code> and a log
+line, never the token.</p>
 
 
 
