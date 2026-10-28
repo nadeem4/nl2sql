@@ -6050,8 +6050,8 @@ after the client is constructed, so the config - not the model name -
 decides what is sent.</p>
 </div>
 <h2 id="per-node-models">Per-node models</h2>
-<p>The six pipeline nodes that call a model, the profiler's drafts and eval
-seeding each have an agent. An agent not under <code>agents</code> runs on the top level:</p>
+<p>The six pipeline nodes that call a model, the profiler's drafts, eval
+seeding and the conversation each have an agent. An agent not under <code>agents</code> runs on the top level:</p>
 <table>
 <thead>
 <tr>
@@ -6091,6 +6091,10 @@ seeding each have an agent. An agent not under <code>agents</code> runs on the t
 <tr>
 <td><code>eval_seeder</code></td>
 <td>drafts eval questions with typed plans during <code>nl2sql eval seed</code> (<a href="../../evals/seeding/">Benchmark your own database</a>)</td>
+</tr>
+<tr>
+<td><code>conversation</code></td>
+<td>leads a conversation turn: reads the history and either replies or calls a tool, one call per step (release 0.9, <a href="../../architecture/wave_c/">Wave C</a>; <code>engine.conversations</code> arrives with C1). A small model is enough. A config that pins every agent's model should add it.</td>
 </tr>
 </tbody>
 </table>

@@ -2395,6 +2395,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#charts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        charts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conversations-and-dashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conversations and dashboards
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5435,6 +5457,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#charts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        charts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conversations-and-dashboards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        conversations and dashboards
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5509,6 +5553,10 @@ different settings.</p>
 <a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="w">  </span><span class="nt">max_cost_usd</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.50</span>
 <a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a><span class="nt">review</span><span class="p">:</span>
 <a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a><span class="w">  </span><span class="nt">max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">365</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a><span class="nt">charts</span><span class="p">:</span><span class="w">                       </span><span class="c1"># read from release 0.9 (Wave C)</span>
+<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a><span class="w">  </span><span class="nt">max_points</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="w">  </span><span class="nt">max_categories</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a><span class="w">  </span><span class="nt">max_series</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
 </code></pre></div>
 <p>Unknown keys are errors, as everywhere in the config. The demo
 (<code>nl2sql init --demo</code>) writes a <code>settings.yaml</code> with <code>pipeline.timeout_s: 300</code>
@@ -5518,7 +5566,7 @@ trace).</p>
 <p>In Python, the groups are <code>Settings</code>, <code>PipelineSettings</code>, <code>RetrySettings</code>,
 <code>RetrievalSettings</code>, <code>RoutingSettings</code>, <code>ResultSettings</code>, <code>TraceSettings</code>,
 <code>SchemaSettings</code>, <code>CuratedSettings</code>, <code>FeedbackSettings</code>, <code>KnowledgeSettings</code>,
-<code>ClarifySettings</code>, <code>ProfilerSettings</code> and <code>ReviewSettings</code> in <code>nl2sql.config</code>.</p>
+<code>ClarifySettings</code>, <code>ProfilerSettings</code>, <code>ReviewSettings</code> and <code>ChartSettings</code> in <code>nl2sql.config</code>.</p>
 <p>Where the engine's events, logs and metrics go is not a setting: it is the
 <a href="../observers/"><code>observers</code> section</a> of
 <code>nl2sql.yaml</code>. The 0.6 <code>observability</code> group (<code>exporter</code>, <code>otlp_endpoint</code>)
@@ -5866,6 +5914,85 @@ accepted and validated now; the Wave B change named with each reads it.</p>
 <td><code>review.max_age_days</code></td>
 <td><code>365</code></td>
 <td>Decided proposals older than this are purged by <code>engine.storage.purge()</code> (Q1).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="charts"><code>charts</code></h2>
+<p>Release 0.9 (<a href="../../architecture/wave_c/">Wave C</a>). It is accepted and validated
+now; the auto charts change (K1) reads it.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>charts.max_points</code></td>
+<td><code>1000</code></td>
+<td>The most rows charted. A longer result is read up to this and flagged <code>truncated</code>; a line chart becomes a table rather than drop points silently.</td>
+</tr>
+<tr>
+<td><code>charts.max_categories</code></td>
+<td><code>20</code></td>
+<td>The most categories a bar chart draws; more is a table.</td>
+</tr>
+<tr>
+<td><code>charts.max_series</code></td>
+<td><code>5</code></td>
+<td>The most lines in one line chart (measures, or values of a category split into lines).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="conversations-and-dashboards"><code>conversations</code> and <code>dashboards</code></h2>
+<p>These two are sections of <code>nl2sql.yaml</code> of their own, not groups of
+<code>settings</code>: see
+<a href="../system/#conversations-chat-tools-dashboards-and-mcp">Conversations, chat tools, dashboards and MCP</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conversations.context_turns</code></td>
+<td><code>3</code></td>
+<td>Turns of history the model sees.</td>
+</tr>
+<tr>
+<td><code>conversations.max_tool_calls</code></td>
+<td><code>12</code></td>
+<td>Tool calls the model may make in one turn; after the last it makes one more call with the tools off and must reply.</td>
+</tr>
+<tr>
+<td><code>conversations.max_turns</code></td>
+<td><code>50</code></td>
+<td>Turns in one conversation; the next is refused with <code>CONVERSATION_TOO_LONG</code>.</td>
+</tr>
+<tr>
+<td><code>conversations.max_age_days</code></td>
+<td><code>30</code></td>
+<td>Conversations, and draft dashboards, not updated for this long are deleted by <code>engine.storage.purge()</code>. <code>null</code> keeps them.</td>
+</tr>
+<tr>
+<td><code>dashboards.max_tiles</code></td>
+<td><code>10</code></td>
+<td>Charts in the starter dashboard.</td>
+</tr>
+<tr>
+<td><code>dashboards.min_refresh_minutes</code></td>
+<td><code>15</code></td>
+<td>The shortest refresh schedule; a shorter one is refused.</td>
+</tr>
+<tr>
+<td><code>dashboards.schedule_identity_max_age_days</code></td>
+<td><code>30</code></td>
+<td>A schedule stops when the owner identity saved with it is older than this, until the owner sets it again.</td>
 </tr>
 </tbody>
 </table>

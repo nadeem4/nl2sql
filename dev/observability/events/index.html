@@ -5399,7 +5399,7 @@ that is not in it cannot be published.</p>
 </tr>
 <tr>
 <td><code>result.manifest</code></td>
-<td><code>results</code>: each saved result's <code>node_id</code>, <code>columns</code>, <code>row_count</code>, <code>truncated</code></td>
+<td><code>results</code>: each saved result's <code>node_id</code>, <code>columns</code>, <code>row_count</code>, <code>truncated</code>, <code>column_kinds</code></td>
 <td>yes</td>
 </tr>
 <tr>
@@ -5539,6 +5539,86 @@ on the engine's bus directly.</p>
 <td><code>proposal.decided</code></td>
 <td><code>id</code>, <code>kind</code>, <code>datasource_id</code>, <code>decision</code>, <code>by</code>, <code>wrote</code></td>
 <td><code>engine.proposals.accept</code> or <code>reject</code> decided one (audited)</td>
+</tr>
+</tbody>
+</table>
+<p>Release 0.9 (<a href="../../architecture/wave_c/">Wave C</a>) adds the events below. They are catalogued now; the change named
+with each publishes it. None is on <code>stream_query</code>'s allow-list: <code>conversations.stream</code> adds the two conversation
+events to its own. The three marked <em>turn</em> belong to a conversation turn, which opens a scope of its own and so has a
+<code>trace_id</code>; none carries rows, a value of an argument, or a token.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Data</th>
+<th>Published when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conversation.started</code></td>
+<td><code>conversation_id</code>, <code>user_id</code>, <code>datasource_id</code></td>
+<td><code>engine.conversations.start</code> (C1)</td>
+</tr>
+<tr>
+<td><code>conversation.step</code> (turn)</td>
+<td><code>conversation_id</code>, <code>turn</code>, <code>tool</code>, <code>status</code>, <code>trace_id</code> (an <code>ask</code> step's), <code>args</code> (argument names only)</td>
+<td>the model's loop finished one tool call (C1)</td>
+</tr>
+<tr>
+<td><code>conversation.turn</code> (turn)</td>
+<td><code>conversation_id</code>, <code>turn</code>, <code>kind</code>, <code>status</code>, <code>trace_id</code>, <code>steps</code>, <code>stored</code> (the stored <code>Turn</code> as JSON, on the conversation stream only)</td>
+<td>a turn was stored (C1)</td>
+</tr>
+<tr>
+<td><code>chat_tool.called</code> (turn)</td>
+<td><code>tool</code>, <code>conversation_id</code>, <code>turn</code>, <code>ok</code>, <code>seconds</code>, <code>error_code</code></td>
+<td>a registry chat tool ran (C2)</td>
+</tr>
+<tr>
+<td><code>dashboard.generated</code></td>
+<td><code>dashboard_id</code>, <code>datasource_id</code>, <code>tiles</code>, <code>skipped</code></td>
+<td><code>engine.dashboards.generate</code> (D3)</td>
+</tr>
+<tr>
+<td><code>dashboard.refreshed</code></td>
+<td><code>dashboard_id</code>, <code>trigger</code>, <code>counts</code> (charts per status), <code>filters</code> (ids, never values)</td>
+<td>a refresh, an open that refreshed, or a scheduled run (D2)</td>
+</tr>
+<tr>
+<td><code>dashboard.changed</code></td>
+<td><code>dashboard_id</code>, <code>change</code> (edit kinds, <code>pinned</code>, <code>moved</code>, <code>deleted</code>), <code>by</code></td>
+<td>an edit, a pin or a delete (D1)</td>
+</tr>
+<tr>
+<td><code>dashboard.schedule_set</code></td>
+<td><code>dashboard_id</code>, <code>every_minutes</code>, <code>by</code></td>
+<td>a schedule was set; it saves a role snapshot (audited, D1)</td>
+</tr>
+<tr>
+<td><code>dashboard.schedule_stopped</code></td>
+<td><code>dashboard_id</code>, <code>reason</code></td>
+<td>a schedule stopped with a visible error (audited, D2)</td>
+</tr>
+<tr>
+<td><code>workspace.changed</code></td>
+<td><code>workspace_id</code>, <code>change</code> (<code>created</code>, <code>renamed</code>, <code>deleted</code>), <code>by</code></td>
+<td><code>engine.workspaces</code> (D1)</td>
+</tr>
+<tr>
+<td><code>datasource.saved</code></td>
+<td><code>datasource_id</code>, <code>file</code>, <code>by</code></td>
+<td><code>engine.datasources.save</code> wrote one datasource file (audited, L2)</td>
+</tr>
+<tr>
+<td><code>api_key.created</code>, <code>api_key.revoked</code></td>
+<td><code>key_id</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code>, <code>by</code> (on revoke, <code>user_id</code> is whose key it was); never the token</td>
+<td><code>engine.api_keys</code> (audited, M1)</td>
+</tr>
+<tr>
+<td><code>mcp.denied</code></td>
+<td><code>reason</code> (<code>missing</code>, <code>malformed</code>, <code>unknown</code>, <code>revoked</code>), <code>key_id</code></td>
+<td><code>nl2sql mcp --http</code> refused a bearer token (audited, M2)</td>
 </tr>
 </tbody>
 </table>

@@ -2702,6 +2702,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#optional-discoverableadapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: DiscoverableAdapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-conformance-kit-nl2sql_sdktesting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5657,6 +5668,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#optional-discoverableadapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional: DiscoverableAdapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-conformance-kit-nl2sql_sdktesting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6199,7 +6221,7 @@ The storage config names one per slot by <code>type</code> (see
 <tbody>
 <tr>
 <td style="text-align: left;"><code>interface_version</code></td>
-<td style="text-align: left;"><code>3</code>. The engine accepts exactly the version it was built for. Version 2 added <code>StateStore.put_schema_diff</code> and <code>get_schema_diff</code> (schema drift); version 3 the review queue's proposal methods and <code>BuildPointer.knowledge_hash</code>. The version is one per kind, so a store of any slot declares <code>3</code>.</td>
+<td style="text-align: left;"><code>4</code>. The engine accepts exactly the version it was built for. Version 2 added <code>StateStore.put_schema_diff</code> and <code>get_schema_diff</code> (schema drift); version 3 the review queue's proposal methods and <code>BuildPointer.knowledge_hash</code>; version 4 the conversation, workspace, dashboard, stored chart result and API key methods. The version is one per kind, so a store of any slot declares <code>4</code>.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>slot</code></td>
@@ -6230,7 +6252,7 @@ The storage config names one per slot by <code>type</code> (see
 </tr>
 <tr>
 <td style="text-align: left;"><code>StateStore</code></td>
-<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code> (also deletes the diffs of the snapshots it deletes), <code>put_schema_diff(diff)</code> (keyed by <code>diff.datasource_id</code> and <code>diff.to_version</code>, which it requires; replaces one stored before), <code>get_schema_diff(datasource_id, schema_version)</code> (or <code>None</code>), <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>put_proposal(proposal)</code> (replaces the row with its id), <code>get_proposal(id)</code>, <code>list_proposals(kind=None, status=None, datasource_id=None, limit=None)</code> (newest first), <code>decide_proposal(id, status, *, by, reason=None, wrote=None, at=None)</code>, <code>purge_proposals(older_than)</code> (decided rows only), <code>lock(name, ttl_s)</code>, <code>close()</code></td>
+<td style="text-align: left;"><code>migrate()</code>, <code>put_snapshot(snapshot)</code>, <code>get_snapshot(datasource_id, schema_version)</code>, <code>list_versions(datasource_id)</code> (newest first), <code>keep_snapshots(datasource_id, keep)</code> (also deletes the diffs of the snapshots it deletes), <code>put_schema_diff(diff)</code> (keyed by <code>diff.datasource_id</code> and <code>diff.to_version</code>, which it requires; replaces one stored before), <code>get_schema_diff(datasource_id, schema_version)</code> (or <code>None</code>), <code>get_plan</code>, <code>put_plan</code>, <code>clear_plans()</code>, <code>add_feedback(row)</code>, <code>list_feedback(limit=None)</code>, <code>clear_feedback()</code>, <code>put_proposal(proposal)</code> (replaces the row with its id), <code>get_proposal(id)</code>, <code>list_proposals(kind=None, status=None, datasource_id=None, limit=None)</code> (newest first), <code>decide_proposal(id, status, *, by, reason=None, wrote=None, at=None)</code>, <code>purge_proposals(older_than)</code> (decided rows only), the version 4 methods on JSON documents (<code>dict</code>; see <a href="../../schema/store/#conversations-dashboards-and-api-keys">The state store</a>): <code>put_conversation</code>, <code>get_conversation</code>, <code>list_conversations(tenant_id, user_id, limit)</code>, <code>delete_conversation</code>, <code>purge_conversations(older_than)</code>, <code>put_dashboard</code>, <code>get_dashboard</code>, <code>list_dashboards(tenant_id, user_id)</code>, <code>delete_dashboard</code>, <code>purge_dashboards(drafts_older_than)</code>, <code>list_scheduled_dashboards()</code>, <code>put_workspace</code>, <code>get_workspace</code>, <code>list_workspaces(tenant_id, user_id)</code>, <code>delete_workspace</code>, <code>put_tile_runs(dashboard_id, docs)</code>, <code>get_tile_runs(dashboard_id)</code>, <code>add_api_key(row)</code> (raises <code>ValueError</code> when the id exists), <code>revoke_api_key(key_id, revoked_at)</code>, <code>get_api_key(key_id)</code>, <code>list_api_keys()</code>, then <code>lock(name, ttl_s)</code>, <code>close()</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>TraceStore</code></td>
@@ -6266,7 +6288,7 @@ vectors it is handed.</p>
 <a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
 <a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
 <a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="k">class</span><span class="w"> </span><span class="nc">BucketResults</span><span class="p">:</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">3</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span>
 <a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">slot</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"results"</span>
 <a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]]</span> <span class="o">=</span> <span class="n">BucketConfig</span>
 <a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
@@ -6379,6 +6401,42 @@ source in the <code>nl2sql.knowledge_sources</code> entry point group, or regist
 in code with <code>registry.add_knowledge_source(name, cls)</code> or
 <code>@registry.knowledge_source(name)</code>. The built-in <code>yaml</code> source arrives
 with release 0.8.</p>
+<hr />
+<h2 id="optional-discoverableadapter">Optional: <code>DiscoverableAdapter</code></h2>
+<p>An adapter can declare what it is found by, so <code>engine.datasources.scan()</code>
+(release 0.9, <a href="../../architecture/wave_c/#finding-a-database-scan">Wave C</a>)
+can offer it without the engine naming any database. It lives in
+<code>nl2sql_sdk.discovery</code>, which imports only pydantic and the standard
+library, with <code>Found</code> (<code>kind</code>: <code>url</code>, <code>file</code> or <code>port</code>, and its <code>value</code>). The
+engine tests for it with <code>isinstance</code>, so an adapter without it is never found,
+only chosen by name, and the adapter interface stays at version 2. The <code>scan()</code>
+method itself arrives with L1.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Member</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>file_suffixes</code></td>
+<td style="text-align: left;">File suffixes it opens, such as <code>(".sqlite", ".sqlite3", ".db")</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>default_ports</code></td>
+<td style="text-align: left;">TCP ports it listens on by default, such as <code>(5432,)</code>. Probed on <code>127.0.0.1</code> only.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>url_schemes</code></td>
+<td style="text-align: left;">Connection URL schemes, up to any <code>+driver</code>, such as <code>("postgresql", "postgres")</code>.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>connection_for(found)</code></td>
+<td style="text-align: left;">A classmethod: the connection fields this <code>Found</code> fills in, or <code>None</code> when it is not this adapter's (a <code>.db</code> file that is not SQLite). It never connects.</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="the-conformance-kit-nl2sql_sdktesting">The conformance kit: <code>nl2sql_sdk.testing</code></h2>
 <p><code>AdapterConformance</code>, installed with <code>pip install "nl2sql-sdk[testing]"</code>

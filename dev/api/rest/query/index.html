@@ -5713,7 +5713,7 @@
 <td><code>result_manifest</code></td>
 <td><code>List[ResultSummary]</code></td>
 <td>no</td>
-<td>The run's saved results, one per terminal DAG node: <code>node_id</code>, <code>columns</code>, <code>row_count</code> (the whole result's) and <code>truncated</code> (a sub-query feeding it was cut at its row limit). Never the rows: read those with the two result routes below, <code>result_id</code> being the <code>node_id</code>. Empty when nothing was saved (<code>execute: false</code>, or the run failed before aggregation).</td>
+<td>The run's saved results, one per terminal DAG node: <code>node_id</code>, <code>columns</code>, <code>row_count</code> (the whole result's), <code>truncated</code> (a sub-query feeding it was cut at its row limit) and <code>column_kinds</code> (each column's type category: <code>number</code>, <code>text</code>, <code>temporal</code>, <code>boolean</code> or <code>other</code>; empty until the auto charts change fills it). Never the rows: read those with the two result routes below, <code>result_id</code> being the <code>node_id</code>. Empty when nothing was saved (<code>execute: false</code>, or the run failed before aggregation).</td>
 </tr>
 <tr>
 <td><code>source</code></td>
@@ -5957,7 +5957,7 @@ operator's, through <code>engine.events.subscribe</code>.</p>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>...
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>event: result.manifest
-<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>data: {"name": "result.manifest", ..., "trace_id": "0f1c...", "data": {"results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false}]}}
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>data: {"name": "result.manifest", ..., "trace_id": "0f1c...", "data": {"results": [{"node_id": "sq_1", "columns": ["customer", "revenue"], "row_count": 5, "truncated": false, "column_kinds": {}}]}}
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>
 <a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>event: answer.delta
 <a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>data: {"name": "answer.delta", ..., "data": {"field": "summary", "text": "Acme leads "}}

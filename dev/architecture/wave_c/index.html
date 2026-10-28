@@ -5724,11 +5724,12 @@ proposals take them (the SDK holds no engine model):</p>
 <a href="#__codelineno-14-16" id="__codelineno-14-16" name="__codelineno-14-16"></a><span class="k">def</span><span class="w"> </span><span class="nf">delete_workspace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
 <a href="#__codelineno-14-17" id="__codelineno-14-17" name="__codelineno-14-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">put_tile_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">docs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># replaces the listed charts' last results</span>
 <a href="#__codelineno-14-18" id="__codelineno-14-18" name="__codelineno-14-18"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_tile_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
-<a href="#__codelineno-14-19" id="__codelineno-14-19" name="__codelineno-14-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">put_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
-<a href="#__codelineno-14-20" id="__codelineno-14-20" name="__codelineno-14-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
-<a href="#__codelineno-14-21" id="__codelineno-14-21" name="__codelineno-14-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_api_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+<a href="#__codelineno-14-19" id="__codelineno-14-19" name="__codelineno-14-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">add_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># a plain insert; ValueError when the id exists</span>
+<a href="#__codelineno-14-20" id="__codelineno-14-20" name="__codelineno-14-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">revoke_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">revoked_at</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
+<a href="#__codelineno-14-21" id="__codelineno-14-21" name="__codelineno-14-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a href="#__codelineno-14-22" id="__codelineno-14-22" name="__codelineno-14-22"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_api_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
 </code></pre></div>
-<p>The <code>sqlite</code> store adds migration 6, five tables: <code>conversations</code> (id, tenant, user, updated_at, the document), <code>workspaces</code> (id, tenant, user, the document), <code>dashboards</code> (id, tenant, user, status, whether it is scheduled, the document), <code>tile_runs</code> (dashboard id, tile id, at, the document: the last result of each chart, with its rows) and <code>api_keys</code> (id, the hash, revoked_at, the row). Stored chart results hold rows, so they sit in the owner's private state store and are deleted with the dashboard; opening a dashboard checks access before serving them (D135). A
+<p>The <code>sqlite</code> store adds migration 6, five tables: <code>conversations</code> (id, tenant, user, updated_at, the document), <code>workspaces</code> (id, tenant, user, created_at, the document), <code>dashboards</code> (id, tenant, user, status, whether it is scheduled, the document), <code>tile_runs</code> (dashboard id, tile id, at, the document: the last result of each chart, with its rows) and <code>api_keys</code> (id, the hash, revoked_at, the row). Stored chart results hold rows, so they sit in the owner's private state store and are deleted with the dashboard; opening a dashboard checks access before serving them (D135). A
 conversation is one document, rewritten per turn: 50 turns without rows is
 a few hundred kilobytes at most, and it is read whole.</p>
 <h2 id="11-error-codes-and-exceptions">11. Error codes and exceptions</h2>
@@ -6007,6 +6008,58 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Built (C0a): C0 was split, and this is its first half</p>
+<p>Row C0 is too big for one PR, so it is two. <strong>C0a</strong> is the shared shapes, with no behaviour:</p>
+<ul>
+<li><strong>Models:</strong> <code>nl2sql/conversations/models.py</code> (<code>Conversation</code>, <code>Turn</code>, <code>ToolStep</code>, <code>ToolCall</code>, <code>ToolOutput</code>,
+  <code>ModelStep</code>, <code>ConversationInfo</code>); <code>nl2sql/charts/spec.py</code> (<code>ChartSpec</code>, <code>Encoding</code>, <code>ChartData</code>,
+  <code>ColumnKind</code>; <code>to_vega_lite</code> raises <code>NotImplementedError</code> naming K1); <code>nl2sql/dashboards/models.py</code>
+  (<code>Workspace</code>, <code>ChartPlan</code>, <code>StoredQuery</code>, <code>TileLayout</code>, <code>Tile</code>, <code>DashboardFilter</code>, <code>ScheduleIdentity</code>,
+  <code>Schedule</code>, <code>Dashboard</code>, <code>TileRun</code>, <code>SkippedTile</code>, <code>DashboardRun</code>, <code>DashboardView</code>, <code>DashboardInfo</code>,
+  <code>StepRef</code>, <code>TileArrangement</code>, the ten edit classes <code>RenameDashboard</code>, <code>RenameTile</code>, <code>SetTileChart</code>,
+  <code>RemoveTile</code>, <code>Arrange</code>, <code>SetFilters</code>, <code>SetSchedule</code>, <code>MoveDashboard</code>, <code>AddTile</code>, <code>ReplacePlan</code>, the
+  <code>DashboardEdit</code> union discriminated on <code>kind</code>, <code>EDIT_KINDS</code> and <code>DEFAULT_WORKSPACE_NAME</code>);
+  <code>nl2sql/chat_tools/__init__.py</code> (<code>ChatTool</code>, <code>ToolContext</code>, <code>ToolOutput</code>, <code>ToolNotApplicable</code>,
+  <code>ChatToolInfo</code>); <code>nl2sql_sdk/discovery.py</code> (<code>Found</code>, <code>DiscoverableAdapter</code>); <code>Candidate</code> and <code>ApiKey</code> in
+  <code>nl2sql/api/types.py</code>. Every one forbids unknown keys (<code>nl2sql.common.strict.StrictModel</code>).</li>
+<li><strong>Config:</strong> <code>Config.conversations</code> (<code>Conversations</code>), <code>Config.chat_tools</code> (<code>Optional[List[str]]</code>, a list
+  section), <code>Config.dashboards</code> (<code>Dashboards</code>), <code>Config.mcp</code> (<code>Mcp</code>, <code>McpHttp</code>), <code>Settings.charts</code>
+  (<code>ChartSettings</code>), and <code>conversation</code> in <code>AgentName</code>; all exported from <code>nl2sql.config</code>.</li>
+<li><strong>Codes and events:</strong> the six <code>ErrorCode</code>s of section 11, the nine facade exceptions (in
+  <code>nl2sql/common/errors.py</code>), and fourteen events in the catalog: the ones of sections 3, 4 and 6, plus
+  <code>datasource.saved</code>, <code>api_key.created</code>, <code>api_key.revoked</code> and <code>mcp.denied</code> (need A5), whose data fields are
+  this PR's to name. The <code>chat_tool</code> registry kind (<code>GROUPS</code>, <code>INTERFACE_VERSIONS</code>, <code>add_chat_tool</code>,
+  <code>@registry.chat_tool</code>; the entry points come in C0b).</li>
+<li><strong>Results:</strong> <code>ResultSummary.column_kinds</code> (the field only; the run events carry it too) and
+  <code>QueryResult.decomposition</code>.</li>
+<li><strong>Store:</strong> <code>StateStore</code> version 4 (the methods of section 10), the <code>sqlite</code> store's migration
+  <code>0006_conversations_dashboards_and_keys</code>, and the registry's store version.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><code>ToolOutput</code> is defined in <code>nl2sql/conversations/models.py</code> and re-exported from <code>nl2sql.chat_tools</code>,
+  because a stored step holds one and <code>chat_tools</code> imports <code>Conversation</code>; defining it in <code>chat_tools</code>
+  would be a circular import.</li>
+<li><code>ToolContext.engine</code> is typed <code>Any</code>: the facade cannot be imported by name here without a cycle.</li>
+<li><code>StoredQuery</code> is not defined in the design. It is one sub-query of an <code>ask</code> step as stored
+  (<code>sub_query_id</code>, <code>datasource_id</code>, and its <code>plan</code> or its <code>verified</code> ref).</li>
+<li><code>ChartPlan</code> checks that it holds exactly one of a decomposition with its plans and a verified query.</li>
+<li><code>dashboards</code> has an <code>updated_at</code> column in migration 6, which section 10 does not list, so
+  <code>purge_dashboards</code> can find old drafts.</li>
+<li><code>QueryResult.decomposition</code> is <code>None</code> on a run a hook ended, as <code>explanation</code> and the data are.</li>
+<li><code>ConversationBusy</code> is a <code>LookupError</code> as section 11 says, though a 404 is a poor answer for "busy"; Wave D's
+  routes may map it differently.</li>
+<li><code>Candidate</code> and <code>ApiKey</code> are pydantic models (the design's shape), though the rest of <code>api/types.py</code> is
+  dataclasses.</li>
+</ul>
+<p><strong>C0b</strong> is the rest of row C0: <code>SuppliedPlan</code> widened and its callers, <code>run_query(answer=)</code> and
+<code>stream_query(answer=)</code>, the five facade namespaces and their stub modules, the stub methods on
+<code>engine.datasources</code> and <code>engine.results</code>, the chat-tool entry points and <code>uvicorn</code> in <code>pyproject.toml</code>,
+the <code>keys</code>, <code>launch</code> and <code>dashboards</code> commands, the stub docs pages and nav, the boundary test's
+constants, and the exports in <code>nl2sql/__init__.py</code>. Tests: <code>tests/unit/test_wave_c_shapes.py</code> and
+<code>tests/unit/test_wave_c_store.py</code>, and <code>test_sdk_discovery_imports_only_pydantic</code> in the architecture test.</p>
+</div>
 <p>The waves, with at most four PRs at once:</p>
 <table>
 <thead>

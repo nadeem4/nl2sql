@@ -2833,6 +2833,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#conversations-dashboards-and-api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conversations, dashboards and API keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-lock" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5387,6 +5398,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#conversations-dashboards-and-api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conversations, dashboards and API keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-lock" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5485,7 +5507,9 @@
 (see <a href="../../configuration/storage/">Storage</a>). The built-in one is <code>sqlite</code>, a
 file at <code>&lt;storage.path&gt;/state.db</code>; any store implementing
 <code>nl2sql_sdk.stores.StateStore</code> can take its place. The same store holds the
-plan cache, the playground's answer ratings and the index build lock.</p>
+plan cache, the playground's answer ratings, the review queue, conversations,
+workspaces, dashboards with their last chart results, API keys and the index
+build lock. The interface is version 4.</p>
 <h3 id="snapshots-are-immutable">Snapshots are immutable</h3>
 <p><code>put_snapshot(snapshot)</code> stores a snapshot as a new row and returns its
 <code>schema_version</code>, <code>YYYYMMDDhhmmss_&lt;hash8&gt;</code> (the time it was stored, and a hash
@@ -5540,7 +5564,60 @@ table, and the engine applies the pending ones when it starts
 <code>state.db</code> is adopted as it is; migration 2 adds the feedback columns that
 came later; migration 3 adds the immutability trigger and the <code>locks</code> table;
 migration 4 adds the <code>schema_diffs</code> table; migration 5 adds the <code>proposals</code>
-table, the review queue (release 0.8, <a href="../../architecture/wave_b/#5-the-review-queue">Wave B</a>).</p>
+table, the review queue (release 0.8, <a href="../../architecture/wave_b/#5-the-review-queue">Wave B</a>);
+migration 6 adds Wave C's five tables, below. A 0.8 <code>state.db</code> is migrated in
+place and keeps its rows.</p>
+<h3 id="conversations-dashboards-and-api-keys">Conversations, dashboards and API keys</h3>
+<p>Release 0.9 (<a href="../../architecture/wave_c/#10-the-registry-and-the-state-store-after-wave-c">Wave C</a>).
+<code>StateStore</code> version 4 adds these methods. Each takes and returns a plain JSON
+document (<code>dict</code>), because the SDK holds none of the engine's models; the
+document carries the fields the store filters on. The engine methods that use
+them arrive in C1 and D1 to D4.</p>
+<table>
+<thead>
+<tr>
+<th>Table (migration 6)</th>
+<th>Methods</th>
+<th>Filtered on</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conversations</code></td>
+<td><code>put_conversation</code>, <code>get_conversation</code>, <code>list_conversations(tenant_id, user_id, limit)</code>, <code>delete_conversation</code>, <code>purge_conversations(older_than)</code></td>
+<td>owner, <code>updated_at</code></td>
+<td>One document per conversation, rewritten each turn, read whole. Stored without result rows. <code>None</code> is an owner of its own in <code>list_*</code>, not a wildcard.</td>
+</tr>
+<tr>
+<td><code>workspaces</code></td>
+<td><code>put_workspace</code>, <code>get_workspace</code>, <code>list_workspaces(tenant_id, user_id)</code>, <code>delete_workspace</code></td>
+<td>owner, <code>created_at</code></td>
+<td>Listed oldest first. A put on an existing id keeps its <code>created_at</code>, so renaming a workspace does not move it.</td>
+</tr>
+<tr>
+<td><code>dashboards</code></td>
+<td><code>put_dashboard</code>, <code>get_dashboard</code>, <code>list_dashboards(tenant_id, user_id)</code>, <code>delete_dashboard</code>, <code>purge_dashboards(drafts_older_than)</code>, <code>list_scheduled_dashboards()</code></td>
+<td>owner, <code>status</code>, <code>updated_at</code>, whether it has a <code>schedule</code></td>
+<td><code>purge_dashboards</code> deletes drafts only; saved dashboards are never purged. <code>list_scheduled_dashboards</code> serves the scheduler across owners.</td>
+</tr>
+<tr>
+<td><code>tile_runs</code></td>
+<td><code>put_tile_runs(dashboard_id, docs)</code>, <code>get_tile_runs(dashboard_id)</code></td>
+<td>dashboard, chart (<code>tile_id</code>), <code>at</code></td>
+<td>The last result of each chart, rows included. <code>put_tile_runs</code> replaces only the charts it lists. Deleted with the dashboard.</td>
+</tr>
+<tr>
+<td><code>api_keys</code></td>
+<td><code>add_api_key</code>, <code>revoke_api_key(key_id, revoked_at)</code>, <code>get_api_key</code>, <code>list_api_keys</code></td>
+<td><code>id</code>, <code>hash</code>, <code>revoked_at</code></td>
+<td>A hash, never a secret. <code>add_api_key</code> is a plain insert and raises <code>ValueError</code> when the <code>id</code> exists, so a clash never replaces another holder's key. <code>revoke_api_key</code> sets <code>revoked_at</code> and nothing else; it returns False for an unknown id.</td>
+</tr>
+</tbody>
+</table>
+<p>Stored chart results hold rows, so they sit in the owner's private state store
+and open only after the access check.</p>
+<p>Each document's timestamps are ISO 8601; a stamp with no zone is read as UTC.</p>
 <h3 id="the-lock">The lock</h3>
 <p><code>lock(name, ttl_s)</code> is a lease held for a <code>with</code> block: in the <code>sqlite</code> store,
 a <code>locks</code> row taken in a <code>BEGIN IMMEDIATE</code> transaction, with an expiry. Every
