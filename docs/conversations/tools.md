@@ -2,7 +2,7 @@
 
 !!! note "Wave C, 0.9: the runner, `chart` and `report` are built"
     `diagram` arrives with K2 and `dashboard_edit` and `dashboard_pin` with D4; until then each raises
-    `NotImplementedError`, which a conversation reports as a failed step. The design is
+    `NotImplementedError`, which a conversation reports as a failed step, so they are off by default. The design is
     [Wave C, section 4](../architecture/wave_c.md#4-chat-tools).
 
 A chat tool turns something a conversation already has into something else, with no model call of its
@@ -18,9 +18,12 @@ own. The five built-ins:
 
 ## Which tools are on
 
-`chat_tools:` in `nl2sql.yaml` lists registered names. Absent, the five built-ins are on; `[]` turns every
-registry tool off and leaves `ask`, the conversation's own tool, which is always on. A name the registry does
-not know is a config error when the engine is built. `engine.chat_tools.list()` returns the enabled tools
+`chat_tools:` in `nl2sql.yaml` lists registered names. Absent, the default tools are on: `chart` and `report`,
+those of them the registry has (an engine built on `Registry.empty()` has none). `diagram`, `dashboard_edit`
+and `dashboard_pin` are off until K2 and D4 make them real; name them in `chat_tools:` to try them. `[]` turns
+every registry tool off and leaves `ask`, the conversation's own tool, which is always on. A name you list
+that the registry does not know is a config error when the engine is built, and so is `ask` (it is not a
+registry tool). `engine.chat_tools.list()` returns the enabled tools
 (`ChatToolInfo`: name, description, JSON Schema of the arguments); it takes no caller, as it lists names.
 
 ## Three ways a tool runs
@@ -44,7 +47,7 @@ and may go on.
 
 | Code | When |
 |---|---|
-| `TOOL_FAILED` | The tool raised, or returned something that is not a `ToolOutput`. |
+| `TOOL_FAILED` | The tool raised, or returned something that is not a `ToolOutput`. The message gives the exception type only, since its text can quote data; the full error is in the log. |
 | `TOOL_NOT_APPLICABLE` | The tool raised `ToolNotApplicable(message)`: it cannot apply to that turn (no answer to chart, rows expired). |
 | `UNKNOWN_CHAT_TOOL` | The name is not enabled; the message names the enabled tools. |
 
@@ -59,16 +62,21 @@ first 20 rows, the takeaway of the chart the data is drawn as (unless it is a ta
 `<details>` block and the trace id. Rows are read back through `engine.results`; once they are purged the
 section says "Results expired." and keeps the text, the SQL and the trace. `turns` picks turn numbers (an
 unknown one is a `ValueError`); the default is every answered turn. A conversation with nothing answered is a
-`ValueError`. The `report` tool is the same call, so it covers earlier turns, not the one it is called in.
+`ValueError`. Every turn is considered, and a question counts when its `ask` step succeeded, even if a later
+tool step in that turn failed. The `report` tool is the same call, so it covers earlier turns, not the one it
+is called in. A stored tool output never holds row data (D106): the `report` tool stores the report without
+its row tables and chart takeaways, and a stored `chart` output has its spec and columns but `data.rows` is
+empty. Ask `conversations.report` again for the full report, and `engine.results.chart` to draw a chart;
+both read the rows from the results while their retention keeps them.
 
 ## Writing one
 
 A tool is a class with `interface_version = 1`, a one-line `description` the model reads, an
-`args_model` (a pydantic model that forbids extra keys; its JSON Schema is shown to the model) and
+`args_model` (a pydantic model that must forbid extra keys, or the engine refuses it when it is built; its JSON Schema is shown to the model) and
 `__call__(ctx: ToolContext, args) -> ToolOutput`. It is built with no arguments. It reaches the engine only
 through the public `NL2SQL` facade in `ctx.engine`, and may import only the top-level `nl2sql` and
 `nl2sql.chat_tools`. Register it under the `nl2sql.chat_tools` entry point group, or with
-`registry.add_chat_tool(name, cls)`, and name it in `chat_tools:` in `nl2sql.yaml`.
+`registry.add_chat_tool(name, cls)`, and name it in `chat_tools:` in `nl2sql.yaml`. The name `ask` is taken.
 
 ```python
 from typing import ClassVar

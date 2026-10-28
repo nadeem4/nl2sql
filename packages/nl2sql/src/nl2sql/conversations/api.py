@@ -26,7 +26,7 @@ from nl2sql.common.errors import ConversationBusy, DashboardNotFound, ErrorCode
 from nl2sql.conversations.agent import ConversationAgent, block, check_call, checked_step, ASK_SPEC, AskArgs
 from nl2sql.conversations.models import Conversation, ConversationInfo, ToolCall, ToolStep, Turn, TurnKind, TurnStatus
 from nl2sql.conversations.report import build_report
-from nl2sql.conversations.store import ConversationStore, owner_of, strip_rows
+from nl2sql.conversations.store import ConversationStore, owner_of, strip_output_rows, strip_rows
 from nl2sql.conversations.tools import ChatToolRunner
 from nl2sql.events import STREAM_EVENTS, RunScope
 from nl2sql.events.catalog import ChatToolCalled, ConversationStarted, ConversationStep, ConversationTurn
@@ -161,10 +161,10 @@ class Conversations:
         return self._turn(conversation_id, user_context, "tool", name, True, CancellationToken(), body)
 
     def report(self, conversation_id: str, *, user_context: UserContext, turns: Optional[Sequence[int]] = None,
-               title: Optional[str] = None) -> str:
+               title: Optional[str] = None, include_rows: bool = True) -> str:
         """The Markdown report of the stored turns, with no model call."""
         return build_report(self.get(conversation_id, user_context=user_context), ResultsAPI(self._ctx),
-                            turns=turns, title=title)
+                            turns=turns, title=title, include_rows=include_rows)
 
     def ask_only(self, conversation_id: str, question: str, *, user_context: UserContext,
                  choice: Optional[str] = None) -> QueryResult:
@@ -353,6 +353,7 @@ class Conversations:
         began = time.monotonic()
         step = self._chat.run(conversation.model_copy(update={"turns": [*conversation.turns, in_flight]}),
                               run.user, call)
+        step = strip_output_rows(step)  # stored without rows (D106)
         run.steps.append(step)
         run.scope.publish("chat_tool.called", ChatToolCalled(
             tool=call.name, conversation_id=conversation.id, turn=index, ok=step.status == "ok",

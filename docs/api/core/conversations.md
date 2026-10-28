@@ -31,7 +31,7 @@ earlier question.
 | `list(*, user_context, limit=20) -> list[ConversationInfo]` | C1 |
 | `delete(conversation_id, *, user_context) -> None` (`ConversationBusy` while a turn runs) | C1 |
 | `tool(conversation_id, name, args=None, *, user_context) -> Turn` | C2 |
-| `report(conversation_id, *, user_context, turns=None, title=None) -> str` | C2 |
+| `report(conversation_id, *, user_context, turns=None, title=None, include_rows=True) -> str` | C2 |
 | `engine.chat_tools.list() -> list[ChatToolInfo]` | C2 |
 
 - `start(dashboard_id=...)` needs a dashboard the caller owns (`DashboardNotFound` otherwise).
@@ -46,5 +46,8 @@ earlier question.
   enabled, raises or cannot apply is a stored step with `error.code` `UNKNOWN_CHAT_TOOL`, `TOOL_FAILED` or
   `TOOL_NOT_APPLICABLE`.
 - `report` returns Markdown for the stored answered turns (or `turns`, a list of turn numbers). A turn number
-  that does not exist, or a conversation with nothing answered, is a `ValueError`.
+  that does not exist, or a conversation with nothing answered, is a `ValueError`. `include_rows=False` leaves
+  the row tables and chart takeaways out, which is how the `report` tool stores its output.
+- Every method needs a caller: `user_context=None`, or a context with no `user_id`, is a `TypeError`, not a
+  shared anonymous owner.
 - `engine.chat_tools.list()` takes no caller: it lists the enabled tools' names.

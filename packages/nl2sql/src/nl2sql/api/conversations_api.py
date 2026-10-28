@@ -63,9 +63,12 @@ class ConversationsAPI:
         return self._service.ask_only(conversation_id, question, user_context=user_context, choice=choice)
 
     def report(self, conversation_id: str, *, user_context: UserContext, turns: Optional[List[int]] = None,
-               title: Optional[str] = None) -> str:
-        """The Markdown report of the conversation's answered turns, with no model call."""
-        return self._service.report(conversation_id, user_context=user_context, turns=turns, title=title)
+               title: Optional[str] = None, include_rows: bool = True) -> str:
+        """The Markdown report of the conversation's answered questions, with no model call. The rows are read
+        from the results when asked for; ``include_rows=False`` leaves them (and the chart takeaway) out, which
+        is how the ``report`` tool stores it."""
+        return self._service.report(conversation_id, user_context=user_context, turns=turns, title=title,
+                                    include_rows=include_rows)
 
     def get(self, conversation_id: str, *, user_context: UserContext) -> Conversation:
         """One conversation, with its turns.

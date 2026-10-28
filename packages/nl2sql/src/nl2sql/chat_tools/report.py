@@ -1,6 +1,7 @@
 """The ``report`` chat tool (docs/architecture/wave_c.md, section 4, "Reports").
 
 Writes the conversation's answered turns up as Markdown through ``engine.conversations.report``: no model call.
+The stored output has no row data (D106); ask ``engine.conversations.report`` for the full report.
 Like every chat tool it imports only the top-level ``nl2sql`` and its own interface module (D109).
 """
 from __future__ import annotations
@@ -28,7 +29,7 @@ class ReportTool:
         assert isinstance(args, ReportArgs)
         try:
             markdown = ctx.engine.conversations.report(ctx.conversation.id, user_context=ctx.user,
-                                                       turns=args.turns, title=args.title)
+                                                       turns=args.turns, title=args.title, include_rows=False)
         except ValueError as error:
             raise ToolNotApplicable(str(error)) from None
         return ToolOutput(kind="markdown", title=args.title or ctx.conversation.title, body=markdown)

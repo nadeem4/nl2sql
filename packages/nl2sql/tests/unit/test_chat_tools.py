@@ -18,9 +18,11 @@ from nl2sql.api.results_api import ResultsAPI
 from nl2sql.chat_tools import ToolContext, ToolNotApplicable, ToolOutput
 from nl2sql.charts.spec import ChartData, ChartSpec
 from nl2sql.config import ConfigError
+from nl2sql.conversations.tools import build_chat_tools
 from nl2sql.common.errors import ConversationNotFound
 from nl2sql.execution.artifacts.results import ResultPage
 from nl2sql.explain.models import ExplainedStep, Explanation
+from nl2sql.policies import UserContext
 from nl2sql.testing.config import make_config
 
 # The fixtures and helpers of the conversation tests: the fake model, the canned runs, the engine builder.
@@ -163,7 +165,7 @@ def test_model_calls_a_tool_and_sees_its_output_without_rows(build, model, runs)
     turn = engine.conversations.ask(conversation.id, "Chart the customers", user_context=ANA)
 
     assert [s.call.name for s in turn.steps] == ["ask", "plot"] and turn.status == "answered"
-    assert turn.steps[1].output.kind == "chart" and turn.steps[1].output.body["data"]["rows"] == [[5917]]
+    assert turn.steps[1].output.kind == "chart" and turn.steps[1].output.body["data"]["rows"] == []
     assert turn.reply == "Here is the chart."
     after_tool = model.prompts[2]
     assert "5917" not in after_tool and '"rows"' not in after_tool and "Norway" not in after_tool
@@ -273,7 +275,8 @@ def test_raising_tool_is_tool_failed_and_the_model_continues(build, model):
 
     [step] = turn.steps
     assert step.status == "error" and step.output is None
-    assert step.error["code"] == "TOOL_FAILED" and "boom" in step.error["message"] and "kaboom" in step.error["message"]
+    assert step.error["code"] == "TOOL_FAILED" and "boom" in step.error["message"] and "RuntimeError" in step.error["message"]
+    assert "kaboom" not in step.error["message"], "the model sees the exception type, not its text"
     assert turn.reply == "The tool failed, sorry." and turn.status == "error", "the model went on and replied"
     assert "TOOL_FAILED" in model.prompts[1]
     assert (seen[0].data["ok"], seen[0].data["error_code"]) == (False, "TOOL_FAILED")
@@ -343,11 +346,56 @@ def test_chat_tools_list_describes_the_enabled_tools(build):
     assert infos[0].description == "Echo some text back." and infos[0].args_schema["required"] == ["text"]
 
 
-def test_no_section_enables_the_five_built_ins(build):
+def test_no_section_enables_chart_and_report_only(build):
     engine = build(None)
 
-    assert [i.name for i in engine.chat_tools.list()] == ["chart", "diagram", "report", "dashboard_edit",
-                                                          "dashboard_pin"]
+    assert [i.name for i in engine.chat_tools.list()] == ["chart", "report"]
+
+
+def test_a_missing_section_enables_only_the_default_tools_the_registry_has():
+    registry = Registry.empty()
+    registry.add_chat_tool("report", Echo)
+    problems: List[Any] = []
+
+    tools = build_chat_tools(None, registry, lambda *a, **k: problems.append(a))
+
+    assert list(tools) == ["report"] and problems == []
+
+
+def test_an_explicit_unknown_name_is_still_a_problem_on_an_empty_registry():
+    problems: List[Any] = []
+
+    build_chat_tools(["chart"], Registry.empty(), lambda *a, **k: problems.append(a))
+
+    assert len(problems) == 1 and problems[0][0] == "chat_tools[0]"
+
+
+def test_a_plugin_named_ask_is_a_config_problem():
+    registry = Registry.empty()
+    registry.add_chat_tool("ask", Echo)
+    problems: List[Any] = []
+
+    tools = build_chat_tools(["ask"], registry, lambda *a, **k: problems.append(a))
+
+    assert "ask" not in tools and len(problems) == 1
+    assert problems[0][0] == "chat_tools[0]" and "ask" in problems[0][1]
+
+
+def test_a_plugin_whose_args_model_allows_extra_keys_is_a_config_problem():
+    class Loose(BaseModel):
+        text: str = ""
+
+    class LoosePlugin(Echo):
+        args_model: ClassVar[type[BaseModel]] = Loose
+
+    registry = Registry.empty()
+    registry.add_chat_tool("loose", LoosePlugin)
+    problems: List[Any] = []
+
+    tools = build_chat_tools(["loose"], registry, lambda *a, **k: problems.append(a))
+
+    assert "loose" not in tools and len(problems) == 1
+    assert problems[0][0] == "chat_tools[0]" and "forbid" in problems[0][1]
 
 
 def test_a_name_the_registry_does_not_know_is_a_config_error(build):
@@ -469,7 +517,77 @@ def test_the_report_tool_is_the_report_as_markdown(build, model, runs):
 
     output = turn.steps[0].output
     assert (output.kind, output.title) == ("markdown", "Weekly")
-    assert output.body == engine.conversations.report(conversation.id, user_context=ANA, title="Weekly")
+    assert output.body == engine.conversations.report(conversation.id, user_context=ANA, title="Weekly",
+                                                      include_rows=False)
+
+
+def test_a_stored_report_body_carries_no_row_data(build, model, runs, monkeypatch):
+    engine = build(None)
+    conversation = answered(engine, model, runs, "How many customers are there?")
+    monkeypatch.setattr(ResultsAPI, "page", page(["n"], [[5917]], 1))
+    chart = ChartSpec(kind="bar", title="t", takeaway="Norway has 5917 customers.", reason="r",
+                      data=ChartData(trace_id="x", result_id="sq1", columns=["n"], rows=[], truncated=False))
+    monkeypatch.setattr(ResultsAPI, "chart", lambda self, *a, **k: chart)
+
+    turn = engine.conversations.tool(conversation.id, "report", {}, user_context=ANA)
+
+    body = turn.steps[0].output.body
+    assert "5917" not in body and "| n |" not in body and "How many customers are there?" in body
+    asked = engine.conversations.report(conversation.id, user_context=ANA)
+    assert "| 5917 |" in asked, "asked for directly, the report is rebuilt from the results"
+    stored = engine.conversations.get(conversation.id, user_context=ANA).turns[-1].steps[0].output.body
+    assert "5917" not in stored
+
+
+def test_a_stored_chart_output_carries_no_rows(build, model, runs):
+    engine = build()
+    conversation = started(engine)
+
+    turn = engine.conversations.tool(conversation.id, "plot", {}, user_context=ANA)
+
+    stored = engine.conversations.get(conversation.id, user_context=ANA).turns[0].steps[0].output
+    assert stored.body["data"]["rows"] == [] and stored.body["data"]["columns"] == ["n"]
+    assert turn.steps[0].output.body["data"]["rows"] == []
+
+
+def test_the_report_keeps_a_question_answered_in_a_turn_that_later_failed_a_tool(build, model, runs):
+    engine = build()
+    conversation = started(engine)
+    model.say(ask("How many customers are there?"), call("boom"), reply("The chart failed."))
+    turn = engine.conversations.ask(conversation.id, "Count them", user_context=ANA)
+    assert turn.status == "error"
+
+    markdown = engine.conversations.report(conversation.id, user_context=ANA)
+
+    assert "## How many customers are there?" in markdown
+
+
+# ------------------------------------------------------------------ a caller is required
+
+NO_USER = [None, UserContext(tenant_id="acme")]
+
+
+@pytest.mark.parametrize("nobody", NO_USER)
+def test_every_conversations_method_refuses_a_missing_caller(build, model, nobody):
+    engine = build()
+    conversation = started(engine)
+    api = engine.conversations
+    calls = {
+        "start": lambda: api.start(user_context=nobody),
+        "ask": lambda: api.ask(conversation.id, "Hi", user_context=nobody),
+        "stream": lambda: api.stream(conversation.id, "Hi", user_context=nobody),
+        "retry": lambda: api.retry(conversation.id, user_context=nobody),
+        "ask_only": lambda: api.ask_only(conversation.id, "Hi", user_context=nobody),
+        "get": lambda: api.get(conversation.id, user_context=nobody),
+        "list": lambda: api.list(user_context=nobody),
+        "delete": lambda: api.delete(conversation.id, user_context=nobody),
+        "tool": lambda: api.tool(conversation.id, "echo", {"text": "x"}, user_context=nobody),
+        "report": lambda: api.report(conversation.id, user_context=nobody),
+    }
+    for name, run in calls.items():
+        with pytest.raises(TypeError, match="user_context"):
+            run()
+    assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 0
 
 
 def test_the_report_tool_on_an_empty_conversation_is_not_applicable(build):

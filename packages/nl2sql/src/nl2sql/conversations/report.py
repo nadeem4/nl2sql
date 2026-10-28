@@ -3,7 +3,8 @@
 Assembled from the stored turns with no model call (D114): each answered question with the plain-English
 explanation the run stored, the first rows read back through ``engine.results``, the takeaway of the chart the
 data is drawn as, the SQL and the trace id. A result that has been purged is said to have expired; the text,
-the SQL and the trace stay.
+the SQL and the trace stay. The rows are read when the report is asked for and never stored (D106): the
+``report`` tool's stored output is the report without them.
 """
 from __future__ import annotations
 
@@ -66,7 +67,7 @@ def _sql(step: ToolStep) -> Optional[str]:
     return f"<details><summary>SQL</summary>\n\n```sql\n{text}\n```\n\n</details>"
 
 
-def _section(results: Any, step: ToolStep) -> str:
+def _section(results: Any, step: ToolStep, include_rows: bool) -> str:
     result = step.result
     parts = [f"## {step.question}"]
     summary = (result.final_answer or {}).get("summary")
@@ -74,9 +75,10 @@ def _section(results: Any, step: ToolStep) -> str:
         parts.append(str(summary))
     if result.explanation and result.explanation.steps:
         parts.append("**Why this answer.** " + " ".join(s.text for s in result.explanation.steps))
-    parts.append("\n".join(_rows(results, step)))
-    if result.result_manifest and (takeaway := _takeaway(results, step)):
-        parts.append(f"**Takeaway.** {takeaway}")
+    if include_rows:
+        parts.append("\n".join(_rows(results, step)))
+        if result.result_manifest and (takeaway := _takeaway(results, step)):
+            parts.append(f"**Takeaway.** {takeaway}")
     if (sql := _sql(step)):
         parts.append(sql)
     parts.append(f"Trace: {step.trace_id}")
@@ -85,7 +87,7 @@ def _section(results: Any, step: ToolStep) -> str:
 
 def _chosen(conversation: Conversation, turns: Optional[Sequence[int]]) -> List[Turn]:
     if turns is None:
-        return [t for t in conversation.turns if t.status == "answered"]
+        return list(conversation.turns)  # the step filter in build_report keeps only answered questions
     by_index = {t.index: t for t in conversation.turns}
     missing = [i for i in turns if i not in by_index]
     if missing:
@@ -94,8 +96,9 @@ def _chosen(conversation: Conversation, turns: Optional[Sequence[int]]) -> List[
 
 
 def build_report(conversation: Conversation, results: Any, *, turns: Optional[Sequence[int]] = None,
-                 title: Optional[str] = None) -> str:
-    """The report of the answered turns (or of ``turns``), as Markdown.
+                 title: Optional[str] = None, include_rows: bool = True) -> str:
+    """The report of the answered questions of every turn (or of ``turns``), as Markdown. With ``include_rows``
+    false the report holds no row data (no table, no chart takeaway): that is the form a stored tool output has.
 
     Raises:
         ValueError: a turn that does not exist, or no answered question to report.
@@ -106,4 +109,4 @@ def build_report(conversation: Conversation, results: Any, *, turns: Optional[Se
         raise ValueError("This conversation has no answered question to report.")
     today = datetime.now(timezone.utc).date().isoformat()
     head = f"# {title or conversation.title}\nGenerated {today} · {len(steps)} questions · nl2sql {_version()}"
-    return "\n\n".join([head, *(_section(results, s) for s in steps)]) + "\n"
+    return "\n\n".join([head, *(_section(results, s, include_rows) for s in steps)]) + "\n"

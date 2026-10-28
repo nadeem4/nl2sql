@@ -1735,10 +1735,20 @@ flowchart TD
     - **A K1 bug fixed here:** a run saves its results under the engine's tenant (`settings.tenant_id`),
       whoever asked, so the `chart` tool no longer reads the conversation's or the caller's tenant (it found
       nothing for a caller with a `tenant_id`). The report reads the engine's tenant too.
-    - A stored chart output keeps its rows (at most `settings.charts.max_points`) in the conversation until
-      `max_age_days`; the model never sees them, and `get` checks the owner only.
-    - `diagram`, `dashboard_edit` and `dashboard_pin` are on by default but still stubs: calling one is a
-      `TOOL_FAILED` step until K2 and D4 land.
+    - Review fixes: a stored tool output holds no rows (D106). A chart output's `data.rows` is emptied before
+      the step is stored (a client draws again through `engine.results.chart`), and the `report` tool stores
+      the report without row tables and chart takeaways (`conversations.report(include_rows=False)`); asked
+      for directly, the report still reads the rows from `engine.results`. `engine.results` does not check the
+      caller (it reads by tenant and trace id); that gap is a separate row.
+    - `chat_tools:` absent means the default tools **the registry has**, so an engine on `Registry.empty()`
+      builds. The defaults are `("chart", "report")` only: `diagram`, `dashboard_edit` and `dashboard_pin` are
+      still stubs and **stay off by default. K2 and D4 each add their own name to `DEFAULT_CHAT_TOOLS`
+      (`conversations/tools.py`) and to the docs when they land.** A name listed explicitly must be registered;
+      `ask` and a plugin whose `args_model` does not forbid extra keys are config errors.
+    - `user_context=None`, or a context with no `user_id`, is a `TypeError` in every `conversations` method (a
+      shared anonymous owner would see everyone's anonymous conversations). `TOOL_FAILED` shows the model the
+      exception type only; the log has the full error. The report considers every turn and keeps each
+      successful `ask` step, so an answer in a turn whose later tool failed is still reported.
     - Names later rows use: `ChatToolRunner`, `build_chat_tools`, `describe` (`nl2sql.conversations.tools`),
       `build_report` (`nl2sql.conversations.report`), `Conversations._tool(run, call)`, `runtime.chat_tools`,
       `check_call` (renamed from `_check_call` in `agent.py`).

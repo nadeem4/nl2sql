@@ -18,17 +18,30 @@ from nl2sql.registry import Registry, RegistryError
 
 logger = get_logger(__name__)
 
-# What `chat_tools:` means when the section is absent; an empty list means none.
-DEFAULT_CHAT_TOOLS = ("chart", "diagram", "report", "dashboard_edit", "dashboard_pin")
+# What `chat_tools:` means when the section is absent: these, of the ones the registry has. An empty list means
+# none. `diagram`, `dashboard_edit` and `dashboard_pin` join when K2 and D4 make them real.
+DEFAULT_CHAT_TOOLS = ("chart", "report")
 
 
 def build_chat_tools(names: Optional[List[str]], registry: Registry,
                      problem: Callable[..., None]) -> Dict[str, Any]:
-    """The enabled tools by name, in config order. A name that cannot be loaded is reported as a config problem."""
+    """The enabled tools by name, in config order. A name that cannot be loaded is reported as a config problem.
+    With no list, the default tools the registry has; a name listed explicitly must be registered."""
+    if names is None:
+        have = set(registry.names("chat_tool"))
+        names = [n for n in DEFAULT_CHAT_TOOLS if n in have]
     tools: Dict[str, Any] = {}
-    for i, name in enumerate(DEFAULT_CHAT_TOOLS if names is None else names):
+    for i, name in enumerate(names):
+        if name == "ask":
+            problem(f"chat_tools[{i}]", "'ask' is the conversation's own tool and cannot be a registered chat tool.")
+            continue
         try:
-            tools[name] = registry.load("chat_tool", name)()
+            tool = registry.load("chat_tool", name)()
+            if tool.args_model.model_config.get("extra") != "forbid":
+                problem(f"chat_tools[{i}]", f"The args_model of the chat tool '{name}' must forbid extra keys "
+                                            "(model_config = ConfigDict(extra=\"forbid\")).")
+                continue
+            tools[name] = tool
         except RegistryError as error:
             problem(f"chat_tools[{i}]", str(error))
         except Exception as error:  # a plugin's constructor
@@ -81,7 +94,7 @@ class ChatToolRunner:
         except Exception as error:
             logger.warning("The chat tool '%s' failed.", call.name, exc_info=True)
             return _failed(call, ErrorCode.TOOL_FAILED,
-                           f"The chat tool '{call.name}' failed: {error or type(error).__name__}")
+                           f"The chat tool '{call.name}' failed ({type(error).__name__}).")
         if not isinstance(output, ToolOutput):
             return _failed(call, ErrorCode.TOOL_FAILED,
                            f"The chat tool '{call.name}' returned something that is not a ToolOutput.")
