@@ -1,10 +1,10 @@
 # Dashboards
 
 !!! note "Partly built (Wave C, 0.9)"
-    Workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1). Refresh, filters and
-    schedules (D2), the starter dashboard (D3) and building in chat (D4) have their signatures and raise
-    `NotImplementedError` naming the pull request that fills them. The design is
-    [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
+    Workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`, `refresh`,
+    stored results and schedules (D2). Filter values and `filter_values` (D2b), the starter dashboard (D3)
+    and building in chat (D4) have their signatures and raise `NotImplementedError` naming the pull request
+    that fills them. The design is [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
 
 A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
 private workspace. Opening one serves stored results after the access check; refreshing re-runs the
@@ -14,7 +14,7 @@ stored plans as the caller with no model call. The methods are in
 | Row | What it adds |
 |---|---|
 | D1 | Workspaces, the dashboard store, `pin`, `move` and the manual edits |
-| D2 | `open`, `refresh`, stored results, filters, schedules and `nl2sql dashboards refresh` |
+| D2 | `open`, `refresh`, stored results, schedules and `nl2sql dashboards refresh` (filter values follow in D2b) |
 | D3 | The starter dashboard: `generate` and `suggest_questions`, with no model |
 | D4 | Building and editing a dashboard in a conversation (`dashboard_edit`, `dashboard_pin`) |
 
@@ -50,7 +50,7 @@ Every change a person can make is a typed edit, and no edit calls a model or tak
 | `set_tile_chart` | `set_tile_chart(id, tile_id, chart)` | `auto`, `line`, `bar`, `big_number` or `table`; a kind the last result cannot be drawn as is a `ValueError` naming the ones it can |
 | `remove_tile` | `remove_tile(id, tile_id)` | Removes a chart and its stored result |
 | `arrange` | `arrange(id, layouts)` | Moves or resizes charts on the 4-column grid; the others stay put |
-| `set_filters` | `set_filters(id, filters)` | Stores the filter definitions (their values are applied by refresh, D2) |
+| `set_filters` | `set_filters(id, filters)` | Stores the filter definitions (their values are applied by refresh, D2b) |
 | `set_schedule` | `set_schedule(id, every_minutes)` | Stores a schedule and a snapshot of your user, tenant and roles; `None` removes it. Below `dashboards.min_refresh_minutes` (15) is `ScheduleTooFrequent` |
 | `move` | `move(id, workspace_id)` | Moves it to another of your workspaces |
 
@@ -64,7 +64,71 @@ Each change publishes `dashboard.changed` (the kinds, never the values), `set_sc
 `dashboard.schedule_set` (it saves a role snapshot, so it is audited) and the workspace calls publish
 `workspace.changed`.
 
+An edit, `pin` and `delete` take the dashboard's refresh lock (see [Open, refresh and stored results](#open-refresh-and-stored-results)),
+so a refresh that is running cannot store results after an edit has made them wrong. If the lock is held you
+get a `ValueError` (`DashboardBusy`) that says the dashboard is being refreshed; try again when it is done.
+
+## Open, refresh and stored results
+
+A chart is re-run from the plan it keeps, never by asking the question again, so **refreshing costs no
+tokens**. Each chart is one `run_query(question, plan=SuppliedPlan(...), answer=False, user_context=...)`:
+the plan goes through the `plan.after` hooks, the validator and the generator under the caller's scope,
+is never cached and is never sent to the refiner, and no answer is written. A multi-query chart re-runs every
+stored query and its combine step; a verified chart re-runs its verified query with its stored values.
+
+```python
+view = engine.dashboards.open(board.id, user_context=me)        # the stored results, after the access check
+run = engine.dashboards.refresh(board.id, user_context=me)      # every chart, in layout order
+run = engine.dashboards.refresh(board.id, tile_id="t3", user_context=me)   # one chart
+```
+
+| Rule | What it means |
+|---|---|
+| **Stored with a time** | The last result of each chart (its rows, at most `charts.max_points`, and the columns' kinds) is saved with an `at` time, replaced by each run and deleted with the dashboard. `open` serves it at once and `refreshed_at` is the oldest `at`. |
+| **Open checks access first** | Before any stored row is served, each stored plan is checked under the caller's current roles: a generated plan is validated and generated but not run, a verified query is run (the matcher is where its access check lives). A chart the caller can no longer read comes back `denied`, one whose plan no longer validates `needs_fixing`, and a check that fails otherwise `error`, all without rows. |
+| **Only what is old** | With `refresh_due=True` (the default) `open` then refreshes the charts older than the schedule's `every_minutes` (or never run), as the caller. A dashboard with no schedule has nothing due. An app that wants an instant open passes `False` and refreshes the ids in `view.due`. |
+| **`needs_fixing`** | A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is `needs_fixing` with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn (D4). |
+| **Cost guard** | A hook that wants a person's yes makes the chart `needs_approval`: it is not run, keeps its last result, and the request is in the run's `approvals_needed`. Pass an `Approval` for it to a **manual** `refresh(approvals=[...])`. `open` and a schedule never approve. |
+| **Caps** | A chart stopped at a Wave A cap (`stopped`) ends the refresh; the rest are `stopped` too and keep their last result. |
+| **No double runs** | A refresh holds the state store's lock `dashboard-refresh:<id>`. A second `refresh` on the same dashboard raises `DashboardBusy`; `open` leaves the charts due; a schedule skips it. |
+
+Each refresh publishes `dashboard.refreshed` (the counts per status; the trigger is `open`, `manual` or
+`schedule`). Each chart is a run, with its own `run.started` and `run.finished`.
+
+## One access rule
+
+A datasource's stored connection sets the most anyone can see through it, and a person's roles and policies
+narrow that. Every way to data uses the same path and the same checks: a question, a refresh, an `open` and
+a schedule all go through `run_query` with the caller's `UserContext` (a schedule's is its owner's saved
+snapshot). So losing access to a table removes its rows from every dashboard at the next `open`, and stored
+results are never served before the check passes.
+
+## Schedules
+
+`set_schedule(id, every_minutes)` re-runs a dashboard by itself. It runs **only inside a long-running
+process**: `nl2sql-api` starts a runner in its lifespan that calls `engine.dashboards.run_scheduled()` every
+minute (a local app does the same, or cron runs `nl2sql dashboards refresh --due`). With nothing running,
+nothing refreshes.
+
+- **As its owner, as saved.** `set_schedule` saves your user, tenant and roles on the schedule. Each run
+  resolves that snapshot against the *current* policies, so it can only narrow what you can read, never widen.
+- **It stops, visibly.** The schedule becomes `stopped`, with a `code` and `message` in `schedule.error` (shown
+  on the dashboard that `open` and `get` return), and `dashboard.schedule_stopped` is published (audited) when
+  the saved identity is older than `dashboards.schedule_identity_max_age_days` (30,
+  `SCHEDULE_IDENTITY_EXPIRED`), a role in it is gone from the policies (`SCHEDULE_ROLE_REMOVED`) or a chart
+  can no longer be read by its owner (`SCHEDULE_ACCESS_DENIED`). Nothing retries it. Setting the schedule
+  again saves a fresh snapshot and starts it again.
+- **It never approves.** A chart that needs a person's yes is skipped and keeps its last result; the schedule goes on.
+- **One run at a time.** A dashboard another process is refreshing is skipped, so two runners (or a runner and
+  cron) do not double up.
+
+```bash
+nl2sql dashboards refresh --dashboard sales --as analyst --user ana --tenant acme   # one dashboard, as that caller
+nl2sql dashboards refresh --due                                                      # every schedule that is due
+```
+
 ## Configuration
 
 `dashboards:` in `nl2sql.yaml` (`max_tiles`, `min_refresh_minutes`, `schedule_identity_max_age_days`) is
-accepted; `min_refresh_minutes` is read by `set_schedule`.
+accepted; `min_refresh_minutes` is read by `set_schedule` and `schedule_identity_max_age_days` by the
+scheduler.

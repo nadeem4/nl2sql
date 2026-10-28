@@ -1821,6 +1821,61 @@ flowchart TD
       `engine.datasources.save(id, by=admin, env_file=True)`; `write_env_values(folder, {...})` for the model key.
       `Config.with_datasource` adds datasources before writing. All three are in `nl2sql.config`.
 
+!!! note "Built (D2): refresh, stored results and schedules; filters are D2b"
+    Row D2 is split, as the row allows: this PR is refresh, stored results, `open` and schedules; the filters
+    (the value checks, the predicates, `filter_values`) are **D2b**, because refresh and schedules alone passed
+    the 1,000-line mark. `refresh(filters=...)` and `filter_values` raise `NotImplementedError` naming D2b, and
+    `dashboard.refreshed` carries an empty `filters` list until then.
+
+    - **Files:** `nl2sql/dashboards/run.py` (`TileRunner`: one chart's `run_query`; `Refresher`: a dashboard's
+      charts in layout order, the access check, the lock and `dashboard.refreshed`), `schedule.py` (when a schedule
+      is due, which charts are due, the identity checks and the stop), `api.py` (`open`, `refresh`,
+      `run_scheduled`; `edit`, `pin` and `delete` now take the lock), `api/dashboards_api.py` (the public
+      face), `cli/commands/dashboards.py`, and `nl2sql_api/main.py` (`run_schedules` in the lifespan).
+    - **Tests:** `tests/unit/test_dashboards_d2.py` (the service, with a canned `run_query`),
+      `tests/e2e/test_dashboards_fake_llm.py` (the real pipeline on the demo databases: no model call, the access
+      check, `needs_fixing` without the refiner, a stored plan never cached, `plan.after`, an approval),
+      `tests/unit/test_cli_dashboards.py`, `packages/api/tests/test_startup.py`, and in the boundary test
+      `test_dashboards_make_no_model_call` and `test_every_entry_point_reaches_data_through_run_query`.
+    - **Statuses.** A run is `needs_fixing` when the validator rejected the plan (the error is
+      `TILE_NEEDS_FIXING` with the validator's message), the stored plan no longer parses, or a verified chart's
+      query cannot be found; `denied` for `SECURITY_VIOLATION` or `HOOK_DENIED`; `needs_approval` and `stopped` are
+      the run's; `empty` is a run with no rows; anything else is `error`. `needs_approval` and `stopped` are
+      returned but **not stored**: the chart keeps its last result. Every other status is stored, so a `denied`,
+      `needs_fixing` or `error` run replaces the rows.
+    - **Open** checks only the charts that have a stored result. A generated plan is checked with `execute=False`;
+      a verified one with `execute=True`, as C0b's note says it must be, which means opening a dashboard with a
+      verified chart runs that query. A check that ends `denied`, `needs_fixing` or `error` serves no rows for
+      that chart (an `error` is treated as a failed check, never as a pass).
+    - **The lock** `dashboard-refresh:<id>` is held by `refresh`, by the scheduled run, by the refresh that `open`
+      starts, and by `edit`, `pin` and `delete` (D1's note asked for `edit`), so a refresh cannot finish after
+      `set_filters` and store results that ignore it. A held lock is `DashboardBusy` (a `ValueError`) from
+      `refresh` and the edits; `open` leaves the charts due and a schedule skips the dashboard.
+    - **Schedules** run each due dashboard as the owner saved on it. The stop codes are
+      `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED` (a role of the snapshot is not in `policies.roles`,
+      unless `allow_all`) and `SCHEDULE_ACCESS_DENIED` (a chart came back `denied`; the run is still stored, then
+      the schedule stops). A schedule that stops sets `state="stopped"`, `next_at=None` and `error`.
+
+    Where the code and the design differ, the code won:
+
+    - The lifespan hook is in `packages/api/src/nl2sql_api/main.py`; the package has no `app.py`.
+    - `ChartPlan` gains `verified_datasource_id` (optional): `SuppliedPlan(verified=...)` needs the datasource and
+      the design's `ChartPlan.verified` (a `VerifiedRef`) has none. Without it the refresh uses the only datasource
+      whose curated section holds the query's id.
+    - `TileRun` gains `approvals_needed` (the `ApprovalRequest`s of a `needs_approval` chart, never stored), or a
+      caller of `refresh(approvals=)` would have no request to approve.
+    - `DashboardRun.usage` stays empty: a refresh makes no model call, so the sum is zero.
+    - `nl2sql dashboards refresh` takes `--user` and `--tenant` as well as `--as`, because a dashboard belongs to a
+      user. `nl2sql dashboards list` does not exist; the stopped schedule's error is on `Dashboard.schedule`, which
+      `open` and `get` return.
+    - The design's test `test_charts_diagrams_tools_and_dashboards_make_no_model_call` is
+      `test_dashboards_make_no_model_call` here (charts have `test_charts_make_no_model_call`, diagrams are K2's).
+    - `DashboardStore.put_runs` is new (D1's store had no write for stored results).
+    - Names D3 and D4 need: `Refresher.run(dashboard, tiles, user, trigger)` for D3's first run of `generate`
+      (trigger `generate`; it stores the results and publishes `dashboard.refreshed`; call it under
+      `Refresher.locked`), `TileRunner.run(tile, user, execute=False)` for D4's no-execute check of `add_tile` and
+      `replace_plan`, and `DashboardBusy`.
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |

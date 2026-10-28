@@ -98,7 +98,6 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # each with the PR that raises it. Wave A's are all raised now (S1, E3), and
 # Wave B's too (L2). Wave C's (wave_c.md, section 3 and 6) leave as D2 lands.
 DECLARED_AHEAD: dict = {
-    "TILE_NEEDS_FIXING": "D2",
 }
 
 

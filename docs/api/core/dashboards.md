@@ -1,9 +1,9 @@
 # Dashboards API
 
 !!! note "Partly built"
-    The workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1). `open`, `refresh`,
-    `filter_values` and `run_scheduled` (D2) and `generate` and `suggest_questions` (D3) have their final
-    signatures and raise `NotImplementedError` naming their row.
+    The workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`,
+    `refresh` and `run_scheduled` (D2). `filter_values` and `refresh(filters=...)` (D2b) and `generate` and
+    `suggest_questions` (D3) have their final signatures and raise `NotImplementedError` naming their row.
 
 ## Purpose
 `engine.workspaces` and `engine.dashboards` ([Dashboards](../../dashboards/index.md)).
@@ -12,7 +12,8 @@
 - `packages/nl2sql/src/nl2sql/api/workspaces_api.py` (`WorkspacesAPI`, internal)
 - `packages/nl2sql/src/nl2sql/api/dashboards_api.py` (`DashboardsAPI`, internal)
 - `packages/nl2sql/src/nl2sql/dashboards/models.py` (`Workspace`, `Dashboard`, `Tile`, `DashboardEdit`)
-- `packages/nl2sql/src/nl2sql/dashboards/` `workspaces.py`, `api.py`, `edits.py`, `store.py` (the logic behind the two faces)
+- `packages/nl2sql/src/nl2sql/dashboards/` `workspaces.py`, `api.py`, `edits.py`, `store.py`, `run.py` (running the
+  charts) and `schedule.py` (the logic behind the two faces)
 
 ## Public Surface
 
@@ -27,7 +28,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **Workspaces.** `create` and `rename` refuse an empty name and a name the owner already uses (ignoring case).
   `delete` raises `WorkspaceNotEmpty` while a dashboard, draft or saved, is in it. They are listed oldest first.
 - **`list`** returns one `status` (`saved` by default, or `draft`) and, with `workspace_id`, one workspace,
-  newest first. `refreshed_at` is the oldest stored result of its charts (None until D2 stores some).
+  newest first. `refreshed_at` is the oldest stored result of its charts (None until a refresh stores some).
 - **`pin`** saves a draft whole, in `workspace_id`, else the workspace the draft is in, else "General" (made on
   first use). There is no way to pin one chart. An empty draft, a dashboard already saved, or a blank `title`
   is a `ValueError`.
@@ -39,12 +40,33 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.
 - **`set_schedule(every_minutes)`** below `dashboards.min_refresh_minutes` is `ScheduleTooFrequent`; otherwise it
-  stores the schedule with the caller's `user_id`, `tenant_id` and roles (D134), and `None` removes it. Nothing
-  runs yet: D2's scheduler does.
+  stores the schedule with the caller's `user_id`, `tenant_id` and roles (D134), and `None` removes it. It runs
+  only while a long-running process calls `run_scheduled` (`nl2sql-api` does, every minute).
 - **Stored results.** `remove_tile` discards that chart's stored result and `set_filters` (when the filters
   change) every chart's; renaming, redrawing, arranging, moving and scheduling keep them.
-- **Events.** `dashboard.changed` (the edit kinds, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`
-  and `workspace.changed`. They carry no titles, names or values.
+- **`open(dashboard_id, refresh_due=True)`** checks access first: each stored plan is checked under the caller's
+  current roles (a generated plan is validated and generated, not run; a verified query is run). It returns
+  `DashboardView(dashboard, runs, refreshed_at, due)`. `runs` holds the stored result of each chart that has one:
+  as stored when the check passed; `denied`, `needs_fixing` or `error`, without rows, when it did not. With
+  `refresh_due`, the charts with no result or one older than the schedule are then refreshed (`trigger="open"`,
+  as the caller, never approving); `due` lists the ids still due (an app that passed `False`, a chart waiting for
+  approval, or a dashboard another process is refreshing).
+- **`refresh(dashboard_id, tile_id=None, approvals=())`** runs the stored plans of one chart or all, in layout
+  order, as the caller, and stores each result (`TileRun`: `at`, `status`, the chart with its rows, the
+  `column_kinds`, the plain-English `explanation`, the `error`). Statuses: `ok`, `empty`, `needs_fixing` (a plan
+  that no longer validates or parses; the refiner is never asked), `denied`, `needs_approval` (its requests in
+  `approvals_needed`; the stored result is kept), `stopped` (a cap; the remaining charts are `stopped` and keep
+  theirs) and `error`. It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
+  edited, and `ValueError` for a `tile_id` the dashboard does not have. `filters` is D2b's.
+- **`run_scheduled(now=None)`** has no caller: it refreshes each dashboard whose schedule is due, as its saved
+  identity, and returns the `DashboardRun`s (`trigger="schedule"`). A schedule that fails a check stops, with
+  `state="stopped"` and `error={"code", "message"}` on `Dashboard.schedule`, and `dashboard.schedule_stopped`.
+  The codes are `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED` and `SCHEDULE_ACCESS_DENIED`.
+- **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`; without one, the refresh
+  uses the only datasource whose curated section holds the query's id, else the chart is `needs_fixing`.
+- **Events.** `dashboard.changed` (the edit kinds, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`,
+  `dashboard.refreshed` (the counts per status), `dashboard.schedule_stopped` and `workspace.changed`. They
+  carry no titles, names or values.
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
   saved dashboards are never purged.
 
@@ -58,7 +80,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 | `dashboards.edit(dashboard_id, edits, *, user_context)` and the named edits `rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule` | D1 |
 | `dashboards.open(dashboard_id, *, user_context, refresh_due=True) -> DashboardView` | D2 |
 | `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2 |
-| `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100)` | D2 |
+| `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100)` | D2b |
 | `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` | D2 |
 | `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None)` | D3 |
 | `dashboards.suggest_questions(datasource_id, *, user_context, n=5) -> list[str]` | D3 |
