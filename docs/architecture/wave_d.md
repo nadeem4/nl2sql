@@ -19,7 +19,20 @@
     is listed in [Needs from Waves A to C](#11-needs-from-waves-a-to-c) as a
     facade method, not designed around.
 
-## Principles
+!!! warning "Wave C was revised on 2026-10-28; this page has not been updated to match"
+    [Wave C](wave_c.md) now has a model-led chat (the model calls tools in
+    a bounded loop; `conversation.step` replaces `conversation.rewritten`),
+    dashboards that are artifacts pinned whole (several sub-queries per
+    chart; `needs_fixing` replaces `stale`; no single-tile pin), workspaces,
+    manual dashboard edits with chat parity, refresh with stored results and
+    schedules, and one access rule for every entry point. Wave D's dashboard
+    and chat routes, its Dashboards and Chat pages, D224 and the job and
+    fixture tables still describe the first draft and need a pass. The rows
+    below that name a changed Wave C item are corrected; the rest are listed
+    here, not rewritten: the Chat tool buttons (**Pin** becomes pinning the
+    whole dashboard), `POST /dashboards/pin` and the tile routes, the
+    Dashboards page (workspaces, arrange, edit, schedule, "refreshed 2 h
+    ago", `needs_fixing`), and the dashboard job.
 
 The owner set them for the redesign, and they rank above everything below:
 
@@ -81,7 +94,7 @@ D13 to D16** and records how each is applied.
 | D221 | **The hosted demo serves the user's side of the web app:** chat, tools, charts, diagrams, reports, dashboards and the knowledge view, keyless from recordings or with the visitor's key. Admin work (Connect, review, index, profile, evals, drift, LLM settings, keys) is off because a hosted visitor is never admin, not by a hosted switch. Jobs, streams and questions are capped per session. | decided overnight, amended after review, owner to confirm | [The hosted demo](#the-hosted-demo) |
 | D222 | **The guided questions are the datasources' `sample_questions`,** which `nl2sql init --demo` already writes (`config/project.py`). The only gap is exposing them on `DatasourceInfo`; `nl2sql.datasets.demo` stops being imported by any app. | decided overnight, amended after review, owner to confirm | [Demo mode](#demo-mode-and-your-data-mode) |
 | D223 | **The foundation is three PRs, not one:** the CI web job first (bug B202, needs nothing), then the API foundation with every engine shape the gaps need, and the web foundation (shell, shared helpers, the client's transport, the CSS split, the build output) beside it, so the parallel PRs never edit the same file. | decided overnight, amended after review, owner to confirm | [PR plan](#14-pr-plan) |
-| D224 | **Dashboards are Wave C's surface and no more:** generate, get, list, refresh, filter values, pin, and delete a dashboard or one tile (`delete(tile_id=)`). Editing, regenerating a stale tile, tiles from the caller's own questions at generate time and tenant sharing are not built: a stale tile is removed and the question pinned again. | decided after review, owner to confirm | [Routes](#the-routes) |
+| D224 | **Dashboards are Wave C's surface and no more:** whatever Wave C's `engine.dashboards` and `engine.workspaces` offer (open, refresh, edit, arrange, filters, schedule, pin, move, delete, workspaces), as thin routes. Wave C (revised 2026-10-28) builds editing and workspaces in the package; this page's route table has not yet been revised to expose them. | decided after review, owner to confirm; superseded in part by Wave C's D116, D131 and D133 | [Routes](#the-routes) |
 
 ## Where 0.9 will leave us
 
@@ -123,7 +136,7 @@ describe them.
 | A durable job queue, several workers, horizontal scaling | D206: one process serves a team; a queue is a product of its own |
 | OAuth or SSO login in the web app | Wave C's D127: keys first. A proxy that authenticates can use `api.auth: proxy`. |
 | MCP mounted in `nl2sql-api`, an operator event stream over REST, a `scan` route | D220 |
-| Editing a dashboard, regenerating a stale tile, tiles from the caller's own questions, tenant-shared dashboards, dragging a layout | D224: Wave C builds none of them; a stale tile is removed and pinned again |
+| Tenant-shared dashboards, publishing a dashboard to a shared workspace, Power BI or Tableau targets, metric alerts | Wave C's Later list (LT1 to LT3): Wave C builds editing, workspaces and refresh in the package; sharing waits |
 | Editing the plan from "why this answer" | Wave B's cut list |
 | A browser end-to-end suite in CI | D217: route tests, golden fixtures and the HTTP smoke cover the contract; the owner runs a browser pass before the release |
 | Rate limiting beyond the hosted demo's | Per-question caps (Wave A) bound spend; a public deployment puts a proxy in front |
@@ -193,7 +206,7 @@ LookupError` still works:
 |---|---|---|
 | `ConversationNotFound`, `DashboardNotFound` (Wave C), `ResultNotFound`, `JobNotFound`, `DatasourceNotFound`, `ApprovalNotFound` (new) | 404 | `NOT_FOUND` |
 | `ConversationBusy` (Wave C); `ReviewError(FILE_CHANGED)` (Wave B) and Wave C's `save` that reuses it | 409 | `CONFLICT`, `FILE_CHANGED` |
-| `NoTiles`, `TileNotPinnable`, `NotIndexed`, `SecretValueInConfig` (Wave C); `MissingProviderKey` (G2); a facade argument check that raises its own subclass | 422 | the exception's code |
+| `NoTiles`, `WorkspaceNotEmpty`, `ScheduleTooFrequent`, `TileNotSavable`, `NotIndexed`, `SecretValueInConfig` (Wave C); `MissingProviderKey` (G2); a facade argument check that raises its own subclass | 422 | the exception's code |
 | `ReviewError(NOT_AUTHORIZED, NOT_WRITABLE)` (Wave B); a caller without an admin or approver role where the facade checks it (`NotAuthorized`, new) | 403 | the exception's code |
 
 | Raised | Status | Code |
@@ -295,7 +308,7 @@ def event_stream(open_events: Callable[[], Iterator[Event]], request: Request,
 
 The streams: `POST /query/stream` (Wave A's caller-safe allow-list, ending
 `run.finished` with `data.result`), `POST /conversations/{id}/turns/stream`
-(Wave C's run events with `conversation.rewritten`, ending
+(Wave C's run events with `conversation.step`, ending
 `conversation.turn`), and `GET /jobs/{id}/events`, which is an `async`
 generator over the in-memory job and holds no thread.
 
@@ -542,7 +555,7 @@ recordings: null        # null: the recordings packaged with the engine (nl2sql/
 | Rule | Detail |
 |---|---|
 | **Where** | `nl2sql/llm/providers/replay.py` (from `llm/replay.py`'s `ReplayStore` and `extract_question`): a provider in `PROVIDER_PRESETS` with no key variable, whose chat model answers `structured()` and plain calls from the store. |
-| **Matching** | As today: the structured-output name plus the question the prompt was built around. Wave C's rewriter prompt gains the same `[USER_QUERY]` marker so a recorded follow-up matches. |
+| **Matching** | As today: the structured-output name plus the question the prompt was built around. Wave C's `conversation` agent prompt gains the same `[USER_QUERY]` marker so a recorded step matches. |
 | **A miss** | The provider raises `ReplayMiss`; the pipeline ends with `REPLAY_MISS` (`ERROR`, not retryable) and "No recorded answer for this question. Add an API key to ask it live." No marker string is matched (`REPLAY_MISS_MARKER` and `finish_question` in `playground/app.py` go). |
 | **Labelled** | Each usage call records `provider: "replay"` and the recording's `recorded_with` model; the web app shows "Recorded run" from that, not from a flag the server adds. |
 | **Coverage** | `engine.llm.recorded(questions) -> list[str]` answers which questions the store covers, for `/meta`. |
@@ -916,7 +929,7 @@ lists the gaps, each a facade change with its PR.
 | G1 | **`results.manifest/page/csv/chart(..., user_context=None)` and `traces.get(trace_id, *, user_context=None)`, bound to the asker (B13); the manifest and trace record `tenant_id` and `user_id`** | Every read of rows or a trace |
 | G1 | **`feedback.record(trace_id, rating, *, user_context, note=None)`** (amendment above) | `/feedback` |
 | G2 | **`llm_override=` on `run_query`, `stream_query`, `conversations.ask`, `stream`, `retry`**, through `llm/request_key.py`, which the apps stop importing; a model override refused without the caller's own key for that provider | D210 |
-| G2 | **The `replay` provider, `ReplayMiss`, `engine.llm.recorded(questions)`**, the rewriter prompt's `[USER_QUERY]` marker | Demo mode |
+| G2 | **The `replay` provider, `ReplayMiss`, `engine.llm.recorded(questions)`**, the `conversation` agent prompt's `[USER_QUERY]` marker | Demo mode |
 | G2 | **`engine.llm.providers()` with each provider's label, verified models and key shape; `nl2sql.provider_for_key(key)` and `nl2sql.provider_keys_in_environment()` exported**, replacing the apps' imports of `nl2sql.llm.providers` | Settings, hosted start |
 | G2 | **`DatasourceInfo.sample_questions`** (the datasource's own plus accepted glossary `examples`); **`nl2sql.prepare_demo(dir) -> Path`** (with today's model choice) and **`nl2sql.init_project`** exported from the top level, replacing the apps' imports of `nl2sql.datasets.demo` and `nl2sql.config` | `/meta`, demo mode, `nl2sql chat --demo` |
 | G3 | **`engine.approvals`: `list`, `grant`, `deny`; a `needs_approval` run stores its requests; `run_query`, `stream_query` and `conversations.retry` take request ids** (amendments above) | Approvals |
