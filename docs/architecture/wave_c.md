@@ -1681,7 +1681,30 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
 
 ### K2
 
-Not built yet.
+!!! note "Built (K2): diagrams"
+    - **Answer view:** `nl2sql.diagram_for(result)` (`nl2sql/charts/diagram.py`, exported lazily from `nl2sql`)
+      is a pure function of the result's `sub_queries[].plan`, its `decomposition` and, for a verified query, its
+      SQL. **Schema view:** `engine.datasources.diagram(datasource_id, *, user_context, tables=None)` draws
+      `datasources.schema(...)` (so the planner's own scope rule: no new one) with `schema_diagram`, plus the
+      glossary joins that `knowledge.scope.visible` leaves the caller. **Tool:** `chat_tools/diagram.py`, args
+      `view`, `turn`, `step`, `datasource_id`, `tables`. `diagram` joins `DEFAULT_CHAT_TOOLS`
+      (`("chart", "diagram", "report")`).
+
+    Where the code and the design differ, the code won:
+
+    - A node's label is `schema.table` (or the table alone); the datasource is the `subgraph` title when there
+      are several, not part of every label. A join with no plain column equality is an unlabelled edge.
+    - A verified query's SQL is parsed with sqlglot's generic dialect, since a pure function has no adapter: SQL
+      that does not parse gives the empty diagram (`No tables`), never an error.
+    - `max_tables` is the `max_tables` argument of `schema_diagram` (default `MAX_TABLES = 30`), not a setting.
+      `tables` that match no table the caller may see raise `ValueError` (the tool reports it as
+      `TOOL_NOT_APPLICABLE`), so a denied table and a missing one answer alike.
+    - Policies are table-level, so "denied columns" cannot arise: a column is drawn only if its table is.
+    - Names are made safe rather than escaped: a label keeps `\w`, space and `. , : $ = -` inside quotes, an
+      identifier is `[A-Za-z0-9_]` and never starts with a word Mermaid reads (`style`, `click`, `classDef`...).
+      A glossary join is drawn with its cardinality; an unknown cardinality is `}o--o{`.
+    - Tests: `test_diagrams.py`; the stub test moves `diagram` out of its tables; `test_public_surface.py` lists
+      `diagram_for`. The no-model-call boundary tests already cover `charts/` and the tools.
 
 ### D1
 

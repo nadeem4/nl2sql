@@ -1,7 +1,7 @@
 # Chat tools
 
-!!! note "Wave C, 0.9: the runner, `chart` and `report` are built"
-    `diagram` arrives with K2 and `dashboard_edit` and `dashboard_pin` with D4; until then each raises
+!!! note "Wave C, 0.9: the runner, `chart`, `diagram` and `report` are built"
+    `dashboard_edit` and `dashboard_pin` arrive with D4; until then each raises
     `NotImplementedError`, which a conversation reports as a failed step, so they are off by default. The design is
     [Wave C, section 4](../architecture/wave_c.md#4-chat-tools).
 
@@ -11,16 +11,16 @@ own. The five built-ins:
 | Tool | Does | Filled by |
 |---|---|---|
 | `chart` | Draws an answer's data as a line, bar, big number or table ([Charts](../charts/index.md)); args `turn`, `step`, `result_id`, `kind` | K1 (built) |
-| `diagram` | Draws the tables of an answer, or of a datasource, as Mermaid ([Diagrams](../charts/diagrams.md)) | K2 |
+| `diagram` | Draws the tables of an answer, or of a datasource, as Mermaid ([Diagrams](../charts/diagrams.md)); args `view` (`answer` or `schema`), `turn`, `step`, `datasource_id`, `tables` | K2 (built) |
 | `report` | Writes the conversation's answered turns up as Markdown; args `turns`, `title` | C2 (built) |
 | `dashboard_edit` | Builds or changes a dashboard ([Dashboards](../dashboards/index.md)) | D4 |
 | `dashboard_pin` | Saves the dashboard being built, whole | D4 |
 
 ## Which tools are on
 
-`chat_tools:` in `nl2sql.yaml` lists registered names. Absent, the default tools are on: `chart` and `report`,
-those of them the registry has (an engine built on `Registry.empty()` has none). `diagram`, `dashboard_edit`
-and `dashboard_pin` are off until K2 and D4 make them real; name them in `chat_tools:` to try them. `[]` turns
+`chat_tools:` in `nl2sql.yaml` lists registered names. Absent, the default tools are on: `chart`, `diagram` and
+`report`, those of them the registry has (an engine built on `Registry.empty()` has none). `dashboard_edit`
+and `dashboard_pin` are off until D4 makes them real; name them in `chat_tools:` to try them. `[]` turns
 every registry tool off and leaves `ask`, the conversation's own tool, which is always on. A name you list
 that the registry does not know is a config error when the engine is built, and so is `ask` (it is not a
 registry tool). `engine.chat_tools.list()` returns the enabled tools
@@ -53,6 +53,15 @@ and may go on.
 
 Every call, successful or not, publishes `chat_tool.called` (`tool`, `conversation_id`, `turn`, `ok`,
 `seconds`, `error_code`).
+
+## The diagram
+
+`diagram` has two views. `answer` (the default) draws the tables the chosen answer read, from its stored plans,
+through `nl2sql.diagram_for`; `turn` picks the turn and `step` which of its answers (the latest turn with an
+answer, its first, by default). `schema` draws `datasource_id` through `engine.datasources.diagram` **for the
+conversation's caller**, so a table that caller may not read is not drawn; `tables` narrows it. No data is in
+either diagram, and a hidden table and a missing one give the same `TOOL_NOT_APPLICABLE`. See
+[Diagrams](../charts/diagrams.md).
 
 ## The report
 

@@ -229,7 +229,7 @@ max_turns: 50           # the 51st turn is refused
 max_age_days: 30        # null keeps conversations; also bounds draft dashboards
 
 # chat_tools.yaml: a list of registered names (the nl2sql.chat_tools entry point group)
-# absent: chart and report (those the registry has); diagram, dashboard_edit and dashboard_pin wait for K2 and D4
+# absent: chart, diagram and report (those the registry has); dashboard_edit and dashboard_pin wait for D4
 - chart
 - report
 

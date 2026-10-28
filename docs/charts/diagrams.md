@@ -1,13 +1,78 @@
 # Diagrams
 
-!!! note "Arrives with K2 (Wave C, 0.9)"
-    This page is a stub. `engine.datasources.diagram` exists with its final signature and raises
-    `NotImplementedError` naming K2. The design is
-    [Wave C, section 4](../architecture/wave_c.md#diagrams).
+Two Mermaid views, written to read the same on a light or a dark page: no `%%{init}` line, no `style`,
+`classDef`, `linkStyle` or `click`, no colour. Emphasis is carried by shape and grouping, and the reader's page
+picks the theme. Neither view calls a model. The design is
+[Wave C, section 4](../architecture/wave_c.md#diagrams).
 
-Two Mermaid views, written to read the same on a light or a dark page (no `%%{init}` line, no `style`,
-`classDef` or `linkStyle`):
+## The answer view
 
-- **The answer view**, `nl2sql.diagram_for(result)`: the tables each sub-query read, one edge per join.
-- **The schema view**, `engine.datasources.diagram(datasource_id, *, user_context, tables=None)`: an
-  `erDiagram` of the tables the caller's scope reaches. The caller is required.
+```python
+import nl2sql
+
+text = nl2sql.diagram_for(result)      # a QueryResult; a pure function
+```
+
+A `flowchart LR` of the tables the answer read, taken from each sub-query's plan and nothing else: no row of
+the result, and no database. One node per table (`schema.table`, or the table alone when the plan names no
+schema), and one edge per join labelled with its columns (`customer_id = id`). A table read twice (a self-join)
+is one node.
+
+- **Several datasources** get a `subgraph` each, and where the decomposition joins or compares two sub-queries
+  from different datasources, an edge between the subgraphs carries the join keys.
+- **A verified query** has no plan. Its SQL is parsed and the tables it reads are listed, unconnected; SQL that
+  does not parse gives an empty diagram rather than an error.
+- **No tables** gives a single node, `No tables`.
+
+```mermaid
+flowchart LR
+    t0["public.orders"]
+    t1["public.customers"]
+    t0 ---|"customer_id = id"| t1
+```
+
+## The schema view
+
+```python
+engine.datasources.diagram("shop", user_context=me)                    # the whole datasource
+engine.datasources.diagram("shop", user_context=me, tables=["orders"]) # orders and its neighbours
+```
+
+An `erDiagram` of the live index snapshot, drawn from `engine.datasources.schema`, so it shows exactly the
+tables the planner would be given for that caller: a table the caller's roles or policy check deny is left
+out, and so is every foreign key and glossary join that names one. **The caller is required**; there is no
+default view.
+
+Each table lists its primary and foreign key columns. Each foreign key is a relationship (`customers ||--o{
+orders : "id = customer_id"`) and each glossary join the caller may see is one too, with its cardinality.
+
+- `tables` limits the diagram to those tables and the ones one relationship away. A name that matches no table
+  the caller may see is a `ValueError`, so a hidden table and a missing one look the same.
+- More than 30 tables are cut to the 30 with the most relationships, and a comment, `%% 41 more tables not
+  shown`, says how many (it names none).
+
+```mermaid
+erDiagram
+    customers {
+        INTEGER id PK
+    }
+    orders {
+        INTEGER id PK
+        INTEGER customer_id FK
+    }
+    customers ||--o{ orders : "id = customer_id"
+```
+
+## Safe to show
+
+Table, column and datasource names come from a database or a model, so none is trusted. A label keeps letters,
+digits, spaces and `. , : $ = -` and is always quoted; an identifier is ASCII letters, digits and `_` and never
+starts with a word Mermaid reads (`style`, `click`, `classDef`...). A name cannot hold a newline, so it cannot
+start a line of its own. The text can be put straight into a Markdown fence or a Mermaid renderer.
+
+## In a conversation
+
+The `diagram` [chat tool](../conversations/tools.md) draws either view as a `mermaid` output. `view` is
+`answer` (the default; `turn` and `step` pick the answer, the latest by default) or `schema` (`datasource_id`,
+and `tables` if wanted), drawn for the conversation's caller. The model reads the diagram's text, which holds
+table names and join columns but no data.
