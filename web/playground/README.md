@@ -321,11 +321,13 @@ with `record: clips` runs the same script in CI and opens a pull request.
   tabs. Picking a tab starts that result at its first page and fetches its
   own rows (`rowsView` in `src/results.js`). The head says **Result** and the whole result's row count
   (`#rows-total`) and offers **Download CSV** (`#rows-csv`), a plain link to
-  `GET /api/query/{trace_id}/results/{node_id}.csv`, so the file is every row,
+  `GET /api/query/{trace_id}/results/{node_id}.csv?role=`, so the file is every row,
   streamed by the server. A result cut at its row ceiling gets one line under
   the head in the warn ink (`#rows-truncated`: "Cut at 1,000 rows, so some are
   missing. Narrow the question to get them all."). The rows come a page of 100
-  at a time from `GET /api/query/{trace_id}/results/{node_id}?offset=&limit=`;
+  at a time from `GET /api/query/{trace_id}/results/{node_id}?role=&offset=&limit=`
+  (both send the role the run was asked as: a playground run is anonymous, so
+  the server serves its rows to that role only);
   the foot says **Rows 101–200 of 3,340** (`#rows-range`, out of the selected
   result's own `row_count`, the number its tab and head show) beside **Previous**
   and **Next** (`#rows-prev`, `#rows-next`, the latter following the server's

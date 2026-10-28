@@ -201,6 +201,24 @@ def test_a_run_is_readable_only_by_the_caller_who_asked_it(monkeypatch, client, 
         assert "n1" not in response.text
 
 
+@pytest.mark.parametrize("suffix", ["", ".csv"])
+def test_an_anonymous_run_is_readable_only_with_the_same_roles(monkeypatch, client, suffix):
+    """REST callers carry roles and no user id (``nl2sql_api.auth``), so a run is bound to its tenant and roles:
+    a viewer holding an admin run's trace id must not read rows its own policies would hide."""
+    from nl2sql.hooks import Allow
+
+    app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])
+    body = _ran(monkeypatch, client, lambda ctx: Allow())
+    path = f"/api/v1/query/{body['trace_id']}/results/combine_g1{suffix}"
+    assert client.get(path).status_code == 200
+
+    for other in (UserContext(roles=["viewer"]), UserContext(roles=["admin", "viewer"])):
+        app.dependency_overrides[get_user_context] = lambda other=other: other
+        response = client.get(path)
+        assert response.status_code == 404, other
+        assert "n1" not in response.text
+
+
 def test_the_routes_need_a_role_like_query_does(client):
     app.dependency_overrides.pop(get_user_context)
 

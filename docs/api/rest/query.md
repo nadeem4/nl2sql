@@ -302,23 +302,30 @@ and streams each slice out, so the result is never built in memory on the server
 - Both need a role, as `/query` does: no role is `HTTP 401`.
 - A run is readable only by the caller who asked it: the request's caller (from
   the auth settings) is passed to `engine.results` as `user_context`, and must
-  have the asker's `user_id` and tenant. Results are read from the engine's own
+  match the run's recorded asker. Results are read from the engine's own
   tenant folder (`TENANT_ID`, the `<tenant_id>` of the artifact path) and nowhere
   else. An unknown `request_id`, another user's run, a run of another tenant, a
   `result_id` the run's manifest does not list, and an id that is not a plain
   token (letters, digits, `_` and `-`, so no `/`, `.` or `..`) are all
   `HTTP 404`, so a caller cannot tell one from the other or reach a path outside
   the run's folder.
-- A caller with only a role (the static or header role, no `user_id`) is
-  anonymous: anonymous callers share each other's results, and see no named
-  user's. See [Who can read a run](../core/results.md#who-can-read-a-run).
+- The REST API has no per-user identity yet: the static or header role gives
+  a caller roles and no `user_id`, so every REST run is anonymous. A REST run
+  is readable by any REST caller of the same tenant with the same roles, and
+  by no caller with other roles: a `viewer` holding an `admin` run's trace id
+  gets `HTTP 404`. API keys are for the MCP server only and give REST callers
+  no `user_id`. See [Who can read a run](../core/results.md#who-can-read-a-run).
+- With the dev flag `api.trust_body_role: true`, the request body's
+  `user_context` picks the caller's `user_id` and `tenant_id` as well as its
+  roles, so a client can read any user's run by naming that user. Use it for
+  local testing only.
 
 ## Tests
 
 `packages/api/tests/test_query_results_routes.py` covers the result routes over the
 real facade and a local artifact store: paging, the cap, `HTTP 422` for a bad
-offset or limit, the complete CSV, `HTTP 404` for unknown, foreign and crafted ids,
-and `HTTP 401` without a role.
+offset or limit, the complete CSV, `HTTP 404` for unknown, foreign and crafted ids
+and for an anonymous run read with other roles, and `HTTP 401` without a role.
 
 `packages/api/tests/test_query_routes.py` and
 `packages/api/tests/test_query_response_shape.py` cover this endpoint with FastAPI's

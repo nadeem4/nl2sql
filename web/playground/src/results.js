@@ -33,17 +33,19 @@ export function rowsView(view, action) {
   return view;
 }
 
-export function viewUrl(requestId, view, limit = PAGE_SIZE) {
-  return pageUrl(requestId, view.active, view.offset, limit);
+// Every read names `role`, the role the run was asked as: a playground run is
+// anonymous, so the server lets only that role read it back.
+export function viewUrl(requestId, view, role, limit = PAGE_SIZE) {
+  return pageUrl(requestId, view.active, role, view.offset, limit);
 }
 
-export function pageUrl(requestId, resultId, offset, limit = PAGE_SIZE) {
-  return `${base(requestId, resultId)}?offset=${offset}&limit=${limit}`;
+export function pageUrl(requestId, resultId, role, offset, limit = PAGE_SIZE) {
+  return `${base(requestId, resultId)}?role=${encodeURIComponent(role)}&offset=${offset}&limit=${limit}`;
 }
 
 // The whole result, streamed by the server; never the sample the page holds.
-export function csvUrl(requestId, resultId) {
-  return `${base(requestId, resultId)}.csv`;
+export function csvUrl(requestId, resultId, role) {
+  return `${base(requestId, resultId)}.csv?role=${encodeURIComponent(role)}`;
 }
 
 // Where Previous and Next go, or null where there is nowhere to go. Next is

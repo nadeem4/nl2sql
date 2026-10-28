@@ -23,23 +23,30 @@ The first three are described with `run_query` in [Query API](query.md).
 ## Who can read a run
 
 Every run writes `manifest.json` beside its results, and the manifest records who asked: a `ResultOwner`, the
-caller's `tenant_id` (else the engine's `settings.tenant_id`) and `user_id`. Every read goes through the manifest,
-and every method takes the caller as a required keyword, `user_context`:
+caller's `tenant_id` (else the engine's `settings.tenant_id`) and `user_id`, and for an anonymous caller its
+`roles`, sorted. Every read goes through the manifest, and every method takes the caller as a required keyword,
+`user_context`:
 
-- The caller who asked reads the run: the same `user_id` and the same tenant, whatever their roles are now.
+- A named user who asked reads the run: the same `user_id` and the same tenant, whatever their roles are now.
+- An anonymous caller (no `user_id`) reads a run asked anonymously in the same tenant with the same set of roles.
 - Any other caller is `ResultNotFound`, exactly as for a run that does not exist: another user of the same tenant,
-  the same user id in another tenant, or an anonymous caller reading a named user's run. A trace id appears in
-  events, traces and the audit log, so it is never the access check.
+  the same user id in another tenant, an anonymous caller reading a named user's run, or an anonymous caller with
+  other roles. A trace id appears in events, traces and the audit log, so it is never the access check.
 - No caller is a `TypeError` (`user_context` missing, `None`, or not a `UserContext`). There is no default caller,
   as for conversations and dashboards: failing open would let anyone read a run whose trace id they saw.
 - A manifest that records no asker (one written before 0.9) is `ResultNotFound` for every caller. There is no
   legacy path; run the question again.
 
-**Anonymous callers.** A run asked with no `user_id` (a `UserContext` with only roles, which the API's static or
-header role and the playground send, or `run_query` with no `user_context`) is owned by
-`(tenant, None)`. It is readable by any caller of that tenant who also has no `user_id`, and by no named user:
-anonymous callers of one tenant share each other's results, because nothing tells them apart. Give callers a
-`user_id` (an API key, or your own auth) to keep their results apart.
+**Anonymous callers.** A run asked with no `user_id` (a `UserContext` with only roles, or `run_query` with no
+`user_context`) is owned by its tenant and its sorted roles. It is readable by any caller of that tenant who also
+has no `user_id` and has the same roles, and by no named user. So a `viewer` holding an `admin` run's trace id
+reads nothing, while anonymous callers with the same roles share each other's results, because nothing else tells
+them apart.
+
+The REST API has no per-user identity yet: its static or header role (and the playground's role picker) build a
+`UserContext` with roles only. So every REST run is anonymous, and readable by any REST caller of the same tenant
+with the same roles. API keys carry a `user_id`, but only to the MCP server; REST does not take them. To keep
+callers' results apart, call the engine in process with a `user_id` from your own auth.
 
 **Operator tools.** `nl2sql run`, `nl2sql trace`, `nl2sql eval`, the replay provider and the feedback tools read
 the result they were just given, traces and recordings, never `engine.results`, so they are unchanged. In-process

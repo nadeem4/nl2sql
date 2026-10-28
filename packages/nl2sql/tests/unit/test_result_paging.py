@@ -81,7 +81,7 @@ def test_the_aggregator_writes_a_manifest_beside_the_results(store, tmp_path):
 
     assert manifest == {
         "request_id": "run-1",
-        "owner": {"tenant_id": "t1", "user_id": None},
+        "owner": {"tenant_id": "t1", "user_id": None, "roles": []},
         "results": [{"node_id": "combine_g1", "columns": ["id", "name"], "row_count": 45, "truncated": False, "column_kinds": {"id": "number", "name": "text"}}],
     }
     assert (tmp_path / "t1" / "run-1" / "result_combine_g1.parquet").is_file()

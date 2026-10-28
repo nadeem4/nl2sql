@@ -7,7 +7,8 @@ manifest, a page of a result, or the whole result as CSV, a slice at a time.
 Nothing is read whole.
 
 The manifest records who asked the run (:class:`ResultOwner`), and every read
-goes through it: only that caller reads the run. Ids are checked to be plain
+goes through it: only that caller reads the run (a named user by tenant and user
+id; an anonymous caller by tenant and the same set of roles). Ids are checked to be plain
 tokens before any path is built from them, and the file read is always rendered
 from the artifact template for the reader's own tenant, never taken from the
 manifest. So an unknown request id, another caller's or another tenant's run, a
@@ -70,12 +71,17 @@ class ResultOwner(BaseModel):
     tenant_id: Optional[str] = None
     # The caller's user id; None for an anonymous caller (one the policies let in without a user id).
     user_id: Optional[str] = None
+    # An anonymous caller's roles, sorted and unique, so only a caller with the same roles reads the run: else an
+    # anonymous viewer holding an admin run's trace id would read rows its own policies hide. None for a named
+    # user, whose run is bound to the user alone.
+    roles: Optional[List[str]] = None
 
     @classmethod
     def of(cls, user: Any, default_tenant: Optional[str]) -> "ResultOwner":
         """The owner a caller (a ``UserContext``, or None for no caller at all) asks or reads as."""
-        return cls(tenant_id=getattr(user, "tenant_id", None) or default_tenant,
-                   user_id=getattr(user, "user_id", None))
+        user_id = getattr(user, "user_id", None)
+        return cls(tenant_id=getattr(user, "tenant_id", None) or default_tenant, user_id=user_id,
+                   roles=None if user_id else sorted(set(getattr(user, "roles", None) or [])))
 
 
 class ResultManifest(BaseModel):

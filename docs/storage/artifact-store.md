@@ -42,11 +42,11 @@ A combined result has no subgraph or schema version of its own: a template that 
 After saving a run's results the aggregator writes a manifest beside them with `ArtifactStore.write_manifest`: which results the run produced, never their rows. While a hook is attached at `answer.after`, it is written later, once those hooks allowed (see *Withheld runs* below).
 
 ```json
-{"request_id": "0f1c...", "owner": {"tenant_id": "acme", "user_id": "ann"}, "results": [
+{"request_id": "0f1c...", "owner": {"tenant_id": "acme", "user_id": "ann", "roles": null}, "results": [
   {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false, "column_kinds": {"genre_name": "text"}}]}
 ```
 
-`owner` is who asked the run: the caller's `tenant_id` (else the engine's) and `user_id` (`null` for a caller with none). Only that caller can read the run back.
+`owner` is who asked the run: the caller's `tenant_id` (else the engine's) and `user_id` (`null` for a caller with none), and for a caller with no `user_id` its sorted `roles` (`null` for a named user). Only that caller, or an anonymous caller of that tenant with the same roles, can read the run back.
 
 `column_kinds` is each column's type category, read from the saved parquet file's schema: integer, decimal and float are `number`; date, time and timestamp `temporal`; string `text`; bool `boolean`; anything else `other`.
 

@@ -1,7 +1,9 @@
 """A run's results are readable only by the caller who asked (docs/security/model.md, "Results").
 
 The manifest a run writes records its asker, ``(tenant_id, user_id)``: the caller's tenant, else the engine's,
-and the caller's user id, None for an anonymous caller. Every read (``manifest``, ``page``, ``csv``, ``chart``,
+and the caller's user id, None for an anonymous caller. An anonymous caller (every REST caller today) also has
+its sorted roles recorded, so only a caller with the same roles reads the run; a named user's run is bound to
+``(tenant_id, user_id)`` alone. Every read (``manifest``, ``page``, ``csv``, ``chart``,
 ``head``) goes through the manifest and needs the caller: another user's or another tenant's trace id is the
 same ``ResultNotFound`` as a missing run, a manifest with no asker recorded is refused, and a read with no
 caller is a ``TypeError``.
@@ -66,7 +68,7 @@ def _engine(store):
 
 def _reads(engine, store, user):
     """Every read of run-1, as ``user``."""
-    owner = ResultOwner(tenant_id=user.tenant_id or TENANT, user_id=user.user_id)
+    owner = ResultOwner.of(user, TENANT)
     return [lambda: engine.results.manifest("run-1", user_context=user),
             lambda: engine.results.page("run-1", RESULT, user_context=user),
             lambda: b"".join(engine.results.csv("run-1", RESULT, user_context=user)),
@@ -77,13 +79,13 @@ def _reads(engine, store, user):
 def test_the_manifest_records_who_asked(store):
     _run(store)
 
-    assert store.read_manifest(TENANT, "run-1")["owner"] == {"tenant_id": TENANT, "user_id": "ann"}
+    assert store.read_manifest(TENANT, "run-1")["owner"] == {"tenant_id": TENANT, "user_id": "ann", "roles": None}
 
 
 def test_the_manifest_records_a_callers_own_tenant(store):
     _run(store, UserContext(user_id="ann", tenant_id="acme"))
 
-    assert store.read_manifest(TENANT, "run-1")["owner"] == {"tenant_id": "acme", "user_id": "ann"}
+    assert store.read_manifest(TENANT, "run-1")["owner"] == {"tenant_id": "acme", "user_id": "ann", "roles": None}
 
 
 def test_the_manifest_written_after_answer_after_records_who_asked(store):
@@ -95,7 +97,7 @@ def test_the_manifest_written_after_answer_after_records_who_asked(store):
 
     release_results(ctx, state.model_copy(update={"aggregator_response": update["aggregator_response"]}))
 
-    assert store.read_manifest(TENANT, "run-1")["owner"] == {"tenant_id": TENANT, "user_id": "ann"}
+    assert store.read_manifest(TENANT, "run-1")["owner"] == {"tenant_id": TENANT, "user_id": "ann", "roles": None}
 
 
 def test_the_asker_reads_their_results(store):
@@ -135,15 +137,44 @@ def test_a_chart_of_a_query_result_checks_the_caller_too(store):
     assert _engine(store).results.chart(result, user_context=ASKER).data.trace_id == "run-1"
 
 
-def test_an_anonymous_run_is_readable_only_by_an_anonymous_caller_of_its_tenant(store):
-    _run(store, UserContext())
+def test_the_manifest_records_an_anonymous_callers_sorted_roles(store):
+    _run(store, UserContext(roles=["viewer", "admin", "viewer"]))
+
+    assert store.read_manifest(TENANT, "run-1")["owner"] == {
+        "tenant_id": TENANT, "user_id": None, "roles": ["admin", "viewer"]}
+
+
+def test_a_named_users_run_is_bound_to_the_user_not_the_role(store):
+    _run(store)
+
+    reader = UserContext(user_id="ann", roles=["viewer"])
+    manifest, page, csv, chart, head = (read() for read in _reads(_engine(store), store, reader))
+    assert page.total_rows == 3 and len(head[1]) == 3
+
+
+def test_an_anonymous_run_is_readable_by_an_anonymous_caller_of_its_tenant_with_the_same_roles(store):
+    _run(store, UserContext(roles=["admin", "analyst"]))
     engine = _engine(store)
 
-    assert engine.results.page("run-1", RESULT, user_context=UserContext(roles=["admin"])).total_rows == 3
-    assert engine.results.page("run-1", RESULT, user_context=UserContext(tenant_id=TENANT)).total_rows == 3
-    for caller in (ASKER, UserContext(tenant_id="t2")):
+    for same in (UserContext(roles=["analyst", "admin"]), UserContext(tenant_id=TENANT, roles=["admin", "analyst"])):
+        manifest, page, csv, chart, head = (read() for read in _reads(engine, store, same))
+        assert page.total_rows == 3 and b"revenue" in csv and len(head[1]) == 3
+
+
+@pytest.mark.parametrize("other", [
+    UserContext(roles=["viewer"]),
+    UserContext(roles=["admin"]),
+    UserContext(roles=["admin", "analyst", "viewer"]),
+    UserContext(user_id="ann", roles=["admin", "analyst"]),
+    UserContext(tenant_id="t2", roles=["admin", "analyst"]),
+], ids=["another role", "fewer roles", "more roles", "a named user", "another tenant"])
+def test_an_anonymous_run_is_not_found_by_any_other_caller(store, other):
+    _run(store, UserContext(roles=["admin", "analyst"]))
+    engine = _engine(store)
+
+    for read in _reads(engine, store, other):
         with pytest.raises(ResultNotFound):
-            engine.results.page("run-1", RESULT, user_context=caller)
+            read()
 
 
 @pytest.mark.parametrize("read", [

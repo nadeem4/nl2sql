@@ -4,8 +4,9 @@ The hosted Space runs the playground, not nl2sql-api, so the same two reads
 are here: ``GET /api/query/{request_id}/results/{result_id}`` for a page and
 ``.../{result_id}.csv`` for the whole result. Both call the facade, never the
 engine context. The store holds ``run-1`` of tenant ``t1`` (45 rows), asked as
-the playground asks, anonymously; a run of tenant ``t2``; and a run of ``t1`` a
-named user asked, which the playground cannot read.
+the playground asks, anonymously as the role ``admin``; a run of tenant ``t2``;
+and a run of ``t1`` a named user asked, which the playground cannot read. The
+page sends the role a run was asked as (``?role=``), as ``/api/schema`` does.
 """
 import csv
 import io
@@ -17,7 +18,7 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from nl2sql import NL2SQL, ResultManifest, ResultSummary  # noqa: E402
+from nl2sql import NL2SQL, ResultManifest, ResultSummary, UserContext  # noqa: E402
 from nl2sql.testing.facade import StubDatasources  # noqa: E402
 from nl2sql.cli.demo.playground.app import build_app  # noqa: E402
 from nl2sql.cli.demo.playground.hosted import Hosted  # noqa: E402
@@ -40,7 +41,8 @@ class _Engine(NL2SQL):
 
 def _save(store, tenant, request, rows, user_id=None):
     ref = store.write_lazy(pl.LazyFrame(rows), store.run_metadata(tenant, request, "result_combine_g1"))
-    owner = ResultOwner(tenant_id=tenant, user_id=user_id)
+    # Asked as the playground asks: anonymously, as the role ``admin``; or by a named user.
+    owner = ResultOwner.of(UserContext(user_id=user_id, roles=["admin"]), tenant)
     store.write_manifest(tenant, request, ResultManifest(request_id=request, owner=owner, results=[
         ResultSummary(node_id="combine_g1", columns=ref.columns, row_count=ref.row_count)]))
 
@@ -58,7 +60,7 @@ def client(request, tmp_path):
 
 
 def test_a_page_of_the_result(client):
-    response = client.get("/api/query/run-1/results/combine_g1", params={"offset": 20, "limit": 20})
+    response = client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "offset": 20, "limit": 20})
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -67,13 +69,13 @@ def test_a_page_of_the_result(client):
 
 
 def test_the_page_size_is_capped_and_bad_values_refused(client):
-    assert client.get("/api/query/run-1/results/combine_g1", params={"limit": 5000}).json()["limit"] == 1000
-    assert client.get("/api/query/run-1/results/combine_g1", params={"offset": -1}).status_code == 422
-    assert client.get("/api/query/run-1/results/combine_g1", params={"limit": 0}).status_code == 422
+    assert client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "limit": 5000}).json()["limit"] == 1000
+    assert client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "offset": -1}).status_code == 422
+    assert client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "limit": 0}).status_code == 422
 
 
 def test_the_csv_is_the_whole_result(client):
-    response = client.get("/api/query/run-1/results/combine_g1.csv")
+    response = client.get("/api/query/run-1/results/combine_g1.csv", params={"role": "admin"})
 
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/csv")
@@ -93,7 +95,27 @@ def test_the_csv_is_the_whole_result(client):
     "/api/query/run-1/results/..%2F..%2Ft2%2Ftheirs%2Fresult_combine_g1.csv",
 ])
 def test_an_unknown_foreign_or_crafted_id_is_404(client, path):
-    response = client.get(path)
+    response = client.get(path, params={"role": "admin"})
 
     assert response.status_code == 404
     assert "secret" not in response.text
+
+
+@pytest.mark.parametrize("suffix", ["", ".csv"])
+def test_a_run_is_read_as_the_role_it_was_asked_as(client, suffix):
+    """Every playground run is anonymous, so its results are bound to the role it was asked as: the page sends
+    that role, and another role is a 404, as a missing run is."""
+    path = f"/api/query/run-1/results/combine_g1{suffix}"
+
+    assert client.get(path, params={"role": "admin"}).status_code == 200
+    response = client.get(path, params={"role": "viewer"})
+    assert response.status_code == 404
+    assert "n1" not in response.text
+
+
+@pytest.mark.parametrize("suffix", ["", ".csv"])
+def test_a_read_without_a_role_is_400(client, suffix):
+    response = client.get(f"/api/query/run-1/results/combine_g1{suffix}")
+
+    assert response.status_code == 400
+    assert "?role=" in response.json()["detail"]

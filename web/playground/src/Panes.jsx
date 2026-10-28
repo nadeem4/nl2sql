@@ -338,7 +338,7 @@ export function SqlPane({ sub, subs = sub ? [sub] : [], state, refused, head, li
 // The rows come from the run's saved results (`result_manifest`), paged from
 // the server; a run that saved none falls back to the sample in the response.
 // Live, the rows load as soon as the manifest arrives, before the answer.
-export function RowsPane({ sub, result, state, head, live = false }) {
+export function RowsPane({ sub, result, role, state, head, live = false }) {
   const rows = sub && sub.rows;
   const saved = Boolean(result && result.trace_id && (result.result_manifest || []).length);
   const planOnly = result && result.status === "plan_only";
@@ -351,7 +351,7 @@ export function RowsPane({ sub, result, state, head, live = false }) {
               : !rows && !saved ? "No rows." : null;
   return (
     <Station id="pane-rows" title="Rows" state={state} note={note} head={head}>
-      {state === "done" && saved && <RowsTable key={result.trace_id} result={result} />}
+      {state === "done" && saved && <RowsTable key={result.trace_id} result={result} role={role} />}
       {state === "done" && !saved && rows && <SampleRows rows={rows} />}
     </Station>
   );
@@ -454,7 +454,7 @@ export default function Run({ asked, result, sub, busy, progress = null, stopped
           verified={busy ? null : verifiedSource(result)} />
         <ValidationPane sub={sub} result={result} state={s.checks} role={asked && asked.role} head={heads.checks} live={live} />
         <SqlPane sub={sub} subs={subs} state={s.sql} refused={gateFailed} head={heads.sql} live={live} />
-        <RowsPane sub={sub} result={live ? liveResult(progress) : result} state={s.rows} head={heads.rows} live={live} />
+        <RowsPane sub={sub} result={live ? liveResult(progress) : result} role={asked && asked.role} state={s.rows} head={heads.rows} live={live} />
         <UsagePane key={(result && result.trace_id) || "none"} usage={result && result.usage} timings={result && result.timings}
           replay={replay} debug={debug} state={s.cost} result={result} head={heads.cost} />
         <Feedback key={`rate-${(result && result.trace_id) || "none"}`} result={result} busy={busy} options={feedback} />

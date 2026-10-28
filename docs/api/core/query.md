@@ -494,7 +494,7 @@ result in memory.
 
 | method | returns | meaning |
 | --- | --- | --- |
-| `results.manifest(run_id, *, user_context)` | `ResultManifest` | `request_id`, `owner` (the asker's `tenant_id` and `user_id`) and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
+| `results.manifest(run_id, *, user_context)` | `ResultManifest` | `request_id`, `owner` (the asker's `tenant_id` and `user_id`, and an anonymous asker's sorted `roles`) and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
 | `results.page(run_id, result_id, offset=0, limit=100, *, user_context)` | `ResultPage` | Rows `offset` to `offset + limit` of the result whose `node_id` is `result_id`. `limit` above `MAX_RESULT_PAGE_SIZE` (1,000) is cut to it, and the page's `limit` says so. A page past the end has no rows. `next_offset` is where the next page starts, `None` at the end. A negative `offset` or a `limit` below 1 raises `ValueError`. |
 | `results.csv(run_id, result_id, *, user_context)` | `Iterator[bytes]` | The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent. |
 

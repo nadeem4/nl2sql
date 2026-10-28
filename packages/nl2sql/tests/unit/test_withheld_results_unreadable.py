@@ -39,7 +39,7 @@ RESULT = "combine_g1"
 SQ = SubQuery(id="sq1", datasource_id="shop", intent="n")
 # These runs are asked with no caller, so they are the anonymous caller's of the engine's tenant (test_results_owner.py).
 ASKER = UserContext()
-OWNER = ResultOwner(tenant_id=TENANT)
+OWNER = ResultOwner.of(ASKER, TENANT)
 
 
 @pytest.fixture()

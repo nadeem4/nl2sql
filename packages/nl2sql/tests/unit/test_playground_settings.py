@@ -224,9 +224,9 @@ def _every_route_response(client, trace_id="0b8f7d2e-1111-4222-8333-944455556666
         ("POST", "/api/ask/stream"): lambda: client.post("/api/ask/stream", json={"question": "q1", "role": "admin"}),
         ("GET", "/api/trace/{trace_id}"): lambda: client.get(f"/api/trace/{trace_id}"),
         ("GET", "/api/query/{request_id}/results/{result_id}"): lambda: client.get(
-            f"/api/query/{trace_id}/results/combine_g1"),
+            f"/api/query/{trace_id}/results/combine_g1", params={"role": "admin"}),
         ("GET", "/api/query/{request_id}/results/{result_id}.csv"): lambda: client.get(
-            f"/api/query/{trace_id}/results/combine_g1.csv"),
+            f"/api/query/{trace_id}/results/combine_g1.csv", params={"role": "admin"}),
         ("GET", "/api/pipeline"): lambda: client.get("/api/pipeline"),
         ("GET", "/api/settings"): lambda: client.get("/api/settings"),
         ("POST", "/api/settings/key"): lambda: client.post("/api/settings/key", json={"api_key": FAKE_KEY}),

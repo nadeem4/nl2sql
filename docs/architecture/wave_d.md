@@ -74,7 +74,7 @@ D13 to D16** and records how each is applied.
 | D201 | **One route convention, applied to the old routes too:** plural nouns (`/datasources`, `/conversations`, `/results`), ids in the path, an action on a collection or a resource as a verb sub-path (`/proposals/accept`), long work as `POST /jobs/{kind}`. `/datasource`, `/index/{id}`, `/index-all`, `/index/status`, `/llm/{agent}` and `/query/{request_id}/results/...` are renamed or folded with no alias. | decided overnight, amended after review, owner to confirm | [Conventions](#route-conventions) |
 | D202 | **One error envelope, and only the facade's own exceptions are mapped.** `{"error": {"code", "message", "fix", "details"}}` for every non-2xx response. The facade's named exceptions share one base, `nl2sql.NL2SQLError` (`code`, `message`, `fix`, `status`); the API maps that base and nothing else. Any other exception, a built-in `ValueError`, `KeyError` or `PermissionError` included, is a 500 naming a request id, never its text. A pipeline outcome stays a 200 with the `QueryResult`. | decided overnight, amended after review, owner to confirm | [Errors](#the-error-envelope) |
 | D203 | **Every request resolves one full `UserContext`** (`user_id`, `tenant_id`, `roles`) from one configured source, `api.auth`: `api_keys` (Wave C's bearer keys), `proxy` (user, tenant and role headers, trusted only from `proxy.trusted_from`), `static` (one role) or `none`. Anonymous browser sessions exist only inside `serve --demo --hosted`, never as a config value. `trust_body_role`, `role_header` and `role` are deleted. | decided overnight, amended after review, owner to confirm | [Identity](#identity-and-auth) |
-| D204 | **Results and traces are bound to the user who asked (bug B13)** in the engine. A run records its asker's `(tenant_id, user_id)`; `results.*` and `traces.get` with a `user_context` answer only that asker, and another user's run is "not found". `user_context=None` is the trusted in-process operator, as Wave A's D24 and Wave C's keys treat it, so `nl2sql trace` reads any run. The API, MCP and the terminal app always pass the caller, which a boundary test checks. Every new method this wave adds requires the caller and fails closed (Wave C's D130). | decided overnight, amended after review, owner to confirm | [Results bound to the user](#results-bound-to-the-user-b13) |
+| D204 | **Results and traces are bound to the user who asked (bug B13)** in the engine. Results were built early by Wave C's C-W2, with a required `user_context` and no operator path (see the [B13 note](#results-bound-to-the-user-b13)); what follows is for traces. A run records its asker's `(tenant_id, user_id)`; `traces.get` with a `user_context` answers only that asker, and another user's run is "not found". `user_context=None` is the trusted in-process operator for traces, as Wave A's D24 and Wave C's keys treat it, so `nl2sql trace` reads any run. The API, MCP and the terminal app always pass the caller, which a boundary test checks. Every new method this wave adds requires the caller and fails closed (Wave C's D130). | decided overnight, amended after review, owner to confirm | [Results bound to the user](#results-bound-to-the-user-b13) |
 | D205 | **Final-design D15, applied safely:** with `api.auth: none`, `nl2sql-api` refuses to start unless it binds a loopback host, as Wave C's MCP does without keys. It then answers only requests whose `Host` is `localhost`, `127.0.0.1` or `[::1]` (with its port) and refuses any request carrying `Forwarded` or `X-Forwarded-For`, so neither a same-host proxy nor a DNS-rebinding page passes for the operator. Such a request is the local operator, with the admin roles. Compose ships with `auth: api_keys`. | decided overnight, amended after review, owner to confirm | [Identity](#identity-and-auth) |
 | D206 | **Jobs run in process, on one worker thread, in memory.** A job is one facade call (index, profile, eval, dashboard) with a progress callback; jobs run one at a time in submission order; each caller has at most one job queued or running; the last 100 are kept and lost on restart. `nl2sql-api` runs one Uvicorn worker. The durable queue is cut. | decided overnight, amended after review, owner to confirm | [Jobs](#jobs) |
 | D207 | **Server-Sent Events carry Wave A's `Event` as is** (`event.sse()`), through one helper that closes the facade's iterator when the client goes away (and cancels the token where the method takes one), with a heartbeat every 15 seconds. A job's event stream is an async generator, so a waiting browser holds no worker thread. | decided overnight, amended after review, owner to confirm | [Streams](#streams) |
@@ -265,8 +265,12 @@ reports a typo.
 Built early for results by Wave C's C-W2, with a stricter rule than below:
 `user_context` is required (none is a `TypeError`, no `None` operator) and
 a manifest with no owner is refused for every caller
-([Who can read a run](../api/core/results.md#who-can-read-a-run)). Traces
-(`engine.traces.get`) remain this section's.
+([Who can read a run](../api/core/results.md#who-can-read-a-run)). A caller
+with no `user_id` also has its sorted roles recorded and must match them, so
+an anonymous `viewer` cannot read an anonymous `admin` run. So the results
+half of the steps below (the `None` operator in 2 and 3, and the results
+part of 6) does not apply; traces (`engine.traces.get`) remain this
+section's.
 
 B13 is fixed in the engine (D204), so the facade, the API, MCP and the
 terminal app all get it:
@@ -924,7 +928,7 @@ lists the gaps, each a facade change with its PR.
 | Wave A | D10, D24 ("nothing is queued or stored") | Approval grants are stored and named by request id (D215); the checks are unchanged | G3 |
 | Wave C | D107 (`retry` takes `Approval`s; nothing stored) | `retry(approvals=)` also takes request ids | G3 |
 | Wave B, Wave C | `feedback.record(result, *, question, role, rating, ...)` | `record(trace_id, rating, *, user_context, note=None)`, reading the run's trace; Wave B's thumbs-up proposal is unchanged | G1 |
-| Wave C | `results.chart(..., tenant_id=None)` | `user_context=None` replaces `tenant_id`, with D204's meaning | G1 |
+| Wave C | `results.chart(..., tenant_id=None)` | Built by C-W2: a required `user_context` replaces `tenant_id`, with no operator path (see the [B13 note](#results-bound-to-the-user-b13)) | C-W2 |
 
 ### Gaps
 
@@ -932,7 +936,7 @@ lists the gaps, each a facade change with its PR.
 |---|---|---|
 | D0a | **`nl2sql.NL2SQLError` (`code`, `message`, `fix`, `status`)** as the base of every named facade exception (Waves A to C's and this wave's), keeping their built-in parents | The error envelope (D202) |
 | D0a | **`LLMOverride(keys, models)`, `ErrorCode.REPLAY_MISS` and `APPROVAL_NOT_GRANTED`, `NotAuthorized`, `ApprovalNotFound`, the approval store methods and migration, the `Api` fields**: shapes only | Every later PR |
-| G1 | **`results.manifest/page/csv/chart(..., user_context=None)` and `traces.get(trace_id, *, user_context=None)`, bound to the asker (B13); the manifest and trace record `tenant_id` and `user_id`** | Every read of rows or a trace |
+| G1 | **`traces.get(trace_id, *, user_context=None)`, bound to the asker (B13); the trace records `tenant_id` and `user_id`** (the results half is built by C-W2; see the [B13 note](#results-bound-to-the-user-b13)) | Every read of a trace |
 | G1 | **`feedback.record(trace_id, rating, *, user_context, note=None)`** (amendment above) | `/feedback` |
 | G2 | **`llm_override=` on `run_query`, `stream_query`, `conversations.ask`, `stream`, `retry`**, through `llm/request_key.py`, which the apps stop importing; a model override refused without the caller's own key for that provider | D210 |
 | G2 | **The `replay` provider, `ReplayMiss`, `engine.llm.recorded(questions)`**, the `conversation` agent prompt's `[USER_QUERY]` marker | Demo mode |
@@ -962,7 +966,7 @@ lists the gaps, each a facade change with its PR.
 | The `.env` entry points | `ENTRY_POINTS_LOADING_DOTENV` drops `cli/commands/demo.py` (the launcher loads nothing; its child does) and replaces `api/src/nl2sql_api/main.py` with `api/src/nl2sql_api/serve.py`. `READS_THE_ENVIRONMENT` is unchanged: `--hosted`'s key check calls `nl2sql.provider_keys_in_environment()`, which reads inside `llm/`. |
 | Only `nl2sql/mcp/`, `nl2sql/cli/demo/` and `cli/commands/demo.py` import Starlette or Uvicorn (Wave C) | `nl2sql/cli/demo/` is deleted and the launcher imports neither; the engine imports them only in `nl2sql/mcp/` |
 | *Only an Accept Writes a Person's File* (Wave B, amended by Wave C) | Unchanged: Wave D adds no writer (D212) |
-| New invariant: *Results Belong to Their Asker* | A saved result or trace is read, by any caller that names itself, only by the `(tenant_id, user_id)` that asked; only the in-process operator (`user_context=None`) reads any. Enforced by `test_another_users_result_is_not_found`, `test_apps_always_pass_the_caller` and the API's route test. Added to `invariants.md`. |
+| New invariant: *Results Belong to Their Asker* | A saved result or trace is read, by any caller that names itself, only by the `(tenant_id, user_id)` that asked; only the in-process operator (`user_context=None`) reads any trace, and no one reads another's results (C-W2 built that half; see the [B13 note](#results-bound-to-the-user-b13)). Enforced by `test_another_users_result_is_not_found`, `test_apps_always_pass_the_caller` and the API's route test. Added to `invariants.md`. |
 | No process globals | Unchanged: per-request keys travel as a value (`LLMOverride`), never in the environment |
 
 ## 13. Testing
