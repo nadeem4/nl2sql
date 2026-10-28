@@ -95,6 +95,15 @@ nav:
     - From Source (Development): getting_started/source.md
     - Demo Data (CLI-first): getting_started/demo.md
     - MCP Server: getting_started/mcp.md
+    - Launch: getting_started/launch.md
+  - Conversations:
+    - Conversations: conversations/index.md
+    - Chat tools: conversations/tools.md
+  - Charts:
+    - Charts: charts/index.md
+    - Diagrams: charts/diagrams.md
+  - Dashboards:
+    - Dashboards: dashboards/index.md
   - Configuration:
     - Configuration System: configuration/system.md
     - Datasources: configuration/datasources.md
@@ -138,6 +147,7 @@ nav:
   - Security:
     - Security Model: security/model.md
     - Multi-Tenant Isolation: security/multi-tenant.md
+    - API keys: security/api-keys.md
   - Deployment:
     - Deployment Architecture: deployment/architecture.md
     - Docker: deployment/docker.md
@@ -169,6 +179,9 @@ nav:
       - Indexing: api/core/indexing.md
       - Policies: api/core/policies.md
       - Query: api/core/query.md
+      - Results: api/core/results.md
+      - Conversations: api/core/conversations.md
+      - Dashboards: api/core/dashboards.md
     - REST API (FastAPI):
       - Overview: api/rest/index.md
       - Health: api/rest/health.md

@@ -13,7 +13,12 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Sequence, Union
 
 if TYPE_CHECKING:
+    from nl2sql.api.api_keys_api import ApiKeysAPI
+    from nl2sql.api.chat_tools_api import ChatToolsAPI
+    from nl2sql.api.conversations_api import ConversationsAPI
     from nl2sql.api.curated_api import CuratedAPI
+    from nl2sql.api.dashboards_api import DashboardsAPI
+    from nl2sql.api.workspaces_api import WorkspacesAPI
     from nl2sql.api.datasource_api import DatasourcesAPI
     from nl2sql.api.evals_api import EvalsAPI
     from nl2sql.api.events_api import EventsAPI
@@ -100,7 +105,8 @@ class NL2SQL:
 
     @cached_property
     def datasources(self) -> "DatasourcesAPI":
-        """The datasources: ``list``, ``get``, ``add``, ``remove``, ``schema``, ``test``."""
+        """The datasources: ``list``, ``get``, ``add``, ``remove``, ``schema``, ``types``, ``test``, ``scan``,
+        ``diagram``, ``save``."""
         from nl2sql.api.datasource_api import DatasourcesAPI
 
         return DatasourcesAPI(self._runtime)
@@ -135,7 +141,7 @@ class NL2SQL:
 
     @cached_property
     def results(self) -> "ResultsAPI":
-        """A run's saved results, by its ``trace_id``: ``manifest``, ``page``, ``csv``."""
+        """A run's saved results, by its ``trace_id``: ``manifest``, ``page``, ``csv``, ``chart``."""
         from nl2sql.api.results_api import ResultsAPI
 
         return ResultsAPI(self._runtime)
@@ -189,6 +195,45 @@ class NL2SQL:
         from nl2sql.api.proposals_api import ProposalsAPI
 
         return ProposalsAPI(self._runtime)
+
+    @cached_property
+    def conversations(self) -> "ConversationsAPI":
+        """Model-led conversations over the database: ``start``, ``ask``, ``stream``, ``retry``, ``tool``,
+        ``ask_only``, ``report``, ``get``, ``list``, ``delete``. Every method takes the caller."""
+        from nl2sql.api.conversations_api import ConversationsAPI
+
+        return ConversationsAPI(self._runtime)
+
+    @cached_property
+    def chat_tools(self) -> "ChatToolsAPI":
+        """The chat tools a conversation can call: ``list``."""
+        from nl2sql.api.chat_tools_api import ChatToolsAPI
+
+        return ChatToolsAPI(self._runtime)
+
+    @cached_property
+    def workspaces(self) -> "WorkspacesAPI":
+        """The folders dashboards live in: ``create``, ``rename``, ``list``, ``delete``. Every method takes the
+        caller."""
+        from nl2sql.api.workspaces_api import WorkspacesAPI
+
+        return WorkspacesAPI(self._runtime)
+
+    @cached_property
+    def dashboards(self) -> "DashboardsAPI":
+        """Dashboards: ``get``, ``list``, ``open``, ``refresh``, ``edit`` and the named edits, ``pin``, ``move``,
+        ``delete``, ``generate``, ``filter_values``, ``suggest_questions``, ``run_scheduled``. Every method
+        takes the caller, except ``run_scheduled``."""
+        from nl2sql.api.dashboards_api import DashboardsAPI
+
+        return DashboardsAPI(self._runtime)
+
+    @cached_property
+    def api_keys(self) -> "ApiKeysAPI":
+        """Bearer keys for MCP over HTTP: ``create``, ``list``, ``revoke``, ``verify``."""
+        from nl2sql.api.api_keys_api import ApiKeysAPI
+
+        return ApiKeysAPI(self._runtime)
 
     @cached_property
     def _queries(self) -> "QueryAPI":
@@ -276,7 +321,7 @@ class NL2SQL:
                   cancellation_token: Optional["CancellationToken"] = None,
                   plan: Optional["SuppliedPlan"] = None,
                   approvals: Optional[Sequence["Approval"]] = None, clarify: bool = True,
-                  choice: Optional["ClarificationChoice"] = None) -> "QueryResult":
+                  choice: Optional["ClarificationChoice"] = None, answer: bool = True) -> "QueryResult":
         """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
 
         ``datasource_id`` skips routing; ``execute=False`` stops after the SQL
@@ -306,18 +351,25 @@ class NL2SQL:
         is not this question's or this caller's ends the run
         ``CLARIFICATION_INVALID``; one the data or glossary has outdated,
         ``CLARIFICATION_STALE``. Not with ``plan`` or ``approvals``.
+
+        ``answer=False`` skips the answer synthesizer: ``final_answer`` is
+        None and the run makes no model call for prose (a dashboard refresh
+        re-runs stored plans with ``plan=`` and ``answer=False``, and no
+        model call at all).
         """
         self._ensure_open()
         return self._queries.run_query(question, datasource_id=datasource_id, execute=execute,
                                        user_context=user_context, cancellation_token=cancellation_token,
-                                       plan=plan, approvals=approvals, clarify=clarify, choice=choice)
+                                       plan=plan, approvals=approvals, clarify=clarify, choice=choice,
+                                       answer=answer)
 
     def stream_query(self, question: str, *, datasource_id: Optional[str] = None, execute: bool = True,
                      user_context: Optional["UserContext"] = None,
                      cancellation_token: Optional["CancellationToken"] = None,
                      plan: Optional["SuppliedPlan"] = None,
                      approvals: Optional[Sequence["Approval"]] = None,
-                     clarify: bool = True, choice: Optional["ClarificationChoice"] = None) -> Iterator["Event"]:
+                     clarify: bool = True, choice: Optional["ClarificationChoice"] = None,
+                     answer: bool = True) -> Iterator["Event"]:
         """
         Run a question as ``run_query`` does, yielding its :class:`~nl2sql.Event`
         values as they are published, from the caller-safe allow-list:
@@ -329,12 +381,13 @@ class NL2SQL:
         (``policy.decision``, ``hook.decision``, ``llm.call``) are never on
         it: subscribe to ``events`` for those. ``event.sse()`` is the event as
         one Server-Sent Event. Closing the iterator early cancels the run.
-        ``plan``, ``approvals``, ``clarify`` and ``choice`` are as for :meth:`run_query`.
+        ``plan``, ``approvals``, ``clarify``, ``choice`` and ``answer`` are as for :meth:`run_query`.
         """
         self._ensure_open()
         return self._queries.stream_query(question, datasource_id=datasource_id, execute=execute,
                                           user_context=user_context, cancellation_token=cancellation_token,
-                                          plan=plan, approvals=approvals, clarify=clarify, choice=choice)
+                                          plan=plan, approvals=approvals, clarify=clarify, choice=choice,
+                                          answer=answer)
 
     def clear_plan_cache(self) -> int:
         """Remove every cached plan from the state store; returns how many there were.

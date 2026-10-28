@@ -504,6 +504,7 @@ class QueryAPI:
         pinned: Optional[PinnedRun] = None,
         clarify: bool = True,
         choice: Optional[ClarificationChoice] = None,
+        answer: bool = True,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -540,6 +541,9 @@ class QueryAPI:
                 planning. A request that is not this run's ends the run
                 ``CLARIFICATION_INVALID``; one the data or glossary has
                 outdated, ``CLARIFICATION_STALE``. Not with ``approvals``.
+            answer: False skips the answer synthesizer: no prose is written,
+                ``final_answer`` is None and the run makes no model call for it
+                (a dashboard refresh re-runs stored plans this way).
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
@@ -566,6 +570,7 @@ class QueryAPI:
                     pinned=pinned,
                     approvals=approvals,
                     clarify=clarify,
+                    answer=answer,
                 )
                 result = result_from_state(
                     state,
@@ -655,6 +660,7 @@ class QueryAPI:
         pinned: Optional[PinnedRun] = None,
         clarify: bool = True,
         choice: Optional[ClarificationChoice] = None,
+        answer: bool = True,
     ) -> Iterator[Event]:
         """
         Run a question as :meth:`run_query` does, yielding its events as they are published.
@@ -681,7 +687,7 @@ class QueryAPI:
         ``ValueError``, raised at the call. Whatever breaks, the stream ends
         with exactly one terminal event. ``names``
         (internal) is the allow-list; Wave C's conversation stream adds its
-        own events to it. ``plan``, ``approvals``, ``pinned`` and ``choice`` are as
+        own events to it. ``plan``, ``approvals``, ``pinned``, ``choice`` and ``answer`` are as
         for :meth:`run_query`, and refused the same way, at the call; so is ``clarify``.
         """
         if scope is not None and scope.closed:
@@ -689,12 +695,12 @@ class QueryAPI:
         pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                             token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
-                            pinned=pinned, approvals=approvals, clarify=clarify, refusal=refusal)
+                            pinned=pinned, approvals=approvals, clarify=clarify, answer=answer, refusal=refusal)
 
     def _stream(self, question: str, *, datasource_id: Optional[str], execute: bool,
                 user_context: Optional[UserContext], token: CancellationToken, opened: Optional[RunScope],
                 allowed: frozenset, pinned: Optional[PinnedRun] = None,
-                approvals: Optional[Sequence[Approval]] = None, clarify: bool = True,
+                approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, answer: bool = True,
                 refusal: Optional[PipelineError] = None) -> Iterator[Event]:
         """:meth:`stream_query`'s run, on a thread of its own, and the events it hands over."""
         events: "queue.Queue[Optional[Event]]" = queue.Queue()
@@ -726,6 +732,7 @@ class QueryAPI:
                         pinned=pinned,
                         approvals=approvals,
                         clarify=clarify,
+                        answer=answer,
                     )
                     result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None),
                                                knowledge=caller_knowledge(self._ctx, state),

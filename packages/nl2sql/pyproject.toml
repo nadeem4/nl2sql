@@ -73,8 +73,8 @@ demo = ["fastapi>=0.100.0", "uvicorn>=0.20.0"]
 duckdb = ["duckdb", "duckdb-engine"]
 hashicorp = ["hvac"]
 # `nl2sql mcp`: the engine as an MCP server over stdio, on the official SDK
-# (structured tool results arrived in 1.10).
-mcp = ["mcp>=1.10,<2"]
+# (structured tool results arrived in 1.10), and over HTTP (`--http`, from 0.9), which needs a server.
+mcp = ["mcp>=1.10,<2", "uvicorn>=0.20.0"]
 mssql = [
     "pyodbc>=4.0.0",
     "pymssql>=2.2.0; platform_system=='Linux'", # Optional fallback
@@ -148,6 +148,14 @@ local = "nl2sql.storage.local:LocalResults"
 log = "nl2sql.observers.log:LogObserver"
 audit = "nl2sql.observers.audit:AuditObserver"
 otel = "nl2sql.observers.otel:OtelObserver"
+
+# The built-in chat tools (docs/architecture/wave_c.md, section 4). A plugin declares its own in the same group.
+[project.entry-points."nl2sql.chat_tools"]
+chart = "nl2sql.chat_tools.chart:ChartTool"
+diagram = "nl2sql.chat_tools.diagram:DiagramTool"
+report = "nl2sql.chat_tools.report:ReportTool"
+dashboard_edit = "nl2sql.chat_tools.dashboard_edit:DashboardEditTool"
+dashboard_pin = "nl2sql.chat_tools.dashboard_pin:DashboardPinTool"
 
 # The built-in knowledge source (docs/architecture/wave_b.md, section 3).
 [project.entry-points."nl2sql.knowledge_sources"]

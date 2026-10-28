@@ -32,6 +32,17 @@ PUBLIC_SURFACE = {
     "KnowledgeSourceConfig", "CostRule", "KnowledgeSourceInfo", "DatasourceKnowledgeView", "Proposal",
     "AcceptReport", "ReviewError", "ProfileReport", "ClarificationRequest", "ClarificationOption",
     "ClarificationChoice", "Explanation", "ExplainedStep", "TermUse",
+    # Wave C: conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys
+    "Conversation", "Turn", "ToolStep", "ToolCall", "ToolOutput", "ModelStep", "ConversationInfo",
+    "ChartSpec", "ChartData", "Encoding", "ColumnKind",
+    "Workspace", "Dashboard", "DashboardInfo", "DashboardView", "DashboardRun", "Tile", "TileRun", "TileLayout",
+    "ChartPlan", "StoredQuery", "DashboardFilter", "Schedule", "ScheduleIdentity", "SkippedTile", "StepRef",
+    "TileArrangement", "DashboardEdit", "RenameDashboard", "RenameTile", "SetTileChart", "RemoveTile", "Arrange",
+    "SetFilters", "SetSchedule", "MoveDashboard", "AddTile", "ReplacePlan",
+    "ChatTool", "ToolContext", "ToolNotApplicable", "ChatToolInfo", "Candidate", "Found", "DiscoverableAdapter",
+    "ApiKey",
+    "ConversationNotFound", "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound", "NotIndexed", "NoTiles",
+    "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
 }
 
 

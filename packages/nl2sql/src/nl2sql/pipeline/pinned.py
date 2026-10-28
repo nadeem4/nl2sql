@@ -49,24 +49,48 @@ class PinnedSource(str, Enum):
 
 
 class SuppliedPlan(BaseModel):
-    """A plan the caller holds, for ``run_query(plan=...)``: one sub-query of one datasource and its plan.
+    """A plan the caller holds, for ``run_query(plan=...)``: a whole run, or a verified query.
 
-    The question is still asked (the answer is written for it), but nothing is
-    routed, decomposed or planned. The plan passes ``plan.after``, the
-    validator and the generator under the caller's scope.
+    Shaped on :class:`PinnedRun`: either a ``decomposition`` (its combine groups
+    and post-combine steps included) with the ``plans`` of every sub-query,
+    keyed by sub-query id, or a ``verified`` query (with its bound params) and
+    the datasource it belongs to. Exactly one. :meth:`for_sub_query` is the
+    one-sub-query case. The question is still asked (the answer is written for
+    it), but nothing is routed, decomposed or planned. Each plan passes
+    ``plan.after``, the validator and the generator under the caller's scope.
     """
 
-    datasource_id: str
-    sub_query: SubQuery
-    plan: PlanModel
+    decomposition: Optional[DecomposerResponse] = None
+    plans: Dict[str, PlanModel] = Field(default_factory=dict)
+    verified: Optional[VerifiedRef] = None
+    verified_datasource_id: Optional[str] = None
+
+    @classmethod
+    def for_sub_query(cls, sub_query: SubQuery, plan: PlanModel) -> "SuppliedPlan":
+        """A run of one sub-query, standalone, with its plan."""
+        decomposition = DecomposerResponse(
+            sub_queries=[sub_query],
+            combine_groups=[CombineGroup(group_id="supplied", operation="standalone",
+                                         inputs=[CombineInput(subquery_id=sub_query.id)])])
+        return cls(decomposition=decomposition, plans={sub_query.id: plan})
 
     @model_validator(mode="after")
-    def _one_datasource(self) -> "SuppliedPlan":
-        if self.sub_query.datasource_id != self.datasource_id:
-            raise ValueError(f"The sub-query is for '{self.sub_query.datasource_id}', "
-                             f"not '{self.datasource_id}'.")
+    def _one_of(self) -> "SuppliedPlan":
+        if (self.decomposition is None) == (self.verified is None):
+            raise ValueError("A supplied plan is a decomposition with its plans, or a verified query: exactly one.")
+        if self.verified is not None:
+            if self.plans:
+                raise ValueError("Plans belong to a decomposition; a verified query has none.")
+            if not self.verified_datasource_id:
+                raise ValueError("A verified query needs verified_datasource_id.")
+            return self
+        if self.verified_datasource_id is not None:
+            raise ValueError("verified_datasource_id goes with a verified query.")
+        ids = {sq.id for sq in self.decomposition.sub_queries}
+        if set(self.plans) != ids:
+            raise ValueError(f"Every sub-query needs its plan and no other plan is allowed; sub-queries: "
+                             f"{sorted(ids)}, plans: {sorted(self.plans)}.")
         return self
-
 
 class PinnedRun(BaseModel):
     """What a pinned run takes as given: the decomposition and each pinned sub-query's plan.
@@ -90,12 +114,11 @@ class PinnedRun(BaseModel):
 
     @classmethod
     def supplied(cls, plan: SuppliedPlan) -> "PinnedRun":
-        """A one-sub-query run of ``plan``: its sub-query, standalone."""
-        decomposition = DecomposerResponse(
-            sub_queries=[plan.sub_query],
-            combine_groups=[CombineGroup(group_id="supplied", operation="standalone",
-                                         inputs=[CombineInput(subquery_id=plan.sub_query.id)])])
-        return cls(source=PinnedSource.SUPPLIED, decomposition=decomposition, plans={plan.sub_query.id: plan.plan})
+        """The run ``plan`` pins: its decomposition and plans, or its verified query."""
+        if plan.verified is not None:
+            return cls(source=PinnedSource.SUPPLIED, verified=plan.verified,
+                       verified_datasource_id=plan.verified_datasource_id)
+        return cls(source=PinnedSource.SUPPLIED, decomposition=plan.decomposition, plans=dict(plan.plans))
 
 
 def pinned_from_approvals(approvals: Sequence[Approval], *, question: str, user: Optional[UserContext],

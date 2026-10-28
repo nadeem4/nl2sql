@@ -16,6 +16,7 @@ def build_graph(
     ctx: Runtime,
     execute: bool = True,
     pinned: bool = False,
+    answer: bool = True,
 ) -> StateGraph:
     """Builds the main LangGraph pipeline.
 
@@ -40,6 +41,8 @@ def build_graph(
         ctx (Runtime): The application context containing registries and services.
         execute (bool): Whether to allow execution against real databases.
         pinned (bool): Build the pinned run's graph.
+        answer (bool): False builds the graph without the answer synthesizer: the run ends at the
+            aggregator and writes no prose (a dashboard refresh; wave_c.md, D119).
 
     Returns:
         StateGraph: The compiled LangGraph runnable.
@@ -49,7 +52,6 @@ def build_graph(
     resolver_node = DatasourceResolverNode(ctx)
     decomposer_node = DecomposerNode(ctx)
     aggregator_node = EngineAggregatorNode(ctx)
-    synthesizer_node = AnswerSynthesizerNode(ctx)
 
     sql_agent_subgraph = build_sql_agent_graph(ctx, execute=execute)
 
@@ -60,7 +62,6 @@ def build_graph(
         wrap_subgraph(sql_agent_subgraph, SQL_AGENT_SUBGRAPH, ctx, execute=execute),
     )
     graph.add_node("aggregator", aggregator_node)
-    graph.add_node("answer_synthesizer", synthesizer_node)
     graph.add_node("layer_router", lambda state: {})
 
     if pinned:
@@ -96,11 +97,15 @@ def build_graph(
     )
 
     graph.add_edge(SQL_AGENT_SUBGRAPH, "layer_router")
-    graph.add_conditional_edges(
-        "aggregator",
-        aggregator_route,
-        {"answer_synthesizer": "answer_synthesizer", END: END},
-    )
-    graph.add_edge("answer_synthesizer", END)
+    if answer:
+        graph.add_node("answer_synthesizer", AnswerSynthesizerNode(ctx))
+        graph.add_conditional_edges(
+            "aggregator",
+            aggregator_route,
+            {"answer_synthesizer": "answer_synthesizer", END: END},
+        )
+        graph.add_edge("answer_synthesizer", END)
+    else:
+        graph.add_edge("aggregator", END)
 
     return graph.compile()

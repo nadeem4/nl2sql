@@ -175,6 +175,7 @@ def run_with_graph(
     pinned: Optional[PinnedRun] = None,
     approvals: Optional[Sequence["Approval"]] = None,
     clarify: bool = True,
+    answer: bool = True,
 ) -> Dict:
     """Convenience function to run the full pipeline.
 
@@ -204,6 +205,10 @@ def run_with_graph(
     ``clarify`` off runs the default reading where the planner saw two
     (``settings.clarify.enabled`` must be on too for the run to ask); the
     prompts are the same either way (docs/architecture/wave_b.md, D58).
+
+    ``answer`` off builds the graph without the answer synthesizer: the run
+    ends at the aggregator, ``final_answer`` is None and no model call is made
+    for prose (docs/architecture/wave_c.md, D119).
     """
     approvals = list(approvals or [])
     # QueryAPI checks this first, before the run's scope opens; a direct caller is held to it here.
@@ -220,8 +225,9 @@ def run_with_graph(
     run_llms = _begin_run(ctx)
     def _graph(pin: Optional[PinnedRun]):
         # A pinned decomposition has a graph of its own; every other run's is the usual one.
+        # Only a run that differs from the usual one says so.
         return build_graph(ctx, execute=execute, **({"pinned": True} if pin is not None and pin.enters_pinned
-                                                     else {}))
+                                                     else {}), **({} if answer else {"answer": False}))
 
     try:
         graph = _graph(pinned)
@@ -270,6 +276,7 @@ def run_with_graph(
                 "datasource_id": datasource_id,
                 "execute": execute,
                 "clarify": clarify,
+                "answer": answer,
                 "today": today,
             },
             started_at=started_at,

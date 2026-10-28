@@ -1445,12 +1445,64 @@ flowchart TD
     - `Candidate` and `ApiKey` are pydantic models (the design's shape), though the rest of `api/types.py` is
       dataclasses.
 
-    **C0b** is the rest of row C0: `SuppliedPlan` widened and its callers, `run_query(answer=)` and
-    `stream_query(answer=)`, the five facade namespaces and their stub modules, the stub methods on
-    `engine.datasources` and `engine.results`, the chat-tool entry points and `uvicorn` in `pyproject.toml`,
-    the `keys`, `launch` and `dashboards` commands, the stub docs pages and nav, the boundary test's
-    constants, and the exports in `nl2sql/__init__.py`. Tests: `tests/unit/test_wave_c_shapes.py` and
+    **C0b** is the rest of row C0, built below. C0a's tests are `tests/unit/test_wave_c_shapes.py` and
     `tests/unit/test_wave_c_store.py`, and `test_sdk_discovery_imports_only_pydantic` in the architecture test.
+
+!!! note "Built (C0b): the rest of row C0"
+    - **`SuppliedPlan`** (`pipeline/pinned.py`) is a whole run, as A1 says: `decomposition` (a
+      `DecomposerResponse`) with `plans` (the plan of **every** sub-query, keyed by id), or `verified` (a
+      `VerifiedRef`) with `verified_datasource_id`; exactly one, checked when it is built. The one-sub-query
+      case is `SuppliedPlan.for_sub_query(sub_query, plan)`, which `evaluation/seed.py` and
+      `feedback/corrections.py` now call. `PinnedRun.supplied` pins the decomposition and plans, or the verified
+      ref. The old `(datasource_id, sub_query, plan)` fields are gone, with no alias.
+    - **`answer=`** is a keyword on `NL2SQL.run_query` and `stream_query`, `QueryAPI`, `run_with_graph` and
+      `build_graph`. `answer=False` builds the graph without the `answer_synthesizer` node and ends it at the
+      aggregator, so `final_answer` is `None` and the run makes no model call for prose. It is recorded in the
+      trace's `request`, and replay passes it back.
+    - **Stubs.** `engine.conversations`, `chat_tools`, `workspaces`, `dashboards` and `api_keys`
+      (`public_api.py`; `api/conversations_api.py`, `chat_tools_api.py`, `workspaces_api.py`, `dashboards_api.py`,
+      `api_keys_api.py`), and `datasources.scan`, `diagram` and `save` and `results.chart`, have their final
+      signatures and raise `NotImplementedError` from `nl2sql.common.planned.arrives_with`, whose message names
+      the row (`engine.dashboards.refresh arrives with D2 (...)`). Rows: C1 `start`, `ask`, `stream`, `retry`,
+      `ask_only`, `get`, `list`, `delete`; C2 `tool`, `report`, `chat_tools.list`; D1 the workspaces and the
+      store, `pin`, `move` and the edits; D2 `open`, `refresh`, `filter_values`, `run_scheduled`; D3 `generate`
+      and `suggest_questions`; M1 the keys; L1 `scan`; K2 `diagram`; L2 `save`; K1 `chart`. Every owned,
+      scoped or privileged method takes `user_context` (or `by`) keyword-only with no default; only
+      `run_scheduled`, `api_keys.verify` and `chat_tools.list` take none.
+    - **Entry points.** `nl2sql.chat_tools`: `chart`, `diagram`, `report`, `dashboard_edit`, `dashboard_pin`,
+      each a class (`ChartTool`, `DiagramTool`, `ReportTool`, `DashboardEditTool`, `DashboardPinTool`) in
+      `nl2sql/chat_tools/<name>.py` with an empty strict `args_model` and a `__call__` that raises the stub
+      error. `uvicorn>=0.20.0` is in the `mcp` extra.
+    - **CLI.** `nl2sql keys create|list|revoke` (`--as`, `--user`, `--role`, `--tenant`, `--label`), `nl2sql
+      launch [DIR]` (`--provider`, `--as`, `--draft`, `--yes`, `--no-ports`) and `nl2sql dashboards refresh
+      [ID] [--due] [--as]` print which row fills them and exit 1 (`cli/common/planned.py`).
+    - **Docs and exports.** The ten stub pages and their `mkdocs.yml` nav entries (`api/core/results.md` was new,
+      not extended), `api/core/query.md` (`answer=`, `SuppliedPlan`) and `invariants.md`. `nl2sql` exports the
+      Wave C models, `ChatTool` and its shapes, `Candidate`, `Found`, `DiscoverableAdapter`, `ApiKey` and the nine
+      exceptions, all through `__getattr__`.
+    - **Boundary test** (`tests/architecture/test_boundaries.py`): `DATABASE_URL` in `READS_THE_ENVIRONMENT` and
+      `launch.py` in `ENTRY_POINTS_LOADING_DOTENV`; `conversations`, `charts`, `dashboards` and `chat_tools` in
+      `DIALECT_SCAN`; `test_chat_tools_use_only_the_public_api` and
+      `test_only_mcp_and_the_demo_import_starlette_or_uvicorn` (new); `test_owned_and_privileged_methods_require_a_caller`;
+      and `PERSONS_FILE_WRITERS` as a map from each writer to the modules that may call it (`write_project`,
+      `write_env_values` added; L2 builds them). Other tests: `test_wave_c_stubs.py`, `test_wave_c_commands.py`,
+      `test_answer_flag_fake_llm.py`, and the widened `SuppliedPlan` in `test_supplied_plan.py`.
+
+    Where the code and the design differ, the code won:
+
+    - `answer=False` is wired in `pipeline/graph.py` (the node is not added) and `pipeline/runtime.py`, not in
+      `pipeline/routes.py`: `aggregator_route` is unchanged, since a graph without the node needs no route.
+    - A verified `SuppliedPlan` is pinned for the curated matcher, which is in the graph only when `execute` is
+      true, so a verified chart needs `execute=True` (D2's access check on open must run verified charts another
+      way, or the matcher must join the graph for a pinned verified run).
+    - `choice` on the conversation methods is an option id (`str`), as the design's prose says; the design's
+      table leaves its type open.
+    - `ToolOutput`-returning tool stubs import `ToolContext` and `ToolOutput` from `nl2sql.chat_tools`, and
+      raise a plain `NotImplementedError`: a tool module may import only `nl2sql` and `nl2sql.chat_tools`, so it
+      cannot use `arrives_with`.
+    - The "amended accept-writer list" is a map of writer to allowed callers. `datasources.save` is a method
+      name too common to scan for, so its guard is `by` (held by `test_owned_and_privileged_methods_require_a_caller`)
+      and L2's hash check.
 
 The waves, with at most four PRs at once:
 

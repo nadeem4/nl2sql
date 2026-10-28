@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Iterator, Optional, Union
 
+from nl2sql.charts.spec import ChartSpec
+from nl2sql.common.planned import arrives_with
 from nl2sql.execution.artifacts.results import (
     DEFAULT_RESULT_PAGE_SIZE,
     ResultManifest,
@@ -11,6 +13,9 @@ from nl2sql.execution.artifacts.results import (
     ResultReader,
 )
 from nl2sql.runtime import Runtime
+
+if TYPE_CHECKING:
+    from nl2sql.api.query_api import QueryResult
 
 
 class ResultsAPI:
@@ -56,3 +61,9 @@ class ResultsAPI:
             ResultNotFound: no such run or result for the tenant.
         """
         return self._reader(tenant_id).csv(run_id, result_id)
+
+    def chart(self, result: Union["QueryResult", str], result_id: Optional[str] = None, *, kind: Optional[str] = None,
+              tenant_id: Optional[str] = None) -> ChartSpec:
+        """The chart the data of ``result`` (a ``QueryResult``, or a ``trace_id``) is drawn as; ``kind`` forces
+        one the data can draw. K1 fills this (docs/architecture/wave_c.md, section 5)."""
+        raise arrives_with("engine.results.chart", "K1")

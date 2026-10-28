@@ -313,7 +313,7 @@ def replay_trace(doc: Dict[str, Any], ctx: Any) -> ReplayReport:
             run, request.get("question") or "", datasource_id=request.get("datasource_id"),
             execute=bool(request.get("execute", True)), callbacks=[playback.recorder],
             # As recorded: a run with clarification off would otherwise replay as a question asked back.
-            clarify=bool(request.get("clarify", True)),
+            clarify=bool(request.get("clarify", True)), answer=bool(request.get("answer", True)),
             user_context=user_context, cancellation_token=playback.token, trace_mode="off",
         )
     finally:
