@@ -197,7 +197,7 @@ def test_result_summary_carries_column_kinds():
     from nl2sql.execution.artifacts.results import ResultSummary
 
     summary = ResultSummary(node_id="n", columns=["d", "total"], row_count=2)
-    assert summary.column_kinds == {}, "the field only: the artifact writer fills it in K1"
+    assert summary.column_kinds == {}, "the field defaults to empty; the artifact writer fills it"
     kinds = {"d": "temporal", "total": "number"}
     assert ResultSummary(node_id="n", column_kinds=kinds).column_kinds == kinds
     with pytest.raises(ValidationError):
@@ -328,13 +328,11 @@ def test_a_stored_step_holds_a_result_without_rows():
     assert step.result.sub_queries[0].rows is not None, "stripping rows is the conversation store's job (C1)"
 
 
-def test_the_chart_spec_has_four_kinds_and_defers_vega_lite_to_k1():
+def test_the_chart_spec_has_four_kinds():
     from nl2sql.charts.spec import ChartSpec, ColumnKind
 
     assert set(get_args(ColumnKind)) == {"number", "text", "temporal", "boolean", "other"}
     assert set(get_args(ChartSpec.model_fields["kind"].annotation)) == {"line", "bar", "big_number", "table"}
-    with pytest.raises(NotImplementedError, match="K1"):
-        _spec().to_vega_lite()
 
 
 def test_a_chat_tool_is_a_protocol_a_plugin_satisfies():

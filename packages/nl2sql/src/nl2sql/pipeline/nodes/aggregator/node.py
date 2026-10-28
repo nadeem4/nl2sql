@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 import polars as pl
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode, RunWarning
-from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary
+from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary, column_kinds
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.common.logger import get_logger
@@ -172,19 +172,21 @@ class EngineAggregatorNode:
         return self.ctx.tenant_id
 
     def _write_manifest(self, state: GraphState, saved: Dict[str, ArtifactRef]) -> List[ResultSummary]:
-        """Writes the run's ``manifest.json`` beside its results: each result's columns,
+        """Writes the run's ``manifest.json`` beside its results: each result's columns, their kinds,
         row count and whether a sub-query feeding it was cut at its row ceiling."""
         cut = {
             output.sub_query.id
             for output in (getattr(state, "subgraph_outputs", None) or {}).values()
             if output.truncated and output.sub_query
         }
+        store = self.service.engine.artifact_store
         results = [
             ResultSummary(node_id=node_id, columns=list(ref.columns), row_count=ref.row_count,
-                          truncated=bool(cut & self._upstream(state, node_id)))
+                          truncated=bool(cut & self._upstream(state, node_id)),
+                          column_kinds=column_kinds(store.scan_parquet(ref).collect_schema()))
             for node_id, ref in saved.items()
         ]
-        self.service.engine.artifact_store.write_manifest(
+        store.write_manifest(
             self._tenant_id(), state.trace_id, ResultManifest(request_id=state.trace_id, results=results))
         return results
 

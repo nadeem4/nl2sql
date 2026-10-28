@@ -1,10 +1,9 @@
 """``ChartSpec``: our own small typed chart, with Vega-Lite as its export (D110).
 
 Four kinds: ``line``, ``bar``, ``big_number`` and ``table``. No colour is ever
-set; the renderer's theme decides. Choosing a chart from a result and the
-Vega-Lite export arrive with K1 (docs/architecture/wave_c.md, section 5); this
-module holds the shapes. It imports only pydantic, so a model that carries a
-``ColumnKind`` costs nothing to import.
+set; the renderer's theme decides. ``choose.py`` picks one from a result
+and ``vega.py`` exports it (docs/architecture/wave_c.md, section 5); this module holds the shapes. It
+imports only pydantic, so a model that carries a ``ColumnKind`` costs nothing to import.
 """
 from __future__ import annotations
 
@@ -44,5 +43,7 @@ class ChartSpec(StrictModel):
     reason: str  # why this kind: "one date column and one number"
 
     def to_vega_lite(self) -> Optional[Dict[str, Any]]:
-        """The Vega-Lite v5 spec with the rows inline; None for a table. Arrives with K1."""
-        raise NotImplementedError("ChartSpec.to_vega_lite arrives with K1 (docs/architecture/wave_c.md, row K1).")
+        """The Vega-Lite v5 spec with the rows inline and no colour set; None for a table."""
+        from nl2sql.charts.vega import to_vega_lite
+
+        return to_vega_lite(self)

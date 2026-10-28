@@ -211,8 +211,8 @@ accepted and validated now; the Wave B change named with each reads it.
 
 ## `charts`
 
-Release 0.9 ([Wave C](../architecture/wave_c.md)). It is accepted and validated
-now; the auto charts change (K1) reads it.
+Release 0.9 ([Wave C](../architecture/wave_c.md)). `engine.results.chart` reads it
+([Charts](../charts/index.md)).
 
 | Key | Default | Description |
 | --- | --- | --- |

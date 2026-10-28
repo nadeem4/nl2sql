@@ -675,6 +675,22 @@ def test_chat_tools_use_only_the_public_api():
         "facade, as an SDK caller does.", offenders)
 
 
+# What a chart is drawn from: the plan's shapes and function lists, nothing that can call a model.
+NO_MODEL_PREFIXES = ("nl2sql.llm", "nl2sql.services", "nl2sql.agents", "langchain", "openai", "anthropic")
+
+
+def test_charts_make_no_model_call():
+    """A chart is chosen by rules and its takeaway is a template (wave_c.md, D111): the chart code and the
+    ``chart`` tool import no LLM client, callback or provider."""
+    offenders = []
+    for path in [*python_files(ENGINE / "charts"), CHAT_TOOLS / "chart.py"]:
+        offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                      if name.startswith(NO_MODEL_PREFIXES)]
+    assert not offenders, _broke(
+        "nl2sql/charts/ and the chart tool make no model call: no import of nl2sql.llm, nl2sql.services or a "
+        "provider SDK. The chart is chosen by rules and the takeaway is a template.", offenders)
+
+
 # Only these serve HTTP, and so only these import a web framework or server.
 WEB_SERVER_LIBRARIES = {"starlette", "uvicorn", "fastapi"}
 WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/", "nl2sql/src/nl2sql/cli/commands/demo.py")
