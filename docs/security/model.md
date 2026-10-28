@@ -7,8 +7,10 @@ security.
 
 ## The role is supplied by the caller
 
-There is **no authentication anywhere in this project**. Where the role comes
-from depends on the client:
+There is **no authentication in the query path**; the engine believes the
+`UserContext` it is given. The one exception is an [API key](api-keys.md),
+which a transport may verify to find that context. Where the role comes from
+depends on the client:
 
 - CLI: `nl2sql run --role <id>`, defaulting to `admin`.
 - Python API: `UserContext(roles=[...])`, whatever the calling code passes.
@@ -22,6 +24,12 @@ from depends on the client:
   roles in `policies.admin_roles` (default `[admin]`), else `HTTP 403`; with no
   role source configured they answer loopback clients only. See
   [Admin routes](../api/rest/index.md#admin-routes).
+
+- API keys: `engine.api_keys` makes bearer tokens that each carry the user,
+  tenant and roles their holder runs as, and `verify(token)` turns a token
+  back into that `UserContext`. This is the one place the engine itself
+  checks who is asking; MCP over HTTP is the first transport to use it, and the
+  other clients above still do not. See [API keys](api-keys.md).
 
 - Playground: the page sends the role chosen in "Ask as" with each request
   (`/api/ask`, and `/api/retrieval` for the Retrieval inspector), and the
@@ -135,6 +143,12 @@ user who produced it is left to a multi-user deployment.
 - **A supplied plan** (`run_query(plan=...)`) skips planning, not checking:
   its datasource is scope-checked, and the plan passes `plan.after` and the
   logical validator under the caller's role like any other.
+- **API keys** (`engine.api_keys`): the token is shown once and only the
+  SHA-256 of its 256-bit secret is stored; `verify` compares in constant time
+  and answers `None` for a malformed, unknown or revoked token. Managing keys
+  needs a `policies.admin_roles` caller, a key's roles must be configured
+  roles, and neither an event nor a log line carries the token. See
+  [API keys](api-keys.md).
 - **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
   (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
   with who made it and each agent's old and new model, never a key. Queries

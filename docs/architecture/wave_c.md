@@ -1620,6 +1620,40 @@ flowchart TD
       `conversation.started`, carry the conversation's tenant. The stream worker runs in a copy of the
       caller's context.
 
+!!! note "Built (M1): API keys"
+    - **Token:** `nl2sql/policies/keys.py` holds the format (`nl2sql_<id>_<secret>`, `id` 8 hex characters,
+      `secret` 43 URL-safe characters from `secrets.token_urlsafe(32)`, matched with `fullmatch`), `hash_secret`
+      (SHA-256 hex) and `matches` (`hmac.compare_digest`). The store row is `id`, `hash`, `label`, `user_id`,
+      `tenant_id`, `roles`, `created_at`, `created_by`, `revoked_at`; the token and the secret are never stored.
+    - **Facade:** `api/api_keys_api.py` fills `create`, `list`, `revoke` and `verify`. `create` and `revoke`
+      publish `api_key.created` and `api_key.revoked` with `key_id`, `user_id`, `tenant_id`, `roles` and `by`
+      (the audit observer keeps both through the catalog's `audit` flag). `nl2sql keys create|list|revoke`
+      (`cli/commands/keys.py`) call them as the `--as` admin.
+    - **Docs:** `security/api-keys.md` (written), `security/model.md`, `observability/events.md` and the README's
+      command table.
+
+    Where the code and the design differ, the code won:
+
+    - `revoke` of an unknown id raises `ValueError` (the design says `None`); revoking a key that is already
+      revoked changes nothing and publishes nothing.
+    - `list` is newest first and includes revoked keys, which `nl2sql keys list` marks `revoked`.
+    - `create` retries a clash of ids (the store's `add_api_key` raises `ValueError`) with a new id, up to eight
+      times, then raises `RuntimeError`; it never overwrites. `user_id` must not be blank.
+    - Roles are checked against `policies.roles`. Under `allow_all` with no roles defined there is nothing to
+      check against, so any role name is accepted; under `allow_all` every caller may manage keys, as for
+      `engine.knowledge.reload` and the review queue.
+    - A `by` that is not a `UserContext` is a `TypeError`, one without an admin role a `PermissionError`
+      (the engine's usual pair), not an `ErrorCode`.
+    - `verify` checks only the key: it does not check that the key's roles are still configured (the policy
+      engine does that on every run).
+    - Tests: `test_api_keys.py`, `test_cli_keys.py`. The stub tests moved `api_keys` and the `keys` commands out
+      of their tables.
+    - **For M2:** call `engine.api_keys.verify(token)` with the bearer token (the text after `Bearer `); `None`
+      is a 401. `verify` does not say why, and `mcp.denied` carries a `reason` (`missing`, `malformed`,
+      `unknown`, `revoked`). `missing` is M2's own (no header). To tell the others apart without reaching into
+      the runtime, M2 adds a method to `ApiKeysAPI` that returns the reason (it may use
+      `nl2sql.policies.keys.parse`, which returns `None` for a malformed token).
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |
