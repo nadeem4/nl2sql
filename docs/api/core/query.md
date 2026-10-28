@@ -494,29 +494,32 @@ result in memory.
 
 | method | returns | meaning |
 | --- | --- | --- |
-| `results.manifest(run_id, tenant_id=None)` | `ResultManifest` | `request_id` and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
-| `results.page(run_id, result_id, offset=0, limit=100, tenant_id=None)` | `ResultPage` | Rows `offset` to `offset + limit` of the result whose `node_id` is `result_id`. `limit` above `MAX_RESULT_PAGE_SIZE` (1,000) is cut to it, and the page's `limit` says so. A page past the end has no rows. `next_offset` is where the next page starts, `None` at the end. A negative `offset` or a `limit` below 1 raises `ValueError`. |
-| `results.csv(run_id, result_id, tenant_id=None)` | `Iterator[bytes]` | The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent. |
+| `results.manifest(run_id, *, user_context)` | `ResultManifest` | `request_id`, `owner` (the asker's `tenant_id` and `user_id`) and `results: List[ResultSummary]`, the same entries as `QueryResult.result_manifest`. |
+| `results.page(run_id, result_id, offset=0, limit=100, *, user_context)` | `ResultPage` | Rows `offset` to `offset + limit` of the result whose `node_id` is `result_id`. `limit` above `MAX_RESULT_PAGE_SIZE` (1,000) is cut to it, and the page's `limit` says so. A page past the end has no rows. `next_offset` is where the next page starts, `None` at the end. A negative `offset` or a `limit` below 1 raises `ValueError`. |
+| `results.csv(run_id, result_id, *, user_context)` | `Iterator[bytes]` | The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent. |
 
 `ResultPage` has `request_id`, `result_id`, `columns`, `rows` (`rows[i]` is row
 `offset + i`), `offset`, `limit`, `total_rows` and `next_offset`.
 
-Scope: results are read from one tenant's folder, `tenant_id` or else the
-engine's own `TENANT_ID`, the tenant every run of this engine writes under. Each
-of these raises `ResultNotFound` (a `LookupError`, exported from `nl2sql`): an
-unknown `run_id`, a run in another tenant's folder, a `result_id` the run's
-manifest does not list, and an id that is not a plain token (letters, digits,
-`_`, `-`; at most 128 characters). Ids are checked before any path is built, and
-the parquet path is rendered from the artifact template, never read from the
-manifest, so no id reaches a file outside the run's folder. Nothing else guards
-a result yet: any caller who knows a `trace_id` can read it.
+Scope: a run is readable only by the caller who asked it, passed as the
+required `user_context` ([Who can read a run](results.md#who-can-read-a-run));
+no caller is a `TypeError`. Results are read from the engine's own `TENANT_ID`
+folder, the tenant every run of this engine writes under. Each of these raises
+`ResultNotFound` (a `LookupError`, exported from `nl2sql`): an unknown `run_id`,
+a run another user or another tenant asked, a manifest that records no asker,
+a `result_id` the run's manifest does not list, and an id that is not a plain
+token (letters, digits, `_`, `-`; at most 128 characters). Ids are checked
+before any path is built, and the parquet path is rendered from the artifact
+template, never read from the manifest, so no id reaches a file outside the
+run's folder.
 
 ```python
-result = engine.run_query("List every genre.", user_context=UserContext(roles=["admin"]))
+ann = UserContext(user_id="ann", roles=["admin"])
+result = engine.run_query("List every genre.", user_context=ann)
 [saved] = result.result_manifest                   # node_id, columns, row_count, truncated
-page = engine.results.page(result.trace_id, saved.node_id, offset=0, limit=20)
+page = engine.results.page(result.trace_id, saved.node_id, offset=0, limit=20, user_context=ann)
 with open("genres.csv", "wb") as out:
-    for chunk in engine.results.csv(result.trace_id, saved.node_id):
+    for chunk in engine.results.csv(result.trace_id, saved.node_id, user_context=ann):
         out.write(chunk)
 ```
 

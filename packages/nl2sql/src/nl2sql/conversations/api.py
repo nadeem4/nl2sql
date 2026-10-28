@@ -164,7 +164,7 @@ class Conversations:
                title: Optional[str] = None, include_rows: bool = True) -> str:
         """The Markdown report of the stored turns, with no model call."""
         return build_report(self.get(conversation_id, user_context=user_context), ResultsAPI(self._ctx),
-                            turns=turns, title=title, include_rows=include_rows)
+                            user_context=user_context, turns=turns, title=title, include_rows=include_rows)
 
     def ask_only(self, conversation_id: str, question: str, *, user_context: UserContext,
                  choice: Optional[str] = None) -> QueryResult:

@@ -3,8 +3,9 @@
 The hosted Space runs the playground, not nl2sql-api, so the same two reads
 are here: ``GET /api/query/{request_id}/results/{result_id}`` for a page and
 ``.../{result_id}.csv`` for the whole result. Both call the facade, never the
-engine context. The store holds ``run-1`` of tenant ``t1`` (45 rows) and a run
-of tenant ``t2``.
+engine context. The store holds ``run-1`` of tenant ``t1`` (45 rows), asked as
+the playground asks, anonymously; a run of tenant ``t2``; and a run of ``t1`` a
+named user asked, which the playground cannot read.
 """
 import csv
 import io
@@ -21,6 +22,7 @@ from nl2sql.testing.facade import StubDatasources  # noqa: E402
 from nl2sql.cli.demo.playground.app import build_app  # noqa: E402
 from nl2sql.cli.demo.playground.hosted import Hosted  # noqa: E402
 from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.execution.artifacts.results import ResultOwner  # noqa: E402
 from nl2sql.storage.local import LocalResults  # noqa: E402
 
 TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
@@ -36,9 +38,10 @@ class _Engine(NL2SQL):
         return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
 
-def _save(store, tenant, request, rows):
+def _save(store, tenant, request, rows, user_id=None):
     ref = store.write_lazy(pl.LazyFrame(rows), store.run_metadata(tenant, request, "result_combine_g1"))
-    store.write_manifest(tenant, request, ResultManifest(request_id=request, results=[
+    owner = ResultOwner(tenant_id=tenant, user_id=user_id)
+    store.write_manifest(tenant, request, ResultManifest(request_id=request, owner=owner, results=[
         ResultSummary(node_id="combine_g1", columns=ref.columns, row_count=ref.row_count)]))
 
 
@@ -47,6 +50,7 @@ def client(request, tmp_path):
     store = ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
+    _save(store, "t1", "anns", [{"id": 1, "name": "secret"}], user_id="ann")
     engine = _Engine(SimpleNamespace(tenant_id="t1", artifact_store=store))
     hosted = Hosted(enabled=True) if request.param == "hosted" else None
     return TestClient(build_app(engine, questions=[], roles=["admin"], mode=request.param,
@@ -83,6 +87,8 @@ def test_the_csv_is_the_whole_result(client):
     "/api/query/run-1/results/combine_nope",
     "/api/query/theirs/results/combine_g1",
     "/api/query/theirs/results/combine_g1.csv",
+    "/api/query/anns/results/combine_g1",
+    "/api/query/anns/results/combine_g1.csv",
     "/api/query/..%2Ft2%2Ftheirs/results/combine_g1",
     "/api/query/run-1/results/..%2F..%2Ft2%2Ftheirs%2Fresult_combine_g1.csv",
 ])

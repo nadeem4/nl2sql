@@ -1,4 +1,7 @@
-"""``engine.results``: the results a run saved, by its ``trace_id``: the manifest, a page, or CSV."""
+"""``engine.results``: the results a run saved, by its ``trace_id``: the manifest, a page, CSV or a chart.
+
+Readable only by the caller who asked the run: every method takes the caller as ``user_context``, and another
+caller's run is the same ``ResultNotFound`` as a missing one."""
 
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from nl2sql.execution.artifacts.results import (
     DEFAULT_RESULT_PAGE_SIZE,
     ResultNotFound,
     ResultManifest,
+    ResultOwner,
     ResultPage,
     ResultReader,
 )
@@ -18,6 +22,7 @@ from nl2sql.runtime import Runtime
 if TYPE_CHECKING:
     from nl2sql.api.query_api import QueryResult
     from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+    from nl2sql.policies import UserContext
 
 
 def _single_plan(result: "QueryResult") -> Optional["PlanModel"]:
@@ -45,22 +50,35 @@ class ResultsAPI:
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
-    def _reader(self, tenant_id: Optional[str]) -> ResultReader:
-        """A reader of one tenant's saved results: ``tenant_id``, else the engine's own."""
-        return ResultReader(self._ctx.artifact_store, tenant_id or getattr(self._ctx, "tenant_id", None) or "")
-
-    def manifest(self, run_id: str, tenant_id: Optional[str] = None) -> ResultManifest:
-        """Which results the run ``run_id`` (its ``trace_id``) saved: per result,
-        its node id, columns, row count and truncated flag. Never the rows.
+    def _reader(self, user_context: "UserContext") -> ResultReader:
+        """A reader of the runs ``user_context`` asked, in the engine's tenant folder (where every run saves).
 
         Raises:
-            ResultNotFound: no such run for the tenant (the engine's own unless
-                ``tenant_id`` is given), or ``run_id`` is not a plain token.
+            TypeError: ``user_context`` is not a ``UserContext``. There is no default caller: failing open would
+                let anyone read a run whose trace id they saw.
         """
-        return self._reader(tenant_id).manifest(run_id)
+        from nl2sql.policies import UserContext
 
-    def page(self, run_id: str, result_id: str, offset: int = 0, limit: int = DEFAULT_RESULT_PAGE_SIZE,
-             tenant_id: Optional[str] = None) -> ResultPage:
+        if not isinstance(user_context, UserContext):
+            raise TypeError("user_context is required: pass the caller's UserContext. A run's results are "
+                            "readable only by the caller who asked it.")
+        tenant = getattr(self._ctx, "tenant_id", None)
+        # The owner is worked out exactly as the writer works it out (``write_manifest``).
+        return ResultReader(self._ctx.artifact_store, tenant or "", ResultOwner.of(user_context, tenant))
+
+    def manifest(self, run_id: str, *, user_context: "UserContext") -> ResultManifest:
+        """Which results the run ``run_id`` (its ``trace_id``) saved: per result,
+        its node id, columns, row count and truncated flag, and who asked. Never the rows.
+
+        Raises:
+            ResultNotFound: no such run, a run another caller asked (another user, or the same user id in
+                another tenant), or ``run_id`` is not a plain token.
+            TypeError: ``user_context`` is not a ``UserContext``.
+        """
+        return self._reader(user_context).manifest(run_id)
+
+    def page(self, run_id: str, result_id: str, offset: int = 0, limit: int = DEFAULT_RESULT_PAGE_SIZE, *,
+             user_context: "UserContext") -> ResultPage:
         """Rows ``offset`` to ``offset + limit`` of one saved result, read lazily
         from its parquet file. ``result_id`` is a node id from
         ``QueryResult.result_manifest``. ``limit`` is capped at
@@ -68,39 +86,42 @@ class ResultsAPI:
         ``next_offset`` is where the next page starts, or None at the end.
 
         Raises:
-            ResultNotFound: no such run or result for the tenant.
+            ResultNotFound: no such run or result for this caller.
+            TypeError: ``user_context`` is not a ``UserContext``.
             ValueError: a negative ``offset`` or a ``limit`` below 1.
         """
-        return self._reader(tenant_id).page(run_id, result_id, offset=offset, limit=limit)
+        return self._reader(user_context).page(run_id, result_id, offset=offset, limit=limit)
 
-    def csv(self, run_id: str, result_id: str, tenant_id: Optional[str] = None) -> Iterator[bytes]:
+    def csv(self, run_id: str, result_id: str, *, user_context: "UserContext") -> Iterator[bytes]:
         """The whole of one saved result as UTF-8 CSV, header first, yielded a
-        slice at a time so it is never built in memory. The ids are checked
-        before the iterator is returned.
+        slice at a time so it is never built in memory. The ids and the caller are
+        checked before the iterator is returned.
 
         Raises:
-            ResultNotFound: no such run or result for the tenant.
+            ResultNotFound: no such run or result for this caller.
+            TypeError: ``user_context`` is not a ``UserContext``.
         """
-        return self._reader(tenant_id).csv(run_id, result_id)
+        return self._reader(user_context).csv(run_id, result_id)
 
-    def chart(self, result: Union["QueryResult", str], result_id: Optional[str] = None, *, kind: Optional[str] = None,
-              tenant_id: Optional[str] = None) -> ChartSpec:
+    def chart(self, result: Union["QueryResult", str], result_id: Optional[str] = None, *,
+              user_context: "UserContext", kind: Optional[str] = None) -> ChartSpec:
         """The chart the data of ``result`` (a ``QueryResult``, or a ``trace_id``) is drawn as.
 
         Five rules choose a line, a bar, a big number or a table from the saved result's column kinds, with no
         model call; a ``QueryResult`` that had one sub-query also lets its plan refine the kinds. The rows are
-        read as ``page`` reads them, by ``trace_id`` and tenant, up to ``settings.charts.max_points``.
+        read as ``page`` reads them, by ``trace_id`` and caller, up to ``settings.charts.max_points``.
         ``result_id`` names the saved result (a node id) and may be left out when the run saved one.
         ``kind`` forces a kind the data can draw.
 
         Raises:
-            ResultNotFound: no such run or result for the tenant.
+            ResultNotFound: no such run or result for this caller.
+            TypeError: ``user_context`` is not a ``UserContext``.
             ValueError: ``kind`` is one the data cannot draw (the message names those it can), or the run saved
                 several results and ``result_id`` names none.
         """
         from nl2sql.charts.choose import choose
 
-        reader = self._reader(tenant_id)
+        reader = self._reader(user_context)
         if isinstance(result, str):
             trace_id, plan, title = result, None, "Result"
             saved = [r.node_id for r in reader.manifest(trace_id).results]

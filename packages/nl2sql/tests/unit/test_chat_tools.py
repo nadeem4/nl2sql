@@ -411,9 +411,13 @@ def explained(question: str, **fields: Any):
     return result(question, explanation=Explanation(steps=[step]), **fields)
 
 
-def page(columns, rows, total):
-    return lambda self, run_id, result_id, offset=0, limit=100, tenant_id=None: ResultPage(
-        request_id=run_id, result_id=result_id, columns=columns, rows=rows[:limit], total_rows=total, limit=limit)
+def page(columns, rows, total, readers=None):
+    """Stands in for ``ResultsAPI.page``; ``readers`` collects whom each page was read as."""
+    def read(self, run_id, result_id, offset=0, limit=100, *, user_context):
+        (readers if readers is not None else []).append(user_context)
+        return ResultPage(request_id=run_id, result_id=result_id, columns=columns, rows=rows[:limit],
+                          total_rows=total, limit=limit)
+    return read
 
 
 def answered(engine, model, runs, *questions: str):
@@ -428,10 +432,11 @@ def answered(engine, model, runs, *questions: str):
 def test_report_has_each_turns_question_explanation_sql_and_trace(build, model, runs, monkeypatch):
     engine = build()
     conversation = answered(engine, model, runs, "How many customers are there?", "How many orders are there?")
-    monkeypatch.setattr(ResultsAPI, "page", page(["n", "who"], [[59, "a|b"], [60, None]], 2))
+    readers = []
+    monkeypatch.setattr(ResultsAPI, "page", page(["n", "who"], [[59, "a|b"], [60, None]], 2, readers))
     chart = ChartSpec(kind="bar", title="t", takeaway="Customers peak in May.", reason="r",
                       data=ChartData(trace_id="x", result_id="sq1", columns=["n"], rows=[], truncated=False))
-    monkeypatch.setattr(ResultsAPI, "chart", lambda self, *a, **k: chart)
+    monkeypatch.setattr(ResultsAPI, "chart", lambda self, *a, user_context, **k: readers.append(user_context) or chart)
 
     markdown = engine.conversations.report(conversation.id, user_context=ANA, title="Quarter review")
 
@@ -445,6 +450,7 @@ def test_report_has_each_turns_question_explanation_sql_and_trace(build, model, 
     assert "<details><summary>SQL</summary>" in markdown and "SELECT 1" in markdown
     for turn in turns:
         assert f"Trace: {turn.steps[0].trace_id}" in markdown
+    assert readers and all(user is ANA for user in readers), "the rows are read as the owner, who asked"
 
 
 def test_report_defaults_to_the_conversations_title_and_picks_turns(build, model, runs):
@@ -527,7 +533,7 @@ def test_a_stored_report_body_carries_no_row_data(build, model, runs, monkeypatc
     monkeypatch.setattr(ResultsAPI, "page", page(["n"], [[5917]], 1))
     chart = ChartSpec(kind="bar", title="t", takeaway="Norway has 5917 customers.", reason="r",
                       data=ChartData(trace_id="x", result_id="sq1", columns=["n"], rows=[], truncated=False))
-    monkeypatch.setattr(ResultsAPI, "chart", lambda self, *a, **k: chart)
+    monkeypatch.setattr(ResultsAPI, "chart", lambda self, *a, user_context, **k: chart)
 
     turn = engine.conversations.tool(conversation.id, "report", {}, user_context=ANA)
 

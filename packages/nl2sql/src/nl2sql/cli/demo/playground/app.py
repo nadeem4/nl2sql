@@ -131,6 +131,10 @@ def _run_event(name: str, data: Dict[str, Any]) -> Event:
 # every event back until the run ends.
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
+# The playground is a local, single-person demo: every run is asked anonymously (a role, no user id), so its
+# results are read back as that same anonymous caller of the engine's tenant. Only the role differs per run.
+PLAYGROUND_CALLER = UserContext()
+
 
 def _event_stream(chunks, cookies) -> StreamingResponse:
     """A ``text/event-stream`` response carrying ``cookies`` (the hosted session's)."""
@@ -616,10 +620,11 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     # The CSV route first: ``{result_id}`` would otherwise match ``x.csv``.
     @app.get("/api/query/{request_id}/results/{result_id}.csv")
     def result_csv(request_id: str, result_id: str) -> StreamingResponse:
-        """The whole saved result as CSV, streamed from its parquet file. Read from the
-        engine's own tenant folder only; an unknown, foreign or crafted id is a 404."""
+        """The whole saved result as CSV, streamed from its parquet file. Read as the
+        playground's one caller (``PLAYGROUND_CALLER``), who asked every run here; an
+        unknown, foreign or crafted id is a 404."""
         try:
-            chunks = engine.results.csv(request_id, result_id)
+            chunks = engine.results.csv(request_id, result_id, user_context=PLAYGROUND_CALLER)
         except ResultNotFound:
             raise HTTPException(status_code=404, detail="No such result.")
         return StreamingResponse(chunks, media_type="text/csv; charset=utf-8", headers={
@@ -630,7 +635,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
                     offset: int = Query(0, ge=0), limit: int = Query(100, ge=1)) -> Dict[str, Any]:
         """One page of a saved result (``limit`` capped at 1,000), as ``nl2sql-api`` serves it."""
         try:
-            page = engine.results.page(request_id, result_id, offset=offset, limit=limit)
+            page = engine.results.page(request_id, result_id, offset=offset, limit=limit,
+                                       user_context=PLAYGROUND_CALLER)
         except ResultNotFound:
             raise HTTPException(status_code=404, detail="No such result.")
         return page.model_dump(mode="json")

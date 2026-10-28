@@ -17,10 +17,10 @@ import polars as pl
 import pytest
 from langgraph.graph import END, StateGraph
 
-from nl2sql import NL2SQL, ResultNotFound
+from nl2sql import NL2SQL, ResultNotFound, UserContext
 from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.execution.artifacts import ArtifactStore
-from nl2sql.execution.artifacts.results import ResultReader
+from nl2sql.execution.artifacts.results import ResultOwner, ResultReader
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
 from nl2sql.hooks import Allow, Deny, HookBinding, HookRunner, NeedsApproval, hooks_of
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
@@ -37,6 +37,9 @@ TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
 TENANT = "t1"
 RESULT = "combine_g1"
 SQ = SubQuery(id="sq1", datasource_id="shop", intent="n")
+# These runs are asked with no caller, so they are the anonymous caller's of the engine's tenant (test_results_owner.py).
+ASKER = UserContext()
+OWNER = ResultOwner(tenant_id=TENANT)
 
 
 @pytest.fixture()
@@ -100,7 +103,7 @@ class Probe:
         self.store, self.decide, self.seen = store, decide, []
 
     def __call__(self, ctx):
-        reader = ResultReader(self.store, TENANT)
+        reader = ResultReader(self.store, TENANT, OWNER)
         for read in (lambda: reader.manifest(ctx.trace_id), lambda: reader.page(ctx.trace_id, RESULT),
                      lambda: list(reader.csv(ctx.trace_id, RESULT))):
             try:
@@ -138,18 +141,21 @@ def _engine(runtime):
 
 
 def _unreadable(engine, store, trace):
-    for read in (lambda: engine.results.manifest(trace), lambda: engine.results.page(trace, RESULT),
-                 lambda: engine.results.csv(trace, RESULT), lambda: engine.results.chart(trace),
-                 lambda: ResultReader(store, TENANT).head(trace, RESULT, 10)):
+    results = engine.results
+    for read in (lambda: results.manifest(trace, user_context=ASKER),
+                 lambda: results.page(trace, RESULT, user_context=ASKER),
+                 lambda: results.csv(trace, RESULT, user_context=ASKER),
+                 lambda: results.chart(trace, user_context=ASKER),
+                 lambda: ResultReader(store, TENANT, OWNER).head(trace, RESULT, 10)):
         with pytest.raises(ResultNotFound):
             read()
     return True
 
 
 def _readable(engine, trace):
-    assert engine.results.manifest(trace).results[0].node_id == RESULT
-    assert engine.results.page(trace, RESULT).rows == [[1], [2], [3]]
-    assert b"3" in b"".join(engine.results.csv(trace, RESULT))
+    assert engine.results.manifest(trace, user_context=ASKER).results[0].node_id == RESULT
+    assert engine.results.page(trace, RESULT, user_context=ASKER).rows == [[1], [2], [3]]
+    assert b"3" in b"".join(engine.results.csv(trace, RESULT, user_context=ASKER))
     return True
 
 

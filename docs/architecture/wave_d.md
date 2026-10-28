@@ -262,6 +262,12 @@ reports a typo.
 
 ### Results bound to the user (B13)
 
+Built early for results by Wave C's C-W2, with a stricter rule than below:
+`user_context` is required (none is a `TypeError`, no `None` operator) and
+a manifest with no owner is refused for every caller
+([Who can read a run](../api/core/results.md#who-can-read-a-run)). Traces
+(`engine.traces.get`) remain this section's.
+
 B13 is fixed in the engine (D204), so the facade, the API, MCP and the
 terminal app all get it:
 

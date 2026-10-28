@@ -582,11 +582,12 @@ draws a table from `data`.
 
 ### Choosing a chart
 
-`engine.results.chart(result, result_id=None, *, kind=None, tenant_id=None)
+`engine.results.chart(result, result_id=None, *, user_context, kind=None)
 -> ChartSpec`. `result` is a `QueryResult` (its plan is used) or a
 `trace_id` (only the columns' kinds are). `kind` forces a kind the data can
 draw, else `ValueError` naming the ones it can. It reads results as
-`engine.results.page` does, by `trace_id` and tenant (B13 unchanged).
+`engine.results.page` does, by `trace_id` and caller: only the caller who
+asked the run reads it (C-W2, which closed B13 for results).
 
 **Column kinds (D112).** The artifact writer records each column's kind when
 it writes the parquet file, from the Arrow type, into
@@ -1625,8 +1626,8 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
     - Review fixes: a stored tool output holds no rows (D106). A chart output's `data.rows` is emptied before
       the step is stored (a client draws again through `engine.results.chart`), and the `report` tool stores
       the report without row tables and chart takeaways (`conversations.report(include_rows=False)`); asked
-      for directly, the report still reads the rows from `engine.results`. `engine.results` does not check the
-      caller (it reads by tenant and trace id); that gap is a separate row.
+      for directly, the report still reads the rows from `engine.results`, as the conversation's caller
+      (C-W2: `engine.results` answers only the caller who asked).
     - `chat_tools:` absent means the default tools **the registry has**, so an engine on `Registry.empty()`
       builds. The defaults are `("chart", "report")` only: `diagram`, `dashboard_edit` and `dashboard_pin` are
       still stubs and **stay off by default. K2 and D4 each add their own name to `DEFAULT_CHAT_TOOLS`
@@ -1674,6 +1675,14 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
       were once readable this way; that gap is closed (C-W1): while a hook is attached at `answer.after` the
       manifest every read goes through is written only once those hooks allowed, so a withheld run has none
       and every read path answers `ResultNotFound` (see `docs/configuration/hooks.md`).
+    - C-W2 (results readable only by their asker): the manifest records the asker's `(tenant_id, user_id)`
+      (`ResultOwner`, written by both write sites, the aggregator and `release_results`); `manifest`, `page`,
+      `csv` and `chart` take a required `user_context` (none is a `TypeError`; `chart`'s `tenant_id` is gone)
+      and answer `ResultNotFound` for any other caller and for a manifest with no asker. Every reader passes
+      its caller: the REST and playground routes, the report and the `chart` tool (the conversation's
+      caller), dashboard refresh (the refreshing caller). Callers with no `user_id` share one anonymous owner
+      per tenant. Unlike wave_d.md's D204 there is no `None` operator and no ownerless read: the operator
+      tools read no saved results. `engine.traces.get` is unchanged (still G1's).
     - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
     - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
       The stub test moves `chart` out of its tables.

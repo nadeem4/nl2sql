@@ -20,9 +20,9 @@ import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
 from pydantic import BaseModel, ConfigDict
 
-from nl2sql import NL2SQL, ConfigError, Embeddings, Storage, StoreConfig
+from nl2sql import NL2SQL, ConfigError, Embeddings, Storage, StoreConfig, UserContext
 from nl2sql.execution.artifacts import ArtifactStore
-from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary
+from nl2sql.execution.artifacts.results import ResultManifest, ResultOwner, ResultSummary
 from nl2sql.runtime import Runtime
 from nl2sql.storage.files import FilesTraces
 from nl2sql.storage.local import LocalResults
@@ -191,10 +191,12 @@ def test_result_pages_read_through_the_store(tmp_path):
         frame = pl.LazyFrame({"id": [1, 2, 3], "name": ["a", "b", "c"]})
         artifacts.write_lazy(frame, ArtifactStore.run_metadata(tenant, "run-1", "result_n1"))
         artifacts.write_manifest(tenant, "run-1", ResultManifest(
-            request_id="run-1", results=[ResultSummary(node_id="n1", columns=["id", "name"], row_count=3)]))
+            request_id="run-1", owner=ResultOwner(tenant_id=tenant, user_id="ann"),
+            results=[ResultSummary(node_id="n1", columns=["id", "name"], row_count=3)]))
+        ann = UserContext(user_id="ann")
 
-        page = engine.results.page("run-1", "n1", offset=1, limit=5)
-        csv = b"".join(engine.results.csv("run-1", "n1")).decode()
+        page = engine.results.page("run-1", "n1", offset=1, limit=5, user_context=ann)
+        csv = b"".join(engine.results.csv("run-1", "n1", user_context=ann)).decode()
 
     assert page.rows == [[2, "b"], [3, "c"]] and page.total_rows == 3
     assert csv.splitlines() == ["id,name", "1,a", "2,b", "3,c"]

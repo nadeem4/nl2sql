@@ -300,14 +300,18 @@ and streams each slice out, so the result is never built in memory on the server
 ### Errors and scope of the result routes
 
 - Both need a role, as `/query` does: no role is `HTTP 401`.
-- Results are read from the engine's own tenant folder (`TENANT_ID`, the
-  `<tenant_id>` of the artifact path) and nowhere else. An unknown `request_id`, a
-  run of another tenant, a `result_id` the run's manifest does not list, and an id
-  that is not a plain token (letters, digits, `_` and `-`, so no `/`, `.` or `..`)
-  are all `HTTP 404`, so a caller cannot tell one from the other or reach a path
-  outside the run's folder.
-- There is no access control beyond that yet: any caller with a role who knows a
-  run's `trace_id` can read its result.
+- A run is readable only by the caller who asked it: the request's caller (from
+  the auth settings) is passed to `engine.results` as `user_context`, and must
+  have the asker's `user_id` and tenant. Results are read from the engine's own
+  tenant folder (`TENANT_ID`, the `<tenant_id>` of the artifact path) and nowhere
+  else. An unknown `request_id`, another user's run, a run of another tenant, a
+  `result_id` the run's manifest does not list, and an id that is not a plain
+  token (letters, digits, `_` and `-`, so no `/`, `.` or `..`) are all
+  `HTTP 404`, so a caller cannot tell one from the other or reach a path outside
+  the run's folder.
+- A caller with only a role (the static or header role, no `user_id`) is
+  anonymous: anonymous callers share each other's results, and see no named
+  user's. See [Who can read a run](../core/results.md#who-can-read-a-run).
 
 ## Tests
 
