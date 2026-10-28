@@ -22,7 +22,7 @@ and every tool call runs as the role they name.
 | Flag | Meaning |
 | --- | --- |
 | `--role ROLE` | A role from `policies.yaml` (repeatable). The caller reads what any of its roles allows. |
-| `--user ID` | The user id runs are recorded under (traces, the audit log, approvals). Optional. |
+| `--user ID` | The user id runs are recorded under (traces, the audit log, approvals) and conversations belong to. Optional: without it the user id is `mcp`. |
 
 Without `--role`, the caller has `policies.default_role`. With neither, the
 server refuses to start, because a caller with no role reads nothing:
@@ -65,7 +65,7 @@ run's trace.
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `ask` | `question` (it must stand alone), `conversation_id` (optional: continue that conversation), `datasource_id` (optional: skip routing; only when starting one), `choice` (optional: the option id for a question that asked, see below) | See below. |
+| `ask` | `question` (it must stand alone; optional only when sending a `choice`, which answers the pending question), `conversation_id` (optional: continue that conversation), `datasource_id` (optional: skip routing; only when starting one), `choice` (optional: the option id for a question that asked, see below) | See below. |
 | `list_datasources` | none | `{"datasources": [...]}`: each one's `id`, `type`, `description` and `status`, for the datasources the caller's roles reach. |
 | `describe_table` | `datasource_id`, `table` (its name, or `schema.name`) | `{"status": "ok", "table": {...}}`: its `columns` (`name`, `type`, `nullable`, `primary_key`, `description`), `foreign_keys`, `row_count` and `description`, as [`engine.datasources.schema`](../api/core/datasource.md) gives them. |
 
@@ -90,7 +90,9 @@ Each `ask` is a turn of a conversation owned by the caller: without `conversatio
 it the question continues that conversation. The client's own model leads, so `ask` runs only the
 question, with no model call of its own; write each question so it stands alone. A conversation that
 is another user's, or does not exist, is `CONVERSATION_NOT_FOUND`; one running another turn is
-`CONVERSATION_BUSY`.
+`CONVERSATION_BUSY`; one that has reached `conversations.max_turns` is `CONVERSATION_TOO_LONG`: start a new one.
+A `datasource_id` on a follow-up (it is set when the conversation starts), or no `question` and no `choice`, is
+`INVALID_REQUEST`.
 
 A question that can be read more than one way is not run. The assistant shows the
 options to its user and calls `ask` again with the same `conversation_id` and
@@ -178,7 +180,7 @@ http:
   host: 127.0.0.1
   port: 8765
   path: /mcp
-  allowed_hosts: ["127.0.0.1:*", "localhost:*"]   # Host headers accepted
+  allowed_hosts: ["127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost", "[::1]"]   # Host headers accepted
   allowed_origins: []                              # browser Origins accepted
 auth: api_keys            # api_keys | none (none: loopback only)
 ```
@@ -193,7 +195,8 @@ each get their own identity. A missing, malformed, unknown or revoked key is a `
 revoked key's id; never the token). Revoke a key and its next request fails.
 
 `auth: none` runs every request as the one identity `--role` and `--user` name, as stdio does. It is
-for trying things out on your own machine: the server refuses to bind any address but loopback with it.
+for trying things out on your own machine: the server refuses to bind any address but loopback with it,
+and refuses to start when `allowed_hosts` lists a name that is not loopback (see below).
 
 ### Host, Origin and TLS
 
@@ -221,7 +224,9 @@ cloudflared tunnel --url http://127.0.0.1:8765
 ```
 
 The proxy or tunnel passes the public name as `Host`, so list it in `allowed_hosts`. Binding a public
-address directly (`--host 0.0.0.0`) is allowed with `auth: api_keys` only.
+address directly (`--host 0.0.0.0`) is allowed with `auth: api_keys` only. For the same reason a proxy or
+tunnel needs `auth: api_keys` too: with `auth: none` the server refuses to start when `allowed_hosts` lists
+any name that is not loopback, since anyone who could reach that name would read as the one identity.
 
 ### Connect a client
 

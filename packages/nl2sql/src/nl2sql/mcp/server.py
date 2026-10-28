@@ -32,6 +32,10 @@ PREVIEW_ROWS = 20
 # function asked on every call, so a server over HTTP can name one per request.
 Identity = Union[UserContext, Callable[[], UserContext]]
 
+# The user id of a fixed identity that names none (stdio without ``--user``, ``auth: none``): conversations belong
+# to a user, so one is needed. A caller that is missing altogether still fails closed.
+DEFAULT_USER = "mcp"
+
 INSTRUCTIONS = (
     "Answers questions about the connected databases in plain English. Call list_datasources to "
     "see what you can query and describe_table for a table's columns; ask runs a question and "
@@ -83,8 +87,8 @@ def build_server(engine: NL2SQL, identity: Identity, *, over_http: bool = False)
     # The builtin ``dict`` return type makes the result the tool's structured
     # content as it is; ``typing.Dict`` would wrap it in ``{"result": ...}``.
     @server.tool()
-    async def ask(question: str, datasource_id: Optional[str] = None, conversation_id: Optional[str] = None,
-                  choice: Optional[str] = None) -> dict[str, Any]:
+    async def ask(question: Optional[str] = None, datasource_id: Optional[str] = None,
+                  conversation_id: Optional[str] = None, choice: Optional[str] = None) -> dict[str, Any]:
         """Answer a question about the data in plain English. Write the question so it stands alone.
 
         Returns the conversation_id, the turn and the question that ran, the
@@ -95,7 +99,8 @@ def build_server(engine: NL2SQL, identity: Identity, *, over_http: bool = False)
         stopped at a limit carries stop. A question that can be read more than
         one way has status needs_clarification and a clarification: its
         options (id, label, explanation). Ask the user which, then call ask
-        again with the returned conversation_id and choice=<the option's id>.
+        again with the returned conversation_id and choice=<the option's id>;
+        the question may then be left out.
         Without conversation_id a new conversation starts, and datasource_id
         (optional) skips routing for all of it; with it, the question continues
         that conversation.
@@ -126,6 +131,8 @@ async def _off_the_loop(caller: Callable[[], UserContext], tool: Callable[..., d
     """
     try:
         user = caller()
+        if not user.user_id:
+            user = user.model_copy(update={"user_id": DEFAULT_USER})
         return await anyio.to_thread.run_sync(lambda: tool(engine, user, *args))
     except Exception:
         logger.exception("The MCP tool %s failed", tool.__name__.lstrip("_"))
@@ -170,9 +177,11 @@ def _qualified(table: dict[str, Any], tables: list[dict[str, Any]]) -> str:
     return f"{table['schema']}.{table['name']}" if twins > 1 else table["name"]
 
 
-def _ask(engine: NL2SQL, user: UserContext, question: str, datasource_id: Optional[str],
+def _ask(engine: NL2SQL, user: UserContext, question: Optional[str], datasource_id: Optional[str],
          conversation_id: Optional[str] = None, choice: Optional[str] = None) -> dict[str, Any]:
     """One ``ask`` turn of a conversation owned by ``user``: a new one, or ``conversation_id``'s."""
+    if question is None and choice is None:
+        return _error("INVALID_REQUEST", "Pass a question, or a choice to answer a clarification.")
     if conversation_id is None and choice is not None:
         return _error("CLARIFICATION_INVALID", "A choice answers a clarification: pass the conversation_id it came with.")
     if conversation_id is not None and datasource_id is not None:
@@ -184,14 +193,24 @@ def _ask(engine: NL2SQL, user: UserContext, question: str, datasource_id: Option
     try:
         if conversation_id is None:
             conversation_id = conversations.start(user_context=user, datasource_id=datasource_id).id
+        if question is None:  # a choice answers the pending request's own question
+            pending = conversations.get(conversation_id, user_context=user).pending
+            if pending is None:
+                raise ValueError("Nothing in this conversation is waiting for a choice.")
+            question = pending.question
         result = conversations.ask_only(conversation_id, question, user_context=user, choice=choice)
-        turn = conversations.get(conversation_id, user_context=user).turns[-1]
+        # This call's turn, found by its run: a follow-up that landed since may be the conversation's last.
+        turns = conversations.get(conversation_id, user_context=user).turns
+        turn = next((t for t in reversed(turns) if any(s.trace_id == result.trace_id for s in t.steps)), turns[-1])
     except ConversationNotFound:  # missing and someone else's answer alike
         return _error("CONVERSATION_NOT_FOUND", f"No conversation '{conversation_id}'.")
     except ConversationBusy:
         return _error("CONVERSATION_BUSY", "The conversation is running another turn. Try again in a moment.")
-    except ValueError as refused:  # ask_only refuses only a choice: the engine words it, naming option ids
-        return _error("CLARIFICATION_INVALID", str(refused))
+    except ValueError as refused:  # the engine words it; a choice it refuses names the option ids
+        message = str(refused)
+        if message.startswith("CONVERSATION_TOO_LONG"):
+            return _error("CONVERSATION_TOO_LONG", message)
+        return _error("CLARIFICATION_INVALID" if choice is not None else "INVALID_REQUEST", message)
     return {"conversation_id": conversation_id, "turn": turn.index, "question": turn.steps[-1].question,
             **_answer(result.model_dump(mode="json"))}
 

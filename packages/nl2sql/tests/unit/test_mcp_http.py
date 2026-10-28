@@ -12,6 +12,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 
+import anyio
 import pytest
 
 pytest.importorskip("mcp")
@@ -19,7 +20,7 @@ from starlette.testclient import TestClient  # noqa: E402
 
 from nl2sql import NL2SQL, QueryResult, UserContext  # noqa: E402
 from nl2sql.api.query_api import QueryAPI  # noqa: E402
-from nl2sql.mcp import http  # noqa: E402
+from nl2sql.mcp import http, server  # noqa: E402
 from nl2sql.testing.config import make_config  # noqa: E402
 
 ROLES = {"admin": {"description": "Everything", "allow": ["*"]},
@@ -35,14 +36,11 @@ class Runs:
 
     def __init__(self, monkeypatch) -> None:
         self.callers: List[UserContext] = []
-        self.barrier: threading.Barrier | None = None
         runs = self
 
         def run_query(api: QueryAPI, question: str, **kwargs: Any) -> QueryResult:
             user = kwargs["user_context"]
             runs.callers.append(user)
-            if runs.barrier:
-                runs.barrier.wait(timeout=10)  # both requests are in flight here
             summary = f"{user.user_id}/{user.tenant_id}/{','.join(user.roles)}"
             answer = QueryResult(status="success", trace_id=kwargs["scope"].trace_id,
                                  final_answer={"summary": summary, "content": question, "format_type": "text"})
@@ -160,17 +158,31 @@ def test_tools_run_as_the_keys_roles(engine, runs):
     assert body["answer"]["summary"] == "ana/acme/viewer"
 
 
-def test_two_keys_concurrently_run_with_their_own_roles(engine, runs):
+def test_two_keys_concurrently_run_with_their_own_roles(engine, runs, monkeypatch):
+    """Request "a" is held inside the tool until request "b" has resolved its identity, so a global identity
+    would hand "a" the caller of "b"."""
     _, ana = _token(engine, user="ana", roles=("analyst",), tenant="acme")
     _, bob = _token(engine, user="bob", roles=("viewer",), tenant="globex")
-    runs.barrier = threading.Barrier(2)  # each ask waits for the other: they overlap
+    b_resolved = threading.Event()
+    real = server._off_the_loop
+
+    async def held(caller, tool, engine_, *args):
+        if args[0] == "b":
+            caller()  # the identity of "b" is resolved now
+            b_resolved.set()
+        else:
+            assert await anyio.to_thread.run_sync(b_resolved.wait, 10), "request b never resolved its identity"
+        return await real(caller, tool, engine_, *args)
+
+    monkeypatch.setattr(server, "_off_the_loop", held)
 
     with _client(engine) as client, ThreadPoolExecutor(2) as pool:
         first = pool.submit(lambda: _result(_call(client, "ask", {"question": "a"}, token=ana)))
         second = pool.submit(lambda: _result(_call(client, "ask", {"question": "b"}, token=bob)))
-        got = {first.result(timeout=20)["answer"]["summary"], second.result(timeout=20)["answer"]["summary"]}
+        got_a, got_b = first.result(timeout=20), second.result(timeout=20)
 
-    assert got == {"ana/acme/analyst", "bob/globex/viewer"}
+    assert got_a["answer"]["summary"] == "ana/acme/analyst"
+    assert got_b["answer"]["summary"] == "bob/globex/viewer"
 
 
 def test_foreign_host_or_origin_is_refused(engine, runs):
@@ -294,3 +306,54 @@ def test_the_request_log_never_holds_the_token(engine, caplog):
         _call(client, "ask", {"question": "q"}, token="nl2sql_" + "0" * 8 + "_" + "A" * 43)
 
     assert token.split("_", 2)[2] not in caplog.text
+
+
+def test_every_path_and_method_needs_a_key(engine, runs):
+    denied = []
+    engine.events.subscribe(denied.append, ["mcp.denied"])
+    with _client(engine) as client:
+        responses = [client.get("/other"), client.options("/mcp"), client.get("/mcp"), client.post("/other", json={})]
+
+    assert [r.status_code for r in responses] == [401, 401, 401, 401]
+    assert [e.data["reason"] for e in denied] == ["missing"] * 4
+    assert runs.callers == []
+
+
+def test_only_the_lifespan_passes_without_a_key(engine):
+    app = http.build_app(engine, None)
+    sent = []
+
+    async def receive():
+        return {"type": "websocket.connect"}
+
+    async def send(message):
+        sent.append(message)
+
+    anyio.run(app, {"type": "websocket", "path": "/mcp", "headers": []}, receive, send)
+
+    assert [m["type"] for m in sent] == ["websocket.close"]
+
+
+def test_auth_none_refuses_a_public_allowed_host(make):
+    me = UserContext(user_id="me", roles=["analyst"])
+
+    for hosts in (["mcp.example.com"], ["127.0.0.1:*", "chat.example.com:*"], ["10.0.0.5"]):
+        engine = make(mcp={"auth": "none", "http": {"allowed_hosts": hosts}})
+        with pytest.raises(ValueError, match="allowed_hosts"):
+            http.build_app(engine, me)
+
+    ok = make(mcp={"auth": "none", "http": {"allowed_hosts": ["localhost:*", "127.0.0.1", "[::1]:*"]}})
+    http.build_app(ok, me)
+
+
+def test_a_public_allowed_host_is_fine_with_keys(make):
+    http.build_app(make(mcp={"http": {"allowed_hosts": ["mcp.example.com"]}}), None)
+
+
+def test_the_default_hosts_cover_every_loopback_form(engine):
+    _, token = _token(engine)
+    with _client(engine) as client:
+        statuses = [_call(client, "list_datasources", token=token, headers={"Host": host}).status_code
+                    for host in ("[::1]:8765", "localhost", "127.0.0.1", "localhost:9", "127.0.0.1:9")]
+
+    assert statuses == [200] * 5

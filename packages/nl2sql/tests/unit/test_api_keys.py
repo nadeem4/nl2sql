@@ -310,5 +310,17 @@ def test_record_denied_publishes_mcp_denied_without_a_token(engine):
 
     assert [e.data for e in events] == [{"reason": "revoked", "key_id": "deadbeef"},
                                         {"reason": "missing", "key_id": None}]
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown reason 'because'"):
         engine.api_keys.record_denied("because")
+    assert len(events) == 2, "an unknown reason publishes nothing"
+
+
+def test_an_unknown_key_id_costs_one_hash_comparison_like_a_known_one(engine, monkeypatch):
+    _, token = _make(engine)
+    secret = token.split("_", 2)[2]
+    seen = []
+    real = token_format.hmac.compare_digest
+    monkeypatch.setattr(token_format.hmac, "compare_digest", lambda a, b: seen.append((a, b)) or real(a, b))
+
+    assert engine.api_keys.check("nl2sql_" + "0" * 8 + "_" + secret).reason == "unknown"
+    assert len(seen) == 1, "the compare runs against a dummy hash, so timing does not say whether the id exists"

@@ -46,11 +46,19 @@ def build_app(engine: NL2SQL, identity: Optional[UserContext]) -> ASGIApp:
     ``identity`` is who every request runs as when ``mcp.auth`` is ``none``; with ``api_keys`` it is not used.
 
     Raises:
-        ValueError: ``mcp.auth`` is ``none`` and no ``identity`` was given.
+        ValueError: ``mcp.auth`` is ``none`` and no ``identity`` was given, or ``http.allowed_hosts`` names a
+            host that is not loopback (a proxy or tunnel forwarding to this loopback bind would expose the one
+            identity).
     """
     fixed = identity if engine.config.mcp.auth == "none" else None
     if engine.config.mcp.auth == "none" and fixed is None:
         raise ValueError("mcp.auth is none: pass the identity every request runs as (nl2sql mcp --http --role ROLE).")
+    if fixed is not None:
+        public = [h for h in engine.config.mcp.http.allowed_hosts if not _loopback(_host_of(h))]
+        if public:
+            raise ValueError(f"mcp.auth is none and mcp.http.allowed_hosts lists {', '.join(public)}: a proxy or "
+                             f"tunnel for that name would let anyone read as the one identity. Set auth: api_keys "
+                             f"in mcp.yaml, or list only loopback names.")
     app = server.build_server(engine, _identity, over_http=True).streamable_http_app()
     return _Authenticated(app, engine, fixed)
 
@@ -76,6 +84,13 @@ def _run(app: ASGIApp, host: str, port: int) -> None:
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
+def _host_of(pattern: str) -> str:
+    """The host of an ``allowed_hosts`` entry: ``localhost:*`` -> ``localhost``, ``[::1]:*`` -> ``::1``."""
+    if pattern.startswith("["):
+        return pattern[1:pattern.index("]")] if "]" in pattern else pattern
+    return pattern.rsplit(":", 1)[0] if pattern.count(":") == 1 else pattern
+
+
 def _loopback(host: str) -> bool:
     if host == "localhost":
         return True
@@ -94,8 +109,12 @@ class _Authenticated:
         self._fixed = fixed
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":  # the lifespan
+        if scope["type"] == "lifespan":
             await self._app(scope, receive, send)
+            return
+        if scope["type"] != "http":  # a websocket, or anything else: never served, so never unauthenticated
+            if scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1008})
             return
         user = self._fixed
         if user is None:

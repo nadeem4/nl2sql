@@ -13,7 +13,9 @@ from nl2sql.api.types import ApiKey
 from nl2sql.policies import UserContext, keys
 from nl2sql.runtime import Runtime
 
-_ID_ATTEMPTS = 8  # a clash of two random 32-bit ids is rare; this many in a row means the generator is broken
+_DENIED_REASONS = frozenset({"missing", "malformed", "unknown", "revoked"})
+_DUMMY_HASH = keys.hash_secret("")  # compared when the id is unknown
+_ID_ATTEMPTS = 8 # a clash of two random 32-bit ids is rare; this many in a row means the generator is broken
 
 
 @dataclass(frozen=True)
@@ -110,7 +112,8 @@ class ApiKeysAPI:
             return KeyCheck(reason="malformed")
         key_id, secret = parsed
         row = self._ctx.state.get_api_key(key_id)
-        if row is None or not keys.matches(secret, row["hash"]):
+        # An unknown id is compared against a dummy hash, so the time does not say whether the id exists.
+        if not keys.matches(secret, row["hash"] if row else _DUMMY_HASH) or row is None:
             return KeyCheck(reason="unknown")
         if row.get("revoked_at"):
             return KeyCheck(reason="revoked", key_id=key_id)
@@ -124,6 +127,8 @@ class ApiKeysAPI:
         Raises:
             ValueError: ``reason`` is not one of the four.
         """
+        if reason not in _DENIED_REASONS:
+            raise ValueError(f"Unknown reason '{reason}': one of {', '.join(sorted(_DENIED_REASONS))}.")
         self._ctx.bus.publish("mcp.denied", {"reason": reason, "key_id": key_id}, tenant_id=self._ctx.tenant_id)
 
     # ------------------------------------------------------------ helpers

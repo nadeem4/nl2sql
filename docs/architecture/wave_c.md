@@ -1200,7 +1200,7 @@ http:
   host: 127.0.0.1
   port: 8765
   path: /mcp
-  allowed_hosts: ["127.0.0.1:*", "localhost:*"]   # Host headers accepted
+  allowed_hosts: ["127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost", "[::1]"]   # Host headers accepted
   allowed_origins: []                              # browser Origins accepted
 auth: api_keys            # api_keys | none (none: loopback only)
 ```
@@ -1997,6 +1997,15 @@ Not built yet.
       token counts: no header is `missing`, anything else that is not `Bearer <token>` is `malformed`. A
       failing key check (the state store is down) is a 500 and a log line.
     - `cli/main.py` changed (the options), which C0's list of untouched files did not expect.
+    - **Review fixes.** A fixed identity with no `user_id` (stdio without `--user`, `auth: none`) asks as
+      `mcp` (`DEFAULT_USER` in `server.py`, applied where the tool resolves its caller), since a conversation
+      needs an owner; a missing caller still fails closed. `auth: none` also refuses to start when
+      `allowed_hosts` lists a non-loopback name (a proxy would expose the one identity). `CONVERSATION_TOO_LONG`
+      has its own code; another `ValueError` is `CLARIFICATION_INVALID` with a `choice` and `INVALID_REQUEST`
+      without. `question` is optional with a `choice` (the pending question is used). The returned turn is
+      matched by the run's `trace_id`, not read as the conversation's last. `record_denied` raises for an
+      unknown reason; `check` hashes a dummy for an unknown id; only `lifespan` scopes skip the key check and a
+      websocket is closed. The default `allowed_hosts` adds `[::1]` and the bare names.
 
 ## 14. Bugs Wave C fixes
 

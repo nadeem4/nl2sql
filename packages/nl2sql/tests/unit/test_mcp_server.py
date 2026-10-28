@@ -81,6 +81,7 @@ class _Conversations:
         conversation_id = f"c{len(self.turns) + 1}"
         self.turns[conversation_id] = []
         self.datasource = datasource_id
+        self.started_as = user_context
         return SimpleNamespace(id=conversation_id)
 
     def ask_only(self, conversation_id, question, *, user_context, choice=None):
@@ -90,13 +91,20 @@ class _Conversations:
         self.engine.choices.append(choice)
         if isinstance(self.engine.answer, Exception):
             raise self.engine.answer
-        self.turns[conversation_id].append(question)
+        self.turns[conversation_id].append((question, self.engine.answer.trace_id))
+        for other in self.concurrent:  # a follow-up that lands once this turn's lock is released
+            self.turns[conversation_id].append(other)
         return self.engine.answer
+
+    pending_question = None
+    concurrent = ()
 
     def get(self, conversation_id, *, user_context):
         asked = self.turns[conversation_id]
-        return SimpleNamespace(turns=[SimpleNamespace(index=i + 1, steps=[SimpleNamespace(question=q)])
-                                      for i, q in enumerate(asked)])
+        pending = SimpleNamespace(question=self.pending_question) if self.pending_question else None
+        return SimpleNamespace(pending=pending, turns=[
+            SimpleNamespace(index=i + 1, steps=[SimpleNamespace(question=q, trace_id=t)])
+            for i, (q, t) in enumerate(asked)])
 
 
 class _Engine(NL2SQL):
@@ -424,3 +432,74 @@ def test_a_busy_conversation_is_reported_not_raised():
     body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id)
 
     assert body["errors"][0]["code"] == "CONVERSATION_BUSY"
+
+
+def test_an_identity_without_a_user_id_asks_as_the_default_user():
+    engine = _Engine()
+
+    _call(engine, UserContext(roles=["viewer"]), "ask", question="q")
+
+    assert engine.conversations.started_as.user_id == "mcp" and engine.conversations.started_as.roles == ["viewer"]
+    assert engine.calls[0][2].user_id == "mcp"
+
+
+def test_an_identity_with_a_user_id_keeps_it():
+    engine = _Engine()
+
+    _call(engine, VIEWER, "ask", question="q")
+
+    assert engine.conversations.started_as.user_id == "ana"
+
+
+def test_a_conversation_at_max_turns_is_conversation_too_long():
+    engine = _Engine(ValueError("CONVERSATION_TOO_LONG: this conversation has 3 turns. Start a new conversation."))
+    conversation_id = _call(_Engine(), VIEWER, "ask", question="q")["conversation_id"]
+    engine.conversations.turns[conversation_id] = []
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id)
+
+    assert body["errors"][0]["code"] == "CONVERSATION_TOO_LONG" and "Start a new conversation" in body["errors"][0]["message"]
+
+
+def test_another_value_error_without_a_choice_is_invalid_request():
+    engine = _Engine(ValueError("Say what you want to ask."))
+    conversation_id = _call(_Engine(), VIEWER, "ask", question="q")["conversation_id"]
+    engine.conversations.turns[conversation_id] = []
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id)
+
+    assert body["errors"][0]["code"] == "INVALID_REQUEST"
+
+
+def test_the_turn_returned_is_the_one_this_call_ran_not_the_latest():
+    engine = _Engine(QueryResult(status="success", trace_id="t-mine"))
+    engine.conversations.concurrent = [("someone else's follow-up", "t-other")]
+
+    body = _call(engine, VIEWER, "ask", question="mine")
+
+    assert (body["turn"], body["question"], body["trace_id"]) == (1, "mine", "t-mine")
+
+
+def test_a_choice_needs_no_question():
+    engine = _Engine(QueryResult(status="success"))
+    conversation_id = _call(engine, VIEWER, "ask", question="How many records?")["conversation_id"]
+    engine.conversations.pending_question = "How many records?"
+
+    body = _call(engine, VIEWER, "ask", conversation_id=conversation_id, choice="b")
+
+    assert body["status"] == "success" and engine.calls[-1][0] == "How many records?" and engine.choices[-1] == "b"
+
+
+def test_no_question_and_no_choice_is_invalid_request():
+    body = _call(_Engine(), VIEWER, "ask")
+
+    assert body["errors"][0]["code"] == "INVALID_REQUEST" and "question" in body["errors"][0]["message"]
+
+
+def test_a_choice_with_nothing_pending_and_no_question_is_clarification_invalid():
+    engine = _Engine()
+    conversation_id = _call(engine, VIEWER, "ask", question="q")["conversation_id"]
+
+    body = _call(engine, VIEWER, "ask", conversation_id=conversation_id, choice="b")
+
+    assert body["errors"][0]["code"] == "CLARIFICATION_INVALID"

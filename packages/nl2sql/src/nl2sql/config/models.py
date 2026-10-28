@@ -687,7 +687,8 @@ class McpHttp(_Model):
     host: str = "127.0.0.1"
     port: int = Field(8765, ge=1, le=65535)
     path: str = "/mcp"
-    allowed_hosts: List[str] = Field(default_factory=lambda: ["127.0.0.1:*", "localhost:*"])  # Host headers accepted
+    allowed_hosts: List[str] = Field(default_factory=lambda: [
+        "127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost", "[::1]"])  # Host headers accepted
     allowed_origins: List[str] = Field(default_factory=list)  # browser Origins accepted
 
     @field_validator("path")
