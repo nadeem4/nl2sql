@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   # True when the pull request touches anything but documentation, so the two
   # slow jobs below are skipped on a docs-only change. A skipped job counts as
