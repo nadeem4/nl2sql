@@ -228,6 +228,7 @@ class Turn(BaseModel):
     status: TurnStatus
     trace_id: str | None               # the turn's own scope: the loop's model calls
     usage: QuestionUsage               # the loop's model calls; each ask step's usage is on its result
+    error: dict[str, Any] | None = None  # the loop's own failure or stop (code, message); a step's stays on it
 
 class Conversation(BaseModel):
     id: str                            # random, 22 url-safe characters
@@ -1545,6 +1546,43 @@ flowchart TD
     - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
     - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
       The stub test moves `chart` out of its tables.
+
+!!! note "Built (C1): conversations core, model-led"
+    - **Files:** `nl2sql/conversations/{api,agent,prompts,store}.py` (the turn and its loop; the `[CONVERSATION]`
+      block and the step checks; the prompt; ownership and `strip_rows`), `api/conversations_api.py` (a thin
+      face over `Conversations`; `tool` and `report` stay stubs), `api/storage_api.py` (`purge()` counts
+      `conversations`), `RunScope.end(name, data)` (a scope that closes with an event other than `run.finished`),
+      and `common/context.current_conversation_id`, which `HookRunner.call` reads into
+      `HookContext.conversation_id`. `nl2sql.api.conversations_api.ConversationsAPI` is built over
+      `nl2sql.conversations.api.Conversations`.
+    - **The loop** runs with `ask` alone: `Conversations._enabled_tools()` returns `{}` and C2 fills it. The
+      agent's schema is `ModelStep` subclassed per call with the turn's checks (tool names, argument models,
+      pending option ids, calls left), so a refused step goes back through `structured()`'s parse retry. C2 adds
+      the registry tools to `_enabled_tools()` and to the `tools` list in `Conversations._by_model`.
+    - **Tests:** `tests/unit/test_conversations.py` (canned `run_query`), `tests/e2e/test_conversations_fake_llm.py`
+      (the demo databases); `test_wave_c_stubs.py` lists only `tool` and `report` now.
+
+    Where the code and the design differ, the code won:
+
+    - `Turn` has `error` (`{"code", "message"}`), set when the loop itself ends the turn: `MODEL_STEP_INVALID`,
+      or `RUN_LIMIT_REACHED` (status `stopped`) when the turn's own model calls hit `max_llm_calls` or
+      `max_cost_usd`. A step's own failure stays on the step.
+    - The new message is a JSON string after `[USER_TEXT]`, not raw text: a message cannot start a line of its
+      own and forge a marker.
+    - `[CONVERSATION]` has the keys `turns`, `pending`, `tools`, `tool_calls_left` and `this_turn` (and `tools` is
+      empty on the last call). The open dashboard joins it with D4.
+    - `CONVERSATION_TOO_LONG` is a `ValueError` whose message starts with the code, as no exception class is
+      defined for it. `stream` raises `ConversationBusy` from the first `next`, while ownership and argument
+      errors are raised at the call.
+    - A turn's status follows the design (the last step that did not end `ok`), so a turn whose `ask` step failed
+      and whose model then replied is `error` with a `reply`.
+    - `ask_only` runs through the same turn machinery (a turn scope, `conversation.step`, `conversation.turn`) and
+      returns the run's result with its rows; the stored step has none.
+    - `start(dashboard_id=)` only checks that the dashboard exists and is the caller's; the dashboard tools are D4.
+    - `purge()` counts conversations only; the draft-dashboard count arrives with D1.
+    - Names later rows use: `Conversations` (`nl2sql.conversations.api`), `checked_step`, `block`, `step_view`,
+      `ASK_SPEC` and `AskArgs` (`nl2sql.conversations.agent`), `ConversationStore`, `owner_of`, `strip_rows`
+      (`nl2sql.conversations.store`), `current_conversation_id`.
 
 The waves, with at most four PRs at once:
 

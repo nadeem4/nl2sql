@@ -590,13 +590,31 @@ The engine writes two files a person owns, and only from the review queue's acce
 ### Why It Exists
 The glossary and the curated answers are what people know and vouch for. An engine that edited them on its own would turn a model's guess into a fact without anyone deciding so, and two writers that did not check the file would lose a person's edit.
 
+## Saved Answers Run as the Caller
+
+### Definition
+A conversation stores what a turn said and found, never a permission. Every method of engine.conversations takes the caller, and each turn's questions run through un_query with the user_context passed to that call, not the one the conversation was started with: a role taken away applies at the next turn. A conversation belongs to the (tenant_id, user_id) that started it; any other caller is told it does not exist. A stored step keeps its plan, SQL and explanation but never the rows of its sub-queries, so reading a result again goes through engine.results, which checks the caller. The model sees summaries and column names, never rows. (Dashboards extend this rule in Wave C's D rows.)
+
+### Enforcement Points
+- ConversationStore.get in 
+l2sql.conversations.store: the owner check behind every method
+- Conversations._ask in 
+l2sql.conversations.api: each step calls un_query with the turn's caller; strip_rows removes the rows before a step is stored
+- 	est_other_users_conversation_is_not_found, 	est_turn_runs_with_the_callers_roles_not_the_starters, 	est_stored_turn_has_no_rows, 	est_model_never_sees_rows in packages/nl2sql/tests/unit/test_conversations.py; 	est_owned_and_privileged_methods_require_a_caller in the boundary test
+
+### Failure Behavior
+ConversationNotFound for an id that is missing or another owner's, with the same message for both.
+
+### Why It Exists
+A conversation outlives the request that began it. If it carried the starter's roles, a person who lost access, or anyone who learned its id, would keep reading what the roles allowed.
+
 ---
 
 ## Categories
 
 - **State**: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
-- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File
+- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter

@@ -19,8 +19,7 @@ ADMIN = UserContext(user_id="root", roles=["admin"])
 
 # namespace -> method -> the row that fills it. Every public method of a stub class is listed.
 STUBS = {
-    "conversations": {"start": "C1", "ask": "C1", "stream": "C1", "retry": "C1", "ask_only": "C1", "get": "C1",
-                      "list": "C1", "delete": "C1", "tool": "C2", "report": "C2"},
+    "conversations": {"tool": "C2", "report": "C2"},
     "chat_tools": {"list": "C2"},
     "workspaces": {"create": "D1", "rename": "D1", "list": "D1", "delete": "D1"},
     "dashboards": {"get": "D1", "list": "D1", "delete": "D1", "pin": "D1", "move": "D1", "edit": "D1",
@@ -30,6 +29,8 @@ STUBS = {
                    "generate": "D3", "suggest_questions": "D3"},
     "api_keys": {"create": "M1", "list": "M1", "revoke": "M1", "verify": "M1"},
 }
+# Methods a row has filled since: they are real now and have their own tests.
+FILLED = {"conversations": {"start", "ask", "stream", "retry", "ask_only", "get", "list", "delete"}}
 # Methods added to namespaces that already exist.
 ADDED = {("datasources", "scan"): "L1", ("datasources", "diagram"): "K2", ("datasources", "save"): "L2",
          }
@@ -59,18 +60,13 @@ def test_stub_namespaces_name_their_pr(engine):
     for name, methods in STUBS.items():
         namespace = getattr(engine, name)
         public = {m for m in dir(namespace) if not m.startswith("_") and callable(getattr(namespace, m))}
-        assert public == set(methods), f"engine.{name} has methods the test does not list (or lacks some)"
+        assert public - FILLED.get(name, set()) == set(methods), f"engine.{name} has methods the test does not list (or lacks some)"
         for method, row in methods.items():
             with pytest.raises(NotImplementedError, match=rf"engine\.{name}\.{method} arrives with {row}\b"):
                 _call(namespace, method)
     for (name, method), row in ADDED.items():
         with pytest.raises(NotImplementedError, match=rf"engine\.{name}\.{method} arrives with {row}\b"):
             _call(getattr(engine, name), method)
-
-
-def test_a_stub_stream_fails_at_the_call_not_on_the_first_next(engine):
-    with pytest.raises(NotImplementedError):
-        engine.conversations.stream("c", "hello", user_context=ADMIN)
 
 
 def test_the_namespaces_are_built_once_and_import_nl2sql_stays_light(engine):

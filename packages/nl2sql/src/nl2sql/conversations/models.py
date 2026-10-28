@@ -75,6 +75,7 @@ class Turn(StrictModel):
     status: TurnStatus
     trace_id: Optional[str] = None  # the turn's own scope: the loop's model calls
     usage: QuestionUsage = Field(default_factory=QuestionUsage)  # the loop's model calls
+    error: Optional[Dict[str, Any]] = None  # code and message, when the loop itself failed or was stopped
 
 
 class Conversation(StrictModel):

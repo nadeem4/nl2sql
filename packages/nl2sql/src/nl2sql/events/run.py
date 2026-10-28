@@ -231,6 +231,11 @@ class RunScope:
                                           "error_code": str(getattr(error_code, "value", error_code)),
                                           "user_id": self.user_id, "roles": self.roles})
 
+    def end(self, name: str, data: Any) -> Optional[Event]:
+        """Close with the event ``name`` instead of ``run.finished``: a scope that is not a question (Wave C's
+        conversation turn closes with ``conversation.turn``). A second close does nothing."""
+        return self._close(name, data)
+
     def _duration(self) -> float:
         return round(time.perf_counter() - self._started_at, 4) if self._started_at is not None else 0.0
 
