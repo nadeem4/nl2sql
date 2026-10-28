@@ -1041,11 +1041,11 @@ WAVE_C_CALLER_METHODS = {
 }
 # `save` writes a datasource file: `by` must hold an admin role.
 WAVE_C_WRITERS = {("api/datasource_api.py", "DatasourcesAPI"): ("by", ("save",))}
-# The few that take no caller, and why: a list of names, a hash lookup, and the scheduler, which runs each
-# dashboard as its stored owner (D134).
+# The few that take no caller, and why: a list of names, the key lookups (they are how a caller is found, and
+# `record_denied` only audits a refusal), and the scheduler, which runs each dashboard as its stored owner (D134).
 WAVE_C_WITHOUT_A_CALLER = {
     ("api/chat_tools_api.py", "ChatToolsAPI"): ("list",),
-    ("api/api_keys_api.py", "ApiKeysAPI"): ("verify",),
+    ("api/api_keys_api.py", "ApiKeysAPI"): ("verify", "check", "record_denied"),
     ("api/dashboards_api.py", "DashboardsAPI"): ("run_scheduled",),
 }
 
@@ -1098,7 +1098,7 @@ def test_owned_and_privileged_methods_require_a_caller():
     assert not offenders, _broke(
         "Every Wave C method that reads or writes something owned, scoped or privileged takes the caller as a "
         "required keyword (user_context, or by for a writer), with no default and no Optional (D130): an app "
-        "that forgot the caller fails rather than seeing or changing everything. Only run_scheduled, verify and "
+        "that forgot the caller fails rather than seeing or changing everything. Only run_scheduled, verify, check, record_denied and "
         "chat_tools.list take none.", offenders)
 
 
