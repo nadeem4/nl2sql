@@ -371,12 +371,14 @@ def test_edits_see_the_dashboard_the_earlier_edits_made(engine):
                                user_context=ANA)
 
 
-def test_the_chat_only_edits_arrive_with_d4(engine):
-    from nl2sql.dashboards.models import AddTile, StepRef
+def test_the_chat_only_edits_need_a_conversation(engine):
+    from nl2sql.dashboards.models import AddTile, ReplacePlan, StepRef
 
     seed(engine)
-    with pytest.raises(NotImplementedError, match=r"add_tile.*arrives with D4"):
-        engine.dashboards.edit("d1", [AddTile(title="X", from_step=StepRef(turn=1, step=1))], user_context=ANA)
+    for chat_only in (AddTile(title="X", from_step=StepRef(turn=1, step=1)),
+                      ReplacePlan(tile_id="t1", from_step=StepRef(turn=1, step=1))):
+        with pytest.raises(ValueError, match=rf"{chat_only.kind}.*only in a conversation"):
+            engine.dashboards.edit("d1", [chat_only], user_context=ANA)
 
 
 def test_edit_discards_only_the_results_it_invalidates(engine):

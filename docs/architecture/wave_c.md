@@ -1905,7 +1905,53 @@ Not built yet.
 
 ### D4
 
-Not built yet.
+!!! note "Built (D4): chat builds and edits dashboards"
+    - **Files:** `nl2sql/chat_tools/dashboard_edit.py` and `dashboard_pin.py` (the two tools), `dashboards/edits.py`
+      (the `add_tile` and `replace_plan` handlers and `plan_from_step`), `dashboards/api.py` and
+      `api/dashboards_api.py` (`create_draft`, and `edit(..., conversation=)`), `conversations/agent.py`
+      (`dashboard_view`, the `dashboard` key of `[CONVERSATION]`), `conversations/api.py` (it reads the open
+      dashboard at every step and ties the draft to the conversation), `conversations/tools.py`
+      (`DEFAULT_CHAT_TOOLS` now has `dashboard_edit` and `dashboard_pin`) and one rule in `conversations/prompts.py`.
+    - **Tests:** `tests/unit/test_dashboards_d4.py` (every name in the row's list, plus the verified chart, a rejected
+      chart saving none of its edit list, bad `from_step` refs, no rows to the model, `create_draft`), one e2e test in
+      `tests/e2e/test_conversations_fake_llm.py` (a real no-execute check, then `pin` and `refresh` with no model
+      call). `test_wave_c_stubs.py` moves both tools out of `CHAT_TOOL_ROWS`; D1's `test_the_chat_only_edits_arrive_with_d4`
+      is now `test_the_chat_only_edits_need_a_conversation`.
+
+    Where the code and the design differ, the code won:
+
+    - **`engine.dashboards.create_draft(*, user_context, title=None, workspace_id=None, conversation_id=None)` is new.**
+      The design's facade has no way to make a draft, and a tool may reach the engine through the facade only. The
+      draft is empty, titled "New dashboard" unless given, and in "General" (created on first use) unless a
+      workspace is given; it publishes `dashboard.changed` (`created`). It takes no plan.
+    - **`edit` takes `conversation=`.** The design has the tool resolve `from_step` to `StoredQuery`s before `edit`,
+      but `AddTile` carries only `from_step`. So the tool passes the conversation it was handed (the stored turns
+      plus the turn in flight, so an `ask` and an `add_tile` in one turn work), and `edit` resolves the step itself
+      with `plan_from_step` (`StoredQuery` is not used). The conversation must be the caller's (`ValueError`
+      otherwise); without one the two edits are a `ValueError` ("exists only in a conversation"). The named methods
+      still take no question or plan, and no model text becomes a plan: the plan is the engine's own stored step.
+    - **`from_step.step` counts the turn's `ask` steps from 1**, as the `chart` tool does, not every step.
+    - **The check** is `Refresher.check` (`TileRunner.run(execute=False, draw=False)`) for the new chart, under the
+      dashboard's lock, accepting the statuses `open` serves (`ok`, `empty`, `needs_approval`). Any other raises a
+      `ValueError` "The plan of the chart '<title>' was refused (<reason>). Nothing was saved." and the whole edit
+      list is dropped. A verified answer becomes a verified chart (`verified_datasource_id` from the answer's source).
+    - **`replace_plan`** keeps the chart's id, title, chart type and place, takes the step's question and plan, and
+      discards its stored result.
+    - **A new tile** gets the first free id `t<n>` and goes beside the last chart when there is room on its row, else
+      on a new row (2 wide, 2 high). There is no cap on charts in chat (`dashboards.max_tiles` is the starter's size).
+    - **The tie to the conversation** is made by `Conversations._tool`: after the first successful `dashboard_edit`
+      with no dashboard yet it sets `Conversation.dashboard_id` from the step's `refs`. A draft the call made is
+      deleted again when its edit fails, so no empty draft is left behind. Edits on a dashboard the conversation does
+      not hold (an explicit `dashboard_id`) do not change `Conversation.dashboard_id`.
+    - **The `[CONVERSATION]` block** gets a `dashboard` key only while the conversation has one that is still the
+      caller's: `id`, `title`, `status`, each chart's `id`, `title`, `question`, `chart` and last stored `status`
+      (null before a first run), the validator's reason (cut at 300 characters) for a `needs_fixing` or `denied`
+      chart, and the filters' ids and labels and the schedule's period when set. It is read at every step of the loop.
+    - A tool's `output` is `json` with the dashboard's title and `refs.dashboard_id`; the model sees the title and
+      refs only. The prompt gained one rule: ask one question per chart, `add_tile` each, `replace_plan` a
+      `needs_fixing` chart, and `dashboard_pin` only when asked.
+    - Names later rows use: `plan_from_step` (`dashboards.edits`), `dashboard_view` (`conversations.agent`),
+      `EditEnv.step` and `EditEnv.check`.
 
 ### L1
 

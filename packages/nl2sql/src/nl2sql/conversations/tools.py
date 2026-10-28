@@ -19,8 +19,8 @@ from nl2sql.registry import Registry, RegistryError
 logger = get_logger(__name__)
 
 # What `chat_tools:` means when the section is absent: these, of the ones the registry has. An empty list means
-# none. `dashboard_edit` and `dashboard_pin` join when D4 makes them real.
-DEFAULT_CHAT_TOOLS = ("chart", "diagram", "report")
+# none.
+DEFAULT_CHAT_TOOLS = ("chart", "diagram", "report", "dashboard_edit", "dashboard_pin")
 
 
 def build_chat_tools(names: Optional[List[str]], registry: Registry,

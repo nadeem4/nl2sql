@@ -28,7 +28,7 @@ entry point group, and the built-ins are declared in
 | `observer` | `nl2sql.observers` | `nl2sql_sdk.events.Observer` (version 1) | `log`, `audit`, `otel` (the `otel` extra); see [Observers](../configuration/observers.md) |
 | `hook` | `nl2sql.hooks` | `nl2sql.hooks.Hook` (version 1, from release 0.7) | none |
 | `scorer` | `nl2sql.scorers` | `nl2sql.evaluation.scorers.Scorer` (version 1, from release 0.7; see [Scorers](../evals/scorers.md)) | `result_match`, `outcome`, `retrieval_recall`, `faithfulness`, `routing` |
-| `chat_tool` | `nl2sql.chat_tools` | `nl2sql.chat_tools.ChatTool` (version 1, from release 0.9; see [Chat tools](../conversations/tools.md)) | `chart`, `diagram`, `report` (`dashboard_edit` and `dashboard_pin` are registered but not yet built) |
+| `chat_tool` | `nl2sql.chat_tools` | `nl2sql.chat_tools.ChatTool` (version 1, from release 0.9; see [Chat tools](../conversations/tools.md)) | `chart`, `diagram`, `report`, `dashboard_edit`, `dashboard_pin` |
 
 - `Registry.default()` lists the installed entry points by name and imports
   none of them. `Registry.empty()` holds nothing.

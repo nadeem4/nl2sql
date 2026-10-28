@@ -558,7 +558,7 @@ CATALOG: Dict[str, EventSpec] = {
                                                      "(engine.dashboards.generate).", run=False),
     "dashboard.refreshed": _spec(DashboardRefreshed, "A dashboard's charts were re-run: counts per status and "
                                                      "the filter ids applied, never values.", run=False),
-    "dashboard.changed": _spec(DashboardChanged, "A dashboard was edited, pinned, moved or deleted: the kinds "
+    "dashboard.changed": _spec(DashboardChanged, "A dashboard was created, edited, pinned, moved or deleted: the kinds "
                                                  "of change, never values.", run=False),
     "dashboard.schedule_set": _spec(DashboardScheduleSet, "A refresh schedule was set; it saves a snapshot of "
                                                           "the caller's roles (D134).", run=False, audit=True),
