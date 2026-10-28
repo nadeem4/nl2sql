@@ -6060,9 +6060,10 @@ Datasource and delete endpoints, and <code>GET /api/v1/llm/{agent}</code>, map <
 <p><code>POST /api/v1/query</code> is the exception: pipeline errors are returned as a normal
 <code>HTTP 200</code> inside <code>QueryResponse.errors</code>, and an unexpected failure returns a
 generic <code>HTTP 500</code> with the traceback logged server-side rather than returned.
-<code>POST /api/v1/datasource</code> does the same: its exception can carry a connection
+<code>POST /api/v1/datasource</code> does the same for an unexpected failure: its exception can carry a connection
 string, password included, so the response says only that it failed and the
-cause goes to the server log.</p>
+cause goes to the server log. A body that does not validate is a <code>HTTP 422</code> that lists each problem by its
+path, never a value (the Connect routes, see <a href="datasource/">Datasources</a>).</p>
 <p>Route handlers that call blocking engine code are declared with <code>def</code> rather than
 <code>async def</code>, so Starlette runs them in its threadpool instead of blocking the
 event loop.</p>
@@ -6132,6 +6133,7 @@ or put the provider in the proxy.</p>
 <code>require_admin</code> dependency in <code>nl2sql_api/auth.py</code>:</p>
 <ul>
 <li><code>POST /api/v1/datasource</code> and <code>DELETE /api/v1/datasource/{datasource_id}</code></li>
+<li>The Connect routes <code>GET /api/v1/datasource-types</code> and <code>POST /api/v1/datasource/test</code></li>
 <li><code>PUT /api/v1/settings/llm</code></li>
 <li><code>POST /api/v1/index/{datasource_id}</code>, <code>POST /api/v1/index-all</code> and <code>DELETE /api/v1/index</code></li>
 </ul>

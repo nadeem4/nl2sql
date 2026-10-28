@@ -5850,6 +5850,7 @@ forms, and a test of a datasource before it is added.</p>
 <li>Test a configured datasource, as <code>check()</code> does, or a <code>Datasource</code> that is not added, registering nothing.</li>
 <li>Find databases to connect: scan a URL, a folder and the local ports for what the adapters declare they open.</li>
 <li>Add a <code>Datasource</code> (validated, built, not connected) and remove one.</li>
+<li>Save one datasource to its <code>datasources/&lt;id&gt;.yaml</code>, secrets as references, refusing a file changed since it was loaded.</li>
 <li>Return the indexed schema as the planner is given it, as one caller may see it.</li>
 </ul>
 <h2 id="key-modules">Key Modules</h2>
@@ -5859,6 +5860,8 @@ forms, and a test of a datasource before it is added.</p>
 <li><code>packages/nl2sql/src/nl2sql/datasources/discovery.py</code> (<code>scan</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/datasources/registry.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/config/models.py</code> (<code>Datasource</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/config/writer.py</code> (secrets as references, <code>write_env_values</code>, the atomic write) and
+  <code>config/project.py</code> (<code>write_project</code>, <code>starter_config</code>)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <table>
@@ -5898,12 +5901,17 @@ forms, and a test of a datasource before it is added.</p>
 <tr>
 <td><code>add(datasource)</code></td>
 <td><code>None</code></td>
-<td>Validates <code>connection</code> against the adapter's connection model and <code>index</code> as an <code>IndexScope</code>, builds the adapter without connecting, registers it, and adds the <code>Datasource</code> to <code>engine.config</code>; its description and sample questions are what indexing reads. Raises <code>ValueError</code> if the id is taken, the type is unknown, a reference does not resolve, <code>index</code> does not validate (naming the <code>index.</code> field) or the adapter rejects its connection settings (naming the field, with "did you mean" for an unknown key, and never a value). Index it next: <code>engine.index.build([datasource.id])</code>.</td>
+<td>Validates <code>connection</code> against the adapter's connection model and <code>index</code> as an <code>IndexScope</code>, builds the adapter without connecting, registers it, and adds the <code>Datasource</code> to <code>engine.config</code>; its description and sample questions are what indexing reads. Raises <code>ValueError</code> if the id is taken, the type is unknown, a reference does not resolve, <code>index</code> does not validate (naming the <code>index.</code> field) or the adapter rejects its connection settings (<code>ConnectionInvalid</code>, a <code>ValueError</code> naming the field, with "did you mean" for an unknown key, and never a value; its <code>problems</code> list each as <code>{path, message}</code>). Index it next: <code>engine.index.build([datasource.id])</code>.</td>
 </tr>
 <tr>
 <td><code>remove(datasource_id)</code></td>
 <td><code>None</code></td>
 <td>Takes the datasource out of routing and out of <code>engine.config</code>, and closes its adapter's pool. Its index entries stay until the next full <code>index.build</code> or <code>index.clear</code>. Raises <code>ValueError</code> for an unknown id.</td>
+</tr>
+<tr>
+<td><code>save(datasource_id, *, by, env_file=False)</code></td>
+<td><code>Path</code></td>
+<td>One datasource as <code>datasources/&lt;id&gt;.yaml</code> beside the <code>nl2sql.yaml</code> the engine was loaded from; returns the file. <code>by</code> must hold an admin role (<code>TypeError</code> if it is not a <code>UserContext</code>, <code>PermissionError</code> without an admin role). Every secret field (by its key, or declared secret by the adapter's connection model) is written as a reference: a literal needs <code>env_file=True</code> (it goes to the <code>.env</code> as <code>${env:NL2SQL_&lt;ID&gt;_&lt;KEY&gt;}</code>) and is otherwise refused with <code>SecretValueInConfig</code>. Refuses (<code>ReviewError</code>, code <code>FILE_CHANGED</code>, fix "reload the engine") a file that changed on disk since the config was loaded, and a new file that already exists. Raises <code>ValueError</code> for an unknown id, an engine built in code or whose <code>datasources</code> is not a folder include, an id that cannot be a file name (letters, digits, <code>_</code>, <code>-</code>, <code>.</code> only; no Windows device name), and two secrets that map to one environment variable. Written to a temporary file and renamed; publishes <code>datasource.saved</code> (audited). See <a href="../../../configuration/datasources/#saving-a-datasource">Saving a datasource</a>.</td>
 </tr>
 <tr>
 <td><code>schema(datasource_id, *, user_context)</code></td>
@@ -5992,7 +6000,8 @@ forms, and a test of a datasource before it is added.</p>
   <code>test_connection</code>, closes the adapter, and registers nothing. It is what a
   Connect a database form calls before <code>add</code>. A failure is reported, never
   raised. An <code>adapter</code> object is tested as given and not closed: the caller
-  owns it.</li>
+  owns it. The datasource's secret literals, and every secret the engine knows, are taken out of the <code>reason</code>
+  and <code>fix</code> (<code>***</code>): a driver may echo the password it was given, and a form shows these words.</li>
 </ul>
 <p>A failed status carries the stage, the reason and the fix:</p>
 <table>

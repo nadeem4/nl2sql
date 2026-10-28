@@ -5894,7 +5894,9 @@ nothing it proposes reaches a prompt or the index until an admin accepts it
 <p>From Python, <code>nl2sql.config.init_project(folder, demo=..., provider=..., force=...)</code>
 writes the same files, and <code>nl2sql.config.demo_config()</code> builds the demo's
 <code>Config</code> in code, with the databases opened read-only from the installed
-package.</p>
+package. <code>nl2sql.config.write_project(config, folder)</code> writes any <code>Config</code> made of data the same way, never over
+an existing file, with every secret written as a <code>${env:...}</code> reference (see
+<a href="../configuration/datasources/#saving-a-datasource">Saving a datasource</a>).</p>
 
 
 

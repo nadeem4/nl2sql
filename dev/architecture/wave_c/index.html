@@ -6607,6 +6607,76 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   <code>check_call</code> (renamed from <code>_check_call</code> in <code>agent.py</code>).</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built (L2): the config writers and the Connect routes</p>
+<ul>
+<li><strong>Files:</strong> <code>config/writer.py</code> (new: <code>EnvSecrets</code>, <code>env_name</code>, <code>datasource_data</code>, <code>write_env_values</code>,
+  <code>write_atomic</code>, <code>update_gitignore</code>, <code>dump_yaml</code>), <code>config/project.py</code> (<code>write_project</code>, <code>starter_config</code>;
+  <code>init_project</code> builds a <code>Config</code> and calls <code>write_project</code>), <code>config/loader.py</code> and <code>config/models.py</code>
+  (a datasources folder's file hashes: <code>Config.datasources_folder</code>, <code>datasource_file_hash</code>,
+  <code>record_datasource_file</code>), <code>api/datasource_api.py</code> (<code>save</code>), and in <code>nl2sql-api</code> <code>routes/datasource.py</code>,
+  <code>services/datasource.py</code>, <code>models/datasource.py</code> and <code>auth.is_fresh_local_install</code>. <code>nl2sql.config</code>
+  exports <code>write_project</code>, <code>starter_config</code> and <code>write_env_values</code>.</li>
+<li><strong>Tests:</strong> <code>test_config_writer.py</code>, <code>test_datasources_save.py</code>, <code>packages/api/tests/test_connect_routes.py</code>;
+  the Connect routes are also in <code>test_admin_auth.py</code>'s admin-only table. <code>test_wave_c_stubs.py</code> lost <code>save</code>;
+  the boundary test's <code>PERSONS_FILE_WRITERS</code> lets <code>config/project.py</code> call <code>write_env_values</code>, and a new
+  test keeps the list from going stale.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><strong><code>write_project(config, folder, *, env_file=False, extra=None)</code>.</strong> <code>env_file</code> is the design's "where the
+  writer may write <code>.env</code>" (launch passes true). <code>extra</code> maps a path to text to write or a file to copy: it
+  is how <code>init_project</code> keeps its example datasource's comments and copies the demo's databases, suites and
+  glossary. The existing-file refusal covers <code>extra</code> too. A section at its default is left out, as <code>init</code>
+  always did; <code>curated</code>, <code>observers: []</code> and every set optional section are written.</li>
+<li><strong>Env names follow the field's path.</strong> <code>NL2SQL_</code> plus the path: a connection secret is
+  <code>NL2SQL_&lt;DATASOURCE_ID&gt;_&lt;KEY&gt;</code> (<code>NL2SQL_SALES_PASSWORD</code>), <code>llm.api_key</code> is <code>NL2SQL_LLM_API_KEY</code>, an agent's key is
+  <code>NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY</code> (the design's <code>NL2SQL_AGENTS_PLANNER_API_KEY</code> was an example that did
+  not follow its own rule), then <code>NL2SQL_EMBEDDINGS_API_KEY</code>, <code>NL2SQL_SECRETS_&lt;PROVIDER_ID&gt;_&lt;KEY&gt;</code>; header values
+  of the LLM and its agents are written the same way (<code>NL2SQL_LLM_HEADERS_&lt;NAME&gt;</code>). A connection field is a
+  secret by its key (<code>password</code>, <code>secret</code>, <code>token</code>, <code>api_key</code>, the same hints that mask it), because a
+  <code>ConnectionModel</code> instance holds it as <code>SecretStr</code>, or (D122) because its adapter's connection model declares
+  it (<code>adapter_secret_fields</code>: <code>format: password</code> in the schema), so a plugin's <code>private_key</code> is written as a
+  reference too. <code>write_project</code> takes the registry to find the adapters in (default <code>Registry.default()</code>).</li>
+<li><strong>A collision is two fields mapping to one name,</strong> inside one write (compared by field, not by path, so a
+  datasource <code>llm</code> with an <code>api_key</code> collides with the LLM's) or against a name another configured
+  datasource's connection already references (<code>${env:NL2SQL_...}</code>) or the writer gives the rest of the config
+  (<code>config_reserved_names</code>: LLM, agents, embeddings, secret providers); the message names both fields. A name
+  already in <code>.env</code> is replaced (it is the same field written again), as the design says for the same names;
+  the engine cannot know which field wrote a line it did not write.</li>
+<li><strong><code>save</code> refuses with the review queue's error:</strong> <code>ReviewError</code> with <code>FILE_CHANGED</code> and the fix "reload the
+  engine"; the hash record lives on the <code>Config</code> (shared by its copies, updated after a save), recorded by the
+  loader for a folder include. <code>by</code> is checked as <code>engine.api_keys</code> does (<code>TypeError</code>, <code>PermissionError</code>; any
+  caller under <code>allow_all</code>). The file is <code>datasources/&lt;id&gt;.yaml</code> in the folder the loader read, and the event's
+  <code>file</code> is <code>&lt;that folder&gt;/&lt;id&gt;.yaml</code>.</li>
+<li><strong><code>test(Datasource)</code> scrubs the status.</strong> The design says the route never echoes a value; the driver's
+  words are the one place one could be, so the facade takes the datasource's secret literals and every
+  secret the engine knows out of <code>reason</code> and <code>fix</code> (<code>***</code>), for every caller. It replaces those exact values
+  only, not the redactor's patterns, which also ate the words around <code>password:</code> in a validation message.</li>
+<li><strong>REST bodies are read as plain JSON and validated by the service,</strong> so FastAPI's own 422 (which echoes the
+  input) is never used, not even for a body that is not JSON or not an object (read from the raw request, answered
+  <code>[{"path": "", "message": ...}]</code>): every problem is <code>{path, message}</code> with the path in the body
+  (<code>config.limits.row_limit</code>), the body's own keys are strict (a <code>sav</code> typo is found; <code>user_context</code> stays allowed
+  for the dev flag). A connection that does not validate is raised by the engine as <code>ConnectionInvalid</code> (a
+  <code>ValueError</code> with <code>problems</code>, exported from <code>nl2sql</code>) and is the same list (<code>config.connection.port</code>). Any
+  other <code>ValueError</code> from <code>add</code> or <code>save</code> (an id taken, <code>SecretValueInConfig</code>) is a 422 with its text,
+  <code>ReviewError</code> a 409 and anything else the generic 500.</li>
+<li><strong>Review fixes (L2).</strong> A save holds one process-wide lock around the hash check, the <code>.env</code> rewrite and the
+  file write; <code>.env</code> values refuse every character <code>str.splitlines</code> splits on and the file is read back split on
+  <code>\n</code> only; a datasource id is allow-listed as a file name (letters, digits, <code>_</code>, <code>-</code>, <code>.</code>; no Windows device
+  name); <code>is_fresh_local_install</code> also needs no <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code> header; the
+  demo's <code>settings.yaml</code> keeps its comment (<code>write_project(headers=...)</code>).
+  <code>POST /datasource/test</code> takes the same <code>{config}</code> body (no <code>save</code>); <code>GET /datasource-types</code> answers
+  <code>{"types": [...]}</code>. A <code>save</code> that fails after the <code>add</code> removes the datasource again.</li>
+<li><strong><code>env_file</code> over REST</strong> is <code>auth.is_fresh_local_install</code>: no role source (<code>api.role_header</code>, <code>api.role</code>,
+  <code>api.trust_body_role</code>) and a loopback client, the one case <code>require_admin</code> lets through unauthenticated.</li>
+<li><strong>For L3:</strong> <code>write_project(starter_config(llm=default_llm(provider), path=DIR/".nl2sql"), DIR, env_file=True)</code>
+  writes a new project (the glossary lands at <code>DIR/glossary.yaml</code>, and an engine with no datasources builds
+  and checks); an existing project takes <code>engine.datasources.add(...)</code> then
+  <code>engine.datasources.save(id, by=admin, env_file=True)</code>; <code>write_env_values(folder, {...})</code> for the model key.
+  <code>Config.with_datasource</code> adds datasources before writing. All three are in <code>nl2sql.config</code>.</li>
+</ul>
+</div>
 <p>The waves, with at most four PRs at once:</p>
 <table>
 <thead>

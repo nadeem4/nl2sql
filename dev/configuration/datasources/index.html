@@ -2466,6 +2466,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#saving-a-datasource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving a datasource
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5848,6 +5859,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#saving-a-datasource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saving a datasource
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#notes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6185,15 +6207,84 @@ when datasources are configured and none is ready. A later <code>check()</code>,
 <code>engine.policies.validate()</code> reports a role that names an unavailable
 datasource as <code>UNAVAILABLE</code>.</p>
 <p>A secret provider that cannot start is different: it fails startup. See <a href="../secrets/#when-a-provider-fails-to-start">Secrets → When a provider fails to start</a>.</p>
+<h2 id="saving-a-datasource">Saving a datasource</h2>
+<p><code>engine.datasources.add(...)</code> changes the running engine only. To keep a datasource, save it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">Datasource</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"sales"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"postgres"</span><span class="p">,</span> <span class="n">connection</span><span class="o">=</span><span class="p">{</span><span class="s2">"host"</span><span class="p">:</span> <span class="s2">"db.internal"</span><span class="p">,</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>                                  <span class="s2">"database"</span><span class="p">:</span> <span class="s2">"sales"</span><span class="p">,</span> <span class="s2">"user"</span><span class="p">:</span> <span class="s2">"app"</span><span class="p">,</span> <span class="s2">"password"</span><span class="p">:</span> <span class="s2">"${env:SALES_DB_PASSWORD}"</span><span class="p">}))</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">datasources</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="n">admin</span><span class="p">)</span>          <span class="c1"># -&gt; &lt;folder&gt;/datasources/sales.yaml</span>
+</code></pre></div>
+<p><code>save</code> writes that one datasource as <code>datasources/&lt;id&gt;.yaml</code> beside the <code>nl2sql.yaml</code> the engine was loaded
+from, and nothing else. It needs:</p>
+<ul>
+<li>an admin <code>by</code> (<code>policies.admin_roles</code>; under <code>allow_all</code> any caller) - a caller without one gets <code>PermissionError</code>;</li>
+<li>an engine loaded from a <code>nl2sql.yaml</code> whose <code>datasources</code> section is a folder (<code>datasources: { file: datasources/ }</code>,
+  one <code>&lt;id&gt;.yaml</code> each, as <code>nl2sql init</code> writes it). An engine built in code, or with the datasources inline in
+  <code>nl2sql.yaml</code>, raises <code>ValueError</code>.</li>
+</ul>
+<p><strong>The file is checked before it is replaced.</strong> The engine records each datasource file's SHA-256 when it loads the
+config, as an accept does for the glossary. If the file changed on disk since (somebody edited it), <code>save</code> raises
+<code>ReviewError</code> with code <code>FILE_CHANGED</code> and the fix "reload the engine", and writes nothing. A datasource that is
+new to the engine must not have a file yet. The file is written to a temporary file beside it and renamed; it
+publishes <code>datasource.saved</code> (audited), and never connects to the database or calls a model.</p>
+<p><strong>A secret is never written into YAML.</strong> Every secret field is written as a reference:</p>
+<table>
+<thead>
+<tr>
+<th>Its value</th>
+<th>Written as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A reference (<code>${env:VAR}</code>, <code>${vault:path}</code>)</td>
+<td>The reference, unchanged</td>
+</tr>
+<tr>
+<td>A literal, with <code>save(..., env_file=True)</code></td>
+<td><code>${env:NL2SQL_&lt;ID&gt;_&lt;KEY&gt;}</code> in the YAML and <code>NL2SQL_&lt;ID&gt;_&lt;KEY&gt;=value</code> in the <code>.env</code> beside <code>nl2sql.yaml</code></td>
+</tr>
+<tr>
+<td>A literal, otherwise</td>
+<td>Refused: <code>SecretValueInConfig</code> naming the field, with the fix "pass <code>${env:VAR}</code> or a secret provider reference"</td>
+</tr>
+</tbody>
+</table>
+<p>A connection field is a secret when its key says so (<code>password</code>, <code>secret</code>, <code>token</code>, <code>api_key</code>) or its adapter's
+connection model declares it secret (<code>SecretStr</code>, <code>"format": "password"</code> in the schema): a plugin's <code>private_key</code> or
+<code>credentials</code> field goes to the <code>.env</code> too, whatever its name. The name is <code>NL2SQL_</code> plus the datasource id and the key
+in upper case, every character that is not a letter or digit as <code>_</code>: <code>NL2SQL_SALES_PASSWORD</code>. Two fields that map to
+one name are refused with both fields named: a value is never overwritten. That covers another datasource's
+reference and the names the writer gives the rest of the config, so a datasource called <code>llm</code> with an <code>api_key</code>
+field cannot replace <code>NL2SQL_LLM_API_KEY</code> (the LLM's and each agent's key and headers, the embeddings key and each
+secret provider's settings). <code>.env</code> keeps every other line, is created when needed, and <code>.gitignore</code> is made to list
+it. A value that holds a line break (<code>\n</code>, <code>\r</code>, <code>\x0b</code>, <code>\x0c</code>, <code>\x1c</code> to <code>\x1e</code>, <code>\x85</code>, <code></code>, <code></code>) is
+refused, as it could start a line of its own. Saves run one at a time, so two at once both keep their <code>.env</code>
+line. Nothing is read from or written to <code>os.environ</code>: the entry points load the <code>.env</code> (<code>nl2sql.load_env_file</code>), and
+it never overrides a variable that is already set.</p>
+<p>The id becomes a file name, so it is limited to letters, digits, <code>_</code>, <code>-</code> and <code>.</code> (up to 128 characters, starting with
+a letter or digit, not ending in a dot) and may not be a Windows device name (<code>con</code>, <code>prn</code>, <code>aux</code>, <code>nul</code>,
+<code>com1</code>-<code>com9</code>, <code>lpt1</code>-<code>lpt9</code>, with or without an extension); anything else is a <code>ValueError</code> naming the id.</p>
+<p>The same rules write a whole new project: <code>nl2sql.config.write_project(config, folder, env_file=False)</code> writes
+any data <code>Config</code> as <code>nl2sql init</code> lays it out (a file per section, <code>datasources/&lt;id&gt;.yaml</code>, <code>knowledge.yaml</code> and
+an empty <code>glossary.yaml</code>), with the secrets of the <code>llm</code>, <code>embeddings</code> and <code>secrets</code> sections and of every
+connection handled as above (<code>NL2SQL_LLM_API_KEY</code>, <code>NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY</code>,
+<code>NL2SQL_EMBEDDINGS_API_KEY</code>, <code>NL2SQL_SECRETS_VAULT_TOKEN</code>). It never overwrites a file, refuses a section that holds
+an object instead of data (an adapter, store, hook or chat model object) and loads what it wrote before it returns.
+<code>nl2sql.config.starter_config(llm=..., path=...)</code> is a config with no datasources, <code>allow_all</code> policies, local
+embeddings and a <code>yaml</code> knowledge source; <code>nl2sql.config.write_env_values(folder, values)</code> writes the <code>.env</code>.</p>
+<p>Over REST, <code>POST /api/v1/datasource</code> with <code>"save": true</code> calls the same method; see
+<a href="../../api/rest/datasource/">Datasource API</a>.</p>
 <h2 id="notes">Notes</h2>
 <ul>
 <li>Use <code>${env:VAR}</code> for environment variables, or <code>${provider:key}</code> for a secret
   from a provider in the <a href="../secrets/"><code>secrets</code> section</a>.</li>
 <li>The keys under <code>connection</code> are the adapter's; see <a href="#connection">Connection</a>.</li>
 <li>From Python, <code>engine.datasources.add(Datasource(...))</code> adds one to a running
-  engine (built, not connected), and <code>engine.datasources.remove(id)</code> takes one
+  engine (built, not connected), <code>engine.datasources.save(id, by=admin)</code> writes it to <code>datasources/&lt;id&gt;.yaml</code>
+  (<a href="#saving-a-datasource">Saving a datasource</a>), and <code>engine.datasources.remove(id)</code> takes one
   out; <code>nl2sql-api</code>'s <code>POST /api/v1/datasource</code> takes
-  the same shape as JSON.</li>
+  the same shape as JSON, and <code>POST /api/v1/datasource/test</code> and <code>GET /api/v1/datasource-types</code> are the Connect a
+  database form's other two calls.</li>
 </ul>
 
 

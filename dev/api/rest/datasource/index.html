@@ -5081,6 +5081,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#datasourcetestrequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasourceTestRequest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#datasourcerequest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5118,6 +5129,28 @@
   
     <nav class="md-nav" aria-label="Endpoints">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1datasource-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/datasource-types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1datasourcetest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/datasource/test
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#post-apiv1datasource" class="md-nav__link">
@@ -5823,6 +5856,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#datasourcetestrequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatasourceTestRequest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#datasourcerequest" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5860,6 +5904,28 @@
   
     <nav class="md-nav" aria-label="Endpoints">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1datasource-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/datasource-types
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1datasourcetest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/datasource/test
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#post-apiv1datasource" class="md-nav__link">
@@ -5930,7 +5996,7 @@
 <h1 id="datasource-api">Datasource API</h1>
 <h2 id="requestresponse-models">Request/Response Models</h2>
 <p>Source: <code>packages/api/src/nl2sql_api/models/datasource.py</code></p>
-<h3 id="datasourcerequest"><code>DatasourceRequest</code></h3>
+<h3 id="datasourcetestrequest"><code>DatasourceTestRequest</code></h3>
 <table>
 <thead>
 <tr>
@@ -5946,6 +6012,28 @@
 <td><code>Dict[str, Any]</code></td>
 <td>yes</td>
 <td>One datasource, in the shape of a <code>datasources</code> entry of <code>nl2sql.yaml</code>: <code>id</code>, <code>type</code>, <code>connection</code>, and optionally <code>description</code>, <code>limits</code>, <code>preferred_tables</code>, <code>sample_questions</code>, <code>required</code>. See <a href="../../../configuration/datasources/">Datasources</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>A key the model does not know is an error, so a typo is found, not ignored. (<code>user_context</code> is the one extra key
+the body may hold: <code>api.trust_body_role</code> reads the caller from it.)</p>
+<h3 id="datasourcerequest"><code>DatasourceRequest</code></h3>
+<p><code>DatasourceTestRequest</code> and:</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>required</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>save</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td>Also write the datasource to <code>datasources/&lt;id&gt;.yaml</code> (default <code>false</code>).</td>
 </tr>
 </tbody>
 </table>
@@ -5978,22 +6066,66 @@
 <td>no</td>
 <td>Datasource ID.</td>
 </tr>
+<tr>
+<td><code>file</code></td>
+<td><code>Optional[str]</code></td>
+<td>no</td>
+<td>With <code>save</code>, the file written, relative to the project (<code>datasources/sales.yaml</code>).</td>
+</tr>
 </tbody>
 </table>
 <h2 id="endpoints">Endpoints</h2>
-<h3 id="post-apiv1datasource"><code>POST /api/v1/datasource</code></h3>
+<p>The three Connect routes (<code>GET /datasource-types</code>, <code>POST /datasource/test</code>, <code>POST /datasource</code>) are what a
+Connect a database form calls, in that order. They are admin only and are thin over <code>engine.datasources</code>.</p>
+<h3 id="get-apiv1datasource-types"><code>GET /api/v1/datasource-types</code></h3>
 <p>Source: <code>packages/api/src/nl2sql_api/routes/datasource.py</code></p>
+<p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
+<p>Response: <code>{"types": [...]}</code>, <code>engine.datasources.types()</code>: every adapter the engine can name, installed or not,
+sorted by name, each with <code>name</code>, <code>title</code>, <code>installed</code>, <code>install_hint</code> (what to install when a driver is
+missing) and <code>connection_schema</code>, the JSON Schema of its connection model. A secret field is
+<code>"format": "password", "writeOnly": true</code>; a field in the <code>advanced</code> group carries <code>"group": "advanced"</code>.</p>
+<h3 id="post-apiv1datasourcetest"><code>POST /api/v1/datasource/test</code></h3>
+<p>Request model: <code>DatasourceTestRequest</code></p>
+<p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
+<p>Execution flow:
+- Validates <code>config</code> as a <code>Datasource</code> and delegates to <code>engine.datasources.test(datasource)</code>: the adapter is
+  built, its connection tested and closed. <strong>Nothing is registered, written or indexed.</strong></p>
+<p>Response: the status, <code>{"id", "status", "required", "stage", "reason", "fix", "warnings"}</code>. A failure is a
+<code>200</code> with <code>status: "failed"</code>, the <code>stage</code> it failed at (<code>config</code>, <code>driver</code>, <code>network</code>, <code>auth</code>, <code>database</code> or
+<code>permission</code>), the <code>reason</code> and the <code>fix</code>. No value is echoed: the datasource's secret literals (a plugin's secret
+fields included) and every secret the engine knows are replaced by <code>***</code> in the driver's words, and only those
+exact values: a validation message such as <code>connection.password: Field required</code> stays readable.</p>
+<p>Errors:
+- A body that does not validate -&gt; <code>HTTP 422</code>, as for <code>POST /datasource</code>.</p>
+<h3 id="post-apiv1datasource"><code>POST /api/v1/datasource</code></h3>
 <p>Request model: <code>DatasourceRequest</code></p>
 <p>Response model: <code>DatasourceResponse</code></p>
 <p>Admin only: see <a href="../#admin-routes">Admin routes</a>.</p>
 <p>Execution flow:
 - Validates <code>config</code> as a <code>Datasource</code> and delegates to <code>engine.datasources.add(...)</code>:
   the adapter is built (not connected) and the datasource joins <code>engine.config</code>.
-  Nothing is written to the config files and nothing is indexed.</p>
+  Nothing is indexed.
+- With <code>"save": true</code>, then <code>engine.datasources.save(id, by=caller, env_file=...)</code> writes
+  <code>datasources/&lt;id&gt;.yaml</code> beside <code>nl2sql.yaml</code> (see <a href="../../../configuration/datasources/#saving-a-datasource">Saving a datasource</a>).
+  <strong>A secret is never written into the YAML.</strong> A reference (<code>${env:VAR}</code>, <code>${vault:path}</code>) is written as it is.
+  A literal is written to the <code>.env</code> beside <code>nl2sql.yaml</code> as <code>${env:NL2SQL_&lt;ID&gt;_&lt;KEY&gt;}</code> only on a fresh local
+  install: no role source is configured (<code>api.role_header</code>, <code>api.role</code>, <code>api.trust_body_role</code>), the client is
+  on loopback and the request carries no <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code> header (a reverse proxy on
+  the same host would make every client look local). Anywhere else a literal secret with <code>save: true</code> is a <code>422</code> that asks for a <code>${env:...}</code> reference.
+  If the save fails, the datasource is taken out again: nothing is left running that was not saved.</p>
 <p>Errors:
 - No role -&gt; <code>HTTP 401</code>; a role not in <code>policies.admin_roles</code> -&gt; <code>HTTP 403</code>.
-- A failure to add -&gt; <code>HTTP 500</code> with a generic message. The exception, which can
-  hold the connection string, is logged server-side and never returned.</p>
+- A body that does not validate, a typo included -&gt; <code>HTTP 422</code> and <code>detail</code> is a list of
+  <code>{"path": "config.sampel_questions", "message": "Extra inputs are not permitted"}</code>, one per problem, each
+  naming its path in the body and never a value. That includes a body that is not a JSON object or not JSON at
+  all (<code>[{"path": "", "message": "The body must be a JSON object."}]</code>, no input echoed), and a <code>connection</code> that
+  does not validate against the adapter's model (<code>config.connection.passwrd</code>, <code>config.connection.port</code>).
+- An id that is already taken, a literal secret that cannot be written, or two secrets that map to one
+  environment variable -&gt; <code>HTTP 422</code> with the reason as text (it names fields, never values).
+- <code>save</code> found <code>datasources/&lt;id&gt;.yaml</code> changed on disk since the engine loaded it, or a new file that already
+  exists -&gt; <code>HTTP 409</code>; reload the engine and try again.
+- Any other failure to add -&gt; <code>HTTP 500</code> with a generic message. The exception, which can hold the connection
+  string, is logged server-side and never returned.</p>
 <h3 id="get-apiv1datasource"><code>GET /api/v1/datasource</code></h3>
 <p>Response: <code>{"datasources": [...]}</code>, <code>engine.datasources.list()</code>: every
 configured datasource with its <code>id</code>, <code>type</code>, <code>description</code>, <code>status</code>

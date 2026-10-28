@@ -5988,6 +5988,22 @@ these details:</p>
   <code>demo_config()</code> points at the packaged files instead.</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Changed by Wave C (L2): <code>init_project</code> calls <code>write_project</code></p>
+<p><code>init_project</code> builds its <code>Config</code> (the demo's, or <code>starter_config(...)</code> plus
+the example datasource) and writes it with <code>nl2sql.config.write_project(config,
+folder, env_file=False, extra=...)</code>, which writes any data <code>Config</code> in the
+same layout, never overwrites a file, and loads what it wrote.
+<code>init_project(force=True)</code> deletes the files it would write, then calls it.
+The files are the ones written above; a section left at its default is
+still left out, and <code>settings.yaml</code> of the demo now carries a generic
+header comment. <code>write_project</code> also writes every secret as a reference
+(<code>${env:NL2SQL_...}</code> with the value in <code>.env</code> where the caller allows it, else
+<code>SecretValueInConfig</code>), which <code>init</code> never needs, as it writes no key. See
+<a href="../../configuration/datasources/#saving-a-datasource">Saving a datasource</a>.
+<code>datasources</code> sections the loader reads from a folder also record each file's
+SHA-256 (<code>Config.datasource_file_hash</code>), for <code>engine.datasources.save</code>.</p>
+</div>
 <table>
 <thead>
 <tr>

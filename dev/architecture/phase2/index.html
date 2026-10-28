@@ -5824,6 +5824,18 @@ classifies. The REST routes and the form are Phase 4.</p>
 <p>These are what the Phase 4 form, the terminal app and <code>nl2sql datasources
 add</code> will call. Saving the result to a file stays the calling app's job, as
 Phase 1 decided.</p>
+<div class="admonition note">
+<p class="admonition-title">Superseded by Wave C (L2): the package saves, and the REST routes exist</p>
+<p>Wave C (<a href="../wave_c/">wave_c.md</a>, section 7) moved saving into the package:
+<code>engine.datasources.save(id, *, by, env_file=False)</code> writes one
+<code>datasources/&lt;id&gt;.yaml</code> (an admin <code>by</code>, a hash check against the file as it
+was loaded, every secret as a reference), so saving is no longer left to
+the app. The REST routes for Connect a database are built too:
+<code>GET /api/v1/datasource-types</code>, <code>POST /api/v1/datasource/test</code> and
+<code>POST /api/v1/datasource</code> with <code>save</code>. <code>test()</code> now also takes the
+datasource's secret literals out of the driver's words, since a form shows
+them. See <a href="../../configuration/datasources/#saving-a-datasource">Saving a datasource</a>.</p>
+</div>
 <h3 id="what-changes-in-existing-code_2">What changes in existing code</h3>
 <table>
 <thead>
