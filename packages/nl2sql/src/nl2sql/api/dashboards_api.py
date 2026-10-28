@@ -1,8 +1,9 @@
 """``engine.dashboards``: dashboards pinned whole into workspaces (docs/architecture/wave_c.md, section 6).
 
-A stub with its final signatures: D1 fills the store, the edits, ``pin`` and ``move``, D2 the refresh, the
-stored results, the filters and the schedules, and D3 the starter dashboard. Every method takes the caller
-keyword-only and required (D130), except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
+The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; ``open``,
+``refresh``, ``filter_values`` and ``run_scheduled`` are stubs for D2 (the refresh, the stored results, the
+filters and the schedules) and ``generate`` and ``suggest_questions`` for D3 (the starter dashboard). Every
+method takes the caller keyword-only and required (D130), except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from nl2sql.common.planned import arrives_with
+from nl2sql.dashboards.api import Dashboards
 from nl2sql.dashboards.models import (
     ChartChoice,
     Dashboard,
@@ -30,6 +32,7 @@ class DashboardsAPI:
 
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
+        self._service = Dashboards(ctx)
 
     # ---- D1: the store and the manual edits
 
@@ -39,64 +42,67 @@ class DashboardsAPI:
         Raises:
             DashboardNotFound: it does not exist or is not the caller's.
         """
-        raise arrives_with("engine.dashboards.get", "D1")
+        return self._service.get(dashboard_id, user_context=user_context)
 
     def list(self, *, user_context: UserContext, workspace_id: Optional[str] = None,
              status: str = "saved") -> List[DashboardInfo]:
-        """The caller's dashboards, newest first."""
-        raise arrives_with("engine.dashboards.list", "D1")
+        """The caller's dashboards of one ``status`` (``saved`` or ``draft``), newest first."""
+        return self._service.list(user_context=user_context, workspace_id=workspace_id, status=status)
 
     def delete(self, dashboard_id: str, *, user_context: UserContext) -> None:
         """Deletes the dashboard, its stored results and its schedule."""
-        raise arrives_with("engine.dashboards.delete", "D1")
+        self._service.delete(dashboard_id, user_context=user_context)
 
     def pin(self, dashboard_id: str, *, user_context: UserContext, workspace_id: Optional[str] = None,
             title: Optional[str] = None) -> Dashboard:
-        """Saves a draft whole, in ``workspace_id`` (else the default workspace). A single tile is never pinned."""
-        raise arrives_with("engine.dashboards.pin", "D1")
+        """Saves a draft whole, in ``workspace_id`` (else the workspace the draft is in, else "General", created
+        on first use). A single tile is never pinned; an empty draft or a saved dashboard is a ``ValueError``."""
+        return self._service.pin(dashboard_id, user_context=user_context, workspace_id=workspace_id, title=title)
 
     def edit(self, dashboard_id: str, edits: List[DashboardEdit], *, user_context: UserContext) -> Dashboard:
-        """Applies a list of dashboard edits, all or none. The named methods below call it."""
-        raise arrives_with("engine.dashboards.edit", "D1")
+        """Applies a list of dashboard edits, all or none. The named methods below call it. ``add_tile`` and
+        ``replace_plan`` change what data a chart shows and arrive with D4 (chat only)."""
+        return self._service.edit(dashboard_id, edits, user_context=user_context)
 
     def rename(self, dashboard_id: str, title: str, *, user_context: UserContext) -> Dashboard:
         """Renames the dashboard."""
-        raise arrives_with("engine.dashboards.rename", "D1")
+        return self._service.rename(dashboard_id, title, user_context=user_context)
 
     def rename_tile(self, dashboard_id: str, tile_id: str, title: str, *, user_context: UserContext) -> Dashboard:
         """Renames one chart."""
-        raise arrives_with("engine.dashboards.rename_tile", "D1")
+        return self._service.rename_tile(dashboard_id, tile_id, title, user_context=user_context)
 
     def set_tile_chart(self, dashboard_id: str, tile_id: str, chart: ChartChoice, *,
                        user_context: UserContext) -> Dashboard:
         """Sets how a chart is drawn; a kind its last result cannot draw is a ``ValueError`` naming the ones it can."""
-        raise arrives_with("engine.dashboards.set_tile_chart", "D1")
+        return self._service.set_tile_chart(dashboard_id, tile_id, chart, user_context=user_context)
 
     def remove_tile(self, dashboard_id: str, tile_id: str, *, user_context: UserContext) -> Dashboard:
         """Removes one chart and its stored result."""
-        raise arrives_with("engine.dashboards.remove_tile", "D1")
+        return self._service.remove_tile(dashboard_id, tile_id, user_context=user_context)
 
     def arrange(self, dashboard_id: str, layouts: List[TileArrangement], *, user_context: UserContext) -> Dashboard:
         """Reorders or resizes charts on the grid."""
-        raise arrives_with("engine.dashboards.arrange", "D1")
+        return self._service.arrange(dashboard_id, layouts, user_context=user_context)
 
     def set_filters(self, dashboard_id: str, filters: List[DashboardFilter], *,
                     user_context: UserContext) -> Dashboard:
-        """Stores the dashboard's filter definitions."""
-        raise arrives_with("engine.dashboards.set_filters", "D1")
+        """Stores the dashboard's filter definitions (D2 applies their values)."""
+        return self._service.set_filters(dashboard_id, filters, user_context=user_context)
 
     def set_schedule(self, dashboard_id: str, every_minutes: Optional[int], *,
                      user_context: UserContext) -> Dashboard:
-        """Sets or (with None) removes the refresh schedule, saving the caller's identity (D134).
+        """Sets or (with None) removes the refresh schedule, saving the caller's identity (D134). Nothing runs
+        until D2's scheduler does.
 
         Raises:
             ScheduleTooFrequent: below ``dashboards.min_refresh_minutes``.
         """
-        raise arrives_with("engine.dashboards.set_schedule", "D1")
+        return self._service.set_schedule(dashboard_id, every_minutes, user_context=user_context)
 
     def move(self, dashboard_id: str, workspace_id: str, *, user_context: UserContext) -> Dashboard:
         """Moves the dashboard to another of the caller's workspaces."""
-        raise arrives_with("engine.dashboards.move", "D1")
+        return self._service.move(dashboard_id, workspace_id, user_context=user_context)
 
     # ---- D2: refresh, stored results, filters and schedules
 

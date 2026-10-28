@@ -1324,6 +1324,7 @@ def list_workspaces(self, tenant_id: str | None, user_id: str | None) -> list[di
 def delete_workspace(self, workspace_id: str) -> bool: ...
 def put_tile_runs(self, dashboard_id: str, docs: list[dict]) -> None: ...   # replaces the listed charts' last results
 def get_tile_runs(self, dashboard_id: str) -> list[dict]: ...
+def delete_tile_runs(self, dashboard_id: str, tile_ids: list[str]) -> None: ...   # D1: an edit discards the results it invalidates
 def add_api_key(self, row: dict) -> None: ...   # a plain insert; ValueError when the id exists
 def revoke_api_key(self, key_id: str, revoked_at: str) -> bool: ...
 def get_api_key(self, key_id: str) -> dict | None: ...
@@ -1659,6 +1660,45 @@ flowchart TD
       probe a key's state and the audit log never records a forged token as a revoked key); `verify` becomes a
       thin wrapper over it, so there is one code path; and `nl2sql.policies.keys.parse` stays behind
       `ApiKeysAPI`, not imported by `mcp/http.py`. Not built in M1.
+
+!!! note "Built (D1): workspaces, the dashboard store and manual edits"
+    - **Files:** `nl2sql/dashboards/{store,workspaces,edits,api}.py` (the owner-scoped store over the state store;
+      the workspaces service; the pure `apply_edits`; the dashboards service), `api/workspaces_api.py` and
+      `api/dashboards_api.py` (thin faces over them), `api/storage_api.py` (`purge()` also counts `dashboards`).
+      `engine.workspaces` is complete; `engine.dashboards` has `get`, `list`, `delete`, `pin`, `move`, `edit` and
+      the named edits. `open`, `refresh`, `filter_values` and `run_scheduled` stay D2's stubs, `generate` and
+      `suggest_questions` D3's.
+    - **Edits** are applied by `apply_edits(dashboard, edits, EditEnv)` to a copy, so an edit list is all or none;
+      `Dashboards.edit` stores the result once, discards the stored results the edits invalidate and publishes one
+      `dashboard.changed` (the kinds, once each, in order) and, for `set_schedule`, `dashboard.schedule_set`.
+      `add_tile` and `replace_plan` raise `NotImplementedError` ("arrives with D4") from `edit`.
+    - **Tests:** `tests/unit/test_dashboards_d1.py`; `test_wave_c_stubs.py` lists only D2 and D3 methods now.
+
+    Where the code and the design differ, the code won:
+
+    - The state store gains `delete_tile_runs(dashboard_id, tile_ids)` (SDK `StateStore` and the `sqlite` store),
+      which the design's store interface lacked: without it an edit could not discard a stored result. Version 4 is
+      unreleased, so it joins the version.
+    - `pin` puts a draft in `workspace_id` if given, else in the workspace the draft already lives in if that is
+      still the caller's, else in "General" (created on first use). The design says "else the default workspace";
+      that would undo a `move` of a draft. A saved dashboard or an empty draft is a `ValueError`.
+    - `set_tile_chart` checks a forced kind against the chart of the tile's last stored result (the kinds its
+      encodings carry, through `choose(..., kind=)`); a tile with no stored result, or a result that has no chart,
+      takes any kind. `auto` is always accepted. D2 stores the results.
+    - `arrange` names the charts it moves and leaves the others where they are, then sorts the dashboard's tiles by
+      row and column (layout order, the order a refresh runs in). An unknown or repeated tile id is a `ValueError`.
+    - `set_filters` checks the definitions only: unique ids, a four-part column (`datasource.schema.table.column`),
+      and `between` on a number or temporal column. Changing the filters discards every chart's stored result;
+      setting the same filters again discards none. D2 checks values and applies them.
+    - `dashboard.changed` records a move as the edit kind `move`, not `moved`.
+    - Workspace names are unique per owner ignoring case; blank names are refused. `list(status=)` takes `saved`
+      or `draft` only (anything else is a `ValueError`).
+    - `purge()` deletes drafts older than `conversations.max_age_days`, as the design says (no setting of its own),
+      and counts them under `dashboards`; it is left out when that is null.
+    - Names later rows use: `Dashboards` (`nl2sql.dashboards.api`), `Workspaces.default(owner, user_context)`,
+      `DashboardStore` (`get`, `list`, `put`, `delete`, `runs`, `drop_runs`, `last_chart`, and the workspace
+      methods), `EditEnv`, `Applied` and `apply_edits` (`nl2sql.dashboards.edits`; D4 adds the two chat-only
+      handlers to its `_HANDLERS` table).
 
 The waves, with at most four PRs at once:
 
