@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from importlib import metadata
 from typing import Any, List, Optional, Sequence
 
+from nl2sql import ResultNotFound
 from nl2sql.conversations.models import Conversation, ToolStep, Turn
-from nl2sql.execution.artifacts.results import ResultNotFound
 
 ROW_LIMIT = 20
 

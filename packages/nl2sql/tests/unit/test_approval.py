@@ -106,6 +106,21 @@ def test_needs_approval_without_an_approval_stops_the_point_with_the_reason():
     assert error.details == {"hook": "review", "point": "execute.before", "reason": "Reads customers"}
 
 
+def test_a_check_leaves_out_the_excluded_hook_and_lets_needs_approval_pass_to_the_next_hook():
+    """A check that runs nothing (an open's access check): the named hook is not asked, a ``NeedsApproval`` does not
+    stop the point, and a later ``Deny`` still does."""
+    asked = []
+    runner = _runner(lambda ctx: asked.append("review") or Deny(reason="never asked"),
+                     NEEDS, lambda ctx: asked.append("third") or Deny(reason="Closed."))
+
+    verdict = runner.call("execute.before", exclude="review", needs_approval_passes=True, trace_id="t",
+                          question="How many customers?", user=ANA, datasource_id="chinook", sub_query=_sq(),
+                          sql=SQL, params=None, approvals=[])
+
+    assert asked == ["third"]
+    assert isinstance(verdict.decision, Deny) and verdict.hook == "third"
+
+
 def test_next_hook_runs_after_an_approval():
     seen = []
     runner = _runner(NEEDS, lambda ctx: seen.append(ctx.point) or Deny(reason="Second opinion says no"))

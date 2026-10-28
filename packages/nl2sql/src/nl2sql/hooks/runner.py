@@ -142,17 +142,21 @@ class HookRunner:
         """The hook object of the built-in binding ``name``, or None."""
         return next((binding.hook for binding in self.bindings if binding.name == name), None)
 
-    def call(self, point: HookPoint, **fields: Any) -> HookVerdict:
+    def call(self, point: HookPoint, *, exclude: Optional[str] = None, needs_approval_passes: bool = False,
+             **fields: Any) -> HookVerdict:
         """Ask every hook attached at ``point``; ``fields`` are the ``HookContext``'s, ``point`` aside.
 
         The hooks see deep copies of ``fields``: the plan, the caller and the
         values are the run's own objects, and a hook that changed one in place
         would change the run without a ``Modify`` (past the validator, or into
         the plan cache). ``Modify`` is the only way a hook changes anything.
+
+        A check that runs nothing (a dashboard open's access check) leaves out the hook named ``exclude`` and
+        passes ``needs_approval_passes``: a ``NeedsApproval`` then counts as ``Allow``, and the next hook is asked.
         """
         rule = HOOK_POINTS[point]
         fields = {"conversation_id": current_conversation_id.get(), **fields}
-        attached = [binding for binding in self.bindings if point in binding.points]
+        attached = [binding for binding in self.bindings if point in binding.points and binding.name != exclude]
         if not attached:
             # Nothing to ask: the values go on as given, unchecked.
             return HookVerdict(HookContext.model_construct(point=point, **fields))
@@ -174,6 +178,9 @@ class HookRunner:
             if problem:
                 _published(binding, ctx, "error", problem, started)
                 return _failed(binding, ctx, problem)
+            if isinstance(decision, NeedsApproval) and needs_approval_passes:
+                _published(binding, ctx, _EVENT_NAMES[NeedsApproval], decision.reason, started)
+                continue
             if isinstance(decision, NeedsApproval):
                 approval = self._covering(binding, ctx)
                 if approval is not None:

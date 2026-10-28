@@ -127,6 +127,71 @@ def test_open_checks_a_verified_chart_without_running_it(demo_project, fake_llm,
     assert server.calls == []
 
 
+class _Gate:
+    """A business rule at ``execute.before`` whose decision the test sets: it allows the refresh, then decides the open."""
+
+    name, points = "gate", frozenset({"execute.before"})
+
+    def __init__(self):
+        self.decision = Allow()
+        self.seen = []
+
+    def __call__(self, ctx):
+        self.seen.append(ctx.sql)
+        return self.decision
+
+
+def _open_a_verified_chart_behind(gate, demo_project, fake_llm, monkeypatch, decision):
+    """Refresh a verified chart with ``gate`` allowing, then open it with ``gate`` deciding ``decision``."""
+    from nl2sql import VerifiedRef
+    from nl2sql.dashboards.models import ChartPlan
+    from nl2sql.execution.executor import SqlExecutorService
+
+    from .test_curated_fake_llm import CURATED
+
+    engine, server = _build(demo_project, fake_llm, monkeypatch, hooks=[gate], curated=CURATED)
+    try:
+        _seed(engine, chart_plan=ChartPlan(verified=VerifiedRef(id="top_customers_by_revenue",
+                                                                params={"n": 5, "year": 2012}),
+                                           verified_datasource_id="chinook"))
+        [refreshed] = engine.dashboards.refresh("d1", user_context=ANA).tiles
+        executed = []
+        execute = SqlExecutorService.execute
+        monkeypatch.setattr(SqlExecutorService, "execute",
+                            lambda self, request: executed.append(request) or execute(self, request))
+        gate.decision, gate.seen = decision, []
+        opened = engine.dashboards.open("d1", user_context=ANA).runs[0]
+    finally:
+        engine.close()
+    assert refreshed.status == "ok", refreshed.error
+    return refreshed, opened, executed, server
+
+
+@pytest.mark.e2e
+def test_open_runs_execute_before_for_a_verified_chart_and_a_deny_serves_no_rows(demo_project, fake_llm, monkeypatch):
+    """A verified query has no plan: ``execute.before`` is its only check point, so the open asks it too."""
+    from nl2sql.hooks import Deny
+
+    gate = _Gate()
+    _, opened, executed, server = _open_a_verified_chart_behind(
+        gate, demo_project, fake_llm, monkeypatch, Deny(reason="Closed for the audit."))
+
+    assert gate.seen, "the open asked the execute.before hook"
+    assert opened.status == "denied" and opened.chart is None and opened.error["code"] == "HOOK_DENIED"
+    assert executed == [] and server.calls == []
+
+
+@pytest.mark.e2e
+def test_open_lets_an_approval_requesting_hook_pass_a_verified_charts_check(demo_project, fake_llm, monkeypatch):
+    """The check executes nothing, so a hook asking for approval before a run does not block serving the rows."""
+    gate = _Gate()
+    refreshed, opened, executed, server = _open_a_verified_chart_behind(
+        gate, demo_project, fake_llm, monkeypatch, NeedsApproval(reason="Reads a lot."))
+
+    assert gate.seen and opened == refreshed
+    assert executed == [] and server.calls == []
+
+
 @pytest.mark.e2e
 def test_a_refresh_as_a_caller_who_lost_access_is_denied(engine):
     engine, _ = engine

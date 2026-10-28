@@ -751,8 +751,6 @@ def test_dashboards_make_no_model_call():
 # result store or the executor.
 DATA_PATHS = ("nl2sql.adapters", "nl2sql.datasources", "nl2sql.execution", "nl2sql_sdk.sqlalchemy")
 DATA_ATTRIBUTES = {"ds_registry", "artifact_store", "get_adapter"}
-# The one name from the result store a caller may import: the exception that says a stored result has expired.
-DATA_MAY_IMPORT = ("nl2sql.execution.artifacts.results",)
 
 
 def test_every_entry_point_reaches_data_through_run_query():
@@ -763,8 +761,7 @@ def test_every_entry_point_reaches_data_through_run_query():
     offenders = []
     for path in python_files(ENGINE / "conversations", DASHBOARDS, ENGINE / "mcp"):
         offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
-                      if (name.startswith(DATA_PATHS) and not name.startswith(DATA_MAY_IMPORT))
-                      or name.partition(".")[0] in DATABASE_LIBRARIES]
+                      if name.startswith(DATA_PATHS) or name.partition(".")[0] in DATABASE_LIBRARIES]
         offenders += [f"{_where(path)}:{node.lineno} .{node.attr}" for node in ast.walk(_tree(path))
                       if isinstance(node, ast.Attribute) and node.attr in DATA_ATTRIBUTES]
     assert not offenders, _broke(

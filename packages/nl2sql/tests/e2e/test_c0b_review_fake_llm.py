@@ -205,22 +205,31 @@ def test_a_supplied_verified_plan_with_execute_false_is_checked_and_not_run(make
 
 
 @pytest.mark.e2e
+@pytest.mark.parametrize("execute", [True, False], ids=["run", "check"])
 @pytest.mark.parametrize("case, code", [
     ("unknown_query", "INVALID_STATE"),
     ("bad_param", "INVALID_STATE"),
     ("scope_miss", "SECURITY_VIOLATION"),
     ("policy_deny", "SECURITY_VIOLATION"),
+    ("matcher_crash", "EXECUTION_FAILED"),
 ])
-def test_a_supplied_verified_plan_that_cannot_run_ends_with_an_error_and_no_model_call(make, case, code):
+def test_a_supplied_verified_plan_that_cannot_run_ends_with_an_error_and_no_model_call(
+        make, monkeypatch, case, code, execute):
+    """The same with ``execute=False`` (a dashboard open's check): a later change cannot split the two paths."""
     from nl2sql import SuppliedPlan, UserContext, VerifiedRef
+    from nl2sql.pipeline.nodes.curated_matcher import node as matcher
 
     engine, server = make(curated=CURATED)
     user = {"scope_miss": UserContext(roles=["nobody"]), "policy_deny": UserContext(roles=["viewer"])}.get(
         case, _analyst())
     plan = {"unknown_query": SuppliedPlan(verified=VerifiedRef(id="nope"), verified_datasource_id="chinook"),
             "bad_param": _verified(n=500, year=2012)}.get(case, _verified())
+    if case == "matcher_crash":
+        def crash(*args, **kwargs):
+            raise RuntimeError("boom")
+        monkeypatch.setattr(matcher, "resolve_params", crash)
 
-    result = engine.run_query("Top customers of 2012", user_context=user, plan=plan, answer=False)
+    result = engine.run_query("Top customers of 2012", user_context=user, plan=plan, answer=False, execute=execute)
 
     assert result.status == "error"
     assert code in [e["error_code"] for e in result.errors], result.errors

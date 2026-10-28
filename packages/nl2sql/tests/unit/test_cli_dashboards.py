@@ -81,8 +81,9 @@ def test_refresh_due_with_nothing_due_says_so(project, monkeypatch):
 @pytest.mark.parametrize("args, message", [
     ([], "--dashboard"),
     (["--dashboard", "d1", "--due"], "--dashboard"),
-    (["--dashboard", "d1", "--as", "nobody"], "Unknown role"),
-    (["--dashboard", "missing", "--as", "analyst", "--user", "ana"],"No dashboard 'missing'"),
+    (["--dashboard", "d1", "--as", "nobody", "--user", "ana"], "Unknown role"),
+    (["--dashboard", "d1", "--as", "analyst"], "--dashboard acts as the dashboard's owner: pass --user"),
+    (["--dashboard", "missing", "--as", "analyst", "--user", "ana"], "No dashboard 'missing'"),
     (["--due", "--as", "analyst"], "--due runs each schedule as its owner"),
     (["--due", "--user", "ana"], "--due runs each schedule as its owner"),
     (["--due", "--tenant", "acme"], "--due runs each schedule as its owner"),

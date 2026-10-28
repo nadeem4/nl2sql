@@ -1850,9 +1850,12 @@ flowchart TD
       generated plan runs with `execute=False`, and so does a verified one. C0b refused a supplied verified plan
       with `execute=False`; that refusal is gone. A run that pins a supplied verified query keeps the curated
       matcher in its graph without `execute` (`build_graph(verified=True)`), and the matcher
-      (`CuratedMatcherNode(ctx, execute=False)`) ends after its scope, values, table-policy and capability checks:
-      the sub-query is done with its SQL and no result, so the run is `plan_only`. It still never falls back to a
-      model run and makes no model call. Rows are served on an allow-list: a check that ends `ok`, `empty`, or
+      (`CuratedMatcherNode(ctx, execute=False)`) ends after its scope, values, table-policy and capability checks
+      and the `execute.before` hooks: the sub-query is done with its SQL and no result, so the run is `plan_only`.
+      A verified query has no plan, so `execute.before` is its only hook point; the check asks every hook there
+      but the cost hook (nothing runs), a `Deny` makes the chart `denied`, and a `NeedsApproval` passes (it gates
+      a run; `HookRunner.call(exclude=, needs_approval_passes=)`). It still never falls back to a model run and
+      makes no model call. Rows are served on an allow-list: a check that ends `ok`, `empty`, or
       `needs_approval` with no other error; anything else fails closed. Only charts this `open` checked, or
       refreshed itself (from the returned `DashboardRun`), are served: a result another process stored between
       the check and the refresh is not, and the chart stays in `due`.
@@ -1867,7 +1870,8 @@ flowchart TD
       is still stored, then the schedule stops. A schedule that stops sets `state="stopped"`, `next_at=None` and
       `error`. `run_scheduled(now=)` without a timezone is a `ValueError`, before any dashboard runs.
     - `nl2sql dashboards refresh --due` refuses `--as`, `--user` and `--tenant`; with `--dashboard`, `--user` and
-      `--tenant` act as that owner (operator use, as the help says).
+      `--tenant` act as that owner (operator use, as the help says), and `--user` is required: without it the
+      command is a usage error naming the flag.
 
     Where the code and the design differ, the code won:
 

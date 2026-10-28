@@ -44,7 +44,7 @@ def refresh(
     due: Annotated[bool, typer.Option("--due", help="Refresh every dashboard whose schedule is due")] = False,
     as_: AsOption = None,
     user: Annotated[Optional[str], typer.Option(
-        "--user", help="The owner to act as (with --dashboard). Operator use: whoever holds the config and the "
+        "--user", help="The owner to act as (required with --dashboard). Operator use: whoever holds the config and the "
                        "credentials may act as any owner.")] = None,
     tenant: Annotated[Optional[str], typer.Option(
         "--tenant", help="The owner's tenant (with --dashboard). Operator use, as --user.")] = None,
@@ -58,6 +58,8 @@ def refresh(
         _fail("Pass --dashboard ID to refresh one dashboard, or --due to run the schedules that are due.")
     if due and (as_ or user is not None or tenant is not None):
         _fail("--due runs each schedule as its owner: pass no --as, --user or --tenant with it.")
+    if not due and not user:
+        _fail("--dashboard acts as the dashboard's owner: pass --user with the owner's user id.")
     engine = build_engine(ctx)
     with engine:
         if due:
