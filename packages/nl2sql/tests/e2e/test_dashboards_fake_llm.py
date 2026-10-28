@@ -81,6 +81,41 @@ def test_refresh_runs_the_stored_plan_with_no_model_call_and_stores_the_result(e
     assert stored == tile
 
 
+VIEWER = _user("viewer")  # the music catalog and anonymous traffic: no customers, invoices or employees
+
+
+def _tables(dashboard):
+    return {t["name"] for tile in dashboard.tiles for body in tile.plan.plans.values() for t in body["tables"]}
+
+
+@pytest.mark.e2e
+def test_generate_builds_a_starter_dashboard_through_the_real_pipeline_with_no_model_call(engine):
+    engine, server = engine
+
+    dashboard, run = engine.dashboards.generate("chinook", user_context=ANA)
+
+    assert dashboard.status == "saved" and dashboard.tiles, run.skipped
+    assert all(r.status == "ok" and r.chart is not None for r in run.tiles) and len(run.tiles) == len(dashboard.tiles)
+    assert dashboard.tiles[0].question.startswith("How many rows are in")
+    assert [t.layout.y for t in dashboard.tiles] == sorted(t.layout.y for t in dashboard.tiles)
+    assert "Employee" not in _tables(dashboard), "the analyst role denies the employee table"
+    assert server.calls == [], "not one model call"
+    opened = engine.dashboards.open(dashboard.id, user_context=ANA)
+    assert [r.status for r in opened.runs] == ["ok"] * len(dashboard.tiles)
+
+
+@pytest.mark.e2e
+def test_generate_as_a_narrower_role_charts_only_what_that_role_reads(engine):
+    engine, server = engine
+
+    dashboard, run = engine.dashboards.generate("chinook", user_context=VIEWER)
+
+    assert dashboard.tiles and _tables(dashboard) <= {"Album", "Artist", "Genre", "MediaType", "Playlist",
+                                                      "PlaylistTrack", "Track"}, _tables(dashboard)
+    assert dashboard.user_id == "ana" and server.calls == []
+    assert engine.dashboards.suggest_questions("chinook", user_context=VIEWER)[0].startswith("How many rows are in")
+
+
 @pytest.mark.e2e
 def test_stored_results_are_denied_once_access_is_lost(engine):
     engine, server = engine
