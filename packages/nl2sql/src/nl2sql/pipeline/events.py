@@ -165,4 +165,5 @@ class RunEvents(BaseCallbackHandler):
     def on_llm_end(self, response: Any, *, run_id: UUID, **kwargs: Any) -> None:
         self._answers.pop(run_id, None)
 
-    on_llm_error = on_llm_end
+    def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+        self._answers.pop(run_id, None)
