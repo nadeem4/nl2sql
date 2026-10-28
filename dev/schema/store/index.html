@@ -6126,9 +6126,9 @@ them arrive in C1 and D1 to D4.</p>
 </tr>
 <tr>
 <td><code>tile_runs</code></td>
-<td><code>put_tile_runs(dashboard_id, docs)</code>, <code>get_tile_runs(dashboard_id)</code></td>
+<td><code>put_tile_runs(dashboard_id, docs)</code>, <code>get_tile_runs(dashboard_id)</code>, <code>delete_tile_runs(dashboard_id, tile_ids)</code></td>
 <td>dashboard, chart (<code>tile_id</code>), <code>at</code></td>
-<td>The last result of each chart, rows included. <code>put_tile_runs</code> replaces only the charts it lists. Deleted with the dashboard.</td>
+<td>The last result of each chart, rows included. <code>put_tile_runs</code> replaces only the charts it lists and <code>delete_tile_runs</code> deletes only those it lists (an edit that changes what a chart shows discards its result). Deleted with the dashboard.</td>
 </tr>
 <tr>
 <td><code>api_keys</code></td>

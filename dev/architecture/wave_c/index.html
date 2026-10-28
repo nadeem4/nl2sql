@@ -5978,10 +5978,11 @@ proposals take them (the SDK holds no engine model):</p>
 <a href="#__codelineno-14-16" id="__codelineno-14-16" name="__codelineno-14-16"></a><span class="k">def</span><span class="w"> </span><span class="nf">delete_workspace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workspace_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
 <a href="#__codelineno-14-17" id="__codelineno-14-17" name="__codelineno-14-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">put_tile_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">docs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># replaces the listed charts' last results</span>
 <a href="#__codelineno-14-18" id="__codelineno-14-18" name="__codelineno-14-18"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_tile_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
-<a href="#__codelineno-14-19" id="__codelineno-14-19" name="__codelineno-14-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">add_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># a plain insert; ValueError when the id exists</span>
-<a href="#__codelineno-14-20" id="__codelineno-14-20" name="__codelineno-14-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">revoke_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">revoked_at</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
-<a href="#__codelineno-14-21" id="__codelineno-14-21" name="__codelineno-14-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
-<a href="#__codelineno-14-22" id="__codelineno-14-22" name="__codelineno-14-22"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_api_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
+<a href="#__codelineno-14-19" id="__codelineno-14-19" name="__codelineno-14-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">delete_tile_runs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">tile_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># D1: an edit discards the results it invalidates</span>
+<a href="#__codelineno-14-20" id="__codelineno-14-20" name="__codelineno-14-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">add_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>   <span class="c1"># a plain insert; ValueError when the id exists</span>
+<a href="#__codelineno-14-21" id="__codelineno-14-21" name="__codelineno-14-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">revoke_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">revoked_at</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
+<a href="#__codelineno-14-22" id="__codelineno-14-22" name="__codelineno-14-22"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_api_key</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<a href="#__codelineno-14-23" id="__codelineno-14-23" name="__codelineno-14-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_api_keys</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span> <span class="o">...</span>
 </code></pre></div>
 <p>The <code>sqlite</code> store adds migration 6, five tables: <code>conversations</code> (id, tenant, user, updated_at, the document), <code>workspaces</code> (id, tenant, user, created_at, the document), <code>dashboards</code> (id, tenant, user, status, whether it is scheduled, the document), <code>tile_runs</code> (dashboard id, tile id, at, the document: the last result of each chart, with its rows) and <code>api_keys</code> (id, the hash, revoked_at, the row). Stored chart results hold rows, so they sit in the owner's private state store and are deleted with the dashboard; opening a dashboard checks access before serving them (D135). A
 conversation is one document, rewritten per turn: 50 turns without rows is
@@ -6505,6 +6506,57 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   probe a key's state and the audit log never records a forged token as a revoked key); <code>verify</code> becomes a
   thin wrapper over it, so there is one code path; and <code>nl2sql.policies.keys.parse</code> stays behind
   <code>ApiKeysAPI</code>, not imported by <code>mcp/http.py</code>. Not built in M1.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built (D1): workspaces, the dashboard store and manual edits</p>
+<ul>
+<li><strong>Files:</strong> <code>nl2sql/dashboards/{store,workspaces,edits,api}.py</code> (the owner-scoped store over the state store;
+  the workspaces service; the pure <code>apply_edits</code>; the dashboards service), <code>api/workspaces_api.py</code> and
+  <code>api/dashboards_api.py</code> (thin faces over them), <code>api/storage_api.py</code> (<code>purge()</code> also counts <code>dashboards</code>).
+  <code>engine.workspaces</code> is complete; <code>engine.dashboards</code> has <code>get</code>, <code>list</code>, <code>delete</code>, <code>pin</code>, <code>move</code>, <code>edit</code> and
+  the named edits. <code>open</code>, <code>refresh</code>, <code>filter_values</code> and <code>run_scheduled</code> stay D2's stubs, <code>generate</code> and
+  <code>suggest_questions</code> D3's.</li>
+<li><strong>Edits</strong> are applied by <code>apply_edits(dashboard, edits, EditEnv)</code> to a copy, so an edit list is all or none;
+  <code>Dashboards.edit</code> stores the result once, discards the stored results the edits invalidate and publishes one
+  <code>dashboard.changed</code> (the kinds, once each, in order) and, for <code>set_schedule</code>, <code>dashboard.schedule_set</code>.
+  <code>add_tile</code> and <code>replace_plan</code> raise <code>NotImplementedError</code> ("arrives with D4") from <code>edit</code>.</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_dashboards_d1.py</code>; <code>test_wave_c_stubs.py</code> lists only D2 and D3 methods now.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li>The state store gains <code>delete_tile_runs(dashboard_id, tile_ids)</code> (SDK <code>StateStore</code> and the <code>sqlite</code> store),
+  which the design's store interface lacked: without it an edit could not discard a stored result. Version 4 is
+  unreleased, so it joins the version.</li>
+<li><code>pin</code> puts a draft in <code>workspace_id</code> if given, else in the workspace the draft already lives in if that is
+  still the caller's, else in "General" (created on first use). The design says "else the default workspace";
+  that would undo a <code>move</code> of a draft. A saved dashboard or an empty draft is a <code>ValueError</code>.</li>
+<li><code>set_tile_chart</code> checks a forced kind against the tile's last stored result through <code>choose(..., kind=)</code>,
+  using the column kinds stored with the result (<code>TileRun.column_kinds</code>, empty for a row stored without them,
+  which falls back to the kinds the chart's encodings carry); a tile with no stored result, or a result that has
+  no chart, takes any kind. <code>auto</code> is always accepted. <strong>For D2:</strong> fill <code>TileRun.column_kinds</code> (from
+  <code>ResultSummary.column_kinds</code>) whenever it stores a result, or a result last drawn as a table cannot be forced
+  to a bar.</li>
+<li><code>edit</code> discards the stored results before it saves the dashboard, so a failing store leaves both as they were.
+  It is still a read-modify-write without a lock. <strong>For D2:</strong> its refresh lock must also cover <code>edit</code>, so a
+  refresh that finishes after a <code>set_filters</code> cannot store results that ignore the new filters.</li>
+<li>A missing caller (<code>user_context=None</code>) is a <code>TypeError("user_context is required")</code> on every dashboard and
+  workspace method, never an anonymous owner. <code>pin(title=)</code> checks the title like <code>rename</code>: blank is a
+  <code>ValueError</code>.</li>
+<li><code>arrange</code> names the charts it moves and leaves the others where they are, then sorts the dashboard's tiles by
+  row and column (layout order, the order a refresh runs in). An unknown or repeated tile id is a <code>ValueError</code>.</li>
+<li><code>set_filters</code> checks the definitions only: unique ids, a four-part column (<code>datasource.schema.table.column</code>),
+  and <code>between</code> on a number or temporal column. Changing the filters discards every chart's stored result;
+  setting the same filters again discards none. D2 checks values and applies them.</li>
+<li><code>dashboard.changed</code> records a move as the edit kind <code>move</code>, not <code>moved</code>.</li>
+<li>Workspace names are unique per owner ignoring case; blank names are refused. <code>list(status=)</code> takes <code>saved</code>
+  or <code>draft</code> only (anything else is a <code>ValueError</code>).</li>
+<li><code>purge()</code> deletes drafts older than <code>conversations.max_age_days</code>, as the design says (no setting of its own),
+  and counts them under <code>dashboards</code>; it is left out when that is null.</li>
+<li>Names later rows use: <code>Dashboards</code> (<code>nl2sql.dashboards.api</code>), <code>Workspaces.default(owner, user_context)</code>,
+  <code>DashboardStore</code> (<code>get</code>, <code>list</code>, <code>put</code>, <code>delete</code>, <code>runs</code>, <code>drop_runs</code>, <code>last_run</code>, and the workspace
+  methods), <code>EditEnv</code>, <code>Applied</code> and <code>apply_edits</code> (<code>nl2sql.dashboards.edits</code>; D4 adds the two chat-only
+  handlers to its <code>_HANDLERS</code> table).</li>
 </ul>
 </div>
 <p>The waves, with at most four PRs at once:</p>

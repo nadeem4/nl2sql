@@ -4924,6 +4924,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5776,6 +5798,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5795,8 +5839,10 @@
 
 <h1 id="dashboards-api">Dashboards API</h1>
 <div class="admonition note">
-<p class="admonition-title">Arrives with D1 to D3</p>
-<p>A stub: every method has its final signature and raises <code>NotImplementedError</code> naming its row.</p>
+<p class="admonition-title">Partly built</p>
+<p>The workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1). <code>open</code>, <code>refresh</code>,
+<code>filter_values</code> and <code>run_scheduled</code> (D2) and <code>generate</code> and <code>suggest_questions</code> (D3) have their final
+signatures and raise <code>NotImplementedError</code> naming their row.</p>
 </div>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.workspaces</code> and <code>engine.dashboards</code> (<a href="../../../dashboards/">Dashboards</a>).</p>
@@ -5805,11 +5851,41 @@
 <li><code>packages/nl2sql/src/nl2sql/api/workspaces_api.py</code> (<code>WorkspacesAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/api/dashboards_api.py</code> (<code>DashboardsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/dashboards/models.py</code> (<code>Workspace</code>, <code>Dashboard</code>, <code>Tile</code>, <code>DashboardEdit</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/dashboards/</code> <code>workspaces.py</code>, <code>api.py</code>, <code>edits.py</code>, <code>store.py</code> (the logic behind the two faces)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <p>Every method takes <code>user_context</code> keyword-only and required, except <code>run_scheduled</code>, which runs each
 dashboard as its stored owner. Another owner's workspace or dashboard is <code>WorkspaceNotFound</code> or
-<code>DashboardNotFound</code>.</p>
+<code>DashboardNotFound</code>. A missing caller (<code>user_context=None</code>) is a <code>TypeError</code>, not an anonymous owner.</p>
+<h2 id="behaviour">Behaviour</h2>
+<ul>
+<li><strong>Private.</strong> A workspace and its dashboards belong to the <code>(tenant_id, user_id)</code> that made them; anyone
+  else's is <code>WorkspaceNotFound</code> or <code>DashboardNotFound</code>, never "forbidden".</li>
+<li><strong>Workspaces.</strong> <code>create</code> and <code>rename</code> refuse an empty name and a name the owner already uses (ignoring case).
+  <code>delete</code> raises <code>WorkspaceNotEmpty</code> while a dashboard, draft or saved, is in it. They are listed oldest first.</li>
+<li><strong><code>list</code></strong> returns one <code>status</code> (<code>saved</code> by default, or <code>draft</code>) and, with <code>workspace_id</code>, one workspace,
+  newest first. <code>refreshed_at</code> is the oldest stored result of its charts (None until D2 stores some).</li>
+<li><strong><code>pin</code></strong> saves a draft whole, in <code>workspace_id</code>, else the workspace the draft is in, else "General" (made on
+  first use). There is no way to pin one chart. An empty draft, a dashboard already saved, or a blank <code>title</code>
+  is a <code>ValueError</code>.</li>
+<li><strong><code>edit</code></strong> applies a list of edits in order, each seeing the ones before, all or none. The named methods
+  (<code>rename</code>, <code>rename_tile</code>, <code>set_tile_chart</code>, <code>remove_tile</code>, <code>arrange</code>, <code>set_filters</code>, <code>set_schedule</code>, <code>move</code>)
+  each build one edit. None calls a model, and none takes a question or a plan: what data a chart shows changes
+  only in chat (<code>add_tile</code>, <code>replace_plan</code>, D4). An unknown chart id is a <code>ValueError</code>.</li>
+<li><strong><code>set_tile_chart</code></strong> with a kind the chart's last result cannot be drawn as raises a <code>ValueError</code> naming the
+  kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
+  still be drawn as a bar). With no stored result any kind is accepted.</li>
+<li><strong><code>set_schedule(every_minutes)</code></strong> below <code>dashboards.min_refresh_minutes</code> is <code>ScheduleTooFrequent</code>; otherwise it
+  stores the schedule with the caller's <code>user_id</code>, <code>tenant_id</code> and roles (D134), and <code>None</code> removes it. Nothing
+  runs yet: D2's scheduler does.</li>
+<li><strong>Stored results.</strong> <code>remove_tile</code> discards that chart's stored result and <code>set_filters</code> (when the filters
+  change) every chart's; renaming, redrawing, arranging, moving and scheduling keep them.</li>
+<li><strong>Events.</strong> <code>dashboard.changed</code> (the edit kinds, <code>pinned</code> or <code>deleted</code>, and <code>by</code>), <code>dashboard.schedule_set</code>
+  and <code>workspace.changed</code>. They carry no titles, names or values.</li>
+<li><strong>Retention.</strong> <code>engine.storage.purge()</code> deletes drafts last edited more than <code>conversations.max_age_days</code> ago;
+  saved dashboards are never purged.</li>
+</ul>
+<h2 id="methods">Methods</h2>
 <table>
 <thead>
 <tr>

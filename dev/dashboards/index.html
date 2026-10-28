@@ -2232,6 +2232,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -2248,6 +2266,69 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#workspaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drafts-and-pinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafts and pinning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editing-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing by hand
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -5661,6 +5742,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#workspaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workspaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#drafts-and-pinning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drafts and pinning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editing-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editing by hand
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -5678,10 +5811,10 @@
 
 <h1 id="dashboards">Dashboards</h1>
 <div class="admonition note">
-<p class="admonition-title">Arrives with D1 to D4 (Wave C, 0.9)</p>
-<p>This page is a stub. The models (<code>Workspace</code>, <code>Dashboard</code>, <code>Tile</code>, <code>DashboardEdit</code> and the rest) and
-the <code>engine.workspaces</code> and <code>engine.dashboards</code> signatures exist; each method raises
-<code>NotImplementedError</code> naming the pull request that fills it. The design is
+<p class="admonition-title">Partly built (Wave C, 0.9)</p>
+<p>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1). Refresh, filters and
+schedules (D2), the starter dashboard (D3) and building in chat (D4) have their signatures and raise
+<code>NotImplementedError</code> naming the pull request that fills them. The design is
 <a href="../architecture/wave_c/#6-dashboards">Wave C, section 6</a>.</p>
 </div>
 <p>A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
@@ -5714,8 +5847,85 @@ stored plans as the caller with no model call. The methods are in
 </tr>
 </tbody>
 </table>
+<h2 id="workspaces">Workspaces</h2>
+<p>A workspace is a named folder of your dashboards ("Sales", "Ops"). A dashboard lives in exactly one, and
+both are private to you: someone else's is "not found". <code>engine.workspaces.create</code>, <code>rename</code>, <code>list</code> and
+<code>delete</code> manage them; <code>delete</code> refuses a workspace that still holds a dashboard, draft or saved. The first
+time you pin with no workspace in mind, a workspace named "General" is made for you.</p>
+<h2 id="drafts-and-pinning">Drafts and pinning</h2>
+<p>A dashboard built in chat is a <strong>draft</strong> tied to its conversation. It is listed only with
+<code>list(status="draft")</code> and is deleted by <code>engine.storage.purge()</code> once it has not changed for
+<code>conversations.max_age_days</code> (30). <code>pin</code> saves the <strong>whole</strong> dashboard (status <code>saved</code>), in the workspace you
+name, else the one it is already in, else "General". A chart is never pinned alone. A saved dashboard is
+never purged.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">ws</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">workspaces</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">"Sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">board</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">pin</span><span class="p">(</span><span class="n">draft</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">workspace_id</span><span class="o">=</span><span class="n">ws</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">"Revenue"</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="editing-by-hand">Editing by hand</h2>
+<p>Every change a person can make is a typed edit, and no edit calls a model or takes a question or a plan:</p>
+<table>
+<thead>
+<tr>
+<th>Edit</th>
+<th>Method</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rename</code></td>
+<td><code>rename(id, title)</code></td>
+<td>Renames the dashboard</td>
+</tr>
+<tr>
+<td><code>rename_tile</code></td>
+<td><code>rename_tile(id, tile_id, title)</code></td>
+<td>Renames one chart</td>
+</tr>
+<tr>
+<td><code>set_tile_chart</code></td>
+<td><code>set_tile_chart(id, tile_id, chart)</code></td>
+<td><code>auto</code>, <code>line</code>, <code>bar</code>, <code>big_number</code> or <code>table</code>; a kind the last result cannot be drawn as is a <code>ValueError</code> naming the ones it can</td>
+</tr>
+<tr>
+<td><code>remove_tile</code></td>
+<td><code>remove_tile(id, tile_id)</code></td>
+<td>Removes a chart and its stored result</td>
+</tr>
+<tr>
+<td><code>arrange</code></td>
+<td><code>arrange(id, layouts)</code></td>
+<td>Moves or resizes charts on the 4-column grid; the others stay put</td>
+</tr>
+<tr>
+<td><code>set_filters</code></td>
+<td><code>set_filters(id, filters)</code></td>
+<td>Stores the filter definitions (their values are applied by refresh, D2)</td>
+</tr>
+<tr>
+<td><code>set_schedule</code></td>
+<td><code>set_schedule(id, every_minutes)</code></td>
+<td>Stores a schedule and a snapshot of your user, tenant and roles; <code>None</code> removes it. Below <code>dashboards.min_refresh_minutes</code> (15) is <code>ScheduleTooFrequent</code></td>
+</tr>
+<tr>
+<td><code>move</code></td>
+<td><code>move(id, workspace_id)</code></td>
+<td>Moves it to another of your workspaces</td>
+</tr>
+</tbody>
+</table>
+<p><code>edit(id, [RenameDashboard(...), RemoveTile(...)], user_context=me)</code> applies a list in order and <strong>all or
+none</strong>: if one edit is refused, nothing is saved. A draft and a saved dashboard take the same edits. Stored
+chart results stay valid across a rename, a redraw, an arrange, a move and a schedule; removing a chart or
+changing the filters discards the results they invalidate. <code>add_tile</code> and <code>replace_plan</code>, which change what
+data a chart shows, are only for chat (D4).</p>
+<p>Each change publishes <code>dashboard.changed</code> (the kinds, never the values), <code>set_schedule</code> also
+<code>dashboard.schedule_set</code> (it saves a role snapshot, so it is audited) and the workspace calls publish
+<code>workspace.changed</code>.</p>
+<h2 id="configuration">Configuration</h2>
 <p><code>dashboards:</code> in <code>nl2sql.yaml</code> (<code>max_tiles</code>, <code>min_refresh_minutes</code>, <code>schedule_identity_max_age_days</code>) is
-already accepted.</p>
+accepted; <code>min_refresh_minutes</code> is read by <code>set_schedule</code>.</p>
 
 
 
