@@ -498,15 +498,6 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#principles">
-<span class="md-ellipsis">
-      
-        Principles
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="#decisions">
 <span class="md-ellipsis">
       
@@ -2693,15 +2684,6 @@
     </label>
 <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
 <li class="md-nav__item">
-<a class="md-nav__link" href="#principles">
-<span class="md-ellipsis">
-      
-        Principles
-      
-    </span>
-</a>
-</li>
-<li class="md-nav__item">
 <a class="md-nav__link" href="#decisions">
 <span class="md-ellipsis">
       
@@ -3167,7 +3149,22 @@ three waves build. Where it needs something they do not provide, the gap
 is listed in <a href="#11-needs-from-waves-a-to-c">Needs from Waves A to C</a> as a
 facade method, not designed around.</p>
 </div>
-<h2 id="principles">Principles</h2>
+<div class="admonition warning">
+<p class="admonition-title">Wave C was revised on 2026-10-28; this page has not been updated to match</p>
+<p><a href="../wave_c/">Wave C</a> now has a model-led chat (the model calls tools in
+a bounded loop; <code>conversation.step</code> replaces <code>conversation.rewritten</code>),
+dashboards that are artifacts pinned whole (several sub-queries per
+chart; <code>needs_fixing</code> replaces <code>stale</code>; no single-tile pin), workspaces,
+manual dashboard edits with chat parity, refresh with stored results and
+schedules, and one access rule for every entry point. Wave D's dashboard
+and chat routes, its Dashboards and Chat pages, D224 and the job and
+fixture tables still describe the first draft and need a pass. The rows
+below that name a changed Wave C item are corrected; the rest are listed
+here, not rewritten: the Chat tool buttons (<strong>Pin</strong> becomes pinning the
+whole dashboard), <code>POST /dashboards/pin</code> and the tile routes, the
+Dashboards page (workspaces, arrange, edit, schedule, "refreshed 2 h
+ago", <code>needs_fixing</code>), and the dashboard job.</p>
+</div>
 <p>The owner set them for the redesign, and they rank above everything below:</p>
 <ul>
 <li><strong>The package is the product; the playground only demonstrates it.</strong> The
@@ -3356,8 +3353,8 @@ D13 to D16</strong> and records how each is applied.</p>
 </tr>
 <tr>
 <td>D224</td>
-<td><strong>Dashboards are Wave C's surface and no more:</strong> generate, get, list, refresh, filter values, pin, and delete a dashboard or one tile (<code>delete(tile_id=)</code>). Editing, regenerating a stale tile, tiles from the caller's own questions at generate time and tenant sharing are not built: a stale tile is removed and the question pinned again.</td>
-<td>decided after review, owner to confirm</td>
+<td><strong>Dashboards are Wave C's surface and no more:</strong> whatever Wave C's <code>engine.dashboards</code> and <code>engine.workspaces</code> offer (open, refresh, edit, arrange, filters, schedule, pin, move, delete, workspaces), as thin routes. Wave C (revised 2026-10-28) builds editing and workspaces in the package; this page's route table has not yet been revised to expose them.</td>
+<td>decided after review, owner to confirm; superseded in part by Wave C's D116, D131 and D133</td>
 <td><a href="#the-routes">Routes</a></td>
 </tr>
 </tbody>
@@ -3491,8 +3488,8 @@ describe them.</p>
 <td>D220</td>
 </tr>
 <tr>
-<td>Editing a dashboard, regenerating a stale tile, tiles from the caller's own questions, tenant-shared dashboards, dragging a layout</td>
-<td>D224: Wave C builds none of them; a stale tile is removed and pinned again</td>
+<td>Tenant-shared dashboards, publishing a dashboard to a shared workspace, Power BI or Tableau targets, metric alerts</td>
+<td>Wave C's Later list (LT1 to LT3): Wave C builds editing, workspaces and refresh in the package; sharing waits</td>
 </tr>
 <tr>
 <td>Editing the plan from "why this answer"</td>
@@ -3619,7 +3616,7 @@ LookupError</code> still works:</p>
 <td><code>CONFLICT</code>, <code>FILE_CHANGED</code></td>
 </tr>
 <tr>
-<td><code>NoTiles</code>, <code>TileNotPinnable</code>, <code>NotIndexed</code>, <code>SecretValueInConfig</code> (Wave C); <code>MissingProviderKey</code> (G2); a facade argument check that raises its own subclass</td>
+<td><code>NoTiles</code>, <code>WorkspaceNotEmpty</code>, <code>ScheduleTooFrequent</code>, <code>NotIndexed</code>, <code>SecretValueInConfig</code> (Wave C); <code>MissingProviderKey</code> (G2); a facade argument check that raises its own subclass</td>
 <td>422</td>
 <td>the exception's code</td>
 </tr>
@@ -3791,7 +3788,7 @@ terminal app all get it:</p>
 </table>
 <p>The streams: <code>POST /query/stream</code> (Wave A's caller-safe allow-list, ending
 <code>run.finished</code> with <code>data.result</code>), <code>POST /conversations/{id}/turns/stream</code>
-(Wave C's run events with <code>conversation.rewritten</code>, ending
+(Wave C's run events with <code>conversation.step</code>, ending
 <code>conversation.turn</code>), and <code>GET /jobs/{id}/events</code>, which is an <code>async</code>
 generator over the in-memory job and holds no thread.</p>
 <h3 id="jobs">Jobs</h3>
@@ -4403,7 +4400,7 @@ use (D209):</p>
 </tr>
 <tr>
 <td><strong>Matching</strong></td>
-<td>As today: the structured-output name plus the question the prompt was built around. Wave C's rewriter prompt gains the same <code>[USER_QUERY]</code> marker so a recorded follow-up matches.</td>
+<td>As today: the structured-output name plus the question the prompt was built around. Wave C's <code>conversation</code> agent prompt gains the same <code>[USER_QUERY]</code> marker so a recorded step matches.</td>
 </tr>
 <tr>
 <td><strong>A miss</strong></td>
@@ -5402,7 +5399,7 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>G2</td>
-<td><strong>The <code>replay</code> provider, <code>ReplayMiss</code>, <code>engine.llm.recorded(questions)</code></strong>, the rewriter prompt's <code>[USER_QUERY]</code> marker</td>
+<td><strong>The <code>replay</code> provider, <code>ReplayMiss</code>, <code>engine.llm.recorded(questions)</code></strong>, the <code>conversation</code> agent prompt's <code>[USER_QUERY]</code> marker</td>
 <td>Demo mode</td>
 </tr>
 <tr>
