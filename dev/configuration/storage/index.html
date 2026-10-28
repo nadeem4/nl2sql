@@ -5967,10 +5967,12 @@ every store.</p>
 before that age, and the <a href="../observers/#audit">audit observer's</a> day files older
 than its <code>max_age_days</code> (90 by default), and the
 <a href="../review/">review queue's</a> decided proposals (accepted, rejected,
-superseded) decided more than <code>settings.review.max_age_days</code> (365) ago, and
-returns the counts, <code>{"traces": 3, "results": 12, "proposals": 4, "audit": 1}</code>
-(no <code>audit</code> when the engine runs no audit observer). Open proposals are never
-purged. It publishes the counts as the
+superseded) decided more than <code>settings.review.max_age_days</code> (365) ago, and the
+<a href="../../conversations/#ownership-and-retention">conversations</a> last updated more than
+<code>conversations.max_age_days</code> (30) ago, and
+returns the counts, <code>{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "audit": 1}</code>
+(no <code>audit</code> when the engine runs no audit observer, no <code>conversations</code> when <code>max_age_days</code> is null). Open
+proposals are never purged. It publishes the counts as the
 <a href="../../observability/events/#the-catalog"><code>retention.purged</code> event</a>, which the
 audit observer writes. A
 plugin trace or results store is purged when it has a <code>max_age_days</code>

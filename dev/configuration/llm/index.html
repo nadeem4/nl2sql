@@ -6617,7 +6617,7 @@ seeding and the conversation each have an agent. An agent not under <code>agents
 </tr>
 <tr>
 <td><code>conversation</code></td>
-<td>leads a conversation turn: reads the history and either replies or calls a tool, one call per step (release 0.9, <a href="../../architecture/wave_c/">Wave C</a>; <code>engine.conversations</code> arrives with C1). A small model is enough. A config that pins every agent's model should add it.</td>
+<td>leads a conversation turn: reads the history and either replies or calls a tool, one call per step (<a href="../../conversations/">Conversations</a>): it chooses a reply or the <code>ask</code> tool, never writes SQL and never sees rows. A small model is enough. A config that pins every agent's model should add it.</td>
 </tr>
 </tbody>
 </table>

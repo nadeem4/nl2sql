@@ -4144,21 +4144,22 @@ into four PRs.</p>
 <a href="#__codelineno-0-27" id="__codelineno-0-27" name="__codelineno-0-27"></a>    <span class="n">status</span><span class="p">:</span> <span class="n">TurnStatus</span>
 <a href="#__codelineno-0-28" id="__codelineno-0-28" name="__codelineno-0-28"></a>    <span class="n">trace_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>               <span class="c1"># the turn's own scope: the loop's model calls</span>
 <a href="#__codelineno-0-29" id="__codelineno-0-29" name="__codelineno-0-29"></a>    <span class="n">usage</span><span class="p">:</span> <span class="n">QuestionUsage</span>               <span class="c1"># the loop's model calls; each ask step's usage is on its result</span>
-<a href="#__codelineno-0-30" id="__codelineno-0-30" name="__codelineno-0-30"></a>
-<a href="#__codelineno-0-31" id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="k">class</span><span class="w"> </span><span class="nc">Conversation</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a href="#__codelineno-0-32" id="__codelineno-0-32" name="__codelineno-0-32"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span>                            <span class="c1"># random, 22 url-safe characters</span>
-<a href="#__codelineno-0-33" id="__codelineno-0-33" name="__codelineno-0-33"></a>    <span class="n">tenant_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
-<a href="#__codelineno-0-34" id="__codelineno-0-34" name="__codelineno-0-34"></a>    <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>                <span class="c1"># the owner (D105)</span>
-<a href="#__codelineno-0-35" id="__codelineno-0-35" name="__codelineno-0-35"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>                         <span class="c1"># the first message, cut at 80 characters</span>
-<a href="#__codelineno-0-36" id="__codelineno-0-36" name="__codelineno-0-36"></a>    <span class="n">datasource_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>          <span class="c1"># when set, every ask skips routing</span>
-<a href="#__codelineno-0-37" id="__codelineno-0-37" name="__codelineno-0-37"></a>    <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>    <span class="c1"># the dashboard the dashboard tools edit (section 6)</span>
-<a href="#__codelineno-0-38" id="__codelineno-0-38" name="__codelineno-0-38"></a>    <span class="n">created_at</span><span class="p">:</span> <span class="n">datetime</span>
-<a href="#__codelineno-0-39" id="__codelineno-0-39" name="__codelineno-0-39"></a>    <span class="n">updated_at</span><span class="p">:</span> <span class="n">datetime</span>
-<a href="#__codelineno-0-40" id="__codelineno-0-40" name="__codelineno-0-40"></a>    <span class="n">turns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Turn</span><span class="p">]</span>
-<a href="#__codelineno-0-41" id="__codelineno-0-41" name="__codelineno-0-41"></a>    <span class="n">pending</span><span class="p">:</span> <span class="n">ClarificationRequest</span> <span class="o">|</span> <span class="kc">None</span>   <span class="c1"># Wave B's request the last turn ended with</span>
-<a href="#__codelineno-0-42" id="__codelineno-0-42" name="__codelineno-0-42"></a>
-<a href="#__codelineno-0-43" id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="k">class</span><span class="w"> </span><span class="nc">ConversationInfo</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-<a href="#__codelineno-0-44" id="__codelineno-0-44" name="__codelineno-0-44"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span><span class="p">;</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">;</span> <span class="n">updated_at</span><span class="p">:</span> <span class="n">datetime</span><span class="p">;</span> <span class="n">turns</span><span class="p">:</span> <span class="nb">int</span>
+<a href="#__codelineno-0-30" id="__codelineno-0-30" name="__codelineno-0-30"></a>    <span class="n">error</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># the loop's own failure or stop (code, message); a step's stays on it</span>
+<a href="#__codelineno-0-31" id="__codelineno-0-31" name="__codelineno-0-31"></a>
+<a href="#__codelineno-0-32" id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="k">class</span><span class="w"> </span><span class="nc">Conversation</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-0-33" id="__codelineno-0-33" name="__codelineno-0-33"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span>                            <span class="c1"># random, 22 url-safe characters</span>
+<a href="#__codelineno-0-34" id="__codelineno-0-34" name="__codelineno-0-34"></a>    <span class="n">tenant_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+<a href="#__codelineno-0-35" id="__codelineno-0-35" name="__codelineno-0-35"></a>    <span class="n">user_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>                <span class="c1"># the owner (D105)</span>
+<a href="#__codelineno-0-36" id="__codelineno-0-36" name="__codelineno-0-36"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>                         <span class="c1"># the first message, cut at 80 characters</span>
+<a href="#__codelineno-0-37" id="__codelineno-0-37" name="__codelineno-0-37"></a>    <span class="n">datasource_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>          <span class="c1"># when set, every ask skips routing</span>
+<a href="#__codelineno-0-38" id="__codelineno-0-38" name="__codelineno-0-38"></a>    <span class="n">dashboard_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>    <span class="c1"># the dashboard the dashboard tools edit (section 6)</span>
+<a href="#__codelineno-0-39" id="__codelineno-0-39" name="__codelineno-0-39"></a>    <span class="n">created_at</span><span class="p">:</span> <span class="n">datetime</span>
+<a href="#__codelineno-0-40" id="__codelineno-0-40" name="__codelineno-0-40"></a>    <span class="n">updated_at</span><span class="p">:</span> <span class="n">datetime</span>
+<a href="#__codelineno-0-41" id="__codelineno-0-41" name="__codelineno-0-41"></a>    <span class="n">turns</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Turn</span><span class="p">]</span>
+<a href="#__codelineno-0-42" id="__codelineno-0-42" name="__codelineno-0-42"></a>    <span class="n">pending</span><span class="p">:</span> <span class="n">ClarificationRequest</span> <span class="o">|</span> <span class="kc">None</span>   <span class="c1"># Wave B's request the last turn ended with</span>
+<a href="#__codelineno-0-43" id="__codelineno-0-43" name="__codelineno-0-43"></a>
+<a href="#__codelineno-0-44" id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="k">class</span><span class="w"> </span><span class="nc">ConversationInfo</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-0-45" id="__codelineno-0-45" name="__codelineno-0-45"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span><span class="p">;</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">;</span> <span class="n">updated_at</span><span class="p">:</span> <span class="n">datetime</span><span class="p">;</span> <span class="n">turns</span><span class="p">:</span> <span class="nb">int</span>
 </code></pre></div>
 <p><code>Conversation</code>, <code>Turn</code>, <code>ToolStep</code> and <code>ConversationInfo</code> are exported from
 <code>nl2sql</code>. A step's <code>result.sub_queries[].rows</code> is always <code>None</code> once stored;
@@ -6383,6 +6384,56 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
 <li><code>Decimal</code> values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.</li>
 <li>Tests: <code>test_charts_choose.py</code>, <code>test_charts_api.py</code>, <code>test_charts_make_no_model_call</code> (architecture).
   The stub test moves <code>chart</code> out of its tables.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built (C1): conversations core, model-led</p>
+<ul>
+<li><strong>Files:</strong> <code>nl2sql/conversations/{api,agent,prompts,store}.py</code> (the turn and its loop; the <code>[CONVERSATION]</code>
+  block and the step checks; the prompt; ownership and <code>strip_rows</code>), <code>api/conversations_api.py</code> (a thin
+  face over <code>Conversations</code>; <code>tool</code> and <code>report</code> stay stubs), <code>api/storage_api.py</code> (<code>purge()</code> counts
+  <code>conversations</code>), <code>RunScope.end(name, data)</code> (a scope that closes with an event other than <code>run.finished</code>),
+  and <code>common/context.current_conversation_id</code>, which <code>HookRunner.call</code> reads into
+  <code>HookContext.conversation_id</code>. <code>nl2sql.api.conversations_api.ConversationsAPI</code> is built over
+  <code>nl2sql.conversations.api.Conversations</code>.</li>
+<li><strong>The loop</strong> runs with <code>ask</code> alone: <code>Conversations._enabled_tools()</code> returns <code>{}</code> and C2 fills it. The
+  agent's schema is <code>ModelStep</code> subclassed per call with the turn's checks (tool names, argument models,
+  pending option ids, calls left), so a refused step goes back through <code>structured()</code>'s parse retry. C2 adds
+  the registry tools to <code>_enabled_tools()</code> and to the <code>tools</code> list in <code>Conversations._by_model</code>.</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_conversations.py</code> (canned <code>run_query</code>), <code>tests/e2e/test_conversations_fake_llm.py</code>
+  (the demo databases); <code>test_wave_c_stubs.py</code> lists only <code>tool</code> and <code>report</code> now.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><code>Turn</code> has <code>error</code> (<code>{"code", "message"}</code>), set when the loop itself ends the turn: <code>MODEL_STEP_INVALID</code>,
+  or <code>RUN_LIMIT_REACHED</code> (status <code>stopped</code>) when the turn's own model calls hit <code>max_llm_calls</code> or
+  <code>max_cost_usd</code>. A step's own failure stays on the step.</li>
+<li>The new message is a JSON string after <code>[USER_TEXT]</code>, not raw text: a message cannot start a line of its
+  own and forge a marker.</li>
+<li><code>[CONVERSATION]</code> has the keys <code>turns</code>, <code>pending</code>, <code>tools</code>, <code>tool_calls_left</code> and <code>this_turn</code> (and <code>tools</code> is
+  empty on the last call). The open dashboard joins it with D4.</li>
+<li><code>CONVERSATION_TOO_LONG</code> is a <code>ValueError</code> whose message starts with the code, as no exception class is
+  defined for it. <code>stream</code> raises <code>ConversationBusy</code> from the first <code>next</code>, while ownership and argument
+  errors are raised at the call.</li>
+<li>A turn's status follows the design (the last step that did not end <code>ok</code>), so a turn whose <code>ask</code> step failed
+  and whose model then replied is <code>error</code> with a <code>reply</code>.</li>
+<li><code>ask_only</code> runs through the same turn machinery (a turn scope, <code>conversation.step</code>, <code>conversation.turn</code>) and
+  returns the run's result with its rows; the stored step has none.</li>
+<li><code>start(dashboard_id=)</code> only checks that the dashboard exists and is the caller's; the dashboard tools are D4.</li>
+<li><code>purge()</code> counts conversations only; the draft-dashboard count arrives with D1.</li>
+<li>Names later rows use: <code>Conversations</code> (<code>nl2sql.conversations.api</code>), <code>checked_step</code>, <code>block</code>, <code>step_view</code>,
+  <code>ASK_SPEC</code> and <code>AskArgs</code> (<code>nl2sql.conversations.agent</code>), <code>ConversationStore</code>, <code>owner_of</code>, <code>strip_rows</code>
+  (<code>nl2sql.conversations.store</code>), <code>current_conversation_id</code>.</li>
+<li><code>max_turns</code> is checked under the conversation's lock for every turn (<code>ask</code>, <code>stream</code>, <code>retry</code>, <code>ask_only</code>).
+  A pending choice is checked again under the lock; if another turn cleared it meanwhile, the call raises
+  the same <code>ValueError</code> as for a choice with nothing pending.</li>
+<li>A cancelled token stops the loop before the next model call, so the turn ends after the step in flight and
+  is stored as <code>error</code> with <code>CANCELLED</code>. A provider failure in a model step (auth, rate limit, timeout)
+  ends the turn as <code>error</code> with the classified <code>PROVIDER_*</code> code and stores it; the scope still closes with
+  <code>conversation.turn</code>.</li>
+<li><code>delete</code> takes the lock and raises <code>ConversationBusy</code> while a turn runs. A turn's scope, and
+  <code>conversation.started</code>, carry the conversation's tenant. The stream worker runs in a copy of the
+  caller's context.</li>
 </ul>
 </div>
 <p>The waves, with at most four PRs at once:</p>

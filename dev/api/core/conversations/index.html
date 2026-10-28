@@ -5795,8 +5795,8 @@
 
 <h1 id="conversations-api">Conversations API</h1>
 <div class="admonition note">
-<p class="admonition-title">Arrives with C1 and C2</p>
-<p>A stub: every method has its final signature and raises <code>NotImplementedError</code> naming its row.</p>
+<p class="admonition-title">C1 is built; <code>tool</code>, <code>report</code> and <code>engine.chat_tools.list</code> arrive with C2</p>
+<p>The three C2 methods have their final signatures and raise <code>NotImplementedError</code> naming their row.</p>
 </div>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.conversations</code>: model-led conversations over the database (<a href="../../../conversations/">Conversations</a>),
@@ -5804,12 +5804,17 @@ and <code>engine.chat_tools</code> (<a href="../../../conversations/tools/">Chat
 <h2 id="key-modules">Key Modules</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/conversations_api.py</code> (<code>ConversationsAPI</code>, internal)</li>
+<li><code>packages/nl2sql/src/nl2sql/conversations/</code> (<code>api.py</code> the turn and its loop, <code>agent.py</code> the <code>[CONVERSATION]</code>
+  block and the step checks, <code>prompts.py</code>, <code>store.py</code> ownership and stored rows)</li>
 <li><code>packages/nl2sql/src/nl2sql/api/chat_tools_api.py</code> (<code>ChatToolsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/conversations/models.py</code> (<code>Conversation</code>, <code>Turn</code>, <code>ToolStep</code>, <code>ModelStep</code>)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <p>Every method takes <code>user_context</code> keyword-only and required. A conversation that is not the caller's is
-<code>ConversationNotFound</code>; one already running a turn is <code>ConversationBusy</code>.</p>
+<code>ConversationNotFound</code>; one already running a turn is <code>ConversationBusy</code>. <code>ValueError</code> is raised, before
+anything runs, for: neither or both of <code>text</code> and <code>choice</code>, a <code>choice</code> with nothing pending or not one of the
+pending options, an empty message, a conversation at <code>max_turns</code> (<code>CONVERSATION_TOO_LONG</code>), <code>retry</code> with no
+earlier question.</p>
 <table>
 <thead>
 <tr>
@@ -5847,7 +5852,7 @@ and <code>engine.chat_tools</code> (<a href="../../../conversations/tools/">Chat
 <td>C1</td>
 </tr>
 <tr>
-<td><code>delete(conversation_id, *, user_context) -&gt; None</code></td>
+<td><code>delete(conversation_id, *, user_context) -&gt; None</code> (<code>ConversationBusy</code> while a turn runs)</td>
 <td>C1</td>
 </tr>
 <tr>
@@ -5864,6 +5869,15 @@ and <code>engine.chat_tools</code> (<a href="../../../conversations/tools/">Chat
 </tr>
 </tbody>
 </table>
+<ul>
+<li><code>start(dashboard_id=...)</code> needs a dashboard the caller owns (<code>DashboardNotFound</code> otherwise).</li>
+<li><code>ask</code> returns the stored <code>Turn</code>: <code>status</code> is that of the last step that did not end <code>ok</code>, else <code>answered</code>;
+  <code>error</code> holds <code>{"code", "message"}</code> when the loop itself ended it (<code>MODEL_STEP_INVALID</code>, or
+  <code>RUN_LIMIT_REACHED</code> for <code>stopped</code>, or the <code>PROVIDER_*</code> code when the model provider refused a step). A <code>cancellation_token</code> that is cancelled ends the turn <code>error</code> with
+  <code>CANCELLED</code> after the step in flight.</li>
+<li><code>stream</code> ends with <code>conversation.turn</code>; see <a href="../../../conversations/#streaming">Streaming</a>.</li>
+<li><code>ask_only</code> returns the run's <code>QueryResult</code> with its rows; the stored turn has none.</li>
+</ul>
 
 
 

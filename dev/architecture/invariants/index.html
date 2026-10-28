@@ -2792,6 +2792,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#saved-answers-run-as-the-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved Answers Run as the Caller
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Saved Answers Run as the Caller">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9514,6 +9575,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#saved-answers-run-as-the-caller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Saved Answers Run as the Caller
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Saved Answers Run as the Caller">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definition_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#enforcement-points_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcement Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failure-behavior_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failure Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-it-exists_30" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why It Exists
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#categories" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10029,11 +10151,25 @@ different <code>storage.path</code> values never share a store.</p>
 <h3 id="why-it-exists_29">Why It Exists</h3>
 <p>The glossary and the curated answers are what people know and vouch for. An engine that edited them on its own would turn a model's guess into a fact without anyone deciding so, and two writers that did not check the file would lose a person's edit.</p>
 <hr />
+<h2 id="saved-answers-run-as-the-caller">Saved Answers Run as the Caller</h2>
+<h3 id="definition_30">Definition</h3>
+<p>A conversation stores what a turn said and found, never a permission. Every method of <code>engine.conversations</code> takes the caller, and each turn's questions run through <code>run_query</code> with the <code>user_context</code> passed to that call, not the one the conversation was started with: a role taken away applies at the next turn. A conversation belongs to the <code>(tenant_id, user_id)</code> that started it; any other caller is told it does not exist. A stored step keeps its plan, SQL and explanation but never the rows of its sub-queries, so reading a result again goes through <code>engine.results</code>, which checks the caller. The model sees summaries and column names, never rows. (Dashboards extend this rule in Wave C's D rows.)</p>
+<h3 id="enforcement-points_30">Enforcement Points</h3>
+<ul>
+<li><code>ConversationStore.get</code> in <code>nl2sql.conversations.store</code>: the owner check behind every method</li>
+<li><code>Conversations._ask</code> in <code>nl2sql.conversations.api</code>: each step calls <code>run_query</code> with the turn's caller; <code>strip_rows</code> removes the rows before a step is stored</li>
+<li><code>test_other_users_conversation_is_not_found</code>, <code>test_turn_runs_with_the_callers_roles_not_the_starters</code>, <code>test_stored_turn_has_no_rows</code>, <code>test_model_never_sees_rows</code> in <code>packages/nl2sql/tests/unit/test_conversations.py</code>; <code>test_owned_and_privileged_methods_require_a_caller</code> in the boundary test</li>
+</ul>
+<h3 id="failure-behavior_30">Failure Behavior</h3>
+<p><code>ConversationNotFound</code> for an id that is missing or another owner's, with the same message for both.</p>
+<h3 id="why-it-exists_30">Why It Exists</h3>
+<p>A conversation outlives the request that began it. If it carried the starter's roles, a person who lost access, or anyone who learned its id, would keep reading what the roles allowed.</p>
+<hr />
 <h2 id="categories">Categories</h2>
 <ul>
 <li><strong>State</strong>: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Execution</strong>: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded</li>
-<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File</li>
+<li><strong>Security</strong>: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller</li>
 <li><strong>Determinism</strong>: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed</li>
 <li><strong>Resource bounds</strong>: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration</li>
 <li><strong>Boundaries</strong>: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter</li>
