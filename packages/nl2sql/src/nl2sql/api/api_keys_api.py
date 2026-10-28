@@ -110,9 +110,8 @@ class ApiKeysAPI:
         return by
 
     def _check_roles(self, roles: List[str]) -> None:
+        # No allow_all exemption: keys outlive the policy, so a role name no policy defines is never stored.
         policies = self._ctx.config.policies
-        if policies.allow_all and not policies.roles:
-            return  # no roles are defined, so none can be checked
         unknown = [role for role in roles if role not in policies.roles]
         if unknown:
             defined = ", ".join(policies.roles) or "none"

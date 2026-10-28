@@ -49,7 +49,8 @@ def _run(call):
 def create(
     ctx: typer.Context,
     user: Annotated[str, typer.Option("--user", help="The user id the key's runs are recorded under.")],
-    role: Annotated[List[str], typer.Option("--role", help="A role the key runs as (repeatable).")],
+    role: Annotated[Optional[List[str]], typer.Option(
+        "--role", help="A role the key runs as (repeatable); none under allow_all, where no roles exist.")] = None,
     as_: AsOption = None,
     tenant: Annotated[Optional[str], typer.Option("--tenant", help="The key's tenant.")] = None,
     label: Annotated[str, typer.Option("--label", help="A note to tell keys apart.")] = "",
@@ -57,7 +58,7 @@ def create(
     """Create a key. The token is printed once; only its hash is kept."""
     engine, admin = _engine_and_admin(ctx, as_)
     with engine:
-        key, token = _run(lambda: engine.api_keys.create(user_id=user, roles=role, by=admin, tenant_id=tenant,
+        key, token = _run(lambda: engine.api_keys.create(user_id=user, roles=list(role or []), by=admin, tenant_id=tenant,
                                                          label=label))
     console.print(f"[green]created[/green] key {escape(key.id)} for {escape(key.user_id)} "
                   f"({escape(', '.join(key.roles))})", soft_wrap=True)

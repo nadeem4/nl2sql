@@ -92,6 +92,30 @@ def test_an_unknown_id_is_refused(project):
     assert result.exit_code == 1 and "No API key" in out
 
 
+def test_under_allow_all_keys_are_managed_without_as(tmp_path):
+    make_config(tmp_path)  # allow_all, no roles
+
+    result, out = _run(tmp_path, "create", "--user", "ana")
+    assert result.exit_code == 0, out
+    token = _token(out)
+
+    result, out = _run(tmp_path, "list")
+    assert result.exit_code == 0 and token.split("_")[1] in out and "ana" in out
+
+    result, out = _run(tmp_path, "revoke", token.split("_")[1])
+    assert result.exit_code == 0 and "revoked" in out
+    with NL2SQL(make_config(tmp_path)) as engine:
+        assert engine.api_keys.verify(token) is None
+
+
+def test_under_allow_all_a_key_role_is_refused(tmp_path):
+    make_config(tmp_path)
+
+    result, out = _run(tmp_path, "create", "--user", "ana", "--role", "admin")
+
+    assert result.exit_code == 1 and "admin" in out and "nl2sql_" not in out
+
+
 def test_an_unknown_as_role_is_refused(project):
     result, out = _run(project, "list", "--as", "ghost")
 

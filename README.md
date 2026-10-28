@@ -308,9 +308,9 @@ command has `--help`.
 | `nl2sql review apply FILE` | Read a review file as an admin role: accept each `accept` (with its edited change), reject each `reject` | `--as ROLE`, `--user` |
 | `nl2sql profile` | Profile the indexed schema and file what it finds for review, and with `--draft` have the model draft missing descriptions; arrives in 0.8 | `--datasource ID`, `--draft`, `--max-cost USD`, `--as ROLE`, `--user` |
 | `nl2sql launch` | Find a database, connect it, index it and look at what was found, in one sitting; arrives in 0.9 (Wave C) | `DIR`, `--provider`, `--as ROLE`, `--draft`, `--yes`, `--no-ports` |
-| `nl2sql keys create` | Create an API key for MCP over HTTP; the token is printed once; managing keys needs an admin role | `--user`, `--role` (repeatable), `--tenant`, `--label`, `--as ROLE` |
-| `nl2sql keys list` | The API keys, never a secret | `--as ROLE` |
-| `nl2sql keys revoke ID` | Revoke an API key; it stops verifying at once | `--as ROLE` |
+| `nl2sql keys create` | Create an API key for MCP over HTTP; the token is printed once; managing keys needs an admin role (under `allow_all` leave out `--as` and `--role`) | `--user`, `--role` (repeatable), `--tenant`, `--label`, `--as ROLE` |
+| `nl2sql keys list` | The API keys, never a secret (under `allow_all` leave out `--as`) | `--as ROLE` |
+| `nl2sql keys revoke ID` | Revoke an API key; it stops verifying at once (under `allow_all` leave out `--as`) | `--as ROLE` |
 | `nl2sql dashboards refresh` | Re-run the stored plans of a dashboard, or of every dashboard that is due, with no model call; arrives in 0.9 (Wave C) | `--dashboard ID`, `--due`, `--as ROLE` |
 | `nl2sql trace show TARGET` | Print a run trace's timeline: nodes, attempts, durations, tokens, errors | a trace file, or a trace id in the trace store (`storage.traces`) |
 | `nl2sql trace replay TARGET` | Re-run a traced question on its recorded LLM responses, with no model calls | |

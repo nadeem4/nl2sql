@@ -10,6 +10,9 @@ nl2sql keys list --as admin
 nl2sql keys revoke <id> --as admin
 ```
 
+On a project with `policies.allow_all` (the starter, `nl2sql launch`) no roles exist: leave out `--as`
+and `--role`, as in `nl2sql keys create --user ana`. Any `--as` or `--role` is refused as an unknown role.
+
 `create` prints the token once. Keep it in the client's secret store: only its hash is kept here, so a
 lost token is replaced by a new key, not recovered.
 
@@ -44,7 +47,10 @@ engine.api_keys.verify(token)             # UserContext(user_id="ana", tenant_id
 `by` is required and has no default. A call without one is a `TypeError`, a `by` that is not a
 `UserContext` is a `TypeError`, and a `by` holding none of `policies.admin_roles` is a
 `PermissionError`. Under `policies.allow_all` every caller is an admin, as for the rest of the engine,
-and any role name is accepted when no roles are defined.
+but a key still cannot carry a role name: with no roles defined, `roles=[]` is the only value, and a role
+name is a `ValueError`. Keys outlive the policy, so an `admin` key minted under `allow_all` would become a
+real admin key once roles are configured. A key with no roles reads everything under `allow_all` and
+nothing once roles are configured; create new keys then.
 
 ## Events and logs
 

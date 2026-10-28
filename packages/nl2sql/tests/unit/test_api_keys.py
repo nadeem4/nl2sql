@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from nl2sql import NL2SQL, UserContext
+from nl2sql.api import api_keys_api as api_keys_module
 from nl2sql.policies import keys as token_format
 from nl2sql.testing.config import make_config
 
@@ -153,11 +155,19 @@ def test_only_admins_manage_keys(engine):
     assert engine._runtime.state.get_api_key(key.id)["revoked_at"] is None
 
 
-def test_under_allow_all_every_caller_may_manage_keys(tmp_path):
+def test_under_allow_all_every_caller_may_manage_keys_but_a_key_carries_no_role(tmp_path):
     with NL2SQL(make_config(tmp_path)) as engine:
-        key, token = engine.api_keys.create(user_id="ana", roles=["anything"], by=UserContext(roles=[]))
+        key, token = engine.api_keys.create(user_id="ana", roles=[], by=UserContext(roles=[]))
 
-        assert engine.api_keys.verify(token).roles == ["anything"] and key.created_by is None
+        assert engine.api_keys.verify(token).roles == [] and key.created_by is None
+
+
+def test_under_allow_all_a_role_name_is_refused(tmp_path):
+    # Keys outlive the policy: an "admin" key minted now would be a real admin once roles are configured.
+    with NL2SQL(make_config(tmp_path)) as engine:
+        with pytest.raises(ValueError, match="admin"):
+            engine.api_keys.create(user_id="ana", roles=["admin"], by=UserContext(roles=[]))
+        assert engine._runtime.state.list_api_keys() == []
 
 
 def test_key_roles_must_be_configured(engine):
@@ -223,16 +233,23 @@ def test_an_id_clash_that_never_clears_fails_loudly(engine, monkeypatch):
     assert len(engine._runtime.state.list_api_keys()) == 1
 
 
-def test_list_is_newest_first_and_includes_revoked(engine):
+def test_list_is_newest_first_and_includes_revoked(engine, monkeypatch):
+    ticks = iter(datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=n) for n in range(100))
+
+    class Clock(datetime):  # each call to now() is one second later, so no two keys share a time
+        @classmethod
+        def now(cls, tz=None):
+            return next(ticks)
+
+    monkeypatch.setattr(api_keys_module, "datetime", Clock)
     a, _ = _make(engine)
     b, _ = engine.api_keys.create(user_id="bob", roles=["admin"], by=ADMIN)
     engine.api_keys.revoke(a.id, by=ADMIN)
 
     listed = engine.api_keys.list(by=ADMIN)
 
-    assert {k.id for k in listed} == {a.id, b.id}
-    assert [k.created_at for k in listed] == sorted((k.created_at for k in listed), reverse=True)
-    assert [k.revoked_at is not None for k in listed if k.id == a.id] == [True]
+    assert [k.id for k in listed] == [b.id, a.id]
+    assert listed[0].revoked_at is None and listed[1].revoked_at is not None
 
 
 def test_keys_survive_a_new_engine(tmp_path):

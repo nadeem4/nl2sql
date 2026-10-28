@@ -1267,7 +1267,7 @@ class ApiKey(BaseModel):              # never the secret
 | **Who may manage keys** | `by` must hold a `policies.admin_roles` role, else `PermissionError`. There is no default: a caller that forgot it fails closed. `roles` must name configured roles. |
 | **Identity to role** | Each key carries the roles its holder runs as. Nothing is inferred from the client; a key per person or per app is the unit of revocation. |
 | **On the wire** | `Authorization: Bearer <token>`. Missing or invalid: 401 with `WWW-Authenticate: Bearer`, and `mcp.denied` (`reason`: `missing`, `malformed`, `unknown`, `revoked`; the key id when there is one; never the token), which the audit observer keeps. |
-| **CLI** | `nl2sql keys create --as ROLE --user NAME --role analyst [--tenant T] [--label L]` prints the token once; `nl2sql keys list --as ROLE`; `nl2sql keys revoke ID --as ROLE`. `--as` builds the admin `by`, as Wave B's `nl2sql review --as ROLE` does. |
+| **CLI** | `nl2sql keys create --as ROLE --user NAME --role analyst [--tenant T] [--label L]` prints the token once; `nl2sql keys list --as ROLE`; `nl2sql keys revoke ID --as ROLE`. `--as` builds the admin `by`, as Wave B's `nl2sql review --as ROLE` does. Under `allow_all` no roles exist: leave out `--as` and `--role`. |
 | **OAuth later** | A client that lets its user set a header (a desktop assistant's config file, an IDE, a script using a model provider's remote MCP tool with headers) works with keys. A chat app's connector screen that offers only OAuth does not, which is why OAuth is the next step after 0.9. |
 
 `engine.api_keys` is the engine's and not MCP's, so Wave D's `nl2sql-api`
@@ -1639,9 +1639,12 @@ flowchart TD
     - `list` is newest first and includes revoked keys, which `nl2sql keys list` marks `revoked`.
     - `create` retries a clash of ids (the store's `add_api_key` raises `ValueError`) with a new id, up to eight
       times, then raises `RuntimeError`; it never overwrites. `user_id` must not be blank.
-    - Roles are checked against `policies.roles`. Under `allow_all` with no roles defined there is nothing to
-      check against, so any role name is accepted; under `allow_all` every caller may manage keys, as for
-      `engine.knowledge.reload` and the review queue.
+    - Roles are checked against `policies.roles`, with no `allow_all` exemption: keys outlive the policy, so a
+      key minted with `roles=["admin"]` under `allow_all` would become a real admin key once roles are
+      configured. Under `allow_all` a key carries `roles=[]` (a role name is a `ValueError`), which reads
+      everything now and nothing once roles are configured. Under `allow_all` every caller may still manage
+      keys, as for `engine.knowledge.reload` and the review queue; the CLI leaves out `--as` and `--role` there
+      (`caller()` refuses every role name when none is defined), so `--role` is optional.
     - A `by` that is not a `UserContext` is a `TypeError`, one without an admin role a `PermissionError`
       (the engine's usual pair), not an `ErrorCode`.
     - `verify` checks only the key: it does not check that the key's roles are still configured (the policy
@@ -1651,8 +1654,11 @@ flowchart TD
     - **For M2:** call `engine.api_keys.verify(token)` with the bearer token (the text after `Bearer `); `None`
       is a 401. `verify` does not say why, and `mcp.denied` carries a `reason` (`missing`, `malformed`,
       `unknown`, `revoked`). `missing` is M2's own (no header). To tell the others apart without reaching into
-      the runtime, M2 adds a method to `ApiKeysAPI` that returns the reason (it may use
-      `nl2sql.policies.keys.parse`, which returns `None` for a malformed token).
+      the runtime, M2 adds a method to `ApiKeysAPI` that returns the reason. Constraints: it compares the
+      secret before reporting `revoked` (right id with a wrong secret is `unknown`, so an id alone cannot
+      probe a key's state and the audit log never records a forged token as a revoked key); `verify` becomes a
+      thin wrapper over it, so there is one code path; and `nl2sql.policies.keys.parse` stays behind
+      `ApiKeysAPI`, not imported by `mcp/http.py`. Not built in M1.
 
 The waves, with at most four PRs at once:
 
