@@ -2,10 +2,11 @@ import json
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import Field, SecretStr
-from sqlalchemy import URL, Connection, text
+from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.discovery import Found
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # libpq reports a failed connection before the server gives any SQLSTATE, so
@@ -45,6 +46,22 @@ class PostgresAdapter(SQLAlchemyAdapter):
     connection_model = PostgresConnection
     driver_modules = ("psycopg2",)
     install_hint = 'pip install "nl2sql-engine[postgres]"'
+    file_suffixes = ()
+    default_ports = (5432,)
+    url_schemes = ("postgresql", "postgres")
+
+    @classmethod
+    def connection_for(cls, found: Found) -> Optional[Dict[str, Any]]:
+        """The host and port of an open local port, or every field a ``postgresql://`` URL carries. Never connects."""
+        if found.kind == "port":
+            host, _, port = found.value.rpartition(":")
+            return {"host": host, "port": int(port)}
+        if found.kind != "url":
+            return None
+        url = make_url(found.value)
+        fields = {"host": url.host, "port": url.port, "database": url.database, "user": url.username,
+                  "password": url.password}
+        return {name: value for name, value in fields.items() if value is not None}
 
     def url(self, connection: PostgresConnection) -> URL:
         # Name the driver: the `postgres` extra installs psycopg2, and a bare

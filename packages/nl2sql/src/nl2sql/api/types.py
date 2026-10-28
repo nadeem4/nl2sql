@@ -71,7 +71,11 @@ class IndexProgress:
 
 
 class Candidate(StrictModel):
-    """A database `engine.datasources.scan()` found, with the connection fields it could fill in (D120)."""
+    """A database `engine.datasources.scan()` found, with the connection fields it could fill in (D120).
+
+    `connection` carries the URL's password: `repr` and `str` mask it, but `model_dump()` and
+    `model_dump_json()` do not. Never log or serialise a Candidate; there is no REST route for scan (D121).
+    """
 
     type: str  # the adapter's registry name
     title: str

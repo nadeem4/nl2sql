@@ -3,12 +3,13 @@ import threading
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
 from pydantic import Field
-from sqlalchemy import Connection, Engine, event, text
+from sqlalchemy import Connection, Engine, event, make_url, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlglot import exp
 from sqlglot.errors import SqlglotError
 
 from nl2sql_sdk import ConnectionModel, DatasourceCapability, Estimate, ForeignKeyContract, IndexIssue, TableRef
+from nl2sql_sdk.discovery import Found
 from nl2sql_sdk.sqlalchemy import ReflectedTable, SQLAlchemyAdapter, driver_message
 
 # Connection.info key of the running statement's interrupt timer.
@@ -27,6 +28,21 @@ class DuckdbAdapter(SQLAlchemyAdapter):
     connection_model = DuckdbConnection
     driver_modules = ("duckdb", "duckdb_engine")
     install_hint = 'pip install "nl2sql-engine[duckdb]"'
+    file_suffixes = (".duckdb",)
+    default_ports = ()
+    url_schemes = ("duckdb",)
+
+    @classmethod
+    def connection_for(cls, found: Found) -> Optional[Dict[str, Any]]:
+        """A ``duckdb:///file`` URL, or a file with DuckDB's magic at byte 8. Reads 12 bytes, never connects."""
+        if found.kind == "url":
+            database = make_url(found.value).database
+            return {"database": database} if database else None
+        if found.kind == "file":
+            with open(found.value, "rb") as handle:
+                if handle.read(12)[8:] == b"DUCK":
+                    return {"database": found.value}
+        return None
 
     def url(self, connection: DuckdbConnection) -> str:
         return f"duckdb:///{self.local_path(connection.database)}"

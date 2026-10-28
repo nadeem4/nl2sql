@@ -1,12 +1,13 @@
 import time
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import Field
-from sqlalchemy import Engine, event
+from sqlalchemy import Engine, event, make_url
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from nl2sql_sdk import ConnectionModel, DatasourceCapability
+from nl2sql_sdk.discovery import Found
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 import sqlglot
 from sqlglot import exp
@@ -72,6 +73,21 @@ class SqliteAdapter(SQLAlchemyAdapter):
     connection_model = SqliteConnection
     driver_modules = ("sqlite3",)
     install_hint = 'sqlite3 ships with Python: use a Python build that includes it'
+    file_suffixes = (".sqlite", ".sqlite3", ".db")
+    default_ports = ()
+    url_schemes = ("sqlite",)
+
+    @classmethod
+    def connection_for(cls, found: Found) -> Optional[Dict[str, Any]]:
+        """A ``sqlite:///file`` URL, or a file that starts with SQLite's header. Reads 16 bytes, never connects."""
+        if found.kind == "url":
+            database = make_url(found.value).database
+            return {"database": database} if database else None
+        if found.kind == "file":
+            with open(found.value, "rb") as handle:
+                if handle.read(16) == b"SQLite format 3\x00":
+                    return {"database": found.value}
+        return None
 
     def url(self, connection: SqliteConnection) -> str:
         """The file, always opened read-only.

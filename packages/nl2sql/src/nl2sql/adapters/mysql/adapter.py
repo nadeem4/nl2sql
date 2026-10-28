@@ -2,11 +2,12 @@ import json
 from typing import Any, Dict, Iterator, Optional
 
 from pydantic import Field, SecretStr
-from sqlalchemy import URL, Connection, text
+from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.exc import SQLAlchemyError
 
 from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.discovery import Found
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # MySQL's error numbers for a failed connection: the first argument of the driver's error.
@@ -37,6 +38,22 @@ class MysqlAdapter(SQLAlchemyAdapter):
     # caching_sha2_password, over a connection without TLS.
     driver_modules = ("pymysql", "cryptography")
     install_hint = 'pip install "nl2sql-engine[mysql]"'
+    file_suffixes = ()
+    default_ports = (3306,)
+    url_schemes = ("mysql", "mariadb")
+
+    @classmethod
+    def connection_for(cls, found: Found) -> Optional[Dict[str, Any]]:
+        """The host and port of an open local port, or every field a ``mysql://`` URL carries. Never connects."""
+        if found.kind == "port":
+            host, _, port = found.value.rpartition(":")
+            return {"host": host, "port": int(port)}
+        if found.kind != "url":
+            return None
+        url = make_url(found.value)
+        fields = {"host": url.host, "port": url.port, "database": url.database, "user": url.username,
+                  "password": url.password}
+        return {name: value for name, value in fields.items() if value is not None}
 
     def url(self, connection: MysqlConnection) -> URL:
         # URL.create escapes the credentials, so a password holding @ : / # %

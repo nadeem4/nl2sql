@@ -87,6 +87,30 @@ Ensure `capabilities()` advertises the correct set for routing and execution:
 - `enforces_read_only` and `enforces_timeout` only when the session cannot
   write, and a statement past `limits.timeout_ms` is stopped, on a real server.
 
+## 5. Optional: let `scan()` find it
+
+`engine.datasources.scan()` offers the databases it finds in a connection URL,
+in files under a folder and on the default ports of `127.0.0.1`. It finds an
+adapter only if the adapter declares how, with the four members of
+[`DiscoverableAdapter`](../adapters/sdk.md#optional-discoverableadapter):
+
+```python
+from nl2sql_sdk.discovery import Found
+
+class SnowflakeAdapter:
+    file_suffixes = ()
+    default_ports = ()
+    url_schemes = ("snowflake",)
+
+    @classmethod
+    def connection_for(cls, found: Found) -> dict | None:
+        if found.kind != "url":
+            return None
+        ...  # parse found.value into the fields of SnowflakeConnection; never connect
+```
+
+An adapter without them still works; it is just chosen by name instead of found.
+
 ## Source references
 
 - Adapter protocol: `packages/sdk/src/nl2sql_sdk/protocols.py`
