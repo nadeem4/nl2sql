@@ -1067,11 +1067,15 @@ URL `sqlite`), DuckDB (`.duckdb`, URL `duckdb`), PostgreSQL (5432,
     - **Depth:** "two levels deep" is two folders below `folder` (`folder/a/b/x.db` is found, `folder/a/b/c/x.db`
       is not). The 50 is files that carry a declared suffix, counted before `connection_for` confirms them.
     - **Duplicates** are one server (type, host, port) or one file (type, resolved path), the first finding wins.
-      A URL naming `127.0.0.1:5432` therefore hides the open-port finding for the same server.
-    - **The password:** `connection` keeps the URL's password (a form needs it), `Candidate`'s repr masks it,
-      and `found.value` is the URL with the password replaced by `***`. The adapter is given the real URL.
-    - An adapter whose `connection_for` raises (a malformed URL) is skipped, not fatal; a missing folder finds
-      nothing; `scan` takes `storage.path` from the engine's config to skip.
+      A missing port counts as the adapter's default and `localhost` as `127.0.0.1`, so a URL naming either
+      hides the open-port finding for the same server.
+    - **The password:** `connection` keeps the URL's password (a form needs it), `Candidate`'s repr masks it
+      (`model_dump` does not, so a Candidate is never logged or serialised), and `found.value` is the URL with
+      the password replaced by `***` and its query and fragment dropped (a password can sit in the query).
+      The adapter is given the real URL.
+    - An adapter whose `connection_for` raises or returns something `Candidate` rejects is skipped, not fatal,
+      and its error text is dropped (it could hold a password); a missing folder finds nothing; `scan` takes
+      `storage.path` from the engine's config to skip. Each port is probed once.
     - A DuckDB file is confirmed by the `DUCK` magic at byte 8 (the design names only SQLite's header).
     - The probe is `socket.create_connection(("127.0.0.1", port), timeout=0.2)`; the tests replace it with a fake.
     - L3 uses `Candidate.type`, `.connection` and `.missing` to fill the form and `.found` to say where a

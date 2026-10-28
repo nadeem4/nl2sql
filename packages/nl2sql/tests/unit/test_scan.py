@@ -186,6 +186,73 @@ def test_url_password_never_prints_in_a_candidate(engine, tmp_path):
     assert candidate.found.value == "postgres://app:***@db/shop"
 
 
+@pytest.mark.parametrize("url", [
+    "postgresql://h/db?password=s3cr3t",
+    "postgresql://u:p@h/db?sslpassword=s3cr3t#s3cr3t",
+    "mssql+pyodbc://h/db?odbc_connect=DRIVER%3Dx%3BPWD%3Ds3cr3t",
+])
+def test_password_in_the_query_never_prints_in_a_candidate(engine, tmp_path, url):
+    found = engine.datasources.scan(tmp_path, url=url, ports=False)
+
+    assert found
+    for candidate in found:
+        assert "s3cr3t" not in repr(candidate) and "s3cr3t" not in str(candidate)
+        assert "s3cr3t" not in candidate.found.value and "?" not in candidate.found.value
+
+
+def test_a_url_without_a_port_is_the_same_server_as_the_open_port(engine, tmp_path, monkeypatch):
+    monkeypatch.setattr(socket, "create_connection", lambda address, timeout=None: _FakeSocket())
+
+    for host in ("127.0.0.1", "localhost"):
+        found = engine.datasources.scan(tmp_path / "empty", url=f"postgresql://u:p@{host}/shop")
+
+        assert [(c.type, c.found.kind) for c in found if c.type == "postgres"] == [("postgres", "url")], host
+
+
+def test_each_port_is_probed_once_however_many_adapters_declare_it(engine, registry, tmp_path, monkeypatch):
+    class TwinAdapter(GhostAdapter):
+        pass
+
+    registry.add_adapter("twin", TwinAdapter)
+    asked = []
+
+    def probe(address, timeout=None, *args, **kwargs):
+        asked.append(address[1])
+        raise OSError("closed")
+
+    monkeypatch.setattr(socket, "create_connection", probe)
+
+    engine.datasources.scan(tmp_path / "empty", ports=True)
+
+    assert asked.count(9999) == 1
+
+
+def test_a_plugin_returning_a_bad_value_is_skipped_not_fatal(tmp_path, registry, no_ports):
+    class NoModel:
+        interface_version = 2
+        file_suffixes = ()
+        default_ports = ()
+        url_schemes = ("nomodel",)
+
+        @classmethod
+        def connection_for(cls, found):
+            return {"host": "h"}
+
+    class BadValue(GhostAdapter):
+        url_schemes = ("badvalue",)
+
+        @classmethod
+        def connection_for(cls, found):
+            return "password=s3cr3t"
+
+    registry.add_adapter("nomodel", NoModel)
+    registry.add_adapter("badvalue", BadValue)
+    with NL2SQL(make_config(tmp_path / "project"), registry=registry) as engine:
+        assert engine.datasources.scan(tmp_path, url="nomodel://x", ports=False) == []
+        assert engine.datasources.scan(tmp_path, url="badvalue://x", ports=False) == []
+        assert [c.type for c in engine.datasources.scan(tmp_path, url="ghost://x", ports=False)] == ["ghost"]
+
+
 def test_port_probe_is_loopback_only(engine, tmp_path, monkeypatch):
     asked = []
 

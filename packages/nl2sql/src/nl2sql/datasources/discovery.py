@@ -35,19 +35,20 @@ def scan(registry: Registry, folder: Path, *, url: Optional[str], ports: bool,
     def add(name: str, cls: Any, where: Found, shown: Optional[Found] = None) -> None:
         try:
             connection = cls.connection_for(where)
-        except Exception:  # an adapter's bug, or a URL it cannot read, is not a reason to stop the scan
-            return
-        if connection is None:
-            return
-        key = _identity(name, connection)
-        if key in seen:
+            if connection is None:
+                return
+            key = _identity(name, cls, connection)
+            if key in seen:
+                return
+            required = [field for field, info in cls.connection_model.model_fields.items() if info.is_required()]
+            candidate = Candidate(
+                type=name, title=getattr(cls, "title", None) or name, found=shown or where, connection=connection,
+                missing=[field for field in required if field not in connection],
+                installed=not missing_modules("adapter", cls), install_hint=getattr(cls, "install_hint", ""))
+        except Exception:  # a plugin's bug or a URL it cannot read; its error text may hold a password, so drop it
             return
         seen.add(key)
-        required = [field for field, info in cls.connection_model.model_fields.items() if info.is_required()]
-        found.append(Candidate(
-            type=name, title=getattr(cls, "title", None) or name, found=shown or where, connection=connection,
-            missing=[field for field in required if field not in connection],
-            installed=not missing_modules("adapter", cls), install_hint=getattr(cls, "install_hint", "")))
+        found.append(candidate)
 
     if url:
         scheme = urlsplit(url).scheme.partition("+")[0].lower()
@@ -62,7 +63,9 @@ def scan(registry: Registry, folder: Path, *, url: Optional[str], ports: bool,
         open_ports: Dict[int, bool] = {}
         for name, cls in adapters.items():
             for port in cls.default_ports:
-                if open_ports.setdefault(port, _is_open(port)):
+                if port not in open_ports:
+                    open_ports[port] = _is_open(port)
+                if open_ports[port]:
                     add(name, cls, Found(kind="port", value=f"{LOOPBACK}:{port}"))
     return found
 
@@ -114,18 +117,28 @@ def _is_open(port: int) -> bool:
     return True
 
 
-def _identity(name: str, connection: Dict[str, Any]) -> Tuple[Any, ...]:
-    """What makes two findings the same database: its server and port, or its file."""
+def _identity(name: str, cls: Any, connection: Dict[str, Any]) -> Tuple[Any, ...]:
+    """What makes two findings the same database: its server and port, or its file.
+
+    A missing port is the adapter's default, and ``localhost`` is the loopback address.
+    """
     if "host" in connection:
-        return name, connection["host"], connection.get("port")
+        host = LOOPBACK if str(connection["host"]).lower() == "localhost" else connection["host"]
+        port = connection.get("port")
+        if port is None:
+            field = cls.connection_model.model_fields.get("port")
+            port = field.default if field is not None and isinstance(field.default, int) else None
+        return name, host, port
     return name, str(Path(str(connection.get("database"))).resolve())
 
 
 def _without_password(url: str) -> str:
-    """``url`` with the password in it replaced by ``***``, so the candidate can be printed."""
+    """``url`` with the password replaced by ``***`` and the query and fragment dropped.
+
+    A password can sit in the query too (``?password=``, an ODBC string), so nothing after the path is kept.
+    """
     parts = urlsplit(url)
     userinfo, at, host = parts.netloc.rpartition("@")
     user, colon, _ = userinfo.partition(":")
-    if not colon:
-        return url
-    return urlunsplit(parts._replace(netloc=f"{user}:***{at}{host}"))
+    netloc = f"{user}:***{at}{host}" if colon else parts.netloc
+    return urlunsplit(parts._replace(netloc=netloc, query="", fragment=""))
