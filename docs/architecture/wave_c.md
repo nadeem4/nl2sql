@@ -1567,9 +1567,9 @@ flowchart TD
       disk) or an id outside it is `ResultNotFound`. The tool turns `ResultNotFound` (expired or withheld
       rows) and a kind the data cannot draw into `ToolNotApplicable`, and reads the conversation's tenant
       (`conversation.tenant_id`, else the caller's).
-    - A bare `trace_id` is checked like `engine.results.page`: tenant and run id only. The withheld rows' files
-      are on disk, so anyone holding the trace id for that tenant can page them; withholding is enforced on
-      `QueryResult`, not on the disk.
+    - A bare `trace_id` is checked like `engine.results.page`: tenant and run id only. A withheld run's files
+      were once readable this way; that gap is closed (C-W1): a withheld run leaves a marker in the results
+      store and every read path answers `ResultNotFound` (see `docs/configuration/hooks.md`).
     - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
     - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
       The stub test moves `chart` out of its tables.

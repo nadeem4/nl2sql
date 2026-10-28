@@ -293,6 +293,21 @@ _HOOK_ENDINGS = {ErrorCode.HOOK_DENIED.value, ErrorCode.HOOK_FAILED.value, Error
                  ErrorCode.COST_LIMIT_EXCEEDED.value}
 
 
+def _ended_by_hook(errors: Sequence[Mapping[str, Any]]) -> bool:
+    return any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
+
+
+def _withhold_stored(ctx: Any, result: "QueryResult") -> None:
+    """Makes the saved results of a run a hook ended unreadable by its trace id, as its returned result is blank.
+
+    Without this the parquet files and manifest stay readable by tenant and run id alone
+    (``engine.results``, the REST routes). If the marker cannot be written the run fails.
+    """
+    store = getattr(ctx, "artifact_store", None)
+    if store is not None and result.trace_id and _ended_by_hook(result.errors):
+        store.withhold(ctx.tenant_id, result.trace_id)
+
+
 def result_from_state(
     state: Dict[str, Any],
     artifact_store: Any = None,
@@ -323,7 +338,7 @@ def result_from_state(
 
     # A hook that ended the run withholds its data as well as its answer:
     # no rows, no artifact references, no result manifest.
-    withheld = any(error.get("error_code") in _HOOK_ENDINGS for error in errors)
+    withheld = _ended_by_hook(errors)
     sub_queries = _sub_query_results(state, None if withheld else artifact_store, sample_rows, warnings)
     usage = QuestionUsage.model_validate(state.get("usage") or {})
     usage.plan_cache_hits = sum(1 for sq in sub_queries if sq.plan_source == "cache")
@@ -580,6 +595,7 @@ class QueryAPI:
                     knowledge=caller_knowledge(self._ctx, state),
                     question=question,
                 )
+                _withhold_stored(self._ctx, result)
             except BaseException as exc:
                 # A KeyboardInterrupt too: every scope ends with a terminal event.
                 scope.fail(f"The run failed: {exc or type(exc).__name__}", ErrorCode.UNKNOWN_ERROR)
@@ -742,7 +758,8 @@ class QueryAPI:
                     result = result_from_state(state, artifact_store=getattr(self._ctx, "artifact_store", None),
                                                knowledge=caller_knowledge(self._ctx, state),
                                                question=question)
-                    finished = self.close_scope(scope, result)
+                    _withhold_stored(self._ctx, result)
+                    finished =self.close_scope(scope, result)
                 if finished is not None and "run.finished" in allowed:
                     deliver(finished.model_copy(update={
                         "data": {**finished.data, "result": result.model_dump(mode="json")}}))

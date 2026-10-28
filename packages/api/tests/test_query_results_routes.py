@@ -109,6 +109,19 @@ def test_an_unknown_foreign_or_crafted_id_is_404(client, path):
     assert "secret" not in response.text
 
 
+@pytest.mark.parametrize("suffix", ["", ".csv"])
+def test_a_withheld_run_is_404_by_its_trace_id(client, suffix):
+    # What a hook that ended the run leaves behind: its results are on disk, but withheld.
+    store = app.dependency_overrides[get_engine]()._runtime.artifact_store
+    assert client.get(f"/api/v1/query/run-1/results/combine_g1{suffix}").status_code == 200
+
+    store.withhold("t1", "run-1")
+
+    response = client.get(f"/api/v1/query/run-1/results/combine_g1{suffix}")
+    assert response.status_code == 404
+    assert "n1" not in response.text
+
+
 def test_the_routes_need_a_role_like_query_does(client):
     app.dependency_overrides.pop(get_user_context)
 

@@ -36,6 +36,9 @@ class _Store:
     def read_result_frame(self, ref):
         return SimpleNamespace(columns=["n"], rows=[[1], [2], [3]], row_count=3)
 
+    def withhold(self, tenant_id, request_id):
+        pass
+
 
 def _bind(fn, points):
     return HookBinding(name="review", hook=fn, points=frozenset(points))

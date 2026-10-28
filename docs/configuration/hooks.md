@@ -83,7 +83,13 @@ the run; it does not fall back to the generated path. **A plan-only run**
 - **A deny** ends the run with the error `HOOK_DENIED` (never retried), whose
   message is the hook's `reason`. A run a hook ended carries none of its
   data: no answer, no rows, no artifact references, no result manifest.
-  While any hook is attached at `answer.after`, `stream_query` does not
+  The same holds for the run's stored results: the run is marked withheld in
+  the results store, so `engine.results.manifest`, `page`, `csv` and `chart`
+  and the REST results routes answer `ResultNotFound` (404) for its
+  `trace_id`, from `run_query` and `stream_query` alike. The files stay until
+  retention purges them, but nothing reads them. A deny, `HOOK_FAILED`,
+  `NEEDS_APPROVAL` and `COST_LIMIT_EXCEEDED` all withhold. The run's trace
+  still records that it was withheld (the error), without rows. While any hook is attached at `answer.after`, `stream_query` does not
   stream the answer as it is written (no `answer.delta` events), and holds
   the `result.manifest` event until the hooks allowed the answer; on a deny
   it is never sent. The answer arrives whole in `run.finished`. At a per-sub-query point (`plan.after`,

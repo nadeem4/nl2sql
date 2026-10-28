@@ -126,7 +126,10 @@ user who produced it is left to a multi-user deployment.
   of datasources is checked against the role again. After the validator a
   hook may only stop the run. Hooks **fail closed**: an exception denies
   with `HOOK_FAILED` unless that hook is configured `on_error: open`. See
-  [Hooks](../configuration/hooks.md).
+  [Hooks](../configuration/hooks.md). A run a hook ended is **withheld**: its
+  returned result is blank and its saved results are unreadable by trace id
+  (`engine.results` and the REST results routes raise `ResultNotFound`), so a
+  deny cannot be bypassed by paging the run's files.
 - **Cost rule** (optional, `policies.cost`): the built-in `policy.cost` hook
   asks the database for the rows a query is estimated to read, before it
   runs, and allows it, asks a person to approve it or refuses it

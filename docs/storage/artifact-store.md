@@ -63,9 +63,15 @@ A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, a
 `ResultReader` (`execution/artifacts/results.py`), behind `engine.results` (`manifest`, `page` and `csv`) (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
 
 1. The request id and the result id must be plain tokens (letters, digits, `_`, `-`; up to 128 characters). Anything else is `ResultNotFound`, before any path is built.
-2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused.
+2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused. A withheld run (below) is not found either.
 3. The result id must be a `node_id` the manifest lists. The parquet key is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a key.
 4. A page is `scan.slice(offset, limit).collect()` on a polars scan, so only that slice is read. A CSV export collects one `CSV_CHUNK_ROWS` (10,000) slice at a time and yields it as CSV text, header first.
+
+### Withheld runs
+
+When a hook ends a run (`HOOK_DENIED`, `HOOK_FAILED`, `NEEDS_APPROVAL`, `COST_LIMIT_EXCEEDED`), `run_query` and `stream_query` call `ArtifactStore.withhold(tenant_id, request_id)`, which writes a marker beside the manifest, `<tenant_id>/<request_id>/manifest.withheld` by default (the manifest's key with `.withheld` for `.json`). `read_manifest` and `scan_result` act as if the run had saved nothing while the marker exists, so every read path, `ResultReader.head` and the REST routes included, raises `ResultNotFound`.
+
+The files are not deleted, because the `ResultStore` protocol has no delete: a marker uses only `write` and `exists`, so it works the same on the `local` store and on any store of your own, with no protocol change. The marker is newer than the files and is purged with them by retention. If the marker cannot be written, the run fails rather than leave its results readable.
 
 ## Where the files go
 
