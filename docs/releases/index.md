@@ -4,6 +4,7 @@ What each release is for, in plain words. The full list of commits is in
 [`CHANGELOG.md`](https://github.com/nadeem4/nl2sql/blob/main/CHANGELOG.md).
 How a release is cut is in [Releasing](../development/releasing.md).
 
+- [0.8.0](0.8.0.md): Wave B: business knowledge in the index and prompts, a review queue, a schema profiler, clarifying questions, "why this answer" and a cost guard.
 - [0.7.0](0.7.0.md): Wave A: events and observers, hooks and approval, `nl2sql eval` with a regression gate, five-signal routing, answer sanity checks, cost caps, schema drift and an MCP server.
 - [0.6.0](0.6.0.md): a real-database test bed, adapter SDK v2 and its conformance kit, four storage slots, OpenAI-compatible providers and allow/deny policy globs.
 - [0.5.0](0.5.0.md): Configuration v2, one `nl2sql.yaml`, an extension registry, a namespaced Python API and per-engine config; a clean break from 0.4.
