@@ -146,10 +146,34 @@ class DatasourcesAPI:
 
         return scan(self._ctx.registry, Path(folder), url=url, ports=ports, skip=self._ctx.config.storage.path)
 
+    def dialect(self, datasource_id: str) -> str:
+        """The sqlglot dialect name of the datasource's adapter (``postgres``, ``tsql``...); raises for a datasource the engine does not have."""
+        return self._ctx.ds_registry.get_dialect(datasource_id)
+
     def diagram(self, datasource_id: str, *, user_context: UserContext, tables: Optional[List[str]] = None) -> str:
-        """The datasource's tables and relationships the caller's scope reaches, as Mermaid text (K2 fills this;
-        docs/architecture/wave_c.md, section 4)."""
-        raise arrives_with("engine.datasources.diagram", "K2")
+        """The datasource's tables and relationships ``user_context`` may see, as a Mermaid ``erDiagram``.
+
+        Drawn from ``schema(...)``, so exactly the tables the planner would be given for that caller: a denied table,
+        and every foreign key or glossary join that names one, is left out. Each table shows its primary and foreign
+        key columns; each foreign key and each glossary join the caller may see is a relationship. With ``tables``,
+        those tables and the ones one relationship away; without, the whole datasource, cut to the 30 with the most
+        relationships and a ``%% N more tables not shown`` comment says so. No colour, no ``%%{init}`` line, no
+        model call. ``user_context`` is required, as for ``schema``.
+
+        Raises:
+            ValueError: ``tables`` names no table the caller may see.
+        """
+        from nl2sql.charts.diagram import schema_diagram
+        from nl2sql.knowledge.scope import deny_names, visible
+
+        view = self.schema(datasource_id, user_context=user_context)
+        joins: List[Any] = []
+        scope = self._ctx.policy_engine.scope(user_context, datasource_id)
+        snapshot = self._ctx.vector_store.snapshot(datasource_id) if view["tables"] else None
+        if snapshot is not None:
+            joins = visible(self._ctx.knowledge.get(datasource_id), snapshot, scope.allows, deny_names(scope)).joins
+        return schema_diagram(view, tables, joins=joins)
+
 
     def save(self, datasource_id: str, *, by: UserContext, env_file: bool = False) -> Path:
         """One datasource as ``datasources/<id>.yaml`` beside the config the engine was loaded from; ``by`` must

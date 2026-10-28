@@ -2,7 +2,7 @@
 
 !!! note "Wave C, 0.9"
     `start`, `ask`, `stream`, `retry`, `ask_only`, `tool`, `report`, `get`, `list` and `delete` work, with the
-    [chat tools](tools.md) `chart` and `report`. The design is [Wave C, section 3](../architecture/wave_c.md#3-conversation).
+    [chat tools](tools.md) `chart`, `diagram` and `report`. The design is [Wave C, section 3](../architecture/wave_c.md#3-conversation).
 
 A conversation is a chat over the database. The model decides, step by step, whether to answer or to ask the
 database a question through the same typed plan and validator as `run_query`. It never writes SQL and never

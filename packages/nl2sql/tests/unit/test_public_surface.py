@@ -34,7 +34,7 @@ PUBLIC_SURFACE = {
     "ClarificationChoice", "Explanation", "ExplainedStep", "TermUse",
     # Wave C: conversations, charts, dashboards and workspaces, chat tools, the launchpad and API keys
     "Conversation", "Turn", "ToolStep", "ToolCall", "ToolOutput", "ModelStep", "ConversationInfo",
-    "ChartSpec", "ChartData", "Encoding", "ColumnKind",
+    "ChartSpec", "ChartData", "Encoding", "ColumnKind", "diagram_for",
     "Workspace", "Dashboard", "DashboardInfo", "DashboardView", "DashboardRun", "Tile", "TileRun", "TileLayout",
     "ChartPlan", "StoredQuery", "DashboardFilter", "Schedule", "ScheduleIdentity", "SkippedTile", "StepRef",
     "TileArrangement", "DashboardEdit", "RenameDashboard", "RenameTile", "SetTileChart", "RemoveTile", "Arrange",
