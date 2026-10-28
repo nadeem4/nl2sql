@@ -156,5 +156,8 @@ def test_the_model_charts_the_answer_it_just_got_and_the_report_has_its_rows(mak
     assert seen["output"]["chart"]["kind"] == "big_number" and "59" not in json.dumps(seen), "the model sees no chart data"
     report = engine.conversations.tool(conversation.id, "report", {}, user_context=_asker())
     body = report.steps[0].output.body
-    assert f"## {COUNT}" in body and "| 59 |" in body and f"Trace: {turn.steps[0].trace_id}" in body
+    assert f"## {COUNT}" in body and f"Trace: {turn.steps[0].trace_id}" in body
+    assert "| 59 |" not in body, "the report tool stores no rows"
+    full = engine.conversations.report(conversation.id, user_context=_asker())
+    assert "| 59 |" in full and f"Trace: {turn.steps[0].trace_id}" in full
     assert [c["name"] for c in server.calls].count("ModelStep") == 3, "the report made no model call"
