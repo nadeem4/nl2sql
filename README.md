@@ -262,7 +262,8 @@ each LLM step. Written to the demo project's `.env` and `llm.yaml`.
 
 **Retrieval inspector:** run the engine's vector search for any text against the
 live index, with k, lambda, entry types and datasource as knobs, and see what
-MMR picked and what it dropped. No LLM call.
+MMR picked and what it dropped, as the role you chose, so entries it may not
+read are not shown. No LLM call.
 
 ![The Retrieval inspector page showing picks, similarity and MMR scores](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-retrieval.png)
 

@@ -3,6 +3,8 @@ index's health, building it and inspecting retrieval.
 
 Each runs over a small fake context, so no database, model or key is needed.
 """
+from types import SimpleNamespace
+
 import pytest
 import yaml
 from index_helpers import Chunk, TestIndex  # same directory
@@ -12,6 +14,7 @@ from nl2sql import NL2SQL, Policies, UserContext
 from nl2sql.llm.registry import LLMRegistry
 from nl2sql.policies import PolicyEngine
 from nl2sql.secrets import SecretManager
+from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.schema import (
     ColumnContract,
     ColumnMetadata,
@@ -69,6 +72,7 @@ class _Context:
         }))
         self.llm_registry = llm_registry
         self.curated = None
+        self.knowledge = SimpleNamespace(get=lambda _ds: DatasourceKnowledge())
 
     @property
     def vector_store(self):
@@ -187,5 +191,5 @@ def test_index_build_hands_the_runtime_to_the_rebuild(monkeypatch):
 
 
 def test_index_inspect_runs_the_stores_mmr_search(tmp_path):
-    record = _engine(_Context(tmp_path, snapshot=_snapshot())).index.inspect("albums", k=3)
+    record = _engine(_Context(tmp_path, snapshot=_snapshot())).index.inspect("albums", k=3, user_context=ADMIN)
     assert [e["datasource_id"] for e in record["pool"]] == ["chinook"]

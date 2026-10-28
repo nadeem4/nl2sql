@@ -46,7 +46,8 @@ Twenty-one routes:
 ``GET  /api/retrieval``        whether the Retrieval inspector is on, and its choices
                                (``engine.index.inspect_defaults()``)
 ``POST /api/retrieval``        one MMR search of the live index: the pool with scores,
-                               the picks in order, and what was dropped
+                               the picks in order, and what was dropped, as the
+                               request's ``role`` (only what that role may read)
 ``GET  /api/feedback``         whether answer feedback is on, the counts and the ratings
 ``POST /api/feedback``         rate a run this playground answered: up or down, and a note
                                (``engine.feedback``)
@@ -193,6 +194,9 @@ class RetrievalRequest(BaseModel):
     lambda_mult: float = Field(default=0.7, ge=0.0, le=1.0)
     types: List[str] = Field(default_factory=list)
     datasource_id: Optional[str] = None
+    # The role the search is made as, required like /api/schema's (D33: no default view): the pool holds only
+    # what that role may read.
+    role: str
 
 
 # The longest note a rating keeps (the feedback table keeps no more).
@@ -723,7 +727,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             raise HTTPException(status_code=422, detail=f"Unknown entry types: {', '.join(unknown)}.")
         try:
             return engine.index.inspect(req.query, k=req.k, lambda_mult=req.lambda_mult,
-                                        types=req.types, datasource_id=req.datasource_id or None)
+                                        types=req.types, datasource_id=req.datasource_id or None,
+                                        user_context=UserContext(roles=[req.role]))
         except Exception as exc:  # an unreadable index store
             raise HTTPException(status_code=409, detail=str(exc))
 

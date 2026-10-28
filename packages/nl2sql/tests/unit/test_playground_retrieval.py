@@ -11,18 +11,54 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
+from types import SimpleNamespace
+
 from nl2sql import NL2SQL
 from nl2sql.testing.facade import StubDatasources
 from nl2sql.cli.demo.playground.app import build_app
 from nl2sql.embeddings import EmbeddingInfo
 from nl2sql.indexing.retrieval import Retriever
+from nl2sql_sdk.knowledge import DatasourceKnowledge
+from nl2sql_sdk.schema import TableRef
 
 from test_retrieval_trace import QUESTION, _store  # noqa: E402  (same directory)
 
 
+def _chinook_snapshot():
+    """The tables the test entries name, as bare names (the entries' ``table`` metadata is the bare name)."""
+    tables = {name: SimpleNamespace(full_name=name, table=TableRef(schema_name="main", table_name=name))
+              for name in ("Genre", "Track", "Invoice", "InvoiceLine", "Artist", "Employee")}
+    return SimpleNamespace(contract=SimpleNamespace(tables=tables))
+
+
 class _Snapshots:
     def get_snapshot(self, _ds, _version):
-        return None
+        return _chinook_snapshot()
+
+
+class _Scope:
+    """What ``policy_engine.scope`` returns: the ``analyst`` role may not read ``Employee``."""
+
+    grants: list = []
+    check = None
+
+    def __init__(self, datasource_id, roles):
+        self.datasource_id, self.roles = datasource_id, roles
+
+    def reaches_datasource(self):
+        return True
+
+    def allows(self, _schema, table):
+        return not ("analyst" in self.roles and table == "Employee")
+
+
+class _Policies:
+    def __init__(self):
+        self.asked_as = []
+
+    def scope(self, user_context, datasource_id):
+        self.asked_as.append(user_context.roles)
+        return _Scope(datasource_id, user_context.roles)
 
 
 class _Registry:
@@ -48,6 +84,9 @@ class _Engine(NL2SQL):
         self._runtime.state = _Snapshots()
         self._runtime.ds_registry = _Registry()
         self._runtime.curated = None
+        self._runtime.policy_engine = _Policies()
+        self._runtime.knowledge = SimpleNamespace(get=lambda _ds: DatasourceKnowledge())
+        store.state = self._runtime.state
 
     @property
     def datasources(self):
@@ -72,7 +111,7 @@ def test_options_say_it_is_on_and_list_the_choices(tmp_path):
 
 
 def test_a_search_returns_the_pool_with_scores_the_picks_and_the_text(tmp_path):
-    response = _client(tmp_path).post("/api/retrieval", json={"query": QUESTION, "k": 3})
+    response = _client(tmp_path).post("/api/retrieval", json={"role": "admin", "query": QUESTION, "k": 3})
 
     assert response.status_code == 200
     body = response.json()
@@ -87,11 +126,11 @@ def test_a_search_returns_the_pool_with_scores_the_picks_and_the_text(tmp_path):
 def test_the_toggles_narrow_and_reweigh_the_search(tmp_path):
     client = _client(tmp_path)
 
-    tables = client.post("/api/retrieval", json={"query": QUESTION, "k": 2, "types": ["schema.table"],
+    tables = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION, "k": 2, "types": ["schema.table"],
                                                  "datasource_id": "chinook", "lambda_mult": 1.0}).json()
-    diverse = client.post("/api/retrieval", json={"query": QUESTION, "k": 2, "types": ["schema.table"],
+    diverse = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION, "k": 2, "types": ["schema.table"],
                                                   "lambda_mult": 0.0}).json()
-    other = client.post("/api/retrieval", json={"query": QUESTION, "datasource_id": "sales"}).json()
+    other = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION, "datasource_id": "sales"}).json()
 
     assert {e["type"] for e in tables["pool"]} == {"schema.table"}
     assert tables["filter"] == {"datasource_id": "chinook", "types": ["schema.table"]}
@@ -99,6 +138,22 @@ def test_the_toggles_narrow_and_reweigh_the_search(tmp_path):
     assert [e["pick_order"] for e in tables["pool"][:2]] == [1, 2]
     assert diverse["pool"][1]["picked"] is False
     assert other["pool"] == []
+
+
+def test_a_search_is_made_as_the_role_asked_and_shows_only_what_it_may_read(tmp_path):
+    engine = _Engine(_store(tmp_path))
+    app = build_app(engine, questions=[], roles=["admin", "analyst"], mode="replay", dataset="chinook",
+                    project_dir=tmp_path)
+    client = TestClient(app, base_url="http://127.0.0.1:8765")
+    tables = lambda body: {e["table"] for e in body["pool"] if e["type"] == "schema.table"}  # noqa: E731
+
+    as_admin = client.post("/api/retrieval", json={"query": QUESTION, "role": "admin"}).json()
+    as_analyst = client.post("/api/retrieval", json={"query": QUESTION, "role": "analyst"}).json()
+
+    assert "Employee" in tables(as_admin) and "Employee" not in tables(as_analyst)
+    assert engine._runtime.policy_engine.asked_as == [["admin"], ["analyst"]]
+    # No default view (D33): a search that names no role is refused, as /api/schema refuses one.
+    assert client.post("/api/retrieval", json={"query": QUESTION}).status_code == 422
 
 
 @pytest.mark.parametrize("body", [
@@ -116,7 +171,7 @@ def test_a_remote_bind_is_refused_without_the_flag(tmp_path, host):
     client = _client(tmp_path, host=host)
 
     options = client.get("/api/retrieval").json()
-    response = client.post("/api/retrieval", json={"query": QUESTION})
+    response = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION})
 
     assert options["available"] is False
     assert "--allow-settings" in options["reason"] and "sample values" in options["reason"]
@@ -127,14 +182,14 @@ def test_a_remote_bind_is_refused_without_the_flag(tmp_path, host):
 def test_a_remote_bind_is_allowed_with_the_flag(tmp_path):
     client = _client(tmp_path, host="0.0.0.0", allow_settings=True)
 
-    assert client.post("/api/retrieval", json={"query": QUESTION}).status_code == 200
+    assert client.post("/api/retrieval", json={"role": "admin", "query": QUESTION}).status_code == 200
 
 
 def test_a_search_must_come_from_the_page_itself(tmp_path):
     client = _client(tmp_path)
 
-    cross = client.post("/api/retrieval", json={"query": QUESTION}, headers={"Origin": "http://evil.example"})
-    rebound = client.post("/api/retrieval", json={"query": QUESTION}, headers={"Host": "evil.example:8765"})
+    cross = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION}, headers={"Origin": "http://evil.example"})
+    rebound = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION}, headers={"Host": "evil.example:8765"})
     form = client.post("/api/retrieval", content=f"query={QUESTION}",
                        headers={"Content-Type": "application/x-www-form-urlencoded"})
 
@@ -147,6 +202,6 @@ def test_an_empty_index_answers_with_an_empty_pool(tmp_path):
     filled = _store(tmp_path)
     client = _client(tmp_path, store=Retriever(filled.index, filled.namespace, filled.embeddings, {}))
 
-    body = client.post("/api/retrieval", json={"query": QUESTION}).json()
+    body = client.post("/api/retrieval", json={"role": "admin", "query": QUESTION}).json()
 
     assert body["pool"] == [] and body["picks"] == []

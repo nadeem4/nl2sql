@@ -204,6 +204,8 @@ class Retriever:
     FETCH_MULTIPLIER = 4
     LAMBDA_MULT = 0.7
     CURATED_FETCH_MULTIPLIER = 10
+    # The inspector's scoped search asks for this many times the candidates, so hiding entries does not empty the pool.
+    SCOPE_OVERFETCH = 4
     # Routing (route): the entries each vote search reads, and the reciprocal
     # rank fusion constant (the value the RRF literature uses). Constants until
     # the routing suite shows a reason to tune them (D28).
@@ -265,7 +267,8 @@ class Retriever:
                     vector=entries[i].vector) for i in order]
 
     def mmr(self, query: str, *, k: int, fetch_k: int, lambda_mult: float, where: Filter,
-            with_text: bool = False, exact: bool = False) -> Tuple[List[Document], Dict[str, Any]]:
+            with_text: bool = False, exact: bool = False,
+            allow: Optional[Callable[[Hit], bool]] = None) -> Tuple[List[Document], Dict[str, Any]]:
         """Runs one MMR search and records it.
 
         Returns:
@@ -274,9 +277,15 @@ class Retriever:
             picks in the order MMR made them, and what was dropped.
             ``with_text`` also records each entry's embedded text (the
             playground's inspector only; a run trace never carries it).
+            ``allow`` keeps only the hits it accepts (the inspector's caller
+            scope). The store cannot express it as a filter, so it asks for
+            ``SCOPE_OVERFETCH`` times the candidates and keeps the first
+            ``fetch_k`` accepted ones.
         """
         embedding = self.embeddings.embed_query(query)
-        pool_hits = self._pool(embedding, fetch_k, where, exact)
+        pool_hits = self._pool(embedding, fetch_k * (self.SCOPE_OVERFETCH if allow else 1), where, exact)
+        if allow:
+            pool_hits = [h for h in pool_hits if allow(h)][:fetch_k]
         vectors = [h.vector for h in pool_hits]
         picks = maximal_marginal_relevance(embedding, vectors, lambda_mult, k) if vectors else []
         relevance = cosine_similarity([embedding], vectors)[0] if vectors else []
@@ -582,15 +591,18 @@ class Retriever:
         return sorted(found, key=lambda c: c.score, reverse=True)
 
     def inspect(self, query: str, k: int = 8, lambda_mult: float = LAMBDA_MULT, types: Optional[List[str]] = None,
-                datasource_id: Optional[str] = None, fetch_k: Optional[int] = None) -> Dict[str, Any]:
+                datasource_id: Optional[str] = None, fetch_k: Optional[int] = None,
+                allow: Optional[Callable[[Hit], bool]] = None) -> Dict[str, Any]:
         """One MMR search over any entry types, for the playground's inspector.
 
         The same search the engine runs, with the knobs exposed and each
         entry's embedded text included. It reads the live builds only.
+        ``allow`` limits the pool to the entries it accepts (see :meth:`mmr`).
         """
         fetch_k = fetch_k or k * self.FETCH_MULTIPLIER
         live = self._live([datasource_id] if datasource_id else None)
         where = Filter(eq={"datasource_id": datasource_id} if datasource_id else {},
                        **{"in": {**({"type": list(types)} if types else {}), **live}})
-        _, record = self.mmr(query, k=k, fetch_k=fetch_k, lambda_mult=lambda_mult, where=where, with_text=True)
+        _, record = self.mmr(query, k=k, fetch_k=fetch_k, lambda_mult=lambda_mult, where=where, with_text=True,
+                             allow=allow)
         return {"filter": {"datasource_id": datasource_id, "types": list(types or [])}, **record}

@@ -412,8 +412,9 @@ with `record: clips` runs the same script in CI and opens a pull request.
   (`#retrieval-k`, the pool is shown as `4 * k`), lambda (`#retrieval-lambda`),
   a datasource filter (`#retrieval-datasource`) and one checkbox per entry type
   (`#retrieval-type-table`, `-column`, `-datasource`, `-join`, `-metric`). It
-  posts to `POST /api/retrieval`; after the first search every knob searches
-  again. The result (`#retrieval-result`) is the pool nearest first, with
+  posts to `POST /api/retrieval` with the role chosen in "Ask as" (`role`, as
+  `/api/ask` takes it), and the pool holds only what that role may read; after
+  the first search every knob, and a change of role, searches again. The result (`#retrieval-result`) is the pool nearest first, with
   similarity (with a bar placed within the pool's own range, nearest full and
   farthest empty, since raw cosines bunch together), MMR pick order, the
   score each pick won with and its overlap with

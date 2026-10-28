@@ -136,7 +136,7 @@ const TYPE_LABELS = { "schema.datasource": "Datasources", "schema.table": "Table
 // engine fixes (k, lambda, which entry types, which datasource) exposed. The
 // embedder is local, so every search is free; after the first one, changing a
 // knob searches again.
-export default function RetrievalInspector({ options, error, question }) {
+export default function RetrievalInspector({ options, error, question, role }) {
   const defaults = (options && options.defaults) || { k: 8, lambda_mult: 0.7, fetch_multiplier: 4 };
   const [query, setQuery] = useState(question || "");
   const [k, setK] = useState(defaults.k);
@@ -158,7 +158,7 @@ export default function RetrievalInspector({ options, error, question }) {
       const response = await fetch("/api/retrieval", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text, k: Number(k), lambda_mult: Number(lambda), types, datasource_id: datasource || null }),
+        body: JSON.stringify({ query: text, k: Number(k), lambda_mult: Number(lambda), types, datasource_id: datasource || null, role }),
       });
       const reply = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -181,7 +181,7 @@ export default function RetrievalInspector({ options, error, question }) {
     const timer = setTimeout(search, 250);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [k, lambda, types, datasource]);
+  }, [k, lambda, types, datasource, role]);
 
   if (error) return <p className="fault">The inspector could not be read: {error}</p>;
   if (!options) return <p className="quiet">Checking the index.</p>;

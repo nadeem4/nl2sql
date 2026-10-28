@@ -2126,6 +2126,40 @@ holds.
       `tests/unit/test_profiler_drafts.py` (the moved sanitizer). The enrichment
       tests are deleted with the code.
 
+!!! note "Built (follow-up K3b): the inspector is scoped by caller"
+    Origin: finding 4 of the K3 review. `engine.index.inspect(..., *, user_context)`
+    now takes the caller as a required keyword (D60): no default, a missing one is
+    a `TypeError`. Its pool holds only what the caller's scope reaches, from the
+    same `policy_engine.scope` the query path reads, and the same visibility
+    `engine.knowledge.show` applies; there is no second scope implementation.
+
+    - **Rules**, per hit, in `IndexAPI._reachable`: a datasource the caller does
+      not reach, or that has no snapshot, shows nothing; a `schema.table` or
+      `schema.column` entry needs its table allowed, a `schema.relationship`
+      both ends; a `knowledge.term` needs the term to be in
+      `knowledge.scope.visible(...)` (so a term on a denied table is hidden);
+      datasource, example and metric entries pass; any other type
+      (`curated.verified_query`) is not shown. Last, an entry whose text names a
+      denied table (`knowledge.scope.mentions`) is dropped, so a table entry
+      whose glossary description names a denied table is hidden whole, though
+      `show` would hide only the description.
+    - **Recall.** The store cannot filter by an allowed set per datasource, so
+      `Retriever.mmr(..., allow=)` asks for `SCOPE_OVERFETCH` (4) times the
+      candidates, keeps the first `fetch_k` allowed ones, then runs MMR. A caller
+      for whom most matches are hidden can still get a short pool; one for whom
+      few are hidden gets a full one.
+    - **The playground.** `RetrievalRequest.role` is required (no default view,
+      as `/api/schema`, D33: a request without it is a 422), and `/api/retrieval`
+      searches as `UserContext(roles=[role])`; `Retrieval.jsx` sends the role
+      chosen in "Ask as", and the committed bundle is rebuilt. The playground
+      trusts the role the page sends (see
+      [the security model](../security/model.md)), as the Ask page does.
+    - **Tests.** `tests/unit/test_index_inspect_scope.py` (denied tables, hidden
+      terms, relationships needing both ends, verified queries never shown, an
+      unindexed datasource, the over-fetch at `Retriever` level) and
+      `test_a_search_is_made_as_the_role_asked_and_shows_only_what_it_may_read`
+      in `tests/unit/test_playground_retrieval.py`.
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |

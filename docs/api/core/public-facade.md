@@ -230,7 +230,7 @@ engine = NL2SQL.demo()
 admin = UserContext(roles=["admin"])                         # the schema is always one caller's view
 engine.datasources.schema("chinook", user_context=admin)["tables"][0]["name"]   # 'Album'
 engine.index.health()["status"]                              # 'ok'
-engine.index.inspect("top customers", k=4)["picks"]
+engine.index.inspect("top customers", k=4, user_context=admin)["picks"]
 ```
 
 ### Top-level exports

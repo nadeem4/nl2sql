@@ -548,7 +548,7 @@ export default function App() {
 
         {page === "retrieval" && (
           <div className="sheet" id="retrieval-panel">
-            <RetrievalInspector options={retrieval} error={retrievalError} question={question} />
+            <RetrievalInspector options={retrieval} error={retrievalError} question={question} role={role} />
           </div>
         )}
       </main>

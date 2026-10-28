@@ -125,12 +125,22 @@ names. The current model's namespace is kept. `nl2sql index prune` calls it.
 ### index.inspect
 
 Signature:
-`inspect(query, k=8, lambda_mult=None, types=None, datasource_id=None) -> dict`
+`inspect(query, k=8, lambda_mult=None, types=None, datasource_id=None, *, user_context) -> dict`
 
 One MMR search of the live index, as the engine runs it: the candidate pool
 with scores, the picks in order and what was dropped. `types` limits the
 entry types (`schema.table`, ...). It reads index metadata only and needs no
 LLM.
+
+`user_context` is required (a missing one is a `TypeError`): the pool holds
+only the entries the caller's scope reaches. A denied table's entries, a
+glossary term `knowledge.show` would hide from the caller, an entry whose text
+names a denied table, and every entry of a datasource the caller cannot reach
+or that is not indexed are left out; verified-query entries are never shown.
+The hiding happens after the search, from a pool four times larger than
+usual, so a caller for whom most matches are hidden can get a short pool. The
+playground and REST API take the role from the request without verifying it;
+see [the security model](../../security/model.md).
 
 ### index.check
 

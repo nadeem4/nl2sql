@@ -348,7 +348,9 @@ it in their run trace (see [Debugging a run](../observability/debugging.md#retri
 and the playground's Retrieval inspector (`engine.index.inspect`) runs the same
 search for any text, with k, lambda, entry types and datasource exposed. That
 inspector is the tool for chunking experiments: change the chunks, rebuild,
-search the same text, and diff the **Copy as text** output.
+search the same text, and diff the **Copy as text** output. It is run as a
+caller (`user_context` is required): entries the caller's scope hides are left
+out of the pool.
 
 ## Routing: five signals, fused
 

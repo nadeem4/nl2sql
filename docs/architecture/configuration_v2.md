@@ -1266,7 +1266,7 @@ the playground stops importing `nl2sql.pipeline.steps` and
 | `rebuild_index(datasource_ids, enrich, full, on_progress, switch_guard)` | `index.build(datasource_ids=None, *, full=False, curated_only=False, enrich=False, on_progress=None, switch_guard=None)` |
 | `clear_index()`, `indexing.clear_index()` | `index.clear()` |
 | `index_health()` | `index.health()` |
-| `inspect_retrieval(query, k, lambda_mult, types, datasource_id)` | `index.inspect(query, ...)` |
+| `inspect_retrieval(query, k, lambda_mult, types, datasource_id)` | `index.inspect(query, ..., user_context=)` (the caller is required since Wave B, K3b) |
 | `check_permissions(user, ds, table, schema)`, `auth.check_permissions(...)` | `policies.allows(user_context, datasource_id, table, schema=None)` |
 | `get_allowed_resources(user)`, `auth.get_allowed_resources(user)` | `policies.allowed(user_context)` |
 | `policy.validate_policies(policies_path, datasources_path, secrets_path)` | `policies.validate()`, against the engine's own config |
