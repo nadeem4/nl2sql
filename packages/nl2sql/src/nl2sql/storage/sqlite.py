@@ -181,9 +181,10 @@ def _conversations_dashboards_and_keys(connection: sqlite3.Connection) -> None:
             id TEXT PRIMARY KEY,
             tenant_id TEXT,
             user_id TEXT,
+            created_at TEXT NOT NULL,
             doc_json TEXT NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces (tenant_id, user_id);
+        CREATE INDEX IF NOT EXISTS idx_workspaces_owner ON workspaces (tenant_id, user_id, created_at);
         CREATE TABLE IF NOT EXISTS dashboards (
             id TEXT PRIMARY KEY,
             tenant_id TEXT,
@@ -596,11 +597,15 @@ class SqliteState:
 
     @_locked
     def put_workspace(self, doc: Dict[str, Any]) -> None:
+        """Stores ``doc``, replacing the workspace with its ``id``; it keeps its place in the list."""
+        created = _stamp(doc["created_at"]) if doc.get("created_at") else _utc(datetime.now(timezone.utc))
         connection = self._conn()
         with connection:
             connection.execute(
-                "INSERT OR REPLACE INTO workspaces (id, tenant_id, user_id, doc_json) VALUES (?, ?, ?, ?);",
-                (doc["id"], doc.get("tenant_id"), doc.get("user_id"), json.dumps(doc)))
+                "INSERT INTO workspaces (id, tenant_id, user_id, created_at, doc_json) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET tenant_id = excluded.tenant_id, user_id = excluded.user_id, "
+                "doc_json = excluded.doc_json;",
+                (doc["id"], doc.get("tenant_id"), doc.get("user_id"), created, json.dumps(doc)))
 
     @_locked
     def get_workspace(self, workspace_id: str) -> Optional[Dict[str, Any]]:
@@ -610,7 +615,8 @@ class SqliteState:
     @_locked
     def list_workspaces(self, tenant_id: Optional[str], user_id: Optional[str]) -> List[Dict[str, Any]]:
         rows = self._conn().execute(
-            "SELECT doc_json FROM workspaces WHERE tenant_id IS ? AND user_id IS ? ORDER BY rowid;",
+            "SELECT doc_json FROM workspaces WHERE tenant_id IS ? AND user_id IS ? "
+            "ORDER BY created_at, id;",
             (tenant_id, user_id)).fetchall()
         return [json.loads(row[0]) for row in rows]
 
@@ -678,19 +684,39 @@ class SqliteState:
 
     @_locked
     def get_tile_runs(self, dashboard_id: str) -> List[Dict[str, Any]]:
-        rows = self._conn().execute("SELECT doc_json FROM tile_runs WHERE dashboard_id = ? ORDER BY rowid;",
+        rows = self._conn().execute("SELECT doc_json FROM tile_runs WHERE dashboard_id = ? ORDER BY tile_id;",
                                     (dashboard_id,)).fetchall()
         return [json.loads(row[0]) for row in rows]
 
     # -- API keys ----------------------------------------------------------------
 
     @_locked
-    def put_api_key(self, row: Dict[str, Any]) -> None:
-        """Stores ``row`` (its ``hash``, never a secret), replacing the key with its ``id``."""
+    def add_api_key(self, row: Dict[str, Any]) -> None:
+        """Stores a new key ``row`` (its ``hash``, never a secret).
+
+        Raises:
+            ValueError: a key with this ``id`` exists; the caller picks another id.
+        """
+        connection = self._conn()
+        try:
+            with connection:
+                connection.execute("INSERT INTO api_keys (id, hash, revoked_at, row_json) VALUES (?, ?, ?, ?);",
+                                   (row["id"], row["hash"], row.get("revoked_at"), json.dumps(row)))
+        except sqlite3.IntegrityError:
+            raise ValueError(f"An API key with id '{row['id']}' already exists.") from None
+
+    @_locked
+    def revoke_api_key(self, key_id: str, revoked_at: str) -> bool:
+        """Marks the key revoked at ``revoked_at`` (ISO 8601) and changes nothing else; False when there is none."""
         connection = self._conn()
         with connection:
-            connection.execute("INSERT OR REPLACE INTO api_keys (id, hash, revoked_at, row_json) VALUES (?, ?, ?, ?);",
-                               (row["id"], row["hash"], row.get("revoked_at"), json.dumps(row)))
+            found = connection.execute("SELECT row_json FROM api_keys WHERE id = ?;", (key_id,)).fetchone()
+            if found is None:
+                return False
+            row = {**json.loads(found[0]), "revoked_at": revoked_at}
+            connection.execute("UPDATE api_keys SET revoked_at = ?, row_json = ? WHERE id = ?;",
+                               (revoked_at, json.dumps(row), key_id))
+            return True
 
     @_locked
     def get_api_key(self, key_id: str) -> Optional[Dict[str, Any]]:
@@ -699,7 +725,7 @@ class SqliteState:
 
     @_locked
     def list_api_keys(self) -> List[Dict[str, Any]]:
-        return [json.loads(row[0]) for row in self._conn().execute("SELECT row_json FROM api_keys ORDER BY rowid;")]
+        return [json.loads(row[0]) for row in self._conn().execute("SELECT row_json FROM api_keys ORDER BY id;")]
 
     # -- the lock ----------------------------------------------------------------
 

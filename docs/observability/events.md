@@ -103,7 +103,7 @@ events to its own. The three marked *turn* belong to a conversation turn, which 
 | `dashboard.schedule_stopped` | `dashboard_id`, `reason` | a schedule stopped with a visible error (audited, D2) |
 | `workspace.changed` | `workspace_id`, `change` (`created`, `renamed`, `deleted`), `by` | `engine.workspaces` (D1) |
 | `datasource.saved` | `datasource_id`, `file`, `by` | `engine.datasources.save` wrote one datasource file (audited, L2) |
-| `api_key.created`, `api_key.revoked` | `key_id`, `user_id`, `tenant_id`, `roles`, `by`; never the token | `engine.api_keys` (audited, M1) |
+| `api_key.created`, `api_key.revoked` | `key_id`, `user_id`, `tenant_id`, `roles`, `by` (on revoke, `user_id` is whose key it was); never the token | `engine.api_keys` (audited, M1) |
 | `mcp.denied` | `reason` (`missing`, `malformed`, `unknown`, `revoked`), `key_id` | `nl2sql mcp --http` refused a bearer token (audited, M2) |
 
 The driver and exception text in `datasource.failed` (`message`, `fix`),

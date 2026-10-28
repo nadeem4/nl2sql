@@ -420,6 +420,9 @@ class ApiKeyCreated(EventData):
 
 class ApiKeyRevoked(EventData):
     key_id: str
+    user_id: str  # whose key it was, so the audit log says so
+    tenant_id: Optional[str] = None
+    roles: List[str] = Field(default_factory=list)
     by: Optional[str] = None
 
 

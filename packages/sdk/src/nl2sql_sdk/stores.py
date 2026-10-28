@@ -360,8 +360,13 @@ class StateStore(Store, Protocol):
 
     # -- API keys (version 4). A row has ``id``, ``hash`` and ``revoked_at``; never the secret.
 
-    def put_api_key(self, row: dict) -> None:
-        """Store ``row``, replacing the key with its ``id`` (revoking a key is a put with ``revoked_at``)."""
+    def add_api_key(self, row: dict) -> None:
+        """Store a new key ``row``. Raises ``ValueError`` when a key with its ``id`` exists, so a clash never
+        replaces another holder's key; the caller picks another id."""
+        ...
+
+    def revoke_api_key(self, key_id: str, revoked_at: str) -> bool:
+        """Set the key's ``revoked_at`` (ISO 8601) and change nothing else. False when there is no such key."""
         ...
 
     def get_api_key(self, key_id: str) -> Optional[dict]: ...

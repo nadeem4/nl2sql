@@ -19,6 +19,8 @@ from nl2sql.services.callbacks.token_handler import QuestionUsage
 # A user's first pin, or the starter dashboard, creates this workspace when they have none named.
 DEFAULT_WORKSPACE_NAME = "General"
 
+GRID_COLUMNS = 4  # the dashboard grid's width
+
 ChartChoice = Literal["auto", "line", "bar", "big_number", "table"]
 TileStatus = Literal["ok", "empty", "needs_fixing", "denied", "needs_approval", "stopped", "error"]
 
@@ -60,14 +62,26 @@ class StoredQuery(StrictModel):
     plan: Optional[Dict[str, Any]] = None  # PlanModel as JSON; None for a verified query
     verified: Optional[VerifiedRef] = None
 
+    @model_validator(mode="after")
+    def _one_of(self) -> "StoredQuery":
+        if (self.plan is None) == (self.verified is None):
+            raise ValueError("A stored query is a plan or a verified query: exactly one.")
+        return self
+
 
 class TileLayout(StrictModel):
     """A place on a 4-column grid."""
 
-    x: int = Field(ge=0, le=3)
+    x: int = Field(ge=0, lt=GRID_COLUMNS)
     y: int = Field(ge=0)
-    w: int = Field(ge=1, le=4)
+    w: int = Field(ge=1, le=GRID_COLUMNS)
     h: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def _on_the_grid(self) -> "TileLayout":
+        if self.x + self.w > GRID_COLUMNS:
+            raise ValueError(f"A chart at column {self.x} with width {self.w} leaves the {GRID_COLUMNS}-column grid.")
+        return self
 
 
 class Tile(StrictModel):

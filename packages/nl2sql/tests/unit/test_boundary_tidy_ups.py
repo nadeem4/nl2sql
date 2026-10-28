@@ -96,8 +96,15 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # Codes added by a wave's foundation PR before their producers, so the parallel
 # PRs never edit errors.py (docs/architecture/wave_a.md, D35; wave_b.md, D59),
 # each with the PR that raises it. Wave A's are all raised now (S1, E3), and
-# Wave B's too (L2).
-DECLARED_AHEAD: dict = {}
+# Wave B's too (L2). Wave C's (wave_c.md, section 3 and 6) leave as C1, C2 and D2 land.
+DECLARED_AHEAD: dict = {
+    "MODEL_STEP_INVALID": "C1",
+    "CONVERSATION_TOO_LONG": "C1",
+    "TOOL_FAILED": "C2",
+    "TOOL_NOT_APPLICABLE": "C2",
+    "UNKNOWN_CHAT_TOOL": "C2",
+    "TILE_NEEDS_FIXING": "D2",
+}
 
 
 def test_cancelled_is_a_string_not_a_one_tuple():

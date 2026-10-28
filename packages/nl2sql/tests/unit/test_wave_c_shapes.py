@@ -47,6 +47,9 @@ def test_new_config_sections_are_strict(tmp_path, section, body, wrong):
     with pytest.raises(ConfigError) as caught:
         make_config(tmp_path, **{section: {wrong: 1}})
     assert "Unknown key" in str(caught.value) and next(iter(body)) in str(caught.value), "did you mean"
+
+
+def test_nested_new_config_sections_are_strict_too(tmp_path):
     with pytest.raises(ConfigError, match="Unknown key"):
         make_config(tmp_path, mcp={"http": {"hosts": "x"}})
     with pytest.raises(ConfigError, match="Unknown key"):
@@ -422,6 +425,46 @@ def test_a_chart_plan_holds_one_whole_run_or_a_verified_query():
             ChartPlan(**bad)
 
 
+def test_a_stored_query_holds_a_plan_or_a_verified_query():
+    from nl2sql.dashboards.models import StoredQuery
+    from nl2sql.hooks.approval import VerifiedRef
+
+    assert StoredQuery(sub_query_id="sq1", datasource_id="ds", plan={"tables": []}).verified is None
+    assert StoredQuery(sub_query_id="sq1", datasource_id="ds", verified=VerifiedRef(id="v1")).plan is None
+    for bad in ({}, {"plan": {}, "verified": VerifiedRef(id="v1")}):
+        with pytest.raises(ValidationError):
+            StoredQuery(sub_query_id="sq1", datasource_id="ds", **bad)
+
+
+def test_a_tile_layout_stays_on_the_four_column_grid():
+    from nl2sql.dashboards.models import TileLayout
+
+    assert TileLayout(x=3, y=0, w=1, h=1).x == 3 and TileLayout(x=0, y=0, w=4, h=1).w == 4
+    assert TileLayout(x=2, y=0, w=2, h=1).w == 2
+    for x, w in ((3, 2), (1, 4), (2, 3)):
+        with pytest.raises(ValidationError):
+            TileLayout(x=x, y=0, w=w, h=1)
+
+
+def test_a_model_step_is_exactly_one_of_a_reply_and_a_call():
+    from nl2sql.conversations.models import ModelStep, ToolCall
+
+    call = ToolCall(name="ask", args={"question": "q"})
+    assert ModelStep(reply="hi").call is None and ModelStep(call=call).reply is None
+    assert ModelStep(reply="hi", offers=[call]).offers == [call], "offers go with a reply"
+    for bad in ({}, {"reply": "hi", "call": call}, {"call": call, "offers": [call]}):
+        with pytest.raises(ValidationError):
+            ModelStep(**bad)
+
+
+def test_api_key_events_say_whose_key_it_was():
+    from nl2sql.events.catalog import ApiKeyCreated, ApiKeyRevoked
+
+    revoked = ApiKeyRevoked(key_id="ab12cd34", user_id="ada", tenant_id="acme", roles=["admin"], by="root")
+    assert set(ApiKeyRevoked.model_fields) == set(ApiKeyCreated.model_fields)
+    assert (revoked.user_id, revoked.tenant_id, revoked.roles) == ("ada", "acme", ["admin"])
+
+
 def test_api_types_candidate_and_api_key():
     from nl2sql.api.types import ApiKey, Candidate
     from nl2sql_sdk.discovery import Found
@@ -456,6 +499,8 @@ def test_discoverable_adapter_is_an_optional_protocol():
     assert Finds.connection_for(Found(kind="file", value="a.sqlite")) == {"path": "a.sqlite"}
     with pytest.raises(ValidationError):
         Found(kind="socket", value="x")
+    with pytest.raises(ValidationError):
+        Found(kind="file", value="a.sqlite", surprise=1)
 
 
 def test_settings_charts_are_part_of_settings():

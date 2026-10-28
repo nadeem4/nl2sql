@@ -79,13 +79,37 @@ def test_state_store_round_trips_conversations_dashboards_and_keys(store):
     assert store.delete_dashboard("d1") is True and store.delete_dashboard("d1") is False
     assert store.get_tile_runs("d1") == [], "results go with the dashboard"
 
-    # API keys: a row with a hash, never a secret; revoking is a put
-    store.put_api_key({"id": "ab12cd34", "hash": "x" * 64, "user_id": "ada", "revoked_at": None})
-    store.put_api_key({"id": "ef56gh78", "hash": "y" * 64, "user_id": "bob", "revoked_at": None})
+    # API keys: a row with a hash, never a secret; adding is an insert, revoking is its own update
+    store.add_api_key({"id": "ab12cd34", "hash": "x" * 64, "user_id": "ada", "revoked_at": None})
+    store.add_api_key({"id": "ef56gh78", "hash": "y" * 64, "user_id": "bob", "revoked_at": None})
     assert store.get_api_key("ab12cd34")["hash"] == "x" * 64 and store.get_api_key("zz") is None
-    store.put_api_key({"id": "ab12cd34", "hash": "x" * 64, "user_id": "ada", "revoked_at": _stamp()})
+    assert store.revoke_api_key("ab12cd34", _stamp()) is True
     assert store.get_api_key("ab12cd34")["revoked_at"] == _stamp()
+    assert store.get_api_key("ab12cd34")["hash"] == "x" * 64, "revoking changes nothing else"
+    assert store.get_api_key("ef56gh78")["revoked_at"] is None
+    assert store.revoke_api_key("zz", _stamp()) is False
     assert sorted(k["id"] for k in store.list_api_keys()) == ["ab12cd34", "ef56gh78"]
+
+
+def test_adding_an_api_key_whose_id_exists_fails_and_keeps_the_first(store):
+    store.add_api_key({"id": "ab12cd34", "hash": "x" * 64, "user_id": "ada", "revoked_at": None})
+    with pytest.raises(ValueError, match="ab12cd34"):
+        store.add_api_key({"id": "ab12cd34", "hash": "z" * 64, "user_id": "bob", "revoked_at": None})
+    kept = store.get_api_key("ab12cd34")
+    assert kept["hash"] == "x" * 64 and kept["user_id"] == "ada", "the first holder keeps the key"
+
+
+def test_renaming_a_workspace_keeps_its_place_in_the_list(store):
+    def workspace(wid, name, days_ago):
+        return {"id": wid, "name": name, "tenant_id": "acme", "user_id": "ada", "created_at": _stamp(days_ago)}
+
+    store.put_workspace(workspace("w1", "General", 3))
+    store.put_workspace(workspace("w2", "Ops", 2))
+    store.put_workspace(workspace("w3", "Finance", 1))
+    store.put_workspace(workspace("w1", "Renamed", 3))
+    listed = store.list_workspaces("acme", "ada")
+    assert [w["id"] for w in listed] == ["w1", "w2", "w3"]
+    assert listed[0]["name"] == "Renamed"
 
 
 def test_purges_delete_old_conversations_and_old_drafts_only(store):

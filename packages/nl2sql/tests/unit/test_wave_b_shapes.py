@@ -162,7 +162,7 @@ def store():
     state.close()
 
 
-def test_a_0_7_state_file_upgrades_to_migration_5_keeping_its_rows(tmp_path):
+def test_a_0_7_state_file_upgrades_to_the_latest_migration_keeping_its_rows(tmp_path):
     """A state.db that ran migrations 1 to 4 (release 0.7) gains the proposals table (and, since 0.9, Wave C's)."""
     from nl2sql.storage.sqlite import MIGRATIONS
 

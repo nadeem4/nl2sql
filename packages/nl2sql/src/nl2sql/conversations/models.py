@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from nl2sql.api.query_api import QueryResult
 from nl2sql.clarify.models import ClarificationRequest
@@ -48,11 +48,20 @@ class ToolStep(StrictModel):
 
 
 class ModelStep(StrictModel):
-    """The conversation agent's structured output: exactly one of a reply and a call (checked by the loop)."""
+    """The conversation agent's structured output: exactly one of a reply and a call. The loop checks the tool
+    name and its args; this check needs no context, so ``structured()``'s parse retry covers it."""
 
     reply: Optional[str] = None  # the model's message to the user
     call: Optional[ToolCall] = None  # or a tool to call
     offers: List[ToolCall] = Field(default_factory=list)  # with a reply: tools it suggests, run only on a click
+
+    @model_validator(mode="after")
+    def _one_of(self) -> "ModelStep":
+        if (self.reply is None) == (self.call is None):
+            raise ValueError("A model step is a reply or a tool call: exactly one.")
+        if self.offers and self.reply is None:
+            raise ValueError("Offers go with a reply.")
+        return self
 
 
 class Turn(StrictModel):

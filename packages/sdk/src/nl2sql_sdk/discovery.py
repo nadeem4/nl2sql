@@ -13,12 +13,14 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Dict, Literal, Optional, Protocol, Tuple, runtime_checkable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Found(BaseModel):
     """Where a database was found: a ``url`` the caller passed, a ``file`` under the scanned folder, or an
     open ``port`` on the loopback address."""
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["url", "file", "port"]
     value: str  # the URL, the file path, or "127.0.0.1:5432"
