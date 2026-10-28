@@ -6367,7 +6367,8 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   file is loaded, or <code>datasource_id</code> is not <code>verified_datasource_id</code>; and the matcher ends the run with an
   error where an approved pin would fall back: <code>SECURITY_VIOLATION</code> (the role may not read the datasource
   or a table), <code>EXECUTION_FAILED</code> (the query failed) or <code>INVALID_STATE</code> (an unknown query, a bad or
-  missing value). D2's access check on open must run verified charts with <code>execute=True</code>.</li>
+  missing value). (D2 lifted the <code>execute</code> refusal: with <code>execute=False</code> the matcher checks and runs nothing;
+  see D2's note.)</li>
 <li><code>choice</code> on the conversation methods is an option id (<code>str</code>), as the design's prose says; the design's
   table leaves its type open.</li>
 <li><code>ToolOutput</code>-returning tool stubs import <code>ToolContext</code> and <code>ToolOutput</code> from <code>nl2sql.chat_tools</code>, and
@@ -6675,6 +6676,78 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   and checks); an existing project takes <code>engine.datasources.add(...)</code> then
   <code>engine.datasources.save(id, by=admin, env_file=True)</code>; <code>write_env_values(folder, {...})</code> for the model key.
   <code>Config.with_datasource</code> adds datasources before writing. All three are in <code>nl2sql.config</code>.</li>
+</ul>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Built (D2): refresh, stored results and schedules; filters are D2b</p>
+<p>Row D2 is split, as the row allows: this PR is refresh, stored results, <code>open</code> and schedules; the filters
+(the value checks, the predicates, <code>filter_values</code>) are <strong>D2b</strong>, because refresh and schedules alone passed
+the 1,000-line mark. <code>refresh(filters=...)</code> and <code>filter_values</code> raise <code>NotImplementedError</code> naming D2b, and
+<code>dashboard.refreshed</code> carries an empty <code>filters</code> list until then.</p>
+<ul>
+<li><strong>Files:</strong> <code>nl2sql/dashboards/run.py</code> (<code>TileRunner</code>: one chart's <code>run_query</code>; <code>Refresher</code>: a dashboard's
+  charts in layout order, the access check, the lock and <code>dashboard.refreshed</code>), <code>schedule.py</code> (when a schedule
+  is due, which charts are due, the identity checks and the stop), <code>api.py</code> (<code>open</code>, <code>refresh</code>,
+  <code>run_scheduled</code>; <code>edit</code>, <code>pin</code> and <code>delete</code> now take the lock), <code>api/dashboards_api.py</code> (the public
+  face), <code>cli/commands/dashboards.py</code>, and <code>nl2sql_api/main.py</code> (<code>run_schedules</code> in the lifespan).</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_dashboards_d2.py</code> (the service, with a canned <code>run_query</code>),
+  <code>tests/e2e/test_dashboards_fake_llm.py</code> (the real pipeline on the demo databases: no model call, the access
+  check, <code>needs_fixing</code> without the refiner, a stored plan never cached, <code>plan.after</code>, an approval),
+  <code>tests/unit/test_cli_dashboards.py</code>, <code>packages/api/tests/test_startup.py</code>, and in the boundary test
+  <code>test_dashboards_make_no_model_call</code> and <code>test_every_entry_point_reaches_data_through_run_query</code>.</li>
+<li><strong>Statuses.</strong> A run is <code>needs_fixing</code> when the validator rejected the plan (the error is
+  <code>TILE_NEEDS_FIXING</code> with the validator's message) or the stored plan no longer parses. A denial is checked
+  first: <code>denied</code> for any <code>SECURITY_VIOLATION</code> or <code>HOOK_DENIED</code> error, or a <code>HOOK_DENIED</code> warning (a hook that
+  dropped one sub-query; the run itself succeeded), whatever else the run says. <code>needs_approval</code> is the run's
+  only when no other error came with it; <code>stopped</code> is the run's; <code>empty</code> is a run with no rows; anything else is
+  <code>error</code>. <code>needs_approval</code>, <code>stopped</code> and <code>error</code> are returned but <strong>not stored</strong>: the chart keeps its last
+  result, so a database outage never wipes good rows. <code>denied</code> and <code>needs_fixing</code> are stored and replace the
+  rows.</li>
+<li><strong>Open</strong> checks only the charts that have a stored result, and the check executes nothing (D135): a
+  generated plan runs with <code>execute=False</code>, and so does a verified one. C0b refused a supplied verified plan
+  with <code>execute=False</code>; that refusal is gone. A run that pins a supplied verified query keeps the curated
+  matcher in its graph without <code>execute</code> (<code>build_graph(verified=True)</code>), and the matcher
+  (<code>CuratedMatcherNode(ctx, execute=False)</code>) ends after its scope, values, table-policy and capability checks
+  and the <code>execute.before</code> hooks: the sub-query is done with its SQL and no result, so the run is <code>plan_only</code>.
+  A verified query has no plan, so <code>execute.before</code> is its only hook point; the check asks every hook there
+  but the cost hook (nothing runs), a <code>Deny</code> makes the chart <code>denied</code>, and a <code>NeedsApproval</code> passes (it gates
+  a run; <code>HookRunner.call(exclude=, needs_approval_passes=)</code>). It still never falls back to a model run and
+  makes no model call. Rows are served on an allow-list: a check that ends <code>ok</code>, <code>empty</code>, or
+  <code>needs_approval</code> with no other error; anything else fails closed. Only charts this <code>open</code> checked, or
+  refreshed itself (from the returned <code>DashboardRun</code>), are served: a result another process stored between
+  the check and the refresh is not, and the chart stays in <code>due</code>.</li>
+<li><strong>The lock</strong> <code>dashboard-refresh:&lt;id&gt;</code> is held by <code>refresh</code>, by the scheduled run, by the refresh that <code>open</code>
+  starts, and by <code>edit</code>, <code>pin</code> and <code>delete</code> (D1's note asked for <code>edit</code>), so a refresh cannot finish after
+  <code>set_filters</code> and store results that ignore it. A held lock is <code>DashboardBusy</code> (a <code>ValueError</code>) from
+  <code>refresh</code> and the edits; <code>open</code> leaves the charts due and a schedule skips the dashboard.</li>
+<li><strong>Schedules</strong> run each due dashboard as the owner saved on it. The stop codes are
+  <code>SCHEDULE_IDENTITY_EXPIRED</code>, <code>SCHEDULE_ROLE_REMOVED</code> (a role of the snapshot is not in <code>policies.roles</code>,
+  unless <code>allow_all</code>), <code>SCHEDULE_ACCESS_DENIED</code> (a chart came back <code>denied</code> with <code>SECURITY_VIOLATION</code>) and
+  <code>SCHEDULE_HOOK_DENIED</code> (a chart a hook denied; the message names the chart and the hook's reason). The run
+  is still stored, then the schedule stops. A schedule that stops sets <code>state="stopped"</code>, <code>next_at=None</code> and
+  <code>error</code>. <code>run_scheduled(now=)</code> without a timezone is a <code>ValueError</code>, before any dashboard runs.</li>
+<li><code>nl2sql dashboards refresh --due</code> refuses <code>--as</code>, <code>--user</code> and <code>--tenant</code>; with <code>--dashboard</code>, <code>--user</code> and
+  <code>--tenant</code> act as that owner (operator use, as the help says), and <code>--user</code> is required: without it the
+  command is a usage error naming the flag.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li>The lifespan hook is in <code>packages/api/src/nl2sql_api/main.py</code>; the package has no <code>app.py</code>.</li>
+<li><code>ChartPlan</code> gains <code>verified_datasource_id</code>, required whenever <code>verified</code> is set: <code>SuppliedPlan(verified=...)</code>
+  needs the datasource and the design's <code>ChartPlan.verified</code> (a <code>VerifiedRef</code>) has none.</li>
+<li><code>TileRun</code> gains <code>approvals_needed</code> (the <code>ApprovalRequest</code>s of a <code>needs_approval</code> chart, never stored), or a
+  caller of <code>refresh(approvals=)</code> would have no request to approve.</li>
+<li><code>DashboardRun.usage</code> stays empty: a refresh makes no model call, so the sum is zero.</li>
+<li><code>nl2sql dashboards refresh</code> takes <code>--user</code> and <code>--tenant</code> as well as <code>--as</code>, because a dashboard belongs to a
+  user. <code>nl2sql dashboards list</code> does not exist; the stopped schedule's error is on <code>Dashboard.schedule</code>, which
+  <code>open</code> and <code>get</code> return.</li>
+<li>The design's test <code>test_charts_diagrams_tools_and_dashboards_make_no_model_call</code> is
+  <code>test_dashboards_make_no_model_call</code> here (charts have <code>test_charts_make_no_model_call</code>, diagrams are K2's).</li>
+<li><code>DashboardStore.put_runs</code> is new (D1's store had no write for stored results).</li>
+<li>Names D3 and D4 need: <code>Refresher.run(dashboard, tiles, user, trigger)</code> for D3's first run of <code>generate</code>
+  (trigger <code>generate</code>; it stores the results and publishes <code>dashboard.refreshed</code>; call it under
+  <code>Refresher.locked</code>), <code>TileRunner.run(tile, user, execute=False)</code> for D4's no-execute check of <code>add_tile</code> and
+  <code>replace_plan</code>, and <code>DashboardBusy</code>.</li>
 </ul>
 </div>
 <p>The waves, with at most four PRs at once:</p>

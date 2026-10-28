@@ -3227,7 +3227,8 @@ datasource (<code>GraphState.datasource_id</code>), only that one is searched.</
 and the run continues at <code>datasource_resolver</code> as if it were not there. When
 the run is plan-only (<code>execute=False</code>) the matcher is skipped.</p>
 <p>A refinement made in PR 3: the node is added to the graph only when curated
-answers are on (a <code>curated</code> section with at least one verified query) and the run executes. Otherwise <code>datasource_resolver</code> stays the entry
+answers are on (a <code>curated</code> section with at least one verified query) and the run executes, or pins a supplied
+verified query (with <code>execute=False</code> the matcher checks it and runs nothing; wave_c.md, D2). Otherwise <code>datasource_resolver</code> stays the entry
 point, so with no curated file the graph, the trace and the answer are exactly
 what they were before, rather than gaining a node that does nothing. The
 first diamond above is therefore decided once when the graph is built

@@ -2316,6 +2316,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#open-refresh-and-stored-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open, refresh and stored results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-access-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One access rule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schedules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schedules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5782,6 +5815,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#open-refresh-and-stored-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open, refresh and stored results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-access-rule" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One access rule
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#schedules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Schedules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5812,10 +5878,10 @@
 <h1 id="dashboards">Dashboards</h1>
 <div class="admonition note">
 <p class="admonition-title">Partly built (Wave C, 0.9)</p>
-<p>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1). Refresh, filters and
-schedules (D2), the starter dashboard (D3) and building in chat (D4) have their signatures and raise
-<code>NotImplementedError</code> naming the pull request that fills them. The design is
-<a href="../architecture/wave_c/#6-dashboards">Wave C, section 6</a>.</p>
+<p>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1), and so do <code>open</code>, <code>refresh</code>,
+stored results and schedules (D2). Filter values and <code>filter_values</code> (D2b), the starter dashboard (D3)
+and building in chat (D4) have their signatures and raise <code>NotImplementedError</code> naming the pull request
+that fills them. The design is <a href="../architecture/wave_c/#6-dashboards">Wave C, section 6</a>.</p>
 </div>
 <p>A dashboard is a set of charts, each holding the typed plan that produced it, saved whole into a
 private workspace. Opening one serves stored results after the access check; refreshing re-runs the
@@ -5835,7 +5901,7 @@ stored plans as the caller with no model call. The methods are in
 </tr>
 <tr>
 <td>D2</td>
-<td><code>open</code>, <code>refresh</code>, stored results, filters, schedules and <code>nl2sql dashboards refresh</code></td>
+<td><code>open</code>, <code>refresh</code>, stored results, schedules and <code>nl2sql dashboards refresh</code> (filter values follow in D2b)</td>
 </tr>
 <tr>
 <td>D3</td>
@@ -5901,7 +5967,7 @@ never purged.</p>
 <tr>
 <td><code>set_filters</code></td>
 <td><code>set_filters(id, filters)</code></td>
-<td>Stores the filter definitions (their values are applied by refresh, D2)</td>
+<td>Stores the filter definitions (their values are applied by refresh, D2b)</td>
 </tr>
 <tr>
 <td><code>set_schedule</code></td>
@@ -5923,9 +5989,95 @@ data a chart shows, are only for chat (D4).</p>
 <p>Each change publishes <code>dashboard.changed</code> (the kinds, never the values), <code>set_schedule</code> also
 <code>dashboard.schedule_set</code> (it saves a role snapshot, so it is audited) and the workspace calls publish
 <code>workspace.changed</code>.</p>
+<p>An edit, <code>pin</code> and <code>delete</code> take the dashboard's refresh lock (see <a href="#open-refresh-and-stored-results">Open, refresh and stored results</a>),
+so a refresh that is running cannot store results after an edit has made them wrong. If the lock is held you
+get a <code>ValueError</code> (<code>DashboardBusy</code>) that says the dashboard is being refreshed; try again when it is done.</p>
+<h2 id="open-refresh-and-stored-results">Open, refresh and stored results</h2>
+<p>A chart is re-run from the plan it keeps, never by asking the question again, so <strong>refreshing costs no
+tokens</strong>. Each chart is one <code>run_query(question, plan=SuppliedPlan(...), answer=False, user_context=...)</code>:
+the plan goes through the <code>plan.after</code> hooks, the validator and the generator under the caller's scope,
+is never cached and is never sent to the refiner, and no answer is written. A multi-query chart re-runs every
+stored query and its combine step; a verified chart re-runs its verified query with its stored values.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">view</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>        <span class="c1"># the stored results, after the access check</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">refresh</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>      <span class="c1"># every chart, in layout order</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">refresh</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">tile_id</span><span class="o">=</span><span class="s2">"t3"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>   <span class="c1"># one chart</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Stored with a time</strong></td>
+<td>The last result of each chart (its rows, at most <code>charts.max_points</code>, and the columns' kinds) is saved with an <code>at</code> time, replaced by each run and deleted with the dashboard. <code>open</code> serves it at once and <code>refreshed_at</code> is the oldest <code>at</code>. A run that fails (<code>error</code>, such as a database outage) does not replace it: the chart keeps its last good result and the refresh returns the error.</td>
+</tr>
+<tr>
+<td><strong>Open checks access first</strong></td>
+<td>Before any stored row is served, each stored plan is checked under the caller's current roles, and the check runs no query: a generated plan is validated and generated, a verified query is checked by the curated matcher (the caller's scope, its values, every table it reads) and by the <code>execute.before</code> hooks, its only hook point, leaving out the cost hook: a hook's <code>Deny</code> makes the chart <code>denied</code>, and a request for approval does not block the check, which runs nothing. Rows are served only when the check ends <code>ok</code> or <code>empty</code>, or <code>needs_approval</code> with nothing else wrong. A chart the caller can no longer read comes back <code>denied</code> (also when only one of its queries is refused, or a hook dropped one of them), one whose plan no longer validates <code>needs_fixing</code>, and a check that fails otherwise <code>error</code>, all without rows. Only charts this <code>open</code> checked, or refreshed itself, are served: a result another process stored meanwhile waits in <code>due</code>.</td>
+</tr>
+<tr>
+<td><strong>Only what is old</strong></td>
+<td>With <code>refresh_due=True</code> (the default) <code>open</code> then refreshes the charts older than the schedule's <code>every_minutes</code> (or never run), as the caller. A dashboard with no schedule has nothing due. An app that wants an instant open passes <code>False</code> and refreshes the ids in <code>view.due</code>.</td>
+</tr>
+<tr>
+<td><strong><code>needs_fixing</code></strong></td>
+<td>A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is <code>needs_fixing</code> with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn (D4).</td>
+</tr>
+<tr>
+<td><strong>Cost guard</strong></td>
+<td>A hook that wants a person's yes makes the chart <code>needs_approval</code>: it is not run, keeps its last result, and the request is in the run's <code>approvals_needed</code>. Pass an <code>Approval</code> for it to a <strong>manual</strong> <code>refresh(approvals=[...])</code>. <code>open</code> and a schedule never approve.</td>
+</tr>
+<tr>
+<td><strong>Caps</strong></td>
+<td>A chart stopped at a Wave A cap (<code>stopped</code>) ends the refresh; the rest are <code>stopped</code> too and keep their last result.</td>
+</tr>
+<tr>
+<td><strong>No double runs</strong></td>
+<td>A refresh holds the state store's lock <code>dashboard-refresh:&lt;id&gt;</code>. A second <code>refresh</code> on the same dashboard raises <code>DashboardBusy</code>; <code>open</code> leaves the charts due; a schedule skips it.</td>
+</tr>
+</tbody>
+</table>
+<p>Each refresh publishes <code>dashboard.refreshed</code> (the counts per status; the trigger is <code>open</code>, <code>manual</code> or
+<code>schedule</code>). Each chart is a run, with its own <code>run.started</code> and <code>run.finished</code>.</p>
+<h2 id="one-access-rule">One access rule</h2>
+<p>A datasource's stored connection sets the most anyone can see through it, and a person's roles and policies
+narrow that. Every way to data uses the same path and the same checks: a question, a refresh, an <code>open</code> and
+a schedule all go through <code>run_query</code> with the caller's <code>UserContext</code> (a schedule's is its owner's saved
+snapshot). So losing access to a table removes its rows from every dashboard at the next <code>open</code>, and stored
+results are never served before the check passes.</p>
+<h2 id="schedules">Schedules</h2>
+<p><code>set_schedule(id, every_minutes)</code> re-runs a dashboard by itself. It runs <strong>only inside a long-running
+process</strong>: <code>nl2sql-api</code> starts a runner in its lifespan that calls <code>engine.dashboards.run_scheduled()</code> every
+minute (a local app does the same, or cron runs <code>nl2sql dashboards refresh --due</code>). With nothing running,
+nothing refreshes.</p>
+<ul>
+<li><strong>As its owner, as saved.</strong> <code>set_schedule</code> saves your user, tenant and roles on the schedule. Each run
+  resolves that snapshot against the <em>current</em> policies, so it can only narrow what you can read, never widen.</li>
+<li><strong>It stops, visibly.</strong> The schedule becomes <code>stopped</code>, with a <code>code</code> and <code>message</code> in <code>schedule.error</code> (shown
+  on the dashboard that <code>open</code> and <code>get</code> return), and <code>dashboard.schedule_stopped</code> is published (audited) when
+  the saved identity is older than <code>dashboards.schedule_identity_max_age_days</code> (30,
+  <code>SCHEDULE_IDENTITY_EXPIRED</code>), a role in it is gone from the policies (<code>SCHEDULE_ROLE_REMOVED</code>), a chart
+  can no longer be read by its owner (<code>SCHEDULE_ACCESS_DENIED</code>) or a hook denied a chart (<code>SCHEDULE_HOOK_DENIED</code>,
+  with the hook's reason). Nothing retries it. Setting the schedule again saves a fresh snapshot and starts it
+  again.</li>
+<li><strong>A failure is not a stop.</strong> A chart whose run fails (<code>error</code>) keeps its last good result and the schedule goes
+  on.</li>
+<li><strong>It never approves.</strong> A chart that needs a person's yes is skipped and keeps its last result; the schedule goes on.</li>
+<li><strong>One run at a time.</strong> A dashboard another process is refreshing is skipped, so two runners (or a runner and
+  cron) do not double up.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>dashboards<span class="w"> </span>refresh<span class="w"> </span>--dashboard<span class="w"> </span>sales<span class="w"> </span>--as<span class="w"> </span>analyst<span class="w"> </span>--user<span class="w"> </span>ana<span class="w"> </span>--tenant<span class="w"> </span>acme<span class="w">   </span><span class="c1"># one dashboard, as that caller</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>dashboards<span class="w"> </span>refresh<span class="w"> </span>--due<span class="w">                                                      </span><span class="c1"># every schedule that is due</span>
+</code></pre></div>
+<p><code>--user</code> and <code>--tenant</code> act as that owner: the command is for the operator, who holds the config and the
+credentials. <code>--dashboard</code> needs <code>--user</code>, since a dashboard belongs to a user. <code>--due</code> runs each schedule as its saved owner, so it refuses <code>--as</code>, <code>--user</code> and <code>--tenant</code>.</p>
 <h2 id="configuration">Configuration</h2>
 <p><code>dashboards:</code> in <code>nl2sql.yaml</code> (<code>max_tiles</code>, <code>min_refresh_minutes</code>, <code>schedule_identity_max_age_days</code>) is
-accepted; <code>min_refresh_minutes</code> is read by <code>set_schedule</code>.</p>
+accepted; <code>min_refresh_minutes</code> is read by <code>set_schedule</code> and <code>schedule_identity_max_age_days</code> by the
+scheduler.</p>
 
 
 

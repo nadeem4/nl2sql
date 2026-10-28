@@ -5840,9 +5840,9 @@
 <h1 id="dashboards-api">Dashboards API</h1>
 <div class="admonition note">
 <p class="admonition-title">Partly built</p>
-<p>The workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1). <code>open</code>, <code>refresh</code>,
-<code>filter_values</code> and <code>run_scheduled</code> (D2) and <code>generate</code> and <code>suggest_questions</code> (D3) have their final
-signatures and raise <code>NotImplementedError</code> naming their row.</p>
+<p>The workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1), and so do <code>open</code>,
+<code>refresh</code> and <code>run_scheduled</code> (D2). <code>filter_values</code> and <code>refresh(filters=...)</code> (D2b) and <code>generate</code> and
+<code>suggest_questions</code> (D3) have their final signatures and raise <code>NotImplementedError</code> naming their row.</p>
 </div>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.workspaces</code> and <code>engine.dashboards</code> (<a href="../../../dashboards/">Dashboards</a>).</p>
@@ -5851,7 +5851,8 @@ signatures and raise <code>NotImplementedError</code> naming their row.</p>
 <li><code>packages/nl2sql/src/nl2sql/api/workspaces_api.py</code> (<code>WorkspacesAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/api/dashboards_api.py</code> (<code>DashboardsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/dashboards/models.py</code> (<code>Workspace</code>, <code>Dashboard</code>, <code>Tile</code>, <code>DashboardEdit</code>)</li>
-<li><code>packages/nl2sql/src/nl2sql/dashboards/</code> <code>workspaces.py</code>, <code>api.py</code>, <code>edits.py</code>, <code>store.py</code> (the logic behind the two faces)</li>
+<li><code>packages/nl2sql/src/nl2sql/dashboards/</code> <code>workspaces.py</code>, <code>api.py</code>, <code>edits.py</code>, <code>store.py</code>, <code>run.py</code> (running the
+  charts) and <code>schedule.py</code> (the logic behind the two faces)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <p>Every method takes <code>user_context</code> keyword-only and required, except <code>run_scheduled</code>, which runs each
@@ -5864,7 +5865,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 <li><strong>Workspaces.</strong> <code>create</code> and <code>rename</code> refuse an empty name and a name the owner already uses (ignoring case).
   <code>delete</code> raises <code>WorkspaceNotEmpty</code> while a dashboard, draft or saved, is in it. They are listed oldest first.</li>
 <li><strong><code>list</code></strong> returns one <code>status</code> (<code>saved</code> by default, or <code>draft</code>) and, with <code>workspace_id</code>, one workspace,
-  newest first. <code>refreshed_at</code> is the oldest stored result of its charts (None until D2 stores some).</li>
+  newest first. <code>refreshed_at</code> is the oldest stored result of its charts (None until a refresh stores some).</li>
 <li><strong><code>pin</code></strong> saves a draft whole, in <code>workspace_id</code>, else the workspace the draft is in, else "General" (made on
   first use). There is no way to pin one chart. An empty draft, a dashboard already saved, or a blank <code>title</code>
   is a <code>ValueError</code>.</li>
@@ -5876,12 +5877,37 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.</li>
 <li><strong><code>set_schedule(every_minutes)</code></strong> below <code>dashboards.min_refresh_minutes</code> is <code>ScheduleTooFrequent</code>; otherwise it
-  stores the schedule with the caller's <code>user_id</code>, <code>tenant_id</code> and roles (D134), and <code>None</code> removes it. Nothing
-  runs yet: D2's scheduler does.</li>
+  stores the schedule with the caller's <code>user_id</code>, <code>tenant_id</code> and roles (D134), and <code>None</code> removes it. It runs
+  only while a long-running process calls <code>run_scheduled</code> (<code>nl2sql-api</code> does, every minute).</li>
 <li><strong>Stored results.</strong> <code>remove_tile</code> discards that chart's stored result and <code>set_filters</code> (when the filters
   change) every chart's; renaming, redrawing, arranging, moving and scheduling keep them.</li>
-<li><strong>Events.</strong> <code>dashboard.changed</code> (the edit kinds, <code>pinned</code> or <code>deleted</code>, and <code>by</code>), <code>dashboard.schedule_set</code>
-  and <code>workspace.changed</code>. They carry no titles, names or values.</li>
+<li><strong><code>open(dashboard_id, refresh_due=True)</code></strong> checks access first: each stored plan is checked under the caller's
+  current roles, running no query (a generated plan is validated and generated; a verified query is checked by
+  the curated matcher). It returns <code>DashboardView(dashboard, runs, refreshed_at, due)</code>. <code>runs</code> holds the stored
+  result of each chart this <code>open</code> checked: as stored when the check ended <code>ok</code>, <code>empty</code>, or <code>needs_approval</code> with
+  no other error; otherwise the check's result (<code>denied</code>, <code>needs_fixing</code>, <code>error</code>, ...) without rows. A denial
+  wins: a chart with one query refused, or one a hook dropped, is <code>denied</code>. A result another process stored after
+  the check is not served; the chart stays in <code>due</code>. With
+  <code>refresh_due</code>, the charts with no result or one older than the schedule are then refreshed (<code>trigger="open"</code>,
+  as the caller, never approving); <code>due</code> lists the ids still due (an app that passed <code>False</code>, a chart waiting for
+  approval, or a dashboard another process is refreshing).</li>
+<li><strong><code>refresh(dashboard_id, tile_id=None, approvals=())</code></strong> runs the stored plans of one chart or all, in layout
+  order, as the caller, and stores each result (<code>TileRun</code>: <code>at</code>, <code>status</code>, the chart with its rows, the
+  <code>column_kinds</code>, the plain-English <code>explanation</code>, the <code>error</code>). Statuses: <code>ok</code>, <code>empty</code>, <code>needs_fixing</code> (a plan
+  that no longer validates or parses; the refiner is never asked), <code>denied</code>, <code>needs_approval</code> (its requests in
+  <code>approvals_needed</code>; the stored result is kept), <code>stopped</code> (a cap; the remaining charts are <code>stopped</code> and keep
+  theirs) and <code>error</code> (returned, not stored: the chart keeps its last good result). It raises <code>DashboardBusy</code> (a <code>ValueError</code>) while the dashboard is being refreshed or
+  edited, and <code>ValueError</code> for a <code>tile_id</code> the dashboard does not have. <code>filters</code> is D2b's.</li>
+<li><strong><code>run_scheduled(now=None)</code></strong> has no caller: it refreshes each dashboard whose schedule is due, as its saved
+  identity, and returns the <code>DashboardRun</code>s (<code>trigger="schedule"</code>). A schedule that fails a check stops, with
+  <code>state="stopped"</code> and <code>error={"code", "message"}</code> on <code>Dashboard.schedule</code>, and <code>dashboard.schedule_stopped</code>.
+  The codes are <code>SCHEDULE_IDENTITY_EXPIRED</code>, <code>SCHEDULE_ROLE_REMOVED</code>, <code>SCHEDULE_ACCESS_DENIED</code> (a chart the owner
+  can no longer read) and <code>SCHEDULE_HOOK_DENIED</code> (a hook denied a chart; the message names the chart and the
+  hook's reason). A <code>now</code> without a timezone is a <code>ValueError</code>.</li>
+<li><strong>A verified chart</strong> keeps its datasource in <code>ChartPlan.verified_datasource_id</code>, required with <code>verified</code>.</li>
+<li><strong>Events.</strong> <code>dashboard.changed</code> (the edit kinds, <code>pinned</code> or <code>deleted</code>, and <code>by</code>), <code>dashboard.schedule_set</code>,
+  <code>dashboard.refreshed</code> (the counts per status), <code>dashboard.schedule_stopped</code> and <code>workspace.changed</code>. They
+  carry no titles, names or values.</li>
 <li><strong>Retention.</strong> <code>engine.storage.purge()</code> deletes drafts last edited more than <code>conversations.max_age_days</code> ago;
   saved dashboards are never purged.</li>
 </ul>
@@ -5920,7 +5946,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 </tr>
 <tr>
 <td><code>dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100)</code></td>
-<td>D2</td>
+<td>D2b</td>
 </tr>
 <tr>
 <td><code>dashboards.run_scheduled(*, now=None) -&gt; list[DashboardRun]</code></td>

@@ -6321,9 +6321,11 @@ the approved re-run (<code>"approved"</code>) and, in Wave B, a plan the asker c
 (<code>"chosen"</code>).</p>
 <p>A supplied verified query is run by the curated matcher with its values, and
 it never falls back to a model run (a dashboard refresh uses no tokens). The
-call raises <code>ValueError</code>, before anything runs, when <code>execute</code> is <code>False</code>, no
-curated file with a verified query is loaded, or <code>datasource_id</code> is not
-<code>verified_datasource_id</code>. Where an approved pin would fall back to
+call raises <code>ValueError</code>, before anything runs, when no curated file with a
+verified query is loaded, or <code>datasource_id</code> is not <code>verified_datasource_id</code>.
+With <code>execute=False</code> the matcher checks the query (the caller's scope, its
+values, every table it reads) and runs nothing: the run ends <code>plan_only</code>, or
+with the error below (a dashboard's access check). Where an approved pin would fall back to
 generation, a supplied one ends the run with an error and makes no model call:
 <code>SECURITY_VIOLATION</code> (the role may not read the datasource or a table the query
 reads), <code>EXECUTION_FAILED</code> (the query failed) or <code>INVALID_STATE</code> (an unknown
