@@ -1709,6 +1709,40 @@ flowchart TD
       methods), `EditEnv`, `Applied` and `apply_edits` (`nl2sql.dashboards.edits`; D4 adds the two chat-only
       handlers to its `_HANDLERS` table).
 
+!!! note "Built (C2): chat tools"
+    - **Files:** `nl2sql/conversations/tools.py` (`build_chat_tools`, `describe`, `ChatToolRunner`),
+      `report.py` (`build_report`), the tool branch of the loop and `Conversations.tool` / `report` in
+      `conversations/api.py`, `agent.py` (`step_view` shows a tool's output without data), `chat_tools/report.py`,
+      `api/chat_tools_api.py`. The runner's tools are built once in `Runtime.components` as `runtime.chat_tools`
+      (name to instance), so an unknown name is a `ConfigError` at `chat_tools[i]`. `ConversationsAPI` and
+      `Conversations` now take the facade (`engine`) as their second argument: that is what a tool is handed.
+    - **Tests:** `tests/unit/test_chat_tools.py`, one e2e test in `tests/e2e/test_conversations_fake_llm.py`,
+      `test_registry_tools_and_the_report_make_no_model_call` (architecture); the stub tests lose `tool`, `report`,
+      `chat_tools.list` and the three tool codes from `DECLARED_AHEAD`.
+
+    Where the code and the design differ, the code won:
+
+    - A tool is handed the conversation **with the turn in flight** appended (its steps so far, status
+      `answered`), so `chart` after `ask` works in one turn. The `report` tool covers stored turns only: it
+      calls `conversations.report`, which reads the store, so it cannot include the turn it is called in.
+    - The model sees a tool step as `output`: a chart is `{kind, reason, columns}`, a diagram is its text, and
+      a `markdown` or `json` body (a report, a dashboard change) is not shown, only its kind, title and `refs`.
+      The chart's takeaway is withheld too (it quotes values). D4 should show the model what it needs of a
+      dashboard through the `[CONVERSATION]` block, as its row says.
+    - `conversations.tool` validates the arguments before it opens a turn: an invalid call is a `ValueError`
+      and stores nothing; only an unknown or disabled name is stored, as an `UNKNOWN_CHAT_TOOL` step. A tool
+      turn's `text` is the tool's name.
+    - **A K1 bug fixed here:** a run saves its results under the engine's tenant (`settings.tenant_id`),
+      whoever asked, so the `chart` tool no longer reads the conversation's or the caller's tenant (it found
+      nothing for a caller with a `tenant_id`). The report reads the engine's tenant too.
+    - A stored chart output keeps its rows (at most `settings.charts.max_points`) in the conversation until
+      `max_age_days`; the model never sees them, and `get` checks the owner only.
+    - `diagram`, `dashboard_edit` and `dashboard_pin` are on by default but still stubs: calling one is a
+      `TOOL_FAILED` step until K2 and D4 land.
+    - Names later rows use: `ChatToolRunner`, `build_chat_tools`, `describe` (`nl2sql.conversations.tools`),
+      `build_report` (`nl2sql.conversations.report`), `Conversations._tool(run, call)`, `runtime.chat_tools`,
+      `check_call` (renamed from `_check_call` in `agent.py`).
+
 The waves, with at most four PRs at once:
 
 | Wave | PRs | Notes |

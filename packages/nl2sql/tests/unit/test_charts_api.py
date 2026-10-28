@@ -231,18 +231,17 @@ def test_chart_tool_does_not_chart_a_withheld_run(store):
         ChartTool()(context, ChartArgs())
 
 
-def test_chart_tool_reads_the_conversations_tenant(store):
-    update = _run(store, MONTHS, tenant="t2")
+def test_chart_tool_reads_the_engines_tenant_not_the_callers(store):
+    # A run saves its results under the engine's tenant (settings.tenant_id), whoever asked: the conversation's
+    # and the caller's tenant name the owner, not where the rows are.
+    update = _run(store, MONTHS, tenant="t1")
     result = _query_result([SubQueryResult(id="sq1")], update["aggregator_response"].results)
-    engine = _engine(store, tenant="t1")  # the engine's default tenant is not the conversation's
+    engine = _engine(store, tenant="t1")
     now = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
     conversation = Conversation(id="c1", title="t", created_at=now, updated_at=now, tenant_id="t2",
                                 turns=[_turn(1, _ask(result))])
-    assert ChartTool()(ToolContext(conversation=conversation, user=USER, engine=engine), ChartArgs()).body["kind"] == "line"
-    # without a tenant on the conversation, the caller's own is used
-    bare = conversation.model_copy(update={"tenant_id": None})
     caller = UserContext(user_id="u", roles=["admin"], tenant_id="t2")
-    assert ChartTool()(ToolContext(conversation=bare, user=caller, engine=engine), ChartArgs()).body["kind"] == "line"
+    assert ChartTool()(ToolContext(conversation=conversation, user=caller, engine=engine), ChartArgs()).body["kind"] == "line"
 
 
 def test_a_result_cut_upstream_is_a_truncated_chart(store):

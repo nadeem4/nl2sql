@@ -202,7 +202,7 @@ class NL2SQL:
         ``ask_only``, ``report``, ``get``, ``list``, ``delete``. Every method takes the caller."""
         from nl2sql.api.conversations_api import ConversationsAPI
 
-        return ConversationsAPI(self._runtime)
+        return ConversationsAPI(self._runtime, self)
 
     @cached_property
     def chat_tools(self) -> "ChatToolsAPI":

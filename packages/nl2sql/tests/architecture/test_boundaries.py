@@ -691,6 +691,20 @@ def test_charts_make_no_model_call():
         "provider SDK. The chart is chosen by rules and the takeaway is a template.", offenders)
 
 
+def test_registry_tools_and_the_report_make_no_model_call():
+    """The five built-in chat tools, the runner that calls them and the report transform what a conversation
+    already has (wave_c.md, D109, D114): none imports an LLM client, callback or provider. Only the agent loop
+    in ``conversations/agent.py`` calls a model."""
+    conversations = ENGINE / "conversations"
+    offenders = []
+    for path in [*python_files(CHAT_TOOLS), conversations / "tools.py", conversations / "report.py"]:
+        offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                      if name.startswith(NO_MODEL_PREFIXES)]
+    assert not offenders, _broke(
+        "The chat tools, their runner (conversations/tools.py) and the report (conversations/report.py) make "
+        "no model call: no import of nl2sql.llm, nl2sql.services or a provider SDK.", offenders)
+
+
 # Only these serve HTTP, and so only these import a web framework or server.
 WEB_SERVER_LIBRARIES = {"starlette", "uvicorn", "fastapi"}
 WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/", "nl2sql/src/nl2sql/cli/commands/demo.py")

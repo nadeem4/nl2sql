@@ -6,6 +6,8 @@ loop with canned runs.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from nl2sql.hooks import Allow, NeedsApproval
@@ -135,3 +137,23 @@ def test_the_stream_carries_the_steps_run_events_and_ends_with_the_stored_turn(m
     stored = events[-1].data["stored"]
     assert stored["reply"] == "59." and stored["steps"][0]["result"]["sub_queries"][0]["rows"] is None
     assert events[-1].data["trace_id"] == stored["trace_id"]
+
+
+@pytest.mark.e2e
+def test_the_model_charts_the_answer_it_just_got_and_the_report_has_its_rows(make):
+    engine, server, prompts = make([_ask_step(COUNT), {"call": {"name": "chart", "args": {}}},
+                                    {"reply": "Here is the chart."}])
+    conversation = engine.conversations.start(user_context=_asker())
+
+    turn = engine.conversations.ask(conversation.id, "Chart the customer count", user_context=_asker())
+
+    assert [s.call.name for s in turn.steps] == ["ask", "chart"], turn.steps[-1].error
+    assert turn.status == "answered", turn.steps[-1].error
+    chart = turn.steps[1].output
+    assert chart.kind == "chart" and chart.body["kind"] == "big_number" and chart.body["data"]["rows"] == [[59]]
+    seen = json.loads(prompts[2].split("[CONVERSATION]\n", 1)[1].split("\n\n[USER_TEXT]\n", 1)[0])["this_turn"][1]
+    assert seen["output"]["chart"]["kind"] == "big_number" and "59" not in json.dumps(seen), "the model sees no chart data"
+    report = engine.conversations.tool(conversation.id, "report", {}, user_context=_asker())
+    body = report.steps[0].output.body
+    assert f"## {COUNT}" in body and "| 59 |" in body and f"Trace: {turn.steps[0].trace_id}" in body
+    assert [c["name"] for c in server.calls].count("ModelStep") == 3, "the report made no model call"

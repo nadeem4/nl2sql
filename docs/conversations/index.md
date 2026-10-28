@@ -1,8 +1,8 @@
 # Conversations
 
-!!! note "Wave C, 0.9: the core is here, the chat tools arrive with C2"
-    `start`, `ask`, `stream`, `retry`, `ask_only`, `get`, `list` and `delete` work. `tool` and `report` and the
-    [chat tools](tools.md) are still stubs. The design is [Wave C, section 3](../architecture/wave_c.md#3-conversation).
+!!! note "Wave C, 0.9"
+    `start`, `ask`, `stream`, `retry`, `ask_only`, `tool`, `report`, `get`, `list` and `delete` work, with the
+    [chat tools](tools.md) `chart` and `report`. The design is [Wave C, section 3](../architecture/wave_c.md#3-conversation).
 
 A conversation is a chat over the database. The model decides, step by step, whether to answer or to ask the
 database a question through the same typed plan and validator as `run_query`. It never writes SQL and never
@@ -28,15 +28,18 @@ flowchart TD
   K -->|no| M["model call: reply or tool call"]
   M -->|reply| ST["store the turn"]
   M -->|"ask"| RUN["run_query: typed plan, validator, cost rule"]
+  M -->|"chat tool"| TOOL["registry tool: no model call"]
   RUN -->|"clarification, approval or stop"| ST
   RUN -->|"ok or error"| M
+  TOOL --> M
   M -->|"bound reached"| LAST["one last call, tools off"]
   LAST --> ST
   RE --> ST
 ```
 
 - **The model chooses.** Each step is one structured call (`ModelStep`): a `reply`, or one `call` of the `ask`
-  tool with a question that stands alone. The model sees the last `context_turns` turns as one JSON object
+  tool with a question that stands alone, or of an enabled [chat tool](tools.md) (a chart, a report). A reply
+  may carry `offers`: tools it suggests, which run only when a client calls `tool`. The model sees the last `context_turns` turns as one JSON object
   (the questions that ran, each answer's summary, the columns, the datasources and tables read), never rows.
   Everything earlier said, the new message included, reaches it as a JSON string value: text in the history
   cannot pass for an instruction or a section marker.

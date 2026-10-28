@@ -1,19 +1,22 @@
-"""The ``report`` chat tool (docs/architecture/wave_c.md, section 4).
+"""The ``report`` chat tool (docs/architecture/wave_c.md, section 4, "Reports").
 
-A stub with its final shape: C2 fills it. Like every chat tool it imports only the top-level ``nl2sql``
-and its own interface module (D109).
+Writes the conversation's answered turns up as Markdown through ``engine.conversations.report``: no model call.
+Like every chat tool it imports only the top-level ``nl2sql`` and its own interface module (D109).
 """
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import ClassVar, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from nl2sql.chat_tools import ToolContext, ToolOutput
+from nl2sql.chat_tools import ToolContext, ToolNotApplicable, ToolOutput
 
 
 class ReportArgs(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    turns: Optional[List[int]] = Field(default=None, description="The turn numbers to include; every answered turn when absent.")
+    title: Optional[str] = Field(default=None, description="The report's title; the conversation's title when absent.")
 
 
 class ReportTool:
@@ -22,4 +25,10 @@ class ReportTool:
     args_model: ClassVar[type[BaseModel]] = ReportArgs
 
     def __call__(self, ctx: ToolContext, args: BaseModel) -> ToolOutput:
-        raise NotImplementedError("The report chat tool arrives with C2 (docs/architecture/wave_c.md, row C2).")
+        assert isinstance(args, ReportArgs)
+        try:
+            markdown = ctx.engine.conversations.report(ctx.conversation.id, user_context=ctx.user,
+                                                       turns=args.turns, title=args.title)
+        except ValueError as error:
+            raise ToolNotApplicable(str(error)) from None
+        return ToolOutput(kind="markdown", title=args.title or ctx.conversation.title, body=markdown)

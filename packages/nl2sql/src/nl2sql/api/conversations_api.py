@@ -1,13 +1,12 @@
 """``engine.conversations``: a model-led conversation over the database (docs/architecture/wave_c.md, section 3).
 
-The logic is ``nl2sql.conversations.api``; C2 fills ``tool`` and ``report``, which are still stubs. Every
+The logic is ``nl2sql.conversations.api``. Every
 method takes the caller keyword-only and required (D105, D130), so an app that forgot it fails closed.
 """
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence
 
-from nl2sql.common.planned import arrives_with
 from nl2sql.conversations.api import Conversations
 from nl2sql.conversations.models import Conversation, ConversationInfo, Turn
 from nl2sql.policies import UserContext
@@ -15,6 +14,7 @@ from nl2sql.runtime import Runtime
 
 if TYPE_CHECKING:
     from nl2sql.api.query_api import QueryResult
+    from nl2sql.public_api import NL2SQL
     from nl2sql.common.cancellation import CancellationToken
     from nl2sql.hooks.approval import Approval
     from nl2sql_sdk.events import Event
@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 class ConversationsAPI:
     """``engine.conversations``. Internal: reach it through ``NL2SQL``."""
 
-    def __init__(self, ctx: Runtime):
+    def __init__(self, ctx: Runtime, engine: "NL2SQL"):
         self._ctx = ctx
-        self._service = Conversations(ctx)
+        self._service = Conversations(ctx, engine)  # a chat tool is handed the engine, the public facade
 
     def start(self, *, user_context: UserContext, datasource_id: Optional[str] = None,
               dashboard_id: Optional[str] = None) -> Conversation:
@@ -55,7 +55,7 @@ class ConversationsAPI:
     def tool(self, conversation_id: str, name: str, args: Optional[Dict[str, Any]] = None, *,
              user_context: UserContext) -> Turn:
         """Calls a registry chat tool by name as a turn of kind ``tool``, with no model call."""
-        raise arrives_with("engine.conversations.tool", "C2")
+        return self._service.tool(conversation_id, name, args, user_context=user_context)
 
     def ask_only(self, conversation_id: str, question: str, *, user_context: UserContext,
                  choice: Optional[str] = None) -> "QueryResult":
@@ -65,7 +65,7 @@ class ConversationsAPI:
     def report(self, conversation_id: str, *, user_context: UserContext, turns: Optional[List[int]] = None,
                title: Optional[str] = None) -> str:
         """The Markdown report of the conversation's answered turns, with no model call."""
-        raise arrives_with("engine.conversations.report", "C2")
+        return self._service.report(conversation_id, user_context=user_context, turns=turns, title=title)
 
     def get(self, conversation_id: str, *, user_context: UserContext) -> Conversation:
         """One conversation, with its turns.

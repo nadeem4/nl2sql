@@ -157,6 +157,9 @@ class Runtime:
                 problem("policies.check", str(e))
         self.hooks = self._build_hooks(config, problem)
         self.knowledge = self._load_knowledge(config, problem)
+        from nl2sql.conversations.tools import build_chat_tools
+
+        self.chat_tools = build_chat_tools(config.chat_tools, self.registry, problem)
         from nl2sql.observers import build_observers
 
         # Subscribed in config order once nothing else is wrong; closed again when something is.
