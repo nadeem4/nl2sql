@@ -12,7 +12,8 @@ gets it with the scope's callbacks, and it publishes, through the scope:
                     the event's ``trace_id`` is the ``request_id`` the paging
                     and CSV routes take. With ``hold_manifest`` (a hook is
                     attached at ``answer.after``) it waits for the answer
-                    and is dropped when a hook stopped the run there
+                    and is dropped unless the results were released (a hook
+                    stopped the run there, or the answer failed)
 ``answer.delta``    ``{"field", "text"}``: the next piece of the answer's
                     ``summary`` or ``content``, as the answer model writes it
                     (only a streamed run's answer model streams)
@@ -39,8 +40,6 @@ ANSWER_NODE = "answer_synthesizer"
 # What stands in for it when the run asks for no answer (answer=False) but a hook still sits at answer.after.
 ANSWER_GATE_NODE = "answer_gate"
 ANSWER_FIELDS = ("summary", "content")
-# What a hook ends a run with: a held manifest is then never sent.
-_HOOK_ENDINGS = {"HOOK_DENIED", "HOOK_FAILED", "NEEDS_APPROVAL", "COST_LIMIT_EXCEEDED"}
 
 Publish = Callable[[str, Mapping[str, Any]], Any]
 
@@ -142,9 +141,9 @@ class RunEvents(BaseCallbackHandler):
                     self._publish("result.manifest", manifest)
         elif node in (ANSWER_NODE, ANSWER_GATE_NODE) and self._held is not None:
             manifest, self._held = self._held, None
-            stopped = any(str(getattr(_get(e, "error_code"), "value", _get(e, "error_code"))) in _HOOK_ENDINGS
-                          for e in (_get(outputs, "errors") or []))
-            if ok and not stopped:
+            # Only once the node released the results: a run that ended here, by a hook or by a
+            # failed answer, never had its results reviewed.
+            if ok and _get(outputs, "results_released"):
                 self._publish("result.manifest", manifest)
 
     def on_chain_end(self, outputs: Any, *, run_id: UUID, **kwargs: Any) -> None:

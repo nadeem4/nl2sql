@@ -86,6 +86,10 @@ class GraphState(BaseModel):
     approvals: List[Approval] = Field(default_factory=list)
     approvals_needed: Annotated[List[ApprovalRequest], operator.add] = Field(default_factory=list)
     clarify: bool = True
+    results_released: bool = Field(
+        default=False,
+        description="Whether the run's result manifest is written, so its results are readable by trace id: set "
+                    "by the aggregator when no hook is attached at answer.after, else by the node that asks it.")
 
 
 class SubgraphExecutionState(BaseModel):

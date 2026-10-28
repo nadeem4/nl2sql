@@ -85,6 +85,8 @@ class EngineAggregatorNode:
             )
             return {
                 "aggregator_response": aggregator_response,
+                # Written above unless a hook at answer.after is yet to rule.
+                "results_released": not self.hooks.attached("answer.after"),
                 "reasoning": [{"node": self.node_name, "content": "ExecutionDAG aggregation executed successfully."}],
                 "warnings": [
                     RunWarning(

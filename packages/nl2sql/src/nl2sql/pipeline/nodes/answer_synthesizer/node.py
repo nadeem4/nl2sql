@@ -105,7 +105,7 @@ class AnswerGateNode:
         if not verdict.allowed:
             return {"errors": [verdict.error(self.node_name)]}
         release_results(self.ctx, state)
-        return {}
+        return {"results_released": True}
 
 
 def release_results(ctx: Runtime, state: GraphState) -> None:
@@ -169,6 +169,7 @@ class AnswerSynthesizerNode:
         if not out.get("errors"):
             # Outside the answer's own error handling: a failed write fails the run, as a crash.
             release_results(self.ctx, state)
+            out["results_released"] = True
         return out
 
     def _answer(self, state: GraphState, config: Optional[RunnableConfig]) -> Dict[str, Any]:

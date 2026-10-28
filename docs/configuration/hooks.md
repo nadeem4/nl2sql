@@ -147,9 +147,13 @@ written only once no hook can end the run any more:
 
 The parquet files of a run with no manifest stay until retention purges
 them, but nothing reads them. With a hook at `answer.after`, a run that
-crashed or timed out before the hooks ruled has no manifest either. The run's trace records the error that
-ended it, without rows. An approved re-run is a new run with a new
-`trace_id`, read as any other.
+crashed or timed out before the hooks ruled has no manifest either, and
+neither has a run whose answer model failed: the hooks never saw its
+results, so it returns no `result_manifest`, no `artifact_refs` and no rows,
+and `stream_query` sends no `result.manifest` event. Without such a hook
+that run keeps its results, as nothing was left to withhold them for. The
+run's trace records the error that ended it, without rows. An approved
+re-run is a new run with a new `trace_id`, read as any other.
 
 ## Built-in hooks
 

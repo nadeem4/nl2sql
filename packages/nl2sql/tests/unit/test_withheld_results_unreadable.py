@@ -229,6 +229,46 @@ def test_a_run_a_hook_ended_is_unreadable_by_its_trace_id(monkeypatch, store, ho
     assert _unreadable(_engine(runtime), store, result.trace_id)
 
 
+def _answer_fails(inputs):
+    raise RuntimeError("the answer model is down")
+
+
+def _ask_with_events(runtime, how):
+    api = QueryAPI(runtime)
+    if how == "run_query":
+        return api.run_query("How many?"), []
+    events = list(api.stream_query("How many?"))
+    assert events[-1].name == "run.finished", [e.name for e in events]
+    return QueryResult.model_validate(events[-1].data["result"]), [e.name for e in events]
+
+
+@pytest.mark.parametrize("how", ["run_query", "stream_query"])
+def test_a_failed_answer_with_a_hook_at_answer_after_releases_nothing(monkeypatch, store, how):
+    runtime = _runtime(monkeypatch, store, [_bind(lambda ctx: Allow(), ["answer.after"])], invoke=_answer_fails)
+
+    result, events = _ask_with_events(runtime, how)
+
+    assert result.status == "error" and "the answer model is down" in result.errors[0]["message"]
+    assert "result.manifest" not in events, "the hook never reviewed these results"
+    assert result.result_manifest == [] and result.artifact_refs == {}
+    assert all(sq.rows is None for sq in result.sub_queries)
+    assert _unreadable(_engine(runtime), store, result.trace_id)
+
+
+@pytest.mark.parametrize("how", ["run_query", "stream_query"])
+def test_a_failed_answer_without_an_answer_after_hook_still_returns_its_results(monkeypatch, store, how):
+    runtime = _runtime(monkeypatch, store, [_bind(lambda ctx: Allow(), ["execute.before"])], invoke=_answer_fails)
+
+    result, events = _ask_with_events(runtime, how)
+
+    assert result.status == "error"
+    assert [r.node_id for r in result.result_manifest] == [RESULT] and result.artifact_refs
+    assert result.sub_queries[0].rows is not None
+    if how == "stream_query":
+        assert "result.manifest" in events
+    assert _readable(_engine(runtime), result.trace_id)
+
+
 def test_the_approved_retry_is_a_new_run_and_readable(monkeypatch, store):
     asked = []
 
