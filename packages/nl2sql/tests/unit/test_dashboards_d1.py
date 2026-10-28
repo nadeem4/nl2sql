@@ -62,7 +62,7 @@ def engine(make):
 
 def tile(tid: str, *, x: int = 0, y: int = 0, w: int = 2, h: int = 2) -> Tile:
     return Tile(id=tid, title=f"Chart {tid}", question=f"What is {tid}?",
-                plan=ChartPlan(verified=VerifiedRef(id=f"v_{tid}")), layout=TileLayout(x=x, y=y, w=w, h=h))
+                plan=ChartPlan(verified=VerifiedRef(id=f"v_{tid}"), verified_datasource_id="ds1"), layout=TileLayout(x=x, y=y, w=w, h=h))
 
 
 def seed(engine: NL2SQL, did: str = "d1", *, user: UserContext = ANA, status: str = "draft", workspace: str = "ws",

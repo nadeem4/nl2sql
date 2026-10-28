@@ -170,12 +170,10 @@ def test_a_supplied_verified_plan_runs_end_to_end_with_no_model_call(make):
 
 
 @pytest.mark.e2e
-@pytest.mark.parametrize("case", ["execute_false", "no_curated_file", "other_datasource"])
+@pytest.mark.parametrize("case", ["no_curated_file", "other_datasource"])
 def test_a_supplied_verified_plan_is_refused_at_the_call_when_it_cannot_run(make, case):
     engine, server = make(curated=None if case == "no_curated_file" else CURATED)
-    kwargs = {"execute": False} if case == "execute_false" else {}
-    if case == "other_datasource":
-        kwargs["datasource_id"] = "support"
+    kwargs = {"datasource_id": "support"} if case == "other_datasource" else {}
 
     with pytest.raises(ValueError):
         engine.run_query("Top customers of 2012", user_context=_analyst(), plan=_verified(), **kwargs)
@@ -183,22 +181,55 @@ def test_a_supplied_verified_plan_is_refused_at_the_call_when_it_cannot_run(make
 
 
 @pytest.mark.e2e
+def test_a_supplied_verified_plan_with_execute_false_is_checked_and_not_run(make, monkeypatch):
+    """The access check of a dashboard's verified chart (D135): the matcher checks scope and tables, runs nothing."""
+    from nl2sql import UserContext
+    from nl2sql.execution.executor import SqlExecutorService
+
+    engine, server = make(curated=CURATED)
+    executed = []
+    execute = SqlExecutorService.execute
+    monkeypatch.setattr(SqlExecutorService, "execute",
+                        lambda self, request: executed.append(request) or execute(self, request))
+
+    checked = engine.run_query("Top customers of 2012", user_context=_analyst(), plan=_verified(), execute=False,
+                               answer=False)
+    denied = engine.run_query("Top customers of 2012", user_context=UserContext(roles=["viewer"]), plan=_verified(),
+                              execute=False, answer=False)
+
+    assert checked.status == "plan_only" and checked.errors == [], checked.errors
+    assert checked.source.type == "verified" and all(sq.rows is None for sq in checked.sub_queries)
+    assert denied.status == "error" and "SECURITY_VIOLATION" in [e["error_code"] for e in denied.errors]
+    assert executed == [], "nothing was executed"
+    assert server.calls == [], "no model call, and no fallback to model planning"
+
+
+@pytest.mark.e2e
+@pytest.mark.parametrize("execute", [True, False], ids=["run", "check"])
 @pytest.mark.parametrize("case, code", [
     ("unknown_query", "INVALID_STATE"),
     ("bad_param", "INVALID_STATE"),
     ("scope_miss", "SECURITY_VIOLATION"),
     ("policy_deny", "SECURITY_VIOLATION"),
+    ("matcher_crash", "EXECUTION_FAILED"),
 ])
-def test_a_supplied_verified_plan_that_cannot_run_ends_with_an_error_and_no_model_call(make, case, code):
+def test_a_supplied_verified_plan_that_cannot_run_ends_with_an_error_and_no_model_call(
+        make, monkeypatch, case, code, execute):
+    """The same with ``execute=False`` (a dashboard open's check): a later change cannot split the two paths."""
     from nl2sql import SuppliedPlan, UserContext, VerifiedRef
+    from nl2sql.pipeline.nodes.curated_matcher import node as matcher
 
     engine, server = make(curated=CURATED)
     user = {"scope_miss": UserContext(roles=["nobody"]), "policy_deny": UserContext(roles=["viewer"])}.get(
         case, _analyst())
     plan = {"unknown_query": SuppliedPlan(verified=VerifiedRef(id="nope"), verified_datasource_id="chinook"),
             "bad_param": _verified(n=500, year=2012)}.get(case, _verified())
+    if case == "matcher_crash":
+        def crash(*args, **kwargs):
+            raise RuntimeError("boom")
+        monkeypatch.setattr(matcher, "resolve_params", crash)
 
-    result = engine.run_query("Top customers of 2012", user_context=user, plan=plan, answer=False)
+    result = engine.run_query("Top customers of 2012", user_context=user, plan=plan, answer=False, execute=execute)
 
     assert result.status == "error"
     assert code in [e["error_code"] for e in result.errors], result.errors

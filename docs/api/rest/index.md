@@ -22,6 +22,11 @@ Source: `packages/api/src/nl2sql_api/main.py`
   seconds), so traces and results older than their store's `max_age_days`
   are deleted (see [Storage → Retention](../../configuration/storage.md#retention)).
   A failed purge is logged and never stops the server.
+- Dashboard schedules: the lifespan starts a runner that calls
+  `engine.dashboards.run_scheduled()` every minute (`run_schedules`, every
+  `SCHEDULE_INTERVAL_S` seconds), so a dashboard with a schedule refreshes as
+  its owner while the server runs (see [Dashboards](../../dashboards/index.md#schedules)).
+  A failed run is logged and never stops the server.
 - The package imports the engine only through the top-level `nl2sql` namespace
   (`from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...`),
   never an engine submodule. `packages/api/tests/test_architecture.py` enforces it.

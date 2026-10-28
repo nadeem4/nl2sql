@@ -416,8 +416,10 @@ def test_a_chart_plan_holds_one_whole_run_or_a_verified_query():
 
     whole = ChartPlan(decomposition=_decomposition().model_dump(mode="json"), plans={"sq1": {"tables": []}})
     assert ChartPlan.model_validate_json(whole.model_dump_json()) == whole
-    assert ChartPlan(verified=VerifiedRef(id="v1", params={"year": 2013})).verified.params == {"year": 2013}
+    verified = ChartPlan(verified=VerifiedRef(id="v1", params={"year": 2013}), verified_datasource_id="ds1")
+    assert verified.verified.params == {"year": 2013}
     for bad in ({}, {"decomposition": {}, "plans": {}, "verified": VerifiedRef(id="v")},
+                {"verified": VerifiedRef(id="v")},  # a verified query names its datasource
                 {"decomposition": {"sub_queries": []}}, {"plans": {"sq1": {}}}):
         with pytest.raises(ValidationError):
             ChartPlan(**bad)

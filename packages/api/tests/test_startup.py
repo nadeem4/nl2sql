@@ -106,6 +106,59 @@ def test_api_purges_at_startup(tmp_path, monkeypatch):
             del app.state.engine
 
 
+def test_api_lifespan_runs_the_scheduler(tmp_path, monkeypatch):
+    """The API calls ``engine.dashboards.run_scheduled()`` every minute while it serves (wave_c.md, D132)."""
+    import time
+
+    from nl2sql.api.dashboards_api import DashboardsAPI
+
+    calls = []
+    monkeypatch.setenv("NL2SQL_CONFIG", str(_project(tmp_path, required=False)))
+    monkeypatch.setattr(DashboardsAPI, "run_scheduled", lambda self, now=None: calls.append(now) or [])
+    monkeypatch.setattr("nl2sql_api.main.SCHEDULE_INTERVAL_S", 0.01)
+
+    try:
+        with TestClient(app):
+            deadline = time.time() + 5
+            while len(calls) < 2 and time.time() < deadline:
+                time.sleep(0.01)
+            ran = len(calls)
+        time.sleep(0.1)
+        assert ran >= 2, "it runs again and again while the API serves"
+        assert len(calls) <= ran + 1, "and stops with the API"
+    finally:
+        if hasattr(app.state, "engine"):
+            del app.state.engine
+
+
+def test_the_scheduler_runs_until_shutdown_and_survives_a_failure():
+    import asyncio
+    from types import SimpleNamespace
+
+    from nl2sql_api.main import run_schedules
+
+    calls = []
+
+    def run_scheduled():
+        calls.append(1)
+        if len(calls) == 1:
+            raise OSError("disk busy")
+        return []
+
+    engine = SimpleNamespace(dashboards=SimpleNamespace(run_scheduled=run_scheduled))
+
+    async def run():
+        task = asyncio.create_task(run_schedules(engine, interval_s=0.01))
+        while len(calls) < 3:
+            await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(run())
+    assert len(calls) >= 3
+
+
 def test_the_daily_purge_runs_until_shutdown_and_survives_a_failure():
     import asyncio
     from types import SimpleNamespace

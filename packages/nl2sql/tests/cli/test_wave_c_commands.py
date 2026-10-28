@@ -21,8 +21,6 @@ def _out(result) -> str:
 
 @pytest.mark.parametrize("command, row", [
     (["launch", ".", "--provider", "openai", "--as", "admin", "--draft", "--yes", "--no-ports"], "L3"),
-    (["dashboards", "refresh", "--due"], "D2"),
-    (["dashboards", "refresh", "--dashboard", "abc", "--as", "admin"], "D2"),
 ])
 def test_a_stub_command_names_its_row_and_exits_1(command, row):
     result = runner.invoke(app, command)

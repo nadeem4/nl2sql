@@ -705,6 +705,70 @@ def test_registry_tools_and_the_report_make_no_model_call():
         "no model call: no import of nl2sql.llm, nl2sql.services or a provider SDK.", offenders)
 
 
+DASHBOARDS = ENGINE / "dashboards"
+# The one shape from the model-side packages a dashboard may import: QuestionUsage, a pydantic model of tokens.
+DASHBOARDS_MAY_IMPORT = {"nl2sql.services.callbacks.token_handler"}
+
+
+def _run_query_problems(source: str) -> list[str]:
+    """What is wrong with each ``run_query`` call in ``source``: it must pass ``plan=`` and ``answer=False``."""
+    problems = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "run_query":
+            keywords = {k.arg: k.value for k in node.keywords}
+            if "plan" not in keywords:
+                problems.append(f"line {node.lineno}: no plan=")
+            answer = keywords.get("answer")
+            if not (isinstance(answer, ast.Constant) and answer.value is False):
+                problems.append(f"line {node.lineno}: no answer=False")
+    return problems
+
+
+def test_the_run_query_scan_sees_a_call_that_may_replan_or_write_prose():
+    assert _run_query_problems("api.run_query(q, user_context=u)") == ["line 1: no plan=", "line 1: no answer=False"]
+    assert _run_query_problems("api.run_query(q, plan=p)") == ["line 1: no answer=False"]
+    assert _run_query_problems("api.run_query(q, plan=p, answer=False)") == []
+
+
+def test_dashboards_make_no_model_call():
+    """A refresh re-runs stored plans and costs no tokens (wave_c.md, D132): ``nl2sql/dashboards/`` imports no LLM
+    client, callback or provider, and every ``run_query`` call in it passes ``plan=`` and ``answer=False``, so a
+    call cannot replan the question or write prose."""
+    offenders, calls = [], 0
+    for path in python_files(DASHBOARDS):
+        offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                      if name.startswith(NO_MODEL_PREFIXES) and not name.startswith(tuple(DASHBOARDS_MAY_IMPORT))]
+        source = path.read_text(encoding="utf-8")
+        calls += source.count(".run_query(")
+        offenders += [f"{_where(path)}: {problem}" for problem in _run_query_problems(source)]
+    assert calls, "the scan found no run_query call to hold"
+    assert not offenders, _broke(
+        "nl2sql/dashboards/ makes no model call: no import of nl2sql.llm, nl2sql.services (but the QuestionUsage "
+        "shape), nl2sql.agents or a provider SDK, and every run_query passes plan= and answer=False.", offenders)
+
+
+# Where an entry point may reach data: run_query, and engine.results for a chart. Not an adapter, a datasource, the
+# result store or the executor.
+DATA_PATHS = ("nl2sql.adapters", "nl2sql.datasources", "nl2sql.execution", "nl2sql_sdk.sqlalchemy")
+DATA_ATTRIBUTES = {"ds_registry", "artifact_store", "get_adapter"}
+
+
+def test_every_entry_point_reaches_data_through_run_query():
+    """One access rule (wave_c.md, D135): the conversation loop, the dashboards and the MCP tools read data through the
+    facade's methods, so the caller's scope, the hooks and the validator apply to all of them. Nothing in
+    ``nl2sql/conversations/``, ``nl2sql/dashboards/`` or ``nl2sql/mcp/`` imports an adapter, a datasource, the executor
+    or the result store, or reaches the datasource registry or the artifact store."""
+    offenders = []
+    for path in python_files(ENGINE / "conversations", DASHBOARDS, ENGINE / "mcp"):
+        offenders += [f"{_where(path)}:{lineno} {name}" for lineno, name, _ in imports(path)
+                      if name.startswith(DATA_PATHS) or name.partition(".")[0] in DATABASE_LIBRARIES]
+        offenders += [f"{_where(path)}:{node.lineno} .{node.attr}" for node in ast.walk(_tree(path))
+                      if isinstance(node, ast.Attribute) and node.attr in DATA_ATTRIBUTES]
+    assert not offenders, _broke(
+        "Nothing in nl2sql/conversations/, nl2sql/dashboards/ or nl2sql/mcp/ reads a database, an adapter or the "
+        "result store except through run_query and engine.results: one access rule for every entry point.", offenders)
+
+
 # Only these serve HTTP, and so only these import a web framework or server.
 WEB_SERVER_LIBRARIES = {"starlette", "uvicorn", "fastapi"}
 WEB_SERVER_MODULES = ("nl2sql/src/nl2sql/mcp/", "nl2sql/src/nl2sql/cli/demo/", "nl2sql/src/nl2sql/cli/commands/demo.py")

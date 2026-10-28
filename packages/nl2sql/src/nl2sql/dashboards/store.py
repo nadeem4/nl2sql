@@ -65,6 +65,12 @@ class DashboardStore:
     def runs(self, dashboard_id: str) -> List[TileRun]:
         return [TileRun.model_validate(doc) for doc in self._state.get_tile_runs(dashboard_id)]
 
+    def put_runs(self, dashboard_id: str, runs: Iterable[TileRun]) -> None:
+        """Replace the last result of each chart in ``runs``; the others' are kept."""
+        docs = [run.model_dump(mode="json") for run in runs]
+        if docs:
+            self._state.put_tile_runs(dashboard_id, docs)
+
     def drop_runs(self, dashboard_id: str, tile_ids: Iterable[str]) -> None:
         tile_ids = list(tile_ids)
         if tile_ids:

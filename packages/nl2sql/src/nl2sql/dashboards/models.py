@@ -13,7 +13,7 @@ from pydantic import Field, model_validator
 
 from nl2sql.charts.spec import ChartSpec, ColumnKind
 from nl2sql.common.strict import StrictModel
-from nl2sql.hooks.approval import VerifiedRef
+from nl2sql.hooks.approval import ApprovalRequest, VerifiedRef
 from nl2sql.services.callbacks.token_handler import QuestionUsage
 
 # A user's first pin, or the starter dashboard, creates this workspace when they have none named.
@@ -40,6 +40,8 @@ class ChartPlan(StrictModel):
     decomposition: Optional[Dict[str, Any]] = None  # DecomposerResponse as JSON: sub-queries, combine groups
     plans: Dict[str, Dict[str, Any]] = Field(default_factory=dict)  # sub_query_id -> PlanModel as JSON
     verified: Optional[VerifiedRef] = None  # a verified query's id and bound params
+    # The datasource the verified query belongs to; required with ``verified`` (``SuppliedPlan.verified_datasource_id``).
+    verified_datasource_id: Optional[str] = None
 
     @model_validator(mode="after")
     def _one_of(self) -> "ChartPlan":
@@ -50,6 +52,10 @@ class ChartPlan(StrictModel):
             raise ValueError("A decomposition needs the plan of each sub-query.")
         if not whole and self.plans:
             raise ValueError("Plans belong to a decomposition; a verified query has none.")
+        if whole and self.verified_datasource_id is not None:
+            raise ValueError("verified_datasource_id goes with a verified query.")
+        if not whole and not self.verified_datasource_id:
+            raise ValueError("A verified query needs verified_datasource_id.")
         return self
 
 
@@ -145,6 +151,9 @@ class TileRun(StrictModel):
     column_kinds: Dict[str, ColumnKind] = Field(default_factory=dict)  # the result's columns; D2 fills it
     filtered: bool = False  # every active filter applied to this chart
     error: Optional[Dict[str, Any]] = None  # the QueryResult's first error, client-safe
+    # What a person must approve before this chart runs (status ``needs_approval``): pass an ``Approval`` for
+    # each to a manual ``refresh``. Never stored: only a refresh's own result carries them.
+    approvals_needed: List[ApprovalRequest] = Field(default_factory=list)
 
 
 class SkippedTile(StrictModel):

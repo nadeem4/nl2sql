@@ -28,7 +28,7 @@
 
 ## Position in Execution Graph
 
-The node is in the graph only when curated answers are on: `CURATED_ENABLED` is true, the curated file is loaded and holds at least one verified query, and the run executes (a plan-only run has no matcher). Otherwise the graph starts at `DatasourceResolverNode`, exactly as without curated answers.
+The node is in the graph only when curated answers are on: `CURATED_ENABLED` is true, the curated file is loaded and holds at least one verified query, and the run executes (a plan-only run has no matcher, except one that pins a supplied verified query: there the matcher checks the query, its values and every table it reads, then ends without running it, and the run is `plan_only`; a dashboard's access check). Otherwise the graph starts at `DatasourceResolverNode`, exactly as without curated answers.
 
 Upstream:
 - Entry point (no upstream nodes).

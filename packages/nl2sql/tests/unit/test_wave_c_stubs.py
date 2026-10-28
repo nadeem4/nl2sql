@@ -20,13 +20,12 @@ ADMIN = UserContext(user_id="root", roles=["admin"])
 # namespace -> method -> the row that fills it. Every public method of a stub class is listed.
 STUBS = {
     "workspaces": {},
-    "dashboards": {"open": "D2", "refresh": "D2", "filter_values": "D2", "run_scheduled": "D2",
-                   "generate": "D3", "suggest_questions": "D3"},
+    "dashboards": {"filter_values": "D2b", "generate": "D3", "suggest_questions": "D3"},
 }
 # Methods a row has filled since: they are real now and have their own tests.
 FILLED = {"workspaces": {"create", "rename", "list", "delete"},
           "dashboards": {"get", "list", "delete", "pin", "move", "edit", "rename", "rename_tile", "set_tile_chart",
-                         "remove_tile", "arrange", "set_filters", "set_schedule"}}
+                         "remove_tile", "arrange", "set_filters", "set_schedule", "open", "refresh", "run_scheduled"}}
 # Methods added to namespaces that already exist.
 ADDED = {("datasources", "diagram"): "K2"}
 

@@ -39,15 +39,21 @@ async def lifespan(app: FastAPI):
     # Retention: once now, then once a day while the API serves.
     await asyncio.to_thread(_purge, engine)
     purging = asyncio.create_task(purge_daily(engine))
+    # Dashboard schedules run only inside a long-running process; this is one (wave_c.md, D132).
+    scheduling = asyncio.create_task(run_schedules(engine))
     yield
-    purging.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await purging
+    for task in (purging, scheduling):
+        task.cancel()
+    for task in (purging, scheduling):
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
     engine.close()
 
 
 # How often the API applies retention (engine.storage.purge()) after the purge at startup.
 PURGE_INTERVAL_S = 24 * 60 * 60
+# How often the API looks for dashboard schedules that are due (engine.dashboards.run_scheduled()).
+SCHEDULE_INTERVAL_S = 60
 
 
 def _purge(engine) -> None:
@@ -65,6 +71,24 @@ async def purge_daily(engine, interval_s: float = PURGE_INTERVAL_S) -> None:
     while True:
         await asyncio.sleep(interval_s)
         await asyncio.to_thread(_purge, engine)
+
+
+def _run_scheduled(engine) -> None:
+    """``engine.dashboards.run_scheduled()``, logged; a failure is logged and never stops the API."""
+    try:
+        runs = engine.dashboards.run_scheduled()
+    except Exception:
+        logger.warning("The scheduled dashboard refresh failed; it is tried again in a minute.", exc_info=True)
+        return
+    if runs:
+        logger.info("Scheduled refresh: %s", ", ".join(run.dashboard_id for run in runs))
+
+
+async def run_schedules(engine, interval_s=None) -> None:
+    """Calls ``engine.dashboards.run_scheduled()`` every ``interval_s`` seconds until cancelled."""
+    while True:
+        await asyncio.sleep(SCHEDULE_INTERVAL_S if interval_s is None else interval_s)
+        await asyncio.to_thread(_run_scheduled, engine)
 
 
 def _app_version() -> str:
