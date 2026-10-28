@@ -249,7 +249,8 @@ class FakeLLMServer:
 
     Each entry in ``calls`` keeps the request ``body``, and the ``authorization``
     header of a matched or unmatched call, so tests can check what was actually
-    sent and with which key.
+    sent and with which key. Anthropic calls record `api_key`, taken from either
+    `x-api-key` or `Authorization: Bearer`.
     """
 
     rules: List[Rule]

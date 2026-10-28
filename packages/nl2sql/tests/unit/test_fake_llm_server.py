@@ -84,3 +84,18 @@ def test_a_bare_plan_answers_the_planner_wrapped():
         assert ask("Other", "x") == plan
     finally:
         server.stop()
+
+
+def test_an_anthropic_call_records_the_key_from_either_header():
+    # anthropic 1.x sends x-api-key, 2.x sends Authorization: Bearer; both must record.
+    server = FakeLLMServer([Rule("plain", "hi")]).start()
+    try:
+        for header, value in (("x-api-key", "key-a"), ("Authorization", "Bearer key-b")):
+            req = urllib.request.Request(
+                server.anthropic_base_url + "/v1/messages",
+                data=json.dumps({"messages": [{"role": "user", "content": "hello"}]}).encode(),
+                headers={"Content-Type": "application/json", header: value}, method="POST")
+            urllib.request.urlopen(req).read()
+        assert [c["api_key"] for c in server.calls] == ["key-a", "key-b"]
+    finally:
+        server.stop()
