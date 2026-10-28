@@ -138,11 +138,16 @@ def mcp(
              "with neither, the server refuses to start.",
     )] = None,
     user: Annotated[Optional[str], typer.Option("--user", help="The user id the runs are recorded under.")] = None,
+    http: Annotated[bool, typer.Option(
+        "--http", help="Serve over HTTP with API keys (mcp.yaml) instead of stdio.")] = False,
+    host: Annotated[Optional[str], typer.Option("--host", help="With --http: the address (mcp.http.host).")] = None,
+    port: Annotated[Optional[int], typer.Option("--port", help="With --http: the port (mcp.http.port).")] = None,
 ):
     """
-    Serve the engine to an MCP client over stdio: ask, list_datasources, describe_table (the mcp extra).
+    Serve the engine to an MCP client: ask, list_datasources, describe_table (the mcp extra). Over stdio
+    by default; with --http, over HTTP behind bearer API keys.
     """
-    mcp_command(ctx, role or [], user)
+    mcp_command(ctx, role or [], user, http, host, port)
 
 
 @trace_app.command("replay")

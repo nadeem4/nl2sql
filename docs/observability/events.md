@@ -104,7 +104,7 @@ events to its own. The three marked *turn* belong to a conversation turn, which 
 | `workspace.changed` | `workspace_id`, `change` (`created`, `renamed`, `deleted`), `by` | `engine.workspaces` (D1) |
 | `datasource.saved` | `datasource_id`, `file`, `by` | `engine.datasources.save` wrote one datasource file (`file` is `datasources/<id>.yaml`; audited) |
 | `api_key.created`, `api_key.revoked` | `key_id`, `user_id`, `tenant_id`, `roles`, `by` (on revoke, `user_id` is whose key it was); never the token | `engine.api_keys.create` and `revoke` (audited); revoking an already revoked key publishes nothing |
-| `mcp.denied` | `reason` (`missing`, `malformed`, `unknown`, `revoked`), `key_id` | `nl2sql mcp --http` refused a bearer token (audited, M2) |
+| `mcp.denied` | `reason` (`missing`, `malformed`, `unknown`, `revoked`), `key_id` | `nl2sql mcp --http` refused a bearer token: no header, a malformed token, an unknown key or a revoked one (audited; never the token) |
 
 The driver and exception text in `datasource.failed` (`message`, `fix`),
 `index.failed` (`reason`) and `index.column_failed` (`message`) is redacted

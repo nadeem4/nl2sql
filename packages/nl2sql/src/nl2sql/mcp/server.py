@@ -18,8 +18,9 @@ from typing import Any, Callable, Optional, Union
 
 import anyio
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
-from nl2sql import NL2SQL, ClarificationChoice, UserContext
+from nl2sql import NL2SQL, ConversationBusy, ConversationNotFound, UserContext
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,10 @@ PREVIEW_ROWS = 20
 # Who is asking: a fixed caller (stdio: whoever started the process), or a
 # function asked on every call, so a server over HTTP can name one per request.
 Identity = Union[UserContext, Callable[[], UserContext]]
+
+# The user id of a fixed identity that names none (stdio without ``--user``, ``auth: none``): conversations belong
+# to a user, so one is needed. A caller that is missing altogether still fails closed.
+DEFAULT_USER = "mcp"
 
 INSTRUCTIONS = (
     "Answers questions about the connected databases in plain English. Call list_datasources to "
@@ -56,37 +61,51 @@ _CALLER_FACING = frozenset({
 })
 
 
-def build_server(engine: NL2SQL, identity: Identity) -> FastMCP:
+def build_server(engine: NL2SQL, identity: Identity, *, over_http: bool = False) -> FastMCP:
     """An MCP server answering for ``identity`` from ``engine``. Run it with ``.run("stdio")``.
 
     ``identity`` is a ``UserContext``, or a function returning one that is
     called once per tool call. The engine stays the caller's to close.
+
+    With ``over_http`` the server is set up for ``streamable_http_app()``, as ``nl2sql.mcp.http`` serves it:
+    stateless, JSON responses, at ``mcp.http.path``, with the SDK's DNS-rebinding protection allowing the
+    configured hosts and origins.
     """
     caller = (lambda: identity) if isinstance(identity, UserContext) else identity
+    http: dict[str, Any] = {}
+    if over_http:
+        config = engine.config.mcp.http
+        http = {"stateless_http": True, "json_response": True, "streamable_http_path": config.path,
+                "transport_security": TransportSecuritySettings(
+                    enable_dns_rebinding_protection=True, allowed_hosts=list(config.allowed_hosts),
+                    allowed_origins=list(config.allowed_origins))}
     # FastMCP's settings are pydantic-settings that would read FASTMCP_*
     # variables and the working directory's .env; FastMCP passes every one of
     # them explicitly, so neither can change the server. Pinned here as well.
-    server = FastMCP("nl2sql", instructions=INSTRUCTIONS, debug=False, log_level="INFO")
+    server = FastMCP("nl2sql", instructions=INSTRUCTIONS, debug=False, log_level="INFO", **http)
 
     # The builtin ``dict`` return type makes the result the tool's structured
     # content as it is; ``typing.Dict`` would wrap it in ``{"result": ...}``.
     @server.tool()
-    async def ask(question: str, datasource_id: Optional[str] = None,
-                  choice: Optional[dict[str, Any]] = None) -> dict[str, Any]:
-        """Answer a question about the data in plain English.
+    async def ask(question: Optional[str] = None, datasource_id: Optional[str] = None,
+                  conversation_id: Optional[str] = None, choice: Optional[str] = None) -> dict[str, Any]:
+        """Answer a question about the data in plain English. Write the question so it stands alone.
 
-        Returns the run's status, the answer (summary and content), each
-        sub-query's SQL with its columns and first 20 rows, whether rows were
-        cut, the answer's source, warnings, and the trace id. A run that
-        needs a person's approval has status needs_approval and lists
-        approvals_needed; a run stopped at a limit carries stop. A question that
-        can be read more than one way has status needs_clarification and a
-        clarification: its options (id, label, explanation) and the request.
-        Ask the user which, then call ask again with the same question and
-        choice={"request": <the request>, "option_id": <the id>}. Pass
-        datasource_id to skip routing.
+        Returns the conversation_id, the turn and the question that ran, the
+        run's status, the answer (summary and content), each sub-query's SQL
+        with its columns and first 20 rows, whether rows were cut, the answer's
+        source, warnings, and the trace id. A run that needs a person's
+        approval has status needs_approval and lists approvals_needed; a run
+        stopped at a limit carries stop. A question that can be read more than
+        one way has status needs_clarification and a clarification: its
+        options (id, label, explanation). Ask the user which, then call ask
+        again with the returned conversation_id and choice=<the option's id>;
+        the question may then be left out.
+        Without conversation_id a new conversation starts, and datasource_id
+        (optional) skips routing for all of it; with it, the question continues
+        that conversation.
         """
-        return await _off_the_loop(caller, _ask, engine, question, datasource_id, choice)
+        return await _off_the_loop(caller, _ask, engine, question, datasource_id, conversation_id, choice)
 
     @server.tool()
     async def list_datasources() -> dict[str, Any]:
@@ -112,6 +131,8 @@ async def _off_the_loop(caller: Callable[[], UserContext], tool: Callable[..., d
     """
     try:
         user = caller()
+        if not user.user_id:
+            user = user.model_copy(update={"user_id": DEFAULT_USER})
         return await anyio.to_thread.run_sync(lambda: tool(engine, user, *args))
     except Exception:
         logger.exception("The MCP tool %s failed", tool.__name__.lstrip("_"))
@@ -156,26 +177,50 @@ def _qualified(table: dict[str, Any], tables: list[dict[str, Any]]) -> str:
     return f"{table['schema']}.{table['name']}" if twins > 1 else table["name"]
 
 
-def _ask(engine: NL2SQL, user: UserContext, question: str, datasource_id: Optional[str],
-         choice: Optional[dict[str, Any]] = None) -> dict[str, Any]:
-    try:
-        picked = ClarificationChoice.model_validate(choice) if choice is not None else None
-    except ValueError:
-        return _error("CLARIFICATION_INVALID", 'choice must be {"request": <the clarification>, "option_id": <an id>}.')
+def _ask(engine: NL2SQL, user: UserContext, question: Optional[str], datasource_id: Optional[str],
+         conversation_id: Optional[str] = None, choice: Optional[str] = None) -> dict[str, Any]:
+    """One ``ask`` turn of a conversation owned by ``user``: a new one, or ``conversation_id``'s."""
+    if question is None and choice is None:
+        return _error("INVALID_REQUEST", "Pass a question, or a choice to answer a clarification.")
+    if conversation_id is None and choice is not None:
+        return _error("CLARIFICATION_INVALID", "A choice answers a clarification: pass the conversation_id it came with.")
+    if conversation_id is not None and datasource_id is not None:
+        return _error("INVALID_REQUEST", "datasource_id is set when a conversation starts; leave it out of a follow-up.")
     if datasource_id is not None and datasource_id not in {info.id for info in _reachable(engine, user)}:
         # A datasource the caller may not reach answers as a missing one does.
         return _error("DATASOURCE_NOT_FOUND", f"No datasource '{datasource_id}'.")
-    result = engine.run_query(question, datasource_id=datasource_id, user_context=user,
-                              **({"choice": picked} if picked else {}))
-    return _answer(result.model_dump(mode="json"))
+    conversations = engine.conversations
+    try:
+        if conversation_id is None:
+            conversation_id = conversations.start(user_context=user, datasource_id=datasource_id).id
+        if question is None:  # a choice answers the pending request's own question
+            pending = conversations.get(conversation_id, user_context=user).pending
+            if pending is None:
+                raise ValueError("Nothing in this conversation is waiting for a choice.")
+            question = pending.question
+        result = conversations.ask_only(conversation_id, question, user_context=user, choice=choice)
+        # This call's turn, found by its run: a follow-up that landed since may be the conversation's last.
+        turns = conversations.get(conversation_id, user_context=user).turns
+        turn = next((t for t in reversed(turns) if any(s.trace_id == result.trace_id for s in t.steps)), turns[-1])
+    except ConversationNotFound:  # missing and someone else's answer alike
+        return _error("CONVERSATION_NOT_FOUND", f"No conversation '{conversation_id}'.")
+    except ConversationBusy:
+        return _error("CONVERSATION_BUSY", "The conversation is running another turn. Try again in a moment.")
+    except ValueError as refused:  # the engine words it; a choice it refuses names the option ids
+        message = str(refused)
+        if message.startswith("CONVERSATION_TOO_LONG"):
+            return _error("CONVERSATION_TOO_LONG", message)
+        return _error("CLARIFICATION_INVALID" if choice is not None else "INVALID_REQUEST", message)
+    return {"conversation_id": conversation_id, "turn": turn.index, "question": turn.steps[-1].question,
+            **_answer(result.model_dump(mode="json"))}
 
 
 def _answer(run: dict[str, Any]) -> dict[str, Any]:
     """``ask``'s result from a ``QueryResult`` as JSON: the answer, the SQL and the first rows.
 
     ``status`` is the run's: success, plan_only, error, needs_approval,
-    stopped, or needs_clarification, which adds ``clarification``: each option's id, label and explanation, and
-    the request itself (the plans stay in it), which the assistant sends back with its pick.
+    stopped, or needs_clarification, which adds ``clarification``: the phrase and each option's id, label and
+    explanation. The request itself stays in the conversation; the assistant sends back an option's id.
     """
     answer = run.get("final_answer") or None
     trace_id = run.get("trace_id") or ""
@@ -198,7 +243,7 @@ def _answer(run: dict[str, Any]) -> dict[str, Any]:
     if run.get("clarification"):
         request = run["clarification"]
         out["clarification"] = {
-            "phrase": request["phrase"], "request": request,
+            "phrase": request["phrase"],
             "options": [{"id": o["id"], "label": o["label"], "explanation": o["explanation"]["text"]}
                         for o in request["options"]]}
     return out

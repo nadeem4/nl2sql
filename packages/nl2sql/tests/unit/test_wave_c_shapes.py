@@ -29,7 +29,8 @@ def test_new_config_sections_have_the_designed_defaults(tmp_path):
     assert (c.context_turns, c.max_tool_calls, c.max_turns, c.max_age_days) == (3, 12, 50, 30)
     assert (d.max_tiles, d.min_refresh_minutes, d.schedule_identity_max_age_days) == (10, 15, 30)
     assert (m.http.host, m.http.port, m.http.path) == ("127.0.0.1", 8765, "/mcp")
-    assert m.http.allowed_hosts == ["127.0.0.1:*", "localhost:*"] and m.http.allowed_origins == []
+    assert m.http.allowed_hosts == [
+        "127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost", "[::1]"] and m.http.allowed_origins == []
     assert m.auth == "api_keys"
     assert config.chat_tools is None, "absent: the five built-ins"
     charts = config.settings.charts

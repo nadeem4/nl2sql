@@ -258,3 +258,69 @@ def test_keys_survive_a_new_engine(tmp_path):
         _, token = _make(first)
     with NL2SQL(config) as second:
         assert second.api_keys.verify(token).user_id == "ana"
+
+
+# ------------------------------------------------------------------ check: why a token was refused (row M2)
+
+def _flip(secret):
+    return ("B" if secret[0] != "B" else "C") + secret[1:]
+
+
+def test_check_returns_the_user_for_a_good_token_and_a_reason_for_a_bad_one(engine):
+    key, token = _make(engine, tenant_id="acme")
+    secret = token.split("_", 2)[2]
+    revoked, revoked_token = _make(engine)
+    engine.api_keys.revoke(revoked.id, by=ADMIN)
+
+    good = engine.api_keys.check(token)
+    assert good.user == UserContext(user_id="ana", tenant_id="acme", roles=["analyst"])
+    assert (good.reason, good.key_id) == (None, key.id)
+    assert engine.api_keys.check("nope").reason == "malformed"
+    assert engine.api_keys.check(None).reason == "malformed"
+    assert engine.api_keys.check("nl2sql_" + "0" * 8 + "_" + secret).reason == "unknown"
+    assert engine.api_keys.check(f"nl2sql_{key.id}_{_flip(secret)}").reason == "unknown"
+    denied = engine.api_keys.check(revoked_token)
+    assert (denied.user, denied.reason, denied.key_id) == (None, "revoked", revoked.id)
+
+
+def test_a_revoked_key_with_the_wrong_secret_is_unknown_not_revoked(engine):
+    # The id alone must not reveal a key's state, and a forged token is never audited as a revoked key.
+    key, token = _make(engine)
+    engine.api_keys.revoke(key.id, by=ADMIN)
+
+    forged = engine.api_keys.check(f"nl2sql_{key.id}_{_flip(token.split('_', 2)[2])}")
+
+    assert (forged.user, forged.reason, forged.key_id) == (None, "unknown", None)
+
+
+def test_verify_is_check_s_user(engine):
+    key, token = _make(engine)
+
+    assert engine.api_keys.verify(token) == engine.api_keys.check(token).user
+    engine.api_keys.revoke(key.id, by=ADMIN)
+    assert engine.api_keys.verify(token) is None and engine.api_keys.check(token).user is None
+
+
+def test_record_denied_publishes_mcp_denied_without_a_token(engine):
+    events = []
+    engine.events.subscribe(events.append, ["mcp.denied"])
+
+    engine.api_keys.record_denied("revoked", "deadbeef")
+    engine.api_keys.record_denied("missing")
+
+    assert [e.data for e in events] == [{"reason": "revoked", "key_id": "deadbeef"},
+                                        {"reason": "missing", "key_id": None}]
+    with pytest.raises(ValueError, match="Unknown reason 'because'"):
+        engine.api_keys.record_denied("because")
+    assert len(events) == 2, "an unknown reason publishes nothing"
+
+
+def test_an_unknown_key_id_costs_one_hash_comparison_like_a_known_one(engine, monkeypatch):
+    _, token = _make(engine)
+    secret = token.split("_", 2)[2]
+    seen = []
+    real = token_format.hmac.compare_digest
+    monkeypatch.setattr(token_format.hmac, "compare_digest", lambda a, b: seen.append((a, b)) or real(a, b))
+
+    assert engine.api_keys.check("nl2sql_" + "0" * 8 + "_" + secret).reason == "unknown"
+    assert len(seen) == 1, "the compare runs against a dummy hash, so timing does not say whether the id exists"

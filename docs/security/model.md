@@ -28,8 +28,11 @@ depends on the client:
 - API keys: `engine.api_keys` makes bearer tokens that each carry the user,
   tenant and roles their holder runs as, and `verify(token)` turns a token
   back into that `UserContext`. This is the one place the engine itself
-  checks who is asking; MCP over HTTP is the first transport to use it, and the
-  other clients above still do not. See [API keys](api-keys.md).
+  checks who is asking; MCP over HTTP (`nl2sql mcp --http`) is the first
+  transport to use it, and the other clients above still do not. Every
+  request there needs a valid key, and runs as that key's user, tenant and
+  roles. See [API keys](api-keys.md) and
+  [MCP over HTTP](../getting_started/mcp.md#over-http).
 
 - Playground: the page sends the role chosen in "Ask as" with each request
   (`/api/ask`, and `/api/retrieval` for the Retrieval inspector), and the
@@ -154,8 +157,17 @@ user who produced it is left to a multi-user deployment.
   SHA-256 of its 256-bit secret is stored; `verify` compares in constant time
   and answers `None` for a malformed, unknown or revoked token. Managing keys
   needs a `policies.admin_roles` caller, a key's roles must be configured
-  roles, and neither an event nor a log line carries the token. See
-  [API keys](api-keys.md).
+  roles, and neither an event nor a log line carries the token.
+- **MCP over HTTP** (`nl2sql mcp --http`): a missing, malformed, unknown or
+  revoked bearer key is a `401` and an audited `mcp.denied` event (the reason
+  and, for a revoked key, its id; never the token). Each request carries its own
+  caller, so two keys in flight never share an identity. A `Host` or `Origin`
+  that `mcp.http.allowed_hosts` and `allowed_origins` do not list is refused
+  (DNS-rebinding protection). `mcp.auth: none` runs every request as one
+  identity, so it is for loopback only and the server refuses to bind any other
+  address with it. The server speaks plain HTTP: put a reverse proxy or a
+  tunnel in front for TLS, since a bearer token sent in the clear is readable.
+  See [API keys](api-keys.md).
 - **Audit logging** records `llm.changed` events only: each `engine.llm.replace`
   (the Python API, `PUT /api/v1/settings/llm`, the playground's model switch),
   with who made it and each agent's old and new model, never a key. Queries

@@ -1,6 +1,6 @@
 # API keys
 
-An API key authenticates a client of MCP over HTTP (arriving with Wave C's M2). It carries the user,
+An API key authenticates a client of [MCP over HTTP](../getting_started/mcp.md#over-http). It carries the user,
 tenant and roles its holder runs as, so a key per person or per app is the unit of revocation. Nothing
 is inferred from the client. The design is [Wave C, section 9](../architecture/wave_c.md#9-mcp-over-http-with-auth).
 
@@ -35,6 +35,7 @@ key, token = engine.api_keys.create(user_id="ana", roles=["analyst"], by=admin, 
 engine.api_keys.list(by=admin)            # [ApiKey, ...], newest first, revoked ones included; no secret
 engine.api_keys.revoke(key.id, by=admin)  # stops verifying at once
 engine.api_keys.verify(token)             # UserContext(user_id="ana", tenant_id="acme", roles=["analyst"]) or None
+engine.api_keys.check(token)              # KeyCheck(user=..., reason=None, key_id="...") or KeyCheck(reason="revoked", ...)
 ```
 
 | Method | Behaviour |
@@ -43,6 +44,8 @@ engine.api_keys.verify(token)             # UserContext(user_id="ana", tenant_id
 | `list(*, by)` | Every key, newest first. `ApiKey` has no secret and no hash. |
 | `revoke(key_id, *, by)` | Sets `revoked_at`; revoking a revoked key changes nothing. An unknown id is a `ValueError`. Publishes `api_key.revoked`. |
 | `verify(token)` | The key's `UserContext`, or `None` for a malformed, unknown or revoked token, or a wrong secret. It takes no caller: it is how a caller is found. |
+| `check(token)` | As `verify`, saying why: a `KeyCheck` with the `user` of a good token, else a `reason` (`malformed`, `unknown`, `revoked`). The secret is compared before a key is called revoked, so a right id with a wrong secret is `unknown`, and an id alone never reveals a key's state. `key_id` is set only when the secret matched. |
+| `record_denied(reason, key_id=None)` | Publishes `mcp.denied` for a request a server refused (`missing`, `malformed`, `unknown` or `revoked`). It takes a reason, never a token. |
 
 `by` is required and has no default. A call without one is a `TypeError`, a `by` that is not a
 `UserContext` is a `TypeError`, and a `by` holding none of `policies.admin_roles` is a
@@ -55,8 +58,17 @@ nothing once roles are configured; create new keys then.
 ## Events and logs
 
 `api_key.created` and `api_key.revoked` carry `key_id`, `user_id`, `tenant_id`, `roles` and `by`, and
-the audit observer keeps both. Neither the token nor any part of the secret appears in an event, a log
+the audit observer keeps both. `mcp.denied` carries a `reason` (`missing`, `malformed`, `unknown`,
+`revoked`) and the `key_id` of a revoked key (only a request that proved the secret names a key), and the
+audit observer keeps it too. Neither the token nor any part of the secret appears in an event, a log
 line or an error. See [Events](../observability/events.md).
+
+## On the wire
+
+`nl2sql mcp --http` takes the key from `Authorization: Bearer <token>`. A missing header, another scheme,
+a malformed token, an unknown key or a revoked key is a `401` with `WWW-Authenticate: Bearer` and an
+`mcp.denied` event; a good key runs the request as the key's user, tenant and roles. See
+[MCP over HTTP](../getting_started/mcp.md#over-http).
 
 ## What a key does and does not give
 

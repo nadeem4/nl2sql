@@ -7,6 +7,7 @@ LLM, is ``tests/e2e/test_mcp_fake_llm.py``.
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,7 +15,8 @@ pytest.importorskip("mcp")
 import anyio  # noqa: E402
 from mcp.shared.memory import create_connected_server_and_client_session  # noqa: E402
 
-from nl2sql import NL2SQL, Policies, QueryResult, SubQueryResult, RowSample, UserContext  # noqa: E402
+from nl2sql import (  # noqa: E402
+    NL2SQL, ConversationNotFound, Policies, QueryResult, RowSample, SubQueryResult, UserContext)
 from nl2sql.mcp.server import PREVIEW_ROWS, build_server  # noqa: E402
 from nl2sql.policies import PolicyEngine  # noqa: E402
 from nl2sql.testing.facade import StubDatasources  # noqa: E402
@@ -68,24 +70,60 @@ class _Runtime:
         }))
 
 
+class _Conversations:
+    """Stands in for ``engine.conversations``: ``ask_only`` answers with the engine's ``answer``."""
+
+    def __init__(self, engine):
+        self.engine = engine
+        self.turns = {}  # conversation id -> [(question, datasource_id)]
+
+    def start(self, *, user_context, datasource_id=None):
+        conversation_id = f"c{len(self.turns) + 1}"
+        self.turns[conversation_id] = []
+        self.datasource = datasource_id
+        self.started_as = user_context
+        return SimpleNamespace(id=conversation_id)
+
+    def ask_only(self, conversation_id, question, *, user_context, choice=None):
+        if conversation_id not in self.turns:
+            raise ConversationNotFound(conversation_id)
+        self.engine.calls.append((question, getattr(self, "datasource", None), user_context))
+        self.engine.choices.append(choice)
+        if isinstance(self.engine.answer, Exception):
+            raise self.engine.answer
+        self.turns[conversation_id].append((question, self.engine.answer.trace_id))
+        for other in self.concurrent:  # a follow-up that lands once this turn's lock is released
+            self.turns[conversation_id].append(other)
+        return self.engine.answer
+
+    pending_question = None
+    concurrent = ()
+
+    def get(self, conversation_id, *, user_context):
+        asked = self.turns[conversation_id]
+        pending = SimpleNamespace(question=self.pending_question) if self.pending_question else None
+        return SimpleNamespace(pending=pending, turns=[
+            SimpleNamespace(index=i + 1, steps=[SimpleNamespace(question=q, trace_id=t)])
+            for i, (q, t) in enumerate(asked)])
+
+
 class _Engine(NL2SQL):
-    """The real facade over a stub runtime; ``run_query`` answers with ``answer``."""
+    """The real facade over a stub runtime; the conversations' ``ask_only`` answers with ``answer``."""
 
     def __init__(self, answer=None):
         self._runtime = _Runtime()
         self.answer = answer if answer is not None else QueryResult(status="success")
         self.calls = []
+        self.choices = []
+        self._conversations = _Conversations(self)
 
     @property
     def datasources(self):
         return StubDatasources(self._runtime, ["chinook", "support"])
 
-    def run_query(self, question, *, datasource_id=None, user_context=None, **kwargs):
-        self.calls.append((question, datasource_id, user_context))
-        self.kwargs = kwargs
-        if isinstance(self.answer, Exception):
-            raise self.answer
-        return self.answer
+    @property
+    def conversations(self):
+        return self._conversations
 
 
 def _call(engine, identity, tool, **arguments):
@@ -304,27 +342,164 @@ def _clarification():
         options=options)
 
 
-def test_mcp_ask_round_trips_a_choice():
-    request = _clarification()
-    asked = _call(_Engine(QueryResult(status="needs_clarification", clarification=request)), VIEWER, "ask",
-                  question="How many records?")
+def test_ask_starts_a_conversation_and_continues_it():
+    engine = _Engine()
 
-    assert asked["status"] == "needs_clarification"
+    first = _call(engine, VIEWER, "ask", question="How many albums?", datasource_id="chinook")
+    second = _call(engine, VIEWER, "ask", question="And artists?", conversation_id=first["conversation_id"])
+
+    assert first["conversation_id"] == "c1" and (first["turn"], first["question"]) == (1, "How many albums?")
+    assert second["conversation_id"] == "c1" and (second["turn"], second["question"]) == (2, "And artists?")
+    assert engine.calls == [("How many albums?", "chinook", VIEWER), ("And artists?", "chinook", VIEWER)]
+    assert len(engine.conversations.turns) == 1, "the follow-up started no conversation"
+
+
+def test_ask_on_another_users_or_a_missing_conversation_is_not_found():
+    engine = _Engine()
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id="nope")
+
+    assert body["status"] == "error"
+    assert body["errors"] == [{"code": "CONVERSATION_NOT_FOUND", "node": None, "message": "No conversation 'nope'."}]
+
+
+def test_a_follow_up_takes_its_datasource_from_the_conversation():
+    body = _call(_Engine(), VIEWER, "ask", question="q", conversation_id="c1", datasource_id="chinook")
+
+    assert body["errors"][0]["code"] == "INVALID_REQUEST" and "datasource_id" in body["errors"][0]["message"]
+
+
+def _clarification():
+    from nl2sql import ClarificationOption, ClarificationRequest
+    from nl2sql.explain.render import explain_plan
+    from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
+
+    plan = PlanModel.model_validate({"tables": [{"name": "Album", "alias": "a"}], "select_items": [
+        {"alias": "n", "expr": {"kind": "column", "alias": "a", "column_name": "AlbumId"}}]})
+    options = [ClarificationOption(id=i, label=label, plan=plan.model_dump(mode="json"),
+                                   explanation=explain_plan(plan, datasource_id="chinook"))
+               for i, label in (("a", "Albums"), ("b", "Releases"))]
+    return ClarificationRequest.build(
+        question="How many records?", asker_user_id="ana", phrase="records", datasource_id="chinook",
+        schema_version="v1", knowledge_digest="d", sub_query={"id": "sq1", "datasource_id": "chinook"},
+        options=options)
+
+
+def test_choice_is_an_option_id_of_the_pending_request():
+    engine = _Engine(QueryResult(status="needs_clarification", clarification=_clarification()))
+    asked = _call(engine, VIEWER, "ask", question="How many records?")
+
     shown = asked["clarification"]
+    assert asked["status"] == "needs_clarification"
     assert [(o["id"], o["label"]) for o in shown["options"]] == [("a", "Albums"), ("b", "Releases")]
     assert all(o["explanation"] for o in shown["options"]) and "plan" not in shown["options"][0]
-    assert shown["request"]["id"] == request.id  # the plans stay in the request the assistant sends back
+    assert "request" not in shown, "the request stays in the conversation; the client sends back an option id"
 
+    engine.answer = QueryResult(status="success")
+    _call(engine, VIEWER, "ask", question="How many records?", conversation_id=asked["conversation_id"], choice="b")
+
+    assert engine.choices == [None, "b"]
+
+
+def test_a_choice_the_conversation_refuses_is_clarification_invalid():
+    engine = _Engine(ValueError("'z' is not an option of the pending question: a, b."))
+    first = _Engine()
+    conversation_id = _call(first, VIEWER, "ask", question="q")["conversation_id"]
+    engine.conversations.turns[conversation_id] = []
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id, choice="z")
+
+    assert body["errors"] == [{"code": "CLARIFICATION_INVALID", "node": None,
+                               "message": "'z' is not an option of the pending question: a, b."}]
+
+
+def test_a_choice_needs_a_conversation():
     engine = _Engine()
-    _call(engine, VIEWER, "ask", question="How many records?", choice={"request": shown["request"], "option_id": "b"})
 
-    choice = engine.kwargs["choice"]
-    assert choice.option_id == "b" and choice.request == request
+    body = _call(engine, VIEWER, "ask", question="q", choice="b")
+
+    assert body["errors"][0]["code"] == "CLARIFICATION_INVALID" and "conversation_id" in body["errors"][0]["message"]
+    assert engine.calls == [] and engine.conversations.turns == {}
 
 
-def test_mcp_ask_refuses_a_choice_that_is_not_a_request():
+def test_a_busy_conversation_is_reported_not_raised():
+    from nl2sql import ConversationBusy
+
+    engine = _Engine(ConversationBusy("Conversation 'c1' is running a turn."))
+    conversation_id = _call(_Engine(), VIEWER, "ask", question="q")["conversation_id"]
+    engine.conversations.turns[conversation_id] = []
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id)
+
+    assert body["errors"][0]["code"] == "CONVERSATION_BUSY"
+
+
+def test_an_identity_without_a_user_id_asks_as_the_default_user():
     engine = _Engine()
-    body = _call(engine, VIEWER, "ask", question="How many records?", choice={"option_id": "b"})
 
-    assert body["status"] == "error" and body["errors"][0]["code"] == "CLARIFICATION_INVALID"
-    assert engine.calls == []
+    _call(engine, UserContext(roles=["viewer"]), "ask", question="q")
+
+    assert engine.conversations.started_as.user_id == "mcp" and engine.conversations.started_as.roles == ["viewer"]
+    assert engine.calls[0][2].user_id == "mcp"
+
+
+def test_an_identity_with_a_user_id_keeps_it():
+    engine = _Engine()
+
+    _call(engine, VIEWER, "ask", question="q")
+
+    assert engine.conversations.started_as.user_id == "ana"
+
+
+def test_a_conversation_at_max_turns_is_conversation_too_long():
+    engine = _Engine(ValueError("CONVERSATION_TOO_LONG: this conversation has 3 turns. Start a new conversation."))
+    conversation_id = _call(_Engine(), VIEWER, "ask", question="q")["conversation_id"]
+    engine.conversations.turns[conversation_id] = []
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id)
+
+    assert body["errors"][0]["code"] == "CONVERSATION_TOO_LONG" and "Start a new conversation" in body["errors"][0]["message"]
+
+
+def test_another_value_error_without_a_choice_is_invalid_request():
+    engine = _Engine(ValueError("Say what you want to ask."))
+    conversation_id = _call(_Engine(), VIEWER, "ask", question="q")["conversation_id"]
+    engine.conversations.turns[conversation_id] = []
+
+    body = _call(engine, VIEWER, "ask", question="q", conversation_id=conversation_id)
+
+    assert body["errors"][0]["code"] == "INVALID_REQUEST"
+
+
+def test_the_turn_returned_is_the_one_this_call_ran_not_the_latest():
+    engine = _Engine(QueryResult(status="success", trace_id="t-mine"))
+    engine.conversations.concurrent = [("someone else's follow-up", "t-other")]
+
+    body = _call(engine, VIEWER, "ask", question="mine")
+
+    assert (body["turn"], body["question"], body["trace_id"]) == (1, "mine", "t-mine")
+
+
+def test_a_choice_needs_no_question():
+    engine = _Engine(QueryResult(status="success"))
+    conversation_id = _call(engine, VIEWER, "ask", question="How many records?")["conversation_id"]
+    engine.conversations.pending_question = "How many records?"
+
+    body = _call(engine, VIEWER, "ask", conversation_id=conversation_id, choice="b")
+
+    assert body["status"] == "success" and engine.calls[-1][0] == "How many records?" and engine.choices[-1] == "b"
+
+
+def test_no_question_and_no_choice_is_invalid_request():
+    body = _call(_Engine(), VIEWER, "ask")
+
+    assert body["errors"][0]["code"] == "INVALID_REQUEST" and "question" in body["errors"][0]["message"]
+
+
+def test_a_choice_with_nothing_pending_and_no_question_is_clarification_invalid():
+    engine = _Engine()
+    conversation_id = _call(engine, VIEWER, "ask", question="q")["conversation_id"]
+
+    body = _call(engine, VIEWER, "ask", conversation_id=conversation_id, choice="b")
+
+    assert body["errors"][0]["code"] == "CLARIFICATION_INVALID"

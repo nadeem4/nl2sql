@@ -51,18 +51,27 @@ def caller(policies: "Policies", roles: List[str], user: Optional[str]) -> "User
     return UserContext(user_id=user, roles=roles)
 
 
-def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str]) -> None:
-    """Build the engine and serve it over stdio until the client closes the stream."""
+def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str], http: bool = False,
+                host: Optional[str] = None, port: Optional[int] = None) -> None:
+    """Build the engine and serve it: over stdio until the client closes the stream, or with ``http`` over HTTP
+    until stopped. HTTP with ``mcp.auth: api_keys`` takes each caller from its key, so no role is given."""
     from nl2sql import NL2SQL, ConfigError, EngineNotReady
     from nl2sql.config import load_config
 
     try:
         config = load_config(config_option(ctx))
-        identity = caller(config.policies, list(roles), user)
+        if http and config.mcp.auth == "api_keys":
+            if roles or user:
+                raise ValueError("--role and --user do not apply with mcp.auth: api_keys: each API key carries its "
+                                 "user and roles (nl2sql keys create).")
+            identity = None
+        else:
+            identity = caller(config.policies, list(roles), user)
     except (ConfigError, ValueError) as error:
         _fail(str(error))
     try:
         from nl2sql.mcp import server
+        from nl2sql.mcp import http as http_server
     except ImportError:
         _fail('nl2sql mcp needs the mcp extra: pip install "nl2sql-engine[mcp]"')
 
@@ -77,10 +86,15 @@ def mcp_command(ctx: typer.Context, roles: List[str], user: Optional[str]) -> No
                 logger.warning("Running degraded: %s", status)
         if config.policies.allow_all:
             logger.warning("policies.allow_all is set: the MCP client can read every table of every datasource.")
-        logger.info("Serving %d datasource(s) over stdio as role(s) %s", len(config.datasources),
-                    ", ".join(identity.roles) or "(allow_all)")
-        server.build_server(engine, identity).run("stdio")
-    except EngineNotReady as error:
+        if http:
+            logger.info("Serving %d datasource(s) over HTTP with %s", len(config.datasources),
+                        "API keys" if identity is None else f"no keys, as role(s) {', '.join(identity.roles) or '(allow_all)'}")
+            http_server.serve(engine, identity, host=host, port=port)
+        else:
+            logger.info("Serving %d datasource(s) over stdio as role(s) %s", len(config.datasources),
+                        ", ".join(identity.roles) or "(allow_all)")
+            server.build_server(engine, identity).run("stdio")
+    except (EngineNotReady, ValueError) as error:
         _fail(str(error))
     finally:
         engine.close()

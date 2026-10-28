@@ -5,6 +5,7 @@ Managing keys needs an admin ``by`` with no default (D130); ``verify`` takes the
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -12,7 +13,20 @@ from nl2sql.api.types import ApiKey
 from nl2sql.policies import UserContext, keys
 from nl2sql.runtime import Runtime
 
-_ID_ATTEMPTS = 8  # a clash of two random 32-bit ids is rare; this many in a row means the generator is broken
+_DENIED_REASONS = frozenset({"missing", "malformed", "unknown", "revoked"})
+_DUMMY_HASH = keys.hash_secret("")  # compared when the id is unknown
+_ID_ATTEMPTS = 8 # a clash of two random 32-bit ids is rare; this many in a row means the generator is broken
+
+
+@dataclass(frozen=True)
+class KeyCheck:
+    """What ``engine.api_keys.check`` found: the key's ``user`` when the token is good, else the ``reason``
+    ("malformed", "unknown" or "revoked"). ``key_id`` is set only when the secret matched, so an id alone
+    never says anything about a key."""
+
+    user: Optional[UserContext] = None
+    reason: Optional[str] = None
+    key_id: Optional[str] = None
 
 
 class ApiKeysAPI:
@@ -88,14 +102,34 @@ class ApiKeysAPI:
     def verify(self, token: str) -> Optional[UserContext]:
         """The key's ``UserContext`` (its user, tenant and roles), or None for a malformed, unknown or revoked
         token. The secret's hash is compared in constant time. Takes no caller: it is how a caller is found."""
+        return self.check(token).user
+
+    def check(self, token: str) -> KeyCheck:
+        """As ``verify``, saying why a token was refused. The secret is compared before a key is called revoked,
+        so a right id with a wrong secret is "unknown": an id alone cannot probe a key's state."""
         parsed = keys.parse(token)
         if parsed is None:
-            return None
+            return KeyCheck(reason="malformed")
         key_id, secret = parsed
         row = self._ctx.state.get_api_key(key_id)
-        if row is None or row.get("revoked_at") or not keys.matches(secret, row["hash"]):
-            return None
-        return UserContext(user_id=row["user_id"], tenant_id=row.get("tenant_id"), roles=list(row["roles"]))
+        # An unknown id is compared against a dummy hash, so the time does not say whether the id exists.
+        if not keys.matches(secret, row["hash"] if row else _DUMMY_HASH) or row is None:
+            return KeyCheck(reason="unknown")
+        if row.get("revoked_at"):
+            return KeyCheck(reason="revoked", key_id=key_id)
+        user = UserContext(user_id=row["user_id"], tenant_id=row.get("tenant_id"), roles=list(row["roles"]))
+        return KeyCheck(user=user, key_id=key_id)
+
+    def record_denied(self, reason: str, key_id: Optional[str] = None) -> None:
+        """Publishes ``mcp.denied`` for a request the MCP server refused (``reason``: "missing", "malformed",
+        "unknown" or "revoked"). Never takes the token.
+
+        Raises:
+            ValueError: ``reason`` is not one of the four.
+        """
+        if reason not in _DENIED_REASONS:
+            raise ValueError(f"Unknown reason '{reason}': one of {', '.join(sorted(_DENIED_REASONS))}.")
+        self._ctx.bus.publish("mcp.denied", {"reason": reason, "key_id": key_id}, tenant_id=self._ctx.tenant_id)
 
     # ------------------------------------------------------------ helpers
 
