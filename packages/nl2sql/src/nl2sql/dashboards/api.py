@@ -9,13 +9,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, List, Optional, Sequence
 
-from nl2sql.conversations.store import Owner, owner_of
-from nl2sql.dashboards.edits import Applied, EditEnv, apply_edits
+from nl2sql.conversations.store import Owner
+from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits
 from nl2sql.dashboards.models import (
     Arrange, ChartChoice, Dashboard, DashboardEdit, DashboardFilter, DashboardInfo, MoveDashboard, RemoveTile,
     RenameDashboard, RenameTile, ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, TileArrangement,
 )
-from nl2sql.dashboards.store import DashboardStore
+from nl2sql.dashboards.store import DashboardStore, owner_for
 from nl2sql.dashboards.workspaces import Workspaces
 from nl2sql.events.catalog import DashboardChanged, DashboardScheduleSet
 from nl2sql.policies import UserContext
@@ -32,7 +32,7 @@ class Dashboards:
         self._workspaces = Workspaces(ctx, self._store)
 
     def _owner(self, user: UserContext) -> Owner:
-        return owner_of(user, self._ctx.tenant_id)
+        return owner_for(user, self._ctx.tenant_id)
 
     # ------------------------------------------------------------ the store
 
@@ -74,7 +74,7 @@ class Dashboards:
             target = mine.get(dashboard.workspace_id) or self._workspaces.default(owner, user_context)
         changes = {"status": "saved", "workspace_id": target.id, "updated_at": datetime.now(timezone.utc)}
         if title is not None:
-            changes["title"] = title.strip() or dashboard.title
+            changes["title"] = _title(title, "dashboard")
         saved = dashboard.model_copy(update=changes)
         self._store.put(saved)
         self._changed(dashboard_id, ["pinned"], user_context)
@@ -93,11 +93,13 @@ class Dashboards:
                                       roles=list(user_context.roles)),
             now=now, min_refresh_minutes=self._ctx.config.dashboards.min_refresh_minutes,
             workspace_ids={w.id for w in self._store.workspaces(owner)}, chart_settings=self._ctx.settings.charts,
-            last_chart=lambda tile_id: self._store.last_chart(dashboard_id, tile_id))
+            last_run=lambda tile_id: self._store.last_run(dashboard_id, tile_id))
         applied = apply_edits(dashboard, edits, env)  # raises before anything is stored: all or none
         saved = applied.dashboard.model_copy(update={"updated_at": now})
-        self._store.put(saved)
+        # Results first: if the drop fails nothing was saved, and a lost result only costs a refresh, whereas a
+        # saved dashboard beside a stale result would show wrong data.
         self._store.drop_runs(dashboard_id, applied.dropped)
+        self._store.put(saved)
         self._published(applied, saved, user_context)
         return saved
 

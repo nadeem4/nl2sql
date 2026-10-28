@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from typing import Any, List
 
 from nl2sql.common.errors import WorkspaceNotEmpty
-from nl2sql.conversations.store import Owner, owner_of
+from nl2sql.conversations.store import Owner
 from nl2sql.dashboards.models import DEFAULT_WORKSPACE_NAME, Workspace
-from nl2sql.dashboards.store import DashboardStore
+from nl2sql.dashboards.store import DashboardStore, owner_for
 from nl2sql.events.catalog import WorkspaceChanged
 from nl2sql.policies import UserContext
 
@@ -24,7 +24,7 @@ class Workspaces:
         self._store = store
 
     def create(self, name: str, *, user_context: UserContext) -> Workspace:
-        owner = owner_of(user_context, self._ctx.tenant_id)
+        owner = owner_for(user_context, self._ctx.tenant_id)
         name = self._unique(name, owner)
         workspace = Workspace(id=secrets.token_urlsafe(12), name=name, tenant_id=owner[0], user_id=owner[1],
                               created_at=datetime.now(timezone.utc))
@@ -33,7 +33,7 @@ class Workspaces:
         return workspace
 
     def rename(self, workspace_id: str, name: str, *, user_context: UserContext) -> Workspace:
-        owner = owner_of(user_context, self._ctx.tenant_id)
+        owner = owner_for(user_context, self._ctx.tenant_id)
         workspace = self._store.workspace(workspace_id, owner)
         renamed = workspace.model_copy(update={"name": self._unique(name, owner, keep=workspace_id)})
         self._store.put_workspace(renamed)
@@ -41,10 +41,10 @@ class Workspaces:
         return renamed
 
     def list(self, *, user_context: UserContext) -> List[Workspace]:
-        return self._store.workspaces(owner_of(user_context, self._ctx.tenant_id))
+        return self._store.workspaces(owner_for(user_context, self._ctx.tenant_id))
 
     def delete(self, workspace_id: str, *, user_context: UserContext) -> None:
-        owner = owner_of(user_context, self._ctx.tenant_id)
+        owner = owner_for(user_context, self._ctx.tenant_id)
         workspace = self._store.workspace(workspace_id, owner)
         if any(d.workspace_id == workspace_id for d in self._store.list(owner)):
             raise WorkspaceNotEmpty(f"Workspace '{workspace.name}' still holds dashboards; move or delete them first.")

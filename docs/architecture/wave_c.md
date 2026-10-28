@@ -1682,9 +1682,18 @@ flowchart TD
     - `pin` puts a draft in `workspace_id` if given, else in the workspace the draft already lives in if that is
       still the caller's, else in "General" (created on first use). The design says "else the default workspace";
       that would undo a `move` of a draft. A saved dashboard or an empty draft is a `ValueError`.
-    - `set_tile_chart` checks a forced kind against the chart of the tile's last stored result (the kinds its
-      encodings carry, through `choose(..., kind=)`); a tile with no stored result, or a result that has no chart,
-      takes any kind. `auto` is always accepted. D2 stores the results.
+    - `set_tile_chart` checks a forced kind against the tile's last stored result through `choose(..., kind=)`,
+      using the column kinds stored with the result (`TileRun.column_kinds`, empty for a row stored without them,
+      which falls back to the kinds the chart's encodings carry); a tile with no stored result, or a result that has
+      no chart, takes any kind. `auto` is always accepted. **For D2:** fill `TileRun.column_kinds` (from
+      `ResultSummary.column_kinds`) whenever it stores a result, or a result last drawn as a table cannot be forced
+      to a bar.
+    - `edit` discards the stored results before it saves the dashboard, so a failing store leaves both as they were.
+      It is still a read-modify-write without a lock. **For D2:** its refresh lock must also cover `edit`, so a
+      refresh that finishes after a `set_filters` cannot store results that ignore the new filters.
+    - A missing caller (`user_context=None`) is a `TypeError("user_context is required")` on every dashboard and
+      workspace method, never an anonymous owner. `pin(title=)` checks the title like `rename`: blank is a
+      `ValueError`.
     - `arrange` names the charts it moves and leaves the others where they are, then sorts the dashboard's tiles by
       row and column (layout order, the order a refresh runs in). An unknown or repeated tile id is a `ValueError`.
     - `set_filters` checks the definitions only: unique ids, a four-part column (`datasource.schema.table.column`),
@@ -1696,7 +1705,7 @@ flowchart TD
     - `purge()` deletes drafts older than `conversations.max_age_days`, as the design says (no setting of its own),
       and counts them under `dashboards`; it is left out when that is null.
     - Names later rows use: `Dashboards` (`nl2sql.dashboards.api`), `Workspaces.default(owner, user_context)`,
-      `DashboardStore` (`get`, `list`, `put`, `delete`, `runs`, `drop_runs`, `last_chart`, and the workspace
+      `DashboardStore` (`get`, `list`, `put`, `delete`, `runs`, `drop_runs`, `last_run`, and the workspace
       methods), `EditEnv`, `Applied` and `apply_edits` (`nl2sql.dashboards.edits`; D4 adds the two chat-only
       handlers to its `_HANDLERS` table).
 

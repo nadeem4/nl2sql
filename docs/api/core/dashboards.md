@@ -18,7 +18,7 @@
 
 Every method takes `user_context` keyword-only and required, except `run_scheduled`, which runs each
 dashboard as its stored owner. Another owner's workspace or dashboard is `WorkspaceNotFound` or
-`DashboardNotFound`.
+`DashboardNotFound`. A missing caller (`user_context=None`) is a `TypeError`, not an anonymous owner.
 
 ## Behaviour
 
@@ -29,13 +29,15 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **`list`** returns one `status` (`saved` by default, or `draft`) and, with `workspace_id`, one workspace,
   newest first. `refreshed_at` is the oldest stored result of its charts (None until D2 stores some).
 - **`pin`** saves a draft whole, in `workspace_id`, else the workspace the draft is in, else "General" (made on
-  first use). There is no way to pin one chart. An empty draft, or a dashboard already saved, is a `ValueError`.
+  first use). There is no way to pin one chart. An empty draft, a dashboard already saved, or a blank `title`
+  is a `ValueError`.
 - **`edit`** applies a list of edits in order, each seeing the ones before, all or none. The named methods
   (`rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule`, `move`)
   each build one edit. None calls a model, and none takes a question or a plan: what data a chart shows changes
   only in chat (`add_tile`, `replace_plan`, D4). An unknown chart id is a `ValueError`.
 - **`set_tile_chart`** with a kind the chart's last result cannot be drawn as raises a `ValueError` naming the
-  kinds it can be. With no stored result any kind is accepted.
+  kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
+  still be drawn as a bar). With no stored result any kind is accepted.
 - **`set_schedule(every_minutes)`** below `dashboards.min_refresh_minutes` is `ScheduleTooFrequent`; otherwise it
   stores the schedule with the caller's `user_id`, `tenant_id` and roles (D134), and `None` removes it. Nothing
   runs yet: D2's scheduler does.

@@ -494,6 +494,68 @@ def test_dashboard_and_workspace_methods_require_a_caller():
             assert parameter.kind is inspect.Parameter.KEYWORD_ONLY and parameter.default is parameter.empty, name
 
 
+def test_a_missing_caller_is_refused_not_treated_as_anonymous(engine):
+    seed(engine, status="saved")
+    calls = [
+        lambda: engine.workspaces.create("X", user_context=None),
+        lambda: engine.workspaces.rename("ws", "X", user_context=None),
+        lambda: engine.workspaces.list(user_context=None),
+        lambda: engine.workspaces.delete("ws", user_context=None),
+        lambda: engine.dashboards.get("d1", user_context=None),
+        lambda: engine.dashboards.list(user_context=None),
+        lambda: engine.dashboards.delete("d1", user_context=None),
+        lambda: engine.dashboards.pin("d1", user_context=None),
+        lambda: engine.dashboards.rename("d1", "X", user_context=None),
+        lambda: engine.dashboards.move("d1", "ws", user_context=None),
+        lambda: engine.dashboards.set_schedule("d1", 60, user_context=None),
+    ]
+    for call in calls:
+        with pytest.raises(TypeError, match="user_context is required"):
+            call()
+
+
+def test_pin_with_a_blank_title_is_refused_like_rename(engine):
+    seed(engine)
+
+    with pytest.raises(ValueError, match="title"):
+        engine.dashboards.pin("d1", user_context=ANA, title="  ")
+
+    assert engine.dashboards.get("d1", user_context=ANA).status == "draft"
+
+
+def test_a_failed_drop_leaves_the_dashboard_and_its_results_as_they_were(engine, monkeypatch):
+    seed(engine)
+    put_run(engine, "t1")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("store down")
+
+    monkeypatch.setattr(engine._runtime.state, "delete_tile_runs", boom)
+    flt = DashboardFilter(id="f1", label="R", column="a.b.c.d", kind="text", op="in")
+
+    with pytest.raises(RuntimeError, match="store down"):
+        engine.dashboards.set_filters("d1", [flt], user_context=ANA)
+
+    assert engine.dashboards.get("d1", user_context=ANA).filters == [], "the filters were not saved"
+    assert stored_runs(engine) == ["t1"]
+
+
+def test_a_table_result_can_be_forced_to_a_bar_from_its_stored_column_kinds(engine):
+    seed(engine)
+    table = bar().model_copy(update={"kind": "table", "x": None, "y": [], "reason": "forced"})
+    run = TileRun(tile_id="t1", at=NOW, status="ok", chart=table, column_kinds={"city": "text", "n": "number"})
+    engine._runtime.state.put_tile_runs("d1", [run.model_dump(mode="json")])
+
+    assert engine.dashboards.set_tile_chart("d1", "t1", "bar", user_context=ANA).tiles[0].chart == "bar"
+    with pytest.raises(ValueError, match="cannot be drawn as 'line'"):
+        engine.dashboards.set_tile_chart("d1", "t1", "line", user_context=ANA)
+
+
+def test_a_stored_result_without_column_kinds_falls_back_to_its_encodings(engine):
+    old = TileRun.model_validate({"tile_id": "t1", "at": NOW.isoformat(), "status": "ok"})
+    assert old.column_kinds == {}, "rows stored before the field existed still load"
+
+
 # ---------------------------------------------------------------- retention
 
 def test_purge_deletes_old_drafts_and_keeps_saved_dashboards(make):

@@ -18,7 +18,7 @@ from nl2sql.common.planned import arrives_with
 from nl2sql.config.models import ChartSettings
 from nl2sql.dashboards.models import (
     Arrange, Dashboard, DashboardEdit, MoveDashboard, RemoveTile, RenameDashboard, RenameTile, Schedule,
-    ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, Tile, TileLayout,
+    ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, Tile, TileLayout, TileRun,
 )
 
 
@@ -31,7 +31,7 @@ class EditEnv:
     min_refresh_minutes: int
     workspace_ids: Set[str]  # the caller's workspaces
     chart_settings: ChartSettings
-    last_chart: Callable[[str], Optional[ChartSpec]]  # a tile's last stored result's chart
+    last_run: Callable[[str], Optional[TileRun]]  # a tile's last stored result
 
 
 @dataclass
@@ -94,11 +94,15 @@ def _kinds_of(spec: ChartSpec) -> Dict[str, ColumnKind]:
 
 def _set_tile_chart(d: Dashboard, e: SetTileChart, env: EditEnv, out: Applied) -> Dashboard:
     _tile(d, e.tile_id)
-    spec = env.last_chart(e.tile_id)
+    run = env.last_run(e.tile_id)
+    spec = run.chart if run is not None else None
     if spec is not None and e.chart != "auto":
         data = spec.data
+        # The kinds stored with the result; a row without them falls back to what the chart's encodings carry.
+        kinds = {column: run.column_kinds.get(column, "other") for column in data.columns} \
+            if run.column_kinds else _kinds_of(spec)
         # Raises ValueError naming the kinds the stored result can be drawn as.
-        choose(columns=data.columns, kinds=_kinds_of(spec), rows=data.rows, row_count=len(data.rows),
+        choose(columns=data.columns, kinds=kinds, rows=data.rows, row_count=len(data.rows),
                title=spec.title, trace_id=data.trace_id, result_id=data.result_id, settings=env.chart_settings,
                kind=e.chart, cut=data.truncated)
     return _with_tile(d, e.tile_id, chart=e.chart)

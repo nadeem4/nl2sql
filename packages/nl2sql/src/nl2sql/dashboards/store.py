@@ -7,10 +7,16 @@ from __future__ import annotations
 
 from typing import Any, Iterable, List, Optional
 
-from nl2sql.charts.spec import ChartSpec
 from nl2sql.common.errors import DashboardNotFound, WorkspaceNotFound
-from nl2sql.conversations.store import Owner
+from nl2sql.conversations.store import Owner, owner_of
 from nl2sql.dashboards.models import Dashboard, TileRun, Workspace
+
+
+def owner_for(user_context: Any, default_tenant: Optional[str]) -> Owner:
+    """The caller's owner pair. A missing caller is a bug in the calling code, never an anonymous owner (D130)."""
+    if user_context is None:
+        raise TypeError("user_context is required")
+    return owner_of(user_context, default_tenant)
 
 
 class DashboardStore:
@@ -64,9 +70,9 @@ class DashboardStore:
         if tile_ids:
             self._state.delete_tile_runs(dashboard_id, tile_ids)
 
-    def last_chart(self, dashboard_id: str, tile_id: str) -> Optional[ChartSpec]:
-        """The chart of a tile's last stored result, or None when it has none."""
+    def last_run(self, dashboard_id: str, tile_id: str) -> Optional[TileRun]:
+        """A tile's last stored result, or None when it has none."""
         for run in self.runs(dashboard_id):
             if run.tile_id == tile_id:
-                return run.chart
+                return run
         return None
