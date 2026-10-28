@@ -505,8 +505,17 @@ can offer it without the engine naming any database. It lives in
 `nl2sql_sdk.discovery`, which imports only pydantic and the standard
 library, with `Found` (`kind`: `url`, `file` or `port`, and its `value`). The
 engine tests for it with `isinstance`, so an adapter without it is never found,
-only chosen by name, and the adapter interface stays at version 2. The `scan()`
-method itself arrives with L1.
+only chosen by name, and the adapter interface stays at version 2. All four
+members are required together: leave a tuple empty for a way of being found
+the adapter does not use. The five built-ins declare it.
+
+`scan()` hands `connection_for` one `Found` at a time: the URL the caller
+passed (whose scheme, up to any `+driver`, is in your `url_schemes`), a file
+under the scanned folder with one of your `file_suffixes`, or `"127.0.0.1:port"`
+for an open port in your `default_ports`. Return the `connection` fields it
+fills in (the keys of your `connection_model`), or `None` when it is not yours.
+Do not connect: read a file's first bytes at most. `scan()` lists the required
+fields you did not fill as `missing`.
 
 | Member | Description |
 | :--- | :--- |

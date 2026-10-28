@@ -31,8 +31,7 @@ STUBS = {
     "api_keys": {"create": "M1", "list": "M1", "revoke": "M1", "verify": "M1"},
 }
 # Methods added to namespaces that already exist.
-ADDED = {("datasources", "scan"): "L1", ("datasources", "diagram"): "K2", ("datasources", "save"): "L2",
-         }
+ADDED = {("datasources", "diagram"): "K2", ("datasources", "save"): "L2"}
 
 
 @pytest.fixture(scope="module")
@@ -87,8 +86,6 @@ def test_stubs_keep_the_signatures_the_design_gives(engine):
     assert list(inspect.signature(engine.dashboards.run_scheduled).parameters) == ["now"]
     assert list(inspect.signature(engine.api_keys.create).parameters) == [
         "user_id", "roles", "by", "tenant_id", "label"]
-    scan = inspect.signature(engine.datasources.scan).parameters
-    assert list(scan) == ["folder", "url", "ports"] and scan["ports"].default is True
 
 
 # ---------------------------------------------------------------- chat-tool entry points

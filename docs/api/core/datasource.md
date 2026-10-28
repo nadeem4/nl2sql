@@ -10,12 +10,14 @@ forms, and a test of a datasource before it is added.
 - List every configured datasource with its status, capabilities and masked connection.
 - List every adapter type the registry can name, installed or not, with its connection model's JSON Schema.
 - Test a configured datasource, as `check()` does, or a `Datasource` that is not added, registering nothing.
+- Find databases to connect: scan a URL, a folder and the local ports for what the adapters declare they open.
 - Add a `Datasource` (validated, built, not connected) and remove one.
 - Return the indexed schema as the planner is given it, as one caller may see it.
 
 ## Key Modules
 - `packages/nl2sql/src/nl2sql/api/datasource_api.py` (`DatasourcesAPI`, internal)
-- `packages/nl2sql/src/nl2sql/api/types.py` (`DatasourceInfo`, `DatasourceType`)
+- `packages/nl2sql/src/nl2sql/api/types.py` (`DatasourceInfo`, `DatasourceType`, `Candidate`)
+- `packages/nl2sql/src/nl2sql/datasources/discovery.py` (`scan`)
 - `packages/nl2sql/src/nl2sql/datasources/registry.py`
 - `packages/nl2sql/src/nl2sql/config/models.py` (`Datasource`)
 
@@ -27,6 +29,7 @@ forms, and a test of a datasource before it is added.
 | `get(datasource_id)` | `DatasourceInfo` | One configured datasource. Raises `ValueError` for an unknown id. |
 | `types()` | `list[DatasourceType]` | Every adapter the engine's registry can name, sorted by name, whether its driver is installed or not. An adapter module imports without its driver, so the connection schema is there before the driver is. A plugin that fails to import, or implements another interface version, is left out. |
 | `test(datasource)` | `DatasourceStatus` | See [Testing a datasource](#testing-a-datasource). |
+| `scan(folder=".", *, url=None, ports=True)` | `list[Candidate]` | The databases found, as connection candidates, in this order and each once: the `url` (its scheme, up to any `+driver`, picks the adapter), database files under `folder` (suffixes the adapters declare; two folders down, at most 50, no hidden folder, not `storage.path`), and with `ports` the adapters' default ports on `127.0.0.1` only (0.2 s each). Every adapter in the registry takes part, installed or not, if it declares [`DiscoverableAdapter`](../../adapters/sdk.md#optional-discoverableadapter). Opens no database session and builds no adapter; `test()` connects. |
 | `add(datasource)` | `None` | Validates `connection` against the adapter's connection model and `index` as an `IndexScope`, builds the adapter without connecting, registers it, and adds the `Datasource` to `engine.config`; its description and sample questions are what indexing reads. Raises `ValueError` if the id is taken, the type is unknown, a reference does not resolve, `index` does not validate (naming the `index.` field) or the adapter rejects its connection settings (naming the field, with "did you mean" for an unknown key, and never a value). Index it next: `engine.index.build([datasource.id])`. |
 | `remove(datasource_id)` | `None` | Takes the datasource out of routing and out of `engine.config`, and closes its adapter's pool. Its index entries stay until the next full `index.build` or `index.clear`. Raises `ValueError` for an unknown id. |
 | `schema(datasource_id, *, user_context)` | `dict` | The indexed schema as the planner is given it, as `user_context` may see it: `{"datasource_id", "tables": [...]}`, tables sorted by name, each with `name`, `schema`, `row_count`, `description`, `columns` (`name`, `type`, `nullable`, `primary_key`, `description`) and `foreign_keys` (`columns`, `references_table`, `references_columns`). A table the caller's roles deny is left out, and so is a foreign key that refers to one; a caller whose roles do not reach the datasource gets no tables. `user_context` is required: there is no default view, so code that forgot it fails instead of showing everything. Pass an admin's `UserContext` for the whole schema. Read from the snapshot the datasource's live index build was made from, not the database; before the first index `tables` is empty. |

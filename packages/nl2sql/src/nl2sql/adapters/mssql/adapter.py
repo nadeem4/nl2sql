@@ -4,11 +4,12 @@ import xml.etree.ElementTree as ElementTree
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import Field, SecretStr
-from sqlalchemy import URL, Connection, text
+from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.dialects import mssql
 from sqlalchemy.exc import SQLAlchemyError
 
 from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk.discovery import Found
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # SQL Server's error numbers for a failed connection, as the ODBC message
@@ -72,6 +73,22 @@ class MssqlAdapter(SQLAlchemyAdapter):
     driver_modules = ("pyodbc",)
     install_hint = ('pip install "nl2sql-engine[mssql]", and Microsoft\'s ODBC Driver for SQL Server: '
                     'https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server')
+    file_suffixes = ()
+    default_ports = (1433,)
+    url_schemes = ("mssql", "sqlserver")
+
+    @classmethod
+    def connection_for(cls, found: Found) -> Optional[Dict[str, Any]]:
+        """The host and port of an open local port, or every field a ``mssql://`` URL carries. Never connects."""
+        if found.kind == "port":
+            host, _, port = found.value.rpartition(":")
+            return {"host": host, "port": int(port)}
+        if found.kind != "url":
+            return None
+        url = make_url(found.value)
+        fields = {"host": url.host, "port": url.port, "database": url.database, "user": url.username,
+                  "password": url.password}
+        return {name: value for name, value in fields.items() if value is not None}
 
     def url(self, connection: MssqlConnection) -> URL:
         """The connection's ``driver``, else the newest one installed, encrypting unless ``encrypt`` is off.

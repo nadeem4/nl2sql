@@ -1055,6 +1055,28 @@ URL `sqlite`), DuckDB (`.duckdb`, URL `duckdb`), PostgreSQL (5432,
 `postgresql`, `postgres`), MySQL (3306, `mysql`, `mariadb`) and SQL Server
 (1433, `mssql`, `sqlserver`).
 
+!!! note "Built (L1)"
+    `engine.datasources.scan` is `nl2sql/datasources/discovery.py`'s `scan(registry, folder, *, url, ports,
+    skip)`; the five built-ins declare the class variables above and a `connection_for` classmethod (SQLite and
+    DuckDB read the first 16 and 12 bytes of a file, the server databases split a `make_url` URL or a
+    `host:port`). Where the code and the design differ, the code won:
+
+    - `Found` and `DiscoverableAdapter` are imported from `nl2sql_sdk.discovery`, not the SDK's top level.
+    - **Order:** the adapters are walked sorted by registry name, so findings of one kind come in name order
+      (files in sorted path order, ports by adapter name, then each adapter's port order).
+    - **Depth:** "two levels deep" is two folders below `folder` (`folder/a/b/x.db` is found, `folder/a/b/c/x.db`
+      is not). The 50 is files that carry a declared suffix, counted before `connection_for` confirms them.
+    - **Duplicates** are one server (type, host, port) or one file (type, resolved path), the first finding wins.
+      A URL naming `127.0.0.1:5432` therefore hides the open-port finding for the same server.
+    - **The password:** `connection` keeps the URL's password (a form needs it), `Candidate`'s repr masks it,
+      and `found.value` is the URL with the password replaced by `***`. The adapter is given the real URL.
+    - An adapter whose `connection_for` raises (a malformed URL) is skipped, not fatal; a missing folder finds
+      nothing; `scan` takes `storage.path` from the engine's config to skip.
+    - A DuckDB file is confirmed by the `DUCK` magic at byte 8 (the design names only SQLite's header).
+    - The probe is `socket.create_connection(("127.0.0.1", port), timeout=0.2)`; the tests replace it with a fake.
+    - L3 uses `Candidate.type`, `.connection` and `.missing` to fill the form and `.found` to say where a
+      finding came from; `scan` never connects, so L3 calls `datasources.test` on the filled form.
+
 ### Writing the config
 
 Three writers, all in the package, all named in the amended invariant

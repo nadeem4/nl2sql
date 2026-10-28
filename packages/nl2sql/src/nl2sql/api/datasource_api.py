@@ -122,9 +122,19 @@ class DatasourcesAPI:
     def scan(self, folder: Union[str, Path] = ".", *, url: Optional[str] = None, ports: bool = True) -> List[Candidate]:
         """The databases found under ``folder``, at ``url`` and on loopback ports, as connection candidates.
 
-        Opens no database session (L1 fills this; docs/architecture/wave_c.md, section 7).
+        Looks in three places and lists what it finds in this order, each once: ``url`` (its scheme, up to any
+        ``+driver``, picks the adapter; pass ``DATABASE_URL`` here), files under ``folder`` whose suffix an adapter
+        declares (two folders down, at most 50, no hidden folder and not ``storage.path``), and with ``ports`` the
+        default ports of the adapters on ``127.0.0.1`` only (0.2 s each). Every adapter the registry names takes part,
+        installed or not, and only the adapters that declare ``DiscoverableAdapter`` are found.
+
+        Each ``Candidate`` carries the connection fields the finding fills in and the required ones still
+        ``missing``. Nothing connects: ``scan`` opens no database session and builds no adapter; ``test`` does.
+        A URL's password is in ``connection`` (masked when the candidate is printed) and never in ``found``.
         """
-        raise arrives_with("engine.datasources.scan", "L1")
+        from nl2sql.datasources.discovery import scan
+
+        return scan(self._ctx.registry, Path(folder), url=url, ports=ports, skip=self._ctx.config.storage.path)
 
     def diagram(self, datasource_id: str, *, user_context: UserContext, tables: Optional[List[str]] = None) -> str:
         """The datasource's tables and relationships the caller's scope reaches, as Mermaid text (K2 fills this;
