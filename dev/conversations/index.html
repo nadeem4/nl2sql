@@ -2587,9 +2587,9 @@
 <article class="md-content__inner md-typeset">
 <h1 id="conversations">Conversations</h1>
 <div class="admonition note">
-<p class="admonition-title">Wave C, 0.9: the core is here, the chat tools arrive with C2</p>
-<p><code>start</code>, <code>ask</code>, <code>stream</code>, <code>retry</code>, <code>ask_only</code>, <code>get</code>, <code>list</code> and <code>delete</code> work. <code>tool</code> and <code>report</code> and the
-<a href="tools/">chat tools</a> are still stubs. The design is <a href="../architecture/wave_c/#3-conversation">Wave C, section 3</a>.</p>
+<p class="admonition-title">Wave C, 0.9</p>
+<p><code>start</code>, <code>ask</code>, <code>stream</code>, <code>retry</code>, <code>ask_only</code>, <code>tool</code>, <code>report</code>, <code>get</code>, <code>list</code> and <code>delete</code> work, with the
+<a href="tools/">chat tools</a> <code>chart</code> and <code>report</code>. The design is <a href="../architecture/wave_c/#3-conversation">Wave C, section 3</a>.</p>
 </div>
 <p>A conversation is a chat over the database. The model decides, step by step, whether to answer or to ask the
 database a question through the same typed plan and validator as <code>run_query</code>. It never writes SQL and never
@@ -2609,14 +2609,17 @@ sees result rows.</p>
   K --&gt;|no| M["model call: reply or tool call"]
   M --&gt;|reply| ST["store the turn"]
   M --&gt;|"ask"| RUN["run_query: typed plan, validator, cost rule"]
+  M --&gt;|"chat tool"| TOOL["registry tool: no model call"]
   RUN --&gt;|"clarification, approval or stop"| ST
   RUN --&gt;|"ok or error"| M
+  TOOL --&gt; M
   M --&gt;|"bound reached"| LAST["one last call, tools off"]
   LAST --&gt; ST
   RE --&gt; ST</code></pre>
 <ul>
 <li><strong>The model chooses.</strong> Each step is one structured call (<code>ModelStep</code>): a <code>reply</code>, or one <code>call</code> of the <code>ask</code>
-  tool with a question that stands alone. The model sees the last <code>context_turns</code> turns as one JSON object
+  tool with a question that stands alone, or of an enabled <a href="tools/">chat tool</a> (a chart, a report). A reply
+  may carry <code>offers</code>: tools it suggests, which run only when a client calls <code>tool</code>. The model sees the last <code>context_turns</code> turns as one JSON object
   (the questions that ran, each answer's summary, the columns, the datasources and tables read), never rows.
   Everything earlier said, the new message included, reaches it as a JSON string value: text in the history
   cannot pass for an instruction or a section marker.</li>

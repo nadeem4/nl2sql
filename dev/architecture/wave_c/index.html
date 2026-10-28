@@ -6560,6 +6560,53 @@ starts once Waves A and B are released, including Wave B's L2. A1's widened
   handlers to its <code>_HANDLERS</code> table).</li>
 </ul>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Built (C2): chat tools</p>
+<ul>
+<li><strong>Files:</strong> <code>nl2sql/conversations/tools.py</code> (<code>build_chat_tools</code>, <code>describe</code>, <code>ChatToolRunner</code>),
+  <code>report.py</code> (<code>build_report</code>), the tool branch of the loop and <code>Conversations.tool</code> / <code>report</code> in
+  <code>conversations/api.py</code>, <code>agent.py</code> (<code>step_view</code> shows a tool's output without data), <code>chat_tools/report.py</code>,
+  <code>api/chat_tools_api.py</code>. The runner's tools are built once in <code>Runtime.components</code> as <code>runtime.chat_tools</code>
+  (name to instance), so an unknown name is a <code>ConfigError</code> at <code>chat_tools[i]</code>. <code>ConversationsAPI</code> and
+  <code>Conversations</code> now take the facade (<code>engine</code>) as their second argument: that is what a tool is handed.</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_chat_tools.py</code>, one e2e test in <code>tests/e2e/test_conversations_fake_llm.py</code>,
+  <code>test_registry_tools_and_the_report_make_no_model_call</code> (architecture); the stub tests lose <code>tool</code>, <code>report</code>,
+  <code>chat_tools.list</code> and the three tool codes from <code>DECLARED_AHEAD</code>.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li>A tool is handed the conversation <strong>with the turn in flight</strong> appended (its steps so far, status
+  <code>answered</code>), so <code>chart</code> after <code>ask</code> works in one turn. The <code>report</code> tool covers stored turns only: it
+  calls <code>conversations.report</code>, which reads the store, so it cannot include the turn it is called in.</li>
+<li>The model sees a tool step as <code>output</code>: a chart is <code>{kind, reason, columns}</code>, a diagram is its text, and
+  a <code>markdown</code> or <code>json</code> body (a report, a dashboard change) is not shown, only its kind, title and <code>refs</code>.
+  The chart's takeaway is withheld too (it quotes values). D4 should show the model what it needs of a
+  dashboard through the <code>[CONVERSATION]</code> block, as its row says.</li>
+<li><code>conversations.tool</code> validates the arguments before it opens a turn: an invalid call is a <code>ValueError</code>
+  and stores nothing; only an unknown or disabled name is stored, as an <code>UNKNOWN_CHAT_TOOL</code> step. A tool
+  turn's <code>text</code> is the tool's name.</li>
+<li><strong>A K1 bug fixed here:</strong> a run saves its results under the engine's tenant (<code>settings.tenant_id</code>),
+  whoever asked, so the <code>chart</code> tool no longer reads the conversation's or the caller's tenant (it found
+  nothing for a caller with a <code>tenant_id</code>). The report reads the engine's tenant too.</li>
+<li>Review fixes: a stored tool output holds no rows (D106). A chart output's <code>data.rows</code> is emptied before
+  the step is stored (a client draws again through <code>engine.results.chart</code>), and the <code>report</code> tool stores
+  the report without row tables and chart takeaways (<code>conversations.report(include_rows=False)</code>); asked
+  for directly, the report still reads the rows from <code>engine.results</code>. <code>engine.results</code> does not check the
+  caller (it reads by tenant and trace id); that gap is a separate row.</li>
+<li><code>chat_tools:</code> absent means the default tools <strong>the registry has</strong>, so an engine on <code>Registry.empty()</code>
+  builds. The defaults are <code>("chart", "report")</code> only: <code>diagram</code>, <code>dashboard_edit</code> and <code>dashboard_pin</code> are
+  still stubs and <strong>stay off by default. K2 and D4 each add their own name to <code>DEFAULT_CHAT_TOOLS</code>
+  (<code>conversations/tools.py</code>) and to the docs when they land.</strong> A name listed explicitly must be registered;
+  <code>ask</code> and a plugin whose <code>args_model</code> does not forbid extra keys are config errors.</li>
+<li><code>user_context=None</code>, or a context with no <code>user_id</code>, is a <code>TypeError</code> in every <code>conversations</code> method (a
+  shared anonymous owner would see everyone's anonymous conversations). <code>TOOL_FAILED</code> shows the model the
+  exception type only; the log has the full error. The report considers every turn and keeps each
+  successful <code>ask</code> step, so an answer in a turn whose later tool failed is still reported.</li>
+<li>Names later rows use: <code>ChatToolRunner</code>, <code>build_chat_tools</code>, <code>describe</code> (<code>nl2sql.conversations.tools</code>),
+  <code>build_report</code> (<code>nl2sql.conversations.report</code>), <code>Conversations._tool(run, call)</code>, <code>runtime.chat_tools</code>,
+  <code>check_call</code> (renamed from <code>_check_call</code> in <code>agent.py</code>).</li>
+</ul>
+</div>
 <p>The waves, with at most four PRs at once:</p>
 <table>
 <thead>

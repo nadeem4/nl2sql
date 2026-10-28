@@ -5794,10 +5794,6 @@
 
 
 <h1 id="conversations-api">Conversations API</h1>
-<div class="admonition note">
-<p class="admonition-title">C1 is built; <code>tool</code>, <code>report</code> and <code>engine.chat_tools.list</code> arrive with C2</p>
-<p>The three C2 methods have their final signatures and raise <code>NotImplementedError</code> naming their row.</p>
-</div>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.conversations</code>: model-led conversations over the database (<a href="../../../conversations/">Conversations</a>),
 and <code>engine.chat_tools</code> (<a href="../../../conversations/tools/">Chat tools</a>).</p>
@@ -5806,6 +5802,7 @@ and <code>engine.chat_tools</code> (<a href="../../../conversations/tools/">Chat
 <li><code>packages/nl2sql/src/nl2sql/api/conversations_api.py</code> (<code>ConversationsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/conversations/</code> (<code>api.py</code> the turn and its loop, <code>agent.py</code> the <code>[CONVERSATION]</code>
   block and the step checks, <code>prompts.py</code>, <code>store.py</code> ownership and stored rows)</li>
+<li><code>packages/nl2sql/src/nl2sql/conversations/tools.py</code> (the chat-tool runner), <code>report.py</code> (the Markdown report)</li>
 <li><code>packages/nl2sql/src/nl2sql/api/chat_tools_api.py</code> (<code>ChatToolsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/conversations/models.py</code> (<code>Conversation</code>, <code>Turn</code>, <code>ToolStep</code>, <code>ModelStep</code>)</li>
 </ul>
@@ -5860,7 +5857,7 @@ earlier question.</p>
 <td>C2</td>
 </tr>
 <tr>
-<td><code>report(conversation_id, *, user_context, turns=None, title=None) -&gt; str</code></td>
+<td><code>report(conversation_id, *, user_context, turns=None, title=None, include_rows=True) -&gt; str</code></td>
 <td>C2</td>
 </tr>
 <tr>
@@ -5877,6 +5874,16 @@ earlier question.</p>
   <code>CANCELLED</code> after the step in flight.</li>
 <li><code>stream</code> ends with <code>conversation.turn</code>; see <a href="../../../conversations/#streaming">Streaming</a>.</li>
 <li><code>ask_only</code> returns the run's <code>QueryResult</code> with its rows; the stored turn has none.</li>
+<li><code>tool</code> runs one enabled <a href="../../../conversations/tools/">chat tool</a> as a turn of kind <code>tool</code> and makes no model
+  call. Arguments the tool's <code>args_model</code> rejects are a <code>ValueError</code> and store nothing; a tool that is not
+  enabled, raises or cannot apply is a stored step with <code>error.code</code> <code>UNKNOWN_CHAT_TOOL</code>, <code>TOOL_FAILED</code> or
+  <code>TOOL_NOT_APPLICABLE</code>.</li>
+<li><code>report</code> returns Markdown for the stored answered turns (or <code>turns</code>, a list of turn numbers). A turn number
+  that does not exist, or a conversation with nothing answered, is a <code>ValueError</code>. <code>include_rows=False</code> leaves
+  the row tables and chart takeaways out, which is how the <code>report</code> tool stores its output.</li>
+<li>Every method needs a caller: <code>user_context=None</code>, or a context with no <code>user_id</code>, is a <code>TypeError</code>, not a
+  shared anonymous owner.</li>
+<li><code>engine.chat_tools.list()</code> takes no caller: it lists the enabled tools' names.</li>
 </ul>
 
 

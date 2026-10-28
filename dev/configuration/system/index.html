@@ -6321,7 +6321,7 @@ same <code>Config</code> as a split layout would:</p>
 <td><code>chat_tools</code></td>
 <td>no</td>
 <td><a href="#conversations-chat-tools-dashboards-and-mcp">below</a></td>
-<td>A list of chat tool names. Absent means the five built-ins; <code>[]</code> means none (<code>ask</code> stays).</td>
+<td>A list of chat tool names. Absent means <code>chart</code> and <code>report</code>, if registered; <code>[]</code> means none (<code>ask</code> stays).</td>
 </tr>
 <tr>
 <td><code>dashboards</code></td>
@@ -6530,25 +6530,23 @@ is optional, and absent, the defaults shown apply. Chart limits are
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">        </span><span class="c1"># null keeps conversations; also bounds draft dashboards</span>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># chat_tools.yaml: a list of registered names (the nl2sql.chat_tools entry point group)</span>
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chart</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">diagram</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># absent: chart and report (those the registry has); diagram, dashboard_edit and dashboard_pin wait for K2 and D4</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chart</span>
 <a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">report</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dashboard_edit</span>
-<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dashboard_pin</span>
-<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>
-<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="c1"># dashboards.yaml (every value shown is the default)</span>
-<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="nt">max_tiles</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w">                        </span><span class="c1"># the starter dashboard's size</span>
-<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="nt">min_refresh_minutes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span><span class="w">              </span><span class="c1"># a schedule below this is refused</span>
-<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="nt">schedule_identity_max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">   </span><span class="c1"># a schedule stops when its saved identity is older</span>
-<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>
-<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="c1"># mcp.yaml (every value shown is the default)</span>
-<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="nt">http</span><span class="p">:</span>
-<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
-<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8765</span>
-<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mcp</span>
-<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
-<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="w">  </span><span class="nt">allowed_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                              </span><span class="c1"># browser Origins accepted</span>
-<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span><span class="w">            </span><span class="c1"># api_keys | none (none: loopback only)</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="c1"># dashboards.yaml (every value shown is the default)</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="nt">max_tiles</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w">                        </span><span class="c1"># the starter dashboard's size</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="nt">min_refresh_minutes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15</span><span class="w">              </span><span class="c1"># a schedule below this is refused</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="nt">schedule_identity_max_age_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">   </span><span class="c1"># a schedule stops when its saved identity is older</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="c1"># mcp.yaml (every value shown is the default)</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="nt">http</span><span class="p">:</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8765</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="w">  </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/mcp</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="w">  </span><span class="nt">allowed_hosts</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"127.0.0.1:*"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"localhost:*"</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># Host headers accepted</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a><span class="w">  </span><span class="nt">allowed_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w">                              </span><span class="c1"># browser Origins accepted</span>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_keys</span><span class="w">            </span><span class="c1"># api_keys | none (none: loopback only)</span>
 </code></pre></div>
 <table>
 <thead>
@@ -6564,7 +6562,7 @@ is optional, and absent, the defaults shown apply. Chart limits are
 </tr>
 <tr>
 <td><code>chat_tools</code></td>
-<td>A list of names: none twice, each a registered chat tool (<code>registry.add_chat_tool</code>, or an entry point). An unknown name is an error when the engine is built, naming the registered ones (C2). <code>ask</code> is the conversation's own tool and is always on.</td>
+<td>A list of names: none twice, each a registered chat tool (<code>registry.add_chat_tool</code>, or an entry point). An unknown name is an error when the engine is built (<code>chat_tools[i]</code> in the report), with the closest registered name; <code>ask</code> and a plugin whose <code>args_model</code> does not forbid extra keys are errors too. Absent means the default tools (<code>chart</code> and <code>report</code>) that the registry has, so an engine on <code>Registry.empty()</code> starts with none and needs no <code>chat_tools: []</code>; a name you list must be registered. <code>[]</code> means none; <code>ask</code> is the conversation's own tool and is always on. Read by <code>engine.conversations</code> and <code>engine.chat_tools</code> (C2); see <a href="../../conversations/tools/">Chat tools</a>.</td>
 </tr>
 <tr>
 <td><code>dashboards</code></td>
