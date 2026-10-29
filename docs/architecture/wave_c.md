@@ -2360,9 +2360,13 @@ The eval scorer reads the shapes a real database returns (design 18.2). All in `
 The engine's join fixes (design 18.3).
 
 - **Partitions** (`adapters/postgres/adapter.py`): `PostgresAdapter.partitions` reads `pg_inherits` for the schema's partitions (`relispartition`, parent in the same schema); `reflect` asks the base for each partition whose top parent is in scope and `fold_partitions` drops them. The parent keeps its own keys and gains its partitions' (deduplicated); a key of the schema that references a partition points at the parent. Sub-partitions fold into the top parent. `row_estimates` sums the partitions' estimates into a parent that has none (`add_partition_estimates`). Tests: `tests/adapters/unit/test_postgres_partitions.py` (the real shape: keys only on the partitions) and a realdb test on the test bed's Pagila. SQL Server and MySQL partitions are transparent (one table to the catalog), so nothing is needed there. The partitions no longer being tables changes the schema fingerprint, so the Pagila retrieval baseline is re-recorded in the same PR.
-- **Follow-up (not investigated).** In the re-recorded model-free Pagila baseline, pagila_001 now gets 8 tables instead of 11 and misses `category`, `rental` and `category.name` (column recall 0.667 to 0.333), which explains the 71.2% to 68.2% column-recall drop; pagila_002 and pagila_011 gained `payment`. The cause is likely that the join-path fill no longer bridges through the partitions. To investigate.
+- **Follow-up (not investigated).** In the re-recorded model-free Pagila baseline, pagila_001 now gets 8 tables instead of 11 and misses `category`, `rental` and `category.name` (column recall 0.667 to 0.333), which explains the 71.2% to 68.2% column-recall drop; pagila_002 and pagila_011 gained `payment`. The cause is likely that the join-path fill no longer bridges through the partitions. Corrected in 18.4: not the join-path fill, unproven.
 - **Hints** (`pipeline/nodes/validator/join_hints.py`): `join_hint(relationships, left, right, normalize, sent)` returns the sentence appended to "Join does not match any allowed relationship." A path runs only through tables the planner was sent (`sent`), since it can use no other; with none, the hint says no path connects them in the schema it was given. No hint when a join alias is unknown. It does not reuse `schema_retriever/join_path.py`: that returns the tables to add, not the keys between them.
 - **Operand order** (`validator/node.py`): a join pair whose aliases are the join's the other way round is swapped before the match. The generator already emits the condition as written, so no change there; a test pins the SQL.
+
+### C-W6d
+
+Date differences in plans (design 18.5). `ast_planner/functions.py`: `DATE_DIFF` joins `ALLOWED_FUNCTIONS`; `date_diff(func_name, args)` reads `DATE_DIFF(unit, start, end)` as `(unit, start, end)` (all three None when malformed), and `DIFF_UNITS = ("day",)`. The generator's `elapsed_days(start, end)` builds `DateDiff(end, start, SECOND) / 86400.0`: elapsed days with the fraction kept, a number on every adapter. The SDK's `SQLAlchemyAdapter.render_sql` rewrites the seconds difference where sqlglot's rendering is wrong (MySQL `CAST(TIMESTAMPDIFF(SECOND, ...) AS DOUBLE)`, since an integer over a decimal literal keeps four decimals there; SQL Server `DATEDIFF_BIG(SECOND, CAST(.. AS DATETIME2), ..)`, which also takes `DATE`); the SQLite adapter uses `(JULIANDAY(end) - JULIANDAY(start)) * 86400.0`. Postgres and DuckDB need nothing. Tests: `tests/unit/test_date_diff.py` runs real SQLite and DuckDB (3.87 days, two minutes across midnight, negative, NULL, DATE-only whole numbers) and pins the rendered Postgres, SQL Server and MySQL expressions; `tests/realdb/test_date_diff.py` runs the same cases on the test bed. The logical validator rejects another unit or shape and returns early on it (`_validate_static`, so the error is `INVALID_PLAN_STRUCTURE`, not `VALIDATOR_CRASH`; `DATE_PART` with a bad unit too), and a `-` between two columns typed date or timestamp (`_date_subtraction`: not `TIME`, tables matched by schema when the plan names one). The planner prompt offers it. Only the day unit. Not caught: a date column wrapped in a function, or a date minus a number.
 
 ## 14. Bugs Wave C fixes
 
@@ -2598,5 +2602,36 @@ match any allowed relationship.", `details` null), each retry costing 20-35 s of
 3. **Operand order.** A declared join written the other way round was rejected (pagila_008). An equality is symmetric,
    so the validator accepts either order.
 
-Out of scope, later rows: the prompt-cache miss, duplicate selector and planner calls, `EXTRACT(EPOCH ...)`, the timeout
-default.
+Out of scope, later rows: the prompt-cache miss and the duplicate selector and planner calls (18.4), `EXTRACT(EPOCH ...)`
+(18.5), the timeout default.
+
+### 18.4 C-W6c: findings (no code change)
+
+Looked into and accepted by the owner, 2026-10-29.
+
+- **Prompt cache works.** Planner retries read about 25k tokens from the cache. The zeros are the first call of each
+  question, because the system messages embed that question's tables and schema (`ast_planner/prompts.py:211`,
+  `refiner/prompts.py:21`, `selector.py:43-47`). Restructuring the selector so its prefix is shared (about 2k tokens a
+  question) is skipped as low value.
+- **pagila_001's duplicate selector and planner calls are by design.** The decomposer split it into two sub-queries, run
+  concurrently: about $0.20 in tokens, about no wall time. "Split only when one query cannot express it" is deferred until
+  the keyed rerun shows whether it matters.
+- **Model-free baseline, pagila_001 from 11 to 8 tables: unproven.** A hermetic repro gives 8 tables before and after the
+  partition fold. Most likely the MMR picks shifted when the seven near-duplicate payment documents left the index; it is
+  not the join-path fill (this corrects the follow-up in the C-W6b note). Accepted, because production uses the model table
+  selector (100% recall in the keyed run). Settling it needs realdb runs at 67236ce and c6144f5, diffing
+  `retrieval.tables[].steps` and the pool.
+
+### 18.5 C-W6d: date differences in plans
+
+Approved by the owner 2026-10-29. In the keyed run pagila_006 ("late rentals": returned later than the film's
+`rental_duration` days) timed out. The planner tried `EXTRACT_EPOCH` (`UNSUPPORTED_FUNCTION`), then subtracted the two
+timestamp columns and compared the interval with `film.rental_duration`; Postgres refused `interval > smallint`.
+
+The plan now says `DATE_DIFF('day', start, end)`: the elapsed days from `start` to `end`, with the fraction kept (seconds
+divided by 86400, a number), the same on every database; two DATE columns give whole numbers, and the model can wrap it in
+`FLOOR` or `ROUND`. Owner's decision after review: sqlglot's own `DateDiff` in days meant three different things (truncate on
+SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed time matches pagila_006's gold. The plan carries
+no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
+rejects any other unit or shape, and a `-` between two date or timestamp columns, naming `DATE_DIFF` in the message
+(validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, `invariants.md`.

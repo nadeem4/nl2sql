@@ -109,7 +109,7 @@ Prevents ambiguous column resolution.
 ### Definition
 Every `func` expression names a function from `ALLOWED_FUNCTIONS` in `nl2sql.pipeline.nodes.ast_planner.functions`, written as a plain identifier (any case).
 
-The only date functions on the list are the ones the planner prompt offers: `DATE_PART` and `DATE_TRUNC`, plus `YEAR`, `QUARTER`, `MONTH`, `DAY` and `EXTRACT`, which are read as `DATE_PART`. `STRFTIME` is still accepted as a legacy name (`LEGACY_FUNCTIONS`): a recorded demo answer and three of the Chinook suite's hand-written plans call it. Nothing offers it to the model, and the validator's rejection message leaves it out of the functions it lists.
+The only date functions on the list are the ones the planner prompt offers: `DATE_PART` and `DATE_TRUNC`, plus `DATE_DIFF('day', start, end)` for the time between two dates, and `YEAR`, `QUARTER`, `MONTH`, `DAY` and `EXTRACT`, which are read as `DATE_PART`. `STRFTIME` is still accepted as a legacy name (`LEGACY_FUNCTIONS`): a recorded demo answer and three of the Chinook suite's hand-written plans call it. Nothing offers it to the model, and the validator's rejection message leaves it out of the functions it lists.
 
 ### Enforcement Points
 - `LogicalValidatorNode._unsupported_functions()` in `nl2sql.pipeline.nodes.validator.node`

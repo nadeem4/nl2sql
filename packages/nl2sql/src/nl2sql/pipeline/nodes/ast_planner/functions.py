@@ -22,7 +22,7 @@ ALLOWED_FUNCTIONS = AGGREGATE_FUNCTIONS | frozenset({
     # Strings
     "LOWER", "UPPER", "LENGTH", "SUBSTR", "SUBSTRING", "TRIM", "LTRIM", "RTRIM", "REPLACE", "CONCAT",
     # Dates
-    "STRFTIME", "YEAR", "QUARTER", "MONTH", "DAY", "EXTRACT", "DATE_PART", "DATE_TRUNC",
+    "STRFTIME", "YEAR", "QUARTER", "MONTH", "DAY", "EXTRACT", "DATE_PART", "DATE_TRUNC", "DATE_DIFF",
     # The value list of an IN (built by the generator, never rendered as a call)
     "TUPLE", "LIST",
 })
@@ -67,6 +67,26 @@ def date_operation(func_name: str | None, args: list) -> tuple | None:
         return kind, None, None
     operand = args[1] if args[0] is units[0] else args[0]
     return kind, units[0].value.strip().lower(), operand
+
+
+# DATE_DIFF(unit, start, end) is end minus start in whole units, an integer. Only
+# days are portable across the adapters (MySQL's DATEDIFF counts days whatever
+# the unit), so day is the one unit.
+DIFF_UNITS = ("day",)
+
+
+def date_diff(func_name: str | None, args: list) -> tuple | None:
+    """Reads ``DATE_DIFF(unit, start, end)`` as ``(unit, start, end)``, or None for any other function.
+
+    ``unit`` is lower-cased and may be outside ``DIFF_UNITS``. All three are
+    None when the call is malformed (not a string literal first, then two operands).
+    """
+    if (func_name or "").strip().upper() != "DATE_DIFF":
+        return None
+    first = args[0] if args else None
+    if len(args) != 3 or first.kind != "literal" or not isinstance(first.value, str):
+        return None, None, None
+    return first.value.strip().lower(), args[1], args[2]
 
 
 def is_allowed_function(name: str | None) -> bool:

@@ -234,7 +234,9 @@ logical validator refuses a star anywhere else (see the generator's star rule).
 Dates in the plan language are two portable functions, described once in the
 system message and the same for every database: `DATE_PART(unit, date)`, an
 integer, and `DATE_TRUNC(unit, date)`, the period's first day as `YYYY-MM-DD`,
-with the unit a string literal `year`, `quarter`, `month` or `day`. The prompt
+with the unit a string literal `year`, `quarter`, `month` or `day`. The time
+between two dates is `DATE_DIFF('day', start, end)`, the elapsed days with the fraction kept (`FLOOR` or `ROUND` for whole days);
+the prompt says never to subtract dates. The prompt
 names no database; each adapter renders the functions (see the generator).
 Subqueries and window functions are not in the language. `offset` pages
 through the plan's `order_by` (rows 11 to 20 are `limit: 10, offset: 10`); a
