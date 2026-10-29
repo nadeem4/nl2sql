@@ -58,9 +58,14 @@ def _admin(engine: "NL2SQL", roles: Optional[List[str]]) -> "UserContext":
     if not chosen and not policies.allow_all and policies.admin_roles:
         chosen = [policies.admin_roles[0]]
     try:
-        return caller(engine, chosen, None)
+        admin = caller(engine, chosen, None)
     except ValueError as error:
         raise _fail(str(error))
+    if not policies.allow_all and not set(admin.roles) & set(policies.admin_roles):
+        allowed = ", ".join(policies.admin_roles) or "none"
+        raise _fail(f"--as must name an admin role (policies.admin_roles: {allowed}); "
+                    f"{', '.join(admin.roles) or 'no role'} cannot file or accept proposals.")
+    return admin
 
 
 def _reload(engine: "NL2SQL", config_path: pathlib.Path) -> "NL2SQL":
@@ -113,25 +118,47 @@ def _choose(engine: "NL2SQL", folder: pathlib.Path, no_ports: bool, types: Dict[
     if not types[name].installed:
         _fixes(types[name].title, types[name].install_hint)
         raise typer.Exit(1)
-    return name, {}, list(types[name].connection_schema.get("required", []))
+    return name, {}, _fields(types[name].connection_schema)
 
 
-def _ask(key: str, spec: Dict[str, Any], current: Any) -> Any:
-    """One connection field. A secret is hidden, and Enter keeps the one typed before."""
+def _fields(schema: Dict[str, Any], *first: str) -> List[str]:
+    """The connection fields to ask: ``first``, the required ones, and every one not marked ``advanced``
+    (a port or an ``sslmode`` has a default, and the default is not always right)."""
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+    shown = [k for k, spec in properties.items() if k in required or spec.get("group") != "advanced"]
+    return list(dict.fromkeys([*first, *shown, *required]))
+
+
+def _ask(key: str, spec: Dict[str, Any], current: Any, required: bool = True) -> Any:
+    """One connection field. A secret is hidden, Enter keeps the one typed before (or the schema default), and
+    Enter on an optional field with neither leaves it out (None)."""
     kind = spec.get("type") or next((o.get("type") for o in spec.get("anyOf", []) if o.get("type") != "null"), "string")
-    convert = {"integer": int, "number": float}.get(kind, str)
+    convert = {"integer": int, "number": float, "boolean": bool}.get(kind, str)
+    if spec.get("enum"):
+        convert = click.Choice([str(v) for v in spec["enum"]])
     secret = spec.get("format") == "password"
-    return typer.prompt(spec.get("title") or key, default=current, hide_input=secret, show_default=not secret,
-                        type=convert)
+    default = current if current is not None else spec.get("default")
+    optional = default is None and not required
+    answer = typer.prompt(spec.get("title") or key, default="" if optional else default, hide_input=secret,
+                          show_default=not secret and not optional, type=convert)
+    return None if optional and answer in ("", None) else answer
 
 
 def _datasource_id(engine: "NL2SQL", type_name: str, connection: Dict[str, Any]) -> str:
+    from nl2sql.config.writer import check_file_name
+
     database = str(connection.get("database") or "")
     stem = pathlib.Path(database).stem if database and ("." in pathlib.Path(database).name) else database
     default = re.sub(r"[^a-z0-9_]+", "_", (stem or type_name).lower()).strip("_") or type_name
     taken = {d.id for d in engine.config.datasources}
     while True:
         chosen = typer.prompt("Name this datasource", default=default)
+        try:
+            check_file_name(chosen)
+        except ValueError as error:
+            _say(f"[yellow]{escape(str(error))}[/yellow]")
+            continue
         if chosen not in taken:
             return chosen
         _say(f"[yellow]'{escape(chosen)}' is already a datasource here.[/yellow]")
@@ -145,10 +172,15 @@ def _connect(engine: "NL2SQL", folder: pathlib.Path, no_ports: bool):
     type_name, connection, ask = _choose(engine, folder, no_ports, types)
     schema = types[type_name].connection_schema
     properties = schema.get("properties", {})
+    required = schema.get("required", [])
     datasource_id = None
     while True:
         for key in ask:
-            connection[key] = _ask(key, properties.get(key, {}), connection.get(key))
+            answer = _ask(key, properties.get(key, {}), connection.get(key), key in required)
+            if answer is None:
+                connection.pop(key, None)
+            else:
+                connection[key] = answer
         datasource_id = datasource_id or _datasource_id(engine, type_name, connection)
         datasource = Datasource(id=datasource_id, type=type_name, connection=dict(connection))
         status = engine.datasources.test(datasource)
@@ -161,8 +193,8 @@ def _connect(engine: "NL2SQL", folder: pathlib.Path, no_ports: bool):
         _say(f"[bold red]The connection failed{escape(stage)}:[/bold red] {escape(str(status.reason))}")
         if status.fix:
             _say(f"  Fix: {escape(status.fix)}")
-        # Ask for every required field again, the typed values as defaults.
-        ask = list(dict.fromkeys([*schema.get("required", []), *ask]))
+        # Ask for every field again, the typed values as defaults: the port may be what is wrong.
+        ask = _fields(schema, *ask)
 
 
 def _model_key(provider: Optional[str]) -> Optional[str]:
@@ -240,18 +272,30 @@ def _starter_questions(engine: "NL2SQL", datasource_id: str, admin: "UserContext
     return questions
 
 
-def _review(engine: "NL2SQL", folder: pathlib.Path, datasource_id: str, admin: "UserContext", yes: bool) -> None:
+def _free_name(folder: pathlib.Path) -> pathlib.Path:
+    """``review.yaml``, or the next free ``review-<n>.yaml``: a review file half decided is never replaced."""
+    path, number = folder / REVIEW_FILE, 0
+    while path.exists():
+        number += 1
+        path = folder / f"review-{number}.yaml"
+    return path
+
+
+def _review(engine: "NL2SQL", folder: pathlib.Path, datasource_id: str, admin: "UserContext", yes: bool,
+            where: str) -> None:
     from nl2sql import ReviewError
 
+    roles = "" if engine.config.policies.allow_all else "".join(f" --as {r}" for r in admin.roles)
     waiting = engine.proposals.list(user_context=admin, datasource_id=datasource_id)
     if not waiting:
         _say("\nNothing waits for review.")
         return
     if yes:
-        path = folder / REVIEW_FILE
+        path = _free_name(folder)
         count = engine.proposals.export(path, user_context=admin, datasource_id=datasource_id)
         _say(f"\n[bold]Review[/bold]: --yes accepts nothing. Wrote {count} proposals to {escape(path.as_posix())}; "
-             f"set each decision, then run: nl2sql review apply {escape(path.as_posix())}")
+             f"set each decision, then run: "
+             f"nl2sql {escape(where)}review apply {escape(path.as_posix())}{escape(roles)}")
         return
     _say(f"\n[bold]Review[/bold]: {len(waiting)} proposals. [a]ccept, [r]eject, [s]kip or [e]dit each.")
     accept: List[str] = []
@@ -264,11 +308,14 @@ def _review(engine: "NL2SQL", folder: pathlib.Path, datasource_id: str, admin: "
         choice = typer.prompt("Decision", type=click.Choice(["a", "r", "s", "e"]), default="s")
         if choice == "e":
             try:
-                edits[proposal.id] = json.loads(typer.prompt("The change, as JSON", default=change))
-                choice = "a"
+                edited = json.loads(typer.prompt("The change, as JSON", default=change))
             except ValueError:
-                _say("[yellow]That is not JSON; skipped.[/yellow]")
+                edited = None
+            if not isinstance(edited, dict):
+                _say("[yellow]That is not a JSON object; skipped.[/yellow]")
                 continue
+            edits[proposal.id] = edited
+            choice = "a"
         if choice == "a":
             accept.append(proposal.id)
         elif choice == "r":
@@ -278,7 +325,7 @@ def _review(engine: "NL2SQL", folder: pathlib.Path, datasource_id: str, admin: "
             report = engine.proposals.accept(accept, by=admin, edits=edits or None)
             _print_report(report)
             if report.accepted:
-                _say("Run `nl2sql index --refresh` so what you accepted reaches the index.")
+                _say(f"Run `nl2sql {where}index --refresh` so what you accepted reaches the index.")
         if reject:
             engine.proposals.reject(reject, by=admin)
             _say(f"[yellow]rejected[/yellow] {len(reject)}")
@@ -309,6 +356,7 @@ def launch_command(
 
     folder = directory
     config_path = folder / "nl2sql.yaml"
+    where = "" if folder == pathlib.Path(".") else f"--config {config_path.as_posix()} "
     exists = config_path.is_file()
     try:
         if exists:
@@ -333,11 +381,10 @@ def launch_command(
         _say("\n[bold]Profiling[/bold]" + (" (drafting descriptions with the model)" if draft else ""))
         profile_datasources(engine, admin, [datasource.id], draft=draft)
         questions = _starter_questions(engine, datasource.id, admin)
-        _review(engine, folder, datasource.id, admin, yes)
+        _review(engine, folder, datasource.id, admin, yes, where)
     finally:
         engine.close()
 
-    where = "" if folder == pathlib.Path(".") else f"--config {config_path.as_posix()} "
     _say("\n[bold]Next[/bold]")
     if questions:
         _say(f"  nl2sql {escape(where)}run {escape(json.dumps(questions[0]))}")

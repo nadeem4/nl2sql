@@ -19,6 +19,7 @@ from nl2sql_sdk.stores import BuildPointer
 from typer.testing import CliRunner
 
 from nl2sql import Candidate, NL2SQL, UserContext, load_config
+from nl2sql.check import DatasourceStatus
 from nl2sql.cli.main import app
 from nl2sql.config import default_llm, starter_config, write_project
 from nl2sql.testing.fake_llm import FakeLLMServer
@@ -163,14 +164,19 @@ def test_launch_indexes_with_the_secret_it_wrote_to_env(folder, index, llm_serve
 
 
 def test_a_failed_test_never_prints_the_password(folder, index, llm_server, monkeypatch):
-    candidate = Candidate(type="sqlite", title="SQLite", found=Found(kind="url", value="sqlite://u:***@h/x"),
-                          connection={"database": str(folder / "no" / "such.db"), "password": PASSWORD},
+    # A driver may echo the password it was given: the status the command prints has it scrubbed.
+    candidate = Candidate(type="postgres", title="PostgreSQL", found=Found(kind="url", value="postgresql://u:***@h/x"),
+                          connection={"host": "h", "database": "x", "user": "u", "password": PASSWORD},
                           missing=[], installed=True, install_hint="")
     monkeypatch.setattr("nl2sql.api.datasource_api.DatasourcesAPI.scan", lambda self, *a, **k: [candidate])
+    monkeypatch.setattr("nl2sql.runtime.Runtime.try_datasource", lambda self, datasource: DatasourceStatus(
+        id=datasource.id, status="failed", stage="auth", reason=f"FATAL: password {PASSWORD} rejected for user u",
+        fix=f"Check the password {PASSWORD}."))
 
     result = _launch(folder, input="1\n\n")
 
-    assert "failed" in _out(result).lower() and PASSWORD not in result.output
+    assert "failed" in _out(result).lower() and "***" in result.output
+    assert PASSWORD not in result.output
     assert not (folder / "nl2sql.yaml").exists()
 
 def test_starter_questions_are_example_proposals_not_sample_questions(folder, index, llm_server):
@@ -274,3 +280,89 @@ def test_demo_still_warns_for_a_stamp_from_an_older_version(tmp_path):
     (tmp_path / STAMP_FILE).write_text('{"engine_version": "0.0.1"}', encoding="utf-8")
 
     assert "nl2sql-engine 0.0.1" in outdated_warning(tmp_path)
+
+# ---------------------------------------------------------------- review fixes
+
+
+def _roles_project(folder):
+    from nl2sql.config.models import Policies
+
+    config = starter_config(llm=default_llm("openai"), path=folder / ".nl2sql").model_copy(update={"policies": Policies(
+        roles={"admin": {"description": "Everything", "allow": ["*"]},
+               "analyst": {"description": "Reads", "allow": ["*"]}}, admin_roles=["admin"])})
+    write_project(config, folder)
+
+
+def test_yes_never_overwrites_an_existing_review_file(folder, index, llm_server):
+    (folder / "review.yaml").write_text("mine: true\n", encoding="utf-8")
+
+    result = _launch(folder, "--yes", input=NEW_PROJECT)
+
+    assert result.exit_code == 0, _out(result)
+    assert (folder / "review.yaml").read_text(encoding="utf-8") == "mine: true\n"
+    assert (folder / "review-1.yaml").is_file() and "review-1.yaml" in _out(result)
+
+
+def test_another_database_asks_the_fields_with_defaults_and_asks_them_again(folder, index, llm_server, monkeypatch):
+    seen = []
+
+    def fail(self, datasource):
+        seen.append(dict(datasource.connection))
+        return DatasourceStatus(id=datasource.id, status="failed", stage="network", reason="refused")
+
+    monkeypatch.setattr("nl2sql.runtime.Runtime.try_datasource", fail)
+    # 2 = another database, postgres; host, port (Enter: the default), database, user, password; the name;
+    # then the failed test asks every field again and the port is changed.
+    first = "2\npostgres\ndbhost\n\nshopdb\nme\nsecret\n\n"
+    again = "dbhost\n7777\nshopdb\nme\n\n"
+
+    result = _launch(folder, input=first + again)
+
+    assert len(seen) == 2, _out(result)
+    assert seen[0]["port"] == 5432
+    assert seen[1]["port"] == 7777 and seen[1]["password"] == "secret"
+
+
+def test_the_next_step_hints_name_the_config_when_the_folder_is_not_here(folder, index, llm_server):
+    result = _launch(folder, "--yes", input=NEW_PROJECT)
+    config = (folder / "nl2sql.yaml").as_posix()
+
+    assert f"nl2sql --config {config} review apply" in _out(result)
+
+def test_the_apply_hint_names_the_admin_role_when_policies_have_roles(folder, index, llm_server, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", KEY)
+    _roles_project(folder)
+
+    result = _launch(folder, "--as", "admin", "--yes", input="1\n\n")
+
+    assert "review apply" in _out(result) and "--as admin" in _out(result)
+
+
+def test_the_index_hint_names_the_config_when_the_folder_is_not_here(folder, index, llm_server):
+    result = _launch(folder, input=NEW_PROJECT + "a\n" * 40)
+
+    assert f"nl2sql --config {(folder / 'nl2sql.yaml').as_posix()} index --refresh" in _out(result)
+
+
+def test_a_role_that_is_not_an_admin_is_refused_before_any_question(folder, index, llm_server):
+    _roles_project(folder)
+
+    result = _launch(folder, "--as", "analyst", input="")
+
+    out = _out(result)
+    assert result.exit_code == 1 and "admin" in out and "Databases found" not in out
+
+
+def test_a_datasource_name_that_cannot_be_a_file_name_is_asked_again(folder, index, llm_server):
+    result = _launch(folder, "--yes", input="1\ncon\n\n" + KEY + "\n")
+
+    assert result.exit_code == 0, _out(result)
+    assert "cannot be a file name" in _out(result)
+    assert [d.id for d in load_config(folder / "nl2sql.yaml").datasources] == ["shop"]
+
+
+def test_edit_with_json_that_is_not_an_object_is_skipped(folder, index, llm_server):
+    result = _launch(folder, input=NEW_PROJECT + "e\n[1]\n" + "r\n" * 40)
+
+    assert result.exit_code == 0, _out(result)
+    assert "not a JSON object" in _out(result) and "Traceback" not in result.output

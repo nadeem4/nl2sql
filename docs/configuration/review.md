@@ -69,7 +69,7 @@ report.accepted, report.files_written, report.warnings, report.refused
 | Method | What it does |
 | --- | --- |
 | `list(*, user_context, kind=None, status="proposed", datasource_id=None, limit=None)` | The proposals the caller may see, newest first; `status=None` lists every status |
-| `propose_examples(datasource_id, questions, *, by)` | Files each question as an `example` proposal (kind `example`, target the question, `change` `{"question": ...}`, origin `template`) and returns the rows; needs an admin role. Nothing reaches the glossary until an accept |
+| `propose_examples(datasource_id, questions, *, by)` | Files each question as an `example` proposal (kind `example`, target the question, `change` `{"question": ...}`, origin `template`) and returns the rows; needs an admin role. Nothing reaches the glossary until an accept. The tables the question names (matched against the live snapshot) are recorded on the proposal, so a role denied one of them does not see it |
 | `get(id, *, user_context)` | One proposal; `ReviewError(NOT_FOUND)` when it is missing or hidden |
 | `current(id, *, user_context)` | What the proposal would replace: the glossary item as the caller sees it, or the curated query with the same id. None when there is none, or when the caller's scope does not reach every table that query reads |
 | `accept(ids, *, by, edits=None)` | Accepts one id or a list; `edits` maps an id to a dict merged over its `change`. Returns an `AcceptReport` |

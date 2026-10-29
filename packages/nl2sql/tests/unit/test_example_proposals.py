@@ -6,6 +6,7 @@ accept appends it to the glossary's ``examples``. A real engine on a small SQLit
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timezone
 
 import pytest
 import yaml
@@ -14,11 +15,12 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from nl2sql import NL2SQL, Embeddings, ReviewError, UserContext
 from nl2sql.review.models import ReviewErrorCode
 from nl2sql.testing.config import make_config
+from nl2sql_sdk.stores import BuildPointer
 
 ADMIN = UserContext(user_id="ada", roles=["admin"])
 ANALYST = UserContext(user_id="bob", roles=["analyst"])
 ROLES = {"admin": {"description": "Everything", "allow": ["*"]},
-         "analyst": {"description": "Reads", "allow": ["shop"]}}
+         "analyst": {"description": "Reads", "allow": ["shop"], "deny": ["shop.main.salaries"]}}
 QUESTIONS = ["How many orders are there?", "Which customers order the most?"]
 
 
@@ -26,6 +28,7 @@ QUESTIONS = ["How many orders are there?", "Which customers order the most?"]
 def project(tmp_path):
     with sqlite3.connect(tmp_path / "shop.db") as connection:
         connection.execute("CREATE TABLE orders (id INTEGER PRIMARY KEY, total REAL)")
+        connection.execute("CREATE TABLE salaries (id INTEGER PRIMARY KEY, amount REAL)")
     connection.close()
     (tmp_path / "glossary.yaml").write_text(yaml.safe_dump({"version": 1, "datasources": {}}), encoding="utf-8")
     config = make_config(tmp_path, datasources=[{"id": "shop", "type": "sqlite", "connection": {"database": "shop.db"}}],
@@ -88,3 +91,28 @@ def test_an_unknown_datasource_is_refused(project):
 
     with pytest.raises(ValueError, match="Unknown datasource"):
         engine.proposals.propose_examples("nope", QUESTIONS, by=ADMIN)
+
+
+def _index_snapshot(engine) -> None:
+    """The snapshot and pointer an index build leaves, without embedding anything."""
+    ctx = engine.index._ctx
+    snapshot = ctx.ds_registry.get_adapter("shop").fetch_schema_snapshot(ctx.ds_registry.get_index_scope("shop"))
+    version = ctx.state.put_snapshot(snapshot)
+    ctx.index.open(ctx.namespace, 8)
+    ctx.index.set_pointers(ctx.namespace, {"shop": BuildPointer(
+        build_id="b1", schema_version=version, built_at=datetime.now(timezone.utc))})
+
+
+def test_an_example_naming_a_denied_table_is_hidden_from_a_role_denied_it(project):
+    engine, _ = project
+    _index_snapshot(engine)
+    secret, open_one = "How many rows are in salaries?", "How many orders are there?"
+
+    filed = engine.proposals.propose_examples("shop", [secret, open_one], by=ADMIN)
+
+    assert "shop.main.salaries" in filed[0].tables
+    assert {p.target for p in engine.proposals.list(user_context=ANALYST, kind="example")} == {open_one}
+    with pytest.raises(ReviewError) as error:
+        engine.proposals.get(filed[0].id, user_context=ANALYST)
+    assert error.value.code == ReviewErrorCode.NOT_FOUND
+    assert {p.target for p in engine.proposals.list(user_context=ADMIN, kind="example")} == {secret, open_one}

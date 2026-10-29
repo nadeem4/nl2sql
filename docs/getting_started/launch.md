@@ -23,9 +23,9 @@ uvx --from nl2sql-engine nl2sql launch my-project
 |---|---|
 | `DIR` | The project folder (default `.`). Without a `nl2sql.yaml` there, `launch` writes a new project; with one, it adds one datasource to it |
 | `--provider NAME` | The LLM provider and its default model for a new project (`openai`, the default, `anthropic`, `openrouter`, ...). An existing project keeps its own |
-| `--as ROLE` | The admin role the launch acts as (repeatable). Default: the first of `policies.admin_roles`; under `allow_all`, none is needed |
+| `--as ROLE` | The admin role the launch acts as (repeatable). Default: the first of `policies.admin_roles`; under `allow_all`, none is needed. A role that is not in `policies.admin_roles` is refused before the first question |
 | `--draft` | Also have the profiler model draft descriptions, under `settings.profiler.max_cost_usd`. The only step that calls a model |
-| `--yes` | Accept nothing: write `DIR/review.yaml` for review in git instead of asking |
+| `--yes` | Accept nothing: write `DIR/review.yaml` (or the next free `review-<n>.yaml`, never over a file already there) for review in git instead of asking |
 | `--no-ports` | Do not look for databases on local ports |
 
 ## What happens
@@ -33,9 +33,9 @@ uvx --from nl2sql-engine nl2sql launch my-project
 | Step | What you see |
 |---|---|
 | Find | A numbered list: database files under `DIR` (two folders down), the `DATABASE_URL` environment variable, and servers listening on their default ports on `127.0.0.1` (PostgreSQL 5432, MySQL 3306, SQL Server 1433), then "Another database". Nothing connects while it looks. |
-| Fill | A prompt for each field the finding could not fill. A password is hidden. |
-| Name | The datasource id, defaulting to the file's name. |
-| Test | A connection test. On failure it prints the stage (`network`, `auth`, ...), the reason and the fix, and asks for the fields again. |
+| Fill | A prompt for each field the finding could not fill. For "Another database" it is every field that is not advanced, with its default (a port, say), so a server on a non-default port can be set. A password is hidden. |
+| Name | The datasource id, defaulting to the file's name. A name that cannot be a file name in `datasources/` (`con`, `a/b`) is asked again. |
+| Test | A connection test. On failure it prints the stage (`network`, `auth`, ...), the reason and the fix, and asks for every field again, what you typed as the default. |
 | Model key | The provider's key from the environment, or asked (hidden). It is not checked with a call; your first question is the check. |
 | Write | A new folder gets the whole project (`nl2sql.yaml` and a file per section, `glossary.yaml`); an existing project gets `datasources/<id>.yaml`. Secrets go to `.env` and the YAML holds `${env:NL2SQL_...}` references. |
 | Index | Builds the index, with progress. The first run downloads the local embedding model. |
@@ -57,11 +57,11 @@ being written. No password or key is printed, not in the candidates, an error or
 The profiler's findings and the starter questions wait in the [review queue](../configuration/review.md).
 Nothing a model or a template drafted reaches a prompt, the index or `glossary.yaml` until an admin accepts
 it. In the prompt, `a` accepts, `r` rejects, `s` (the default) leaves it for later and `e` edits its change as
-JSON before accepting. An accepted item is written to `glossary.yaml`; run `nl2sql index --refresh` so it
-reaches the index.
+JSON object before accepting (anything else is skipped). An accepted item is written to `glossary.yaml`; run `nl2sql index --refresh` so it
+reaches the index. When `DIR` is not `.`, the commands `launch` prints carry `--config DIR/nl2sql.yaml` (and `--as ROLE` under roles).
 
 With `--yes`, nothing is accepted. `launch` exports the open proposals to `DIR/review.yaml`; set each
-`decision` in a pull request and run `nl2sql review apply DIR/review.yaml --as ROLE`.
+`decision` in a pull request and run `nl2sql --config DIR/nl2sql.yaml review apply DIR/review.yaml --as ROLE`.
 
 ## Drivers
 
