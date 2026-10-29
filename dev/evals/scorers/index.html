@@ -5897,11 +5897,15 @@ errors apart from failures.</p>
 <p><code>result_match</code> compares rows strictly:</p>
 <ul>
 <li>column names are ignored, and column order counts;</li>
-<li>numbers match within half a cent;</li>
-<li>row order counts only when <code>order_matters</code>.</li>
+<li>numbers (database decimals too) match within half a cent;</li>
+<li>dates match their ISO strings, and a date-only label matches that day's midnight in the other value's own offset;</li>
+<li>row order counts only when <code>order_matters</code>;</li>
+<li>the right rows with extra columns also pass, if the gold's columns keep their
+  order and match strictly (<code>detail["match"]</code> is <code>extra columns</code>; <code>strict</code> for
+  an exact match).</li>
 </ul>
 <p>It also keeps the lenient reading in <code>detail["lenient"]</code>, which accepts
-reordered and a few extra columns, and period labels against dates. The
+reordered columns and period labels against dates besides. The
 report gives the strict and lenient accuracy side by side. The rules, and
 <code>faithfulness</code>'s, are in <a href="../../testing/evaluation-dataset/#strict-and-lenient-accuracy">the Chinook
 suite</a>.</p>

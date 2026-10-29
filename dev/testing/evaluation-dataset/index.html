@@ -6257,6 +6257,13 @@ the <a href="../../evals/scorers/">scorers</a>. For <code>result_match</code> an
 <li><strong>A number matches a string that spells it</strong>, within the same tolerance, so
   <code>'2009'</code> is <code>2009</code>: databases differ in which of the two they return for the
   same value.</li>
+<li><strong>A database decimal matches the number or string it spells</strong>, so a
+  <code>Decimal</code> of <code>3094.78</code> is <code>"3094.78"</code>: gold rows are stored as JSON.</li>
+<li><strong>Dates match their ISO strings.</strong> A <code>date</code> or <code>datetime</code> equals
+  <code>"2022-01-01T00:00:00Z"</code>, and a date-only label (<code>"2022-01-01"</code>) equals that
+  day's midnight in that datetime's own offset (<code>2021-12-31T19:00-05:00</code> is not
+  <code>2022-01-01</code>), either way round. Two full datetimes are compared as instants,
+  and a value with no timezone is read as UTC.</li>
 <li><strong>Other strings must be equal.</strong> Two strings compare as strings, so
   <code>'2009'</code> is not <code>'2009.0'</code>.</li>
 <li><strong>Row order counts only when <code>order_matters</code> is true.</strong></li>
@@ -6273,7 +6280,7 @@ the <a href="../../evals/scorers/">scorers</a>. For <code>result_match</code> an
 <tbody>
 <tr>
 <td><strong>Strict</strong></td>
-<td>The execution match above, unchanged: the same columns, in the same order, and the same rows</td>
+<td>The execution match above: the same columns, in the same order, and the same rows; or the same rows with <strong>extra columns</strong> (see below)</td>
 </tr>
 <tr>
 <td><strong>Lenient</strong></td>
@@ -6329,6 +6336,14 @@ are equal: <code>'2009'</code> matches <code>'2009-01-01'</code>, and <code>'201
 <li>Nothing else is normalised. Anything broader belongs in an alternative
   answer, which is reviewed per case and cannot silently widen.</li>
 </ul>
+<p>Extra columns are the one lenient reading that counts as a pass in the strict
+score. A result wider than the gold passes <code>result_match</code> when some choice of
+its columns, <strong>in their own order</strong>, equals the gold under the strict rules
+above (the extra columns may sit anywhere), within the column cap. The record
+says which match it was (<code>detail.match</code>: <code>strict</code> or <code>extra columns</code>).
+Reordered gold columns and period labels never pass this way, with or without
+extra columns; they stay lenient-only. The row count and every row value are
+as strict as before.</p>
 <p>Lenient is a superset of strict by construction: everything strict accepts is
 accepted. It is not partial credit -- a case passes a score or it does
 not -- and there is no model in either score, so both stay reproducible.
@@ -6617,11 +6632,11 @@ with no model (<code>nl2sql/evaluation/faithfulness.py</code>).</p>
 <tbody>
 <tr>
 <td>A number: <code>1,297</code>, <code>1234.5</code>, <code>$523.06</code>, <code>-5</code></td>
-<td>It equals a value in the rows at the precision written (<code>523.1</code> and <code>523</code> match <code>523.06</code>; <code>523.60</code> does not), the row count, or the sum of a numeric column</td>
+<td>It equals a value in the rows at the precision written (<code>523.1</code> and <code>523</code> match <code>523.06</code>; <code>523.60</code> does not), the row count, the preview size (<code>results.preview_rows</code>: "the first 20"), the sum of a numeric column, or the difference between two values of one column when the answer also writes both of them ("<code>1,179</code> ... <code>1,096</code> ... by <code>83</code>"). Database decimals count as numbers</td>
 </tr>
 <tr>
 <td>A percentage: <code>37.2%</code></td>
-<td>As above, or it is a share in the rows times 100 (<code>0.3718</code>)</td>
+<td>As above, or it is a share in the rows times 100 (<code>0.3718</code>), or the ratio (a/b x 100) or the percent change between two values of one column that the answer also writes</td>
 </tr>
 <tr>
 <td>A number inside a text cell or the question</td>
@@ -6643,7 +6658,10 @@ with no model (<code>nl2sql/evaluation/faithfulness.py</code>).</p>
   flags little it should not.</li>
 </ul>
 <p><code>1,300</code> for <code>1297</code>, a <code>2013</code> that neither the rows nor the question hold, and
-a bold genre the rows do not list are all unsupported.</p>
+a bold genre the rows do not list are all unsupported. Only differences and
+those two percentages are derived, and only from two operands the answer
+states; a product, a sum of two chosen rows or any
+other arithmetic is unsupported.</p>
 <p>Each record carries <code>faithfulness</code>: <code>faithful</code>, <code>unsupported_numbers</code> and
 <code>unsupported_entities</code> (as written), and <code>checked</code> (how many numbers and
 names were checked). A refusal or error writes no answer, and the scorer does
