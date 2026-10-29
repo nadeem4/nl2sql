@@ -399,7 +399,7 @@ def test_the_filters_generate_makes_work_with_filter_values_and_refresh(engine, 
 
     dashboard, _ = engine.dashboards.generate("ds1", user_context=ANA)
     pages = iter([[["2024-01-01", "2024-12-31"]], [["open"], ["shut"]], [["FR"]]])
-    monkeypatch.setattr(ResultsAPI, "page", lambda api, run_id, result_id, offset=0, limit=100, tenant_id=None:
+    monkeypatch.setattr(ResultsAPI, "page", lambda api, run_id, result_id, offset=0, limit=100, *, user_context:
                         ResultPage(request_id=run_id, result_id=result_id, columns=["v"], rows=next(pages),
                                    limit=limit))
 

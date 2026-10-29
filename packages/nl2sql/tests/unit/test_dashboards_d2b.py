@@ -339,10 +339,11 @@ def test_another_owner_cannot_filter_a_dashboard(engine, runs):
 @pytest.fixture
 def paged(monkeypatch):
     """``ResultsAPI.page`` returns the rows a test sets, and records what was asked."""
-    state = SimpleNamespace(rows=[["Oslo"], ["Paris"]], asked=[])
+    state = SimpleNamespace(rows=[["Oslo"], ["Paris"]], asked=[], readers=[])
 
-    def page(api, run_id, result_id, offset=0, limit=100, tenant_id=None):
+    def page(api, run_id, result_id, offset=0, limit=100, *, user_context):
         state.asked.append((run_id, result_id, limit))
+        state.readers.append(user_context)
         return ResultPage(request_id=run_id, result_id=result_id, columns=["value"], rows=state.rows, limit=limit)
 
     monkeypatch.setattr(ResultsAPI, "page", page)
@@ -363,7 +364,7 @@ def test_filter_values_runs_as_the_caller(engine, runs, server, paged):
     assert [(t.schema_name, t.name) for t in plan.tables] == [("main", "orders")]
     assert plan.distinct is True and plan.limit == 20 and plan.where is None
     assert [show(i.expr) for i in plan.select_items] == ["t1.city"] and plan.order_by[0].direction == "asc"
-    assert paged.asked == [("tr-1", "sq1", 20)]
+    assert paged.asked == [("tr-1", "sq1", 20)] and paged.readers == [ANA], "the rows are read as the caller"
     assert server.calls == [], "no model call"
 
 

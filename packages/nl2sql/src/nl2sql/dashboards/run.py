@@ -91,7 +91,7 @@ class TileRunner:
         if status == "empty":
             return []
         page = self._results.page(result.trace_id, result.result_manifest[0].node_id,
-                                  limit=limit if f.op == "in" else 1)
+                                  limit=limit if f.op == "in" else 1, user_context=user)
         rows = [[plain(v) for v in row] for row in page.rows]
         if f.op == "between":
             return rows[0] if rows and any(v is not None for v in rows[0]) else []
