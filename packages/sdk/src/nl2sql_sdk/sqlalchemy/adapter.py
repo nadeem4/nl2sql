@@ -146,6 +146,27 @@ def _by_name(reflected: Dict[Any, Any]) -> Dict[str, Any]:
     return {key[1]: value for key, value in reflected.items()}
 
 
+def _elapsed_seconds(node: Any, dialect: str) -> Any:
+    """Makes the engine's seconds between two dates exact on MySQL and SQL Server.
+
+    The engine builds ``DateDiff(end, start, SECOND)``. sqlglot renders it right
+    for most databases but MySQL's ``DATEDIFF`` ignores the unit and SQL Server's
+    ``DATEDIFF`` counts in 32 bits and refuses a ``DATE`` in seconds.
+    """
+    from sqlglot import expressions as exp
+
+    if not isinstance(node, exp.DateDiff) or not node.args.get("unit") or node.args["unit"].name.upper() != "SECOND":
+        return node
+    unit = exp.Var(this="SECOND")
+    if dialect == "mysql":
+        return exp.TimestampDiff(this=node.this, expression=node.expression, unit=unit)
+    if dialect == "tsql":
+        def datetime2(operand):
+            return exp.Cast(this=operand, to=exp.DataType.build("DATETIME2", dialect="tsql"))
+        return exp.Anonymous(this="DATEDIFF_BIG", expressions=[unit, datetime2(node.expression), datetime2(node.this)])
+    return node
+
+
 class SQLAlchemyAdapter:
     """The base of an adapter on SQLAlchemy: connection, execution and schema reading.
 
@@ -290,7 +311,8 @@ class SQLAlchemyAdapter:
         result types in the SDK contract (a date part is an integer, a
         truncated date a ``YYYY-MM-DD`` string).
         """
-        return expression.sql(dialect=self.get_dialect())
+        dialect = self.get_dialect()
+        return expression.copy().transform(lambda node: _elapsed_seconds(node, dialect)).sql(dialect=dialect)
 
     # --- The engine ----------------------------------------------------------
 

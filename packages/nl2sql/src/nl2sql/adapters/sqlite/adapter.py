@@ -46,6 +46,10 @@ def _sqlite_dates(node: exp.Expression) -> exp.Expression:
         return _from_template(_DATE_PARTS[node.name.upper()], node.expression)
     if isinstance(node, exp.TimestampTrunc) and node.unit and node.unit.name.upper() in _DATE_TRUNCS:
         return _from_template(_DATE_TRUNCS[node.unit.name.upper()], node.this)
+    if isinstance(node, exp.DateDiff) and node.args.get("unit") and node.args["unit"].name.upper() == "SECOND":
+        # The elapsed seconds, to the fraction (sqlglot's rendering truncates to an integer).
+        days = exp.Sub(this=exp.func("JULIANDAY", node.this), expression=exp.func("JULIANDAY", node.expression))
+        return exp.Mul(this=exp.Paren(this=days), expression=exp.Literal.number("86400.0"))
     return node
 
 # SQLite's messages for a query that is itself wrong; a new plan can fix these.

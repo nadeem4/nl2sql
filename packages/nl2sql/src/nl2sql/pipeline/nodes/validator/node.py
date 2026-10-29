@@ -625,14 +625,20 @@ class LogicalValidatorNode:
         types: Dict[str, Dict[str, str]] = {}
         for ref in plan.tables:
             for table in state.relevant_tables:
-                if (table.name or "").lower().split(".")[-1] == (ref.name or "").lower():
+                name = (table.name or "").lower()
+                wanted = (ref.name or "").lower()
+                if ref.schema_name:
+                    matches = name == f"{ref.schema_name}.{wanted}".lower()
+                else:
+                    matches = name.split(".")[-1] == wanted
+                if matches:
                     types[ref.alias] = {c.name.lower(): (c.type or "").lower() for c in table.columns}
 
         def is_date(operand: Optional[Expr]) -> bool:
             if operand is None or operand.kind != "column":
                 return False
             kind = types.get(operand.alias or "", {}).get((operand.column_name or "").lower(), "")
-            return "date" in kind or "time" in kind
+            return "date" in kind or "timestamp" in kind
 
         for node in _plan_exprs(plan):
             if node.kind == "binary" and node.op == "-" and is_date(node.left) and is_date(node.right):
@@ -797,7 +803,8 @@ class LogicalValidatorNode:
 
         date_err = self._date_operations(plan)
         if date_err:
-            errors.append(date_err)
+            # A date operation the generator cannot render makes every walk raise.
+            return errors + [date_err]
 
         subtraction_err = self._date_subtraction(state, plan)
         if subtraction_err:

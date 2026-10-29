@@ -2366,7 +2366,7 @@ The engine's join fixes (design 18.3).
 
 ### C-W6d
 
-Date differences in plans (design 18.5). `ast_planner/functions.py`: `DATE_DIFF` joins `ALLOWED_FUNCTIONS`; `date_diff(func_name, args)` reads `DATE_DIFF(unit, start, end)` as `(unit, start, end)` (all three None when malformed), and `DIFF_UNITS = ("day",)`. The generator builds `exp.DateDiff(this=end, expression=start, unit=DAY)`, which sqlglot renders per adapter (Postgres epoch seconds / 86400, SQL Server `DATEDIFF(DAY, ...)`, MySQL `DATEDIFF`, DuckDB `DATE_DIFF('DAY', ...)`, SQLite `JULIANDAY` difference); the SQLite case runs for real in `tests/unit/test_date_diff.py`. The logical validator rejects another unit or shape (`_date_operations`) and a `-` between two columns typed date or timestamp (`_date_subtraction`, from the retrieved schema's column types), both naming `DATE_DIFF`. The planner prompt's date rule offers it. Only days: sqlglot's MySQL `DATEDIFF` ignores the unit, so hours or months would be wrong there. A mixed-type subtraction (a date minus a number) and a date column wrapped in a function are not caught.
+Date differences in plans (design 18.5). `ast_planner/functions.py`: `DATE_DIFF` joins `ALLOWED_FUNCTIONS`; `date_diff(func_name, args)` reads `DATE_DIFF(unit, start, end)` as `(unit, start, end)` (all three None when malformed), and `DIFF_UNITS = ("day",)`. The generator's `elapsed_days(start, end)` builds `DateDiff(end, start, SECOND) / 86400.0`: elapsed days with the fraction kept, a number on every adapter. The SDK's `SQLAlchemyAdapter.render_sql` rewrites the seconds difference where sqlglot's rendering is wrong (MySQL `TIMESTAMPDIFF(SECOND, ...)`; SQL Server `DATEDIFF_BIG(SECOND, CAST(.. AS DATETIME2), ..)`, which also takes `DATE`); the SQLite adapter uses `(JULIANDAY(end) - JULIANDAY(start)) * 86400.0`. Postgres and DuckDB need nothing. Tests: `tests/unit/test_date_diff.py` runs real SQLite and DuckDB (3.87 days, two minutes across midnight, negative, NULL, DATE-only whole numbers) and pins the rendered Postgres, SQL Server and MySQL expressions; `tests/realdb/test_date_diff.py` runs the same cases on the test bed. The logical validator rejects another unit or shape and returns early on it (`_validate_static`, so the error is `INVALID_PLAN_STRUCTURE`, not `VALIDATOR_CRASH`; `DATE_PART` with a bad unit too), and a `-` between two columns typed date or timestamp (`_date_subtraction`: not `TIME`, tables matched by schema when the plan names one). The planner prompt offers it. Only the day unit. Not caught: a date column wrapped in a function, or a date minus a number.
 
 ## 14. Bugs Wave C fixes
 
@@ -2628,8 +2628,10 @@ Approved by the owner 2026-10-29. In the keyed run pagila_006 ("late rentals": r
 `rental_duration` days) timed out. The planner tried `EXTRACT_EPOCH` (`UNSUPPORTED_FUNCTION`), then subtracted the two
 timestamp columns and compared the interval with `film.rental_duration`; Postgres refused `interval > smallint`.
 
-The plan now says `DATE_DIFF('day', start, end)`: the whole days from `start` to `end`, an integer, the same on every
-database. It is built as sqlglot's `DateDiff` and rendered by the adapter's dialect, like `DATE_PART`. Only the day unit:
-sqlglot renders MySQL's `DATEDIFF` without the unit, so hours or months would be wrong there. The logical validator
+The plan now says `DATE_DIFF('day', start, end)`: the elapsed days from `start` to `end`, with the fraction kept (seconds
+divided by 86400, a number), the same on every database; two DATE columns give whole numbers, and the model can wrap it in
+`FLOOR` or `ROUND`. Owner's decision after review: sqlglot's own `DateDiff` in days meant three different things (truncate on
+SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed time matches pagila_006's gold. The plan carries
+no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
 rejects any other unit or shape, and a `-` between two date or timestamp columns, naming `DATE_DIFF` in the message
 (validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, `invariants.md`.

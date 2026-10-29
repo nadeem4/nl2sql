@@ -301,7 +301,9 @@ every database:
 | :--- | :--- | :--- |
 | `DATE_PART(unit, date)`, unit `year`, `quarter`, `month`, `day` | INTEGER | `2011` |
 | `DATE_TRUNC(unit, date)`, same units | ISO date string `YYYY-MM-DD` | `'2011-04-01'` |
-| `DATE_DIFF('day', start, end)` | INTEGER, whole days from start to end | `3` |
+| `DATE_DIFF('day', start, end)` | number, elapsed days with the fraction kept (negative when end is before start, NULL if either is) | `3.87` |
+
+The engine builds a day difference as `DateDiff(end, start, SECOND) / 86400.0`; the base class's `render_sql` fixes it for MySQL and SQL Server, and an adapter whose database sqlglot renders it wrongly for (SQLite) rewrites the `DateDiff` node into a fractional seconds count.
 
 The engine already wraps a date part in `CAST(... AS INT)` and a truncation
 in a `YYYY-MM-DD` format; an adapter that rewrites the inner nodes keeps

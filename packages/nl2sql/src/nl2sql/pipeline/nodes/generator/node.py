@@ -115,9 +115,20 @@ def portable_date(kind: str, unit: str, operand: exp.Expression) -> exp.Expressi
     return exp.TimeToStr(this=exp.TimestampTrunc(this=operand, unit=var), format=exp.Literal.string("%Y-%m-%d"))
 
 
+def elapsed_days(start: exp.Expression, end: exp.Expression) -> exp.Expression:
+    """The days from ``start`` to ``end`` as a fraction: seconds divided by 86400.
+
+    Built from sqlglot's seconds difference; the adapter's ``render_sql`` makes
+    it exact on its database (see ``nl2sql_sdk.sqlalchemy.elapsed_seconds``).
+    """
+    seconds = exp.DateDiff(this=end, expression=start, unit=exp.Var(this="SECOND"))
+    return exp.Div(this=seconds, expression=exp.Literal.number("86400.0"))
+
+
 DATE_DIFF_USAGE = (
-    "the difference between two dates is DATE_DIFF(unit, start, end), the whole days from start "
-    "to end as a number; the unit is the string literal 'day'. Never subtract dates."
+    "the difference between two dates is DATE_DIFF(unit, start, end), the elapsed days from start "
+    "to end as a number with the fraction kept (round it with FLOOR or ROUND for whole days); "
+    "the unit is the string literal 'day'. Never subtract dates."
 )
 
 _MIRRORED_JOIN = {"left": "right", "right": "left"}
@@ -242,7 +253,7 @@ class SqlVisitor:
             unit, start, end = diff
             if unit not in DIFF_UNITS:
                 raise ValueError(f"Unsupported date operation {expr.func_name}: {DATE_DIFF_USAGE}")
-            return exp.DateDiff(this=self.visit(end), expression=self.visit(start), unit=exp.Var(this=unit.upper()))
+            return elapsed_days(self.visit(start), self.visit(end))
 
         date = date_operation(expr.func_name, expr.args)
         if date is not None:
