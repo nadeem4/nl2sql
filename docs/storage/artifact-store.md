@@ -42,9 +42,11 @@ A combined result has no subgraph or schema version of its own: a template that 
 After saving a run's results the aggregator writes a manifest beside them with `ArtifactStore.write_manifest`: which results the run produced, never their rows. While a hook is attached at `answer.after`, it is written later, once those hooks allowed (see *Withheld runs* below).
 
 ```json
-{"request_id": "0f1c...", "results": [
+{"request_id": "0f1c...", "owner": {"tenant_id": "acme", "user_id": "ann", "roles": null}, "results": [
   {"node_id": "combine_g1", "columns": ["genre_name"], "row_count": 25, "truncated": false, "column_kinds": {"genre_name": "text"}}]}
 ```
+
+`owner` is who asked the run: the caller's `tenant_id` (else the engine's) and `user_id` (`null` for a caller with none), and for a caller with no `user_id` its sorted `roles` (`null` for a named user). Only that caller, or an anonymous caller of that tenant with the same roles, can read the run back.
 
 `column_kinds` is each column's type category, read from the saved parquet file's schema: integer, decimal and float are `number`; date, time and timestamp `temporal`; string `text`; bool `boolean`; anything else `other`.
 
@@ -60,10 +62,10 @@ A template without `<sub_query_id>` or `<dag_node_id>` gets `-manifest` added, a
 
 ### Reading a result back
 
-`ResultReader` (`execution/artifacts/results.py`), behind `engine.results` (`manifest`, `page` and `csv`) (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads one tenant's results by request id:
+`ResultReader` (`execution/artifacts/results.py`), behind `engine.results` (`manifest`, `page`, `csv` and `chart`) (see [Query API](../api/core/query.md#reading-a-runs-saved-results)), reads, by request id, the results in one tenant folder that one caller (a `ResultOwner`) asked for:
 
 1. The request id and the result id must be plain tokens (letters, digits, `_`, `-`; up to 128 characters). Anything else is `ResultNotFound`, before any path is built.
-2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused. A run a hook ended has no manifest, so it is not found either (below).
+2. The manifest is read from the key rendered for the reader's tenant and that request id (`ArtifactStore.read_manifest`). No such key in the results store is `ResultNotFound`, so another tenant's run is not found, not refused. The manifest's `owner` (the asker's `tenant_id` and `user_id`, written with it) must be the reader's caller; another caller's run, and a manifest with no `owner`, are `ResultNotFound` too ([Who can read a run](../api/core/results.md#who-can-read-a-run)). A run a hook ended has no manifest, so it is not found either (below).
 3. The result id must be a `node_id` the manifest lists. The parquet key is then rendered from the template, exactly as the aggregator wrote it (`ArtifactStore.scan_result`); the manifest never supplies a key.
 4. A page is `scan.slice(offset, limit).collect()` on a polars scan, so only that slice is read. A CSV export collects one `CSV_CHUNK_ROWS` (10,000) slice at a time and yields it as CSV text, header first.
 

@@ -33,8 +33,11 @@ class QueryService:
                 event = event.model_copy(update={"data": {**event.data, "result": response}})
             yield event
 
-    def get_result_page(self, request_id: str, result_id: str, offset: int, limit: int) -> ResultPage:
-        return self.engine.results.page(request_id, result_id, offset=offset, limit=limit)
+    def get_result_page(self, request_id: str, result_id: str, offset: int, limit: int,
+                        user_context: UserContext) -> ResultPage:
+        """A page of a run ``user_context`` asked; anyone else's run is ``ResultNotFound``."""
+        return self.engine.results.page(request_id, result_id, offset=offset, limit=limit, user_context=user_context)
 
-    def export_result_csv(self, request_id: str, result_id: str) -> Iterator[bytes]:
-        return self.engine.results.csv(request_id, result_id)
+    def export_result_csv(self, request_id: str, result_id: str, user_context: UserContext) -> Iterator[bytes]:
+        """A run ``user_context`` asked, as CSV; anyone else's run is ``ResultNotFound``."""
+        return self.engine.results.csv(request_id, result_id, user_context=user_context)

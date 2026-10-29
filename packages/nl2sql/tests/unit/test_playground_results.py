@@ -3,8 +3,10 @@
 The hosted Space runs the playground, not nl2sql-api, so the same two reads
 are here: ``GET /api/query/{request_id}/results/{result_id}`` for a page and
 ``.../{result_id}.csv`` for the whole result. Both call the facade, never the
-engine context. The store holds ``run-1`` of tenant ``t1`` (45 rows) and a run
-of tenant ``t2``.
+engine context. The store holds ``run-1`` of tenant ``t1`` (45 rows), asked as
+the playground asks, anonymously as the role ``admin``; a run of tenant ``t2``;
+and a run of ``t1`` a named user asked, which the playground cannot read. The
+page sends the role a run was asked as (``?role=``), as ``/api/schema`` does.
 """
 import csv
 import io
@@ -16,11 +18,12 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from nl2sql import NL2SQL, ResultManifest, ResultSummary  # noqa: E402
+from nl2sql import NL2SQL, ResultManifest, ResultSummary, UserContext  # noqa: E402
 from nl2sql.testing.facade import StubDatasources  # noqa: E402
 from nl2sql.cli.demo.playground.app import build_app  # noqa: E402
 from nl2sql.cli.demo.playground.hosted import Hosted  # noqa: E402
 from nl2sql.execution.artifacts import ArtifactStore
+from nl2sql.execution.artifacts.results import ResultOwner  # noqa: E402
 from nl2sql.storage.local import LocalResults  # noqa: E402
 
 TEMPLATE = "<tenant_id>/<request_id>/<sub_query_id>.parquet"
@@ -36,9 +39,11 @@ class _Engine(NL2SQL):
         return StubDatasources(getattr(self, "_runtime", None), ["chinook"])
 
 
-def _save(store, tenant, request, rows):
+def _save(store, tenant, request, rows, user_id=None):
     ref = store.write_lazy(pl.LazyFrame(rows), store.run_metadata(tenant, request, "result_combine_g1"))
-    store.write_manifest(tenant, request, ResultManifest(request_id=request, results=[
+    # Asked as the playground asks: anonymously, as the role ``admin``; or by a named user.
+    owner = ResultOwner.of(UserContext(user_id=user_id, roles=["admin"]), tenant)
+    store.write_manifest(tenant, request, ResultManifest(request_id=request, owner=owner, results=[
         ResultSummary(node_id="combine_g1", columns=ref.columns, row_count=ref.row_count)]))
 
 
@@ -47,6 +52,7 @@ def client(request, tmp_path):
     store = ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
     _save(store, "t1", "run-1", ROWS)
     _save(store, "t2", "theirs", [{"id": 1, "name": "secret"}])
+    _save(store, "t1", "anns", [{"id": 1, "name": "secret"}], user_id="ann")
     engine = _Engine(SimpleNamespace(tenant_id="t1", artifact_store=store))
     hosted = Hosted(enabled=True) if request.param == "hosted" else None
     return TestClient(build_app(engine, questions=[], roles=["admin"], mode=request.param,
@@ -54,7 +60,7 @@ def client(request, tmp_path):
 
 
 def test_a_page_of_the_result(client):
-    response = client.get("/api/query/run-1/results/combine_g1", params={"offset": 20, "limit": 20})
+    response = client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "offset": 20, "limit": 20})
 
     assert response.status_code == 200, response.text
     body = response.json()
@@ -63,13 +69,13 @@ def test_a_page_of_the_result(client):
 
 
 def test_the_page_size_is_capped_and_bad_values_refused(client):
-    assert client.get("/api/query/run-1/results/combine_g1", params={"limit": 5000}).json()["limit"] == 1000
-    assert client.get("/api/query/run-1/results/combine_g1", params={"offset": -1}).status_code == 422
-    assert client.get("/api/query/run-1/results/combine_g1", params={"limit": 0}).status_code == 422
+    assert client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "limit": 5000}).json()["limit"] == 1000
+    assert client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "offset": -1}).status_code == 422
+    assert client.get("/api/query/run-1/results/combine_g1", params={"role": "admin", "limit": 0}).status_code == 422
 
 
 def test_the_csv_is_the_whole_result(client):
-    response = client.get("/api/query/run-1/results/combine_g1.csv")
+    response = client.get("/api/query/run-1/results/combine_g1.csv", params={"role": "admin"})
 
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/csv")
@@ -83,11 +89,33 @@ def test_the_csv_is_the_whole_result(client):
     "/api/query/run-1/results/combine_nope",
     "/api/query/theirs/results/combine_g1",
     "/api/query/theirs/results/combine_g1.csv",
+    "/api/query/anns/results/combine_g1",
+    "/api/query/anns/results/combine_g1.csv",
     "/api/query/..%2Ft2%2Ftheirs/results/combine_g1",
     "/api/query/run-1/results/..%2F..%2Ft2%2Ftheirs%2Fresult_combine_g1.csv",
 ])
 def test_an_unknown_foreign_or_crafted_id_is_404(client, path):
-    response = client.get(path)
+    response = client.get(path, params={"role": "admin"})
 
     assert response.status_code == 404
     assert "secret" not in response.text
+
+
+@pytest.mark.parametrize("suffix", ["", ".csv"])
+def test_a_run_is_read_as_the_role_it_was_asked_as(client, suffix):
+    """Every playground run is anonymous, so its results are bound to the role it was asked as: the page sends
+    that role, and another role is a 404, as a missing run is."""
+    path = f"/api/query/run-1/results/combine_g1{suffix}"
+
+    assert client.get(path, params={"role": "admin"}).status_code == 200
+    response = client.get(path, params={"role": "viewer"})
+    assert response.status_code == 404
+    assert "n1" not in response.text
+
+
+@pytest.mark.parametrize("suffix", ["", ".csv"])
+def test_a_read_without_a_role_is_400(client, suffix):
+    response = client.get(f"/api/query/run-1/results/combine_g1{suffix}")
+
+    assert response.status_code == 400
+    assert "?role=" in response.json()["detail"]

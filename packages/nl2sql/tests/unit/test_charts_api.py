@@ -14,7 +14,7 @@ from nl2sql.chat_tools import ToolContext, ToolNotApplicable
 from nl2sql.chat_tools.chart import ChartArgs, ChartTool
 from nl2sql.conversations.models import Conversation, ToolCall, ToolStep, Turn
 from nl2sql.execution.artifacts import ArtifactStore
-from nl2sql.execution.artifacts.results import ResultManifest
+from nl2sql.execution.artifacts.results import ResultManifest, ResultOwner
 from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
 from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, GroupByItem, PlanModel, SelectItem
@@ -34,8 +34,8 @@ def store(tmp_path):
     return ArtifactStore(LocalResults(str(tmp_path)), path_template=TEMPLATE)
 
 
-def _run(store, rows, request="run-1", tenant="t1", settings=None):
-    """The aggregator over one scan of ``rows``: it saves the result and its manifest."""
+def _run(store, rows, request="run-1", tenant="t1", settings=None, user=USER):
+    """The aggregator over one scan of ``rows``, asked by ``user``: it saves the result and its manifest."""
     ref = store.create_artifact_ref(ResultFrame.from_row_dicts(rows),
                                     {"tenant_id": tenant, "request_id": request, "sub_query_id": "sq1"})
     output = SubgraphOutput(subgraph_id="sg1", sub_query=SubQuery(id="sq1", datasource_id="d", intent="i"),
@@ -47,7 +47,7 @@ def _run(store, rows, request="run-1", tenant="t1", settings=None):
         edges=[LogicalEdge(edge_id="e1", from_id="sq1", to_id="combine_g1")])
     node = EngineAggregatorNode(fake_runtime(settings={"tenant_id": tenant, **(settings or {})}, artifact_store=store))
     return node(GraphState(trace_id=request, user_query="q", execution_dag=dag,
-                           artifact_refs={"sq1": ref}, subgraph_outputs={"sg1": output}))
+                           artifact_refs={"sq1": ref}, subgraph_outputs={"sg1": output}, user_context=user))
 
 
 def _engine(store, tenant="t1", settings=None):
@@ -65,12 +65,12 @@ def test_the_artifact_writer_records_the_kinds_in_the_manifest(store):
     (summary,) = update["aggregator_response"].results
     assert summary.column_kinds == {"day": "temporal", "n": "number", "price": "number", "who": "text",
                                     "ok": "boolean"}
-    assert _engine(store).results.manifest("run-1").results[0].column_kinds == summary.column_kinds
+    assert _engine(store).results.manifest("run-1", user_context=USER).results[0].column_kinds == summary.column_kinds
 
 
 def test_a_trace_id_alone_charts_from_the_kinds(store):
     _run(store, MONTHS)
-    spec = _engine(store).results.chart("run-1")
+    spec = _engine(store).results.chart("run-1", user_context=USER)
     assert spec.kind == "line" and spec.x.field == "month" and spec.data.trace_id == "run-1"
     assert spec.data.result_id == "combine_g1" and spec.data.truncated is False
     assert spec.title  # no question is known from a trace id; it is still named
@@ -81,14 +81,14 @@ def test_the_chart_reads_up_to_max_points_rows_and_says_it_was_cut(store):
     rows = [{"day": f"2024-01-{d:02d}", "n": d} for d in range(1, 9)]
     _run(store, rows)
     # "day" is text here, so a bar of 8 categories would be drawn if it fit; with max_points 5 the read is cut.
-    spec = _engine(store, settings={"charts": {"max_points": 5}}).results.chart("run-1")
+    spec = _engine(store, settings={"charts": {"max_points": 5}}).results.chart("run-1", user_context=USER)
     assert spec.data.truncated is True and len(spec.data.rows) == 5
     assert spec.kind == "table"
 
 
 def test_decimals_are_plain_numbers_in_the_chart_data(store):
     _run(store, [{"c": "a", "v": Decimal("1.5")}, {"c": "b", "v": Decimal("2.5")}])
-    spec = _engine(store).results.chart("run-1")
+    spec = _engine(store).results.chart("run-1", user_context=USER)
     assert spec.kind == "bar"
     json.dumps(spec.model_dump(mode="json"))
     assert {r[1] for r in spec.data.rows} == {1.5, 2.5}
@@ -98,26 +98,27 @@ def test_a_forced_kind_the_data_cannot_draw_names_the_ones_it_can(store):
     _run(store, [{"c": "a", "v": 1}, {"c": "b", "v": 2}])
     engine = _engine(store)
     with pytest.raises(ValueError, match="bar"):
-        engine.results.chart("run-1", kind="line")
-    assert engine.results.chart("run-1", kind="table").kind == "table"
+        engine.results.chart("run-1", user_context=USER, kind="line")
+    assert engine.results.chart("run-1", user_context=USER, kind="table").kind == "table"
 
 
 def test_an_unknown_result_or_run_is_not_found(store):
     _run(store, MONTHS)
-    manifest = _engine(store).results.manifest("run-1")
+    manifest = _engine(store).results.manifest("run-1", user_context=USER)
     assert [r.node_id for r in manifest.results] == ["combine_g1"]
-    assert _engine(store).results.chart("run-1", "combine_g1").kind == "line"
+    assert _engine(store).results.chart("run-1", "combine_g1", user_context=USER).kind == "line"
     with pytest.raises(ResultNotFound):
-        _engine(store).results.chart("run-1", "nope")
+        _engine(store).results.chart("run-1", "nope", user_context=USER)
     with pytest.raises(ResultNotFound):
-        _engine(store).results.chart("no-such-run")
+        _engine(store).results.chart("no-such-run", user_context=USER)
 
 
 def test_another_tenants_run_is_not_found(store):
     _run(store, MONTHS)
     with pytest.raises(ResultNotFound):
-        _engine(store, tenant="t2").results.chart("run-1")
-    assert _engine(store, tenant="t2").results.chart("run-1", tenant_id="t1").kind == "line"
+        _engine(store, tenant="t2").results.chart("run-1", user_context=USER)
+    with pytest.raises(ResultNotFound):
+        _engine(store).results.chart("run-1", user_context=UserContext(user_id="u", tenant_id="t2"))
 
 
 def _plan():
@@ -141,17 +142,17 @@ def test_plan_refines_only_a_single_sub_query(store):
     manifest = update["aggregator_response"].results
     one = SubQueryResult(id="sq1", intent="Revenue by month", plan=_plan().model_dump())
     engine = _engine(store)
-    assert engine.results.chart(_query_result([one], manifest)).kind == "line"
+    assert engine.results.chart(_query_result([one], manifest), user_context=USER).kind == "line"
     # "period" is text in the file, and the same rows are drawn as a bar (3 categories) without the plan
-    assert engine.results.chart("run-1").kind == "bar"
+    assert engine.results.chart("run-1", user_context=USER).kind == "bar"
     two = [one, SubQueryResult(id="sq2", plan=_plan().model_dump())]
-    assert engine.results.chart(_query_result(two, manifest)).kind == "bar"
+    assert engine.results.chart(_query_result(two, manifest), user_context=USER).kind == "bar"
 
 
 def test_a_query_result_names_its_chart_by_the_single_sub_querys_intent(store):
     update = _run(store, MONTHS)
     one = SubQueryResult(id="sq1", intent="Revenue by month")
-    spec = _engine(store).results.chart(_query_result([one], update["aggregator_response"].results))
+    spec = _engine(store).results.chart(_query_result([one], update["aggregator_response"].results), user_context=USER)
     assert spec.title == "Revenue by month"
 
 
@@ -217,11 +218,11 @@ def test_withheld_result_is_not_charted(store):
     update = _run(store, MONTHS)
     engine = _engine(store)
     with pytest.raises(ResultNotFound):
-        engine.results.chart(QueryResult(trace_id="run-1", result_manifest=[]))
+        engine.results.chart(QueryResult(trace_id="run-1", result_manifest=[]), user_context=USER)
     kept = update["aggregator_response"].results
     with pytest.raises(ResultNotFound):
-        engine.results.chart(QueryResult(trace_id="run-1", result_manifest=kept), "other")
-    assert engine.results.chart(QueryResult(trace_id="run-1", result_manifest=kept), "combine_g1").kind == "line"
+        engine.results.chart(QueryResult(trace_id="run-1", result_manifest=kept), "other", user_context=USER)
+    assert engine.results.chart(QueryResult(trace_id="run-1", result_manifest=kept), "combine_g1", user_context=USER).kind == "line"
 
 
 def test_chart_tool_does_not_chart_a_withheld_run(store):
@@ -231,23 +232,27 @@ def test_chart_tool_does_not_chart_a_withheld_run(store):
         ChartTool()(context, ChartArgs())
 
 
-def test_chart_tool_reads_the_engines_tenant_not_the_callers(store):
-    # A run saves its results under the engine's tenant (settings.tenant_id), whoever asked: the conversation's
-    # and the caller's tenant name the owner, not where the rows are.
-    update = _run(store, MONTHS, tenant="t1")
+def test_chart_tool_reads_as_the_conversations_caller(store):
+    # A run saves its results under the engine's tenant (settings.tenant_id), whoever asked; the manifest records
+    # the asker, here a caller of tenant t2, and the tool reads as the conversation's caller.
+    caller = UserContext(user_id="u", roles=["admin"], tenant_id="t2")
+    update = _run(store, MONTHS, tenant="t1", user=caller)
     result = _query_result([SubQueryResult(id="sq1")], update["aggregator_response"].results)
     engine = _engine(store, tenant="t1")
     now = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
     conversation = Conversation(id="c1", title="t", created_at=now, updated_at=now, tenant_id="t2",
                                 turns=[_turn(1, _ask(result))])
-    caller = UserContext(user_id="u", roles=["admin"], tenant_id="t2")
     assert ChartTool()(ToolContext(conversation=conversation, user=caller, engine=engine), ChartArgs()).body["kind"] == "line"
+    other = UserContext(user_id="v", roles=["admin"], tenant_id="t2")
+    with pytest.raises(ToolNotApplicable, match="no longer"):
+        ChartTool()(ToolContext(conversation=conversation, user=other, engine=engine), ChartArgs())
 
 
 def test_a_result_cut_upstream_is_a_truncated_chart(store):
     update = _run(store, MONTHS)
     (summary,) = update["aggregator_response"].results
     cut = summary.model_copy(update={"truncated": True})
-    store.write_manifest("t1", "run-1", ResultManifest(request_id="run-1", results=[cut]))
-    spec = _engine(store).results.chart(QueryResult(trace_id="run-1", result_manifest=[cut]))
+    store.write_manifest("t1", "run-1", ResultManifest(request_id="run-1", owner=ResultOwner(tenant_id="t1", user_id="u"),
+                                                       results=[cut]))
+    spec = _engine(store).results.chart(QueryResult(trace_id="run-1", result_manifest=[cut]), user_context=USER)
     assert spec.data.truncated is True and spec.kind == "table"

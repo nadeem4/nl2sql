@@ -117,7 +117,7 @@ def release_results(ctx: Runtime, state: GraphState) -> None:
     """
     hooks = hooks_of(ctx)
     if hooks.attached("answer.after") and state.aggregator_response is not None:
-        write_manifest(ctx, state.trace_id, list(state.aggregator_response.results))
+        write_manifest(ctx, state, list(state.aggregator_response.results))
 
 
 class AnswerSynthesizerNode:

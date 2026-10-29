@@ -72,7 +72,7 @@ class TileRunner:
             kinds = dict(result.result_manifest[0].column_kinds) if result.result_manifest else {}
             if status == "ok" and draw:
                 try:
-                    chart = self._draw(tile, result)
+                    chart = self._draw(tile, result, user)
                 except Exception as exc:  # one chart that cannot be drawn never stops the others
                     status, error = "error", {"code": ErrorCode.UNKNOWN_ERROR.value,
                                               "message": f"The chart could not be drawn: {exc}"}
@@ -87,14 +87,16 @@ class TileRunner:
         return SuppliedPlan(decomposition=DecomposerResponse.model_validate(plan.decomposition),
                             plans={sub_query: PlanModel.model_validate(body) for sub_query, body in plan.plans.items()})
 
-    def _draw(self, tile: Tile, result: QueryResult) -> ChartSpec:
+    def _draw(self, tile: Tile, result: QueryResult, user: UserContext) -> ChartSpec:
+        """The chart of the run ``user`` just asked: its results are readable by that caller only."""
         node_id = result.result_manifest[0].node_id
         try:
-            spec = self._results.chart(result, node_id, kind=None if tile.chart == "auto" else tile.chart)
+            spec = self._results.chart(result, node_id, user_context=user,
+                                       kind=None if tile.chart == "auto" else tile.chart)
         except ValueError:  # the data can no longer be drawn as the chart the person forced
             if tile.chart == "auto":
                 raise
-            spec = self._results.chart(result, node_id)
+            spec = self._results.chart(result, node_id, user_context=user)
         return spec.model_copy(update={"title": tile.title})
 
 

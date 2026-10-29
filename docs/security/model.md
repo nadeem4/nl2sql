@@ -150,6 +150,20 @@ user who produced it is left to a multi-user deployment.
   of the hook's configured roles. An `Approval` is not signed: it is trusted
   as far as the `user_context` the caller passes. See
   [Query API → Approval](../api/core/query.md#approval).
+- **Results belong to their asker**: a run's manifest records who asked,
+  `(tenant_id, user_id)`, plus the sorted roles of an anonymous asker, and every read of its rows (`engine.results`, the
+  REST and playground results routes, a conversation's report and `chart`
+  tool, a dashboard's charts) needs the caller and answers only that asker.
+  Another user's or another tenant's trace id is `ResultNotFound` (`HTTP 404`),
+  the same as a missing run, so a trace id seen in an event, a trace or a log
+  reads nothing; no caller is a `TypeError`, and a manifest that records no
+  asker is refused. Callers with no `user_id` are anonymous: their runs are
+  bound to the tenant and the same set of roles, so a `viewer` cannot read an
+  `admin` run, but anonymous callers with the same roles share results. The
+  REST API has no per-user identity yet (its role settings carry roles only,
+  and API keys are MCP-only), so REST runs are readable by REST callers of the
+  same tenant with the same roles. See
+  [Who can read a run](../api/core/results.md#who-can-read-a-run).
 - **A supplied plan** (`run_query(plan=...)`) skips planning, not checking:
   its datasource is scope-checked, and the plan passes `plan.after` and the
   logical validator under the caller's role like any other.

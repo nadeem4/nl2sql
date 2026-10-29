@@ -123,7 +123,7 @@ def test_the_playground_streams_server_sent_events(demo_project, fake_llm, monke
     reply = client.post("/api/ask/stream", json={"question": QUESTION, "role": "admin"})
     final = _check_progress(parse_sse(reply.text))
     [entry] = final["result_manifest"]
-    page = client.get(f"/api/query/{final['trace_id']}/results/{entry['node_id']}").json()
+    page = client.get(f"/api/query/{final['trace_id']}/results/{entry['node_id']}", params={"role": "admin"}).json()
 
     assert final["status"] == "success" and final["recorded"] is False
     assert len(page["rows"]) == 25

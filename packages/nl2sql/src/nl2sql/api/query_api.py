@@ -107,7 +107,8 @@ class QueryResult(BaseModel):
     The full result set still lives in artifact storage, addressable through
     ``artifact_refs``. ``result_manifest`` lists the run's saved results (its
     manifest: node id, columns, row count, truncated), never their rows; read
-    those by ``trace_id`` with ``engine.results.page`` or ``engine.results.csv``.
+    those by ``trace_id`` with ``engine.results.page`` or ``engine.results.csv``,
+    as the caller who asked (``user_context``): nobody else can read them.
     ``trace_path`` is where this run's trace file was written, or None when
     ``settings.traces.mode`` did not keep one or the trace store is not the
     ``files`` store (read it with ``engine.traces.get(trace_id)``).

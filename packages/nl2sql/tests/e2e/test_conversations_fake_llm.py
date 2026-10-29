@@ -83,9 +83,13 @@ def test_a_question_runs_through_the_real_pipeline_and_the_turn_stores_no_rows(m
     assert step.result.sub_queries[0].sql and step.result.explanation is not None
     names = [c["name"] for c in server.calls]
     assert names.count("ModelStep") == 2 and "AggregatedResponse" in names
-    # The rows are still there, by the step's trace id.
-    page = engine.results.page(step.trace_id, step.result.result_manifest[0].node_id)
-    assert page.rows == [[59]]
+    # The rows are still there, by the step's trace id, for the caller who asked only.
+    node_id = step.result.result_manifest[0].node_id
+    assert engine.results.page(step.trace_id, node_id, user_context=_asker()).rows == [[59]]
+    from nl2sql import ResultNotFound, UserContext
+
+    with pytest.raises(ResultNotFound):
+        engine.results.page(step.trace_id, node_id, user_context=UserContext(user_id="bob", tenant_id="acme"))
     assert '"rows"' not in prompts[1]
 
 

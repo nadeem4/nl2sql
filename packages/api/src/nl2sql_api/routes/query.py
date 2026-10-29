@@ -112,7 +112,7 @@ def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller)
     return StreamingResponse(body(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
-_NOT_FOUND = {404: {"description": "No such run or result for this tenant."},
+_NOT_FOUND = {404: {"description": "No such run or result for this caller."},
               401: {"description": "No role for this request (see the auth settings)."}}
 
 
@@ -126,11 +126,12 @@ _NOT_FOUND = {404: {"description": "No such run or result for this tenant."},
 def export_result_csv(request_id: str, result_id: str, service: QuerySvc, user_context: Caller):
     """The whole of one saved result as CSV, streamed a slice at a time from its
     parquet file, never built in memory. `request_id` is the run's `trace_id`;
-    `result_id` is a `node_id` from the query response's `result_manifest`. Results are
-    read from the engine's own tenant folder only: an unknown run, another
-    tenant's, or an id that is not a plain token is a 404."""
+    `result_id` is a `node_id` from the query response's `result_manifest`. A run is
+    readable only by the caller who asked it (the same user id and tenant): an
+    unknown run, another user's or another tenant's, or an id that is not a plain
+    token is a 404."""
     try:
-        chunks = service.export_result_csv(request_id, result_id)
+        chunks = service.export_result_csv(request_id, result_id, user_context)
     except ResultNotFound:
         raise HTTPException(status_code=404, detail="No such result.")
     return StreamingResponse(
@@ -157,10 +158,10 @@ def get_result_page(
     """Rows `offset` to `offset + limit` of one saved result, read lazily from its
     parquet file. `request_id` is the run's `trace_id`; `result_id` is a `node_id`
     from the query response's `result_manifest`. `next_offset` is where the next page
-    starts, null at the end; a page past the end is empty. Results are read from
-    the engine's own tenant folder only: an unknown run, another tenant's, or an
-    id that is not a plain token is a 404."""
+    starts, null at the end; a page past the end is empty. A run is readable only
+    by the caller who asked it (the same user id and tenant): an unknown run,
+    another user's or another tenant's, or an id that is not a plain token is a 404."""
     try:
-        return service.get_result_page(request_id, result_id, offset=offset, limit=limit)
+        return service.get_result_page(request_id, result_id, offset=offset, limit=limit, user_context=user_context)
     except ResultNotFound:
         raise HTTPException(status_code=404, detail="No such result.")

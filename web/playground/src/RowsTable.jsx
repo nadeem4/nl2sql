@@ -65,7 +65,7 @@ function Grid({ columns, rows, busy = false }) {
 // loads, so Next never blanks the card.
 // `view` (results.js, `rowsView`) says which result and which offset; a new
 // result remounts this, so no page of the last one is shown under its tab.
-function PagedResult({ requestId, summary, subQueries, view, onPage }) {
+function PagedResult({ requestId, role, summary, subQueries, view, onPage }) {
   const empty = firstPage(summary);
   const [page, setPage] = useState(empty);
   const [loading, setLoading] = useState(!empty);
@@ -79,7 +79,7 @@ function PagedResult({ requestId, summary, subQueries, view, onPage }) {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(viewUrl(requestId, view, PAGE_SIZE), { signal: controller.signal })
+    fetch(viewUrl(requestId, view, role, PAGE_SIZE), { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) {
           const reply = await response.json().catch(() => ({}));
@@ -97,7 +97,7 @@ function PagedResult({ requestId, summary, subQueries, view, onPage }) {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [requestId, resultId, offset, attempt]);
+  }, [requestId, role, resultId, offset, attempt]);
 
   const cut = truncatedNotice(summary, subQueries);
   const nav = page ? pageNav(page) : { prev: null, next: null };
@@ -107,7 +107,7 @@ function PagedResult({ requestId, summary, subQueries, view, onPage }) {
         <span className="art-label">Result</span>
         <span className="art-meta" id="rows-total">{rowCount(summary)}</span>
         {summary.row_count > 0 && (
-          <a className="inspect-close art-download" id="rows-csv" href={csvUrl(requestId, resultId)} download>
+          <a className="inspect-close art-download" id="rows-csv" href={csvUrl(requestId, resultId, role)} download>
             Download CSV
           </a>
         )}
@@ -163,8 +163,10 @@ export function SampleRows({ rows }) {
 }
 
 // The rows a run saved, read from `result_manifest`. A tab per result only
-// when there is more than one; a tab opens on its result's first page.
-export default function RowsTable({ result }) {
+// when there is more than one; a tab opens on its result's first page. `role`
+// is the role the run was asked as: the server serves an anonymous run's rows
+// to that role only.
+export default function RowsTable({ result, role }) {
   const manifest = result.result_manifest || [];
   const tabs = resultTabs(manifest);
   const [view, dispatch] = useReducer(rowsView, manifest, initialView);
@@ -201,7 +203,7 @@ export default function RowsTable({ result }) {
       )}
       <div id="rows-panel" role={tabs.length ? "tabpanel" : undefined}
         aria-labelledby={tabs.length ? `rows-tab-${tabs.findIndex((t) => t.id === summary.node_id)}` : undefined}>
-        <PagedResult key={summary.node_id} requestId={result.trace_id} summary={summary}
+        <PagedResult key={summary.node_id} requestId={result.trace_id} role={role} summary={summary}
           subQueries={result.sub_queries} view={{ ...view, active: summary.node_id }}
           onPage={(offset) => dispatch({ type: "page", offset })} />
       </div>

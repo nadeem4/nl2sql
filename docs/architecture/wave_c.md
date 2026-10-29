@@ -159,7 +159,7 @@ Wave D.
 | OAuth for MCP and `nl2sql-api`; hosted-demo MCP | D127, D128 | After 0.9 |
 | MCP inside `nl2sql-api`, rate limiting | D126; per-question caps bound the spend | Wave D |
 | `scan()` over REST, network or cloud discovery | D120, D121 | Wave D (local), later |
-| Results bound to the user who asked (B13) | Unchanged: Wave C's own reads go through conversation and dashboard ownership | Wave D |
+| Traces bound to the user who asked (B13's traces half) | Results are bound by C-W2 here (see wave_d.md's [B13 note](wave_d.md#results-bound-to-the-user-b13)); `engine.traces.get` is not | Wave D |
 
 ### Later, not in 0.9
 
@@ -372,7 +372,7 @@ hook interface changes.
 | **Owner (D105)** | `start` records the caller's `tenant_id` (else `settings.tenant_id`) and `user_id`. Every other method compares the caller's with the stored pair; a mismatch is `ConversationNotFound`. |
 | **Roles** | Never stored. Each turn runs with the `user_context` passed to that call, so a role taken away applies at the next turn. |
 | **No `user_id`** | Allowed, and owned by "no user": every caller without a `user_id` in that tenant sees those conversations. Fine for a single-user CLI or script; not for a server. `nl2sql-api`'s `get_user_context` sets roles only today, so Wave D must give each request a `user_id` before it exposes conversations. |
-| **Results** | A turn's rows are read with `engine.results.page(turn.trace_id, ...)`. A tool reads only turns of a conversation the caller owns, so Wave C adds no new way to read another user's results (bug B13 stays Wave D's). |
+| **Results** | A turn's rows are read with `engine.results.page(turn.trace_id, ...)`. A tool reads only turns of a conversation the caller owns, and C-W2 binds every results read to the run's asker (B13's results half; see wave_d.md's [B13 note](wave_d.md#results-bound-to-the-user-b13)), so a trace id alone reads no one's rows. |
 | **Limits** | `conversations.max_turns` (50): the 51st turn is refused with `CONVERSATION_TOO_LONG` and the fix "start a new conversation". |
 | **Retention (D106)** | `engine.storage.purge()` deletes conversations whose `updated_at` is older than `conversations.max_age_days` (30; `null` keeps them), and draft dashboards older than that (section 6), and reports the counts in `retention.purged`. A turn whose result has been purged says so (`ResultNotFound` from `engine.results`) and keeps its text, question and SQL. |
 
@@ -582,11 +582,12 @@ draws a table from `data`.
 
 ### Choosing a chart
 
-`engine.results.chart(result, result_id=None, *, kind=None, tenant_id=None)
+`engine.results.chart(result, result_id=None, *, user_context, kind=None)
 -> ChartSpec`. `result` is a `QueryResult` (its plan is used) or a
 `trace_id` (only the columns' kinds are). `kind` forces a kind the data can
 draw, else `ValueError` naming the ones it can. It reads results as
-`engine.results.page` does, by `trace_id` and tenant (B13 unchanged).
+`engine.results.page` does, by `trace_id` and caller: only the caller who
+asked the run reads it (C-W2, which closed B13 for results).
 
 **Column kinds (D112).** The artifact writer records each column's kind when
 it writes the parquet file, from the Arrow type, into
@@ -1625,8 +1626,8 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
     - Review fixes: a stored tool output holds no rows (D106). A chart output's `data.rows` is emptied before
       the step is stored (a client draws again through `engine.results.chart`), and the `report` tool stores
       the report without row tables and chart takeaways (`conversations.report(include_rows=False)`); asked
-      for directly, the report still reads the rows from `engine.results`. `engine.results` does not check the
-      caller (it reads by tenant and trace id); that gap is a separate row.
+      for directly, the report still reads the rows from `engine.results`, as the conversation's caller
+      (C-W2: `engine.results` answers only the caller who asked).
     - `chat_tools:` absent means the default tools **the registry has**, so an engine on `Registry.empty()`
       builds. The defaults are `("chart", "report")` only: `diagram`, `dashboard_edit` and `dashboard_pin` are
       still stubs and **stay off by default. K2 and D4 each add their own name to `DEFAULT_CHAT_TOOLS`
@@ -1674,6 +1675,15 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
       were once readable this way; that gap is closed (C-W1): while a hook is attached at `answer.after` the
       manifest every read goes through is written only once those hooks allowed, so a withheld run has none
       and every read path answers `ResultNotFound` (see `docs/configuration/hooks.md`).
+    - C-W2 (results readable only by their asker): the manifest records the asker's `(tenant_id, user_id)`
+      (`ResultOwner`, written by both write sites, the aggregator and `release_results`); `manifest`, `page`,
+      `csv` and `chart` take a required `user_context` (none is a `TypeError`; `chart`'s `tenant_id` is gone)
+      and answer `ResultNotFound` for any other caller and for a manifest with no asker. Every reader passes
+      its caller: the REST and playground routes, the report and the `chart` tool (the conversation's
+      caller), dashboard refresh (the refreshing caller). A caller with no `user_id` (every REST caller today)
+      also has its sorted roles recorded, and only a caller of that tenant with the same roles reads the run;
+      the playground's results routes take the run's role as `?role=`. Unlike wave_d.md's D204 there is no `None` operator and no ownerless read: the operator
+      tools read no saved results. `engine.traces.get` is unchanged (still G1's).
     - `Decimal` values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.
     - Tests: `test_charts_choose.py`, `test_charts_api.py`, `test_charts_make_no_model_call` (architecture).
       The stub test moves `chart` out of its tables.

@@ -32,8 +32,10 @@ Twenty-one routes:
                                capped at 1,000), as ``nl2sql-api`` serves it
 ``GET  /api/query/{request_id}/results/{result_id}.csv``
                                the whole saved result as CSV, streamed; both read the
-                               engine's own tenant folder only, so an unknown, foreign
-                               or crafted id is a 404
+                               engine's own tenant folder only, as the role the run was
+                               asked as (``?role=``, required: 400 without it), so an
+                               unknown, foreign or crafted id, or another role's run,
+                               is a 404
 ``GET  /api/pipeline``         every step of a run in order, which call a model, and the
                                model each of those is configured to use (``engine.about()``),
                                and the model the replay recordings were made with
@@ -613,24 +615,35 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
             raise HTTPException(status_code=404, detail="No trace with that id.")
         return doc
 
+    def _result_reader(role: Optional[str]) -> UserContext:
+        # Every run here is asked anonymously as one role, so it is read back as that role (``?role=``, as the page
+        # sends it): another role's run is a 404. No default role, as ``/api/schema`` has none.
+        if not role:
+            raise HTTPException(status_code=400, detail="Name the role the run was asked as: ?role=<role>.")
+        return UserContext(roles=[role])
+
     # The CSV route first: ``{result_id}`` would otherwise match ``x.csv``.
     @app.get("/api/query/{request_id}/results/{result_id}.csv")
-    def result_csv(request_id: str, result_id: str) -> StreamingResponse:
-        """The whole saved result as CSV, streamed from its parquet file. Read from the
-        engine's own tenant folder only; an unknown, foreign or crafted id is a 404."""
+    def result_csv(request_id: str, result_id: str, role: Optional[str] = None) -> StreamingResponse:
+        """The whole saved result as CSV, streamed from its parquet file. Read as the
+        anonymous caller with ``role``, as the run was asked; an unknown, foreign or
+        crafted id, or another role's run, is a 404."""
+        user = _result_reader(role)
         try:
-            chunks = engine.results.csv(request_id, result_id)
+            chunks = engine.results.csv(request_id, result_id, user_context=user)
         except ResultNotFound:
             raise HTTPException(status_code=404, detail="No such result.")
         return StreamingResponse(chunks, media_type="text/csv; charset=utf-8", headers={
             "Content-Disposition": f'attachment; filename="{request_id}_{result_id}.csv"'})
 
     @app.get("/api/query/{request_id}/results/{result_id}")
-    def result_page(request_id: str, result_id: str,
+    def result_page(request_id: str, result_id: str, role: Optional[str] = None,
                     offset: int = Query(0, ge=0), limit: int = Query(100, ge=1)) -> Dict[str, Any]:
-        """One page of a saved result (``limit`` capped at 1,000), as ``nl2sql-api`` serves it."""
+        """One page of a saved result (``limit`` capped at 1,000), as ``nl2sql-api`` serves it,
+        read as the anonymous caller with ``role``."""
+        user = _result_reader(role)
         try:
-            page = engine.results.page(request_id, result_id, offset=offset, limit=limit)
+            page = engine.results.page(request_id, result_id, offset=offset, limit=limit, user_context=user)
         except ResultNotFound:
             raise HTTPException(status_code=404, detail="No such result.")
         return page.model_dump(mode="json")

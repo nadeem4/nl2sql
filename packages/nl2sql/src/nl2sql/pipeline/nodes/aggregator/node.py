@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 import polars as pl
 
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode, RunWarning
-from nl2sql.execution.artifacts.results import ResultManifest, ResultSummary, column_kinds
+from nl2sql.execution.artifacts.results import ResultManifest, ResultOwner, ResultSummary, column_kinds
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.nodes.aggregator.schemas import AggregatorResponse
 from nl2sql.common.logger import get_logger
@@ -20,9 +20,12 @@ from nl2sql.aggregation.join_keys import DTYPE_PLURAL
 logger = get_logger("aggregator")
 
 
-def write_manifest(ctx: Runtime, trace_id: str, results: List[ResultSummary]) -> None:
-    """Writes a run's result manifest, which makes its results readable by its trace id (``engine.results``)."""
-    ctx.artifact_store.write_manifest(ctx.tenant_id, trace_id, ResultManifest(request_id=trace_id, results=results))
+def write_manifest(ctx: Runtime, state: "GraphState", results: List[ResultSummary]) -> None:
+    """Writes a run's result manifest, which makes its results readable by its trace id (``engine.results``), and
+    only by the caller who asked: the manifest records that caller (``ResultOwner``)."""
+    owner = ResultOwner.of(state.user_context, ctx.tenant_id)
+    ctx.artifact_store.write_manifest(ctx.tenant_id, state.trace_id,
+                                      ResultManifest(request_id=state.trace_id, owner=owner, results=results))
 
 # A capped input to these is refused: missing rows mean missing matches, so the
 # answer may be wrong. A union of a capped input is still right, only incomplete.
@@ -201,7 +204,7 @@ class EngineAggregatorNode:
             for node_id, ref in saved.items()
         ]
         if not self.hooks.attached("answer.after"):
-            write_manifest(self.ctx, state.trace_id, results)
+            write_manifest(self.ctx, state, results)
         return results
 
     @staticmethod

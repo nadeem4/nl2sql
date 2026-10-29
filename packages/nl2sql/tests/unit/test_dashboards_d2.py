@@ -80,6 +80,7 @@ class Runs:
     def __init__(self, monkeypatch) -> None:
         self.calls: List[Dict[str, Any]] = []
         self.charts: List[Any] = []
+        self.readers: List[UserContext] = []  # whom each chart's results were read as
         self.respond: Callable[[Dict[str, Any]], QueryResult] = lambda call: good()
         self.gate: Callable[[], None] = lambda: None
         runs = self
@@ -89,8 +90,9 @@ class Runs:
             runs.gate()
             return runs.respond(runs.calls[-1])
 
-        def chart(api: ResultsAPI, result: QueryResult, result_id=None, *, kind=None, tenant_id=None) -> ChartSpec:
+        def chart(api: ResultsAPI, result: QueryResult, result_id=None, *, user_context, kind=None) -> ChartSpec:
             runs.charts.append(kind)
+            runs.readers.append(user_context)
             return spec(result.trace_id)
 
         monkeypatch.setattr(QueryAPI, "run_query", run_query)
@@ -250,7 +252,7 @@ def test_a_forced_chart_kind_is_drawn_and_one_the_data_cannot_draw_falls_back_to
     seed(engine, tiles=[tile("t1", chart="line")])
     drawn: List[Any] = []
 
-    def chart(api, result, result_id=None, *, kind=None, tenant_id=None):
+    def chart(api, result, result_id=None, *, user_context, kind=None):
         drawn.append(kind)
         if kind == "line":
             raise ValueError("A line needs a temporal column.")
@@ -316,6 +318,7 @@ def test_refresh_runs_as_the_caller(engine, runs):
 
     assert {call["user_context"].user_id for call in runs.calls} == {"ana"}
     assert {tuple(call["user_context"].roles) for call in runs.calls} == {("analyst", "sales")}
+    assert runs.readers and {user.user_id for user in runs.readers} == {"ana"}, "the results are read as the asker"
     with pytest.raises(DashboardNotFound):
         engine.dashboards.refresh("d1", user_context=BOB)
     with pytest.raises(TypeError, match="user_context is required"):
@@ -810,7 +813,7 @@ def test_allow_all_has_no_roles_to_lose(make, runs):
 def test_run_scheduled_survives_a_chart_that_cannot_be_drawn(engine, runs, monkeypatch):
     seed(engine, schedule=_due_schedule())
 
-    def broken(api, result, result_id=None, *, kind=None, tenant_id=None):
+    def broken(api, result, result_id=None, *, user_context, kind=None):
         raise RuntimeError("No parquet.")
 
     monkeypatch.setattr(ResultsAPI, "chart", broken)

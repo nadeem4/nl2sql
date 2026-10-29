@@ -26,17 +26,18 @@ def _genres(demo_project):
 
 
 def _read_back(client, prefix, body):
-    """Every page of the run's one result, then its CSV."""
+    """Every page of the run's one result, then its CSV, as the role it was asked as (the playground needs it;
+    nl2sql-api takes the role from its config and ignores the parameter)."""
     [entry] = body["result_manifest"]
     assert entry["row_count"] == 25 and entry["columns"] == ["genre_name"] and entry["truncated"] is False
     url = f"{prefix}/query/{body['trace_id']}/results/{entry['node_id']}"
     rows, offset, pages = [], 0, 0
     while offset is not None:
-        page = client.get(url, params={"offset": offset, "limit": 7})
+        page = client.get(url, params={"offset": offset, "limit": 7, "role": "admin"})
         assert page.status_code == 200, page.text
         rows.extend(page.json()["rows"])
         offset, pages = page.json()["next_offset"], pages + 1
-    download = client.get(f"{url}.csv")
+    download = client.get(f"{url}.csv", params={"role": "admin"})
     assert download.status_code == 200, download.text
     return rows, pages, list(csv.reader(io.StringIO(download.text)))
 
@@ -89,7 +90,7 @@ def test_the_playground_pages_and_exports_the_whole_result(demo_project, fake_ll
     body = client.post("/api/ask", json={"question": QUESTION, "role": "admin"}).json()
     assert body["status"] == "success", body["errors"]
     rows, pages, lines = _read_back(client, "/api", body)
-    other = client.get(f"/api/query/{body['trace_id']}/results/nope").status_code
+    other = client.get(f"/api/query/{body['trace_id']}/results/nope", params={"role": "admin"}).status_code
 
     genres = _genres(demo_project)
     assert rows == genres and pages == 4

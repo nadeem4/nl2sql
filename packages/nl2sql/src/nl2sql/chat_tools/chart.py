@@ -49,8 +49,8 @@ class ChartTool:
             raise ToolNotApplicable(f"Turn {turn.index} has {len(asks)} answer(s) with data; there is no step {args.step}.")
         step = asks[position]
         try:
-            # The engine's own tenant: a run saves its results there, whoever asked.
-            spec = ctx.engine.results.chart(step.result, args.result_id, kind=args.kind)
+            # As the conversation's caller, who asked the run: nobody else can read its results.
+            spec = ctx.engine.results.chart(step.result, args.result_id, user_context=ctx.user, kind=args.kind)
         except ResultNotFound:
             raise ToolNotApplicable("The rows of that answer are no longer available, so it cannot be charted.") from None
         except ValueError as error:

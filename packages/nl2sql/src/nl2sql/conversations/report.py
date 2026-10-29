@@ -35,13 +35,13 @@ def _table(columns: Sequence[str], rows: Sequence[Sequence[Any]]) -> List[str]:
     return lines
 
 
-def _rows(results: Any, step: ToolStep) -> List[str]:
+def _rows(results: Any, user: Any, step: ToolStep) -> List[str]:
     """The first rows of the step's result as a table, or the reason there are none."""
     manifest = step.result.result_manifest if step.result else []
     if not manifest:
         return ["_No rows were released for this answer._"]
     try:
-        page = results.page(step.trace_id, manifest[0].node_id, limit=ROW_LIMIT)
+        page = results.page(step.trace_id, manifest[0].node_id, limit=ROW_LIMIT, user_context=user)
     except ResultNotFound:
         return ["_Results expired._"]
     lines = _table(page.columns, page.rows)
@@ -50,10 +50,10 @@ def _rows(results: Any, step: ToolStep) -> List[str]:
     return lines
 
 
-def _takeaway(results: Any, step: ToolStep) -> Optional[str]:
+def _takeaway(results: Any, user: Any, step: ToolStep) -> Optional[str]:
     """The sentence of the chart the data is drawn as, unless it is a table or the rows are gone."""
     try:
-        chart = results.chart(step.result, step.result.result_manifest[0].node_id)
+        chart = results.chart(step.result, step.result.result_manifest[0].node_id, user_context=user)
     except (ResultNotFound, ValueError):
         return None
     return chart.takeaway if chart.kind != "table" and chart.takeaway else None
@@ -67,7 +67,7 @@ def _sql(step: ToolStep) -> Optional[str]:
     return f"<details><summary>SQL</summary>\n\n```sql\n{text}\n```\n\n</details>"
 
 
-def _section(results: Any, step: ToolStep, include_rows: bool) -> str:
+def _section(results: Any, user: Any, step: ToolStep, include_rows: bool) -> str:
     result = step.result
     parts = [f"## {step.question}"]
     summary = (result.final_answer or {}).get("summary")
@@ -76,8 +76,8 @@ def _section(results: Any, step: ToolStep, include_rows: bool) -> str:
     if result.explanation and result.explanation.steps:
         parts.append("**Why this answer.** " + " ".join(s.text for s in result.explanation.steps))
     if include_rows:
-        parts.append("\n".join(_rows(results, step)))
-        if result.result_manifest and (takeaway := _takeaway(results, step)):
+        parts.append("\n".join(_rows(results, user, step)))
+        if result.result_manifest and (takeaway := _takeaway(results, user, step)):
             parts.append(f"**Takeaway.** {takeaway}")
     if (sql := _sql(step)):
         parts.append(sql)
@@ -95,10 +95,12 @@ def _chosen(conversation: Conversation, turns: Optional[Sequence[int]]) -> List[
     return [by_index[i] for i in dict.fromkeys(turns)]
 
 
-def build_report(conversation: Conversation, results: Any, *, turns: Optional[Sequence[int]] = None,
+def build_report(conversation: Conversation, results: Any, *, user_context: Any,
+                 turns: Optional[Sequence[int]] = None,
                  title: Optional[str] = None, include_rows: bool = True) -> str:
     """The report of the answered questions of every turn (or of ``turns``), as Markdown. With ``include_rows``
     false the report holds no row data (no table, no chart takeaway): that is the form a stored tool output has.
+    The rows are read as ``user_context``, the conversation's owner, who asked every run in it.
 
     Raises:
         ValueError: a turn that does not exist, or no answered question to report.
@@ -109,4 +111,4 @@ def build_report(conversation: Conversation, results: Any, *, turns: Optional[Se
         raise ValueError("This conversation has no answered question to report.")
     today = datetime.now(timezone.utc).date().isoformat()
     head = f"# {title or conversation.title}\nGenerated {today} · {len(steps)} questions · nl2sql {_version()}"
-    return "\n\n".join([head, *(_section(results, s, include_rows) for s in steps)]) + "\n"
+    return "\n\n".join([head, *(_section(results, user_context, s, include_rows) for s in steps)]) + "\n"

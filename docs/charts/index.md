@@ -1,11 +1,11 @@
 # Charts
 
-An answer's rows become a chart without a model call. `engine.results.chart(result)` reads the saved
-result and returns a `ChartSpec`: our own small typed chart (a line, a bar, a big number or a table),
+An answer's rows become a chart without a model call. `engine.results.chart(result, user_context=caller)` reads the
+saved result, as the caller who asked it, and returns a `ChartSpec`: our own small typed chart (a line, a bar, a big number or a table),
 which `to_vega_lite()` exports for a browser. See [Results API](../api/core/results.md).
 
 ```python
-spec = engine.results.chart(result)          # a QueryResult, or a trace_id
+spec = engine.results.chart(result, user_context=caller)   # a QueryResult, or a trace_id
 spec.kind, spec.reason, spec.takeaway
 vega = spec.to_vega_lite()                   # None for a table
 ```
