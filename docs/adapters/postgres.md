@@ -2,6 +2,8 @@
 
 This adapter extends `SQLAlchemyAdapter`, leveraging automatic schema reflection and statistics gathering. Its row counts are the catalog's estimates (`pg_class.reltuples`), so a table never analyzed has none.
 
+A partitioned table is one table. PostgreSQL declares its foreign keys on the partitions (`payment_p2022_01`, ...), so the adapter does not list the partitions: the parent takes the partitions' foreign keys (once each), unless it declares keys of its own, and a key that points at a partition points at its parent. A query names the parent, and the planner is sent one table instead of the parent and all its partitions. A partition is read when its top parent is in the datasource's `index` scope.
+
 ## Configuration
 
 **Type**: `postgres`
