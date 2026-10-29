@@ -38,6 +38,7 @@ Successful completion criteria:
 - Or reaches `END` after `clarifier`, which asked which reading of the question was meant (`NEEDS_CLARIFICATION`, `INFO`): no SQL is generated or run, and the wrapper reports the sub-query with status `needs_clarification`.
 
 Failure exits:
+- `check_retriever` returns `end` when `schema_retriever` returned a non-retryable error: retrieval failed and there was no snapshot to fall back to (`SCHEMA_RETRIEVAL_FAILED`, `CRITICAL`). The planner is never called.
 - `check_planner` returns `end` when planner output is missing and retries are exhausted or errors are non-retryable.
 - `check_logical_validation` returns `end` when validation errors are non-retryable or retries are exhausted.
 - `check_execution` returns `end` after `executor` unless the database rejected the query as wrong (`EXECUTION_FAILED`) and retries remain: a success, a refusal (`DB_EXECUTION_ERROR`: permission, timeout, connection) and any other executor error all end the subgraph.
@@ -64,7 +65,8 @@ Execution order (nominal path):
 Mermaid diagram (sql_agent only):
 ```mermaid
 flowchart TD
-    schema_retriever --> ast_planner
+    schema_retriever -->|ok| ast_planner
+    schema_retriever -->|end| END
     ast_planner -->|ok| logical_validator
     ast_planner -->|retry| retry_handler
     ast_planner -->|end| END
@@ -91,7 +93,7 @@ Field ownership, reducers, and lifecycle are defined in `../graph_state.md`.
 
 ## Step-by-Step Execution Flow
 
-1. `schema_retriever` builds a semantic query from `sub_query` and retrieves relevant schema context; if none found, it falls back to full schema snapshot.
+1. `schema_retriever` builds a semantic query from `sub_query` and retrieves relevant schema context; if none found, or the search fails, it falls back to full schema snapshot. A table cut to the searched columns keeps its keys, join columns and label. `check_retriever` routes `end` when retrieval failed with no snapshot (a non-retryable `SCHEMA_RETRIEVAL_FAILED`), else `ok`.
 2. `ast_planner` runs an LLM planning chain to produce `PlanModel`.
 3. `check_planner` routes:
    - `ok` if a plan exists.

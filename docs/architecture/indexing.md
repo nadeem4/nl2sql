@@ -451,8 +451,14 @@ Tenant scoping is **not implemented** in indexing:
 Current failure behaviors:
 
 - Vector store retrieval wrapped by `VECTOR_BREAKER`; failures fast‑fail.
-- Vector retrieval errors in `SchemaRetrieverNode` return empty results with warnings.
-- If no candidates are found, the retriever falls back to full schema snapshot.
+- If vector retrieval in `SchemaRetrieverNode` raises, or finds no candidates,
+  the retriever falls back to the full schema snapshot (the tables the caller
+  may read) with a `SCHEMA_RETRIEVAL_FAILED` warning. With no snapshot to fall
+  back to, a raised error ends the sub-query with a non-retryable
+  `SCHEMA_RETRIEVAL_FAILED`.
+- A table cut to the columns the `planning` search returned keeps its primary
+  key, both sides of each join it is offered and its `name`/`title` label
+  (see [SchemaRetrieverNode](nodes/schema_retriever_node.md#kept-columns)).
 - Indexing calls no model, so a missing API key never affects it. Descriptions
   a model drafts are proposals (the profiler), not part of the index or the
   snapshot, until a person accepts them into the glossary.

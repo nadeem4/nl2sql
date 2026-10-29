@@ -15,7 +15,10 @@
 - Build a semantic query from sub‑query intent, filters, group_by, expected_schema, metrics.
 - Retrieve candidate tables/columns/relationships from the run's pinned `Retriever`.
 - Resolve authoritative tables from `SchemaStore`.
-- Fall back to full schema snapshot when retrieval returns no candidates.
+- Fall back to full schema snapshot when retrieval returns no candidates or
+  the search fails; see [Error Handling](#error-handling).
+- Keep the columns a join or an answer needs on a table cut to the columns
+  the search returned; see [Kept columns](#kept-columns).
 - Rank the datasource's `preferred_tables` first and set `preferred=True` on
   them, on the full-snapshot path and the retrieval path; see
   [Preferred tables](#preferred-tables).
@@ -47,14 +50,16 @@ Upstream:
 - SQL agent subgraph entry.
 
 Downstream:
-- `ASTPlannerNode`
+- `ASTPlannerNode`, or the end of the sub-query when it returned a
+  non-retryable error (retrieval failed with no snapshot to fall back to).
 
 Trigger conditions:
 - Always executed as the subgraph entry node.
 
 ```mermaid
 flowchart LR
-    SchemaRetriever[SchemaRetrieverNode] --> Planner[ASTPlannerNode]
+    SchemaRetriever[SchemaRetrieverNode] -->|tables| Planner[ASTPlannerNode]
+    SchemaRetriever -->|SCHEMA_RETRIEVAL_FAILED| End([end of sub-query])
 ```
 
 ---
@@ -88,6 +93,8 @@ Mutations to `SubgraphExecutionState`:
 - `knowledge_used` (`KnowledgeUsed`): the terms and rules sent as
   `[BUSINESS_CONTEXT]`; absent when none matched, and for a pinned plan
 - `reasoning` and `warnings` in fallback paths
+- `errors`: one `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` when retrieval failed
+  and there is no snapshot to fall back to
 
 Side effects:
 
@@ -107,9 +114,32 @@ Side effects:
 3. If no table chunks, retrieve columns via `retrieve_column_candidates()`, `k = table_k`.
 4. If tables are identified, retrieve columns/relationships via `retrieve_planning_context()`, `k = settings.retrieval.planning_k` (12).
 5. Resolve schema snapshot via `_resolve_snapshot()`.
-6. Build `Table` objects with `_build_tables_from_snapshot()`.
+6. Build `Table` objects with `_build_tables_from_snapshot()`: each table
+   keeps the columns the searches returned plus its [kept columns](#kept-columns).
 7. If no tables were found, return full snapshot with warning.
-8. On exception, log error and return empty `relevant_tables`.
+8. On exception, see [Error Handling](#error-handling).
+
+### Kept columns
+
+The `planning` search returns `planning_k` (12) entries across all the tables
+found, so a table often arrives with a few columns and none of its keys. On
+Pagila (29 tables), the 0.9.0 smoke test's question about films in the Sports
+category got `film` without `film_id` or `title` and `category` without `name`,
+and no join or answer could be validated (bug B103 in
+[Wave C, section 14](../wave_c.md#14-bugs-wave-c-fixes)). So a table cut to
+the search's columns also keeps (`_kept_columns`):
+
+- its primary key;
+- both sides of every join it is offered: the constrained columns of its
+  foreign keys and glossary joins into a readable table, and the referred
+  columns of a foreign key or glossary join into it from another table sent,
+  so every relationship in the schema block can be bound;
+- its label: a column named `name` or `title`, or `<table>_name` /
+  `<table>_title` (case ignored). An answer lists or filters by it far more
+  often than the search ranks it.
+
+A table sent whole (the full-snapshot path, or a table the search named with
+no column) is unchanged.
 
 ### Preferred tables
 
@@ -194,7 +224,15 @@ Key contracts:
 ## Error Handling
 
 - Exceptions are caught and logged via `logger.error`.
-- Returns empty `relevant_tables` with error reasoning; no `PipelineError` is emitted.
+- With a snapshot (the search failed, e.g. the embedding model could not
+  load), it does what the no-candidates path does: every table the caller may
+  read, a `SCHEMA_RETRIEVAL_FAILED` `RunWarning` with a fixed message (the
+  exception detail goes to the log only), and no error. Planning against no
+  tables fails every attempt (bug B105 in
+  [Wave C, section 14](../wave_c.md#14-bugs-wave-c-fixes)).
+- Without one (the snapshot itself could not be read), it returns empty
+  `relevant_tables` and a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` error with a
+  fixed message, which is not retryable: the SQL agent ends the sub-query before the planner.
 
 ---
 
@@ -244,7 +282,15 @@ Key contracts:
 
 - No tenant scoping in vector retrieval.
 - No caching of retrieved tables across retries.
-- Fallback to full schema can be expensive for large schemas.
+- Fallback to full schema can be expensive for large schemas. A failed search
+  falls back the same way, with no `full_snapshot_max_tables` cap, so a very
+  large schema may overflow the context.
+- A pruned table keeps its foreign-key columns for joins into any table the
+  caller can read, with no per-table cap; a wide fact table keeps them all.
+- The label rule goes by column name, so a label named otherwise
+  (`first_name`, `country`) is kept only when the search returns it. It also
+  strips one trailing `s` from the table name (`customers` matches
+  `customer_name`), so other plurals (`categories` and `category_name`) miss.
 
 ---
 
