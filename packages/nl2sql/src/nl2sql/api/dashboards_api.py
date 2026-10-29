@@ -1,10 +1,10 @@
 """``engine.dashboards``: dashboards pinned whole into workspaces (docs/architecture/wave_c.md, section 6).
 
 The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; D2 ``open``,
-``refresh`` and ``run_scheduled`` (``filter_values`` and the filters of ``refresh`` are D2b's stubs); D3 the
-starter dashboard, ``generate`` and ``suggest_questions``; D4 lets a conversation build and edit a draft
-(``create_draft``, and ``edit`` with a conversation). Every method takes the caller keyword-only and required (D130),
-except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
+``refresh`` and ``run_scheduled``; D2b ``filter_values`` and the filters of ``refresh``; D3 the starter dashboard,
+``generate`` and ``suggest_questions``; D4 lets a conversation build and edit a draft (``create_draft``, and ``edit``
+with a conversation). Every method takes the caller keyword-only and required (D130), except ``run_scheduled``, which
+runs each dashboard as its stored owner (D134).
 """
 from __future__ import annotations
 
@@ -114,7 +114,7 @@ class DashboardsAPI:
 
     def set_filters(self, dashboard_id: str, filters: List[DashboardFilter], *,
                     user_context: UserContext) -> Dashboard:
-        """Stores the dashboard's filter definitions (D2 applies their values)."""
+        """Stores the dashboard's filter definitions; ``refresh(filters=...)`` applies their values."""
         return self._service.set_filters(dashboard_id, filters, user_context=user_context)
 
     def set_schedule(self, dashboard_id: str, every_minutes: Optional[int], *,
@@ -162,20 +162,34 @@ class DashboardsAPI:
         A chart whose run fails (``error``) keeps its last good result too. A chart stopped at a cap ends the
         refresh.
 
+        ``filters`` maps filter ids to values (D117). Each is checked against the filter's kind before anything
+        runs, then added as a predicate (``between [a, b]`` is two comparisons, ``in`` is ORs, the values plan
+        literals) to every stored query that reads the filter's table; a query that does not read it runs
+        unfiltered, and a chart is ``filtered`` only when every active filter reached one of its queries. A
+        filtered refresh is returned and never stored: the stored results stay unfiltered.
+
         Raises:
             DashboardNotFound: it does not exist or is not the caller's.
             DashboardBusy: (a ``ValueError``) another caller or process is refreshing or editing it.
-            ValueError: ``tile_id`` is not one of its charts.
+            ValueError: ``tile_id`` is not one of its charts, a filter id is not the dashboard's, or a value has
+                the wrong type or count (the message names the filter).
         """
-        if filters:
-            raise arrives_with("engine.dashboards.refresh(filters=...)", "D2b")
         return self._service.refresh(dashboard_id, user_context=user_context, tile_id=tile_id, filters=filters,
                                      approvals=approvals)
 
     def filter_values(self, dashboard_id: str, filter_id: str, *, user_context: UserContext,
                       limit: int = 100) -> List[Any]:
-        """The distinct values of an ``in`` filter's column, or ``[min, max]`` of a ``between`` one."""
-        raise arrives_with("engine.dashboards.filter_values", "D2b")
+        """The distinct values of an ``in`` filter's column (up to ``limit``, 1 to 1,000, in order), or ``[min, max]``
+        of a ``between`` one; ``[]`` when there are none. A plan built in code, run as the caller through the same
+        supplied-plan path as a chart (the validator applies the caller's scope and policies), with no model call.
+        Dates come back as ISO text, so a value can be passed straight to ``refresh(filters=...)``.
+
+        Raises:
+            DashboardNotFound: it does not exist or is not the caller's.
+            ValueError: no such filter, ``limit`` out of range, or the caller cannot read the column (the message
+                says why).
+        """
+        return self._service.filter_values(dashboard_id, filter_id, user_context=user_context, limit=limit)
 
     def run_scheduled(self, *, now: Optional[datetime] = None) -> List[DashboardRun]:
         """Refreshes every dashboard whose schedule is due, each as its stored owner (D134). It has no caller;

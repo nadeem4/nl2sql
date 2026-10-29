@@ -18,14 +18,12 @@ from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.api.results_api import ResultsAPI
 from nl2sql.charts.spec import ChartSpec, ColumnKind
 from nl2sql.common.errors import ErrorCode
-from nl2sql.dashboards.models import ChartPlan, Dashboard, DashboardRun, Tile, TileRun, TileStatus
+from nl2sql.dashboards.filters import Active, plain, supply, values_plan
+from nl2sql.dashboards.models import Dashboard, DashboardFilter, DashboardRun, Tile, TileRun, TileStatus
 from nl2sql.dashboards.store import DashboardStore
 from nl2sql.events.catalog import DashboardRefreshed
 from nl2sql.hooks.approval import Approval
 from nl2sql.limits import describe
-from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
-from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
-from nl2sql.pipeline.pinned import SuppliedPlan
 from nl2sql.policies import UserContext
 
 # What an error code says about a chart: the caller may not read it, or the stored plan no longer validates.
@@ -55,12 +53,13 @@ class TileRunner:
         self._results = ResultsAPI(ctx)
 
     def run(self, tile: Tile, user: UserContext, *, execute: bool = True, approvals: Sequence[Approval] = (),
-            draw: bool = True) -> TileRun:
+            draw: bool = True, active: Sequence[Active] = ()) -> TileRun:
         """The chart's run. ``execute=False`` is the access check: the plan is validated and generated, not run.
-        ``draw=False`` leaves out the chart (a check's result is thrown away)."""
+        ``draw=False`` leaves out the chart (a check's result is thrown away). ``active`` are the filters (D117)
+        added to the plan as predicates before it goes to ``run_query``."""
         at = datetime.now(timezone.utc)
         try:
-            supplied = self._supplied(tile.plan)
+            supplied, every_filter = supply(tile.plan, active)
             result = self._queries.run_query(tile.question, plan=supplied, answer=False, execute=execute,
                                              user_context=user, approvals=list(approvals) or None)
         except ValueError as error:  # the stored plan does not parse, or run_query refuses it at the call
@@ -78,14 +77,25 @@ class TileRunner:
                                               "message": f"The chart could not be drawn: {exc}"}
         return TileRun(tile_id=tile.id, at=at, status=status, trace_id=result.trace_id or None, chart=chart,
                        explanation=_why(result) if status in ("ok", "empty") else None, column_kinds=kinds,
-                       error=error, approvals_needed=list(result.approvals_needed))
+                       filtered=every_filter, error=error, approvals_needed=list(result.approvals_needed))
 
-    @staticmethod
-    def _supplied(plan: ChartPlan) -> SuppliedPlan:
-        if plan.verified is not None:
-            return SuppliedPlan(verified=plan.verified, verified_datasource_id=plan.verified_datasource_id)
-        return SuppliedPlan(decomposition=DecomposerResponse.model_validate(plan.decomposition),
-                            plans={sub_query: PlanModel.model_validate(body) for sub_query, body in plan.plans.items()})
+    def values(self, f: DashboardFilter, user: UserContext, limit: int) -> List[Any]:
+        """A filter's values (``filter_values``): a plan built in code, run as the caller through ``run_query`` with
+        no model call. Raises ``ValueError`` when the run is not ``ok`` (denied, invalid, failed)."""
+        result = self._queries.run_query(f"The values of the {f.label} filter", plan=values_plan(f, limit),
+                                         answer=False, execute=True, user_context=user)
+        status, error = _classify(result)
+        if status not in ("ok", "empty"):
+            raise ValueError(f"The values of filter '{f.id}' ({f.label}) could not be read: "
+                             f"{(error or {}).get('message') or status}")
+        if status == "empty":
+            return []
+        page = self._results.page(result.trace_id, result.result_manifest[0].node_id,
+                                  limit=limit if f.op == "in" else 1, user_context=user)
+        rows = [[plain(v) for v in row] for row in page.rows]
+        if f.op == "between":
+            return rows[0] if rows and any(v is not None for v in rows[0]) else []
+        return [row[0] for row in rows if row and row[0] is not None]
 
     def _draw(self, tile: Tile, result: QueryResult, user: UserContext) -> ChartSpec:
         """The chart of the run ``user`` just asked: its results are readable by that caller only."""
@@ -167,27 +177,34 @@ class Refresher:
         return {tile.id: self._runner.run(tile, user, execute=False, draw=False) for tile in tiles}
 
     def run(self, dashboard: Dashboard, tiles: Sequence[Tile], user: UserContext, trigger: str,
-            approvals: Sequence[Approval] = (), announce: bool = True) -> DashboardRun:
+            approvals: Sequence[Approval] = (), announce: bool = True, active: Sequence[Active] = ()) -> DashboardRun:
         """Refresh ``tiles`` in layout order as ``user``; call it under the lock. A chart that needs approval or
-        fails keeps its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too."""
+        fails keeps its last result, and a chart stopped at a cap ends the refresh: the rest keep theirs too.
+        A run with ``active`` filters (D117) is a view for whoever asked: it is returned and never stored, so the
+        stored results stay the dashboard's own."""
         runs: List[TileRun] = []
         stopped = False
         for tile in tiles:
             if stopped:
                 run = TileRun(tile_id=tile.id, at=datetime.now(timezone.utc), status="stopped")
             else:
-                run = self._runner.run(tile, user, approvals=approvals)
+                run = self._runner.run(tile, user, approvals=approvals, active=active)
                 stopped = run.status == "stopped"
             runs.append(run)
-        self._store.put_runs(dashboard.id, [r for r in runs if r.status not in KEEPS_LAST])
-        done = DashboardRun(dashboard_id=dashboard.id, at=datetime.now(timezone.utc), trigger=trigger, tiles=runs)
+        if not active:
+            self._store.put_runs(dashboard.id, [r for r in runs if r.status not in KEEPS_LAST])
+        done = DashboardRun(dashboard_id=dashboard.id, at=datetime.now(timezone.utc), trigger=trigger, tiles=runs,
+                            filters={a.filter.id: a.values for a in active})
         if announce:
             self.announce(dashboard, done)
         return done
 
     def announce(self, dashboard: Dashboard, done: DashboardRun) -> None:
-        """Publish ``dashboard.refreshed`` for ``done``. ``run(..., announce=False)`` leaves it to the caller, who
-        may drop the dashboard before it is ever shown."""
+        """Publish ``dashboard.refreshed`` for ``done``, with the ids of the filters it applied.
+        ``run(..., announce=False)`` leaves it to the caller, who may drop the dashboard before it is ever shown."""
         self._ctx.bus.publish("dashboard.refreshed", DashboardRefreshed(
             dashboard_id=dashboard.id, trigger=done.trigger, counts=dict(Counter(r.status for r in done.tiles)),
-            filters=[]), tenant_id=dashboard.tenant_id or self._ctx.tenant_id)
+            filters=list(done.filters)), tenant_id=dashboard.tenant_id or self._ctx.tenant_id)
+
+    def values(self, f: DashboardFilter, user: UserContext, limit: int) -> List[Any]:
+        return self._runner.values(f, user, limit)

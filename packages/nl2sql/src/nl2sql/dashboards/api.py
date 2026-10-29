@@ -18,6 +18,7 @@ from nl2sql.common.errors import NoTiles, WorkspaceNotEmpty
 from nl2sql.conversations.models import Conversation
 from nl2sql.conversations.store import ConversationStore, Owner
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits, plan_from_step
+from nl2sql.dashboards import filters as filtering
 from nl2sql.dashboards.layout import arrange
 from nl2sql.dashboards.models import (
     Arrange, ChartChoice, Dashboard, DashboardEdit, DashboardFilter, DashboardInfo, DashboardRun, DashboardView,
@@ -226,10 +227,22 @@ class Dashboards:
                 filters: Optional[Dict[str, List[Any]]] = None, approvals: Sequence[Approval] = ()) -> DashboardRun:
         owner = self._owner(user_context)
         dashboard = self._store.get(dashboard_id, owner)
+        active = filtering.activate(dashboard.filters, filters)  # refused before anything runs
+        if active:  # a view for whoever asked: nothing is stored, so there is nothing to lock
+            return self._refresher.run(dashboard, self._chosen(dashboard, tile_id), user_context, "manual",
+                                       approvals=approvals, active=active)
         with self._refresher.locked(dashboard_id, len(dashboard.tiles)):
             dashboard = self._store.get(dashboard_id, owner)  # as it is now, under the lock
-            tiles = self._chosen(dashboard, tile_id)
-            return self._refresher.run(dashboard, tiles, user_context, "manual", approvals)
+            return self._refresher.run(dashboard, self._chosen(dashboard, tile_id), user_context, "manual",
+                                       approvals=approvals)
+
+    def filter_values(self, dashboard_id: str, filter_id: str, *, user_context: UserContext,
+                      limit: int = 100) -> List[Any]:
+        dashboard = self._store.get(dashboard_id, self._owner(user_context))
+        f = filtering.find(dashboard.filters, filter_id)
+        if not 1 <= limit <= filtering.MAX_VALUES_LIMIT:
+            raise ValueError(f"limit must be between 1 and {filtering.MAX_VALUES_LIMIT}, not {limit}.")
+        return self._refresher.values(f, user_context, limit)
 
     @staticmethod
     def _chosen(dashboard: Dashboard, tile_id: Optional[str]) -> List[Tile]:
