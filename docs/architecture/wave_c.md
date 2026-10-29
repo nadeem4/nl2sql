@@ -2372,6 +2372,12 @@ Date differences in plans (design 18.5). `ast_planner/functions.py`: `DATE_DIFF`
 
 Prompt fixes from the keyed Pagila rerun (design 18.7). `decomposer/prompts.py`: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final ranking as one sort op carrying `order_by` and `limit`). `answer_synthesizer/prompts.py`: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in `tests/unit/test_decomposer_tool_schema.py` and `tests/unit/test_node_answer_synthesizer.py`; no model call, so the effect shows only in the owner's next keyed run.
 
+### C-W6f
+
+Full-name alternatives for pagila_002 and pagila_003 (design 18.6). Data only: `alt_sql` and its regenerated `alt_rows` on the two cases in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` pins that each alternative's rows are the gold's, name for name, in the same order with the same figures.
+
+The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (enchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json, run 40954475050); the older records are untouched.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2639,6 +2645,21 @@ SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed tim
 no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
 rejects any other unit or shape, and a `-` between two date or timestamp columns, naming `DATE_DIFF` in the message
 (validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, `invariants.md`.
+
+### 18.6 C-W6f: full-name alternatives (pagila_002, pagila_003)
+
+Approved by the owner 2026-10-29. Both cases failed `result_match` in the keyed run ("rows differ", 5 rows against 5): the
+model wrote the person as one `first_name || ' ' || last_name` column where the gold has `first_name` and `last_name`. Run
+without a model on the test bed's Pagila, the gold and the generated SQL returned the same five people in the same order with
+the same totals (002: Curtis Irby 167.62, Troy Quigley 144.70, Derrick Bourque 95.78, Loretta Carpenter 93.78, Darrell Power
+91.75; 003: Gina Degeneres 753, Matthew Carrey 678, Mary Keitel 674, Angela Witherspoon 654, Walter Torn 640). Only the name
+shape differs, which the docs already name an accepted second answer
+([evaluation dataset](../testing/evaluation-dataset.md#when-to-add-one-and-when-not-to)): a real run produced it, the rows
+were read, it reads the same tables, and ties break on the key.
+
+Each case gets an `alt_sql`: the gold query with `first_name || ' ' || last_name AS customer` (or `AS actor`), the gold's
+joins, grouping and `customer_id` / `actor_id` tie-break, not the model's aliases or its name-based tie-break. `alt_rows`
+come from `engine.evals.regenerate`, not by hand. The gold data is not changed.
 
 ### 18.7 C-W6e: split only when needed, quote exact figures
 

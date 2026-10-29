@@ -46,3 +46,15 @@ def test_the_demo_does_not_copy_a_suite_for_a_database_it_does_not_have(tmp_path
 
     copied = {p.name for p in (tmp_path / "evals").iterdir()}
     assert "chinook.yaml" in copied and "pagila.yaml" not in copied
+
+
+@pytest.mark.parametrize("case_id", ["pagila_002", "pagila_003"])
+def test_a_person_in_one_full_name_column_is_an_accepted_answer(case_id):
+    """A run wrote the name as one column (C-W6f); the same people, order and totals as the gold's two columns."""
+    case = next(c for c in SUITE.cases if c.id == case_id)
+
+    assert len(case.alt_sql) == len(case.alt_rows) == 1
+    name, measure = case.alt_rows[0][0].keys()
+    assert [(r[name], r[measure]) for r in case.alt_rows[0]] == [
+        (f"{g['first_name']} {g['last_name']}", g[next(k for k in g if k not in ("first_name", "last_name"))])
+        for g in case.rows]
