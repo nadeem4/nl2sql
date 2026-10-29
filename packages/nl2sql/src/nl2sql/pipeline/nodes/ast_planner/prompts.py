@@ -175,6 +175,8 @@ PLANNER_SYSTEM_PROMPT = (
     "   DATE_PART(unit, date) returns an integer (DATE_PART('year', d) = 2011);\n"
     "   DATE_TRUNC(unit, date) returns the period's first day as 'YYYY-MM-DD'.\n"
     "   The unit is a string literal first argument: 'year', 'quarter', 'month' or 'day'.\n"
+    "   For the time between two dates, DATE_DIFF(unit, start, end) returns the whole days from start to"
+    " end as a number (unit 'day'); compare it with a number, and never subtract dates or timestamps.\n"
     "   Never use any other date or time function.\n"
     "13. A column's \"range\" is the [min, max] of the data it holds. When the question names a relative"
     " period (this year, last month, the last 30 days) that falls outside a date column's range, do not"

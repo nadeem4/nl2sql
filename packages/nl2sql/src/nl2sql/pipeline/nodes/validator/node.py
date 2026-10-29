@@ -13,12 +13,15 @@ from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.pipeline.nodes.ast_planner.functions import (
     ALLOWED_FUNCTIONS,
     DATE_UNITS,
+    DIFF_UNITS,
     LEGACY_FUNCTIONS,
+    date_diff,
     date_operation,
     is_allowed_function,
 )
 from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanModel, Expr
 from nl2sql.pipeline.nodes.generator.node import (
+    DATE_DIFF_USAGE,
     SUPPORTED_BINARY_OPS,
     GeneratorNode,
     MisplacedStar,
@@ -584,6 +587,16 @@ class LogicalValidatorNode:
         for node in _plan_exprs(plan):
             if node.kind != "func":
                 continue
+            diff = date_diff(node.func_name, node.args)
+            if diff is not None:
+                if diff[0] in DIFF_UNITS:
+                    continue
+                return PipelineError(
+                    node="logical_validator",
+                    message=f"Unsupported date operation {node.func_name}: {DATE_DIFF_USAGE}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                )
             date = date_operation(node.func_name, node.args)
             if date is None:
                 continue
@@ -600,6 +613,35 @@ class LogicalValidatorNode:
                 severity=ErrorSeverity.ERROR,
                 error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
             )
+        return None
+
+    @staticmethod
+    def _date_subtraction(state: SubgraphExecutionState, plan: PlanModel) -> Optional[PipelineError]:
+        """Rejects ``a - b`` of two date or timestamp columns.
+
+        It is an interval on some databases and text arithmetic on others, and an
+        interval cannot be compared with a number: use ``DATE_DIFF``.
+        """
+        types: Dict[str, Dict[str, str]] = {}
+        for ref in plan.tables:
+            for table in state.relevant_tables:
+                if (table.name or "").lower().split(".")[-1] == (ref.name or "").lower():
+                    types[ref.alias] = {c.name.lower(): (c.type or "").lower() for c in table.columns}
+
+        def is_date(operand: Optional[Expr]) -> bool:
+            if operand is None or operand.kind != "column":
+                return False
+            kind = types.get(operand.alias or "", {}).get((operand.column_name or "").lower(), "")
+            return "date" in kind or "time" in kind
+
+        for node in _plan_exprs(plan):
+            if node.kind == "binary" and node.op == "-" and is_date(node.left) and is_date(node.right):
+                return PipelineError(
+                    node="logical_validator",
+                    message=f"Dates cannot be subtracted: {DATE_DIFF_USAGE}",
+                    severity=ErrorSeverity.ERROR,
+                    error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                )
         return None
 
     @staticmethod
@@ -711,7 +753,8 @@ class LogicalValidatorNode:
         - Join alias validity.
         - No function named DISTINCT (it is the ``distinct`` flag).
         - Every other function name is a known one (``ast_planner.functions``).
-        - Date operations name a portable unit (year, quarter, month, day).
+        - Date operations name a portable unit (year, quarter, month, day), and
+          dates are never subtracted (``DATE_DIFF``).
         - Every binary operator is one the generator can render.
         - Column existence and scoping (via sqlglot's qualify optimizer).
         - The plan builds into a query at all (``_validate_buildable``): every
@@ -755,6 +798,10 @@ class LogicalValidatorNode:
         date_err = self._date_operations(plan)
         if date_err:
             errors.append(date_err)
+
+        subtraction_err = self._date_subtraction(state, plan)
+        if subtraction_err:
+            errors.append(subtraction_err)
 
         if state.sub_query and state.sub_query.expected_schema:
             expected_names = [c.name for c in state.sub_query.expected_schema if c.name]

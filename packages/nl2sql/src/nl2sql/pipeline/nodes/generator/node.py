@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.datasources import DatasourceRegistry
 from nl2sql.common.logger import get_logger
-from nl2sql.pipeline.nodes.ast_planner.functions import DATE_UNITS, date_operation
+from nl2sql.pipeline.nodes.ast_planner.functions import DATE_UNITS, DIFF_UNITS, date_diff, date_operation
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel, Expr, TableRef
 from nl2sql.pipeline.nodes.generator.schemas import GeneratorResponse
 from nl2sql.runtime import Runtime
@@ -114,6 +114,11 @@ def portable_date(kind: str, unit: str, operand: exp.Expression) -> exp.Expressi
         return exp.Cast(this=exp.Extract(this=var, expression=operand), to=exp.DataType.build("INT"))
     return exp.TimeToStr(this=exp.TimestampTrunc(this=operand, unit=var), format=exp.Literal.string("%Y-%m-%d"))
 
+
+DATE_DIFF_USAGE = (
+    "the difference between two dates is DATE_DIFF(unit, start, end), the whole days from start "
+    "to end as a number; the unit is the string literal 'day'. Never subtract dates."
+)
 
 _MIRRORED_JOIN = {"left": "right", "right": "left"}
 
@@ -231,6 +236,13 @@ class SqlVisitor:
         """Converts a function call expression to sqlglot."""
         if str(expr.func_name).upper() in ("TUPLE", "LIST"):
             return exp.Tuple(expressions=[self.visit(arg) for arg in expr.args])
+
+        diff = date_diff(expr.func_name, expr.args)
+        if diff is not None:
+            unit, start, end = diff
+            if unit not in DIFF_UNITS:
+                raise ValueError(f"Unsupported date operation {expr.func_name}: {DATE_DIFF_USAGE}")
+            return exp.DateDiff(this=self.visit(end), expression=self.visit(start), unit=exp.Var(this=unit.upper()))
 
         date = date_operation(expr.func_name, expr.args)
         if date is not None:

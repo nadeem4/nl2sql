@@ -301,6 +301,7 @@ every database:
 | :--- | :--- | :--- |
 | `DATE_PART(unit, date)`, unit `year`, `quarter`, `month`, `day` | INTEGER | `2011` |
 | `DATE_TRUNC(unit, date)`, same units | ISO date string `YYYY-MM-DD` | `'2011-04-01'` |
+| `DATE_DIFF('day', start, end)` | INTEGER, whole days from start to end | `3` |
 
 The engine already wraps a date part in `CAST(... AS INT)` and a truncation
 in a `YYYY-MM-DD` format; an adapter that rewrites the inner nodes keeps
