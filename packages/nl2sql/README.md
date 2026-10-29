@@ -19,7 +19,7 @@ databases, nothing to install.
 The server holds no API key: you paste your own into the page, one per
 provider, and it stays in that browser tab, is used in memory for the question
 that needs it, and is never stored, logged or traced. Settings also puts each
-of the six model-using steps on a provider and model of its own.
+of the seven model-using steps on a provider and model of its own.
 
 ![The nl2sql playground on its Ask page: the search index over three databases and a switcher for whichever of their schemas to read on the left, the question box and the guided questions on the right](https://raw.githubusercontent.com/nadeem4/nl2sql/main/docs/assets/screenshots/playground-overview.png)
 

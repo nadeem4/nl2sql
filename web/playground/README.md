@@ -60,7 +60,7 @@ that write only to this tab's `sessionStorage`, never to the server:
   `<details>` card, open from the start at 1060px and wider (where it sits
   beside the key card) and shut on a narrower window; its summary says what the
   steps will use. Each
-  of the six model steps has a selector over the same catalogue the local page
+  of the seven model steps has a selector over the same catalogue the local page
   offers, which hosted mode's `GET /api/settings` now carries (`nodes` and
   `providers`, and still not a key of any kind). The choices travel as one
   `X-NL2SQL-Models` header, `{"astplanner":"anthropic:claude-opus-5"}`, which

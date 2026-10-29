@@ -12,7 +12,7 @@ import pytest
 
 from nl2sql.config import Curated
 from nl2sql.llm.providers import LLM_AGENTS
-from nl2sql.pipeline.steps import PIPELINE_STEPS, SQL_AGENT_STEP, describe_pipeline
+from nl2sql.pipeline.steps import INSIDE_A_NODE, PIPELINE_STEPS, SQL_AGENT_STEP, describe_pipeline
 from nl2sql.testing.runtime import fake_runtime
 
 CURATED = Curated.model_validate({"datasources": {"ds": {"verified_queries": [
@@ -50,17 +50,25 @@ def graph_nodes(monkeypatch):
 def test_every_graph_node_is_described_and_nothing_else_is(graph_nodes):
     top, inner = graph_nodes
 
-    described = {step.node for step in PIPELINE_STEPS}
+    described = {step.node for step in PIPELINE_STEPS if step.node not in INSIDE_A_NODE}
 
     # The subgraph is one node of the control graph and a step of its own; its
     # children are described under it.
     assert described == (top | inner)
 
 
+def test_a_model_call_inside_a_node_is_described_beside_the_node_that_makes_it():
+    order = [step.node for step in PIPELINE_STEPS]
+
+    assert INSIDE_A_NODE == {"table_selector": "schema_retriever"}
+    for call, host in INSIDE_A_NODE.items():
+        assert order.index(host) < order.index(call)
+
+
 def test_the_subgraph_children_are_the_steps_nested_under_it(graph_nodes):
     _, inner = graph_nodes
 
-    nested = {step.node for step in PIPELINE_STEPS if step.parent == SQL_AGENT_STEP}
+    nested = {step.node for step in PIPELINE_STEPS if step.parent == SQL_AGENT_STEP and step.node not in INSIDE_A_NODE}
 
     assert nested == inner
 

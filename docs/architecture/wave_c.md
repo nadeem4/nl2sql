@@ -2269,6 +2269,56 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
   second plan answers 59 after one retry).
 - **D3.** Its templates now write the row count as `COUNT(*)` (the `COUNT(1)` note under D3 is superseded).
 
+### C-W4
+
+Table recall on large schemas (bug B106 in section 14, design in section 17). This PR passed 1,000 changed lines
+without its fixtures, so, as 17.7 says, the Pagila suite is a second PR; this one is the retriever, the selector, the
+join-path fill and the eval wiring they need.
+
+- **Retriever** (`schema_retriever/node.py`). Past `full_snapshot_max_tables`, and never for a pinned plan, the tables sent
+  are the union of the vector search, the matched glossary terms' tables, the selector's picks and the join-path fill
+  (17.3). `match_terms` moved out of `_knowledge_used` into `_matched_terms`, which runs once before retrieval; the
+  terms go to `_retrieve` and on to `_knowledge_used`. `SchemaRetrieverNode.__call__` re-raises `LimitReached` and
+  `RunCancelled` before its blanket `except Exception`, so the whole-snapshot fallback never plans on after a stop.
+  `_build_tables_from_snapshot` takes `keys_only`: a table in it with no columns of its own gets its kept columns
+  (key, join columns, label), not every column, which is how a bridge table stays small. The `retrieval` record's
+  tables keep `table` and `columns` and gain `steps` (`vector`, `glossary`, `selector`, `join_path`).
+- **Selector** (`schema_retriever/selector.py`). `TableSelector.pick` is `TABLE_SELECTOR_PROMPT | structured(llm,
+  TableSelection)`, the `curated_matcher` template; the model is built on the first call
+  (`get_llm("tableselector")`), never in `__init__`, so `table_selector: false` and `evaluation/seed.py` need no key.
+  The catalog (name, description cut to 200 characters, column names) is JSON under `[TABLES]`, beside
+  `[BUSINESS_CONTEXT]` (the matched terms) and `[ALREADY_SELECTED]`. A name outside the catalog is dropped; a failure
+  logs a warning and costs only the selector's tables. Settings `table_selector`, `selector_catalog_max` and
+  `join_path_max_hops` are in `RetrievalSettings`; `table_selector` is an `AgentName` and `LLM_AGENTS` entry.
+- **Join path** (`schema_retriever/join_path.py`). `connect(adjacency, chosen, max_hops)` is the approximate Steiner
+  tree: it merges the two nearest groups by a BFS shortest path until the nearest is past `max_hops`. Starting from
+  singleton groups, not from one seed, means a chosen table with no foreign key (a view) does not stop the others
+  connecting.
+- **Mode retrieval** is still model-free: `RETRIEVAL_CHANGES` also sets `settings.retrieval.table_selector` to false and
+  `retrieval_settings()` reports it and `join_path_max_hops`.
+- **Tests.** `tests/unit/test_table_recall.py` (the smoke question, per-table steps, join path alone, hop limit, a
+  view with no key, bridge columns, selector columns up to and past 40, a hidden table in the catalog, the result and a
+  path, a raising selector, an unknown name, an empty pick, glossary tables with no selector, the prompt, the catalog
+  cap, no call at or below the threshold or for a pinned plan, `LimitReached` ending the run, no model with the selector
+  off, the model built once), and `tests/unit/pagila_snapshot.py`, Pagila's tables and foreign keys, which the
+  suite's test in the second PR shares. `test_pipeline_steps.py` and the three playground tests follow the new agent.
+- **Where the code differs from 17.**
+  - The catalog names a table as the snapshot does (`[public].[film]`), and the selector's answer is matched to it
+    ignoring case.
+  - `table_selector` is a step in `PIPELINE_STEPS` (the Pipeline page lists its model) but not a graph node:
+    `INSIDE_A_NODE` names it as a call inside `schema_retriever`, and the graph-shape test excludes it.
+  - The vector-picked tables' planning search is unchanged (it runs over them alone, before the other steps); a
+    selector pick past 40 columns gets one more planning search of its own, so a wide table is not cut to its keys.
+  - A table a term names without a column is sent as a vector pick is (whole, unless the planning search named some of
+    its columns); a term's column keeps the table to that column plus the keys when nothing else named it.
+  - The Pagila fixture has the 15 base tables and 7 views (22 tables, still past 15), not the 29 of the smoke run: the
+    pinned dump's payment partitions are not in it.
+  - The model-free Pagila baseline is a follow-up: neither the `realdb` workflow nor the snapshot fixture runs the
+    retrieval mode (it needs the Pagila schema indexed with embeddings), so no floor is recorded.
+- **Still to do.** The Pagila suite (second PR). Then the owner's keyed run on the test bed's Pagila with the selector
+  on (17.5): regenerate the suite's rows, run mode full, and for any gold table not sent read the trace's per-table
+  `steps` before closing B106.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2279,7 +2329,7 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
 | B103 | On a large schema the schema retriever cuts each table to the columns the `planning` search returned (`planning_k` 12 across up to 8 tables), so a table can arrive without its keys or label: the 0.9.0 smoke test on Pagila (29 tables) got `film` without `film_id`/`title` and `category` without `name`, and every plan failed `COLUMN_NOT_FOUND` or "Join does not match any allowed relationship" until `PIPELINE_TIMEOUT`. Fixed: a pruned table also keeps its primary key, both sides of every join it is offered, and its `name`/`title` label | `schema_retriever/node.py` `_build_tables_from_snapshot` (only `resolved_columns` kept); the smoke run's `retrieval` trace record | 0.9.0 smoke fix |
 | B104 | A pipeline timeout inside a conversation turn ends the turn `CANCELLED` and the model never replies: the runtime cancels the token it was given on a timeout, and that was the turn's own, so the loop stopped and `_finish` overwrote the step's `PIPELINE_TIMEOUT`; through `stream()` the turn was dropped and never stored. MCP `ask` showed the same mismatch. Fixed: each `ask` step runs on a child of the turn's token (`CancellationToken.child()`), so a timeout fails only that step and the model still gets its reply call, while a user's cancel still reaches the step and ends the turn `CANCELLED`. The planner also lets `RunCancelled` through instead of logging it as "Planner failed". A step that stops at `max_llm_calls` or `max_cost_usd` no longer cancels the turn token (`Budget.bind` now cancels the step's child), so `stream()` stores that turn with the step `stopped` instead of dropping it; each step's child is released after the step | `pipeline/runtime.py` (`token.cancel()` on timeout), `conversations/api.py` (`_ask` passed `run.token`; `_by_model`, `_finish`), 0.9.0 pre-release smoke test | fix PR (after C-W3) |
 | B105 | A schema retrieval that raises (the smoke test's ONNX embedding model failing to load with "bad allocation") returns no tables and no error, so the planner plans blind and every retry fails `TABLE_NOT_FOUND` until `PIPELINE_TIMEOUT`. Fixed: with a snapshot it sends every table the caller may read with a `SCHEMA_RETRIEVAL_FAILED` warning, as the no-candidates path does; without one a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` ends the sub-query before the planner | `schema_retriever/node.py` `__call__` (`except Exception` returning `relevant_tables: []`) | 0.9.0 smoke fix |
-| B106 | On a schema over `full_snapshot_max_tables`, retrieval sends only the `table_k` (8) tables nearest the question, so a table whose name is far from the question's words never arrives: the 0.9.0 smoke test on Pagila (29 tables) never got `payment` for "top 5 films by revenue in the top category", and the planner asked a clarifying question instead of summing `payment.amount` | `schema_retriever/node.py` (vector search only; no join-graph walk); the smoke run's `retrieval` trace record | C-W4 (section 17) |
+| B106 | On a schema over `full_snapshot_max_tables`, retrieval sends only the `table_k` (8) tables nearest the question, so a table whose name is far from the question's words never arrives: the 0.9.0 smoke test on Pagila (29 tables) never got `payment` for "top 5 films by revenue in the top category", and the planner asked a clarifying question instead of summing `payment.amount`. Fixed: past the threshold the retriever also adds the glossary's tables, the tables a model picks from a catalog (`table_selector`) and the tables that join them from the foreign-key graph (`join_path_max_hops`); a keyed run on the test bed's Pagila is the owner's to confirm | `schema_retriever/node.py` (vector search only; no join-graph walk); the smoke run's `retrieval` trace record | C-W4 (section 17) |
 
 Bugs are numbered from B100, as decisions are from D100, so they never
 collide with Wave B's (B31 onwards).

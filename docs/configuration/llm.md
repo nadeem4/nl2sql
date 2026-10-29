@@ -297,7 +297,7 @@ Nothing is retried without the parameter: what the config says is what is sent.
 
 ## Per-node models
 
-The six pipeline nodes that call a model, the profiler's drafts, eval
+The pipeline's model calls (six nodes, and the table selector inside schema retrieval), the profiler's drafts, eval
 seeding and the conversation each have an agent. An agent not under `agents` runs on the top level:
 
 | `agents` key | node |
@@ -305,6 +305,7 @@ seeding and the conversation each have an agent. An agent not under `agents` run
 | `curated_matcher` | picks the verified query that answers the question, if any (one short call; only when [curated answers](curated.md) are configured and a candidate clears the floor) |
 | `datasource_resolver` | checks that the connected data can answer the question at all (one short call; refuses with `QUESTION_NOT_ANSWERABLE`) |
 | `decomposer` | splits the question into sub-queries |
+| `table_selector` | picks the tables a question needs from a catalog of every table the caller may read, on a schema past `settings.retrieval.full_snapshot_max_tables` (one call per sub-query; never on a small schema or a pinned plan; off with `settings.retrieval.table_selector: false`). A small model is enough. It is built on its first call, so a project that turns it off needs no key for it |
 | `ast_planner` | writes the query plan (the largest prompt: it carries the schema) |
 | `refiner` | explains a failed plan so the planner can retry |
 | `answer_synthesizer` | writes the final answer from the rows |
@@ -360,7 +361,7 @@ The playground's **Pipeline** page reads the same configuration back: it lists
 every step of a run and, for each of the six a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by `GET /api/pipeline` from `engine.about()`, whose steps
-(`nl2sql.pipeline.steps`) take their six model steps from `LLM_AGENTS` rather
+(`nl2sql.pipeline.steps`) take their seven model steps from `LLM_AGENTS` rather
 than repeating the table above. See [the Pipeline page](../getting_started/demo.md#the-pipeline-page).
 
 On the **hosted demo** (`nl2sql demo --hosted`) the same choice is offered and

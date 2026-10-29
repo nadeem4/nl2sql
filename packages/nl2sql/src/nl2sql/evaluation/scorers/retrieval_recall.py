@@ -7,7 +7,8 @@ much was sent, since sending everything would score 1.0.
 In mode ``full`` what was sent is read from the run's schema retriever. In
 mode ``retrieval`` no model runs: :func:`sent` runs the retriever the way the
 pipeline does, with the vector search forced on (Chinook's 11 tables are
-under the full-snapshot limit that would skip it), and the retriever's query
+under the full-snapshot limit that would skip it) and the table selector off
+(it is a model call), so the run is the floor without the model, and the retriever's query
 is the question alone, since the decomposer that would add to it is a model.
 :func:`routed` ranks the datasources for the ``routing`` scorer with the
 resolver's routing (``Retriever.route`` and ``settings.routing``), without its
@@ -23,7 +24,10 @@ from nl2sql.evaluation.suite import EvalCase
 from nl2sql.policies import UserContext
 
 # Mode retrieval's runtime: the vector search runs on a schema of any size.
-RETRIEVAL_CHANGES: Dict[str, Any] = {"settings.retrieval.full_snapshot_max_tables": 0}
+# No model runs in this mode, so the table selector (a model call) is off: the run covers the vector search,
+# the glossary's tables and the join-path fill, and records the floor without the model (C-W4).
+RETRIEVAL_CHANGES: Dict[str, Any] = {"settings.retrieval.full_snapshot_max_tables": 0,
+                                     "settings.retrieval.table_selector": False}
 
 
 def recall(case: EvalCase, sent_tables: Dict[str, List[str]]) -> Dict[str, Any]:
@@ -85,4 +89,5 @@ def retrieval_settings(ctx: Any) -> Dict[str, Any]:
     retrieval = ctx.settings.retrieval
     return {"table_k": retrieval.table_k, "planning_k": retrieval.planning_k,
             "fetch_multiplier": ctx.vector_store.FETCH_MULTIPLIER, "lambda_mult": ctx.vector_store.LAMBDA_MULT,
-            "full_snapshot_max_tables": 0, "query": "question"}
+            "full_snapshot_max_tables": 0, "table_selector": retrieval.table_selector,
+            "join_path_max_hops": retrieval.join_path_max_hops, "query": "question"}

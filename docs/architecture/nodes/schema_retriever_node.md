@@ -17,6 +17,10 @@
 - Resolve authoritative tables from `SchemaStore`.
 - Fall back to full schema snapshot when retrieval returns no candidates or
   the search fails; see [Error Handling](#error-handling).
+- On a schema past `full_snapshot_max_tables`, send the tables the question
+  needs, not only the ones nearest its words: the glossary's, a model's picks
+  from a catalog, and the tables that join them; see
+  [Table recall on large schemas](#table-recall-on-large-schemas).
 - Keep the columns a join or an answer needs on a table cut to the columns
   the search returned; see [Kept columns](#kept-columns).
 - Rank the datasource's `preferred_tables` first and set `preferred=True` on
@@ -74,6 +78,8 @@ From `Runtime`:
 
 - `knowledge` (optional): the run's pinned `Knowledge`; none means no glossary
 - `settings.knowledge`: `top_k` and `block_max_chars`
+- `llm_registry` (optional): the table selector's model, agent `table_selector`
+  (node name `tableselector`); asked for on the first selector call only
 - `vector_store` (optional)
 - `state` (the state store; required for authoritative resolution)
 - `ds_registry` (optional): `get_preferred_tables(datasource_id)`, `get_dialect(datasource_id)` (for derived date roles)
@@ -110,14 +116,57 @@ Side effects:
 ## Internal Flow (Step-by-Step)
 
 1. Build semantic query with `_build_semantic_query()`.
-2. Retrieve table/metric chunks via `retrieve_schema_context()`, `k = settings.retrieval.table_k` (8).
-3. If no table chunks, retrieve columns via `retrieve_column_candidates()`, `k = table_k`.
-4. If tables are identified, retrieve columns/relationships via `retrieve_planning_context()`, `k = settings.retrieval.planning_k` (12).
-5. Resolve schema snapshot via `_resolve_snapshot()`.
-6. Build `Table` objects with `_build_tables_from_snapshot()`: each table
+2. Resolve schema snapshot via `_resolve_snapshot()`, and match the glossary's
+   terms once (`_matched_terms()`); `_knowledge_used()` sends the same terms.
+3. Past `full_snapshot_max_tables` (and not for a pinned plan):
+   1. Retrieve table/metric chunks via `retrieve_schema_context()`, `k = settings.retrieval.table_k` (8).
+   2. If no table chunks, retrieve columns via `retrieve_column_candidates()`, `k = table_k`.
+   3. If tables are identified, retrieve columns/relationships via `retrieve_planning_context()`, `k = settings.retrieval.planning_k` (12).
+   4. Add the matched terms' tables, the table selector's picks and the join-path fill; see
+      [Table recall on large schemas](#table-recall-on-large-schemas).
+4. Build `Table` objects with `_build_tables_from_snapshot()`: each table
    keeps the columns the searches returned plus its [kept columns](#kept-columns).
-7. If no tables were found, return full snapshot with warning.
-8. On exception, see [Error Handling](#error-handling).
+5. If no tables were found, return full snapshot with warning.
+6. On exception, see [Error Handling](#error-handling).
+
+### Table recall on large schemas
+
+Wave C, C-W4 ([design](../wave_c.md#17-c-w4-table-recall-on-large-schemas)).
+A missing table guarantees a wrong answer; an extra one costs some prompt. On
+Pagila (29 tables) the question "top 5 films by revenue in the top category"
+never got `payment`: "revenue" is not near that table, and the chain is
+`film -> inventory -> rental -> payment`. Past `full_snapshot_max_tables`, the
+tables sent are the union of four steps, per sub-query and per datasource:
+
+1. **Vector search**, as above.
+2. **Glossary terms.** Each matched term's `tables`, and the table of each of
+   its `columns`, are added, and the named columns kept. A table the caller
+   cannot read is never added.
+3. **The table selector**, one model call (`settings.retrieval.table_selector`,
+   on by default; agent `table_selector`). The catalog lists every table the
+   caller may read: its name, its description cut to 200 characters, its column
+   names, as JSON values under `[TABLES]`, with the question, the matched
+   terms and the tables steps 1 and 2 chose. Past
+   `settings.retrieval.selector_catalog_max` (200) readable tables the catalog
+   is the nearest that many by vector search. The model returns table names;
+   a name not in the catalog is dropped, and an empty answer is fine. A table it
+   picks keeps all its columns, up to 40; a wider one keeps what the planning
+   search returned plus its keys. A failed call (an invalid answer after the
+   agent's parse retries, a provider error) is logged and costs only the
+   selector's tables; a run limit (`LimitReached`) or a cancel is not swallowed
+   and ends the run. The call counts against `max_llm_calls` and `max_cost_usd`.
+   The model is built on the first call, so `table_selector: false` needs no key.
+4. **Join-path fill.** The tables from steps 1 to 3 are connected through a graph of
+   the tables the caller may read, whose edges are foreign keys and glossary
+   joins: repeatedly the two nearest unconnected groups are joined by a shortest
+   path (an approximate Steiner tree, in `join_path.py`). A path longer than
+   `settings.retrieval.join_path_max_hops` (4) is not added. A bridge table
+   keeps its [kept columns](#kept-columns) only: key, join columns, label.
+
+Nothing changes at or below the threshold, or for a pinned plan: every table is
+sent and no selector call is made. The `retrieval` record lists, for each table
+sent, the `steps` that added it (`vector`, `glossary`, `selector`,
+`join_path`), so a missed answer is traced to its cause.
 
 ### Kept columns
 
@@ -257,7 +306,8 @@ Key contracts:
 - Returns a `retrieval` record in its update (not a state field, so LangGraph
   drops it; the run trace keeps it): the query text embedded, each search's
   pool with scores, the MMR picks in order and what was dropped, and the tables
-  and columns sent to the planner; or, when the schema is small enough to send
+  and columns sent to the planner, each table with the `steps` that added it
+  when the schema is past the threshold; or, when the schema is small enough to send
   whole, `skipped: true` and why. Column entries of a table the role cannot read
   keep their name and rank but lose their scores (their embedded text holds
   sample values). See [Debugging a run](../../observability/debugging.md#retrieval).
@@ -266,7 +316,8 @@ Key contracts:
 
 ## Configuration
 
-- `settings.retrieval.full_snapshot_max_tables`, `table_k` and `planning_k` (see [Settings](../../configuration/settings.md#retrieval)).
+- `settings.retrieval.full_snapshot_max_tables`, `table_k`, `planning_k`, `table_selector`, `selector_catalog_max` and `join_path_max_hops` (see [Settings](../../configuration/settings.md#retrieval)).
+- The `table_selector` agent under `llm.agents` (see [LLM](../../configuration/llm.md#per-node-models)).
 - Vector store configuration is set in `Runtime`.
 
 ---
@@ -297,4 +348,6 @@ Key contracts:
 ## Related Code
 
 - `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py`
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/selector.py` (the prompt, `TableSelection`)
+- `packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/join_path.py`
 - `packages/nl2sql/src/nl2sql/indexing/retrieval.py`

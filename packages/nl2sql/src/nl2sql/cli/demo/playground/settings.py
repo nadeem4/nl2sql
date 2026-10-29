@@ -73,6 +73,9 @@ _NODE_TEXT = {
                             "Refuses a question the connected data cannot answer, before anything else runs. "
                             "A short prompt."),
     "decomposer": ("Question splitter", "Breaks the question into sub-queries. A short prompt."),
+    "table_selector": ("Table selection",
+                       "Picks the tables a question needs from a catalog of every table, on a schema too big to "
+                       "send whole. A short prompt."),
     "ast_planner": ("Query planner",
                     "Turns each sub-query into a plan. Decides whether the SQL is right; most of the tokens."),
     "refiner": ("Plan repair", "Rewrites a plan the validator rejected. Runs only on a retry."),

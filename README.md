@@ -506,9 +506,9 @@ nl2sql run "How many customers are there?"
 `temperature: null`), `openrouter` (OpenAI-compatible gateway, default
 `anthropic/claude-sonnet-4.5`) and `ollama` (local; small models often cannot
 fill the recursive plan schema). Those defaults are what `nl2sql init` and
-`nl2sql demo` write. Each of the six model-using steps can have its own
+`nl2sql demo` write. Each of the seven model-using steps can have its own
 provider and model under `agents`: `curated_matcher`, `datasource_resolver`, `decomposer`,
-`ast_planner`, `refiner` and `answer_synthesizer`, plus `profiler`
+`table_selector`, `ast_planner`, `refiner` and `answer_synthesizer`, plus `profiler`
 for optional schema descriptions drafted for review (`nl2sql index` calls no
 model).
 

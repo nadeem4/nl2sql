@@ -63,7 +63,8 @@ def test_mode_retrieval_asks_the_retriever_about_the_cases_datasource_with_the_s
     asked = []
 
     def sent(run, case, role):
-        asked.append((case.id, case.datasources[0], role, run.settings.retrieval.full_snapshot_max_tables))
+        asked.append((case.id, case.datasources[0], role, run.settings.retrieval.full_snapshot_max_tables,
+                      run.settings.retrieval.table_selector))
         return {"Customer": ["CustomerId", "FirstName", "LastName"], "Invoice": ["CustomerId", "Total"]}
 
     monkeypatch.setattr(rr, "sent", sent)
@@ -73,13 +74,20 @@ def test_mode_retrieval_asks_the_retriever_about_the_cases_datasource_with_the_s
     report = run_module.run_evals(ctx, [suite], mode="retrieval", scorers=["retrieval_recall", "routing"],
                                   curated=True)
 
-    assert asked == [("chinook_002", "chinook", "admin", 0)]
-    assert ctx.settings.retrieval.full_snapshot_max_tables == 15
+    # No model runs in mode retrieval, so the table selector is off for it (C-W4) and on for the engine.
+    assert asked == [("chinook_002", "chinook", "admin", 0, False)]
+    assert ctx.settings.retrieval.full_snapshot_max_tables == 15 and ctx.settings.retrieval.table_selector is True
     board = report.configs["retrieval"]
     assert board["retrieval"]["column_recall"] == 1.0
     # Shortlisted, but ranked second: routing's top-1 is part of the verdict.
     assert board["scores"]["routing"]["failed"] == 1
     assert board["routing"] == {"cases": 1, "top1": 0.0, "shortlist": 1.0}
+
+
+def test_the_settings_a_retrieval_report_names_say_the_selector_was_off():
+    ctx = fake_runtime(vector_store=SimpleNamespace(FETCH_MULTIPLIER=4, LAMBDA_MULT=0.7)).derive(rr.RETRIEVAL_CHANGES)
+
+    assert rr.retrieval_settings(ctx)["table_selector"] is False
 
 
 def _report(table=0.9, column=0.6):
