@@ -7672,7 +7672,7 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
   &lt;code&gt;retrieval_settings()&lt;/code&gt; reports it and &lt;code&gt;join_path_max_hops&lt;/code&gt;.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Suite&lt;/strong&gt; (&lt;code&gt;evaluation/suites/pagila.yaml&lt;/code&gt;, the second PR). 11 approved cases over the test bed's Pagila, gold SQL and
   tables, the smoke question first. &lt;code&gt;test_pagila_suite_reads_the_tables_it_names&lt;/code&gt; parses each gold SQL with sqlglot and
-  holds &lt;code&gt;tables&lt;/code&gt; equal to the tables it reads. The cases have no &lt;code&gt;rows&lt;/code&gt;: &lt;code&gt;regenerate&lt;/code&gt; writes them against the test bed.&lt;/li&gt;
+  holds &lt;code&gt;tables&lt;/code&gt; equal to the tables it reads. The cases carry &lt;code&gt;rows&lt;/code&gt;, written by &lt;code&gt;regenerate&lt;/code&gt; against the test bed's Pagila (2026-10-29).&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Tests.&lt;/strong&gt; &lt;code&gt;tests/unit/test_table_recall.py&lt;/code&gt; (the smoke question, per-table steps, join path alone, hop limit, a
   view with no key, bridge columns, selector columns up to and past 40, a hidden table in the catalog, the result and a
   path, a raising selector, an unknown name, an empty pick, glossary tables with no selector, the prompt, the catalog
@@ -7697,8 +7697,13 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
   drops them. The selector's call carries &lt;code&gt;metadata["langgraph_node"] = "table_selector"&lt;/code&gt;, so usage, the Pipeline page
   and &lt;code&gt;models_by_node&lt;/code&gt; attribute it to its own step. Each trace table also carries &lt;code&gt;qualified&lt;/code&gt;, so two schemas with one
   table name stay apart. &lt;code&gt;test_schema_retriever_keys.py&lt;/code&gt; now uses the shared Pagila fixture.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Still to do (owner).&lt;/strong&gt; The keyed run on the test bed's Pagila with the selector on (17.5): regenerate the suite's
-  rows, run mode full, and for any gold table not sent read the trace's per-table &lt;code&gt;steps&lt;/code&gt; before closing B106.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Keyed run (2026-10-29).&lt;/strong&gt; GCP test bed Pagila (29 tables), model claude-opus-5 (Anthropic), mode full, selector on,
+  empty glossary; $2.70 spent, stopped at the $3 cap after 8 of 11 cases. Table recall 100% and column recall 100% on
+  all 8 (tables sent 10-18, mean 13.1), including pagila_001, the smoke question. Answers 0 of 8 passed: 5 hit
+  PIPELINE_TIMEOUT (60 s), 3 finished and were failed on faithfulness (the scorer did not match comma-formatted numbers
+  such as "3,094.78"; pagila_005's rows matched the gold rows, so it failed on faithfulness alone; pagila_004 grouped by title with an extra count column; pagila_007's
+  monthly totals differ from the gold rows, cause not yet known). C-W4's goal (recall) is met; answer quality on large
+  schemas is row C-W6.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;

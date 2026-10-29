@@ -6124,8 +6124,9 @@ category" needs <code>film</code>, <code>film_category</code>, <code>category</c
 <code>payment</code>. <code>tables</code> and <code>columns</code> are what the gold SQL reads, and
 <code>test_pagila_suite_reads_the_tables_it_names</code> keeps the two equal.</p>
 <p><code>nl2sql init --demo</code> does not copy it into the demo, which has no Pagila. The cases
-have SQL and no <code>rows</code>: point a suite file at the test bed and run
-<code>engine.evals.regenerate</code>, then review the rows, before a full run. Mode
+carry the <code>rows</code> that <code>engine.evals.regenerate</code> wrote from the gold SQL on the
+test bed's Pagila. After you edit a case, point a suite file at the test bed
+and run <code>regenerate</code> again, then review the rows, before a full run. Mode
 retrieval needs no rows.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--suite<span class="w"> </span>pagila.yaml<span class="w"> </span>--out<span class="w"> </span>eval_pagila.json<span class="w">   </span><span class="c1"># no key: the floor, without the table selector</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--suite<span class="w"> </span>pagila.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">                  </span><span class="c1"># with the selector: every gold table should be sent</span>
