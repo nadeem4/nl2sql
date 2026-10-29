@@ -5872,6 +5872,11 @@ earlier question.</p>
   <code>error</code> holds <code>{"code", "message"}</code> when the loop itself ended it (<code>MODEL_STEP_INVALID</code>, or
   <code>RUN_LIMIT_REACHED</code> for <code>stopped</code>, or the <code>PROVIDER_*</code> code when the model provider refused a step). A <code>cancellation_token</code> that is cancelled ends the turn <code>error</code> with
   <code>CANCELLED</code> after the step in flight.</li>
+<li>A timeout is not a cancel. Each <code>ask</code> step runs on its own token, a child of the turn's: a run that exceeds
+  <code>pipeline.timeout_s</code> fails that step with <code>error.code</code> <code>PIPELINE_TIMEOUT</code>, and the loop goes on, so the model
+  can say so in its reply (within <code>max_tool_calls</code>). Cancelling the turn's token still cancels the step in flight.
+  <code>ask_only</code> (MCP's <code>ask</code>) returns the timed-out <code>QueryResult</code> with <code>PIPELINE_TIMEOUT</code>, and a <code>stream</code> stores the
+  turn as usual.</li>
 <li><code>stream</code> ends with <code>conversation.turn</code>; see <a href="../../../conversations/#streaming">Streaming</a>.</li>
 <li><code>ask_only</code> returns the run's <code>QueryResult</code> with its rows; the stored turn has none.</li>
 <li><code>tool</code> runs one enabled <a href="../../../conversations/tools/">chat tool</a> as a turn of kind <code>tool</code> and makes no model

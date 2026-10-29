@@ -7491,6 +7491,12 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a &l
 &lt;td&gt;&lt;code&gt;generator/node.py&lt;/code&gt; &lt;code&gt;SqlVisitor._visit_column&lt;/code&gt; (&lt;code&gt;exp.to_identifier("*")&lt;/code&gt;) against the validator's own &lt;code&gt;ValidationSqlVisitor&lt;/code&gt;&lt;/td&gt;
 &lt;td&gt;C-W3&lt;/td&gt;
 &lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;B104&lt;/td&gt;
+&lt;td&gt;A pipeline timeout inside a conversation turn ends the turn &lt;code&gt;CANCELLED&lt;/code&gt; and the model never replies: the runtime cancels the token it was given on a timeout, and that was the turn's own, so the loop stopped and &lt;code&gt;_finish&lt;/code&gt; overwrote the step's &lt;code&gt;PIPELINE_TIMEOUT&lt;/code&gt;; through &lt;code&gt;stream()&lt;/code&gt; the turn was dropped and never stored. MCP &lt;code&gt;ask&lt;/code&gt; showed the same mismatch. Fixed: each &lt;code&gt;ask&lt;/code&gt; step runs on a child of the turn's token (&lt;code&gt;CancellationToken.child()&lt;/code&gt;), so a timeout fails only that step and the model still gets its reply call, while a user's cancel still reaches the step and ends the turn &lt;code&gt;CANCELLED&lt;/code&gt;. The planner also lets &lt;code&gt;RunCancelled&lt;/code&gt; through instead of logging it as "Planner failed". A step that stops at &lt;code&gt;max_llm_calls&lt;/code&gt; or &lt;code&gt;max_cost_usd&lt;/code&gt; no longer cancels the turn token (&lt;code&gt;Budget.bind&lt;/code&gt; now cancels the step's child), so &lt;code&gt;stream()&lt;/code&gt; stores that turn with the step &lt;code&gt;stopped&lt;/code&gt; instead of dropping it; each step's child is released after the step&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;pipeline/runtime.py&lt;/code&gt; (&lt;code&gt;token.cancel()&lt;/code&gt; on timeout), &lt;code&gt;conversations/api.py&lt;/code&gt; (&lt;code&gt;_ask&lt;/code&gt; passed &lt;code&gt;run.token&lt;/code&gt;; &lt;code&gt;_by_model&lt;/code&gt;, &lt;code&gt;_finish&lt;/code&gt;), 0.9.0 pre-release smoke test&lt;/td&gt;
+&lt;td&gt;fix PR (after C-W3)&lt;/td&gt;
+&lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;Bugs are numbered from B100, as decisions are from D100, so they never

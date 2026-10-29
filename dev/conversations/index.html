@@ -2645,6 +2645,12 @@ sees result rows.</p>
   a turn of kind <code>retry</code>, with no model call.</li>
 <li><code>ask_only(conversation_id, question, user_context=..., choice=None)</code> runs just the <code>ask</code> tool (a turn of
   kind <code>tool</code>, no model call) and returns the full <code>QueryResult</code> with its rows. MCP's <code>ask</code> will use it.</li>
+<li>A run that times out (<code>pipeline.timeout_s</code>) fails only its step, with <code>error.code</code> <code>PIPELINE_TIMEOUT</code>; the
+  turn goes on and the model replies, for example by suggesting a narrower question. Each <code>ask</code> step runs on
+  its own cancellation token, a child of the turn's, so the timeout never cancels the turn, while cancelling
+  the turn (<code>cancellation_token</code>, or closing a stream) still stops the step in flight. Only a cancel ends a
+  turn <code>CANCELLED</code>. After a timeout the old run may still finish its in-flight model call or SQL while the
+  loop goes on, so the next <code>ask</code> step can overlap it.</li>
 </ul>
 <h2 id="streaming">Streaming</h2>
 <p><code>stream(...)</code> takes the same arguments as <code>ask</code> and yields the caller-safe run events of each <code>ask</code> step
