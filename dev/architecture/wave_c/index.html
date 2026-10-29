@@ -1260,6 +1260,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6f">
+<span class="md-ellipsis">
+      
+        C-W6f
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1417,6 +1426,15 @@
 <span class="md-ellipsis">
       
         18.5 C-W6d: date differences in plans
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#186-c-w6f-full-name-alternatives-pagila_002-pagila_003">
+<span class="md-ellipsis">
+      
+        18.6 C-W6f: full-name alternatives (pagila_002, pagila_003)
       
     </span>
 </a>
@@ -4151,6 +4169,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6f">
+<span class="md-ellipsis">
+      
+        C-W6f
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4308,6 +4335,15 @@
 <span class="md-ellipsis">
       
         18.5 C-W6d: date differences in plans
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#186-c-w6f-full-name-alternatives-pagila_002-pagila_003">
+<span class="md-ellipsis">
+      
+        18.6 C-W6f: full-name alternatives (pagila_002, pagila_003)
       
     </span>
 </a>
@@ -7963,6 +7999,9 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
 &lt;p&gt;Date differences in plans (design 18.5). &lt;code&gt;ast_planner/functions.py&lt;/code&gt;: &lt;code&gt;DATE_DIFF&lt;/code&gt; joins &lt;code&gt;ALLOWED_FUNCTIONS&lt;/code&gt;; &lt;code&gt;date_diff(func_name, args)&lt;/code&gt; reads &lt;code&gt;DATE_DIFF(unit, start, end)&lt;/code&gt; as &lt;code&gt;(unit, start, end)&lt;/code&gt; (all three None when malformed), and &lt;code&gt;DIFF_UNITS = ("day",)&lt;/code&gt;. The generator's &lt;code&gt;elapsed_days(start, end)&lt;/code&gt; builds &lt;code&gt;DateDiff(end, start, SECOND) / 86400.0&lt;/code&gt;: elapsed days with the fraction kept, a number on every adapter. The SDK's &lt;code&gt;SQLAlchemyAdapter.render_sql&lt;/code&gt; rewrites the seconds difference where sqlglot's rendering is wrong (MySQL &lt;code&gt;CAST(TIMESTAMPDIFF(SECOND, ...) AS DOUBLE)&lt;/code&gt;, since an integer over a decimal literal keeps four decimals there; SQL Server &lt;code&gt;DATEDIFF_BIG(SECOND, CAST(.. AS DATETIME2), ..)&lt;/code&gt;, which also takes &lt;code&gt;DATE&lt;/code&gt;); the SQLite adapter uses &lt;code&gt;(JULIANDAY(end) - JULIANDAY(start)) * 86400.0&lt;/code&gt;. Postgres and DuckDB need nothing. Tests: &lt;code&gt;tests/unit/test_date_diff.py&lt;/code&gt; runs real SQLite and DuckDB (3.87 days, two minutes across midnight, negative, NULL, DATE-only whole numbers) and pins the rendered Postgres, SQL Server and MySQL expressions; &lt;code&gt;tests/realdb/test_date_diff.py&lt;/code&gt; runs the same cases on the test bed. The logical validator rejects another unit or shape and returns early on it (&lt;code&gt;_validate_static&lt;/code&gt;, so the error is &lt;code&gt;INVALID_PLAN_STRUCTURE&lt;/code&gt;, not &lt;code&gt;VALIDATOR_CRASH&lt;/code&gt;; &lt;code&gt;DATE_PART&lt;/code&gt; with a bad unit too), and a &lt;code&gt;-&lt;/code&gt; between two columns typed date or timestamp (&lt;code&gt;_date_subtraction&lt;/code&gt;: not &lt;code&gt;TIME&lt;/code&gt;, tables matched by schema when the plan names one). The planner prompt offers it. Only the day unit. Not caught: a date column wrapped in a function, or a date minus a number.&lt;/p&gt;
 &lt;h3 id="c-w6e"&gt;C-W6e&lt;/h3&gt;
 &lt;p&gt;Prompt fixes from the keyed Pagila rerun (design 18.7). &lt;code&gt;decomposer/prompts.py&lt;/code&gt;: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final ranking as one sort op carrying &lt;code&gt;order_by&lt;/code&gt; and &lt;code&gt;limit&lt;/code&gt;). &lt;code&gt;answer_synthesizer/prompts.py&lt;/code&gt;: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in &lt;code&gt;tests/unit/test_decomposer_tool_schema.py&lt;/code&gt; and &lt;code&gt;tests/unit/test_node_answer_synthesizer.py&lt;/code&gt;; no model call, so the effect shows only in the owner's next keyed run.&lt;/p&gt;
+&lt;h3 id="c-w6f"&gt;C-W6f&lt;/h3&gt;
+&lt;p&gt;Full-name alternatives for pagila_002 and pagila_003 (design 18.6). Data only: &lt;code&gt;alt_sql&lt;/code&gt; and its regenerated &lt;code&gt;alt_rows&lt;/code&gt; on the two cases in &lt;code&gt;suites/pagila.yaml&lt;/code&gt;; the gold &lt;code&gt;sql&lt;/code&gt; and &lt;code&gt;rows&lt;/code&gt; are untouched. &lt;code&gt;tests/unit/test_pagila_suite.py&lt;/code&gt; pins that each alternative's rows are the gold's, name for name, in the same order with the same figures.&lt;/p&gt;
+&lt;p&gt;The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (enchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json, run 40954475050); the older records are untouched.&lt;/p&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -8357,6 +8396,18 @@ SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed tim
 no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
 rejects any other unit or shape, and a &lt;code&gt;-&lt;/code&gt; between two date or timestamp columns, naming &lt;code&gt;DATE_DIFF&lt;/code&gt; in the message
 (validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, &lt;code&gt;invariants.md&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="186-c-w6f-full-name-alternatives-pagila_002-pagila_003"&gt;18.6 C-W6f: full-name alternatives (pagila_002, pagila_003)&lt;/h3&gt;
+&lt;p&gt;Approved by the owner 2026-10-29. Both cases failed &lt;code&gt;result_match&lt;/code&gt; in the keyed run ("rows differ", 5 rows against 5): the
+model wrote the person as one &lt;code&gt;first_name || ' ' || last_name&lt;/code&gt; column where the gold has &lt;code&gt;first_name&lt;/code&gt; and &lt;code&gt;last_name&lt;/code&gt;. Run
+without a model on the test bed's Pagila, the gold and the generated SQL returned the same five people in the same order with
+the same totals (002: Curtis Irby 167.62, Troy Quigley 144.70, Derrick Bourque 95.78, Loretta Carpenter 93.78, Darrell Power
+91.75; 003: Gina Degeneres 753, Matthew Carrey 678, Mary Keitel 674, Angela Witherspoon 654, Walter Torn 640). Only the name
+shape differs, which the docs already name an accepted second answer
+(&lt;a href="../../testing/evaluation-dataset/#when-to-add-one-and-when-not-to"&gt;evaluation dataset&lt;/a&gt;): a real run produced it, the rows
+were read, it reads the same tables, and ties break on the key.&lt;/p&gt;
+&lt;p&gt;Each case gets an &lt;code&gt;alt_sql&lt;/code&gt;: the gold query with &lt;code&gt;first_name || ' ' || last_name AS customer&lt;/code&gt; (or &lt;code&gt;AS actor&lt;/code&gt;), the gold's
+joins, grouping and &lt;code&gt;customer_id&lt;/code&gt; / &lt;code&gt;actor_id&lt;/code&gt; tie-break, not the model's aliases or its name-based tie-break. &lt;code&gt;alt_rows&lt;/code&gt;
+come from &lt;code&gt;engine.evals.regenerate&lt;/code&gt;, not by hand. The gold data is not changed.&lt;/p&gt;
 &lt;h3 id="187-c-w6e-split-only-when-needed-quote-exact-figures"&gt;18.7 C-W6e: split only when needed, quote exact figures&lt;/h3&gt;
 &lt;p&gt;Approved by the owner 2026-10-29 after the keyed Pagila rerun (5 of 9 passed).&lt;/p&gt;
 &lt;ul&gt;
