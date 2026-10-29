@@ -84,6 +84,24 @@ cases:
   - {first_name: DERRICK, last_name: BOURQUE, total_spent: '95.78'}
   - {first_name: LORETTA, last_name: CARPENTER, total_spent: '93.78'}
   - {first_name: DARRELL, last_name: POWER, total_spent: '91.75'}
+  alt_sql:
+  - |
+    SELECT cu.first_name || ' ' || cu.last_name AS customer, SUM(p.amount) AS total_spent
+    FROM customer cu
+    JOIN address a ON a.address_id = cu.address_id
+    JOIN city ci ON ci.city_id = a.city_id
+    JOIN country co ON co.country_id = ci.country_id
+    JOIN payment p ON p.customer_id = cu.customer_id
+    WHERE co.country = 'Canada'
+    GROUP BY cu.customer_id, cu.first_name, cu.last_name
+    ORDER BY total_spent DESC, cu.customer_id
+    LIMIT 5
+  alt_rows:
+  - - {customer: CURTIS IRBY, total_spent: '167.62'}
+    - {customer: TROY QUIGLEY, total_spent: '144.70'}
+    - {customer: DERRICK BOURQUE, total_spent: '95.78'}
+    - {customer: LORETTA CARPENTER, total_spent: '93.78'}
+    - {customer: DARRELL POWER, total_spent: '91.75'}
 
 - id: pagila_003
   question: Which five actors are in the most rented films?
@@ -111,6 +129,22 @@ cases:
   - {first_name: MARY, last_name: KEITEL, rentals: 674}
   - {first_name: ANGELA, last_name: WITHERSPOON, rentals: 654}
   - {first_name: WALTER, last_name: TORN, rentals: 640}
+  alt_sql:
+  - |
+    SELECT a.first_name || ' ' || a.last_name AS actor, COUNT(r.rental_id) AS rentals
+    FROM actor a
+    JOIN film_actor fa ON fa.actor_id = a.actor_id
+    JOIN inventory i ON i.film_id = fa.film_id
+    JOIN rental r ON r.inventory_id = i.inventory_id
+    GROUP BY a.actor_id, a.first_name, a.last_name
+    ORDER BY rentals DESC, a.actor_id
+    LIMIT 5
+  alt_rows:
+  - - {actor: GINA DEGENERES, rentals: 753}
+    - {actor: MATTHEW CARREY, rentals: 678}
+    - {actor: MARY KEITEL, rentals: 674}
+    - {actor: ANGELA WITHERSPOON, rentals: 654}
+    - {actor: WALTER TORN, rentals: 640}
 
 - id: pagila_004
   question: Which films have never been rented?
