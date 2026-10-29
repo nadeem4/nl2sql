@@ -3033,6 +3033,10 @@ snapshot. On Chinook the ranges cost about 140 tokens of schema block (2,324 to
 and a <code>func</code> expr with <code>distinct: true</code> is a distinct aggregate such as
 <code>COUNT(DISTINCT x)</code>. The system message's instructions and one of its examples
 say so; a function named <code>DISTINCT</code> is rejected by the logical validator.</p>
+<p>Row counts in the plan language are <code>COUNT(*)</code>, written as a <code>COUNT</code> whose one
+argument is a column named <code>*</code> with no alias, or a count of a non-null key
+column. The same instruction says so and that <code>COUNT(t.*)</code> is never used; the
+logical validator refuses a star anywhere else (see the generator's star rule).</p>
 <p>Dates in the plan language are two portable functions, described once in the
 system message and the same for every database: <code>DATE_PART(unit, date)</code>, an
 integer, and <code>DATE_TRUNC(unit, date)</code>, the period's first day as <code>YYYY-MM-DD</code>,

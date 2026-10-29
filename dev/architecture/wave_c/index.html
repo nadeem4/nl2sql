@@ -1197,6 +1197,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w3">
+<span class="md-ellipsis">
+      
+        C-W3
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -3866,6 +3875,15 @@
 <span class="md-ellipsis">
       
         M2
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w3">
+<span class="md-ellipsis">
+      
+        C-W3
       
     </span>
 </a>
@@ -7086,8 +7104,9 @@ the lock and saves the dashboard; <code>api/dashboards_api.py</code> gathers wha
 </ul>
 <p>Where the code and the design differ, the code won:</p>
 <ul>
-<li><strong><code>COUNT(1)</code>, not <code>COUNT(*)</code>.</strong> A plan writes a star as the column name <code>*</code>, which the validator accepts but the
-  generator quotes (<code>t1."*"</code>), so the database refuses it. The row count is <code>COUNT(1)</code>, the same number.</li>
+<li><strong><code>COUNT(1)</code>, not <code>COUNT(*)</code></strong> (superseded by C-W3: the generator no longer quotes the star, and the row
+  count is <code>COUNT(*)</code>). A plan writes a star as the column name <code>*</code>, which the validator accepted but the
+  generator quoted (<code>t1."*"</code>), so the database refused it.</li>
 <li><strong>Names only.</strong> A chart's question and title use the columns' names humanised; a glossary description's first
   clause is not used (no description is needed for a good question, and one could carry text a person did not
   write for a question).</li>
@@ -7417,6 +7436,32 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a &l
   websocket is closed. The default &lt;code&gt;allowed_hosts&lt;/code&gt; adds &lt;code&gt;[::1]&lt;/code&gt; and the bare names.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/div&gt;
+&lt;h3 id="c-w3"&gt;C-W3&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;COUNT(*)&lt;/code&gt; and &lt;code&gt;t1.*&lt;/code&gt; passed the logical validator and failed at the database (bug B102 in section 14).&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Cause.&lt;/strong&gt; The validator mapped a &lt;code&gt;*&lt;/code&gt; column name to a real sqlglot star in its own subclass of &lt;code&gt;SqlVisitor&lt;/code&gt;
+  (&lt;code&gt;ValidationSqlVisitor&lt;/code&gt;); the generator's &lt;code&gt;SqlVisitor&lt;/code&gt; ran it through &lt;code&gt;exp.to_identifier&lt;/code&gt;, which quotes it
+  (&lt;code&gt;COUNT(t1."*")&lt;/code&gt;, T-SQL &lt;code&gt;t1.[*]&lt;/code&gt;, MySQL &lt;code&gt;t1.`*`&lt;/code&gt;). The two trees differed, so the validator's check said nothing
+  about what the generator rendered, and the failure came at execution, after the last retry edge.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Fix.&lt;/strong&gt; &lt;code&gt;SqlVisitor&lt;/code&gt; owns the one rule for the star, so the validator and the generator build the same tree, and
+  &lt;code&gt;ValidationSqlVisitor&lt;/code&gt; is gone. A star is allowed in two places only: a whole select item with no alias (&lt;code&gt;*&lt;/code&gt;, or
+  &lt;code&gt;t1.*&lt;/code&gt; where &lt;code&gt;t1&lt;/code&gt; is a declared table alias), and the single, non-DISTINCT argument of &lt;code&gt;COUNT&lt;/code&gt; as a bare &lt;code&gt;*&lt;/code&gt;
+  (&lt;code&gt;COUNT(*)&lt;/code&gt;). Anywhere else the visitor raises &lt;code&gt;MisplacedStar&lt;/code&gt;, and the validator reports it as a retryable
+  &lt;code&gt;INVALID_PLAN_STRUCTURE&lt;/code&gt; that tells the planner to use &lt;code&gt;COUNT(*)&lt;/code&gt; or count a non-null column such as the key. That
+  covers &lt;code&gt;COUNT(t1.*)&lt;/code&gt;, &lt;code&gt;COUNT(DISTINCT *)&lt;/code&gt;, &lt;code&gt;SUM(*)&lt;/code&gt;, &lt;code&gt;MAX(t1.*)&lt;/code&gt;, &lt;code&gt;t1.* AS x&lt;/code&gt;, a star in &lt;code&gt;WHERE&lt;/code&gt;, &lt;code&gt;GROUP BY&lt;/code&gt;,
+  &lt;code&gt;ORDER BY&lt;/code&gt; or arithmetic, &lt;code&gt;COUNT(*, x)&lt;/code&gt;, and &lt;code&gt;x.*&lt;/code&gt; for an undeclared alias.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Why &lt;code&gt;COUNT(t1.*)&lt;/code&gt; is refused, not rewritten.&lt;/strong&gt; SQLite and T-SQL refuse it, and it does not mean &lt;code&gt;COUNT(*)&lt;/code&gt;: on
+  Postgres, &lt;code&gt;COUNT(o.*)&lt;/code&gt; over a &lt;code&gt;LEFT JOIN orders o&lt;/code&gt; counts a customer with no orders as 0 (the NULL-extended row),
+  while &lt;code&gt;COUNT(*)&lt;/code&gt; counts it as 1. Rewriting it would change the answer silently; refusing it costs one retry.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Planner prompt.&lt;/strong&gt; Instruction 9 gains one line: count rows with &lt;code&gt;COUNT(*)&lt;/code&gt; (a &lt;code&gt;*&lt;/code&gt; column with no alias) or a
+  non-null key column, never &lt;code&gt;COUNT(t.*)&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Tests.&lt;/strong&gt; &lt;code&gt;tests/unit/test_generator_star.py&lt;/code&gt; (the real validator and generator on sqlite, postgres, tsql, mysql and
+  duckdb: &lt;code&gt;COUNT(*)&lt;/code&gt;, &lt;code&gt;*&lt;/code&gt; and &lt;code&gt;u.*&lt;/code&gt; render unquoted and parse back as stars; every other position is a retryable
+  plan error and the generator never renders it) and two full runs in &lt;code&gt;tests/e2e/test_retry_fake_llm.py&lt;/code&gt; (a
+  &lt;code&gt;COUNT(*)&lt;/code&gt; plan on the demo SQLite answers 59 with no retry; a &lt;code&gt;COUNT(t1.*)&lt;/code&gt; plan is refused, and the planner's
+  second plan answers 59 after one retry).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;D3.&lt;/strong&gt; Its templates now write the row count as &lt;code&gt;COUNT(*)&lt;/code&gt; (the &lt;code&gt;COUNT(1)&lt;/code&gt; note under D3 is superseded).&lt;/li&gt;
+&lt;/ul&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -7439,6 +7484,12 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a &l
 &lt;td&gt;&lt;code&gt;nl2sql demo --dir&lt;/code&gt; warns that any folder without a demo stamp was "created by an older version", so a project folder that was never a demo gets a false warning&lt;/td&gt;
 &lt;td&gt;&lt;code&gt;cli/demo/stamp.py&lt;/code&gt; (&lt;code&gt;outdated_warning&lt;/code&gt;: &lt;code&gt;created_by is None&lt;/code&gt; is "older")&lt;/td&gt;
 &lt;td&gt;L3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;B102&lt;/td&gt;
+&lt;td&gt;A plan's &lt;code&gt;COUNT(*)&lt;/code&gt; or &lt;code&gt;t1.*&lt;/code&gt; passes the logical validator, but the generator quotes the star (&lt;code&gt;COUNT(t1."*")&lt;/code&gt;), so the database refuses it after the last retry edge; a star anywhere else (&lt;code&gt;SUM(*)&lt;/code&gt;, &lt;code&gt;COUNT(t1.*)&lt;/code&gt;, &lt;code&gt;ORDER BY t1.*&lt;/code&gt;) passes too. Fixed: &lt;code&gt;COUNT(*)&lt;/code&gt; and an unaliased &lt;code&gt;*&lt;/code&gt; / &lt;code&gt;t1.*&lt;/code&gt; select item render bare, every other star is a retryable plan error&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;generator/node.py&lt;/code&gt; &lt;code&gt;SqlVisitor._visit_column&lt;/code&gt; (&lt;code&gt;exp.to_identifier("*")&lt;/code&gt;) against the validator's own &lt;code&gt;ValidationSqlVisitor&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;C-W3&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
