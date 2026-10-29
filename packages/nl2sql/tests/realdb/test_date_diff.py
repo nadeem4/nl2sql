@@ -5,6 +5,8 @@ below are computed here, not by the database under test.
 """
 from __future__ import annotations
 
+from datetime import datetime
+
 import pytest
 from sqlglot import expressions as exp
 
@@ -15,12 +17,17 @@ from nl2sql.secrets.manager import SecretManager
 
 from .servers import datasource
 
-# (start, end, days): 3.87 days; two minutes across midnight; negative.
+# (start, end): about 3.87 days; two minutes across midnight; negative.
 TIMESTAMPS = [
-    ("2005-05-24 22:53:30", "2005-05-28 19:40:33", 3.8697569444),
-    ("2020-01-01 23:59:00", "2020-01-02 00:01:00", 2 / 1440),
-    ("2020-01-05 00:00:00", "2020-01-01 00:00:00", -4.0),
+    ("2005-05-24 22:53:30", "2005-05-28 19:40:33"),
+    ("2020-01-01 23:59:00", "2020-01-02 00:01:00"),
+    ("2020-01-05 00:00:00", "2020-01-01 00:00:00"),
 ]
+
+
+def _expected(start: str, end: str) -> float:
+    fmt = "%Y-%m-%d %H:%M:%S"
+    return (datetime.strptime(end, fmt) - datetime.strptime(start, fmt)).total_seconds() / 86400
 
 
 @pytest.fixture
@@ -40,11 +47,11 @@ def _days(adapter, kind: str, start: str, end: str | None):
     return adapter.execute_sql(sql).rows[0][0]
 
 
-@pytest.mark.parametrize("start, end, days", TIMESTAMPS)
-def test_elapsed_days_keep_the_fraction(adapter, start, end, days):
+@pytest.mark.parametrize("start, end", TIMESTAMPS)
+def test_elapsed_days_keep_the_fraction(adapter, start, end):
     kind = "DATETIME" if adapter.get_dialect() == "mysql" else "TIMESTAMP"
 
-    assert float(_days(adapter, kind, start, end)) == pytest.approx(days, abs=1e-6)
+    assert float(_days(adapter, kind, start, end)) == pytest.approx(_expected(start, end), abs=1e-6)
 
 
 def test_date_only_values_give_whole_days(adapter):

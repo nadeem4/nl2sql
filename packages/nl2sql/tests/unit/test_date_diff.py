@@ -81,7 +81,7 @@ def test_date_diff_reads_unit_start_and_end():
     assert date_diff("DATE_DIFF", [_lit("week"), START, END])[0] == "week"
 
 
-# (rental_date, return_date): 3.87 days; two minutes across midnight; negative; NULL end.
+# (rental_date, return_date): about 3.87 days; two minutes across midnight; negative; NULL end.
 CASES = [
     ("2005-05-24 22:53:30", "2005-05-28 19:40:33"),
     ("2020-01-01 23:59:00", "2020-01-02 00:01:00"),
@@ -169,7 +169,7 @@ def test_duckdb_date_only_values_give_whole_days():
     (MssqlAdapter,
      "CAST(DATEDIFF_BIG(SECOND, CAST(t1.rental_date AS DATETIME2), CAST(t1.return_date AS DATETIME2)) AS FLOAT)"
      " / 86400.0"),
-    (MysqlAdapter, "TIMESTAMPDIFF(SECOND, t1.rental_date, t1.return_date) / 86400.0"),
+    (MysqlAdapter, "CAST(TIMESTAMPDIFF(SECOND, t1.rental_date, t1.return_date) AS DOUBLE) / 86400.0"),
 ])
 def test_each_adapter_divides_exact_seconds_by_a_day(adapter, expected):
     sql = _sql(_plan(DIFF), _adapter(adapter))

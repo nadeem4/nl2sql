@@ -159,7 +159,9 @@ def _elapsed_seconds(node: Any, dialect: str) -> Any:
         return node
     unit = exp.Var(this="SECOND")
     if dialect == "mysql":
-        return exp.TimestampDiff(this=node.this, expression=node.expression, unit=unit)
+        # DOUBLE: an integer divided by a decimal literal keeps only four decimals on MySQL.
+        seconds = exp.TimestampDiff(this=node.this, expression=node.expression, unit=unit)
+        return exp.Cast(this=seconds, to=exp.DataType.build("DOUBLE"))
     if dialect == "tsql":
         def datetime2(operand):
             return exp.Cast(this=operand, to=exp.DataType.build("DATETIME2", dialect="tsql"))
