@@ -6601,7 +6601,7 @@ after the client is constructed, so the config - not the model name -
 decides what is sent.</p>
 </div>
 <h2 id="per-node-models">Per-node models</h2>
-<p>The six pipeline nodes that call a model, the profiler's drafts, eval
+<p>The pipeline's model calls (six nodes, and the table selector inside schema retrieval), the profiler's drafts, eval
 seeding and the conversation each have an agent. An agent not under <code>agents</code> runs on the top level:</p>
 <table>
 <thead>
@@ -6622,6 +6622,10 @@ seeding and the conversation each have an agent. An agent not under <code>agents
 <tr>
 <td><code>decomposer</code></td>
 <td>splits the question into sub-queries</td>
+</tr>
+<tr>
+<td><code>table_selector</code></td>
+<td>picks the tables a question needs from a catalog of every table the caller may read, on a schema past <code>settings.retrieval.full_snapshot_max_tables</code> (one call per sub-query; never on a small schema or a pinned plan; off with <code>settings.retrieval.table_selector: false</code>). A small model is enough. It is built on its first call, so a project that turns it off needs no key for it</td>
 </tr>
 <tr>
 <td><code>ast_planner</code></td>
@@ -6689,10 +6693,10 @@ next question. The page offers the providers and models in
 now, and a provider only once its key is saved. See
 <a href="../../getting_started/demo/#the-settings-page">the Settings page</a>.</p>
 <p>The playground's <strong>Pipeline</strong> page reads the same configuration back: it lists
-every step of a run and, for each of the six a model decides, the provider and
+every step of a run and, for each of the seven a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by <code>GET /api/pipeline</code> from <code>engine.about()</code>, whose steps
-(<code>nl2sql.pipeline.steps</code>) take their six model steps from <code>LLM_AGENTS</code> rather
+(<code>nl2sql.pipeline.steps</code>) take their seven model steps from <code>LLM_AGENTS</code> rather
 than repeating the table above. See <a href="../../getting_started/demo/#the-pipeline-page">the Pipeline page</a>.</p>
 <p>On the <strong>hosted demo</strong> (<code>nl2sql demo --hosted</code>) the same choice is offered and
 nothing is written at all. The visitor keeps one key per provider and a model

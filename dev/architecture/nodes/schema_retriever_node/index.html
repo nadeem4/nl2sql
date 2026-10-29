@@ -809,6 +809,15 @@
 <nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#table-recall-on-large-schemas">
+<span class="md-ellipsis">
+      
+        Table recall on large schemas
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#kept-columns">
 <span class="md-ellipsis">
       
@@ -2713,6 +2722,15 @@
 <nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#table-recall-on-large-schemas">
+<span class="md-ellipsis">
+      
+        Table recall on large schemas
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#kept-columns">
 <span class="md-ellipsis">
       
@@ -2856,6 +2874,10 @@
 <li>Resolve authoritative tables from <code>SchemaStore</code>.</li>
 <li>Fall back to full schema snapshot when retrieval returns no candidates or
   the search fails; see <a href="#error-handling">Error Handling</a>.</li>
+<li>On a schema past <code>full_snapshot_max_tables</code>, send the tables the question
+  needs, not only the ones nearest its words: the glossary's, a model's picks
+  from a catalog, and the tables that join them; see
+  <a href="#table-recall-on-large-schemas">Table recall on large schemas</a>.</li>
 <li>Keep the columns a join or an answer needs on a table cut to the columns
   the search returned; see <a href="#kept-columns">Kept columns</a>.</li>
 <li>Rank the datasource's <code>preferred_tables</code> first and set <code>preferred=True</code> on
@@ -2903,6 +2925,8 @@
 <ul>
 <li><code>knowledge</code> (optional): the run's pinned <code>Knowledge</code>; none means no glossary</li>
 <li><code>settings.knowledge</code>: <code>top_k</code> and <code>block_max_chars</code></li>
+<li><code>llm_registry</code> (optional): the table selector's model, agent <code>table_selector</code>
+  (node name <code>tableselector</code>); asked for on the first selector call only</li>
 <li><code>vector_store</code> (optional)</li>
 <li><code>state</code> (the state store; required for authoritative resolution)</li>
 <li><code>ds_registry</code> (optional): <code>get_preferred_tables(datasource_id)</code>, <code>get_dialect(datasource_id)</code> (for derived date roles)</li>
@@ -2936,15 +2960,60 @@
 <h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
 <ol>
 <li>Build semantic query with <code>_build_semantic_query()</code>.</li>
+<li>Resolve schema snapshot via <code>_resolve_snapshot()</code>, and match the glossary's
+   terms once (<code>_matched_terms()</code>); <code>_knowledge_used()</code> sends the same terms.</li>
+<li>Past <code>full_snapshot_max_tables</code> (and not for a pinned plan):</li>
 <li>Retrieve table/metric chunks via <code>retrieve_schema_context()</code>, <code>k = settings.retrieval.table_k</code> (8).</li>
 <li>If no table chunks, retrieve columns via <code>retrieve_column_candidates()</code>, <code>k = table_k</code>.</li>
 <li>If tables are identified, retrieve columns/relationships via <code>retrieve_planning_context()</code>, <code>k = settings.retrieval.planning_k</code> (12).</li>
-<li>Resolve schema snapshot via <code>_resolve_snapshot()</code>.</li>
+<li>Add the matched terms' tables, the table selector's picks and the join-path fill; see
+      <a href="#table-recall-on-large-schemas">Table recall on large schemas</a>.</li>
 <li>Build <code>Table</code> objects with <code>_build_tables_from_snapshot()</code>: each table
    keeps the columns the searches returned plus its <a href="#kept-columns">kept columns</a>.</li>
 <li>If no tables were found, return full snapshot with warning.</li>
 <li>On exception, see <a href="#error-handling">Error Handling</a>.</li>
 </ol>
+<h3 id="table-recall-on-large-schemas">Table recall on large schemas</h3>
+<p>Wave C, C-W4 (<a href="../../wave_c/#17-c-w4-table-recall-on-large-schemas">design</a>).
+A missing table guarantees a wrong answer; an extra one costs some prompt. On
+Pagila (29 tables) the question "top 5 films by revenue in the top category"
+never got <code>payment</code>: "revenue" is not near that table, and the chain is
+<code>film -&gt; inventory -&gt; rental -&gt; payment</code>. Past <code>full_snapshot_max_tables</code>, the
+tables sent are the union of four steps, per sub-query and per datasource:</p>
+<ol>
+<li><strong>Vector search</strong>, as above.</li>
+<li><strong>Glossary terms.</strong> Each matched term's <code>tables</code>, and the table of each of
+   its <code>columns</code>, are added, and the named columns kept. A table the caller
+   cannot read is never added.</li>
+<li><strong>The table selector</strong>, one model call (<code>settings.retrieval.table_selector</code>,
+   on by default; agent <code>table_selector</code>). The catalog lists every table the
+   caller may read: its name, its description cut to 200 characters, its column
+   names, as JSON values under <code>[TABLES]</code>, with the question, the matched
+   terms and the tables steps 1 and 2 chose. Past
+   <code>settings.retrieval.selector_catalog_max</code> (200) readable tables the catalog
+   is the nearest that many by vector search. The model returns table names;
+   a name not in the catalog is dropped, and an empty answer is fine. A table it
+   picks keeps all its columns, up to 40; a wider one keeps what the planning
+   search returned plus its keys. A failed call (an invalid answer after the
+   agent's parse retries, a provider error) is logged and costs only the
+   selector's tables; a run limit (<code>LimitReached</code>) or a cancel is not swallowed
+   and ends the run. The call counts against <code>max_llm_calls</code> and <code>max_cost_usd</code>.
+   The model is built on the first call, so <code>table_selector: false</code> needs no key.</li>
+<li><strong>Join-path fill.</strong> The tables from steps 1 to 3 are connected through a graph of
+   the tables the caller may read, whose edges are foreign keys and glossary
+   joins: repeatedly the two nearest unconnected groups are joined by a shortest
+   path (an approximate Steiner tree, in <code>join_path.py</code>). A path longer than
+   <code>settings.retrieval.join_path_max_hops</code> (4) is not added. A bridge table
+   keeps its <a href="#kept-columns">kept columns</a> only: key, join columns, label.</li>
+</ol>
+<p>Nothing changes at or below the threshold, or for a pinned plan: every table is
+sent and no selector call is made. The <code>retrieval</code> record lists, for each table
+sent, its <code>qualified</code> name and the <code>steps</code> that added it (<code>vector</code>,
+<code>glossary</code>, <code>selector</code>, <code>join_path</code>), so a missed answer is traced to its cause.
+The selector's model call is recorded under its own step, <code>table_selector</code>, in
+usage and <code>models_by_node</code>, not under <code>schema_retriever</code>. A table already chosen
+by an earlier step is never cut by the selector's pick, and a glossary term's
+columns are always kept.</p>
 <h3 id="kept-columns">Kept columns</h3>
 <p>The <code>planning</code> search returns <code>planning_k</code> (12) entries across all the tables
 found, so a table often arrives with a few columns and none of its keys. On
@@ -3089,7 +3158,8 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <li>Returns a <code>retrieval</code> record in its update (not a state field, so LangGraph
   drops it; the run trace keeps it): the query text embedded, each search's
   pool with scores, the MMR picks in order and what was dropped, and the tables
-  and columns sent to the planner; or, when the schema is small enough to send
+  and columns sent to the planner, each table with the <code>steps</code> that added it
+  when the schema is past the threshold; or, when the schema is small enough to send
   whole, <code>skipped: true</code> and why. Column entries of a table the role cannot read
   keep their name and rank but lose their scores (their embedded text holds
   sample values). See <a href="../../../observability/debugging/#retrieval">Debugging a run</a>.</li>
@@ -3097,7 +3167,8 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <hr/>
 <h2 id="configuration">Configuration</h2>
 <ul>
-<li><code>settings.retrieval.full_snapshot_max_tables</code>, <code>table_k</code> and <code>planning_k</code> (see <a href="../../../configuration/settings/#retrieval">Settings</a>).</li>
+<li><code>settings.retrieval.full_snapshot_max_tables</code>, <code>table_k</code>, <code>planning_k</code>, <code>table_selector</code>, <code>selector_catalog_max</code> and <code>join_path_max_hops</code> (see <a href="../../../configuration/settings/#retrieval">Settings</a>).</li>
+<li>The <code>table_selector</code> agent under <code>llm.agents</code> (see <a href="../../../configuration/llm/#per-node-models">LLM</a>).</li>
 <li>Vector store configuration is set in <code>Runtime</code>.</li>
 </ul>
 <hr/>
@@ -3125,6 +3196,8 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <h2 id="related-code">Related Code</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/selector.py</code> (the prompt, <code>TableSelection</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/join_path.py</code></li>
 <li><code>packages/nl2sql/src/nl2sql/indexing/retrieval.py</code></li>
 </ul>
 </article>

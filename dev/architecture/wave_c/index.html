@@ -1206,6 +1206,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w4">
+<span class="md-ellipsis">
+      
+        C-W4
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1235,6 +1244,82 @@
       
     </span>
 </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#17-c-w4-table-recall-on-large-schemas">
+<span class="md-ellipsis">
+      
+        17. C-W4: table recall on large schemas
+      
+    </span>
+</a>
+<nav aria-label="17. C-W4: table recall on large schemas" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#171-why">
+<span class="md-ellipsis">
+      
+        17.1 Why
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#172-goals-and-non-goals">
+<span class="md-ellipsis">
+      
+        17.2 Goals and non-goals
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#173-the-design">
+<span class="md-ellipsis">
+      
+        17.3 The design
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#174-the-table-selector">
+<span class="md-ellipsis">
+      
+        17.4 The table selector
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#175-measuring-it">
+<span class="md-ellipsis">
+      
+        17.5 Measuring it
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#176-docs">
+<span class="md-ellipsis">
+      
+        17.6 Docs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#177-builders-calls">
+<span class="md-ellipsis">
+      
+        17.7 Builder's calls
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 </ul>
 </nav>
@@ -3900,6 +3985,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w4">
+<span class="md-ellipsis">
+      
+        C-W4
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -3929,6 +4023,82 @@
       
     </span>
 </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#17-c-w4-table-recall-on-large-schemas">
+<span class="md-ellipsis">
+      
+        17. C-W4: table recall on large schemas
+      
+    </span>
+</a>
+<nav aria-label="17. C-W4: table recall on large schemas" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#171-why">
+<span class="md-ellipsis">
+      
+        17.1 Why
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#172-goals-and-non-goals">
+<span class="md-ellipsis">
+      
+        17.2 Goals and non-goals
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#173-the-design">
+<span class="md-ellipsis">
+      
+        17.3 The design
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#174-the-table-selector">
+<span class="md-ellipsis">
+      
+        17.4 The table selector
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#175-measuring-it">
+<span class="md-ellipsis">
+      
+        17.5 Measuring it
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#176-docs">
+<span class="md-ellipsis">
+      
+        17.6 Docs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#177-builders-calls">
+<span class="md-ellipsis">
+      
+        17.7 Builder's calls
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
 </li>
 </ul>
 </nav>
@@ -7474,6 +7644,60 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a &l
   second plan answers 59 after one retry).&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;D3.&lt;/strong&gt; Its templates now write the row count as &lt;code&gt;COUNT(*)&lt;/code&gt; (the &lt;code&gt;COUNT(1)&lt;/code&gt; note under D3 is superseded).&lt;/li&gt;
 &lt;/ul&gt;
+&lt;h3 id="c-w4"&gt;C-W4&lt;/h3&gt;
+&lt;p&gt;Table recall on large schemas (bug B106 in section 14, design in section 17). This PR passed 1,000 changed lines
+without its fixtures, so, as 17.7 says, the Pagila suite is a second PR; this one is the retriever, the selector, the
+join-path fill and the eval wiring they need.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Retriever&lt;/strong&gt; (&lt;code&gt;schema_retriever/node.py&lt;/code&gt;). Past &lt;code&gt;full_snapshot_max_tables&lt;/code&gt;, and never for a pinned plan, the tables sent
+  are the union of the vector search, the matched glossary terms' tables, the selector's picks and the join-path fill
+  (17.3). &lt;code&gt;match_terms&lt;/code&gt; moved out of &lt;code&gt;_knowledge_used&lt;/code&gt; into &lt;code&gt;_matched_terms&lt;/code&gt;, which runs once before retrieval; the
+  terms go to &lt;code&gt;_retrieve&lt;/code&gt; and on to &lt;code&gt;_knowledge_used&lt;/code&gt;. &lt;code&gt;SchemaRetrieverNode.__call__&lt;/code&gt; re-raises &lt;code&gt;LimitReached&lt;/code&gt; and
+  &lt;code&gt;RunCancelled&lt;/code&gt; before its blanket &lt;code&gt;except Exception&lt;/code&gt;, so the whole-snapshot fallback never plans on after a stop.
+  &lt;code&gt;_build_tables_from_snapshot&lt;/code&gt; takes &lt;code&gt;keys_only&lt;/code&gt;: a table in it with no columns of its own gets its kept columns
+  (key, join columns, label), not every column, which is how a bridge table stays small. The &lt;code&gt;retrieval&lt;/code&gt; record's
+  tables keep &lt;code&gt;table&lt;/code&gt; and &lt;code&gt;columns&lt;/code&gt; and gain &lt;code&gt;steps&lt;/code&gt; (&lt;code&gt;vector&lt;/code&gt;, &lt;code&gt;glossary&lt;/code&gt;, &lt;code&gt;selector&lt;/code&gt;, &lt;code&gt;join_path&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Selector&lt;/strong&gt; (&lt;code&gt;schema_retriever/selector.py&lt;/code&gt;). &lt;code&gt;TableSelector.pick&lt;/code&gt; is &lt;code&gt;TABLE_SELECTOR_PROMPT | structured(llm,
+  TableSelection)&lt;/code&gt;, the &lt;code&gt;curated_matcher&lt;/code&gt; template; the model is built on the first call
+  (&lt;code&gt;get_llm("tableselector")&lt;/code&gt;), never in &lt;code&gt;__init__&lt;/code&gt;, so &lt;code&gt;table_selector: false&lt;/code&gt; and &lt;code&gt;evaluation/seed.py&lt;/code&gt; need no key.
+  The catalog (name, description cut to 200 characters, column names) is JSON under &lt;code&gt;[TABLES]&lt;/code&gt;, beside
+  &lt;code&gt;[BUSINESS_CONTEXT]&lt;/code&gt; (the matched terms) and &lt;code&gt;[ALREADY_SELECTED]&lt;/code&gt;. A name outside the catalog is dropped; a failure
+  logs a warning and costs only the selector's tables. Settings &lt;code&gt;table_selector&lt;/code&gt;, &lt;code&gt;selector_catalog_max&lt;/code&gt; and
+  &lt;code&gt;join_path_max_hops&lt;/code&gt; are in &lt;code&gt;RetrievalSettings&lt;/code&gt;; &lt;code&gt;table_selector&lt;/code&gt; is an &lt;code&gt;AgentName&lt;/code&gt; and &lt;code&gt;LLM_AGENTS&lt;/code&gt; entry.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Join path&lt;/strong&gt; (&lt;code&gt;schema_retriever/join_path.py&lt;/code&gt;). &lt;code&gt;connect(adjacency, chosen, max_hops)&lt;/code&gt; is the approximate Steiner
+  tree: it merges the two nearest groups by a BFS shortest path until the nearest is past &lt;code&gt;max_hops&lt;/code&gt;. Starting from
+  singleton groups, not from one seed, means a chosen table with no foreign key (a view) does not stop the others
+  connecting.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Mode retrieval&lt;/strong&gt; is still model-free: &lt;code&gt;RETRIEVAL_CHANGES&lt;/code&gt; also sets &lt;code&gt;settings.retrieval.table_selector&lt;/code&gt; to false and
+  &lt;code&gt;retrieval_settings()&lt;/code&gt; reports it and &lt;code&gt;join_path_max_hops&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Tests.&lt;/strong&gt; &lt;code&gt;tests/unit/test_table_recall.py&lt;/code&gt; (the smoke question, per-table steps, join path alone, hop limit, a
+  view with no key, bridge columns, selector columns up to and past 40, a hidden table in the catalog, the result and a
+  path, a raising selector, an unknown name, an empty pick, glossary tables with no selector, the prompt, the catalog
+  cap, no call at or below the threshold or for a pinned plan, &lt;code&gt;LimitReached&lt;/code&gt; ending the run, no model with the selector
+  off, the model built once), and &lt;code&gt;tests/unit/pagila_snapshot.py&lt;/code&gt;, Pagila's tables and foreign keys, which the
+  suite's test in the second PR shares. &lt;code&gt;test_pipeline_steps.py&lt;/code&gt; and the three playground tests follow the new agent.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Where the code differs from 17.&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;The catalog names a table as the snapshot does (&lt;code&gt;[public].[film]&lt;/code&gt;), and the selector's answer is matched to it
+    ignoring case.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;table_selector&lt;/code&gt; is a step in &lt;code&gt;PIPELINE_STEPS&lt;/code&gt; (the Pipeline page lists its model) but not a graph node:
+    &lt;code&gt;INSIDE_A_NODE&lt;/code&gt; names it as a call inside &lt;code&gt;schema_retriever&lt;/code&gt;, and the graph-shape test excludes it.&lt;/li&gt;
+&lt;li&gt;The vector-picked tables' planning search is unchanged (it runs over them alone, before the other steps); a
+    selector pick past 40 columns gets one more planning search of its own, so a wide table is not cut to its keys.&lt;/li&gt;
+&lt;li&gt;A table a term names without a column is sent as a vector pick is (whole, unless the planning search named some of
+    its columns); a term's column keeps the table to that column plus the keys when nothing else named it.&lt;/li&gt;
+&lt;li&gt;The Pagila fixture has the 15 base tables and 7 views (22 tables, still past 15), not the 29 of the smoke run: the
+    pinned dump's payment partitions are not in it.&lt;/li&gt;
+&lt;li&gt;The model-free Pagila baseline is a follow-up: neither the &lt;code&gt;realdb&lt;/code&gt; workflow nor the snapshot fixture runs the
+    retrieval mode (it needs the Pagila schema indexed with embeddings), so no floor is recorded.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Review fixes.&lt;/strong&gt; A table an earlier step already chose is never moved to &lt;code&gt;keys_only&lt;/code&gt; by the selector's pick (a
+  vector pick over 40 columns was cut to its keys), and a term's columns are kept apart and unioned in last, so no cut
+  drops them. The selector's call carries &lt;code&gt;metadata["langgraph_node"] = "table_selector"&lt;/code&gt;, so usage, the Pipeline page
+  and &lt;code&gt;models_by_node&lt;/code&gt; attribute it to its own step. Each trace table also carries &lt;code&gt;qualified&lt;/code&gt;, so two schemas with one
+  table name stay apart. &lt;code&gt;test_schema_retriever_keys.py&lt;/code&gt; now uses the shared Pagila fixture.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Still to do.&lt;/strong&gt; The Pagila suite (second PR). Then the owner's keyed run on the test bed's Pagila with the selector
+  on (17.5): regenerate the suite's rows, run mode full, and for any gold table not sent read the trace's per-table
+  &lt;code&gt;steps&lt;/code&gt; before closing B106.&lt;/li&gt;
+&lt;/ul&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -7520,6 +7744,12 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a &l
 &lt;td&gt;A schema retrieval that raises (the smoke test's ONNX embedding model failing to load with "bad allocation") returns no tables and no error, so the planner plans blind and every retry fails &lt;code&gt;TABLE_NOT_FOUND&lt;/code&gt; until &lt;code&gt;PIPELINE_TIMEOUT&lt;/code&gt;. Fixed: with a snapshot it sends every table the caller may read with a &lt;code&gt;SCHEMA_RETRIEVAL_FAILED&lt;/code&gt; warning, as the no-candidates path does; without one a &lt;code&gt;CRITICAL&lt;/code&gt; &lt;code&gt;SCHEMA_RETRIEVAL_FAILED&lt;/code&gt; ends the sub-query before the planner&lt;/td&gt;
 &lt;td&gt;&lt;code&gt;schema_retriever/node.py&lt;/code&gt; &lt;code&gt;__call__&lt;/code&gt; (&lt;code&gt;except Exception&lt;/code&gt; returning &lt;code&gt;relevant_tables: []&lt;/code&gt;)&lt;/td&gt;
 &lt;td&gt;0.9.0 smoke fix&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;B106&lt;/td&gt;
+&lt;td&gt;On a schema over &lt;code&gt;full_snapshot_max_tables&lt;/code&gt;, retrieval sends only the &lt;code&gt;table_k&lt;/code&gt; (8) tables nearest the question, so a table whose name is far from the question's words never arrives: the 0.9.0 smoke test on Pagila (29 tables) never got &lt;code&gt;payment&lt;/code&gt; for "top 5 films by revenue in the top category", and the planner asked a clarifying question instead of summing &lt;code&gt;payment.amount&lt;/code&gt;. Fixed: past the threshold the retriever also adds the glossary's tables, the tables a model picks from a catalog (&lt;code&gt;table_selector&lt;/code&gt;) and the tables that join them from the foreign-key graph (&lt;code&gt;join_path_max_hops&lt;/code&gt;); a keyed run on the test bed's Pagila is the owner's to confirm&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;schema_retriever/node.py&lt;/code&gt; (vector search only; no join-graph walk); the smoke run's &lt;code&gt;retrieval&lt;/code&gt; trace record&lt;/td&gt;
+&lt;td&gt;C-W4 (section 17)&lt;/td&gt;
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
@@ -7626,6 +7856,155 @@ routes and the schedule runner in &lt;code&gt;nl2sql-api&lt;/code&gt;; the conve
 dashboard REST routes stay in Wave D (D121), as the first draft had them.
 &lt;a href="../wave_d/"&gt;&lt;code&gt;wave_d.md&lt;/code&gt;&lt;/a&gt; designs those routes and needs a pass to match this
 page (see its note).&lt;/p&gt;
+&lt;h2 id="17-c-w4-table-recall-on-large-schemas"&gt;17. C-W4: table recall on large schemas&lt;/h2&gt;
+&lt;p&gt;Agreed with the owner on 2026-10-29. Fixes B106.&lt;/p&gt;
+&lt;h3 id="171-why"&gt;17.1 Why&lt;/h3&gt;
+&lt;p&gt;A missing table guarantees a wrong answer; an extra table costs some prompt and rarely misleads the planner. On a
+schema the caller can read more than &lt;code&gt;full_snapshot_max_tables&lt;/code&gt; (15) tables of, the retriever sends the planner the
+&lt;code&gt;table_k&lt;/code&gt; (8) tables nearest the question by vector search. The 0.9.0 smoke test on Pagila (29 tables) asked "top 5
+films by revenue in the top category": "revenue" is not near &lt;code&gt;payment&lt;/code&gt;, so &lt;code&gt;payment&lt;/code&gt; never arrived and the planner
+asked a clarifying question instead of summing &lt;code&gt;payment.amount&lt;/code&gt;. Neither a bigger &lt;code&gt;table_k&lt;/code&gt; nor adding each picked
+table's direct neighbours fixes it: the question and the table stay far apart, and the chain is
+&lt;code&gt;film → inventory → rental → payment&lt;/code&gt;, three joins from &lt;code&gt;film&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;What other systems do, and what this section adopts: let a model choose tables from a short catalog of every table
+(it knows revenue is payments), fill in the tables that join the chosen ones from the foreign-key graph, let business
+terms bring their own tables, and measure recall on a schema past the threshold.&lt;/p&gt;
+&lt;h3 id="172-goals-and-non-goals"&gt;17.2 Goals and non-goals&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Goal:&lt;/strong&gt; on a schema over the threshold, every table the answer needs reaches the planner, with the columns it needs.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Goal:&lt;/strong&gt; the smoke question on Pagila gets &lt;code&gt;payment&lt;/code&gt;, &lt;code&gt;rental&lt;/code&gt;, &lt;code&gt;inventory&lt;/code&gt;, &lt;code&gt;film&lt;/code&gt;, &lt;code&gt;film_category&lt;/code&gt; and &lt;code&gt;category&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Non-goal:&lt;/strong&gt; changing anything at or below the threshold (the whole snapshot is still sent with no search).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Non-goal:&lt;/strong&gt; schemas past a few hundred tables getting the same recall (see the catalog cap); scale-only work
+  waits until someone needs it.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Anti-goal:&lt;/strong&gt; a table the caller may not read reaching the model, in the catalog or in what is sent.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Anti-goal:&lt;/strong&gt; a selector failure failing the run. It degrades to today's retrieval plus the deterministic steps.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="173-the-design"&gt;17.3 The design&lt;/h3&gt;
+&lt;p&gt;Inside &lt;code&gt;SchemaRetrieverNode&lt;/code&gt; (&lt;code&gt;pipeline/nodes/schema_retriever/node.py&lt;/code&gt;), when the caller's visible tables in the
+sub-query's datasource exceed &lt;code&gt;full_snapshot_max_tables&lt;/code&gt;, the selected set is the union of four sources, in this
+order. Everything is per sub-query and per datasource, as retrieval already is; a pinned plan still sends every table
+and makes no selector call.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Vector search&lt;/strong&gt;, as today (&lt;code&gt;table_k&lt;/code&gt;, the column fallback).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Glossary terms.&lt;/strong&gt; &lt;code&gt;match_terms&lt;/code&gt; moves before retrieval and runs once: its result is passed on to
+   &lt;code&gt;_knowledge_used&lt;/code&gt; instead of matching again. Each matched term's &lt;code&gt;tables&lt;/code&gt;, and the table part of each of its
+   &lt;code&gt;columns&lt;/code&gt;, are added. Their named columns are kept on those tables (step 5).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The table selector&lt;/strong&gt;, one model call (17.4).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Join-path fill.&lt;/strong&gt; Over a graph of the visible tables, built from the snapshot's &lt;code&gt;foreign_keys&lt;/code&gt; and the glossary
+   joins in &lt;code&gt;SchemaKnowledge.relationships&lt;/code&gt;, connect the tables from steps 1–3: repeatedly join the nearest
+   unconnected table to the connected group by a shortest path (an approximate Steiner tree), adding the tables on
+   the path. A path longer than &lt;code&gt;join_path_max_hops&lt;/code&gt; (default 4) is not added, and the tables stay unconnected, as
+   today. Edges to tables the caller cannot read never enter the graph.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Columns.&lt;/strong&gt; Bridge tables from step 4 keep what B103 already keeps: primary key, both sides of each offered join,
+   the label. Tables the selector picked keep all their columns, up to 40; past 40 they get the planning search's
+   columns plus the B103 keys. Glossary-term columns are always kept. Vector-picked tables are unchanged.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;The planning search (&lt;code&gt;planning_k&lt;/code&gt;) and everything after the retriever are unchanged. The retrieval trace record lists,
+for each sent table, which steps added it (&lt;code&gt;vector&lt;/code&gt;, &lt;code&gt;glossary&lt;/code&gt;, &lt;code&gt;selector&lt;/code&gt;, &lt;code&gt;join_path&lt;/code&gt;), so a missed answer can be
+traced to its cause.&lt;/p&gt;
+&lt;h3 id="174-the-table-selector"&gt;17.4 The table selector&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;A new agent, &lt;code&gt;table_selector&lt;/code&gt;&lt;/strong&gt;, in &lt;code&gt;AgentName&lt;/code&gt; and &lt;code&gt;LLM_AGENTS&lt;/code&gt; (node name &lt;code&gt;tableselector&lt;/code&gt;), so it can be pointed
+  at a cheaper model under &lt;code&gt;llm.agents&lt;/code&gt;. The template is &lt;code&gt;curated_matcher&lt;/code&gt;: &lt;code&gt;PROMPT | structured(llm, TableSelection)&lt;/code&gt;.
+  &lt;code&gt;TableSelection&lt;/code&gt; is &lt;code&gt;tables: List[str]&lt;/code&gt; (qualified names as the catalog gives them).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The catalog&lt;/strong&gt; is every visible table: its name, its description from &lt;code&gt;SchemaKnowledge.tables&lt;/code&gt; (already
+  scope-cleaned, so a description naming a hidden table is dropped) cut to 200 characters, and its column names.
+  Entries reach the prompt only as JSON values, as &lt;code&gt;knowledge/render.py&lt;/code&gt; does, under a &lt;code&gt;[TABLES]&lt;/code&gt; marker that the
+  prompt calls data, not instructions. The question, the step-2 glossary matches and the tables steps 1 and 2 already
+  chose go in too, the last marked as already selected, so the model's job is to add what is missing.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The model is built lazily.&lt;/strong&gt; &lt;code&gt;get_llm("tableselector")&lt;/code&gt; is called on the first selector call, never in
+  &lt;code&gt;__init__&lt;/code&gt;, and never when &lt;code&gt;table_selector&lt;/code&gt; is off: &lt;code&gt;SchemaRetrieverNode&lt;/code&gt; is also built by &lt;code&gt;evaluation/seed.py&lt;/code&gt;
+  (&lt;code&gt;visible_tables&lt;/code&gt;) and &lt;code&gt;retrieval_recall.sent()&lt;/code&gt;, which must work with no key.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The prompt&lt;/strong&gt; asks for every table the question needs, including tables that hold a measure or a filter it
+  implies, and says to include a table when unsure. It does not ask for joins; step 4 does that.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Catalog cap.&lt;/strong&gt; Past &lt;code&gt;selector_catalog_max&lt;/code&gt; visible tables (default 200), the catalog is the
+  &lt;code&gt;selector_catalog_max&lt;/code&gt; nearest tables by vector search instead of all of them.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Output checking.&lt;/strong&gt; A name not in the catalog is dropped. An empty pick is allowed (steps 1, 2 and 4 still run).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Failures.&lt;/strong&gt; An invalid output after the agent's parse retries, or a provider error, logs a warning and continues
+  without the selector's tables. &lt;code&gt;LimitReached&lt;/code&gt; and &lt;code&gt;RunCancelled&lt;/code&gt; are not swallowed. Both subclass &lt;code&gt;Exception&lt;/code&gt;, so
+  they are re-raised in two places: in the selector's own catch, and before the blanket &lt;code&gt;except Exception&lt;/code&gt; in
+  &lt;code&gt;SchemaRetrieverNode.__call__&lt;/code&gt; that falls back to the whole snapshot (B105's path).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Cost.&lt;/strong&gt; One call per sub-query that reaches retrieval on a schema over the threshold. It counts against
+  &lt;code&gt;max_llm_calls&lt;/code&gt; and &lt;code&gt;max_cost_usd&lt;/code&gt; through the run's &lt;code&gt;Budget&lt;/code&gt;, like every node's call.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Off switch.&lt;/strong&gt; &lt;code&gt;settings.retrieval.table_selector: false&lt;/code&gt; skips step 3. Steps 2 and 4 stay on; they make no call.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;New settings sit in &lt;code&gt;RetrievalSettings&lt;/code&gt; (&lt;code&gt;config/models.py&lt;/code&gt;): &lt;code&gt;table_selector&lt;/code&gt; (true), &lt;code&gt;selector_catalog_max&lt;/code&gt; (200),
+&lt;code&gt;join_path_max_hops&lt;/code&gt; (4).&lt;/p&gt;
+&lt;h3 id="175-measuring-it"&gt;17.5 Measuring it&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Tests with a fake LLM&lt;/strong&gt;, on a Pagila snapshot fixture with Pagila's real tables and foreign keys. The 29-table
+  fixture in &lt;code&gt;tests/unit/test_schema_retriever_keys.py&lt;/code&gt; has only four real tables plus filler, so it is replaced or
+  extended with the real ones (&lt;code&gt;film_category&lt;/code&gt;, &lt;code&gt;category&lt;/code&gt;, &lt;code&gt;inventory&lt;/code&gt;, &lt;code&gt;rental&lt;/code&gt; and the rest), shared by both test
+  files. The smoke question sends all six tables of 17.2 with &lt;code&gt;payment.amount&lt;/code&gt;. Step 4 alone, given &lt;code&gt;film&lt;/code&gt; and &lt;code&gt;payment&lt;/code&gt;,
+  adds &lt;code&gt;inventory&lt;/code&gt; and &lt;code&gt;rental&lt;/code&gt;. A hidden table never appears in the catalog, the result or a path. A selector that
+  raises, or names an unknown table, still returns the other steps' tables. Glossary-term tables arrive with no
+  selector. At or below the threshold, or with a pinned plan, no selector call is made. &lt;code&gt;LimitReached&lt;/code&gt; from the
+  selector ends the run. With &lt;code&gt;table_selector&lt;/code&gt; off and no key configured, the node builds and retrieves. The trace
+  record keeps its &lt;code&gt;table&lt;/code&gt; and &lt;code&gt;columns&lt;/code&gt; keys, so &lt;code&gt;retrieval_recall.sent()&lt;/code&gt; reads it unchanged.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;A Pagila eval suite&lt;/strong&gt; (&lt;code&gt;evaluation/suites/pagila.yaml&lt;/code&gt;) with gold tables and gold SQL. It starts with the smoke
+  question and about ten more, chosen so the needed tables sit more than one join apart or the question's words don't
+  match the table names. Gold tables are read from the gold SQL and checked by hand.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Retrieval mode stays model-free&lt;/strong&gt;, as its docstring says (glossary matching is an embedding search, not a model
+  call), so a CI baseline needs no key: &lt;code&gt;RETRIEVAL_CHANGES&lt;/code&gt; in &lt;code&gt;retrieval_recall.py&lt;/code&gt; also sets
+  &lt;code&gt;settings.retrieval.table_selector&lt;/code&gt; to false, &lt;code&gt;retrieval_settings()&lt;/code&gt; reports it, and the run covers steps 1, 2 and
+  4 and records the floor without the model. The floor has no target; it is a baseline. Whether the Pagila retrieval record can run on CI
+  (it needs the Pagila schema indexed) is the builder's call: through the &lt;code&gt;realdb&lt;/code&gt; workflow, or from the snapshot
+  fixture. If neither fits in this PR, the suite ships and the baseline is a follow-up row.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;An end-to-end run with the model&lt;/strong&gt; on the test bed's Pagila (the suite, with the selector on) is run once by the
+  owner with a key, after the PR is green. The target is every gold table sent for every question; a miss is
+  investigated through the trace's per-table steps before the row is closed. The results go in the built note. It
+  needs the owner's yes, as every keyed run does.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="176-docs"&gt;17.6 Docs&lt;/h3&gt;
+&lt;p&gt;The retrieval settings and the new agent in the configuration pages, the retrieval description wherever the docs
+explain how tables are chosen, and a C-W4 built note under 13.1 when it ships.&lt;/p&gt;
+&lt;h3 id="177-builders-calls"&gt;17.7 Builder's calls&lt;/h3&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Call&lt;/th&gt;
+&lt;th&gt;What was picked&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Columns for selector-picked tables&lt;/td&gt;
+&lt;td&gt;All, up to 40; past 40, the planning search's plus the B103 keys. The selector does not pick columns.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Catalog entry&lt;/td&gt;
+&lt;td&gt;Name, description cut to 200 characters, column names.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;join_path_max_hops&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;4: Pagila's &lt;code&gt;film → payment&lt;/code&gt; is 3.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;selector_catalog_max&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;200, about 15k tokens with column names.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Path algorithm&lt;/td&gt;
+&lt;td&gt;Approximate Steiner tree by repeated shortest paths (BFS; edges unweighted).&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Selector input&lt;/td&gt;
+&lt;td&gt;Gets the tables steps 1 and 2 already chose, marked as selected, and adds to them.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Eval target&lt;/td&gt;
+&lt;td&gt;100% gold-table recall on the Pagila suite with the selector on; the model-free floor is a baseline only.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pagila fixture&lt;/td&gt;
+&lt;td&gt;Real Pagila tables and foreign keys, replacing the filler fixture, shared by the retriever tests.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;One PR&lt;/td&gt;
+&lt;td&gt;Selector, glossary step, join fill and the suite together; if it passes 1,000 changed lines, the suite and its eval wiring move to a second PR.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
 
 
 
