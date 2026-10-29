@@ -4298,6 +4298,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-pagila-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pagila suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#regenerating-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5821,6 +5832,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-pagila-suite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Pagila suite
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#regenerating-rows" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6090,10 +6112,28 @@ The suite is copied by <code>nl2sql init --demo</code> but not named in <code>ev
 since its cases run only with clarification on:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">suites</span><span class="o">=</span><span class="p">[</span><span class="s2">"evals/clarify.yaml"</span><span class="p">],</span> <span class="n">clarify</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="the-pagila-suite">The Pagila suite</h2>
+<p><code>suites/pagila.yaml</code> holds 11 approved cases over the test bed's Pagila
+database (a datasource named <code>pagila</code>), which is past
+<code>settings.retrieval.full_snapshot_max_tables</code>, so the retriever has to choose
+tables (<a href="../../architecture/wave_c/#17-c-w4-table-recall-on-large-schemas">the design</a>).
+Each case is chosen so a table it needs is more than one join from the
+others, or the question's words are not near the table's name ("revenue" is
+not near <code>payment</code>): the smoke question "top 5 films by revenue in the top
+category" needs <code>film</code>, <code>film_category</code>, <code>category</code>, <code>inventory</code>, <code>rental</code> and
+<code>payment</code>. <code>tables</code> and <code>columns</code> are what the gold SQL reads, and
+<code>test_pagila_suite_reads_the_tables_it_names</code> keeps the two equal.</p>
+<p><code>nl2sql init --demo</code> does not copy it into the demo, which has no Pagila. The cases
+have SQL and no <code>rows</code>: point a suite file at the test bed and run
+<code>engine.evals.regenerate</code>, then review the rows, before a full run. Mode
+retrieval needs no rows.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--suite<span class="w"> </span>pagila.yaml<span class="w"> </span>--out<span class="w"> </span>eval_pagila.json<span class="w">   </span><span class="c1"># no key: the floor, without the table selector</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--suite<span class="w"> </span>pagila.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">                  </span><span class="c1"># with the selector: every gold table should be sent</span>
+</code></pre></div>
 <h2 id="regenerating-rows">Regenerating rows</h2>
 <p><code>rows</code> and <code>alt_rows</code> are never typed by hand. After you add or edit a case,
 an alternative or any SQL, run:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"evals/mine.yaml"</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">evals</span><span class="o">.</span><span class="n">regenerate</span><span class="p">(</span><span class="s2">"evals/mine.yaml"</span><span class="p">)</span>
 </code></pre></div>
 <p>For each approved case with SQL, <code>regenerate</code> asks the case's datasource
 adapter to run <code>sql</code> and every <code>alt_sql</code>. It goes through the engine's

@@ -7670,6 +7670,9 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
   connecting.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Mode retrieval&lt;/strong&gt; is still model-free: &lt;code&gt;RETRIEVAL_CHANGES&lt;/code&gt; also sets &lt;code&gt;settings.retrieval.table_selector&lt;/code&gt; to false and
   &lt;code&gt;retrieval_settings()&lt;/code&gt; reports it and &lt;code&gt;join_path_max_hops&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Suite&lt;/strong&gt; (&lt;code&gt;evaluation/suites/pagila.yaml&lt;/code&gt;, the second PR). 11 approved cases over the test bed's Pagila, gold SQL and
+  tables, the smoke question first. &lt;code&gt;test_pagila_suite_reads_the_tables_it_names&lt;/code&gt; parses each gold SQL with sqlglot and
+  holds &lt;code&gt;tables&lt;/code&gt; equal to the tables it reads. The cases have no &lt;code&gt;rows&lt;/code&gt;: &lt;code&gt;regenerate&lt;/code&gt; writes them against the test bed.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Tests.&lt;/strong&gt; &lt;code&gt;tests/unit/test_table_recall.py&lt;/code&gt; (the smoke question, per-table steps, join path alone, hop limit, a
   view with no key, bridge columns, selector columns up to and past 40, a hidden table in the catalog, the result and a
   path, a raising selector, an unknown name, an empty pick, glossary tables with no selector, the prompt, the catalog
@@ -7694,9 +7697,8 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
   drops them. The selector's call carries &lt;code&gt;metadata["langgraph_node"] = "table_selector"&lt;/code&gt;, so usage, the Pipeline page
   and &lt;code&gt;models_by_node&lt;/code&gt; attribute it to its own step. Each trace table also carries &lt;code&gt;qualified&lt;/code&gt;, so two schemas with one
   table name stay apart. &lt;code&gt;test_schema_retriever_keys.py&lt;/code&gt; now uses the shared Pagila fixture.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Still to do.&lt;/strong&gt; The Pagila suite (second PR). Then the owner's keyed run on the test bed's Pagila with the selector
-  on (17.5): regenerate the suite's rows, run mode full, and for any gold table not sent read the trace's per-table
-  &lt;code&gt;steps&lt;/code&gt; before closing B106.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Still to do (owner).&lt;/strong&gt; The keyed run on the test bed's Pagila with the selector on (17.5): regenerate the suite's
+  rows, run mode full, and for any gold table not sent read the trace's per-table &lt;code&gt;steps&lt;/code&gt; before closing B106.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
