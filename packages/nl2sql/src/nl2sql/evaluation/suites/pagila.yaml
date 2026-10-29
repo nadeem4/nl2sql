@@ -180,13 +180,12 @@ cases:
   difficulty: hard
   tags: [table-recall, aggregation]
   outcome: {admin: allowed}
-  tables: [customer, rental, inventory, film_category, category]
-  columns: [category.name, customer.customer_id]
+  tables: [rental, inventory, film_category, category]
+  columns: [category.name, rental.customer_id]
   order_matters: false
   sql: |
-    SELECT COUNT(DISTINCT cu.customer_id) AS customers
-    FROM customer cu
-    JOIN rental r ON r.customer_id = cu.customer_id
+    SELECT COUNT(DISTINCT r.customer_id) AS customers
+    FROM rental r
     JOIN inventory i ON i.inventory_id = r.inventory_id
     JOIN film_category fc ON fc.film_id = i.film_id
     JOIN category ca ON ca.category_id = fc.category_id
@@ -221,10 +220,10 @@ cases:
   tags: [table-recall, aggregation]
   outcome: {admin: allowed}
   tables: [customer, address, city]
-  columns: [city.city]
+  columns: [city.city_id]
   order_matters: false
   sql: |
-    SELECT COUNT(DISTINCT ci.city) AS cities
+    SELECT COUNT(DISTINCT ci.city_id) AS cities
     FROM customer cu
     JOIN address a ON a.address_id = cu.address_id
     JOIN city ci ON ci.city_id = a.city_id

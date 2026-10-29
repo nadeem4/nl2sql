@@ -33,3 +33,12 @@ def test_pagila_suite_reads_the_tables_it_names(case):
     assert set(case.tables) == _tables_read(case.sql), case.id
     assert {c.split(".")[0] for c in case.columns} <= set(case.tables), case.id
     assert all(c.casefold() in COLUMNS for c in case.columns), case.id
+
+
+def test_the_demo_does_not_copy_a_suite_for_a_database_it_does_not_have(tmp_path):
+    from nl2sql.config.project import init_project
+
+    init_project(tmp_path, demo=True)
+
+    copied = {p.name for p in (tmp_path / "evals").iterdir()}
+    assert "chinook.yaml" in copied and "pagila.yaml" not in copied
