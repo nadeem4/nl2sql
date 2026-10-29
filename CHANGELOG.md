@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.9.0](https://github.com/nadeem4/nl2sql/compare/v0.8.0...v0.9.0) (2026-10-29)
+
+
+### Features
+
+* **charts:** automatic charts from a result's column kinds (K1) ([#357](https://github.com/nadeem4/nl2sql/issues/357)) ([b8f3f0f](https://github.com/nadeem4/nl2sql/commit/b8f3f0f009d600c46425626a74b702d78edc774b))
+* **charts:** Mermaid diagrams of an answer and a schema (K2) ([#366](https://github.com/nadeem4/nl2sql/issues/366)) ([3417821](https://github.com/nadeem4/nl2sql/commit/3417821ae6376b7ddfc44aa8e363aacdbf2189dd))
+* **cli:** nl2sql launch, from a database to a working project (L3) ([#373](https://github.com/nadeem4/nl2sql/issues/373)) ([0b8893e](https://github.com/nadeem4/nl2sql/commit/0b8893e8c08c91212a66a4628b7fd0d4040f0490))
+* **config:** write projects and datasources with secrets as env references (L2) ([#364](https://github.com/nadeem4/nl2sql/issues/364)) ([f0aab54](https://github.com/nadeem4/nl2sql/commit/f0aab5434d463ee88ec11ccb5de63fc08ac9332d))
+* **conversations:** chat tools in the loop and the conversation report (C2) ([#363](https://github.com/nadeem4/nl2sql/issues/363)) ([ded431e](https://github.com/nadeem4/nl2sql/commit/ded431ec1bca6670dea642ea5d650ce60b7d80d6))
+* **conversations:** model-led conversations with ask, retry and ownership (C1) ([#358](https://github.com/nadeem4/nl2sql/issues/358)) ([05c24f3](https://github.com/nadeem4/nl2sql/commit/05c24f31eab5167dc3b331efdc5d0fb6da3648c3))
+* **dashboards:** a starter dashboard from the schema and glossary (D3) ([#370](https://github.com/nadeem4/nl2sql/issues/370)) ([d8713a1](https://github.com/nadeem4/nl2sql/commit/d8713a14ed16ffbb3fa7bde97e4e190fbcf1cd96))
+* **dashboards:** chat builds and edits dashboards (D4) ([#371](https://github.com/nadeem4/nl2sql/issues/371)) ([496d959](https://github.com/nadeem4/nl2sql/commit/496d959e385799e67fb2bb6aea8f5bc3b38b6189))
+* **dashboards:** dashboard filters as predicates before the validator (D2b) ([#372](https://github.com/nadeem4/nl2sql/issues/372)) ([8c3deec](https://github.com/nadeem4/nl2sql/commit/8c3deec2750489c8dc83220523f37ad56aeeb871))
+* **dashboards:** token-free refresh, stored results and schedules (D2) ([#365](https://github.com/nadeem4/nl2sql/issues/365)) ([d0cbd14](https://github.com/nadeem4/nl2sql/commit/d0cbd14f82c4d2b42a537704f5ab7a2a095376cc))
+* **dashboards:** workspaces, the dashboard store and manual edits (D1) ([#361](https://github.com/nadeem4/nl2sql/issues/361)) ([42fc4d1](https://github.com/nadeem4/nl2sql/commit/42fc4d11a29fa9a0f556af2032571838e5b3e7aa))
+* **datasources:** scan a folder, URL or local ports for datasources (L1) ([#359](https://github.com/nadeem4/nl2sql/issues/359)) ([091e1c5](https://github.com/nadeem4/nl2sql/commit/091e1c5c5cd82a29281c6f6bf3afe3dae16793a1))
+* **keys:** API keys with hashed tokens, revoke and verify (M1) ([#360](https://github.com/nadeem4/nl2sql/issues/360)) ([9fd4a81](https://github.com/nadeem4/nl2sql/commit/9fd4a81f61af8c701e8cb2d96b3cb9b808203556))
+* **mcp:** MCP over HTTP with API keys (M2) ([#367](https://github.com/nadeem4/nl2sql/issues/367)) ([bdb856c](https://github.com/nadeem4/nl2sql/commit/bdb856cf8d33d8cbf4b87ea5665a39ccdef71ceb))
+* **wave-c:** shared models, config, codes, events and store v4 (C0a) ([#354](https://github.com/nadeem4/nl2sql/issues/354)) ([696c798](https://github.com/nadeem4/nl2sql/commit/696c798280b6e912b61d7a89a0216ee5cf4c2b19))
+* **wave-c:** supplied plan for a whole run, answer flag and track stubs (C0b) ([#355](https://github.com/nadeem4/nl2sql/issues/355)) ([abba2b6](https://github.com/nadeem4/nl2sql/commit/abba2b6eed8d70cb8885fac2907c2d9bdc1a90ab))
+
+
+### Bug Fixes
+
+* **conversations:** a pipeline timeout fails the step, not the turn ([#376](https://github.com/nadeem4/nl2sql/issues/376)) ([08c7c73](https://github.com/nadeem4/nl2sql/commit/08c7c7353fd48ba9f5e3188d3faa7c64bf09a49a))
+* **generator:** emit COUNT(*) and t1.* unquoted, as the validator reads them ([#374](https://github.com/nadeem4/nl2sql/issues/374)) ([f007670](https://github.com/nadeem4/nl2sql/commit/f0076705f0ac2cab40386bc71eccea9c0984b7d6))
+* **results:** results are readable only by the caller who asked ([#369](https://github.com/nadeem4/nl2sql/issues/369)) ([57e5c5a](https://github.com/nadeem4/nl2sql/commit/57e5c5a4e7054cc04566e172bed78229d824317b))
+* **results:** withheld runs stay unreadable by trace id ([#362](https://github.com/nadeem4/nl2sql/issues/362)) ([7b2d30a](https://github.com/nadeem4/nl2sql/commit/7b2d30a63c53039b4fc6d0fd7e3d3aa4ad5b9644))
+* **retrieval:** keep key columns and fall back to the snapshot when search fails ([#377](https://github.com/nadeem4/nl2sql/issues/377)) ([04e3c27](https://github.com/nadeem4/nl2sql/commit/04e3c275f3a21aef4bb1045979d992a73d609fc8))
+
+
+### Documentation
+
+* **release:** notes for 0.9.0 ([#375](https://github.com/nadeem4/nl2sql/issues/375)) ([0369340](https://github.com/nadeem4/nl2sql/commit/03693406a32e32481cdb2fdfd104851c380c5b7e))
+* **wave-c:** model-led chat, dashboards pinned whole, workspaces, refresh ([#352](https://github.com/nadeem4/nl2sql/issues/352)) ([ae72415](https://github.com/nadeem4/nl2sql/commit/ae72415ac4b4a739afd61b5694e7ff2b539da24b))
+* **wave-c:** one Built-note slot per row ([#368](https://github.com/nadeem4/nl2sql/issues/368)) ([661ca9c](https://github.com/nadeem4/nl2sql/commit/661ca9c8473e3eac96b597940510e1350e7348ec))
+
 ## [0.8.0](https://github.com/nadeem4/nl2sql/compare/v0.7.0...v0.8.0) (2026-10-28)
 
 
