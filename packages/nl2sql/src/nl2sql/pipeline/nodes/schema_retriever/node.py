@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
-from nl2sql.common.errors import ErrorCode, RunWarning
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.common.logger import get_logger
 from nl2sql.knowledge.models import KnowledgeUsed
 from nl2sql.runtime import Runtime
@@ -301,6 +301,8 @@ class SchemaRetrieverNode:
 
         Descriptions, roles, units, grains and code values come from
         ``knowledge``, and its glossary joins are listed beside the foreign keys.
+        A table cut to the columns the search returned keeps the ones a join or
+        an answer needs as well (``_kept_columns``).
         """
         if not snapshot:
             return []
@@ -309,6 +311,7 @@ class SchemaRetrieverNode:
         tables_out: List[Table] = []
         table_keys = list(visible) if not resolved_tables else list(resolved_tables.keys())
         visible_names = {contract.table.full_name for contract in visible.values()}
+        kept = self._kept_columns(table_keys, visible, knowledge) if resolved_tables else {}
 
         for table_key in table_keys:
             table_contract = visible.get(table_key)
@@ -319,10 +322,11 @@ class SchemaRetrieverNode:
             resolved_columns = resolved_tables[table_key] if resolved_tables else set()
             if not resolved_columns:
                 resolved_columns = set(table_contract.columns.keys())
+            resolved_columns = resolved_columns | kept.get(table_key, set())
 
             columns: List[Column] = []
             for col_key, col_contract in table_contract.columns.items():
-                if col_key not in resolved_columns:
+                if col_key not in resolved_columns and col_contract.name not in resolved_columns:
                     continue
                 col_metadata = table_metadata.columns.get(col_key) if table_metadata else None
                 facts = dict(knowledge.columns.get((table_key, col_contract.name)) or {})
@@ -380,6 +384,40 @@ class SchemaRetrieverNode:
         return tables_out
 
     @staticmethod
+    def _kept_columns(table_keys: List[str], visible: Dict[str, Any],
+                      knowledge: SchemaKnowledge) -> Dict[str, Set[str]]:
+        """The columns each table keeps whatever the search returned, by table key.
+
+        Its primary key; both sides of every foreign key and glossary join it
+        is offered (from it to a readable table, and into it from another table
+        sent), so each join the planner sees can be bound; and its label, the
+        column named ``name`` or ``title`` (or ``<table>_name``, ``<table>_title``),
+        which an answer lists or filters by far more often than the search finds it.
+        """
+        key_of = {contract.table.full_name: key for key, contract in visible.items()}
+        sent = set(table_keys)
+        kept: Dict[str, Set[str]] = defaultdict(set)
+        for table_key in sent:
+            contract = visible.get(table_key)
+            if contract is None:
+                continue
+            table = contract.table.table_name.lower()
+            labels = {"name", "title", f"{table}_name", f"{table}_title"}
+            kept[table_key].update(c.name for c in contract.columns.values()
+                                   if c.is_primary_key or c.name.lower() in labels)
+            joins = [(fk.constrained_columns, fk.referred_table.full_name, fk.referred_columns)
+                     for fk in contract.foreign_keys]
+            joins += [(rel["from_columns"], rel["to_table"], rel["to_columns"])
+                      for rel in knowledge.relationships.get(table_key, [])]
+            for from_columns, to_table, to_columns in joins:
+                if to_table not in key_of:
+                    continue  # a join into a hidden table is not offered
+                kept[table_key].update(from_columns)
+                if key_of[to_table] in sent:
+                    kept[key_of[to_table]].update(to_columns)
+        return kept
+
+    @staticmethod
     def _retrieval(query: str, searches: List[Dict[str, Any]], tables_out: List[Table],
                    reason: Optional[str] = None) -> Dict[str, Any]:
         """What the vector searches retrieved and what survived, for the run trace.
@@ -396,16 +434,19 @@ class SchemaRetrieverNode:
         return record
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
+        sub_query = state.sub_query
+        if not sub_query:
+            return {"relevant_tables": []}
+        query = ""
+        snapshot: Optional[SchemaSnapshot] = None
+        visible: Optional[Dict[str, Any]] = None
+        preferred: Callable[[TableRef], bool] = lambda _ref: False
+        knowledge: Optional[SchemaKnowledge] = None
         try:
-            sub_query = state.sub_query
-            if not sub_query:
-                return {"relevant_tables": []}
-
             datasource_id = sub_query.datasource_id
-            schema_version = sub_query.schema_version
             query = self._build_semantic_query(sub_query)
 
-            snapshot = self._resolve_snapshot(datasource_id, schema_version)
+            snapshot = self._resolve_snapshot(datasource_id, sub_query.schema_version)
             visible = self._visible(state.user_context, datasource_id, snapshot)
             preferred = self._preferred(datasource_id)
             knowledge = self._knowledge(state.user_context, datasource_id, snapshot)
@@ -416,16 +457,39 @@ class SchemaRetrieverNode:
             return update
         except Exception as exc:
             logger.error(f"Schema retrieval failed: {exc}")
+            message = f"Schema retrieval failed: {exc}"
+            if snapshot and visible is not None:
+                # Planning without a schema fails every attempt, so the planner gets every table
+                # the caller may read instead, as when the search finds nothing.
+                return self._whole_snapshot(query, [], snapshot, sub_query.schema_version, visible, preferred,
+                                            knowledge, f"{message}. Using full schema snapshot.")
             return {
                 "relevant_tables": [],
-                "reasoning": [
-                    {
-                        "node": self.node_name,
-                        "content": f"Schema retrieval failed: {exc}",
-                        "type": "error",
-                    }
-                ],
+                "reasoning": [{"node": self.node_name, "content": message, "type": "error"}],
+                # Nothing to plan from, and a retry would meet the same failure: the sub-query ends here.
+                "errors": [PipelineError(node=self.node_name, message=message, severity=ErrorSeverity.CRITICAL,
+                                         error_code=ErrorCode.SCHEMA_RETRIEVAL_FAILED)],
             }
+
+    def _whole_snapshot(self, query: str, searches: List[Dict[str, Any]], snapshot: Optional[SchemaSnapshot],
+                        schema_version: Optional[str], visible: Dict[str, Any],
+                        preferred: Callable[[TableRef], bool], knowledge: Optional[SchemaKnowledge],
+                        message: str) -> Dict[str, Any]:
+        """Every table the caller may read, with a ``SCHEMA_RETRIEVAL_FAILED`` warning saying why."""
+        relevant_tables = self._build_tables_from_snapshot(
+            snapshot, resolved_tables=None, schema_version=schema_version,
+            visible=visible, preferred=preferred, knowledge=knowledge,
+        )
+        return {
+            "relevant_tables": relevant_tables,
+            "retrieval": self._retrieval(
+                query, searches, relevant_tables,
+                reason=None if self.vector_store else "No vector store is configured.",
+            ),
+            "reasoning": [{"node": self.node_name, "content": message, "type": "warning"}],
+            "warnings": [RunWarning(code=ErrorCode.SCHEMA_RETRIEVAL_FAILED.value, node=self.node_name,
+                                    message=message)],
+        }
 
     def _retrieve(self, state: SubgraphExecutionState, query: str, snapshot: Optional[SchemaSnapshot],
                   visible: Dict[str, Any], preferred: Callable[[TableRef], bool],
@@ -517,35 +581,8 @@ class SchemaRetrieverNode:
                     tables[to_table].update(doc.metadata.get("to_columns") or [])
 
         if not tables:
-            relevant_tables = self._build_tables_from_snapshot(
-                snapshot,
-                resolved_tables=None,
-                schema_version=schema_version,
-                visible=visible,
-                preferred=preferred,
-                knowledge=knowledge,
-            )
-            return {
-                "relevant_tables": relevant_tables,
-                "retrieval": self._retrieval(
-                    query, searches, relevant_tables,
-                    reason=None if self.vector_store else "No vector store is configured.",
-                ),
-                "reasoning": [
-                    {
-                        "node": self.node_name,
-                        "content": "Vector retrieval produced no candidates. Using full schema snapshot.",
-                        "type": "warning",
-                    }
-                ],
-                "warnings": [
-                    RunWarning(
-                        code=ErrorCode.SCHEMA_RETRIEVAL_FAILED.value,
-                        node=self.node_name,
-                        message="Vector retrieval produced no candidates. Using full schema snapshot.",
-                    )
-                ],
-            }
+            return self._whole_snapshot(query, searches, snapshot, schema_version, visible, preferred, knowledge,
+                                        "Vector retrieval produced no candidates. Using full schema snapshot.")
 
         relevant_tables = self._build_tables_from_snapshot(
             snapshot,

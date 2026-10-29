@@ -18,6 +18,7 @@ Failure in this system is represented as structured `PipelineError` objects accu
 - Resolver returns `SCHEMA_RETRIEVAL_FAILED` if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.
 - Resolver returns `QUESTION_NOT_ANSWERABLE` when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns `SCHEMA_RETRIEVAL_FAILED` with the model's error, or a `PROVIDER_*` error when the provider refused it.
 - Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns `None`, it silently returns an empty table list.
+- A schema retrieval that raises (an embedding model that cannot load, a broken index) falls back the same way when there is a snapshot: every table the caller may read, with a `SCHEMA_RETRIEVAL_FAILED` warning. With no snapshot it returns a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` error and the SQL agent ends the sub-query before the planner, instead of planning against no tables until the run times out.
 
 ### Planning
 - Decomposer LLM failures return `ORCHESTRATOR_CRASH` (critical) and empty responses; a provider's refusal returns a `PROVIDER_*` error instead.

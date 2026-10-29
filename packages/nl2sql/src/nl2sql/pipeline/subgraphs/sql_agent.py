@@ -32,7 +32,10 @@ def build_sql_agent_graph(
     """Builds the SQL Agent Subgraph.
 
     Pipeline Flow:
-    Planner -> LogicalValidator -> Clarifier -> Generator -> Executor
+    SchemaRetriever -> Planner -> LogicalValidator -> Clarifier -> Generator -> Executor
+
+    A retrieval that failed with no snapshot to fall back to ends the
+    sub-query before the planner (``SCHEMA_RETRIEVAL_FAILED``, not retried).
 
     The clarifier is on the validator's "valid" edge: with no alternative
     readings from the planner it passes straight through; when it asks which
@@ -119,6 +122,12 @@ def build_sql_agent_graph(
         return {
             "retry_count": count + 1,
         }
+
+    def check_retriever(state: SubgraphExecutionState) -> str:
+        """Ends the sub-query when retrieval failed with no schema to plan from; planning blind cannot succeed."""
+        if any(not e.is_retryable for e in state.errors):
+            return "end"
+        return "ok"
 
     def check_planner(state: SubgraphExecutionState, config: Optional[RunnableConfig] = None) -> str:
         """Routes based on planner result."""
@@ -207,7 +216,11 @@ def build_sql_agent_graph(
 
     graph.set_entry_point("schema_retriever")
 
-    graph.add_edge("schema_retriever", "ast_planner")
+    graph.add_conditional_edges(
+        "schema_retriever",
+        check_retriever,
+        {"ok": "ast_planner", "end": END},
+    )
 
     graph.add_conditional_edges(
         "ast_planner",
