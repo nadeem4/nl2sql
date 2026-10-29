@@ -235,9 +235,18 @@ def test_a_failed_rebuild_is_reported_and_keeps_the_previous_index(tmp_path, mon
     assert body["health"]["total"] == 1
 
 
-def test_an_old_demo_folder_is_flagged(tmp_path):
-    _, client = _client(tmp_path)  # tmp_path has no stamp
+def test_a_folder_stamped_by_an_older_engine_is_flagged(tmp_path):
+    (tmp_path / "nl2sql-demo.json").write_text('{"engine_version": "0.0.1"}', encoding="utf-8")
+    _, client = _client(tmp_path)
 
     folder = client.get("/api/index").json()["folder"]
 
     assert folder["warning"] and "--dir" in folder["warning"]
+
+
+def test_an_unstamped_folder_is_not_a_demo_folder_so_it_is_not_flagged(tmp_path):
+    _, client = _client(tmp_path)  # tmp_path has no stamp: made by launch or init, not by nl2sql demo
+
+    folder = client.get("/api/index").json()["folder"]
+
+    assert not folder["warning"]

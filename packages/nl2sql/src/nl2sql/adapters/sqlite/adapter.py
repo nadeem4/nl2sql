@@ -2,11 +2,11 @@ import time
 from typing import Any, Dict, Optional
 
 from pydantic import Field
-from sqlalchemy import Engine, event, make_url
+from sqlalchemy import Engine, event, make_url, text
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-from nl2sql_sdk import ConnectionModel, DatasourceCapability
+from nl2sql_sdk import ConnectionCheck, ConnectionModel, DatasourceCapability
 from nl2sql_sdk.discovery import Found
 from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter
 import sqlglot
@@ -128,10 +128,21 @@ class SqliteAdapter(SQLAlchemyAdapter):
         return engine
 
     def classify(self, exc: BaseException) -> Optional[str]:
-        """A file that cannot be opened is the ``database`` stage: read-only never creates one."""
-        if "unable to open database file" in str(getattr(exc, "orig", None) or exc):
+        """A file that cannot be opened, or is not a SQLite database, is the ``database`` stage."""
+        message = str(getattr(exc, "orig", None) or exc)
+        if "unable to open database file" in message or "file is not a database" in message:
             return "database"
         return super().classify(exc)
+
+    def test_connection(self) -> ConnectionCheck:
+        """Reads the file's schema first: ``SELECT 1`` can succeed on a file that is not a database,
+        because SQLite opens any file lazily and only complains when it reads the header."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT count(*) FROM sqlite_master"))
+        except Exception as e:
+            return self._failed_check(e, self.classify(e))
+        return super().test_connection()
 
     def get_dialect(self) -> str:
         return sqlite.dialect.name
