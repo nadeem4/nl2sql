@@ -5904,7 +5904,8 @@ thumbs-up on a generated answer files a proposed verified query, and so does a
 checked <a href="../../observability/feedback/#correcting-an-answer-nl2sql-feedback-correct">correction</a>
 (<code>engine.feedback.correct</code>, origin <code>correction</code>); the <a href="../../schema/profiler/">schema profiler</a> files its join candidates and
 column roles the same way (<code>nl2sql profile</code>, and with <code>--draft</code> the descriptions the profiler model drafts), a saved
-<a href="#saving-a-clarification-pick">clarification pick</a> files a proposed term. Nothing in
+<a href="#saving-a-clarification-pick">clarification pick</a> files a proposed term, and <a href="../../getting_started/launch/"><code>nl2sql launch</code></a>
+files its five starter questions as proposed <code>example</code>s (origin <code>template</code>). Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql<span class="w"> </span>review<span class="w"> </span>list<span class="w"> </span>--as<span class="w"> </span>admin<span class="w">                     </span><span class="c1"># what is waiting</span>
@@ -5929,7 +5930,7 @@ third-party state store can keep it:</p>
 </tr>
 <tr>
 <td><code>kind</code></td>
-<td><code>join</code>, <code>column</code>, <code>table</code> or <code>term</code> (the glossary), or <code>verified_query</code> (<code>curated.yaml</code>)</td>
+<td><code>join</code>, <code>column</code>, <code>table</code>, <code>term</code> or <code>example</code> (the glossary), or <code>verified_query</code> (<code>curated.yaml</code>)</td>
 </tr>
 <tr>
 <td><code>target</code></td>
@@ -5945,7 +5946,7 @@ third-party state store can keep it:</p>
 </tr>
 <tr>
 <td><code>origin</code></td>
-<td><code>thumbs_up</code>, <code>profiler</code>, <code>draft</code>, <code>correction</code> or <code>clarification</code></td>
+<td><code>thumbs_up</code>, <code>profiler</code>, <code>draft</code>, <code>correction</code>, <code>clarification</code> or <code>template</code> (a starter question from <code>nl2sql launch</code>)</td>
 </tr>
 <tr>
 <td><code>evidence</code></td>
@@ -6015,6 +6016,10 @@ as the caller's <code>UserContext</code> is.</p>
 <td>The proposals the caller may see, newest first; <code>status=None</code> lists every status</td>
 </tr>
 <tr>
+<td><code>propose_examples(datasource_id, questions, *, by)</code></td>
+<td>Files each question as an <code>example</code> proposal (kind <code>example</code>, target the question, <code>change</code> <code>{"question": ...}</code>, origin <code>template</code>) and returns the rows; needs an admin role. Nothing reaches the glossary until an accept. The tables the question names (matched against the live snapshot) are recorded on the proposal, so a role denied one of them does not see it</td>
+</tr>
+<tr>
 <td><code>get(id, *, user_context)</code></td>
 <td>One proposal; <code>ReviewError(NOT_FOUND)</code> when it is missing or hidden</td>
 </tr>
@@ -6071,8 +6076,8 @@ it is dropped and the question is no longer asked.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>join</code>, <code>column</code>, <code>table</code>, <code>term</code></td>
-<td>The first <code>yaml</code> <a href="../knowledge/">knowledge source</a>'s <code>glossary.yaml</code>, each change merged in. A <code>term</code> whose name exists replaces that term.</td>
+<td><code>join</code>, <code>column</code>, <code>table</code>, <code>term</code>, <code>example</code></td>
+<td>The first <code>yaml</code> <a href="../knowledge/">knowledge source</a>'s <code>glossary.yaml</code>, each change merged in. A <code>term</code> whose name exists replaces that term; an <code>example</code> is appended to the datasource's <code>examples</code> unless it is there.</td>
 <td>The knowledge is reloaded: the items are in the next run's prompts.</td>
 </tr>
 <tr>

@@ -7273,7 +7273,60 @@ DuckDB read the first 16 and 12 bytes of a file, the server databases split a &l
 &lt;/ul&gt;
 &lt;/div&gt;
 &lt;h3 id="l3"&gt;L3&lt;/h3&gt;
-&lt;p&gt;Not built yet.&lt;/p&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;Built (L3): &lt;code&gt;nl2sql launch&lt;/code&gt;, and need B2&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Files:&lt;/strong&gt; &lt;code&gt;cli/commands/launch.py&lt;/code&gt; (the command; it reuses &lt;code&gt;profile_datasources&lt;/code&gt; and &lt;code&gt;review._print_report&lt;/code&gt;),
+  &lt;code&gt;cli/demo/stamp.py&lt;/code&gt; (&lt;code&gt;outdated_warning&lt;/code&gt;: no stamp is no warning), and, for need B2 (below), &lt;code&gt;nl2sql_sdk/stores.py&lt;/code&gt;
+  (&lt;code&gt;ProposalKind&lt;/code&gt; admits &lt;code&gt;example&lt;/code&gt;, &lt;code&gt;ProposalOrigin&lt;/code&gt; admits &lt;code&gt;template&lt;/code&gt;), &lt;code&gt;knowledge/apply.py&lt;/code&gt;, &lt;code&gt;review/accept.py&lt;/code&gt;,
+  &lt;code&gt;review/queue.py&lt;/code&gt; and &lt;code&gt;api/proposals_api.py&lt;/code&gt; (&lt;code&gt;propose_examples&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Tests:&lt;/strong&gt; &lt;code&gt;tests/cli/test_launch_command.py&lt;/code&gt; (the row's list, plus a review that rejects, a review that
+  accepts, an unknown provider, a never-overwritten file, a driver error that echoes the password (printed as &lt;code&gt;***&lt;/code&gt;), and one test per review fix),
+  &lt;code&gt;tests/unit/test_example_proposals.py&lt;/code&gt;, &lt;code&gt;test_database_url_is_read_only_by_launch&lt;/code&gt; in the boundary test;
+  &lt;code&gt;test_wave_c_commands.py&lt;/code&gt; lost its &lt;code&gt;launch&lt;/code&gt; stub case and &lt;code&gt;test_demo_index_repair.py&lt;/code&gt;'s unstamped-folder test now
+  expects no warning.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Where the code and the design differ, the code won:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;B2 was not built by Wave B, so L3 builds it&lt;/strong&gt; (the design's "Wave B PR" column named B0 and Q1, but
+  &lt;code&gt;example&lt;/code&gt; was dropped there and never returned). &lt;code&gt;engine.proposals.propose_examples(datasource_id, questions, *,
+  by)&lt;/code&gt; needs an admin (&lt;code&gt;require_admin&lt;/code&gt;), refuses an unknown datasource (&lt;code&gt;ValueError&lt;/code&gt;), and files each question as
+  kind &lt;code&gt;example&lt;/code&gt;, origin &lt;code&gt;template&lt;/code&gt;, target the question, &lt;code&gt;change&lt;/code&gt; &lt;code&gt;{"question": text}&lt;/code&gt;. Accept appends it to the
+  datasource's &lt;code&gt;examples&lt;/code&gt; unless it is there; &lt;code&gt;current&lt;/code&gt; shows the existing example. An example carries no table list, so
+  &lt;code&gt;named_tables&lt;/code&gt; reads the live snapshot (index pointer, then state) and records every table whose name, or its
+  words, the question contains; a role denied one of them does not see the proposal (D60). Without an index, none
+  is recorded.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The questions are asked in this order:&lt;/strong&gt; which database, the missing fields, the datasource's name (default:
+  the file's name, or the type), then the test. A failed test asks every required and every non-advanced field
+  again, the typed values as defaults (a hidden one keeps its value on Enter), so a database that is fully filled,
+  or has a wrong port, can still be corrected. A name that &lt;code&gt;check_file_name&lt;/code&gt; refuses is asked again.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;"Another database"&lt;/strong&gt; asks for a type by name (&lt;code&gt;sqlite&lt;/code&gt;, &lt;code&gt;postgres&lt;/code&gt;, ...), then the connection schema's required and
+  non-advanced fields in schema order, each with its default (&lt;code&gt;port&lt;/code&gt;, say); an optional field with no default is
+  left out on Enter. A driver that is missing is reported before any field is asked, from the candidate's
+  &lt;code&gt;installed&lt;/code&gt;/&lt;code&gt;install_hint&lt;/code&gt; or from &lt;code&gt;types()&lt;/code&gt;. The &lt;code&gt;uvx&lt;/code&gt; line is built from the extra in &lt;code&gt;install_hint&lt;/code&gt;
+  (&lt;code&gt;nl2sql-engine[postgres]&lt;/code&gt;); a hint without one prints the hint only.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;A new project's first engine&lt;/strong&gt; is &lt;code&gt;starter_config(...)&lt;/code&gt; without its knowledge source, because the glossary it
+  names does not exist until &lt;code&gt;write_project&lt;/code&gt; writes it; only &lt;code&gt;scan&lt;/code&gt; and &lt;code&gt;test&lt;/code&gt; run on it, and it is closed before
+  the project's own engine is built from the files.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The model key:&lt;/strong&gt; read with &lt;code&gt;api_key_from_env(provider)&lt;/code&gt; (so &lt;code&gt;llm/&lt;/code&gt; stays the one reader of a key variable);
+  absent, it is asked, hidden, and checked only for shape (&lt;code&gt;looks_like_api_key&lt;/code&gt;). A new project writes it as
+  &lt;code&gt;llm.api_key&lt;/code&gt;, so &lt;code&gt;write_project&lt;/code&gt; turns it into &lt;code&gt;${env:NL2SQL_LLM_API_KEY}&lt;/code&gt; and &lt;code&gt;NL2SQL_LLM_API_KEY=&lt;/code&gt; in &lt;code&gt;.env&lt;/code&gt;;
+  an existing project whose &lt;code&gt;llm.api_key&lt;/code&gt; is unset gets &lt;code&gt;&lt;PROVIDER&gt;_API_KEY=&lt;/code&gt; in its &lt;code&gt;.env&lt;/code&gt;, which the engine
+  already reads, and its YAML is not touched.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The admin&lt;/strong&gt; is &lt;code&gt;--as&lt;/code&gt;, else the first of &lt;code&gt;policies.admin_roles&lt;/code&gt;, else (under &lt;code&gt;allow_all&lt;/code&gt;) a caller with no
+  role; a bad role, or one outside &lt;code&gt;policies.admin_roles&lt;/code&gt;, exits 1 before anything is asked. The new project is &lt;code&gt;allow_all&lt;/code&gt;, so profile and review run
+  as that caller.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Review&lt;/strong&gt; shows each proposal's kind, target and change; &lt;code&gt;a&lt;/code&gt;, &lt;code&gt;r&lt;/code&gt;, &lt;code&gt;s&lt;/code&gt; (the default) and &lt;code&gt;e&lt;/code&gt; (the change as
+  JSON; anything that is not an object is skipped). Decisions are collected and applied as one &lt;code&gt;accept&lt;/code&gt; and one &lt;code&gt;reject&lt;/code&gt;. After an accept it prints the
+  &lt;code&gt;nl2sql index --refresh&lt;/code&gt; hint rather than refreshing itself. &lt;code&gt;--yes&lt;/code&gt; exports &lt;code&gt;DIR/review.yaml&lt;/code&gt; (the next free
+  &lt;code&gt;review-&lt;n&gt;.yaml&lt;/code&gt; when it exists) for the datasource, and decides nothing. The hints it prints carry
+  &lt;code&gt;--config DIR/nl2sql.yaml&lt;/code&gt; when &lt;code&gt;DIR&lt;/code&gt; is not &lt;code&gt;.&lt;/code&gt;, and &lt;code&gt;--as ROLE&lt;/code&gt; on &lt;code&gt;review apply&lt;/code&gt; when there are roles.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;--draft&lt;/code&gt;&lt;/strong&gt; is the only model call; without it the fake LLM server records none
+  (&lt;code&gt;test_launch_makes_no_model_call_without_draft&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;nl2sql demo&lt;/code&gt;:&lt;/strong&gt; &lt;code&gt;outdated_warning&lt;/code&gt; returns None for a folder with no stamp, and still warns for a stamp from an
+  older version.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
 &lt;h3 id="m1"&gt;M1&lt;/h3&gt;
 &lt;div class="admonition note"&gt;
 &lt;p class="admonition-title"&gt;Built (M1): API keys&lt;/p&gt;
