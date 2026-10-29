@@ -30,6 +30,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.events import publish
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
 from nl2sql.pipeline.nodes.validator.join_keys import join_key_type_errors
+from nl2sql.pipeline.nodes.validator.join_hints import join_hint
 
 
 logger = get_logger("logical_validator")
@@ -840,6 +841,9 @@ class LogicalValidatorNode:
                 right_table = alias_to_table.get(j.right_alias, "")
                 matched = False
                 for left_alias, left_col, right_alias, right_col in join_pairs:
+                    # An equality reads the same either way round: `b.x = a.y` joins `a` to `b` as `a.y = b.x` does.
+                    if (left_alias, right_alias) == (j.right_alias, j.left_alias):
+                        left_alias, left_col, right_alias, right_col = right_alias, right_col, left_alias, left_col
                     if left_alias != j.left_alias or right_alias != j.right_alias:
                         continue
                     for rel in relationships:
@@ -869,7 +873,8 @@ class LogicalValidatorNode:
                     errors.append(
                         PipelineError(
                             node="logical_validator",
-                            message="Join does not match any allowed relationship.",
+                            message="Join does not match any allowed relationship. "
+                            + join_hint(relationships, left_table, right_table, self._normalize_name),
                             severity=ErrorSeverity.ERROR,
                             error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
                         )

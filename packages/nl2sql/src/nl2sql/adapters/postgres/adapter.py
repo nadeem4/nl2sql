@@ -1,13 +1,13 @@
 import json
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 from pydantic import Field, SecretStr
 from sqlalchemy import URL, Connection, make_url, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from nl2sql_sdk import DatasourceCapability, Estimate
+from nl2sql_sdk import DatasourceCapability, Estimate, ForeignKeyContract, IndexIssue, TableRef
 from nl2sql_sdk.discovery import Found
-from nl2sql_sdk.sqlalchemy import SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
+from nl2sql_sdk.sqlalchemy import ReflectedTable, SQLAlchemyAdapter, SQLAlchemyConnection, driver_message
 
 # libpq reports a failed connection before the server gives any SQLSTATE, so
 # psycopg2 has none: the message is all there is. Checked in this order.
@@ -150,6 +150,25 @@ class PostgresAdapter(SQLAlchemyAdapter):
     def system_schemas(self) -> set[str]:
         return {"pg_catalog", "information_schema"}
 
+    def partitions(self, conn: Connection, schema: str) -> Dict[str, str]:
+        """Each partition of ``schema`` by name, with the table it directly belongs to."""
+        rows = conn.execute(text(
+            "SELECT child.relname, parent.relname FROM pg_catalog.pg_inherits i "
+            "JOIN pg_catalog.pg_class child ON child.oid = i.inhrelid "
+            "JOIN pg_catalog.pg_class parent ON parent.oid = i.inhparent "
+            "JOIN pg_catalog.pg_namespace n ON n.oid = child.relnamespace "
+            "WHERE n.nspname = :schema AND child.relispartition"
+        ), {"schema": schema})
+        return {child: parent for child, parent in rows}
+
+    def reflect(self, conn: Connection, schema: str, wants_table: Callable[[str], bool],
+                issues: List[IndexIssue]) -> Dict[str, ReflectedTable]:
+        """The base's reflection with each partition folded into its parent (``fold_partitions``)."""
+        parents = self.partitions(conn, schema)
+        top = {name: _top_parent(name, parents) for name in parents}
+        reflected = super().reflect(conn, schema, lambda name: wants_table(top.get(name, name)), issues)
+        return fold_partitions(reflected, parents)
+
     def row_estimates(self, conn: Connection, schema: str) -> Dict[str, int]:
         """``pg_class.reltuples``, which ANALYZE and autovacuum keep. A table never analyzed (-1) has none."""
         rows = conn.execute(text(
@@ -158,6 +177,44 @@ class PostgresAdapter(SQLAlchemyAdapter):
             "WHERE n.nspname = :schema AND c.relkind IN ('r', 'p', 'm', 'f') AND c.reltuples >= 0"
         ), {"schema": schema})
         return {name: int(count) for name, count in rows}
+
+
+def _top_parent(name: str, parents: Dict[str, str]) -> str:
+    """The table a partition belongs to once its sub-partitioning is followed; ``name`` itself when it is not one."""
+    while name in parents:
+        name = parents[name]
+    return name
+
+
+def fold_partitions(reflected: Dict[str, ReflectedTable], parents: Dict[str, str]) -> Dict[str, ReflectedTable]:
+    """``reflected`` without its partitions, each parent holding the foreign keys its partitions declare.
+
+    PostgreSQL declares a partitioned table's foreign keys on its partitions, so the parent, which is what a
+    query names, would have none. A parent that declares keys of its own keeps them. A key that points at a
+    partition points at its parent, and the parent's keys are listed once.
+    """
+    top = {name: _top_parent(name, parents) for name in parents}
+
+    def points_at_parent(fk: ForeignKeyContract) -> ForeignKeyContract:
+        target = fk.referred_table
+        if target.table_name not in top:
+            return fk
+        return fk.model_copy(update={"referred_table": TableRef(schema_name=target.schema_name,
+                                                                table_name=top[target.table_name])})
+
+    kept = {name: table for name, table in reflected.items() if name not in top}
+    inherited: Dict[str, List[ForeignKeyContract]] = {}
+    for name, parent in top.items():
+        if name in reflected and parent in kept:
+            inherited.setdefault(parent, []).extend(reflected[name].foreign_keys)
+    folded = {}
+    for name, table in kept.items():
+        keys = table.foreign_keys or inherited.get(name, [])
+        unique: Dict[Any, ForeignKeyContract] = {}
+        for fk in map(points_at_parent, keys):
+            unique.setdefault((tuple(fk.constrained_columns), fk.referred_table, tuple(fk.referred_columns)), fk)
+        folded[name] = table._replace(foreign_keys=list(unique.values()))
+    return folded
 
 
 def _plan(explained: Any) -> Dict[str, Any]:

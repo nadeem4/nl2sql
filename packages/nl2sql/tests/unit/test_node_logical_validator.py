@@ -437,6 +437,6 @@ def test_logical_validator_still_rejects_non_fk_join_with_qualified_names():
     # Assert
     assert any(
         e.error_code == ErrorCode.INVALID_PLAN_STRUCTURE
-        and e.message == "Join does not match any allowed relationship."
+        and e.message.startswith("Join does not match any allowed relationship.")
         for e in result["errors"]
     )
