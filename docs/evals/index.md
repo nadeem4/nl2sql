@@ -80,9 +80,13 @@ engine serving traffic never changes. In each mode:
 - **Modes `plans` and `retrieval` turn curated answers off.** The curated
   matcher makes a model call the gold-plan fake cannot answer, and a verified
   hit would skip the plan or the retrieval being measured.
-- **Mode `retrieval` always runs the vector search.** Its runtime sets
-  `settings.retrieval.full_snapshot_max_tables` to 0, because Chinook's 11
-  tables are under the limit that would otherwise skip the search.
+- **Mode `retrieval` always runs the vector search, and never a model.** Its
+  runtime sets `settings.retrieval.full_snapshot_max_tables` to 0, because
+  Chinook's 11 tables are under the limit that would otherwise skip the search,
+  and `settings.retrieval.table_selector` to false, because the table selector
+  is a model call. The run covers the vector search, the glossary's tables and
+  the join-path fill, and so records the floor without the model; the report's
+  `settings.retrieval` says so. Mode `full` runs the selector.
 
 ### Mode full: the configured model, priced and capped
 

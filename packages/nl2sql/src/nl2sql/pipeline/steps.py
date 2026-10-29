@@ -9,11 +9,13 @@ docs can read the same list.
 The order is the order :func:`nl2sql.pipeline.graph.build_graph` and
 :func:`nl2sql.pipeline.subgraphs.sql_agent.build_sql_agent_graph` run their
 nodes, with the SQL agent's own nodes nested under it, exactly as the Debug
-ledger nests them. The six steps with an ``agent`` are the LLM nodes, and that
+ledger nests them. The seven steps with an ``agent`` are the LLM nodes, and that
 mapping is :data:`nl2sql.llm.providers.LLM_AGENTS` rather than a second copy of
 it. The curated matcher is in the graph only when curated answers are
 configured. ``tests/unit/test_pipeline_steps.py`` builds both graphs and fails
-when a node is added, renamed or removed and this list does not follow.
+when a node is added, renamed or removed and this list does not follow. The
+one step that is not a graph node is ``table_selector``, a model call made
+inside ``schema_retriever`` (``INSIDE_A_NODE``).
 """
 from __future__ import annotations
 
@@ -21,10 +23,13 @@ from typing import Any, Dict, List, NamedTuple, Optional
 
 from nl2sql.llm.providers import LLM_AGENTS
 
-__all__ = ["PIPELINE_STEPS", "SQL_AGENT_STEP", "PipelineStep", "describe_pipeline"]
+__all__ = ["INSIDE_A_NODE", "PIPELINE_STEPS", "SQL_AGENT_STEP", "PipelineStep", "describe_pipeline"]
 
 # The node the SQL agent's own nodes are nested under.
 SQL_AGENT_STEP = "sql_agent"
+
+# Model steps that are a call inside another node, not a node of their own: step -> the node that makes it.
+INSIDE_A_NODE = {"table_selector": "schema_retriever"}
 
 
 class PipelineStep(NamedTuple):
@@ -81,6 +86,11 @@ PIPELINE_STEPS: List[PipelineStep] = [
     _step("schema_retriever", "Schema retrieval",
           "Searches the index for the tables and columns this sub-query is about, so the planner "
           "sees a handful of them rather than the whole database.", parent=SQL_AGENT_STEP),
+    _step("table_selector", "Table selection",
+          "On a schema too big to send whole, picks from a catalog of every table the ones the "
+          "question needs, so a table far from its words in vector search still arrives. Not a graph "
+          "node: a model call inside schema retrieval, followed there by code that adds the tables "
+          "joining the picks.", parent=SQL_AGENT_STEP),
     _step("ast_planner", "Query planner",
           "Writes a structured plan of tables, joins, filters and grouping, and never SQL text. "
           "Most of a run's tokens are spent here.", parent=SQL_AGENT_STEP),

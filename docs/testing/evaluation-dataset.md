@@ -306,7 +306,7 @@ report = engine.evals.run(llm={"gpt-5.4": model_config("gpt-5.4"),       # a com
                           max_cost_usd=10)
 ```
 
-`model_config(MODEL)` puts `MODEL` on all six LLM nodes:
+`model_config(MODEL)` puts `MODEL` on all seven LLM nodes:
 
 - **A model in `VERIFIED_MODELS`** (`nl2sql/llm/providers.py`) names its own
   provider and temperature: `gpt-5.4`, `gpt-5.4-mini`, `gpt-4.1`, `gpt-4o`,
@@ -552,7 +552,10 @@ How it runs (`nl2sql/evaluation/scorers/retrieval_recall.py`):
 
 - **The search always runs.** Chinook's 11 tables are under
   `settings.retrieval.full_snapshot_max_tables` (15), which would send the
-  whole schema without a search, so the run sets the limit to 0.
+  whole schema without a search, so the run sets the limit to 0. It also
+  sets `settings.retrieval.table_selector` to false: the selector is a model
+  call, and this mode has none, so the score is the floor without it (the
+  vector search, the glossary's tables and the join-path fill).
 - **Each case is scored against the datasource it names**, which for this
   suite is always `chinook`, whatever else the project has registered.
   Routing's ranking is scored separately by the `routing` scorer; the

@@ -114,6 +114,7 @@ LLM_AGENTS: Dict[str, str] = {
     "curated_matcher": "curatedmatcher",
     "datasource_resolver": "datasourceresolver",
     "decomposer": "decomposer",
+    "table_selector": "tableselector",
     "ast_planner": "astplanner",
     "refiner": "refiner",
     "answer_synthesizer": "answersynthesizer",

@@ -8,12 +8,16 @@ if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
     from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
 
+from nl2sql.common.cancellation import RunCancelled
 from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, RunWarning
 from nl2sql.common.logger import get_logger
-from nl2sql.knowledge.models import KnowledgeUsed
+from nl2sql.knowledge.models import KnowledgeUsed, TermMatch
+from nl2sql.limits import LimitReached
 from nl2sql.runtime import Runtime
 from nl2sql.datasources.models import matches_table
+from .join_path import connect
 from .schema import Table, Column
+from .selector import TableSelector, catalog_entry
 from nl2sql_sdk.knowledge import DatasourceKnowledge
 from nl2sql_sdk.schema import SchemaSnapshot, TableRef
 
@@ -124,6 +128,11 @@ class SchemaRetrieverNode:
         # matches), then planning_k columns and relationships of those tables.
         self.table_k = ctx.settings.retrieval.table_k
         self.planning_k = ctx.settings.retrieval.planning_k
+        # Table recall past full_snapshot_max_tables (C-W4): the model is built on its first call only.
+        self.table_selector = ctx.settings.retrieval.table_selector
+        self.selector_catalog_max = ctx.settings.retrieval.selector_catalog_max
+        self.join_path_max_hops = ctx.settings.retrieval.join_path_max_hops
+        self.selector = TableSelector(getattr(ctx, "llm_registry", None))
         # The run's pinned knowledge (Runtime.pin_index), filtered per caller in _knowledge.
         self.knowledge = getattr(ctx, "knowledge", None)
         self.knowledge_settings = ctx.settings.knowledge
@@ -202,30 +211,46 @@ class SchemaRetrieverNode:
             dialect = None
         return schema_knowledge(self.knowledge, datasource_id, snapshot, scope, dialect)
 
-    def _knowledge_used(self, state: SubgraphExecutionState, knowledge: Optional[SchemaKnowledge],
-                        snapshot: Optional[SchemaSnapshot], tables: List[Table]) -> Optional[KnowledgeUsed]:
-        """The terms and rules the planner and refiner send as ``[BUSINESS_CONTEXT]``, within the caller's scope.
+    def _matched_terms(self, state: SubgraphExecutionState, knowledge: Optional[SchemaKnowledge],
+                       snapshot: Optional[SchemaSnapshot]) -> Optional[List[TermMatch]]:
+        """The glossary terms the sub-query's intent or the question matches, within the caller's scope.
 
-        Terms match the sub-query's intent or the question; rules concern the
-        tables sent. The block is cut to ``settings.knowledge.block_max_chars``
-        and what was cut is recorded. None when nothing matched, and for a
-        pinned plan, which no prompt plans. The planner publishes
-        ``knowledge.used`` when a prompt carries it (not on a plan-cache hit).
+        Matched once per sub-query, before retrieval: the terms' tables join the
+        retrieved set, and ``_knowledge_used`` sends the same terms to the
+        planner. None without knowledge or a snapshot, and for a pinned plan.
         """
-        from nl2sql.knowledge.match import match_terms, rules_for
-        from nl2sql.knowledge.render import fit_business_context
+        from nl2sql.knowledge.match import match_terms
 
         if knowledge is None or snapshot is None or getattr(state, "pinned_plan", None) is not None:
             return None
         shown, sources = knowledge.shown, knowledge.provenance
         sub_query = state.sub_query
-        terms = match_terms(shown.terms, [sub_query.intent, state.user_query],
-                            sources={t.term: sources.get(f"terms.{t.term}", "knowledge") for t in shown.terms},
-                            top_k=self.knowledge_settings.top_k,
-                            similar=(self._similar_terms(sub_query.intent or state.user_query, sub_query.datasource_id,
-                                                          [t.term for t in shown.terms])
-                                     if shown.terms else None),
-                            floor=self.knowledge_settings.match_floor)
+        return match_terms(shown.terms, [sub_query.intent, state.user_query],
+                           sources={t.term: sources.get(f"terms.{t.term}", "knowledge") for t in shown.terms},
+                           top_k=self.knowledge_settings.top_k,
+                           similar=(self._similar_terms(sub_query.intent or state.user_query, sub_query.datasource_id,
+                                                         [t.term for t in shown.terms])
+                                    if shown.terms else None),
+                           floor=self.knowledge_settings.match_floor)
+
+    def _knowledge_used(self, state: SubgraphExecutionState, knowledge: Optional[SchemaKnowledge],
+                        snapshot: Optional[SchemaSnapshot], tables: List[Table],
+                        terms: Optional[List[TermMatch]]) -> Optional[KnowledgeUsed]:
+        """The terms and rules the planner and refiner send as ``[BUSINESS_CONTEXT]``, within the caller's scope.
+
+        ``terms`` are the ones ``_matched_terms`` found; rules concern the
+        tables sent. The block is cut to ``settings.knowledge.block_max_chars``
+        and what was cut is recorded. None when nothing matched, and for a
+        pinned plan, which no prompt plans. The planner publishes
+        ``knowledge.used`` when a prompt carries it (not on a plan-cache hit).
+        """
+        from nl2sql.knowledge.match import rules_for
+        from nl2sql.knowledge.render import fit_business_context
+
+        if knowledge is None or snapshot is None or terms is None:
+            return None
+        shown, sources = knowledge.shown, knowledge.provenance
+        sub_query = state.sub_query
         rules = rules_for(shown.rules, {t.name for t in tables}, snapshot,
                           sources={r.id: sources.get(f"rules.{r.id}", "knowledge") for r in shown.rules})
         if not terms and not rules:
@@ -296,13 +321,15 @@ class SchemaRetrieverNode:
         visible: Dict[str, Any],
         preferred: Callable[[TableRef], bool] = lambda _ref: False,
         knowledge: Optional[SchemaKnowledge] = None,
+        keys_only: Set[str] = frozenset(),
     ) -> List[Table]:
         """The planner's tables: ``resolved_tables`` (all of ``visible`` when empty), never a hidden one.
 
         Descriptions, roles, units, grains and code values come from
         ``knowledge``, and its glossary joins are listed beside the foreign keys.
         A table cut to the columns the search returned keeps the ones a join or
-        an answer needs as well (``_kept_columns``).
+        an answer needs as well (``_kept_columns``). A table in ``keys_only``
+        with no columns of its own gets just those, not every column.
         """
         if not snapshot:
             return []
@@ -320,7 +347,7 @@ class SchemaRetrieverNode:
                 continue
 
             resolved_columns = resolved_tables[table_key] if resolved_tables else set()
-            if not resolved_columns:
+            if not resolved_columns and (table_key not in keys_only or not kept.get(table_key)):
                 resolved_columns = set(table_contract.columns.keys())
             resolved_columns = resolved_columns | kept.get(table_key, set())
 
@@ -420,18 +447,24 @@ class SchemaRetrieverNode:
 
     @staticmethod
     def _retrieval(query: str, searches: List[Dict[str, Any]], tables_out: List[Table],
-                   reason: Optional[str] = None) -> Dict[str, Any]:
+                   reason: Optional[str] = None,
+                   steps: Optional[List[Tuple[str, List[str]]]] = None) -> Dict[str, Any]:
         """What the vector searches retrieved and what survived, for the run trace.
 
-        Not a state field: LangGraph drops the key, the trace keeps the node's
-        whole return.
+        ``steps`` is, for each of ``tables_out`` in order, its qualified name
+        and the steps that added it (``vector``, ``glossary``, ``selector``,
+        ``join_path``), so a missed answer can be traced to its cause. Not a
+        state field: LangGraph drops the key, the trace keeps the node's whole
+        return.
         """
         record: Dict[str, Any] = {"skipped": reason is not None}
         if reason is not None:
             record["reason"] = reason
         else:
             record.update(query=query, searches=searches)
-        record["tables"] = [{"table": t.name, "columns": [c.name for c in t.columns]} for t in tables_out]
+        record["tables"] = [{"table": t.name, "columns": [c.name for c in t.columns],
+                             **({"qualified": steps[i][0], "steps": steps[i][1]} if steps else {})}
+                            for i, t in enumerate(tables_out)]
         return record
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
@@ -451,11 +484,15 @@ class SchemaRetrieverNode:
             visible = self._visible(state.user_context, datasource_id, snapshot)
             preferred = self._preferred(datasource_id)
             knowledge = self._knowledge(state.user_context, datasource_id, snapshot)
-            update = self._retrieve(state, query, snapshot, visible, preferred, knowledge)
-            used = self._knowledge_used(state, knowledge, snapshot, update["relevant_tables"])
+            terms = self._matched_terms(state, knowledge, snapshot)
+            update = self._retrieve(state, query, snapshot, visible, preferred, knowledge, terms or [])
+            used = self._knowledge_used(state, knowledge, snapshot, update["relevant_tables"], terms)
             if used is not None:
                 update["knowledge_used"] = used
             return update
+        except (LimitReached, RunCancelled):
+            # The run ends here; the fallback to the whole snapshot would plan on after a stop.
+            raise
         except Exception as exc:
             # The detail (a path, a table name) stays in the log; the caller sees a fixed message.
             logger.error(f"Schema retrieval failed: {exc}")
@@ -495,8 +532,12 @@ class SchemaRetrieverNode:
 
     def _retrieve(self, state: SubgraphExecutionState, query: str, snapshot: Optional[SchemaSnapshot],
                   visible: Dict[str, Any], preferred: Callable[[TableRef], bool],
-                  knowledge: Optional[SchemaKnowledge]) -> Dict[str, Any]:
-        """The relevant tables: every visible one when they fit, else the vector searches' picks."""
+                  knowledge: Optional[SchemaKnowledge], terms: List[TermMatch]) -> Dict[str, Any]:
+        """The relevant tables: every visible one when they fit, else the union of four steps.
+
+        Vector search, the matched glossary ``terms``' tables, the table
+        selector's picks, and the tables that join them (wave_c.md, section 17).
+        """
         datasource_id = state.sub_query.datasource_id
         schema_version = state.sub_query.schema_version
         limit = self.full_snapshot_max_tables
@@ -529,11 +570,17 @@ class SchemaRetrieverNode:
             }
 
         tables: Dict[str, Set[str]] = defaultdict(set)
+        steps: Dict[str, List[str]] = {}
         searches: List[Dict[str, Any]] = []
         schema_docs = []
         column_docs = []
+        key_of = {contract.table.full_name: key for key, contract in visible.items()}
 
-        # Only the tables the caller may read are searched, so the top k is
+        def add(table: str, step: str) -> None:
+            if step not in steps.setdefault(table, []):
+                steps[table].append(step)
+
+        # 1. Vector search. Only the tables the caller may read are searched, so the top k is
         # filled with readable ones.
         searchable = [contract.table.full_name for contract in visible.values()]
         if self.vector_store and searchable:
@@ -545,8 +592,10 @@ class SchemaRetrieverNode:
                     table = doc.metadata.get("table")
                     if table:
                         tables[table].update([])
+                        add(table, "vector")
                 for table in self._near_preferred(searches, snapshot, preferred):
                     tables[table].update([])
+                    add(table, "vector")
             else:
                 column_docs = self.vector_store.retrieve_column_candidates(
                     query, datasource_id, k=self.table_k, explain=searches, tables=searchable
@@ -557,6 +606,7 @@ class SchemaRetrieverNode:
                     if not table:
                         continue
                     tables[table].update([])
+                    add(table, "vector")
                     if column:
                         tables[table].add(column)
 
@@ -565,8 +615,91 @@ class SchemaRetrieverNode:
             planning_docs = self.vector_store.retrieve_planning_context(
                 query, datasource_id, list(tables.keys()), k=self.planning_k, explain=searches
             )
+        self._apply_planning(planning_docs, tables, searchable, add)
 
-        for doc in planning_docs:
+        # 2. Glossary terms bring their own tables, and keep the columns they name. A table with no
+        # columns of its own yet is sent whole, as a vector pick is, so a term naming only a table keeps all of it.
+        # The named columns are also kept apart (``pinned``), so no later step can cut them.
+        pinned: Dict[str, Set[str]] = defaultdict(set)
+        for term in terms:
+            for key, column in self._term_tables(term, snapshot, visible, key_of):
+                if key not in tables:
+                    tables[key] = set()
+                    if column:
+                        tables[key].add(column)
+                add(key, "glossary")
+                if column:
+                    pinned[key].add(column)
+
+        # 3. The table selector picks from a catalog of every table the caller may read. A table already
+        # chosen keeps what it has, or all its columns up to 40; only a new table past 40 is cut to the search.
+        keys_only: Set[str] = set()
+        chosen = set(tables)
+        picked = self._select(state, query, visible, knowledge, terms, chosen, searchable)
+        wide: List[str] = []
+        for key in picked:
+            add(key, "selector")
+            columns = visible[key].columns
+            if len(columns) <= self.SELECTOR_ALL_COLUMNS_MAX:
+                tables[key] = set(columns)
+            elif key not in chosen:
+                tables[key] = set()
+                keys_only.add(key)
+                wide.append(key)
+        if wide and self.vector_store:
+            wide_docs = self.vector_store.retrieve_planning_context(
+                query, datasource_id, [visible[key].table.full_name for key in wide], k=self.planning_k,
+                explain=searches)
+            self._apply_planning(wide_docs, tables, searchable, add)
+
+        # 4. Join-path fill connects what steps 1-3 chose, through tables that hold neither a measure nor a filter.
+        for key in connect(self._graph(visible, knowledge, key_of), list(tables), self.join_path_max_hops):
+            tables[key] = set()
+            keys_only.add(key)
+            add(key, "join_path")
+        for key, columns in pinned.items():
+            if tables[key] or key in keys_only:  # a table with no columns of its own is sent whole already
+                tables[key] |= columns
+
+        if not tables:
+            return self._whole_snapshot(query, searches, snapshot, schema_version, visible, preferred, knowledge,
+                                        "Vector retrieval produced no candidates. Using full schema snapshot.")
+
+        relevant_tables = self._build_tables_from_snapshot(
+            snapshot,
+            resolved_tables=tables,
+            schema_version=schema_version,
+            visible=visible,
+            preferred=preferred,
+            knowledge=knowledge,
+            keys_only=keys_only,
+        )
+        # relevant_tables is the visible tables in ``tables`` order, preferred first (a stable sort).
+        sent = sorted((key for key in tables if key in visible), key=lambda key: not preferred(visible[key].table))
+        steps_by_name = [(visible[key].table.full_name, steps.get(key, [])) for key in sent]
+
+        return {
+            "relevant_tables": relevant_tables,
+            "retrieval": self._retrieval(query, searches, relevant_tables, steps=steps_by_name),
+            "reasoning": [
+                {
+                    "node": self.node_name,
+                    "content": (
+                        f"Retrieved {len(relevant_tables)} tables "
+                        f"with {sum(len(t.columns) for t in relevant_tables)} columns."
+                    ),
+                }
+            ],
+        }
+
+    # A table the selector picked keeps every column up to this many; past it, the planning search's.
+    SELECTOR_ALL_COLUMNS_MAX = 40
+
+    @staticmethod
+    def _apply_planning(docs: List[Any], tables: Dict[str, Set[str]], searchable: List[str],
+                        add: Callable[[str, str], None]) -> None:
+        """Adds the columns and relationships the planning search returned to ``tables``."""
+        for doc in docs:
             doc_type = doc.metadata.get("type")
             if doc_type == "schema.column":
                 table = doc.metadata.get("table")
@@ -580,31 +713,77 @@ class SchemaRetrieverNode:
                 if from_table:
                     tables[from_table].update(doc.metadata.get("from_columns") or [])
                 if to_table and to_table in searchable:
+                    if to_table not in tables:
+                        add(to_table, "vector")
                     tables[to_table].update(doc.metadata.get("to_columns") or [])
 
-        if not tables:
-            return self._whole_snapshot(query, searches, snapshot, schema_version, visible, preferred, knowledge,
-                                        "Vector retrieval produced no candidates. Using full schema snapshot.")
+    @staticmethod
+    def _term_tables(term: TermMatch, snapshot: SchemaSnapshot, visible: Dict[str, Any],
+                     key_of: Dict[str, str]) -> List[Tuple[str, Optional[str]]]:
+        """The readable tables a matched term names, each with the column it names (or None), in order."""
+        from nl2sql.knowledge.resolve import resolve_column, resolve_table
 
-        relevant_tables = self._build_tables_from_snapshot(
-            snapshot,
-            resolved_tables=tables,
-            schema_version=schema_version,
-            visible=visible,
-            preferred=preferred,
-            knowledge=knowledge,
-        )
+        found: List[Tuple[str, Optional[str]]] = []
+        for name in term.tables:
+            table, _ = resolve_table(name, snapshot)
+            if table is not None and key_of.get(table.table.full_name) in visible:
+                found.append((key_of[table.table.full_name], None))
+        for name in term.columns:
+            table, column, _ = resolve_column(name, snapshot)
+            if column is not None and key_of.get(table.table.full_name) in visible:
+                found.append((key_of[table.table.full_name], column.name))
+        return found
 
-        return {
-            "relevant_tables": relevant_tables,
-            "retrieval": self._retrieval(query, searches, relevant_tables),
-            "reasoning": [
-                {
-                    "node": self.node_name,
-                    "content": (
-                        f"Retrieved {len(relevant_tables)} tables "
-                        f"with {sum(len(t.columns) for t in relevant_tables)} columns."
-                    ),
-                }
-            ],
-        }
+    @staticmethod
+    def _graph(visible: Dict[str, Any], knowledge: Optional[SchemaKnowledge],
+               key_of: Dict[str, str]) -> Dict[str, Set[str]]:
+        """The tables the caller may read, joined by foreign keys and glossary joins; an edge to a hidden table is never in it."""
+        graph: Dict[str, Set[str]] = {key: set() for key in visible}
+        edges = [(key, fk.referred_table.full_name) for key, contract in visible.items()
+                 for fk in contract.foreign_keys]
+        edges += [(key, rel["to_table"]) for key in visible
+                  for rel in (knowledge.relationships.get(key, []) if knowledge else [])]
+        for key, referred in edges:
+            other = key_of.get(referred)
+            if other is not None and other != key:
+                graph[key].add(other)
+                graph[other].add(key)
+        return graph
+
+    def _select(self, state: SubgraphExecutionState, query: str, visible: Dict[str, Any],
+                knowledge: Optional[SchemaKnowledge], terms: List[TermMatch], chosen: Set[str],
+                searchable: List[str]) -> List[str]:
+        """The tables the model picks from the catalog, as keys; nothing when it is off or cannot answer.
+
+        The catalog is every table the caller may read, or the nearest
+        ``selector_catalog_max`` by vector search past that many. A name
+        outside it is dropped. A failed call (an invalid answer, a provider
+        error) is logged and costs the selector's tables only; a stop (the
+        run's limit, a cancel) ends the run.
+        """
+        if not self.table_selector or not visible:
+            return []
+        try:
+            keys = list(visible)
+            if len(keys) > self.selector_catalog_max:
+                near = self.vector_store.retrieve_schema_context(
+                    query, state.sub_query.datasource_id, k=self.selector_catalog_max, tables=searchable)
+                keys = [doc.metadata["table"] for doc in near if doc.metadata.get("table") in visible]
+            descriptions = knowledge.tables if knowledge else {}
+            catalog = [catalog_entry(visible[key].table.full_name, [c.name for c in visible[key].columns.values()],
+                                     descriptions.get(key)) for key in keys]
+            names = self.selector.pick(state.sub_query.intent or state.user_query, catalog,
+                                       sorted(visible[key].table.full_name for key in chosen if key in visible),
+                                       terms)
+        except (LimitReached, RunCancelled):
+            raise
+        except Exception as exc:
+            logger.warning(f"The table selector failed; continuing without its tables: {exc}")
+            return []
+        by_name = {visible[key].table.full_name.casefold(): key for key in keys}
+        picked: List[str] = []
+        for name in names:
+            key = by_name.get(name.strip().casefold())
+            if key is not None and key not in picked:
+                picked.append(key)
+        return picked

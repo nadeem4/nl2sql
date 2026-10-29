@@ -93,6 +93,7 @@ AgentName = Literal[
     "curated_matcher",
     "datasource_resolver",
     "decomposer",
+    "table_selector",  # picking tables from a catalog on a schema past full_snapshot_max_tables (C-W4)
     "ast_planner",
     "refiner",
     "answer_synthesizer",
@@ -478,6 +479,12 @@ class RetrievalSettings(_Model):
     table_k: PositiveInt = 8
     planning_k: PositiveInt = 12
     decomposer_tables: PositiveInt = 30
+    # Table recall past full_snapshot_max_tables (C-W4, docs/architecture/wave_c.md section 17): a model
+    # picks tables from a catalog of every visible table (the nearest selector_catalog_max past that many),
+    # and the tables that join the picks are added from the foreign keys, up to join_path_max_hops joins apart.
+    table_selector: bool = True
+    selector_catalog_max: PositiveInt = 200
+    join_path_max_hops: PositiveInt = 4
 
 
 class RoutingSettings(_Model):

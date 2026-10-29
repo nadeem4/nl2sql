@@ -174,9 +174,14 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
     "picks": ["<ids in the order MMR picked them>"],
     "dropped": ["<ids of the pool entries not picked>"]
   }],
-  "tables": [{"table": "Track", "columns": ["Name", "GenreId"]}]
+  "tables": [{"table": "Track", "columns": ["Name", "GenreId"], "qualified": "[main].[Track]", "steps": ["vector"]}]
 }
 ```
+
+On a schema past `settings.retrieval.full_snapshot_max_tables`, each sent table
+carries `steps`: which of `vector`, `glossary`, `selector` and `join_path` added
+it, so a missed table can be traced to its cause (see
+[the schema retriever](../architecture/nodes/schema_retriever_node.md#table-recall-on-large-schemas)).
 
 - **`query`** is the text actually embedded: the question for the resolver's routing, and
   for the schema retriever the sub-query's intent, filters, group-by, expected

@@ -10,6 +10,7 @@ retriever returned no tables at all, and every retry planned blind.
 from types import SimpleNamespace
 
 import pytest
+from pagila_snapshot import DS, pagila_snapshot, ref
 
 from nl2sql.common.errors import ErrorCode
 from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
@@ -17,61 +18,14 @@ from nl2sql.pipeline.nodes.schema_retriever.node import SchemaRetrieverNode
 from nl2sql.pipeline.state import SubgraphExecutionState
 from nl2sql.policies import UserContext
 from nl2sql.testing.runtime import fake_runtime
-from nl2sql_sdk.schema import (
-    ColumnContract,
-    ForeignKeyContract,
-    SchemaContract,
-    SchemaMetadata,
-    SchemaSnapshot,
-    TableContract,
-    TableMetadata,
-    TableRef,
-)
+from nl2sql_sdk.schema import ColumnContract, SchemaSnapshot, TableContract, TableRef
 
-DS = "pagila"
-
-
-def _ref(name: str) -> TableRef:
-    return TableRef(schema_name="public", table_name=name)
-
-
-FILM, FILM_CATEGORY, CATEGORY, LANGUAGE = (_ref(n) for n in ("film", "film_category", "category", "language"))
-
-
-def _col(name: str, pk: bool = False, data_type: str = "int") -> ColumnContract:
-    return ColumnContract(name=name, data_type=data_type, is_nullable=not pk, is_primary_key=pk)
-
-
-def _fk(columns, table: TableRef, referred) -> ForeignKeyContract:
-    return ForeignKeyContract(constrained_columns=columns, referred_table=table, referred_columns=referred)
+FILM, FILM_CATEGORY, CATEGORY, LANGUAGE = (ref(n) for n in ("film", "film_category", "category", "language"))
 
 
 def _pagila() -> SchemaSnapshot:
-    """Four Pagila tables plus 25 filler tables: 29, too many to send whole."""
-    contracts = {
-        FILM: TableContract(table=FILM, columns={c.name: c for c in [
-            _col("film_id", pk=True), _col("title", data_type="text"), _col("description", data_type="text"),
-            _col("release_year"), _col("rental_rate", data_type="numeric"), _col("language_id")]},
-            foreign_keys=[_fk(["language_id"], LANGUAGE, ["language_id"])]),
-        FILM_CATEGORY: TableContract(table=FILM_CATEGORY, columns={c.name: c for c in [
-            _col("film_id", pk=True), _col("category_id", pk=True), _col("last_update", data_type="timestamp")]},
-            foreign_keys=[_fk(["film_id"], FILM, ["film_id"]), _fk(["category_id"], CATEGORY, ["category_id"])]),
-        CATEGORY: TableContract(table=CATEGORY, columns={c.name: c for c in [
-            _col("category_id", pk=True), _col("name", data_type="text"),
-            _col("last_update", data_type="timestamp")]}, foreign_keys=[]),
-        LANGUAGE: TableContract(table=LANGUAGE, columns={c.name: c for c in [
-            _col("language_id", pk=True), _col("name", data_type="text")]}, foreign_keys=[]),
-    }
-    for i in range(25):
-        ref = _ref(f"filler_{i}")
-        contracts[ref] = TableContract(table=ref, columns={"id": _col("id", pk=True)}, foreign_keys=[])
-    return SchemaSnapshot(
-        contract=SchemaContract(datasource_id=DS, engine_type="postgresql",
-                                tables={ref.full_name: c for ref, c in contracts.items()}),
-        metadata=SchemaMetadata(datasource_id=DS, engine_type="postgresql",
-                                tables={ref.full_name: TableMetadata(table=ref, row_count=1, columns={})
-                                        for ref in contracts}),
-    )
+    """Pagila's 22 tables (the shared fixture): too many to send whole."""
+    return pagila_snapshot()
 
 
 def _doc(**metadata):
@@ -153,7 +107,10 @@ def test_a_pruned_table_keeps_its_label_column():
 
 def test_a_restricted_scope_keeps_keys_without_naming_a_hidden_table():
     # The caller may read film, film_category and the fillers, not category.
-    allow = [f"{DS}.public.film", f"{DS}.public.film_category", f"{DS}.public.filler_*"]
+    allow = [f"{DS}.public.{n}" for n in ("film", "film_category", "actor", "address", "city", "country", "customer",
+                                          "language", "store", "staff", "actor_info", "customer_list", "film_list",
+                                          "nicer_but_slower_film_list", "sales_by_film_category", "sales_by_store",
+                                          "staff_list")]
     out = _node(_store(_pagila()), allow=allow)(_state())
 
     columns = _columns(out)
@@ -191,14 +148,14 @@ def test_a_glossary_join_into_a_hidden_table_keeps_nothing():
 
 
 def test_a_plural_table_keeps_its_singular_label():
-    ref = _ref("customers")
-    contract = TableContract(table=ref, columns={c.name: c for c in [
-        _col("customer_id", pk=True), _col("customer_name", data_type="text"), _col("notes", data_type="text")]},
-        foreign_keys=[])
+    table = TableRef(schema_name="public", table_name="customers")
+    contract = TableContract(table=table, columns={c: ColumnContract(name=c, data_type="text", is_primary_key=c == "customer_id")
+                                                   for c in ("customer_id", "customer_name", "notes")},
+                             foreign_keys=[])
 
-    kept = SchemaRetrieverNode._kept_columns([ref.full_name], {ref.full_name: contract}, _knowledge({}))
+    kept = SchemaRetrieverNode._kept_columns([table.full_name], {table.full_name: contract}, _knowledge({}))
 
-    assert kept[ref.full_name] == {"customer_id", "customer_name"}
+    assert kept[table.full_name] == {"customer_id", "customer_name"}
 
 
 def _raises(*_a, **_k):

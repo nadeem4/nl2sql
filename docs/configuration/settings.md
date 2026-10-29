@@ -22,6 +22,9 @@ retrieval:
   table_k: 8
   planning_k: 12
   decomposer_tables: 30
+  table_selector: true
+  selector_catalog_max: 200
+  join_path_max_hops: 4
 routing:
   candidates: 3
   max_datasources: 3
@@ -131,10 +134,16 @@ check for work that is not a question: make the model calls with
 | `table_k` | `8` | Table entries the schema retriever's search keeps for a sub-query (and column entries, when no table matches). |
 | `planning_k` | `12` | Column and relationship entries of those tables the planner is shown for a sub-query. |
 | `decomposer_tables` | `30` | Table names the decomposer is shown per datasource; the rest are counted. |
+| `table_selector` | `true` | On a schema past `full_snapshot_max_tables`, one model call per sub-query picks tables from a catalog of every table the caller may read (the [`table_selector` agent](llm.md#per-node-models)), so a table whose name is far from the question's words still arrives. `false` skips the call; the glossary's tables and the join-path fill still run, and no model is needed. |
+| `selector_catalog_max` | `200` | Past this many readable tables, the selector's catalog is the nearest this many by vector search, not all of them (about 15,000 tokens at 200, with column names). |
+| `join_path_max_hops` | `4` | The tables that join the chosen ones are added from the foreign keys and glossary joins when at most this many joins apart; a longer path is not added. |
 
 `table_k`, `planning_k` and `decomposer_tables` replace the constants the
 schema retriever and the resolver had before 0.7 (`TABLE_K`, `PLANNING_K`,
 `MAX_DECOMPOSER_TABLES`).
+
+How the tables are chosen past the threshold is in the
+[schema retriever's reference](../architecture/nodes/schema_retriever_node.md).
 
 ## `routing`
 
