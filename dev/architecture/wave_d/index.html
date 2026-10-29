@@ -741,6 +741,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-start-screen">
+<span class="md-ellipsis">
+      
+        The start screen
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#the-hosted-demo">
 <span class="md-ellipsis">
       
@@ -3137,6 +3146,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-start-screen">
+<span class="md-ellipsis">
+      
+        The start screen
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#the-hosted-demo">
 <span class="md-ellipsis">
       
@@ -3747,6 +3765,10 @@ describe them.</p>
 <tr>
 <td>A Kubernetes chart</td>
 <td><code>docs/deployment/kubernetes.md</code> stays prose; Compose is the supported self-host</td>
+</tr>
+<tr>
+<td>A multi-project platform</td>
+<td>Decided with the owner on 2026-10-29: later, as its own package (working name <code>nl2sql-platform</code>) so <code>nl2sql-engine</code> and <code>nl2sql-api</code> keep serving one project unchanged. Sketch: a project is one <code>NL2SQL</code> engine and one project folder; the platform package holds many, keeps each running (schedules, jobs), lists them in one platform file, holds platform-wide identity (a key or a proxy identity names a person; the platform knows their projects) and answers every access question through one <code>can(user, action, project)</code> check over named actions (<code>project.create</code>, <code>project.use</code>, <code>project.configure</code>, ...). At first only an admin creates projects and grants them; project-level roles later become a table <code>can</code> reads, with no route or page change. It adds platform routes beside the per-project <code>/api/v1</code>. Waits because quotas and sharing between projects on one server are a product of their own.</td>
 </tr>
 </tbody>
 </table>
@@ -4859,6 +4881,23 @@ project; that line becomes <code>nl2sql-api serve --config DIR/nl2sql.yaml</code
 </tr>
 </tbody>
 </table>
+<h3 id="the-start-screen">The start screen</h3>
+<p>Decided with the owner on 2026-10-29. The web app offers the two choices up front:</p>
+<ul>
+<li><strong>Local or self-hosted.</strong> When the served project has no datasource yet (a fresh <code>nl2sql-api serve</code> on an empty
+  project folder, which Wave C's L2 already allows), the app opens on a start screen with <strong>Try the demo</strong> and
+  <strong>Connect your database</strong>. <strong>Try the demo</strong> adds the three sample databases and the demo glossary to the project as
+  ordinary datasources and indexes them (a job with progress), then opens Chat on a guided question. <strong>Connect your
+  database</strong> opens Connect. Both remain reachable afterwards: Connect can add the sample databases, and the Chat
+  datasource switcher moves between them and the caller's own. The server still serves one project; no second
+  engine is involved. Both actions are admin, as Connect is.</li>
+<li><strong>Hosted.</strong> The start screen shows the same two choices. <strong>Try the demo</strong> opens Chat as today. <strong>Connect your
+  database</strong> connects nothing on the hosted server: it shows how to run nl2sql yourself (the one-line install and
+  launch command, the Docker Compose option, a link to the self-hosting guide) and says the visitor's data never
+  reaches the hosted server.</li>
+<li><code>/meta</code> says which screen applies (<code>start: "choose" | "hosted" | null</code>), so the page computes nothing (section 5's
+  "No logic").</li>
+</ul>
 <h3 id="the-hosted-demo">The hosted demo</h3>
 <p>The Space keeps its URL, its limits and its keyless start (D221):</p>
 <table>
@@ -4892,6 +4931,10 @@ project; that line becomes <code>nl2sql-api serve --config DIR/nl2sql.yaml</code
 <tr>
 <td>Evals, drift, Connect, review, index, profile, LLM settings, API keys</td>
 <td>Off: admin routes, and a visitor is never admin</td>
+</tr>
+<tr>
+<td>Start screen</td>
+<td><strong>Try the demo</strong> and <strong>Connect your database</strong>; the second shows how to run nl2sql locally or self-host (see <a href="#the-start-screen">The start screen</a>)</td>
 </tr>
 <tr>
 <td>Limits</td>
@@ -5035,7 +5078,7 @@ no W-PR deletes a file another imports:</p>
 <tbody>
 <tr>
 <td><strong>Home</strong> (kept)</td>
-<td>The hero, the path, three features with clips; "Try a sample question" opens Chat with the first recorded guided question</td>
+<td>The hero, the path, three features with clips; "Try a sample question" opens Chat with the first recorded guided question. The start screen (<a href="#the-start-screen">section 4</a>) when <code>/meta</code> asks for it</td>
 <td><code>meta.js</code></td>
 </tr>
 <tr>
@@ -5951,7 +5994,7 @@ uses a key.</p>
 </tr>
 <tr>
 <td>W4</td>
-<td><strong>Evals, Settings, Home, Pipeline, Retrieval, hosted first run.</strong> Files: <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code>, <code>src/pages/Settings.jsx</code> (per-tab keys and models, the tab's API key, server LLM, API keys), <code>src/pages/Home.jsx</code>, <code>Pipeline.jsx</code>, <code>Retrieval.jsx</code> and the modules beside them (section 5's table), <code>src/api/evals.js</code>, <code>settings.js</code>, <code>meta.js</code>, <code>styles/settings.css</code>, <code>styles/evals.css</code>.</td>
+<td><strong>Evals, Settings, Home (with the start screen of section 4, and <code>/meta</code>'s <code>start</code>), Pipeline, Retrieval, hosted first run.</strong> Tests add <code>startScreen.test.js</code> (the three <code>start</code> values from <code>/meta</code> fixtures; hosted "Connect" shows the run-it-yourself steps and calls no route) and a route test that an empty project's <code>/meta</code> says <code>choose</code>. Files: <code>src/pages/Evals.jsx</code>, <code>src/evals/report.js</code>, <code>src/pages/Settings.jsx</code> (per-tab keys and models, the tab's API key, server LLM, API keys), <code>src/pages/Home.jsx</code>, <code>Pipeline.jsx</code>, <code>Retrieval.jsx</code> and the modules beside them (section 5's table), <code>src/api/evals.js</code>, <code>settings.js</code>, <code>meta.js</code>, <code>styles/settings.css</code>, <code>styles/evals.css</code>.</td>
 <td>A4, D0b</td>
 <td><code>report.test.js</code> (from the <code>EvalReport</code> fixture), <code>hostedKey.test.js</code> and <code>hostedModels.test.js</code> (kept, now every mode), <code>firstRun.test.js</code> (recorded from the <code>usage</code> provider), <code>status.test.js</code> (modes from the <code>/meta</code> fixture), <code>home.test.js</code> (kept)</td>
 <td><code>apps/web.md</code> (evals, settings), the <code>getting_started/</code> pages that show the playground</td>
