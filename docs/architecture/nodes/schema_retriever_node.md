@@ -226,12 +226,13 @@ Key contracts:
 - Exceptions are caught and logged via `logger.error`.
 - With a snapshot (the search failed, e.g. the embedding model could not
   load), it does what the no-candidates path does: every table the caller may
-  read, a `SCHEMA_RETRIEVAL_FAILED` `RunWarning` naming the failure, and no
-  error. Planning against no tables fails every attempt (bug B105 in
+  read, a `SCHEMA_RETRIEVAL_FAILED` `RunWarning` with a fixed message (the
+  exception detail goes to the log only), and no error. Planning against no
+  tables fails every attempt (bug B105 in
   [Wave C, section 14](../wave_c.md#14-bugs-wave-c-fixes)).
 - Without one (the snapshot itself could not be read), it returns empty
-  `relevant_tables` and a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` error, which
-  is not retryable: the SQL agent ends the sub-query before the planner.
+  `relevant_tables` and a `CRITICAL` `SCHEMA_RETRIEVAL_FAILED` error with a
+  fixed message, which is not retryable: the SQL agent ends the sub-query before the planner.
 
 ---
 
@@ -281,9 +282,15 @@ Key contracts:
 
 - No tenant scoping in vector retrieval.
 - No caching of retrieved tables across retries.
-- Fallback to full schema can be expensive for large schemas.
+- Fallback to full schema can be expensive for large schemas. A failed search
+  falls back the same way, with no `full_snapshot_max_tables` cap, so a very
+  large schema may overflow the context.
+- A pruned table keeps its foreign-key columns for joins into any table the
+  caller can read, with no per-table cap; a wide fact table keeps them all.
 - The label rule goes by column name, so a label named otherwise
-  (`first_name`, `country`) is kept only when the search returns it.
+  (`first_name`, `country`) is kept only when the search returns it. It also
+  strips one trailing `s` from the table name (`customers` matches
+  `customer_name`), so other plurals (`categories` and `category_name`) miss.
 
 ---
 

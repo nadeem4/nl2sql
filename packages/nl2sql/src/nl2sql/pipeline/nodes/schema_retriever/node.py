@@ -391,7 +391,7 @@ class SchemaRetrieverNode:
         Its primary key; both sides of every foreign key and glossary join it
         is offered (from it to a readable table, and into it from another table
         sent), so each join the planner sees can be bound; and its label, the
-        column named ``name`` or ``title`` (or ``<table>_name``, ``<table>_title``),
+        column named ``name`` or ``title`` (or ``<table>_name``, ``<table>_title``, with a trailing ``s`` of the table dropped),
         which an answer lists or filters by far more often than the search finds it.
         """
         key_of = {contract.table.full_name: key for key, contract in visible.items()}
@@ -402,7 +402,8 @@ class SchemaRetrieverNode:
             if contract is None:
                 continue
             table = contract.table.table_name.lower()
-            labels = {"name", "title", f"{table}_name", f"{table}_title"}
+            singular = table[:-1] if table.endswith("s") else table  # customers -> customer_name
+            labels = {"name", "title", *(f"{t}_{kind}" for t in {table, singular} for kind in ("name", "title"))}
             kept[table_key].update(c.name for c in contract.columns.values()
                                    if c.is_primary_key or c.name.lower() in labels)
             joins = [(fk.constrained_columns, fk.referred_table.full_name, fk.referred_columns)
@@ -456,13 +457,14 @@ class SchemaRetrieverNode:
                 update["knowledge_used"] = used
             return update
         except Exception as exc:
+            # The detail (a path, a table name) stays in the log; the caller sees a fixed message.
             logger.error(f"Schema retrieval failed: {exc}")
-            message = f"Schema retrieval failed: {exc}"
             if snapshot and visible is not None:
                 # Planning without a schema fails every attempt, so the planner gets every table
                 # the caller may read instead, as when the search finds nothing.
                 return self._whole_snapshot(query, [], snapshot, sub_query.schema_version, visible, preferred,
-                                            knowledge, f"{message}. Using full schema snapshot.")
+                                            knowledge, "Schema search failed; using every table you can read.")
+            message = "Schema retrieval failed; no schema is available."
             return {
                 "relevant_tables": [],
                 "reasoning": [{"node": self.node_name, "content": message, "type": "error"}],

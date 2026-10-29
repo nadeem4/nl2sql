@@ -151,6 +151,56 @@ def test_a_pruned_table_keeps_its_label_column():
     assert "name" in columns["category"]
 
 
+def test_a_restricted_scope_keeps_keys_without_naming_a_hidden_table():
+    # The caller may read film, film_category and the fillers, not category.
+    allow = [f"{DS}.public.film", f"{DS}.public.film_category", f"{DS}.public.filler_*"]
+    out = _node(_store(_pagila()), allow=allow)(_state())
+
+    columns = _columns(out)
+    assert set(columns) == {"film", "film_category"}
+    # The searched column, plus the keys; the key into the hidden table is not offered, and nothing fell back.
+    assert columns["film_category"] == {"film_id", "category_id", "last_update"}
+    assert not out.get("warnings") and not out.get("errors")
+    for table in out["relevant_tables"]:
+        assert all(rel["to_table"] != CATEGORY.full_name for rel in table.relationships)
+    assert CATEGORY.full_name not in str(out)
+
+
+def _knowledge(relationships):
+    return SimpleNamespace(relationships=relationships)
+
+
+def test_a_glossary_join_keeps_both_of_its_columns():
+    visible = _pagila().contract.tables
+    join = {"from_columns": ["release_year"], "to_table": CATEGORY.full_name, "to_columns": ["last_update"]}
+
+    kept = SchemaRetrieverNode._kept_columns([FILM.full_name, CATEGORY.full_name], visible,
+                                             _knowledge({FILM.full_name: [join]}))
+
+    assert "release_year" in kept[FILM.full_name]
+    assert "last_update" in kept[CATEGORY.full_name]
+
+
+def test_a_glossary_join_into_a_hidden_table_keeps_nothing():
+    visible = {k: v for k, v in _pagila().contract.tables.items() if k != CATEGORY.full_name}
+    join = {"from_columns": ["release_year"], "to_table": CATEGORY.full_name, "to_columns": ["last_update"]}
+
+    kept = SchemaRetrieverNode._kept_columns([FILM.full_name], visible, _knowledge({FILM.full_name: [join]}))
+
+    assert "release_year" not in kept[FILM.full_name]
+
+
+def test_a_plural_table_keeps_its_singular_label():
+    ref = _ref("customers")
+    contract = TableContract(table=ref, columns={c.name: c for c in [
+        _col("customer_id", pk=True), _col("customer_name", data_type="text"), _col("notes", data_type="text")]},
+        foreign_keys=[])
+
+    kept = SchemaRetrieverNode._kept_columns([ref.full_name], {ref.full_name: contract}, _knowledge({}))
+
+    assert kept[ref.full_name] == {"customer_id", "customer_name"}
+
+
 def _raises(*_a, **_k):
     raise RuntimeError("bad allocation")
 
@@ -164,7 +214,9 @@ def test_a_failed_search_sends_the_snapshot_with_a_warning():
     # Whole tables, as the no-candidates fallback sends them.
     assert "description" in _columns(out)["film"]
     assert [w.code for w in out["warnings"]] == [ErrorCode.SCHEMA_RETRIEVAL_FAILED.value]
-    assert "bad allocation" in out["warnings"][0].message
+    # The exception text stays in the log; the caller sees a fixed message.
+    assert "bad allocation" not in str(out)
+    assert out["warnings"][0].message == "Schema search failed; using every table you can read."
     assert not out.get("errors")
     # A hidden table never reaches the output.
     assert FILM_CATEGORY.full_name not in str(out) and LANGUAGE.full_name not in str(out)
@@ -176,6 +228,8 @@ def test_a_failed_search_without_a_snapshot_ends_the_run():
 
     assert out["relevant_tables"] == []
     [error] = out["errors"]
+    assert "bad allocation" not in str(out)
+    assert error.message == "Schema retrieval failed; no schema is available."
     assert error.error_code == ErrorCode.SCHEMA_RETRIEVAL_FAILED
     assert not error.is_retryable
 
