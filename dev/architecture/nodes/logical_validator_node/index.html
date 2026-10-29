@@ -2889,7 +2889,7 @@ emits a <code>PlanModel</code>, never SQL.</p>
 <p>Validation performed:</p>
 <ul>
 <li>Aliases must be unique.</li>
-<li>Joins must match known relationships.</li>
+<li>Joins must match known relationships. An equality reads the same either way round, so <code>b.x = a.y</code> matches a relationship declared as <code>a.y = b.x</code>. A join that matches none is rejected with the joins that are allowed: the declared joins between its two tables, or, when there are none, the shortest declared path through the tables the planner was sent (or, if none runs only through those, that no path exists in the schema it was given) ("No relationship is declared between inventory and film_category. Shortest declared path: inventory.film_id = film.film_id; film.film_id = film_category.film_id."). The text is in the error's <code>message</code>, which is what the refiner and the planner are sent on a retry.</li>
 <li>Column references must exist and be unambiguous.</li>
 <li>Every binary operator must be one the generator can render.</li>
 <li>A <code>*</code> column appears only as a bare select item or as <code>COUNT(*)</code>.</li>

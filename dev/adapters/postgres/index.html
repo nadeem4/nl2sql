@@ -5885,6 +5885,7 @@
 
 <h1 id="postgresql-adapter">PostgreSQL Adapter</h1>
 <p>This adapter extends <code>SQLAlchemyAdapter</code>, leveraging automatic schema reflection and statistics gathering. Its row counts are the catalog's estimates (<code>pg_class.reltuples</code>), so a table never analyzed has none.</p>
+<p>A partitioned table is one table. PostgreSQL declares its foreign keys on the partitions (<code>payment_p2022_01</code>, ...), so the adapter does not list the partitions: the parent keeps the foreign keys it declares and gains the partitions' (once each), and a key that points at a partition points at its parent. A query names the parent, and the planner is sent one table instead of the parent and all its partitions. A parent never analyzed takes the sum of its partitions' row estimates. A partition is read when its top parent is in the datasource's <code>index</code> scope.</p>
 <h2 id="configuration">Configuration</h2>
 <p><strong>Type</strong>: <code>postgres</code></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># datasources/my_db.yaml</span>
