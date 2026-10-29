@@ -100,6 +100,23 @@ def _sides(value: Any) -> List[str]:
     return [value] if isinstance(value, str) else [v for v in value or [] if isinstance(v, str)]
 
 
+def _tables_in_question(ctx: Any, proposal: Proposal) -> List[Tuple[str, str]]:
+    """The live snapshot's tables whose name (or its words, ``order items`` for ``OrderItems``) the question contains.
+
+    An example question carries no table list, so the names in its text are what a role denied that table must not see.
+    """
+    from nl2sql.dashboards.templates import _words
+
+    pointer = ctx.index.pointers(ctx.namespace).get(proposal.datasource_id)
+    snapshot = ctx.state.get_snapshot(proposal.datasource_id, pointer.schema_version) if pointer else None
+    if snapshot is None:
+        return []
+    text = f" {_words(str(proposal.change.get('question') or proposal.target))} "
+    return [(contract.table.schema_name or "", contract.table.table_name)
+            for contract in snapshot.contract.tables.values()
+            if f" {_words(contract.table.table_name)} " in text]
+
+
 def named_tables(ctx: Any, proposal: Proposal) -> List[str]:
     """Every table the proposal's target and change name, as ``datasource.schema.table``.
 
@@ -125,6 +142,8 @@ def named_tables(ctx: Any, proposal: Proposal) -> List[str]:
         except Exception:  # not one read-only query, or no such datasource: nothing to read from it
             pairs = []
         return table_names(ctx, proposal.datasource_id, pairs)
+    elif proposal.kind == "example":
+        return table_names(ctx, proposal.datasource_id, _tables_in_question(ctx, proposal))
     pairs = []
     for name in (n.strip() for n in names if n and n.strip()):
         schema, _, table = name.rpartition(".")
@@ -196,6 +215,9 @@ def current_value(ctx: Any, user: "UserContext", proposal: Proposal) -> Optional
         item = next((v for k, v in items.items() if k.strip().lower() == target), None)
     elif proposal.kind == "term":
         item = next((t for t in knowledge.terms if t.term.strip().lower() == target), None)
+    elif proposal.kind == "example":
+        found = next((e for e in knowledge.examples if e.strip().lower() == target), None)
+        return {"question": found} if found is not None else None
     else:
         item = next((j for j in knowledge.joins
                      if "->".join(",".join(_sides(s)) for s in (j.from_, j.to)).lower() == target.replace(" ", "")),

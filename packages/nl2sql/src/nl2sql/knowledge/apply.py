@@ -11,6 +11,7 @@ returns a new, validated glossary and writes nothing.
 | ``column`` | ``table.column`` | sets its fields over the column's knowledge |
 | ``join`` | ``from->to`` | the join (``from``, ``to``, ...) replaces the same join, or is added |
 | ``term`` | the term's name | the term replaces the one of the same name (D50), or is added |
+| ``example`` | the question | the ``question`` is appended to the datasource's ``examples`` unless it is there |
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from pydantic import ValidationError
 from nl2sql_sdk.knowledge import ITEM_MAX_CHARS, DatasourceKnowledge, Glossary, JoinKnowledge, Term
 from nl2sql_sdk.stores import Proposal
 
-GLOSSARY_KINDS = ("table", "column", "join", "term")
+GLOSSARY_KINDS = ("table", "column", "join", "term", "example")
 
 
 def _same(a: str, b: str) -> bool:
@@ -60,6 +61,11 @@ def apply_change(glossary: Glossary, kind: str, datasource_id: str, target: str,
         except ValidationError as e:
             raise ValueError(f"The join change to {datasource_id} {target} is not valid: {e}") from None
         block["joins"] = _replace_in_place(glossary, datasource_id, new)
+    elif kind == "example":
+        question = str(change.get("question", target)).strip()
+        examples = block.setdefault("examples", [])
+        if question and not any(_same(question, e) for e in examples):
+            examples.append(question)
     else:  # term
         try:
             new_term = Term.model_validate(change, context={"item_max_chars": item_max_chars})

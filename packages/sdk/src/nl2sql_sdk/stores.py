@@ -105,8 +105,8 @@ class BuildPointer(BaseModel):
     knowledge_hash: Optional[str] = None
 
 
-ProposalKind = Literal["join", "column", "table", "term", "verified_query"]
-ProposalOrigin = Literal["profiler", "draft", "correction", "thumbs_up", "clarification"]
+ProposalKind = Literal["join", "column", "table", "term", "example", "verified_query"]
+ProposalOrigin = Literal["profiler", "draft", "correction", "thumbs_up", "clarification", "template"]
 ProposalStatus = Literal["proposed", "accepted", "rejected", "superseded"]
 
 

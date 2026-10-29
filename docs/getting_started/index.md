@@ -13,6 +13,7 @@ to use the platform:
 - [Docker (REST API)](docker.md)
 - [From Source (Development)](source.md)
 - [Demo Data (CLI-first)](demo.md)
+- [Launch](launch.md): connect your own database in one sitting with `nl2sql launch`
 - [MCP server](mcp.md): serve the engine to a desktop assistant or an IDE with `nl2sql mcp`
 
 ## One config: `nl2sql.yaml`
@@ -22,6 +23,15 @@ CLI takes it from `--config PATH`, then the `NL2SQL_CONFIG` variable, then
 `./nl2sql.yaml`; `nl2sql-api` from `NL2SQL_CONFIG`, then `./nl2sql.yaml`; Python
 from `NL2SQL.from_config(path)`. The sections, their fields and every 0.4 file
 and variable they replace are in [Configuration](../configuration/system.md).
+
+## Or let `nl2sql launch` do it
+
+```bash
+nl2sql launch my-project         # finds your database, asks for what is missing, writes, indexes, profiles
+```
+
+[Launch](launch.md) is `init`, the datasource file, the index and the first review in one command, with
+secrets written to `.env`. The rest of this page is the same project written by hand.
 
 ## Start a config with `nl2sql init`
 

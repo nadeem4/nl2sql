@@ -277,6 +277,8 @@ def _sets(knowledge: Any, proposal: Proposal) -> bool:
         return any(fields.get(name) not in (None, [], {}) for name in proposal.change if name != "synonyms")
     if proposal.kind == "term":
         return any(t.term.strip().lower() == target for t in knowledge.terms)
+    if proposal.kind == "example":
+        return any(e.strip().lower() == target for e in knowledge.examples)
 
     def side(value):
         return ",".join(v.strip().lower() for v in ([value] if isinstance(value, str) else value))

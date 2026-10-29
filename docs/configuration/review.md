@@ -6,7 +6,8 @@ thumbs-up on a generated answer files a proposed verified query, and so does a
 checked [correction](../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct)
 (`engine.feedback.correct`, origin `correction`); the [schema profiler](../schema/profiler.md) files its join candidates and
 column roles the same way (`nl2sql profile`, and with `--draft` the descriptions the profiler model drafts), a saved
-[clarification pick](#saving-a-clarification-pick) files a proposed term. Nothing in
+[clarification pick](#saving-a-clarification-pick) files a proposed term, and [`nl2sql launch`](../getting_started/launch.md)
+files its five starter questions as proposed `example`s (origin `template`). Nothing in
 the queue reaches a prompt, the index or a file until a person with an admin
 role accepts it.
 
@@ -25,11 +26,11 @@ third-party state store can keep it:
 | Field | What it holds |
 | --- | --- |
 | `id` | 16 hex characters: SHA-256 of `kind`, `datasource_id`, `target` and the canonical JSON of `change` |
-| `kind` | `join`, `column`, `table` or `term` (the glossary), or `verified_query` (`curated.yaml`) |
+| `kind` | `join`, `column`, `table`, `term` or `example` (the glossary), or `verified_query` (`curated.yaml`) |
 | `target` | What it changes: `Invoice.Total`, `Track.MediaTypeId->MediaType.MediaTypeId`, a term's name, a question |
 | `change` | The fields it would set, in `glossary.yaml`'s or `curated.yaml`'s shape |
 | `tables` | Every `datasource.schema.table` its target and change name, for the scope filter. Filing completes it: a table, a column's table, both sides of a join, a term's tables and columns' tables, and the tables a verified query's SQL reads are always listed |
-| `origin` | `thumbs_up`, `profiler`, `draft`, `correction` or `clarification` |
+| `origin` | `thumbs_up`, `profiler`, `draft`, `correction`, `clarification` or `template` (a starter question from `nl2sql launch`) |
 | `evidence` | Counts and checks (a thumbs-up's trace id and role; a correction's trace id, original SQL, `ran`, `row_count` and `columns`); never rows |
 | `status` | `proposed`, `accepted`, `rejected` or `superseded` |
 | `created_at`, `created_by`, `decided_at`, `decided_by`, `reason`, `wrote` | Who and when; a rejection's reason; the file an accept wrote |
@@ -68,6 +69,7 @@ report.accepted, report.files_written, report.warnings, report.refused
 | Method | What it does |
 | --- | --- |
 | `list(*, user_context, kind=None, status="proposed", datasource_id=None, limit=None)` | The proposals the caller may see, newest first; `status=None` lists every status |
+| `propose_examples(datasource_id, questions, *, by)` | Files each question as an `example` proposal (kind `example`, target the question, `change` `{"question": ...}`, origin `template`) and returns the rows; needs an admin role. Nothing reaches the glossary until an accept. The tables the question names (matched against the live snapshot) are recorded on the proposal, so a role denied one of them does not see it |
 | `get(id, *, user_context)` | One proposal; `ReviewError(NOT_FOUND)` when it is missing or hidden |
 | `current(id, *, user_context)` | What the proposal would replace: the glossary item as the caller sees it, or the curated query with the same id. None when there is none, or when the caller's scope does not reach every table that query reads |
 | `accept(ids, *, by, edits=None)` | Accepts one id or a list; `edits` maps an id to a dict merged over its `change`. Returns an `AcceptReport` |
@@ -106,7 +108,7 @@ Accept is the only code that writes a file a person owns, and it writes two:
 
 | Kind | Writes | Then |
 | --- | --- | --- |
-| `join`, `column`, `table`, `term` | The first `yaml` [knowledge source](knowledge.md)'s `glossary.yaml`, each change merged in. A `term` whose name exists replaces that term. | The knowledge is reloaded: the items are in the next run's prompts. |
+| `join`, `column`, `table`, `term`, `example` | The first `yaml` [knowledge source](knowledge.md)'s `glossary.yaml`, each change merged in. A `term` whose name exists replaces that term; an `example` is appended to the datasource's `examples` unless it is there. | The knowledge is reloaded: the items are in the next run's prompts. |
 | `verified_query` | The `curated` section's own file (`curated: {file: curated.yaml}`), the query added under its datasource | The curated checks run first, on the edited section. Then the engine's curated answers are swapped and the datasource's curated index entries refreshed (as `nl2sql index --refresh` does), so the next question can match it. |
 
 | Rule | Detail |
