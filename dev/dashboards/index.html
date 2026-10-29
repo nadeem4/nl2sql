@@ -2316,6 +2316,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-in-chat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building in chat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#open-refresh-and-stored-results" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5826,6 +5837,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-in-chat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building in chat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#open-refresh-and-stored-results" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5901,8 +5923,8 @@
 <div class="admonition note">
 <p class="admonition-title">Partly built (Wave C, 0.9)</p>
 <p>Workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1), and so do <code>open</code>, <code>refresh</code>,
-stored results and schedules (D2), and so do <code>generate</code> and <code>suggest_questions</code>, the starter dashboard (D3).
-Filter values and <code>filter_values</code> (D2b) and building in chat (D4) have their signatures and raise
+stored results and schedules (D2), and so do <code>generate</code> and <code>suggest_questions</code>, the starter dashboard (D3),
+and building in chat (D4). Filter values and <code>filter_values</code> (D2b) have their signatures and raise
 <code>NotImplementedError</code> naming the pull request that fills them. The design is
 <a href="../architecture/wave_c/#6-dashboards">Wave C, section 6</a>.</p>
 </div>
@@ -5932,7 +5954,7 @@ stored plans as the caller with no model call. The methods are in
 </tr>
 <tr>
 <td>D4</td>
-<td>Building and editing a dashboard in a conversation (<code>dashboard_edit</code>, <code>dashboard_pin</code>)</td>
+<td>Building and editing a dashboard in a conversation (<code>dashboard_edit</code>, <code>dashboard_pin</code>) and <code>create_draft</code></td>
 </tr>
 </tbody>
 </table>
@@ -6008,22 +6030,54 @@ never purged.</p>
 none</strong>: if one edit is refused, nothing is saved. A draft and a saved dashboard take the same edits. Stored
 chart results stay valid across a rename, a redraw, an arrange, a move and a schedule; removing a chart or
 changing the filters discards the results they invalidate. <code>add_tile</code> and <code>replace_plan</code>, which change what
-data a chart shows, are only for chat (D4).</p>
+data a chart shows, are only for a conversation (see <a href="#building-in-chat">Building in chat</a>).</p>
 <p>Each change publishes <code>dashboard.changed</code> (the kinds, never the values), <code>set_schedule</code> also
 <code>dashboard.schedule_set</code> (it saves a role snapshot, so it is audited) and the workspace calls publish
 <code>workspace.changed</code>.</p>
 <p>An edit, <code>pin</code> and <code>delete</code> take the dashboard's refresh lock (see <a href="#open-refresh-and-stored-results">Open, refresh and stored results</a>),
 so a refresh that is running cannot store results after an edit has made them wrong. If the lock is held you
 get a <code>ValueError</code> (<code>DashboardBusy</code>) that says the dashboard is being refreshed; try again when it is done.</p>
+<h2 id="building-in-chat">Building in chat</h2>
+<p>In a conversation the model builds a dashboard the way a person would: one question per chart, then the
+<code>dashboard_edit</code> <a href="../conversations/tools/#the-dashboard-tools">chat tool</a> with an <code>add_tile</code> edit for each
+answer it wants, and further edits to the same draft.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">chat</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">conversations</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">conversations</span><span class="o">.</span><span class="n">ask</span><span class="p">(</span><span class="n">chat</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s2">"Build me a dashboard of orders by city and customers by country"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">board</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">engine</span><span class="o">.</span><span class="n">conversations</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">chat</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span><span class="o">.</span><span class="n">dashboard_id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">engine</span><span class="o">.</span><span class="n">conversations</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span><span class="n">chat</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="s2">"dashboard_pin"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Sales"</span><span class="p">},</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>   <span class="c1"># only when asked</span>
+</code></pre></div>
+<ul>
+<li><strong>A draft on first use.</strong> The first <code>dashboard_edit</code> makes an empty draft (<code>create_draft</code>) in "General" or the
+  workspace named, tied to the conversation. A conversation started with <code>start(dashboard_id=...)</code> edits that
+  dashboard instead. It stays a draft until <code>dashboard_pin</code> (the model calls it only when the user asks) saves it
+  whole.</li>
+<li><strong><code>add_tile</code></strong> takes a <code>title</code> and <code>from_step</code> (<code>turn</code>, which defaults to the turn being answered, and which of that turn's <code>ask</code> calls). The chart keeps
+  the <strong>whole</strong> plan of that answer: its decomposition, the plan of every sub-query and the combine step, or the
+  verified query that answered. The model never writes or sees a plan or SQL, and the engine reads the plan from
+  its own stored step.</li>
+<li><strong>A chart is checked before it is saved.</strong> The plan goes through a run that executes nothing (the check <code>open</code>
+  uses), as the caller. If the validator rejects it, or the caller may not read it, nothing in that
+  <code>dashboard_edit</code> call is saved and the model is told why.</li>
+<li><strong>Fixing a chart.</strong> A chart that is <code>needs_fixing</code> is shown to the model in the open dashboard with the
+  validator's reason. It asks the question again and calls <code>replace_plan</code> with the new answer: the chart keeps its
+  id, title, chart type and place, takes the new question and plan, and its stored result is discarded. This is
+  the only part of the dashboard that spends tokens.</li>
+<li><strong>The same edits as by hand.</strong> <code>dashboard_edit</code> takes every manual edit in the table above, so the model and the
+  person change a dashboard in the same ways and with the same checks. The model sees the open dashboard (charts
+  with their ids, questions and last status) at every step, never a row.</li>
+<li><strong>The facade.</strong> <code>engine.dashboards.edit(id, edits, user_context=me, conversation=chat)</code> takes the two chat-only
+  edits when it is given a conversation of the caller's; without one they are a <code>ValueError</code>. The named methods
+  take no question and no plan.</li>
+</ul>
 <h2 id="open-refresh-and-stored-results">Open, refresh and stored results</h2>
 <p>A chart is re-run from the plan it keeps, never by asking the question again, so <strong>refreshing costs no
 tokens</strong>. Each chart is one <code>run_query(question, plan=SuppliedPlan(...), answer=False, user_context=...)</code>:
 the plan goes through the <code>plan.after</code> hooks, the validator and the generator under the caller's scope,
 is never cached and is never sent to the refiner, and no answer is written. A multi-query chart re-runs every
 stored query and its combine step; a verified chart re-runs its verified query with its stored values.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">view</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>        <span class="c1"># the stored results, after the access check</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">refresh</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>      <span class="c1"># every chart, in layout order</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">refresh</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">tile_id</span><span class="o">=</span><span class="s2">"t3"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>   <span class="c1"># one chart</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">view</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>        <span class="c1"># the stored results, after the access check</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">refresh</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>      <span class="c1"># every chart, in layout order</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">refresh</span><span class="p">(</span><span class="n">board</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">tile_id</span><span class="o">=</span><span class="s2">"t3"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>   <span class="c1"># one chart</span>
 </code></pre></div>
 <table>
 <thead>
@@ -6047,7 +6101,7 @@ stored query and its combine step; a verified chart re-runs its verified query w
 </tr>
 <tr>
 <td><strong><code>needs_fixing</code></strong></td>
-<td>A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is <code>needs_fixing</code> with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn (D4).</td>
+<td>A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is <code>needs_fixing</code> with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn: <a href="#building-in-chat"><code>replace_plan</code></a>.</td>
 </tr>
 <tr>
 <td><strong>Cost guard</strong></td>
@@ -6092,16 +6146,16 @@ nothing refreshes.</p>
 <li><strong>One run at a time.</strong> A dashboard another process is refreshing is skipped, so two runners (or a runner and
   cron) do not double up.</li>
 </ul>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nl2sql<span class="w"> </span>dashboards<span class="w"> </span>refresh<span class="w"> </span>--dashboard<span class="w"> </span>sales<span class="w"> </span>--as<span class="w"> </span>analyst<span class="w"> </span>--user<span class="w"> </span>ana<span class="w"> </span>--tenant<span class="w"> </span>acme<span class="w">   </span><span class="c1"># one dashboard, as that caller</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nl2sql<span class="w"> </span>dashboards<span class="w"> </span>refresh<span class="w"> </span>--due<span class="w">                                                      </span><span class="c1"># every schedule that is due</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span>dashboards<span class="w"> </span>refresh<span class="w"> </span>--dashboard<span class="w"> </span>sales<span class="w"> </span>--as<span class="w"> </span>analyst<span class="w"> </span>--user<span class="w"> </span>ana<span class="w"> </span>--tenant<span class="w"> </span>acme<span class="w">   </span><span class="c1"># one dashboard, as that caller</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span>dashboards<span class="w"> </span>refresh<span class="w"> </span>--due<span class="w">                                                      </span><span class="c1"># every schedule that is due</span>
 </code></pre></div>
 <p><code>--user</code> and <code>--tenant</code> act as that owner: the command is for the operator, who holds the config and the
 credentials. <code>--dashboard</code> needs <code>--user</code>, since a dashboard belongs to a user. <code>--due</code> runs each schedule as its saved owner, so it refuses <code>--as</code>, <code>--user</code> and <code>--tenant</code>.</p>
 <h2 id="the-starter-dashboard">The starter dashboard</h2>
 <p><code>generate</code> makes a first dashboard from a datasource's schema, with no model and no profile run: it needs an
 index.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">board</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>          <span class="c1"># saved in your "General" workspace</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">suggest_questions</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>         <span class="c1"># the first five questions, nothing run</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">board</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">)</span>          <span class="c1"># saved in your "General" workspace</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">engine</span><span class="o">.</span><span class="n">dashboards</span><span class="o">.</span><span class="n">suggest_questions</span><span class="p">(</span><span class="s2">"sales"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">me</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>         <span class="c1"># the first five questions, nothing run</span>
 </code></pre></div>
 <p><strong>What it reads.</strong> Each column gets a role from the indexed snapshot alone (no query): what the schema proves (a
 key is an <em>identifier</em>, a date type a <em>date</em>), then Wave B's name and statistics rules (<code>money</code>, <code>quantity</code>,

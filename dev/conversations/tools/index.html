@@ -935,6 +935,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-dashboard-tools">
+<span class="md-ellipsis">
+      
+        The dashboard tools
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#errors">
 <span class="md-ellipsis">
       
@@ -2543,6 +2552,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#the-dashboard-tools">
+<span class="md-ellipsis">
+      
+        The dashboard tools
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#errors">
 <span class="md-ellipsis">
       
@@ -2587,10 +2605,8 @@
 <article class="md-content__inner md-typeset">
 <h1 id="chat-tools">Chat tools</h1>
 <div class="admonition note">
-<p class="admonition-title">Wave C, 0.9: the runner, <code>chart</code>, <code>diagram</code> and <code>report</code> are built</p>
-<p><code>dashboard_edit</code> and <code>dashboard_pin</code> arrive with D4; until then each raises
-<code>NotImplementedError</code>, which a conversation reports as a failed step, so they are off by default. The design is
-<a href="../../architecture/wave_c/#4-chat-tools">Wave C, section 4</a>.</p>
+<p class="admonition-title">Wave C, 0.9: the runner and the five tools are built</p>
+<p>The design is <a href="../../architecture/wave_c/#4-chat-tools">Wave C, section 4</a>.</p>
 </div>
 <p>A chat tool turns something a conversation already has into something else, with no model call of its
 own. The five built-ins:</p>
@@ -2620,20 +2636,20 @@ own. The five built-ins:</p>
 </tr>
 <tr>
 <td><code>dashboard_edit</code></td>
-<td>Builds or changes a dashboard (<a href="../../dashboards/">Dashboards</a>)</td>
-<td>D4</td>
+<td>Builds or changes a dashboard (<a href="../../dashboards/#building-in-chat">Dashboards</a>); args <code>edits</code>, <code>dashboard_id</code>, <code>title</code>, <code>workspace_id</code></td>
+<td>D4 (built)</td>
 </tr>
 <tr>
 <td><code>dashboard_pin</code></td>
-<td>Saves the dashboard being built, whole</td>
-<td>D4</td>
+<td>Saves the dashboard being built, whole; args <code>dashboard_id</code>, <code>workspace_id</code>, <code>title</code></td>
+<td>D4 (built)</td>
 </tr>
 </tbody>
 </table>
 <h2 id="which-tools-are-on">Which tools are on</h2>
-<p><code>chat_tools:</code> in <code>nl2sql.yaml</code> lists registered names. Absent, the default tools are on: <code>chart</code>, <code>diagram</code> and
-<code>report</code>, those of them the registry has (an engine built on <code>Registry.empty()</code> has none). <code>dashboard_edit</code>
-and <code>dashboard_pin</code> are off until D4 makes them real; name them in <code>chat_tools:</code> to try them. <code>[]</code> turns
+<p><code>chat_tools:</code> in <code>nl2sql.yaml</code> lists registered names. Absent, the default tools are on: <code>chart</code>, <code>diagram</code>,
+<code>report</code>, <code>dashboard_edit</code> and <code>dashboard_pin</code>, those of them the registry has (an engine built on
+<code>Registry.empty()</code> has none). <code>[]</code> turns
 every registry tool off and leaves <code>ask</code>, the conversation's own tool, which is always on. A name you list
 that the registry does not know is a config error when the engine is built, and so is <code>ask</code> (it is not a
 registry tool). <code>engine.chat_tools.list()</code> returns the enabled tools
@@ -2652,6 +2668,24 @@ registry tool). <code>engine.chat_tools.list()</code> returns the enabled tools
   runs one enabled tool as a turn of kind <code>tool</code>, with no model call. Arguments that do not validate raise
   <code>ValueError</code> and store nothing. A name that is not enabled is stored as a failed step.</li>
 </ul>
+<h2 id="the-dashboard-tools">The dashboard tools</h2>
+<p><code>dashboard_edit</code> takes <code>edits</code>, the list of <a href="../../dashboards/#editing-by-hand">dashboard edits</a> a person can
+make by hand plus <code>add_tile</code> and <code>replace_plan</code>, and applies them with <code>engine.dashboards.edit</code>, all or none. Its
+other arguments are <code>dashboard_id</code> (the conversation's dashboard when absent), and <code>title</code> and <code>workspace_id</code> for a
+new draft. The first call in a conversation makes a <strong>draft</strong> tied to it (<code>Conversation.dashboard_id</code>,
+<code>Dashboard.conversation_id</code>); later calls edit the same one, and a conversation started with
+<code>start(dashboard_id=...)</code> edits that dashboard. <code>add_tile</code> and <code>replace_plan</code> name an answer by <code>from_step</code>
+(<code>turn</code>, which defaults to the turn being answered, and which of that turn's <code>ask</code> calls with a result, counting
+from 1): the engine reads the whole plan from its own
+stored step, never from model text, and checks it with a run that executes nothing before saving, so a plan the
+validator rejects ends the step as <code>TOOL_NOT_APPLICABLE</code> with the validator's message and saves nothing. A draft
+this call made is removed again, whatever the failure. If the conversation's dashboard was deleted, the next edit
+makes a new draft and the conversation is tied to that. <code>dashboard_pin</code> saves the whole draft (<code>engine.dashboards.pin</code>) and is called
+only when the user asks. A dashboard that is not the caller's is "not found". Neither tool calls a model or
+shows the model a row: it gets the step's kind, title and <code>refs</code> (<code>{"dashboard_id": ...}</code>), and the open
+dashboard in <code>[CONVERSATION]</code> as <code>dashboard</code> (<code>id</code>, <code>title</code>, <code>status</code>, and each chart's <code>id</code>, <code>title</code>, <code>question</code>,
+<code>chart</code> and last <code>status</code>, with the reason for a <code>needs_fixing</code> or <code>denied</code> one), re-read at every step so it
+shows this turn's edits.</p>
 <h2 id="errors">Errors</h2>
 <p>A step that does not succeed has <code>status</code> <code>error</code> and <code>ToolStep.error = {"code", "message"}</code>; the model sees it
 and may go on.</p>

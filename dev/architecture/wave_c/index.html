@@ -7067,355 +7067,445 @@ the lock and saves the dashboard; <code>api/dashboards_api.py</code> gathers wha
 </ul>
 </div>
 <h3 id="d4">D4</h3>
-<p>Not built yet.</p>
-<h3 id="l1">L1</h3>
 <div class="admonition note">
-<p class="admonition-title">Built (L1)</p>
-<p><code>engine.datasources.scan</code> is <code>nl2sql/datasources/discovery.py</code>'s <code>scan(registry, folder, *, url, ports,
-skip)</code>; the five built-ins declare the class variables above and a <code>connection_for</code> classmethod (SQLite and
-DuckDB read the first 16 and 12 bytes of a file, the server databases split a <code>make_url</code> URL or a
-<code>host:port</code>). Where the code and the design differ, the code won:</p>
+<p class="admonition-title">Built (D4): chat builds and edits dashboards</p>
 <ul>
-<li><code>Found</code> and <code>DiscoverableAdapter</code> are imported from <code>nl2sql_sdk.discovery</code>, not the SDK's top level.</li>
-<li><strong>Order:</strong> the adapters are walked sorted by registry name, so findings of one kind come in name order
-  (files in sorted path order, ports by adapter name, then each adapter's port order).</li>
-<li><strong>Depth:</strong> "two levels deep" is two folders below <code>folder</code> (<code>folder/a/b/x.db</code> is found, <code>folder/a/b/c/x.db</code>
-  is not). The 50 is files that carry a declared suffix, counted before <code>connection_for</code> confirms them.</li>
-<li><strong>Duplicates</strong> are one server (type, host, port) or one file (type, resolved path), the first finding wins.
-  A missing port counts as the adapter's default and <code>localhost</code> as <code>127.0.0.1</code>, so a URL naming either
-  hides the open-port finding for the same server.</li>
-<li><strong>The password:</strong> <code>connection</code> keeps the URL's password (a form needs it), <code>Candidate</code>'s repr masks it
-  (<code>model_dump</code> does not, so a Candidate is never logged or serialised), and <code>found.value</code> is the URL with
-  the password replaced by <code>***</code> and its query and fragment dropped (a password can sit in the query).
-  The adapter is given the real URL.</li>
-<li>An adapter whose <code>connection_for</code> raises or returns something <code>Candidate</code> rejects is skipped, not fatal,
-  and its error text is dropped (it could hold a password); a missing folder finds nothing; <code>scan</code> takes
-  <code>storage.path</code> from the engine's config to skip. Each port is probed once.</li>
-<li>A DuckDB file is confirmed by the <code>DUCK</code> magic at byte 8 (the design names only SQLite's header).</li>
-<li>The probe is <code>socket.create_connection(("127.0.0.1", port), timeout=0.2)</code>; the tests replace it with a fake.</li>
-<li>L3 uses <code>Candidate.type</code>, <code>.connection</code> and <code>.missing</code> to fill the form and <code>.found</code> to say where a
-  finding came from; <code>scan</code> never connects, so L3 calls <code>datasources.test</code> on the filled form.</li>
-</ul>
-</div>
-<h3 id="l2">L2</h3>
-<div class="admonition note">
-<p class="admonition-title">Built (L2): the config writers and the Connect routes</p>
-<ul>
-<li><strong>Files:</strong> <code>config/writer.py</code> (new: <code>EnvSecrets</code>, <code>env_name</code>, <code>datasource_data</code>, <code>write_env_values</code>,
-  <code>write_atomic</code>, <code>update_gitignore</code>, <code>dump_yaml</code>), <code>config/project.py</code> (<code>write_project</code>, <code>starter_config</code>;
-  <code>init_project</code> builds a <code>Config</code> and calls <code>write_project</code>), <code>config/loader.py</code> and <code>config/models.py</code>
-  (a datasources folder's file hashes: <code>Config.datasources_folder</code>, <code>datasource_file_hash</code>,
-  <code>record_datasource_file</code>), <code>api/datasource_api.py</code> (<code>save</code>), and in <code>nl2sql-api</code> <code>routes/datasource.py</code>,
-  <code>services/datasource.py</code>, <code>models/datasource.py</code> and <code>auth.is_fresh_local_install</code>. <code>nl2sql.config</code>
-  exports <code>write_project</code>, <code>starter_config</code> and <code>write_env_values</code>.</li>
-<li><strong>Tests:</strong> <code>test_config_writer.py</code>, <code>test_datasources_save.py</code>, <code>packages/api/tests/test_connect_routes.py</code>;
-  the Connect routes are also in <code>test_admin_auth.py</code>'s admin-only table. <code>test_wave_c_stubs.py</code> lost <code>save</code>;
-  the boundary test's <code>PERSONS_FILE_WRITERS</code> lets <code>config/project.py</code> call <code>write_env_values</code>, and a new
-  test keeps the list from going stale.</li>
+<li><strong>Files:</strong> <code>nl2sql/chat_tools/dashboard_edit.py</code> and <code>dashboard_pin.py</code> (the two tools), <code>dashboards/edits.py</code>
+  (the <code>add_tile</code> and <code>replace_plan</code> handlers and <code>plan_from_step</code>), <code>dashboards/api.py</code> and
+  <code>api/dashboards_api.py</code> (<code>create_draft</code>, and <code>edit(..., conversation=)</code>), <code>conversations/agent.py</code>
+  (<code>dashboard_view</code>, the <code>dashboard</code> key of <code>[CONVERSATION]</code>), <code>conversations/api.py</code> (it reads the open
+  dashboard at every step and ties the draft to the conversation), <code>conversations/tools.py</code>
+  (<code>DEFAULT_CHAT_TOOLS</code> now has <code>dashboard_edit</code> and <code>dashboard_pin</code>) and one rule in <code>conversations/prompts.py</code>.</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_dashboards_d4.py</code> (every name in the row's list, plus the verified chart, a rejected
+  chart saving none of its edit list, bad <code>from_step</code> refs, no rows to the model, <code>create_draft</code>), one e2e test in
+  <code>tests/e2e/test_conversations_fake_llm.py</code> (a real no-execute check, then <code>pin</code> and <code>refresh</code> with no model
+  call). <code>test_wave_c_stubs.py</code> moves both tools out of <code>CHAT_TOOL_ROWS</code>; D1's <code>test_the_chat_only_edits_arrive_with_d4</code>
+  is now <code>test_the_chat_only_edits_need_a_conversation</code>.</li>
 </ul>
 <p>Where the code and the design differ, the code won:</p>
 <ul>
-<li><strong><code>write_project(config, folder, *, env_file=False, extra=None)</code>.</strong> <code>env_file</code> is the design's "where the
-  writer may write <code>.env</code>" (launch passes true). <code>extra</code> maps a path to text to write or a file to copy: it
-  is how <code>init_project</code> keeps its example datasource's comments and copies the demo's databases, suites and
-  glossary. The existing-file refusal covers <code>extra</code> too. A section at its default is left out, as <code>init</code>
-  always did; <code>curated</code>, <code>observers: []</code> and every set optional section are written.</li>
-<li><strong>Env names follow the field's path.</strong> <code>NL2SQL_</code> plus the path: a connection secret is
-  <code>NL2SQL_&lt;DATASOURCE_ID&gt;_&lt;KEY&gt;</code> (<code>NL2SQL_SALES_PASSWORD</code>), <code>llm.api_key</code> is <code>NL2SQL_LLM_API_KEY</code>, an agent's key is
-  <code>NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY</code> (the design's <code>NL2SQL_AGENTS_PLANNER_API_KEY</code> was an example that did
-  not follow its own rule), then <code>NL2SQL_EMBEDDINGS_API_KEY</code>, <code>NL2SQL_SECRETS_&lt;PROVIDER_ID&gt;_&lt;KEY&gt;</code>; header values
-  of the LLM and its agents are written the same way (<code>NL2SQL_LLM_HEADERS_&lt;NAME&gt;</code>). A connection field is a
-  secret by its key (<code>password</code>, <code>secret</code>, <code>token</code>, <code>api_key</code>, the same hints that mask it), because a
-  <code>ConnectionModel</code> instance holds it as <code>SecretStr</code>, or (D122) because its adapter's connection model declares
-  it (<code>adapter_secret_fields</code>: <code>format: password</code> in the schema), so a plugin's <code>private_key</code> is written as a
-  reference too. <code>write_project</code> takes the registry to find the adapters in (default <code>Registry.default()</code>).</li>
-<li><strong>A collision is two fields mapping to one name,</strong> inside one write (compared by field, not by path, so a
-  datasource <code>llm</code> with an <code>api_key</code> collides with the LLM's) or against a name another configured
-  datasource's connection already references (<code>${env:NL2SQL_...}</code>) or the writer gives the rest of the config
-  (<code>config_reserved_names</code>: LLM, agents, embeddings, secret providers); the message names both fields. A name
-  already in <code>.env</code> is replaced (it is the same field written again), as the design says for the same names;
-  the engine cannot know which field wrote a line it did not write.</li>
-<li><strong><code>save</code> refuses with the review queue's error:</strong> <code>ReviewError</code> with <code>FILE_CHANGED</code> and the fix "reload the
-  engine"; the hash record lives on the <code>Config</code> (shared by its copies, updated after a save), recorded by the
-  loader for a folder include. <code>by</code> is checked as <code>engine.api_keys</code> does (<code>TypeError</code>, <code>PermissionError</code>; any
-  caller under <code>allow_all</code>). The file is <code>datasources/&lt;id&gt;.yaml</code> in the folder the loader read, and the event's
-  <code>file</code> is <code>&lt;that folder&gt;/&lt;id&gt;.yaml</code>.</li>
-<li><strong><code>test(Datasource)</code> scrubs the status.</strong> The design says the route never echoes a value; the driver's
+<li><strong><code>engine.dashboards.create_draft(*, user_context, title=None, workspace_id=None, conversation_id=None)</code> is new.</strong>
+  The design's facade has no way to make a draft, and a tool may reach the engine through the facade only. The
+  draft is empty, titled "New dashboard" unless given, and in "General" (created on first use) unless a
+  workspace is given; it publishes <code>dashboard.changed</code> (<code>created</code>). It takes no plan.</li>
+<li><strong><code>edit</code> takes <code>conversation=</code>.</strong> The design has the tool resolve <code>from_step</code> to <code>StoredQuery</code>s before <code>edit</code>,
+  but <code>AddTile</code> carries only <code>from_step</code>. So the tool passes the conversation it was handed (the stored turns
+  plus the turn in flight, so an <code>ask</code> and an <code>add_tile</code> in one turn work), and <code>edit</code> resolves the step itself
+  with <code>plan_from_step</code> (<code>StoredQuery</code> is not used). The conversation must be the caller's (<code>ValueError</code>
+  otherwise); without one the two edits are a <code>ValueError</code> ("exists only in a conversation"). The named methods
+  still take no question or plan, and no model text becomes a plan: the plan is the engine's own stored step.</li>
+<li><strong><code>from_step.step</code> counts the turn's <code>ask</code> steps that have a result, from 1</strong>, as the <code>chart</code> tool does, not
+  every step. <strong><code>from_step.turn</code> is optional</strong> and defaults to the conversation's latest turn, which in a chat is
+  the one being answered (the <code>[CONVERSATION]</code> block names no index for it); the prompt says to leave it out for
+  an answer asked in this turn.</li>
+<li><strong>The check</strong> is <code>Refresher.check</code> (<code>TileRunner.run(execute=False, draw=False)</code>) for the new chart, under the
+  dashboard's lock, accepting the statuses <code>open</code> serves (<code>ok</code>, <code>empty</code>, <code>needs_approval</code>). Any other raises a
+  <code>ValueError</code> "The plan of the chart '<title>' was refused (&lt;reason&gt;). Nothing was saved." and the whole edit
+  list is dropped. A verified answer becomes a verified chart (&lt;code&gt;verified_datasource_id&lt;/code&gt; from the answer's source).
+  The lock's time limit is one pipeline timeout per &lt;code&gt;add_tile&lt;/code&gt; or &lt;code&gt;replace_plan&lt;/code&gt; in the list.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;replace_plan&lt;/code&gt;&lt;/strong&gt; keeps the chart's id, title, chart type and place, takes the step's question and plan, and
+  discards its stored result.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;A new tile&lt;/strong&gt; gets the first free id &lt;code&gt;t&lt;n&gt;&lt;/code&gt; and goes beside the last chart when there is room on its row, else
+  on a new row (2 wide, 2 high). There is no cap on charts in chat (&lt;code&gt;dashboards.max_tiles&lt;/code&gt; is the starter's size).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The tie to the conversation&lt;/strong&gt; is made by &lt;code&gt;Conversations._tool&lt;/code&gt;: after a &lt;code&gt;dashboard_edit&lt;/code&gt; that made a draft
+  (its &lt;code&gt;refs&lt;/code&gt; carry &lt;code&gt;created&lt;/code&gt;) it sets &lt;code&gt;Conversation.dashboard_id&lt;/code&gt; from the step's &lt;code&gt;refs&lt;/code&gt;. A draft the call made
+  is deleted again when anything fails, so no empty draft is left behind. Edits on a dashboard the conversation
+  does not hold (an explicit &lt;code&gt;dashboard_id&lt;/code&gt;) never change &lt;code&gt;Conversation.dashboard_id&lt;/code&gt;, even when it has none.
+  When the conversation's dashboard has been deleted, the next edit makes a new draft and ties to that.
+  &lt;code&gt;create_draft(conversation_id=)&lt;/code&gt; is &lt;code&gt;ConversationNotFound&lt;/code&gt; for a conversation that is not the caller's, and
+  &lt;code&gt;edit(conversation=)&lt;/code&gt; trusts the &lt;code&gt;Conversation&lt;/code&gt; it is handed (only its owner is checked): SDK-only, not
+  exposed over REST or MCP, and the plan's access check still runs as the caller.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The &lt;code&gt;[CONVERSATION]&lt;/code&gt; block&lt;/strong&gt; gets a &lt;code&gt;dashboard&lt;/code&gt; key only while the conversation has one that is still the
+  caller's: &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;title&lt;/code&gt;, &lt;code&gt;status&lt;/code&gt;, each chart's &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;title&lt;/code&gt;, &lt;code&gt;question&lt;/code&gt;, &lt;code&gt;chart&lt;/code&gt; and last stored &lt;code&gt;status&lt;/code&gt;
+  (null before a first run), the validator's reason (cut at 300 characters) for a &lt;code&gt;needs_fixing&lt;/code&gt; or &lt;code&gt;denied&lt;/code&gt;
+  chart, and the filters' ids and labels and the schedule's period when set. It is read at every step of the loop.&lt;/li&gt;
+&lt;li&gt;A tool's &lt;code&gt;output&lt;/code&gt; is &lt;code&gt;json&lt;/code&gt; with the dashboard's title and &lt;code&gt;refs.dashboard_id&lt;/code&gt;; the model sees the title and
+  refs only. The prompt gained one rule: ask one question per chart, &lt;code&gt;add_tile&lt;/code&gt; each, &lt;code&gt;replace_plan&lt;/code&gt; a
+  &lt;code&gt;needs_fixing&lt;/code&gt; chart, and &lt;code&gt;dashboard_pin&lt;/code&gt; only when asked.&lt;/li&gt;
+&lt;li&gt;Names later rows use: &lt;code&gt;plan_from_step&lt;/code&gt; (&lt;code&gt;dashboards.edits&lt;/code&gt;), &lt;code&gt;dashboard_view&lt;/code&gt; (&lt;code&gt;conversations.agent&lt;/code&gt;),
+  &lt;code&gt;EditEnv.step&lt;/code&gt; and &lt;code&gt;EditEnv.check&lt;/code&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;h3 id="l1"&gt;L1&lt;/h3&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;Built (L1)&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;engine.datasources.scan&lt;/code&gt; is &lt;code&gt;nl2sql/datasources/discovery.py&lt;/code&gt;'s &lt;code&gt;scan(registry, folder, *, url, ports,
+skip)&lt;/code&gt;; the five built-ins declare the class variables above and a &lt;code&gt;connection_for&lt;/code&gt; classmethod (SQLite and
+DuckDB read the first 16 and 12 bytes of a file, the server databases split a &lt;code&gt;make_url&lt;/code&gt; URL or a
+&lt;code&gt;host:port&lt;/code&gt;). Where the code and the design differ, the code won:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Found&lt;/code&gt; and &lt;code&gt;DiscoverableAdapter&lt;/code&gt; are imported from &lt;code&gt;nl2sql_sdk.discovery&lt;/code&gt;, not the SDK's top level.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Order:&lt;/strong&gt; the adapters are walked sorted by registry name, so findings of one kind come in name order
+  (files in sorted path order, ports by adapter name, then each adapter's port order).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Depth:&lt;/strong&gt; "two levels deep" is two folders below &lt;code&gt;folder&lt;/code&gt; (&lt;code&gt;folder/a/b/x.db&lt;/code&gt; is found, &lt;code&gt;folder/a/b/c/x.db&lt;/code&gt;
+  is not). The 50 is files that carry a declared suffix, counted before &lt;code&gt;connection_for&lt;/code&gt; confirms them.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Duplicates&lt;/strong&gt; are one server (type, host, port) or one file (type, resolved path), the first finding wins.
+  A missing port counts as the adapter's default and &lt;code&gt;localhost&lt;/code&gt; as &lt;code&gt;127.0.0.1&lt;/code&gt;, so a URL naming either
+  hides the open-port finding for the same server.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;The password:&lt;/strong&gt; &lt;code&gt;connection&lt;/code&gt; keeps the URL's password (a form needs it), &lt;code&gt;Candidate&lt;/code&gt;'s repr masks it
+  (&lt;code&gt;model_dump&lt;/code&gt; does not, so a Candidate is never logged or serialised), and &lt;code&gt;found.value&lt;/code&gt; is the URL with
+  the password replaced by &lt;code&gt;***&lt;/code&gt; and its query and fragment dropped (a password can sit in the query).
+  The adapter is given the real URL.&lt;/li&gt;
+&lt;li&gt;An adapter whose &lt;code&gt;connection_for&lt;/code&gt; raises or returns something &lt;code&gt;Candidate&lt;/code&gt; rejects is skipped, not fatal,
+  and its error text is dropped (it could hold a password); a missing folder finds nothing; &lt;code&gt;scan&lt;/code&gt; takes
+  &lt;code&gt;storage.path&lt;/code&gt; from the engine's config to skip. Each port is probed once.&lt;/li&gt;
+&lt;li&gt;A DuckDB file is confirmed by the &lt;code&gt;DUCK&lt;/code&gt; magic at byte 8 (the design names only SQLite's header).&lt;/li&gt;
+&lt;li&gt;The probe is &lt;code&gt;socket.create_connection(("127.0.0.1", port), timeout=0.2)&lt;/code&gt;; the tests replace it with a fake.&lt;/li&gt;
+&lt;li&gt;L3 uses &lt;code&gt;Candidate.type&lt;/code&gt;, &lt;code&gt;.connection&lt;/code&gt; and &lt;code&gt;.missing&lt;/code&gt; to fill the form and &lt;code&gt;.found&lt;/code&gt; to say where a
+  finding came from; &lt;code&gt;scan&lt;/code&gt; never connects, so L3 calls &lt;code&gt;datasources.test&lt;/code&gt; on the filled form.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;h3 id="l2"&gt;L2&lt;/h3&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;Built (L2): the config writers and the Connect routes&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Files:&lt;/strong&gt; &lt;code&gt;config/writer.py&lt;/code&gt; (new: &lt;code&gt;EnvSecrets&lt;/code&gt;, &lt;code&gt;env_name&lt;/code&gt;, &lt;code&gt;datasource_data&lt;/code&gt;, &lt;code&gt;write_env_values&lt;/code&gt;,
+  &lt;code&gt;write_atomic&lt;/code&gt;, &lt;code&gt;update_gitignore&lt;/code&gt;, &lt;code&gt;dump_yaml&lt;/code&gt;), &lt;code&gt;config/project.py&lt;/code&gt; (&lt;code&gt;write_project&lt;/code&gt;, &lt;code&gt;starter_config&lt;/code&gt;;
+  &lt;code&gt;init_project&lt;/code&gt; builds a &lt;code&gt;Config&lt;/code&gt; and calls &lt;code&gt;write_project&lt;/code&gt;), &lt;code&gt;config/loader.py&lt;/code&gt; and &lt;code&gt;config/models.py&lt;/code&gt;
+  (a datasources folder's file hashes: &lt;code&gt;Config.datasources_folder&lt;/code&gt;, &lt;code&gt;datasource_file_hash&lt;/code&gt;,
+  &lt;code&gt;record_datasource_file&lt;/code&gt;), &lt;code&gt;api/datasource_api.py&lt;/code&gt; (&lt;code&gt;save&lt;/code&gt;), and in &lt;code&gt;nl2sql-api&lt;/code&gt; &lt;code&gt;routes/datasource.py&lt;/code&gt;,
+  &lt;code&gt;services/datasource.py&lt;/code&gt;, &lt;code&gt;models/datasource.py&lt;/code&gt; and &lt;code&gt;auth.is_fresh_local_install&lt;/code&gt;. &lt;code&gt;nl2sql.config&lt;/code&gt;
+  exports &lt;code&gt;write_project&lt;/code&gt;, &lt;code&gt;starter_config&lt;/code&gt; and &lt;code&gt;write_env_values&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Tests:&lt;/strong&gt; &lt;code&gt;test_config_writer.py&lt;/code&gt;, &lt;code&gt;test_datasources_save.py&lt;/code&gt;, &lt;code&gt;packages/api/tests/test_connect_routes.py&lt;/code&gt;;
+  the Connect routes are also in &lt;code&gt;test_admin_auth.py&lt;/code&gt;'s admin-only table. &lt;code&gt;test_wave_c_stubs.py&lt;/code&gt; lost &lt;code&gt;save&lt;/code&gt;;
+  the boundary test's &lt;code&gt;PERSONS_FILE_WRITERS&lt;/code&gt; lets &lt;code&gt;config/project.py&lt;/code&gt; call &lt;code&gt;write_env_values&lt;/code&gt;, and a new
+  test keeps the list from going stale.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Where the code and the design differ, the code won:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;write_project(config, folder, *, env_file=False, extra=None)&lt;/code&gt;.&lt;/strong&gt; &lt;code&gt;env_file&lt;/code&gt; is the design's "where the
+  writer may write &lt;code&gt;.env&lt;/code&gt;" (launch passes true). &lt;code&gt;extra&lt;/code&gt; maps a path to text to write or a file to copy: it
+  is how &lt;code&gt;init_project&lt;/code&gt; keeps its example datasource's comments and copies the demo's databases, suites and
+  glossary. The existing-file refusal covers &lt;code&gt;extra&lt;/code&gt; too. A section at its default is left out, as &lt;code&gt;init&lt;/code&gt;
+  always did; &lt;code&gt;curated&lt;/code&gt;, &lt;code&gt;observers: []&lt;/code&gt; and every set optional section are written.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Env names follow the field's path.&lt;/strong&gt; &lt;code&gt;NL2SQL_&lt;/code&gt; plus the path: a connection secret is
+  &lt;code&gt;NL2SQL_&lt;DATASOURCE_ID&gt;_&lt;KEY&gt;&lt;/code&gt; (&lt;code&gt;NL2SQL_SALES_PASSWORD&lt;/code&gt;), &lt;code&gt;llm.api_key&lt;/code&gt; is &lt;code&gt;NL2SQL_LLM_API_KEY&lt;/code&gt;, an agent's key is
+  &lt;code&gt;NL2SQL_LLM_AGENTS_AST_PLANNER_API_KEY&lt;/code&gt; (the design's &lt;code&gt;NL2SQL_AGENTS_PLANNER_API_KEY&lt;/code&gt; was an example that did
+  not follow its own rule), then &lt;code&gt;NL2SQL_EMBEDDINGS_API_KEY&lt;/code&gt;, &lt;code&gt;NL2SQL_SECRETS_&lt;PROVIDER_ID&gt;_&lt;KEY&gt;&lt;/code&gt;; header values
+  of the LLM and its agents are written the same way (&lt;code&gt;NL2SQL_LLM_HEADERS_&lt;NAME&gt;&lt;/code&gt;). A connection field is a
+  secret by its key (&lt;code&gt;password&lt;/code&gt;, &lt;code&gt;secret&lt;/code&gt;, &lt;code&gt;token&lt;/code&gt;, &lt;code&gt;api_key&lt;/code&gt;, the same hints that mask it), because a
+  &lt;code&gt;ConnectionModel&lt;/code&gt; instance holds it as &lt;code&gt;SecretStr&lt;/code&gt;, or (D122) because its adapter's connection model declares
+  it (&lt;code&gt;adapter_secret_fields&lt;/code&gt;: &lt;code&gt;format: password&lt;/code&gt; in the schema), so a plugin's &lt;code&gt;private_key&lt;/code&gt; is written as a
+  reference too. &lt;code&gt;write_project&lt;/code&gt; takes the registry to find the adapters in (default &lt;code&gt;Registry.default()&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;A collision is two fields mapping to one name,&lt;/strong&gt; inside one write (compared by field, not by path, so a
+  datasource &lt;code&gt;llm&lt;/code&gt; with an &lt;code&gt;api_key&lt;/code&gt; collides with the LLM's) or against a name another configured
+  datasource's connection already references (&lt;code&gt;${env:NL2SQL_...}&lt;/code&gt;) or the writer gives the rest of the config
+  (&lt;code&gt;config_reserved_names&lt;/code&gt;: LLM, agents, embeddings, secret providers); the message names both fields. A name
+  already in &lt;code&gt;.env&lt;/code&gt; is replaced (it is the same field written again), as the design says for the same names;
+  the engine cannot know which field wrote a line it did not write.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;save&lt;/code&gt; refuses with the review queue's error:&lt;/strong&gt; &lt;code&gt;ReviewError&lt;/code&gt; with &lt;code&gt;FILE_CHANGED&lt;/code&gt; and the fix "reload the
+  engine"; the hash record lives on the &lt;code&gt;Config&lt;/code&gt; (shared by its copies, updated after a save), recorded by the
+  loader for a folder include. &lt;code&gt;by&lt;/code&gt; is checked as &lt;code&gt;engine.api_keys&lt;/code&gt; does (&lt;code&gt;TypeError&lt;/code&gt;, &lt;code&gt;PermissionError&lt;/code&gt;; any
+  caller under &lt;code&gt;allow_all&lt;/code&gt;). The file is &lt;code&gt;datasources/&lt;id&gt;.yaml&lt;/code&gt; in the folder the loader read, and the event's
+  &lt;code&gt;file&lt;/code&gt; is &lt;code&gt;&lt;that folder&gt;/&lt;id&gt;.yaml&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;test(Datasource)&lt;/code&gt; scrubs the status.&lt;/strong&gt; The design says the route never echoes a value; the driver's
   words are the one place one could be, so the facade takes the datasource's secret literals and every
-  secret the engine knows out of <code>reason</code> and <code>fix</code> (<code>***</code>), for every caller. It replaces those exact values
-  only, not the redactor's patterns, which also ate the words around <code>password:</code> in a validation message.</li>
-<li><strong>REST bodies are read as plain JSON and validated by the service,</strong> so FastAPI's own 422 (which echoes the
+  secret the engine knows out of &lt;code&gt;reason&lt;/code&gt; and &lt;code&gt;fix&lt;/code&gt; (&lt;code&gt;***&lt;/code&gt;), for every caller. It replaces those exact values
+  only, not the redactor's patterns, which also ate the words around &lt;code&gt;password:&lt;/code&gt; in a validation message.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;REST bodies are read as plain JSON and validated by the service,&lt;/strong&gt; so FastAPI's own 422 (which echoes the
   input) is never used, not even for a body that is not JSON or not an object (read from the raw request, answered
-  <code>[{"path": "", "message": ...}]</code>): every problem is <code>{path, message}</code> with the path in the body
-  (<code>config.limits.row_limit</code>), the body's own keys are strict (a <code>sav</code> typo is found; <code>user_context</code> stays allowed
-  for the dev flag). A connection that does not validate is raised by the engine as <code>ConnectionInvalid</code> (a
-  <code>ValueError</code> with <code>problems</code>, exported from <code>nl2sql</code>) and is the same list (<code>config.connection.port</code>). Any
-  other <code>ValueError</code> from <code>add</code> or <code>save</code> (an id taken, <code>SecretValueInConfig</code>) is a 422 with its text,
-  <code>ReviewError</code> a 409 and anything else the generic 500.</li>
-<li><strong>Review fixes (L2).</strong> A save holds one process-wide lock around the hash check, the <code>.env</code> rewrite and the
-  file write; <code>.env</code> values refuse every character <code>str.splitlines</code> splits on and the file is read back split on
-  <code>\n</code> only; a datasource id is allow-listed as a file name (letters, digits, <code>_</code>, <code>-</code>, <code>.</code>; no Windows device
-  name); <code>is_fresh_local_install</code> also needs no <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code> header; the
-  demo's <code>settings.yaml</code> keeps its comment (<code>write_project(headers=...)</code>).
-  <code>POST /datasource/test</code> takes the same <code>{config}</code> body (no <code>save</code>); <code>GET /datasource-types</code> answers
-  <code>{"types": [...]}</code>. A <code>save</code> that fails after the <code>add</code> removes the datasource again.</li>
-<li><strong><code>env_file</code> over REST</strong> is <code>auth.is_fresh_local_install</code>: no role source (<code>api.role_header</code>, <code>api.role</code>,
-  <code>api.trust_body_role</code>) and a loopback client, the one case <code>require_admin</code> lets through unauthenticated.</li>
-<li><strong>For L3:</strong> <code>write_project(starter_config(llm=default_llm(provider), path=DIR/".nl2sql"), DIR, env_file=True)</code>
-  writes a new project (the glossary lands at <code>DIR/glossary.yaml</code>, and an engine with no datasources builds
-  and checks); an existing project takes <code>engine.datasources.add(...)</code> then
-  <code>engine.datasources.save(id, by=admin, env_file=True)</code>; <code>write_env_values(folder, {...})</code> for the model key.
-  <code>Config.with_datasource</code> adds datasources before writing. All three are in <code>nl2sql.config</code>.</li>
-</ul>
-</div>
-<h3 id="l3">L3</h3>
-<p>Not built yet.</p>
-<h3 id="m1">M1</h3>
-<div class="admonition note">
-<p class="admonition-title">Built (M1): API keys</p>
-<ul>
-<li><strong>Token:</strong> <code>nl2sql/policies/keys.py</code> holds the format (<code>nl2sql_&lt;id&gt;_&lt;secret&gt;</code>, <code>id</code> 8 hex characters,
-  <code>secret</code> 43 URL-safe characters from <code>secrets.token_urlsafe(32)</code>, matched with <code>fullmatch</code>), <code>hash_secret</code>
-  (SHA-256 hex) and <code>matches</code> (<code>hmac.compare_digest</code>). The store row is <code>id</code>, <code>hash</code>, <code>label</code>, <code>user_id</code>,
-  <code>tenant_id</code>, <code>roles</code>, <code>created_at</code>, <code>created_by</code>, <code>revoked_at</code>; the token and the secret are never stored.</li>
-<li><strong>Facade:</strong> <code>api/api_keys_api.py</code> fills <code>create</code>, <code>list</code>, <code>revoke</code> and <code>verify</code>. <code>create</code> and <code>revoke</code>
-  publish <code>api_key.created</code> and <code>api_key.revoked</code> with <code>key_id</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code> and <code>by</code>
-  (the audit observer keeps both through the catalog's <code>audit</code> flag). <code>nl2sql keys create|list|revoke</code>
-  (<code>cli/commands/keys.py</code>) call them as the <code>--as</code> admin.</li>
-<li><strong>Docs:</strong> <code>security/api-keys.md</code> (written), <code>security/model.md</code>, <code>observability/events.md</code> and the README's
-  command table.</li>
-</ul>
-<p>Where the code and the design differ, the code won:</p>
-<ul>
-<li><code>revoke</code> of an unknown id raises <code>ValueError</code> (the design says <code>None</code>); revoking a key that is already
-  revoked changes nothing and publishes nothing.</li>
-<li><code>list</code> is newest first and includes revoked keys, which <code>nl2sql keys list</code> marks <code>revoked</code>.</li>
-<li><code>create</code> retries a clash of ids (the store's <code>add_api_key</code> raises <code>ValueError</code>) with a new id, up to eight
-  times, then raises <code>RuntimeError</code>; it never overwrites. <code>user_id</code> must not be blank.</li>
-<li>Roles are checked against <code>policies.roles</code>, with no <code>allow_all</code> exemption: keys outlive the policy, so a
-  key minted with <code>roles=["admin"]</code> under <code>allow_all</code> would become a real admin key once roles are
-  configured. Under <code>allow_all</code> a key carries <code>roles=[]</code> (a role name is a <code>ValueError</code>), which reads
-  everything now and nothing once roles are configured. Under <code>allow_all</code> every caller may still manage
-  keys, as for <code>engine.knowledge.reload</code> and the review queue; the CLI leaves out <code>--as</code> and <code>--role</code> there
-  (<code>caller()</code> refuses every role name when none is defined), so <code>--role</code> is optional.</li>
-<li>A <code>by</code> that is not a <code>UserContext</code> is a <code>TypeError</code>, one without an admin role a <code>PermissionError</code>
-  (the engine's usual pair), not an <code>ErrorCode</code>.</li>
-<li><code>verify</code> checks only the key: it does not check that the key's roles are still configured (the policy
-  engine does that on every run).</li>
-<li>Tests: <code>test_api_keys.py</code>, <code>test_cli_keys.py</code>. The stub tests moved <code>api_keys</code> and the <code>keys</code> commands out
-  of their tables.</li>
-<li><strong>For M2:</strong> call <code>engine.api_keys.verify(token)</code> with the bearer token (the text after <code>Bearer</code>); <code>None</code>
-  is a 401. <code>verify</code> does not say why, and <code>mcp.denied</code> carries a <code>reason</code> (<code>missing</code>, <code>malformed</code>,
-  <code>unknown</code>, <code>revoked</code>). <code>missing</code> is M2's own (no header). To tell the others apart without reaching into
-  the runtime, M2 adds a method to <code>ApiKeysAPI</code> that returns the reason. Constraints: it compares the
-  secret before reporting <code>revoked</code> (right id with a wrong secret is <code>unknown</code>, so an id alone cannot
-  probe a key's state and the audit log never records a forged token as a revoked key); <code>verify</code> becomes a
-  thin wrapper over it, so there is one code path; and <code>nl2sql.policies.keys.parse</code> stays behind
-  <code>ApiKeysAPI</code>, not imported by <code>mcp/http.py</code>. Not built in M1.</li>
-</ul>
-</div>
-<h3 id="m2">M2</h3>
-<div class="admonition note">
-<p class="admonition-title">Built (M2): MCP over HTTP</p>
-<ul>
-<li><strong>Files:</strong> <code>nl2sql/mcp/http.py</code> (new: <code>build_app</code>, <code>serve</code>, the bearer middleware, the context variable),
-  <code>nl2sql/mcp/server.py</code> (<code>build_server(..., over_http=True)</code>, the new <code>ask</code>), <code>cli/commands/mcp.py</code> and
-  <code>cli/main.py</code> (<code>--http</code>, <code>--host</code>, <code>--port</code>), <code>api/api_keys_api.py</code> (<code>check</code>, <code>record_denied</code>, <code>KeyCheck</code>).</li>
-<li><strong>Tests:</strong> <code>tests/unit/test_mcp_http.py</code> (Starlette's in-process client over a real engine; <code>run_query</code>
-  answers with the caller it ran as, so no model or database is involved), <code>test_mcp_server.py</code> (the new
-  <code>ask</code>), <code>tests/cli/test_mcp_command.py</code> (<code>--http</code>), <code>test_api_keys.py</code> (<code>check</code>, <code>record_denied</code>).</li>
-</ul>
-<p>Where the code and the design differ, the code won:</p>
-<ul>
-<li><strong><code>engine.api_keys.check(token) -&gt; KeyCheck</code> and <code>record_denied(reason, key_id=None)</code></strong>, as M1's note asked:
-  <code>check</code> compares the secret before it reports <code>revoked</code> (right id, wrong secret is <code>unknown</code>, and then
-  <code>key_id</code> is <code>None</code>), <code>verify</code> is <code>check(token).user</code>, and <code>nl2sql.policies.keys.parse</code> stays behind
-  <code>ApiKeysAPI</code>. <code>mcp/</code> has no way to publish an event through the facade, so <code>record_denied</code> publishes
-  <code>mcp.denied</code> (all four reasons, <code>missing</code> included); a later <code>nl2sql-api</code> that wants its own event
-  would add its own method.</li>
-<li><strong><code>ask</code> takes <code>conversation_id</code> and an option-id <code>choice</code></strong>, and returns <code>conversation_id</code>, <code>turn</code> and
-  <code>question</code> (what ran: for a choice, the request's own question) beside Wave A's keys. <code>datasource_id</code>
+  &lt;code&gt;[{"path": "", "message": ...}]&lt;/code&gt;): every problem is &lt;code&gt;{path, message}&lt;/code&gt; with the path in the body
+  (&lt;code&gt;config.limits.row_limit&lt;/code&gt;), the body's own keys are strict (a &lt;code&gt;sav&lt;/code&gt; typo is found; &lt;code&gt;user_context&lt;/code&gt; stays allowed
+  for the dev flag). A connection that does not validate is raised by the engine as &lt;code&gt;ConnectionInvalid&lt;/code&gt; (a
+  &lt;code&gt;ValueError&lt;/code&gt; with &lt;code&gt;problems&lt;/code&gt;, exported from &lt;code&gt;nl2sql&lt;/code&gt;) and is the same list (&lt;code&gt;config.connection.port&lt;/code&gt;). Any
+  other &lt;code&gt;ValueError&lt;/code&gt; from &lt;code&gt;add&lt;/code&gt; or &lt;code&gt;save&lt;/code&gt; (an id taken, &lt;code&gt;SecretValueInConfig&lt;/code&gt;) is a 422 with its text,
+  &lt;code&gt;ReviewError&lt;/code&gt; a 409 and anything else the generic 500.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Review fixes (L2).&lt;/strong&gt; A save holds one process-wide lock around the hash check, the &lt;code&gt;.env&lt;/code&gt; rewrite and the
+  file write; &lt;code&gt;.env&lt;/code&gt; values refuse every character &lt;code&gt;str.splitlines&lt;/code&gt; splits on and the file is read back split on
+  &lt;code&gt;\n&lt;/code&gt; only; a datasource id is allow-listed as a file name (letters, digits, &lt;code&gt;_&lt;/code&gt;, &lt;code&gt;-&lt;/code&gt;, &lt;code&gt;.&lt;/code&gt;; no Windows device
+  name); &lt;code&gt;is_fresh_local_install&lt;/code&gt; also needs no &lt;code&gt;X-Forwarded-For&lt;/code&gt;, &lt;code&gt;Forwarded&lt;/code&gt; or &lt;code&gt;X-Real-IP&lt;/code&gt; header; the
+  demo's &lt;code&gt;settings.yaml&lt;/code&gt; keeps its comment (&lt;code&gt;write_project(headers=...)&lt;/code&gt;).
+  &lt;code&gt;POST /datasource/test&lt;/code&gt; takes the same &lt;code&gt;{config}&lt;/code&gt; body (no &lt;code&gt;save&lt;/code&gt;); &lt;code&gt;GET /datasource-types&lt;/code&gt; answers
+  &lt;code&gt;{"types": [...]}&lt;/code&gt;. A &lt;code&gt;save&lt;/code&gt; that fails after the &lt;code&gt;add&lt;/code&gt; removes the datasource again.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;env_file&lt;/code&gt; over REST&lt;/strong&gt; is &lt;code&gt;auth.is_fresh_local_install&lt;/code&gt;: no role source (&lt;code&gt;api.role_header&lt;/code&gt;, &lt;code&gt;api.role&lt;/code&gt;,
+  &lt;code&gt;api.trust_body_role&lt;/code&gt;) and a loopback client, the one case &lt;code&gt;require_admin&lt;/code&gt; lets through unauthenticated.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;For L3:&lt;/strong&gt; &lt;code&gt;write_project(starter_config(llm=default_llm(provider), path=DIR/".nl2sql"), DIR, env_file=True)&lt;/code&gt;
+  writes a new project (the glossary lands at &lt;code&gt;DIR/glossary.yaml&lt;/code&gt;, and an engine with no datasources builds
+  and checks); an existing project takes &lt;code&gt;engine.datasources.add(...)&lt;/code&gt; then
+  &lt;code&gt;engine.datasources.save(id, by=admin, env_file=True)&lt;/code&gt;; &lt;code&gt;write_env_values(folder, {...})&lt;/code&gt; for the model key.
+  &lt;code&gt;Config.with_datasource&lt;/code&gt; adds datasources before writing. All three are in &lt;code&gt;nl2sql.config&lt;/code&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;h3 id="l3"&gt;L3&lt;/h3&gt;
+&lt;p&gt;Not built yet.&lt;/p&gt;
+&lt;h3 id="m1"&gt;M1&lt;/h3&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;Built (M1): API keys&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Token:&lt;/strong&gt; &lt;code&gt;nl2sql/policies/keys.py&lt;/code&gt; holds the format (&lt;code&gt;nl2sql_&lt;id&gt;_&lt;secret&gt;&lt;/code&gt;, &lt;code&gt;id&lt;/code&gt; 8 hex characters,
+  &lt;code&gt;secret&lt;/code&gt; 43 URL-safe characters from &lt;code&gt;secrets.token_urlsafe(32)&lt;/code&gt;, matched with &lt;code&gt;fullmatch&lt;/code&gt;), &lt;code&gt;hash_secret&lt;/code&gt;
+  (SHA-256 hex) and &lt;code&gt;matches&lt;/code&gt; (&lt;code&gt;hmac.compare_digest&lt;/code&gt;). The store row is &lt;code&gt;id&lt;/code&gt;, &lt;code&gt;hash&lt;/code&gt;, &lt;code&gt;label&lt;/code&gt;, &lt;code&gt;user_id&lt;/code&gt;,
+  &lt;code&gt;tenant_id&lt;/code&gt;, &lt;code&gt;roles&lt;/code&gt;, &lt;code&gt;created_at&lt;/code&gt;, &lt;code&gt;created_by&lt;/code&gt;, &lt;code&gt;revoked_at&lt;/code&gt;; the token and the secret are never stored.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Facade:&lt;/strong&gt; &lt;code&gt;api/api_keys_api.py&lt;/code&gt; fills &lt;code&gt;create&lt;/code&gt;, &lt;code&gt;list&lt;/code&gt;, &lt;code&gt;revoke&lt;/code&gt; and &lt;code&gt;verify&lt;/code&gt;. &lt;code&gt;create&lt;/code&gt; and &lt;code&gt;revoke&lt;/code&gt;
+  publish &lt;code&gt;api_key.created&lt;/code&gt; and &lt;code&gt;api_key.revoked&lt;/code&gt; with &lt;code&gt;key_id&lt;/code&gt;, &lt;code&gt;user_id&lt;/code&gt;, &lt;code&gt;tenant_id&lt;/code&gt;, &lt;code&gt;roles&lt;/code&gt; and &lt;code&gt;by&lt;/code&gt;
+  (the audit observer keeps both through the catalog's &lt;code&gt;audit&lt;/code&gt; flag). &lt;code&gt;nl2sql keys create|list|revoke&lt;/code&gt;
+  (&lt;code&gt;cli/commands/keys.py&lt;/code&gt;) call them as the &lt;code&gt;--as&lt;/code&gt; admin.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Docs:&lt;/strong&gt; &lt;code&gt;security/api-keys.md&lt;/code&gt; (written), &lt;code&gt;security/model.md&lt;/code&gt;, &lt;code&gt;observability/events.md&lt;/code&gt; and the README's
+  command table.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Where the code and the design differ, the code won:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;revoke&lt;/code&gt; of an unknown id raises &lt;code&gt;ValueError&lt;/code&gt; (the design says &lt;code&gt;None&lt;/code&gt;); revoking a key that is already
+  revoked changes nothing and publishes nothing.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;list&lt;/code&gt; is newest first and includes revoked keys, which &lt;code&gt;nl2sql keys list&lt;/code&gt; marks &lt;code&gt;revoked&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;create&lt;/code&gt; retries a clash of ids (the store's &lt;code&gt;add_api_key&lt;/code&gt; raises &lt;code&gt;ValueError&lt;/code&gt;) with a new id, up to eight
+  times, then raises &lt;code&gt;RuntimeError&lt;/code&gt;; it never overwrites. &lt;code&gt;user_id&lt;/code&gt; must not be blank.&lt;/li&gt;
+&lt;li&gt;Roles are checked against &lt;code&gt;policies.roles&lt;/code&gt;, with no &lt;code&gt;allow_all&lt;/code&gt; exemption: keys outlive the policy, so a
+  key minted with &lt;code&gt;roles=["admin"]&lt;/code&gt; under &lt;code&gt;allow_all&lt;/code&gt; would become a real admin key once roles are
+  configured. Under &lt;code&gt;allow_all&lt;/code&gt; a key carries &lt;code&gt;roles=[]&lt;/code&gt; (a role name is a &lt;code&gt;ValueError&lt;/code&gt;), which reads
+  everything now and nothing once roles are configured. Under &lt;code&gt;allow_all&lt;/code&gt; every caller may still manage
+  keys, as for &lt;code&gt;engine.knowledge.reload&lt;/code&gt; and the review queue; the CLI leaves out &lt;code&gt;--as&lt;/code&gt; and &lt;code&gt;--role&lt;/code&gt; there
+  (&lt;code&gt;caller()&lt;/code&gt; refuses every role name when none is defined), so &lt;code&gt;--role&lt;/code&gt; is optional.&lt;/li&gt;
+&lt;li&gt;A &lt;code&gt;by&lt;/code&gt; that is not a &lt;code&gt;UserContext&lt;/code&gt; is a &lt;code&gt;TypeError&lt;/code&gt;, one without an admin role a &lt;code&gt;PermissionError&lt;/code&gt;
+  (the engine's usual pair), not an &lt;code&gt;ErrorCode&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;verify&lt;/code&gt; checks only the key: it does not check that the key's roles are still configured (the policy
+  engine does that on every run).&lt;/li&gt;
+&lt;li&gt;Tests: &lt;code&gt;test_api_keys.py&lt;/code&gt;, &lt;code&gt;test_cli_keys.py&lt;/code&gt;. The stub tests moved &lt;code&gt;api_keys&lt;/code&gt; and the &lt;code&gt;keys&lt;/code&gt; commands out
+  of their tables.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;For M2:&lt;/strong&gt; call &lt;code&gt;engine.api_keys.verify(token)&lt;/code&gt; with the bearer token (the text after &lt;code&gt;Bearer&lt;/code&gt;); &lt;code&gt;None&lt;/code&gt;
+  is a 401. &lt;code&gt;verify&lt;/code&gt; does not say why, and &lt;code&gt;mcp.denied&lt;/code&gt; carries a &lt;code&gt;reason&lt;/code&gt; (&lt;code&gt;missing&lt;/code&gt;, &lt;code&gt;malformed&lt;/code&gt;,
+  &lt;code&gt;unknown&lt;/code&gt;, &lt;code&gt;revoked&lt;/code&gt;). &lt;code&gt;missing&lt;/code&gt; is M2's own (no header). To tell the others apart without reaching into
+  the runtime, M2 adds a method to &lt;code&gt;ApiKeysAPI&lt;/code&gt; that returns the reason. Constraints: it compares the
+  secret before reporting &lt;code&gt;revoked&lt;/code&gt; (right id with a wrong secret is &lt;code&gt;unknown&lt;/code&gt;, so an id alone cannot
+  probe a key's state and the audit log never records a forged token as a revoked key); &lt;code&gt;verify&lt;/code&gt; becomes a
+  thin wrapper over it, so there is one code path; and &lt;code&gt;nl2sql.policies.keys.parse&lt;/code&gt; stays behind
+  &lt;code&gt;ApiKeysAPI&lt;/code&gt;, not imported by &lt;code&gt;mcp/http.py&lt;/code&gt;. Not built in M1.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;h3 id="m2"&gt;M2&lt;/h3&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;Built (M2): MCP over HTTP&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Files:&lt;/strong&gt; &lt;code&gt;nl2sql/mcp/http.py&lt;/code&gt; (new: &lt;code&gt;build_app&lt;/code&gt;, &lt;code&gt;serve&lt;/code&gt;, the bearer middleware, the context variable),
+  &lt;code&gt;nl2sql/mcp/server.py&lt;/code&gt; (&lt;code&gt;build_server(..., over_http=True)&lt;/code&gt;, the new &lt;code&gt;ask&lt;/code&gt;), &lt;code&gt;cli/commands/mcp.py&lt;/code&gt; and
+  &lt;code&gt;cli/main.py&lt;/code&gt; (&lt;code&gt;--http&lt;/code&gt;, &lt;code&gt;--host&lt;/code&gt;, &lt;code&gt;--port&lt;/code&gt;), &lt;code&gt;api/api_keys_api.py&lt;/code&gt; (&lt;code&gt;check&lt;/code&gt;, &lt;code&gt;record_denied&lt;/code&gt;, &lt;code&gt;KeyCheck&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Tests:&lt;/strong&gt; &lt;code&gt;tests/unit/test_mcp_http.py&lt;/code&gt; (Starlette's in-process client over a real engine; &lt;code&gt;run_query&lt;/code&gt;
+  answers with the caller it ran as, so no model or database is involved), &lt;code&gt;test_mcp_server.py&lt;/code&gt; (the new
+  &lt;code&gt;ask&lt;/code&gt;), &lt;code&gt;tests/cli/test_mcp_command.py&lt;/code&gt; (&lt;code&gt;--http&lt;/code&gt;), &lt;code&gt;test_api_keys.py&lt;/code&gt; (&lt;code&gt;check&lt;/code&gt;, &lt;code&gt;record_denied&lt;/code&gt;).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Where the code and the design differ, the code won:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;engine.api_keys.check(token) -&gt; KeyCheck&lt;/code&gt; and &lt;code&gt;record_denied(reason, key_id=None)&lt;/code&gt;&lt;/strong&gt;, as M1's note asked:
+  &lt;code&gt;check&lt;/code&gt; compares the secret before it reports &lt;code&gt;revoked&lt;/code&gt; (right id, wrong secret is &lt;code&gt;unknown&lt;/code&gt;, and then
+  &lt;code&gt;key_id&lt;/code&gt; is &lt;code&gt;None&lt;/code&gt;), &lt;code&gt;verify&lt;/code&gt; is &lt;code&gt;check(token).user&lt;/code&gt;, and &lt;code&gt;nl2sql.policies.keys.parse&lt;/code&gt; stays behind
+  &lt;code&gt;ApiKeysAPI&lt;/code&gt;. &lt;code&gt;mcp/&lt;/code&gt; has no way to publish an event through the facade, so &lt;code&gt;record_denied&lt;/code&gt; publishes
+  &lt;code&gt;mcp.denied&lt;/code&gt; (all four reasons, &lt;code&gt;missing&lt;/code&gt; included); a later &lt;code&gt;nl2sql-api&lt;/code&gt; that wants its own event
+  would add its own method.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;ask&lt;/code&gt; takes &lt;code&gt;conversation_id&lt;/code&gt; and an option-id &lt;code&gt;choice&lt;/code&gt;&lt;/strong&gt;, and returns &lt;code&gt;conversation_id&lt;/code&gt;, &lt;code&gt;turn&lt;/code&gt; and
+  &lt;code&gt;question&lt;/code&gt; (what ran: for a choice, the request's own question) beside Wave A's keys. &lt;code&gt;datasource_id&lt;/code&gt;
   applies when a conversation starts (it is the conversation's, as in C1) and is refused with a
-  <code>conversation_id</code>. A <code>choice</code> without a <code>conversation_id</code> is <code>CLARIFICATION_INVALID</code> and starts nothing.
-  The clarification no longer carries <code>request</code> (the conversation holds it; the client sends back an id),
-  only <code>phrase</code> and the options. New codes in the tool's output, not <code>ErrorCode</code>s: <code>CONVERSATION_NOT_FOUND</code>
-  (missing or someone else's), <code>CONVERSATION_BUSY</code>, <code>INVALID_REQUEST</code>.</li>
-<li><strong><code>auth: none</code> takes an identity.</strong> <code>nl2sql mcp --http</code> with <code>auth: none</code> runs every request as the
-  <code>--role</code>/<code>--user</code> identity (as stdio does) and needs a role; with <code>api_keys</code> a <code>--role</code> or <code>--user</code> is
-  an error. The bind rule is the design's: <code>auth: none</code> on a non-loopback host refuses to start. A public
-  bind with <code>api_keys</code> and no keys created yet starts (no key can be used, so nothing is exposed).</li>
-<li>The bearer middleware is plain ASGI (not Starlette's <code>BaseHTTPMiddleware</code>), so the context variable
-  reaches the stateless transport's task. Only an <code>Authorization</code> header with the <code>Bearer</code> scheme and a
-  token counts: no header is <code>missing</code>, anything else that is not <code>Bearer &lt;token&gt;</code> is <code>malformed</code>. A
-  failing key check (the state store is down) is a 500 and a log line.</li>
-<li><code>cli/main.py</code> changed (the options), which C0's list of untouched files did not expect.</li>
-<li><strong>Review fixes.</strong> A fixed identity with no <code>user_id</code> (stdio without <code>--user</code>, <code>auth: none</code>) asks as
-  <code>mcp</code> (<code>DEFAULT_USER</code> in <code>server.py</code>, applied where the tool resolves its caller), since a conversation
-  needs an owner; a missing caller still fails closed. <code>auth: none</code> also refuses to start when
-  <code>allowed_hosts</code> lists a non-loopback name (a proxy would expose the one identity). <code>CONVERSATION_TOO_LONG</code>
-  has its own code; another <code>ValueError</code> is <code>CLARIFICATION_INVALID</code> with a <code>choice</code> and <code>INVALID_REQUEST</code>
-  without. <code>question</code> is optional with a <code>choice</code> (the pending question is used). The returned turn is
-  matched by the run's <code>trace_id</code>, not read as the conversation's last. <code>record_denied</code> raises for an
-  unknown reason; <code>check</code> hashes a dummy for an unknown id; only <code>lifespan</code> scopes skip the key check and a
-  websocket is closed. The default <code>allowed_hosts</code> adds <code>[::1]</code> and the bare names.</li>
-</ul>
-</div>
-<h2 id="14-bugs-wave-c-fixes">14. Bugs Wave C fixes</h2>
-<table>
-<thead>
-<tr>
-<th>#</th>
-<th>Bug</th>
-<th>Evidence</th>
-<th>Fixed by</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>B100</td>
-<td><code>POST /api/v1/datasource</code> answers every failure, a typo in the body included, with a 500 and "the cause is in the server log", so a Connect form cannot say what is wrong</td>
-<td><code>packages/api/src/nl2sql_api/routes/datasource.py</code> (<code>except Exception</code> around <code>add_datasource</code>)</td>
-<td>L2</td>
-</tr>
-<tr>
-<td>B101</td>
-<td><code>nl2sql demo --dir</code> warns that any folder without a demo stamp was "created by an older version", so a project folder that was never a demo gets a false warning</td>
-<td><code>cli/demo/stamp.py</code> (<code>outdated_warning</code>: <code>created_by is None</code> is "older")</td>
-<td>L3</td>
-</tr>
-</tbody>
-</table>
-<p>Bugs are numbered from B100, as decisions are from D100, so they never
-collide with Wave B's (B31 onwards).</p>
-<h2 id="15-release-09">15. Release 0.9</h2>
-<ul>
-<li>release-please opens the release PR as usual. Releasing is the owner's act
-  (see <a href="../../development/releasing/">Releasing</a>); no agent merges it.</li>
-<li><code>docs/releases/0.9.0.md</code> is written with the release-notes process. Its
+  &lt;code&gt;conversation_id&lt;/code&gt;. A &lt;code&gt;choice&lt;/code&gt; without a &lt;code&gt;conversation_id&lt;/code&gt; is &lt;code&gt;CLARIFICATION_INVALID&lt;/code&gt; and starts nothing.
+  The clarification no longer carries &lt;code&gt;request&lt;/code&gt; (the conversation holds it; the client sends back an id),
+  only &lt;code&gt;phrase&lt;/code&gt; and the options. New codes in the tool's output, not &lt;code&gt;ErrorCode&lt;/code&gt;s: &lt;code&gt;CONVERSATION_NOT_FOUND&lt;/code&gt;
+  (missing or someone else's), &lt;code&gt;CONVERSATION_BUSY&lt;/code&gt;, &lt;code&gt;INVALID_REQUEST&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;&lt;code&gt;auth: none&lt;/code&gt; takes an identity.&lt;/strong&gt; &lt;code&gt;nl2sql mcp --http&lt;/code&gt; with &lt;code&gt;auth: none&lt;/code&gt; runs every request as the
+  &lt;code&gt;--role&lt;/code&gt;/&lt;code&gt;--user&lt;/code&gt; identity (as stdio does) and needs a role; with &lt;code&gt;api_keys&lt;/code&gt; a &lt;code&gt;--role&lt;/code&gt; or &lt;code&gt;--user&lt;/code&gt; is
+  an error. The bind rule is the design's: &lt;code&gt;auth: none&lt;/code&gt; on a non-loopback host refuses to start. A public
+  bind with &lt;code&gt;api_keys&lt;/code&gt; and no keys created yet starts (no key can be used, so nothing is exposed).&lt;/li&gt;
+&lt;li&gt;The bearer middleware is plain ASGI (not Starlette's &lt;code&gt;BaseHTTPMiddleware&lt;/code&gt;), so the context variable
+  reaches the stateless transport's task. Only an &lt;code&gt;Authorization&lt;/code&gt; header with the &lt;code&gt;Bearer&lt;/code&gt; scheme and a
+  token counts: no header is &lt;code&gt;missing&lt;/code&gt;, anything else that is not &lt;code&gt;Bearer &lt;token&gt;&lt;/code&gt; is &lt;code&gt;malformed&lt;/code&gt;. A
+  failing key check (the state store is down) is a 500 and a log line.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;cli/main.py&lt;/code&gt; changed (the options), which C0's list of untouched files did not expect.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Review fixes.&lt;/strong&gt; A fixed identity with no &lt;code&gt;user_id&lt;/code&gt; (stdio without &lt;code&gt;--user&lt;/code&gt;, &lt;code&gt;auth: none&lt;/code&gt;) asks as
+  &lt;code&gt;mcp&lt;/code&gt; (&lt;code&gt;DEFAULT_USER&lt;/code&gt; in &lt;code&gt;server.py&lt;/code&gt;, applied where the tool resolves its caller), since a conversation
+  needs an owner; a missing caller still fails closed. &lt;code&gt;auth: none&lt;/code&gt; also refuses to start when
+  &lt;code&gt;allowed_hosts&lt;/code&gt; lists a non-loopback name (a proxy would expose the one identity). &lt;code&gt;CONVERSATION_TOO_LONG&lt;/code&gt;
+  has its own code; another &lt;code&gt;ValueError&lt;/code&gt; is &lt;code&gt;CLARIFICATION_INVALID&lt;/code&gt; with a &lt;code&gt;choice&lt;/code&gt; and &lt;code&gt;INVALID_REQUEST&lt;/code&gt;
+  without. &lt;code&gt;question&lt;/code&gt; is optional with a &lt;code&gt;choice&lt;/code&gt; (the pending question is used). The returned turn is
+  matched by the run's &lt;code&gt;trace_id&lt;/code&gt;, not read as the conversation's last. &lt;code&gt;record_denied&lt;/code&gt; raises for an
+  unknown reason; &lt;code&gt;check&lt;/code&gt; hashes a dummy for an unknown id; only &lt;code&gt;lifespan&lt;/code&gt; scopes skip the key check and a
+  websocket is closed. The default &lt;code&gt;allowed_hosts&lt;/code&gt; adds &lt;code&gt;[::1]&lt;/code&gt; and the bare names.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/div&gt;
+&lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;#&lt;/th&gt;
+&lt;th&gt;Bug&lt;/th&gt;
+&lt;th&gt;Evidence&lt;/th&gt;
+&lt;th&gt;Fixed by&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;B100&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;POST /api/v1/datasource&lt;/code&gt; answers every failure, a typo in the body included, with a 500 and "the cause is in the server log", so a Connect form cannot say what is wrong&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;packages/api/src/nl2sql_api/routes/datasource.py&lt;/code&gt; (&lt;code&gt;except Exception&lt;/code&gt; around &lt;code&gt;add_datasource&lt;/code&gt;)&lt;/td&gt;
+&lt;td&gt;L2&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;B101&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;nl2sql demo --dir&lt;/code&gt; warns that any folder without a demo stamp was "created by an older version", so a project folder that was never a demo gets a false warning&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;cli/demo/stamp.py&lt;/code&gt; (&lt;code&gt;outdated_warning&lt;/code&gt;: &lt;code&gt;created_by is None&lt;/code&gt; is "older")&lt;/td&gt;
+&lt;td&gt;L3&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Bugs are numbered from B100, as decisions are from D100, so they never
+collide with Wave B's (B31 onwards).&lt;/p&gt;
+&lt;h2 id="15-release-09"&gt;15. Release 0.9&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;release-please opens the release PR as usual. Releasing is the owner's act
+  (see &lt;a href="../../development/releasing/"&gt;Releasing&lt;/a&gt;); no agent merges it.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;docs/releases/0.9.0.md&lt;/code&gt; is written with the release-notes process. Its
   breaking-changes table covers: the state store's interface version 4 (an
-  0.8 file is migrated in place by migration 6), <code>ResultSummary.column_kinds</code>,
-  the new <code>conversation</code> agent (a config that pins every agent's
-  model should add it), the MCP <code>ask</code> tool's <code>choice</code> (an option id with
-  <code>conversation_id</code>, replacing <code>{request, option_id}</code>), MCP's
-  <code>build_server(engine, identity)</code>, <code>POST /api/v1/datasource</code> answering 422
-  for a bad body, and <code>init_project</code> writing through <code>write_project</code> (same
-  files).</li>
-<li>Before tagging, the owner runs <code>nl2sql launch</code> once against the test bed's
+  0.8 file is migrated in place by migration 6), &lt;code&gt;ResultSummary.column_kinds&lt;/code&gt;,
+  the new &lt;code&gt;conversation&lt;/code&gt; agent (a config that pins every agent's
+  model should add it), the MCP &lt;code&gt;ask&lt;/code&gt; tool's &lt;code&gt;choice&lt;/code&gt; (an option id with
+  &lt;code&gt;conversation_id&lt;/code&gt;, replacing &lt;code&gt;{request, option_id}&lt;/code&gt;), MCP's
+  &lt;code&gt;build_server(engine, identity)&lt;/code&gt;, &lt;code&gt;POST /api/v1/datasource&lt;/code&gt; answering 422
+  for a bad body, and &lt;code&gt;init_project&lt;/code&gt; writing through &lt;code&gt;write_project&lt;/code&gt; (same
+  files).&lt;/li&gt;
+&lt;li&gt;Before tagging, the owner runs &lt;code&gt;nl2sql launch&lt;/code&gt; once against the test bed's
   PostgreSQL with a key, asks three follow-ups through
-  <code>engine.conversations</code> in a short script (the chat UI is Wave D),
+  &lt;code&gt;engine.conversations&lt;/code&gt; in a short script (the chat UI is Wave D),
   has the model build a dashboard for Chinook in that conversation, edits and pins it, refreshes it and sets a schedule, and connects one MCP client over HTTP
-  with a key. The results go in the release notes.</li>
-</ul>
-<h2 id="16-open-questions">16. Open questions</h2>
-<p>None blocking. The owner reviewed this design on 2026-10-28: every decision
+  with a key. The results go in the release notes.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="16-open-questions"&gt;16. Open questions&lt;/h2&gt;
+&lt;p&gt;None blocking. The owner reviewed this design on 2026-10-28: every decision
 not marked revised or new is confirmed as written, D123 and D128 included.
 The builder's calls below are the choices the owner left to the design;
 each is flagged in the decision that makes it, and any can be changed
-before its PR starts.</p>
-<table>
-<thead>
-<tr>
-<th>Builder's call</th>
-<th>Decision</th>
-<th>What was picked</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>No separate rewrite call</td>
-<td>D101</td>
-<td>The conversation agent's loop carries the standalone question in <code>ask</code>; the <code>conversation_rewriter</code> agent and the <code>Rewrite</code> type are gone.</td>
-</tr>
-<tr>
-<td><code>max_tool_calls</code> default</td>
-<td>D108</td>
-<td>12, not 5: a six-chart dashboard is six <code>ask</code> calls, an edit and a pin.</td>
-</tr>
-<tr>
-<td>Loop output is a typed <code>ModelStep</code></td>
-<td>D101</td>
-<td>The loop uses <code>structured()</code> like every agent, not a provider's native tool-calling, so every LLM adapter works the same way.</td>
-</tr>
-<tr>
-<td>Minimum schedule interval</td>
-<td>D132</td>
-<td><code>dashboards.min_refresh_minutes</code>, 15.</td>
-</tr>
-<tr>
-<td>Schedule shape</td>
-<td>D132</td>
-<td><code>every_minutes</code>, not cron expressions; cron users call <code>nl2sql dashboards refresh --due</code>.</td>
-</tr>
-<tr>
-<td>Scheduled-refresh identity</td>
-<td>D134</td>
-<td>A snapshot of the owner's <code>user_context</code> saved on the schedule when it is set, checked on every run, expiring after 30 days; a failed check stops the schedule with a visible error.</td>
-</tr>
-<tr>
-<td>Default workspace</td>
-<td>D131</td>
-<td>"General", created on first <code>pin</code> or <code>generate</code>.</td>
-</tr>
-<tr>
-<td><code>SuppliedPlan</code> shape (A1)</td>
-<td>D116</td>
-<td>C0 widens it to a whole run, shaped on <code>PinnedRun</code>: a <code>DecomposerResponse</code> (combine groups included) plus <code>plans</code>, or a verified ref; exactly one. <code>ChartPlan</code> stores the same.</td>
-</tr>
-<tr>
-<td><code>QueryResult.decomposition</code></td>
-<td>D116</td>
-<td>Set on every run with a decomposition, so a stored turn can rebuild the whole run for <code>add_tile</code>.</td>
-</tr>
-<tr>
-<td>Verified charts</td>
-<td>D116</td>
-<td>Stay in 0.9, through <code>SuppliedPlan</code>'s verified form.</td>
-</tr>
-<tr>
-<td>Approval on refresh</td>
-<td>D132</td>
-<td><code>refresh(approvals=)</code> only; scheduled runs and <code>open</code> never approve.</td>
-</tr>
-<tr>
-<td>MCP <code>ask</code></td>
-<td>section 9</td>
-<td>Calls <code>conversations.ask_only(...)</code>, which runs just the <code>ask</code> tool; named apart because <code>conversations.ask</code> is the model-led turn.</td>
-</tr>
-</tbody>
-</table>
-<p>The owner's note that Wave C ships "the REST API" is read as the Connect
-routes and the schedule runner in <code>nl2sql-api</code>; the conversation and
+before its PR starts.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Builder's call&lt;/th&gt;
+&lt;th&gt;Decision&lt;/th&gt;
+&lt;th&gt;What was picked&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;No separate rewrite call&lt;/td&gt;
+&lt;td&gt;D101&lt;/td&gt;
+&lt;td&gt;The conversation agent's loop carries the standalone question in &lt;code&gt;ask&lt;/code&gt;; the &lt;code&gt;conversation_rewriter&lt;/code&gt; agent and the &lt;code&gt;Rewrite&lt;/code&gt; type are gone.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;max_tool_calls&lt;/code&gt; default&lt;/td&gt;
+&lt;td&gt;D108&lt;/td&gt;
+&lt;td&gt;12, not 5: a six-chart dashboard is six &lt;code&gt;ask&lt;/code&gt; calls, an edit and a pin.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Loop output is a typed &lt;code&gt;ModelStep&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;D101&lt;/td&gt;
+&lt;td&gt;The loop uses &lt;code&gt;structured()&lt;/code&gt; like every agent, not a provider's native tool-calling, so every LLM adapter works the same way.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Minimum schedule interval&lt;/td&gt;
+&lt;td&gt;D132&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;dashboards.min_refresh_minutes&lt;/code&gt;, 15.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Schedule shape&lt;/td&gt;
+&lt;td&gt;D132&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;every_minutes&lt;/code&gt;, not cron expressions; cron users call &lt;code&gt;nl2sql dashboards refresh --due&lt;/code&gt;.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Scheduled-refresh identity&lt;/td&gt;
+&lt;td&gt;D134&lt;/td&gt;
+&lt;td&gt;A snapshot of the owner's &lt;code&gt;user_context&lt;/code&gt; saved on the schedule when it is set, checked on every run, expiring after 30 days; a failed check stops the schedule with a visible error.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Default workspace&lt;/td&gt;
+&lt;td&gt;D131&lt;/td&gt;
+&lt;td&gt;"General", created on first &lt;code&gt;pin&lt;/code&gt; or &lt;code&gt;generate&lt;/code&gt;.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;SuppliedPlan&lt;/code&gt; shape (A1)&lt;/td&gt;
+&lt;td&gt;D116&lt;/td&gt;
+&lt;td&gt;C0 widens it to a whole run, shaped on &lt;code&gt;PinnedRun&lt;/code&gt;: a &lt;code&gt;DecomposerResponse&lt;/code&gt; (combine groups included) plus &lt;code&gt;plans&lt;/code&gt;, or a verified ref; exactly one. &lt;code&gt;ChartPlan&lt;/code&gt; stores the same.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;QueryResult.decomposition&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;D116&lt;/td&gt;
+&lt;td&gt;Set on every run with a decomposition, so a stored turn can rebuild the whole run for &lt;code&gt;add_tile&lt;/code&gt;.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Verified charts&lt;/td&gt;
+&lt;td&gt;D116&lt;/td&gt;
+&lt;td&gt;Stay in 0.9, through &lt;code&gt;SuppliedPlan&lt;/code&gt;'s verified form.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Approval on refresh&lt;/td&gt;
+&lt;td&gt;D132&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;refresh(approvals=)&lt;/code&gt; only; scheduled runs and &lt;code&gt;open&lt;/code&gt; never approve.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;MCP &lt;code&gt;ask&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;section 9&lt;/td&gt;
+&lt;td&gt;Calls &lt;code&gt;conversations.ask_only(...)&lt;/code&gt;, which runs just the &lt;code&gt;ask&lt;/code&gt; tool; named apart because &lt;code&gt;conversations.ask&lt;/code&gt; is the model-led turn.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The owner's note that Wave C ships "the REST API" is read as the Connect
+routes and the schedule runner in &lt;code&gt;nl2sql-api&lt;/code&gt;; the conversation and
 dashboard REST routes stay in Wave D (D121), as the first draft had them.
-<a href="../wave_d/"><code>wave_d.md</code></a> designs those routes and needs a pass to match this
-page (see its note).</p>
-</article>
-</div>
-<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
-</div>
-<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
-<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+&lt;a href="../wave_d/"&gt;&lt;code&gt;wave_d.md&lt;/code&gt;&lt;/a&gt; designs those routes and needs a pass to match this
+page (see its note).&lt;/p&gt;
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              &lt;/article&gt;
+            &lt;/div&gt;
+          
+          
+&lt;script&gt;var target=document.getElementById(location.hash.slice(1));target&amp;&amp;target.name&amp;&amp;(target.checked=target.name.startsWith("__tabbed_"))&lt;/script&gt;
+        &lt;/div&gt;
+        
+          &lt;button type="button" class="md-top md-icon" data-md-component="top" hidden&gt;
+  
+  &lt;svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"&gt;&lt;path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/&gt;&lt;/svg&gt;
   Back to top
-</button>
-</main>
-<footer class="md-footer">
-<div class="md-footer-meta md-typeset">
-<div class="md-footer-meta__inner md-grid">
-<div class="md-copyright">
+&lt;/button&gt;
+        
+      &lt;/main&gt;
+      
+        &lt;footer class="md-footer"&gt;
+  
+  &lt;div class="md-footer-meta md-typeset"&gt;
+    &lt;div class="md-footer-meta__inner md-grid"&gt;
+      &lt;div class="md-copyright"&gt;
   
   
     Made with
-    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+    &lt;a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener"&gt;
       Material for MkDocs
-    </a>
-</div>
-</div>
-</div>
-</footer>
-</div>
-<div class="md-dialog" data-md-component="dialog">
-<div class="md-dialog__inner md-typeset"></div>
-</div>
-<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
-<script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
-</body>
-</html>
+    &lt;/a&gt;
+  
+&lt;/div&gt;
+      
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/footer&gt;
+      
+    &lt;/div&gt;
+    &lt;div class="md-dialog" data-md-component="dialog"&gt;
+      &lt;div class="md-dialog__inner md-typeset"&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    
+    
+    
+      
+      
+      &lt;script id="__config" type="application/json"&gt;{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}&lt;/script&gt;
+    
+    
+      &lt;script src="../../assets/javascripts/bundle.c21346df.min.js"&gt;&lt;/script&gt;
+      
+    
+  &lt;/body&gt;
+&lt;/html&gt;</title></li></ul></div></article></div></div></main></div></body></html>

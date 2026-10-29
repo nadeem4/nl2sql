@@ -5842,7 +5842,8 @@
 <p class="admonition-title">Partly built</p>
 <p>The workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1), and so do <code>open</code>,
 <code>refresh</code> and <code>run_scheduled</code> (D2), and <code>generate</code> and <code>suggest_questions</code> (D3). <code>filter_values</code> and
-<code>refresh(filters=...)</code> (D2b) have their final signatures and raise <code>NotImplementedError</code> naming their row.</p>
+<code>refresh(filters=...)</code> (D2b) have their final signatures and raise <code>NotImplementedError</code> naming their row. A
+conversation builds and edits a draft with the <code>dashboard_edit</code> and <code>dashboard_pin</code> chat tools (D4).</p>
 </div>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.workspaces</code> and <code>engine.dashboards</code> (<a href="../../../dashboards/">Dashboards</a>).</p>
@@ -5870,10 +5871,24 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 <li><strong><code>pin</code></strong> saves a draft whole, in <code>workspace_id</code>, else the workspace the draft is in, else "General" (made on
   first use). There is no way to pin one chart. An empty draft, a dashboard already saved, or a blank <code>title</code>
   is a <code>ValueError</code>.</li>
-<li><strong><code>edit</code></strong> applies a list of edits in order, each seeing the ones before, all or none. The named methods
-  (<code>rename</code>, <code>rename_tile</code>, <code>set_tile_chart</code>, <code>remove_tile</code>, <code>arrange</code>, <code>set_filters</code>, <code>set_schedule</code>, <code>move</code>)
-  each build one edit. None calls a model, and none takes a question or a plan: what data a chart shows changes
-  only in chat (<code>add_tile</code>, <code>replace_plan</code>, D4). An unknown chart id is a <code>ValueError</code>.</li>
+<li><strong><code>create_draft(title=None, workspace_id=None, conversation_id=None)</code></strong> makes an empty draft owned by the caller
+  (title "New dashboard"; in <code>workspace_id</code>, else "General", made on first use) and publishes <code>dashboard.changed</code>
+  (<code>created</code>). The <code>dashboard_edit</code> chat tool calls it on first use, with the conversation's id, which is stored as
+  <code>Dashboard.conversation_id</code>; a <code>conversation_id</code> that is not the caller's is <code>ConversationNotFound</code>. The tool also
+  makes a new draft when the conversation's dashboard has been deleted.</li>
+<li><strong><code>edit(dashboard_id, edits, conversation=None)</code></strong> applies a list of edits in order, each seeing the ones before,
+  all or none. The named methods (<code>rename</code>, <code>rename_tile</code>, <code>set_tile_chart</code>, <code>remove_tile</code>, <code>arrange</code>,
+  <code>set_filters</code>, <code>set_schedule</code>, <code>move</code>) each build one edit. None calls a model, and none takes a question or a
+  plan: what data a chart shows changes only in a conversation. <code>add_tile</code> and <code>replace_plan</code> read an <code>ask</code> step of
+  the <code>conversation</code> passed (it must be the caller's, else <code>ValueError</code>; the chat tool passes the one it runs in)
+  and are a <code>ValueError</code> without one. The step's whole decomposition and each sub-query's plan, or the verified
+  query that answered, become the chart's plan; it is first checked by a run that executes nothing, as the caller
+  and under the dashboard's lock, and a plan the validator rejects or the caller may not read raises a
+  <code>ValueError</code> that ends with "Nothing was saved." An unknown chart id is a <code>ValueError</code>. <code>from_step.turn</code> defaults
+  to the conversation's latest turn. <strong><code>conversation</code> is trusted:</strong> its steps are not re-read from the store, only
+  its owner is checked against the caller, so it is for SDK code holding the caller's own <code>Conversation</code> and is
+  not exposed over REST or MCP; the plan's access check still runs as the caller. The lock lasts as long as the
+  edit's checks (one time limit per <code>add_tile</code> or <code>replace_plan</code>).</li>
 <li><strong><code>set_tile_chart</code></strong> with a kind the chart's last result cannot be drawn as raises a <code>ValueError</code> naming the
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.</li>
@@ -5915,7 +5930,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
   <strong><code>suggest_questions(datasource_id, n=5)</code></strong> returns the questions of the first <code>n</code> charts <code>generate</code> would
   choose and runs and saves nothing (<code>[]</code> when the caller reaches no table; <code>NotIndexed</code> as above).</li>
 <li><strong>A verified chart</strong> keeps its datasource in <code>ChartPlan.verified_datasource_id</code>, required with <code>verified</code>.</li>
-<li><strong>Events.</strong> <code>dashboard.changed</code> (the edit kinds, <code>pinned</code> or <code>deleted</code>, and <code>by</code>), <code>dashboard.schedule_set</code>,
+<li><strong>Events.</strong> <code>dashboard.changed</code> (the edit kinds, <code>created</code>, <code>pinned</code> or <code>deleted</code>, and <code>by</code>), <code>dashboard.schedule_set</code>,
   <code>dashboard.generated</code>, <code>dashboard.refreshed</code> (the counts per status), <code>dashboard.schedule_stopped</code> and <code>workspace.changed</code>. They
   carry no titles, names or values.</li>
 <li><strong>Retention.</strong> <code>engine.storage.purge()</code> deletes drafts last edited more than <code>conversations.max_age_days</code> ago;
