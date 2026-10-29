@@ -873,8 +873,12 @@ class LogicalValidatorNode:
                     errors.append(
                         PipelineError(
                             node="logical_validator",
-                            message="Join does not match any allowed relationship. "
-                            + join_hint(relationships, left_table, right_table, self._normalize_name),
+                            message="Join does not match any allowed relationship."
+                            + (
+                                " " + join_hint(relationships, left_table, right_table, self._normalize_name,
+                                                set(table_to_cols))
+                                if left_table and right_table else ""
+                            ),
                             severity=ErrorSeverity.ERROR,
                             error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
                         )

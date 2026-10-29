@@ -7,7 +7,7 @@ between the two tables or, when there are none, the shortest declared path throu
 from __future__ import annotations
 
 from collections import deque
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # One declared join: (table, its columns, the other table, its columns), names normalized.
 Edge = Tuple[str, List[str], str, List[str]]
@@ -54,9 +54,13 @@ def _shortest_path(edges: List[Edge], start: str, goal: str) -> List[str]:
     return steps[::-1]
 
 
-def join_hint(relationships: List[Dict[str, Any]], left: str, right: str, normalize: Callable[[Optional[str]], str]) -> str:
-    """The sentence a rejected join between the tables ``left`` and ``right`` is followed by."""
-    edges = _edges(relationships, normalize)
+def join_hint(relationships: List[Dict[str, Any]], left: str, right: str, normalize: Callable[[Optional[str]], str],
+              sent: Set[str]) -> str:
+    """The sentence a rejected join between the tables ``left`` and ``right`` is followed by.
+
+    ``sent`` is the tables the planner was sent: a path only runs through those, since the planner can use no other.
+    """
+    edges = [e for e in _edges(relationships, normalize) if e[0] in sent and e[2] in sent]
     direct = sorted({_step(e, left) for e in edges if {e[0], e[2]} == {left, right}})
     if direct:
         return f"Allowed joins between {left} and {right}: {'; '.join(direct)}."

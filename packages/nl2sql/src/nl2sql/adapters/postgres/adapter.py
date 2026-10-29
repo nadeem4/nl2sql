@@ -151,13 +151,13 @@ class PostgresAdapter(SQLAlchemyAdapter):
         return {"pg_catalog", "information_schema"}
 
     def partitions(self, conn: Connection, schema: str) -> Dict[str, str]:
-        """Each partition of ``schema`` by name, with the table it directly belongs to."""
+        """Each partition of ``schema`` by name, with the table of the same schema it directly belongs to."""
         rows = conn.execute(text(
             "SELECT child.relname, parent.relname FROM pg_catalog.pg_inherits i "
             "JOIN pg_catalog.pg_class child ON child.oid = i.inhrelid "
             "JOIN pg_catalog.pg_class parent ON parent.oid = i.inhparent "
             "JOIN pg_catalog.pg_namespace n ON n.oid = child.relnamespace "
-            "WHERE n.nspname = :schema AND child.relispartition"
+            "WHERE n.nspname = :schema AND child.relispartition AND parent.relnamespace = child.relnamespace"
         ), {"schema": schema})
         return {child: parent for child, parent in rows}
 
@@ -167,7 +167,7 @@ class PostgresAdapter(SQLAlchemyAdapter):
         parents = self.partitions(conn, schema)
         top = {name: _top_parent(name, parents) for name in parents}
         reflected = super().reflect(conn, schema, lambda name: wants_table(top.get(name, name)), issues)
-        return fold_partitions(reflected, parents)
+        return fold_partitions(reflected, parents, schema)
 
     def row_estimates(self, conn: Connection, schema: str) -> Dict[str, int]:
         """``pg_class.reltuples``, which ANALYZE and autovacuum keep. A table never analyzed (-1) has none."""
@@ -176,7 +176,7 @@ class PostgresAdapter(SQLAlchemyAdapter):
             "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
             "WHERE n.nspname = :schema AND c.relkind IN ('r', 'p', 'm', 'f') AND c.reltuples >= 0"
         ), {"schema": schema})
-        return {name: int(count) for name, count in rows}
+        return add_partition_estimates({name: int(count) for name, count in rows}, self.partitions(conn, schema))
 
 
 def _top_parent(name: str, parents: Dict[str, str]) -> str:
@@ -186,18 +186,28 @@ def _top_parent(name: str, parents: Dict[str, str]) -> str:
     return name
 
 
-def fold_partitions(reflected: Dict[str, ReflectedTable], parents: Dict[str, str]) -> Dict[str, ReflectedTable]:
+def add_partition_estimates(estimates: Dict[str, int], parents: Dict[str, str]) -> Dict[str, int]:
+    """``estimates`` without the partitions; a parent with no estimate of its own (never analyzed) gets their sum."""
+    summed: Dict[str, int] = {}
+    for name, parent in parents.items():
+        if name in estimates:
+            summed[_top_parent(name, parents)] = summed.get(_top_parent(name, parents), 0) + estimates[name]
+    kept = {name: count for name, count in estimates.items() if name not in parents}
+    return {**{name: count for name, count in summed.items() if name not in kept}, **kept}
+
+
+def fold_partitions(reflected: Dict[str, ReflectedTable], parents: Dict[str, str], schema: str) -> Dict[str, ReflectedTable]:
     """``reflected`` without its partitions, each parent holding the foreign keys its partitions declare.
 
     PostgreSQL declares a partitioned table's foreign keys on its partitions, so the parent, which is what a
-    query names, would have none. A parent that declares keys of its own keeps them. A key that points at a
-    partition points at its parent, and the parent's keys are listed once.
+    query names, would have none. The parent keeps the keys it declares and gains its partitions', listed once. A
+    key of ``schema`` that points at a partition points at its parent.
     """
     top = {name: _top_parent(name, parents) for name in parents}
 
     def points_at_parent(fk: ForeignKeyContract) -> ForeignKeyContract:
         target = fk.referred_table
-        if target.table_name not in top:
+        if target.schema_name != schema or target.table_name not in top:
             return fk
         return fk.model_copy(update={"referred_table": TableRef(schema_name=target.schema_name,
                                                                 table_name=top[target.table_name])})
@@ -209,7 +219,7 @@ def fold_partitions(reflected: Dict[str, ReflectedTable], parents: Dict[str, str
             inherited.setdefault(parent, []).extend(reflected[name].foreign_keys)
     folded = {}
     for name, table in kept.items():
-        keys = table.foreign_keys or inherited.get(name, [])
+        keys = [*table.foreign_keys, *inherited.get(name, [])]
         unique: Dict[Any, ForeignKeyContract] = {}
         for fk in map(points_at_parent, keys):
             unique.setdefault((tuple(fk.constrained_columns), fk.referred_table, tuple(fk.referred_columns)), fk)
