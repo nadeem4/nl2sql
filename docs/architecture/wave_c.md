@@ -2336,7 +2336,7 @@ A model-free Pagila retrieval baseline on CI (design 17.5).
 
 - **Where it runs: the `realdb` workflow, not the snapshot fixture.** The fixture's store is a fake, so it can not
   measure a vector search, and the record gates on a real index. The test bed's Pagila is already in the workflow, and
-  the wide-schema routing test already indexes with local embeddings there, so one more test costs one index of 22
+  the wide-schema routing test already indexes with local embeddings there, so one more test costs one index of 29
   tables and no key. `tests/realdb/test_pagila_retrieval.py` (PostgreSQL only) builds a datasource called `pagila`
   (the id the suite names), indexes it, runs `pagila.yaml` in mode retrieval (selector off, steps 1, 2 and 4) and
   gates the report against `benchmarks/` with `engine.evals.gate`. A series break or a regression fails it, as

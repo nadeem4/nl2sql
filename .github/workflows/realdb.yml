@@ -43,6 +43,8 @@ jobs:
               - 'packages/nl2sql/tests/realdb/**'
               - 'packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/**'
               - 'packages/nl2sql/src/nl2sql/evaluation/**'
+              - 'packages/nl2sql/src/nl2sql/embeddings/**'
+              - 'packages/nl2sql/src/nl2sql/pipeline/steps.py'
               - 'benchmarks/retrieval/pagila/**'
               - 'testbed/**'
               - '.github/workflows/realdb.yml'
