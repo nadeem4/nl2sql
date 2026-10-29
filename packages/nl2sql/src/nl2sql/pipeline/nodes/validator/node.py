@@ -60,26 +60,6 @@ def _plan_exprs(plan: PlanModel):
         yield from walk(root)
 
 
-class ValidationSqlVisitor(SqlVisitor):
-    """``SqlVisitor`` variant used to build a throw-away tree for validation.
-
-    Identical to the generator's visitor except that a ``*`` column name is
-    rendered as a real sqlglot star, so the optimizer expands it instead of
-    trying to resolve a column literally named ``*``.
-    """
-
-    def _visit_column(self, expr: Expr) -> exp.Expression:
-        """Converts a column expression, mapping wildcards to sqlglot stars."""
-        if (expr.column_name or "").strip() == "*":
-            if expr.alias:
-                return exp.Column(
-                    this=exp.Star(),
-                    table=exp.Identifier(this=expr.alias, quoted=False),
-                )
-            return exp.Star()
-        return super()._visit_column(expr)
-
-
 class LogicalValidatorNode:
     """Validates the generated AST (PlanModel).
 
@@ -193,7 +173,7 @@ class LogicalValidatorNode:
 
     def _condition_aliases(self, condition: Expr) -> Set[str]:
         """Returns the table aliases referenced by a join condition."""
-        node = ValidationSqlVisitor().visit(condition)
+        node = SqlVisitor().visit(condition)
         return {col.table for col in node.find_all(exp.Column) if col.table}
 
     def _resolve_plan_tables(
@@ -286,7 +266,7 @@ class LogicalValidatorNode:
         on join structure; join conditions are folded into the WHERE clause so
         that their columns are resolved too.
         """
-        visitor = ValidationSqlVisitor()
+        visitor = SqlVisitor()
 
         selects = [visitor.visit(s.expr) for s in plan.select_items] or [exp.Star()]
         query = exp.select(*selects)

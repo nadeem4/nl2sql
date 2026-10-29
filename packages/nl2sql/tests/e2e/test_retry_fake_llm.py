@@ -12,6 +12,8 @@ import json
 
 import pytest
 
+from nl2sql.testing.fake_llm import Rule
+
 from .conftest import _base_env, run_cli
 from .recordings_chinook import RULES_ALBUMS_PER_ARTIST_RETRY
 from .test_trace_fake_llm import _serve
@@ -60,6 +62,34 @@ def test_an_unjoined_plan_is_retried_and_the_second_plan_answers(demo_project, t
     # structural error, never as a terminal generation failure.
     codes = [e["error_code"] for e in doc["result"]["errors"]]
     assert "SQL_GEN_FAILED" not in codes
+
+
+@pytest.mark.e2e
+def test_a_count_star_plan_runs_first_time_without_a_retry(demo_project, fake_llm, monkeypatch):
+    """The planner writes ``COUNT(*)`` as a ``*`` column; the generator must not quote it (C-W3)."""
+    from nl2sql import NL2SQL, UserContext
+
+    from .recordings_chinook import COUNT_CUSTOMERS_PLAN, RULES_COUNT_CUSTOMERS
+    from .test_result_paging_fake_llm import _env
+
+    star = {"kind": "func", "func_name": "COUNT", "is_aggregate": True,
+            "args": [{"kind": "column", "alias": "t1", "column_name": "*"}]}
+    plan = {**COUNT_CUSTOMERS_PLAN, "select_items": [{"alias": "customer_count", "expr": star}]}
+    rules = [Rule("PlannerAnswer", plan) if r.name == "PlannerAnswer" else r for r in RULES_COUNT_CUSTOMERS]
+    server, env = fake_llm(rules)
+    _env(monkeypatch, demo_project, env)
+    engine = NL2SQL.from_config()
+
+    try:
+        result = engine.run_query("How many customers are there?", user_context=UserContext(roles=["analyst"]))
+    finally:
+        engine.close()
+
+    [sub] = result.sub_queries
+    assert result.status == "success", result.errors
+    assert sub.retry_count == 0
+    assert "COUNT(*)" in sub.sql.replace(" ", "").upper(), sub.sql
+    assert sub.rows.rows == [[59]]
 
 
 @pytest.mark.e2e

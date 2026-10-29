@@ -161,8 +161,8 @@ def _col(column: Col) -> Expr:
 
 
 def _count() -> Expr:
-    """``COUNT(1)``: the rows. The generator quotes a ``*`` column name, so ``COUNT(*)`` cannot be written in a plan."""
-    return _func("COUNT", _lit(1))
+    """``COUNT(*)``: the rows."""
+    return _func("COUNT", Expr(kind="column", column_name="*"))
 
 
 def _func(name: str, *args: Expr, aggregate: bool = True) -> Expr:

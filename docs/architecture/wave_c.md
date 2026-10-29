@@ -1878,8 +1878,9 @@ Not built yet.
 
     Where the code and the design differ, the code won:
 
-    - **`COUNT(1)`, not `COUNT(*)`.** A plan writes a star as the column name `*`, which the validator accepts but the
-      generator quotes (`t1."*"`), so the database refuses it. The row count is `COUNT(1)`, the same number.
+    - **`COUNT(1)`, not `COUNT(*)`** (superseded by C-W3: the generator no longer quotes the star, and the row
+      count is `COUNT(*)`). A plan writes a star as the column name `*`, which the validator accepted but the
+      generator quoted (`t1."*"`), so the database refused it.
     - **Names only.** A chart's question and title use the columns' names humanised; a glossary description's first
       clause is not used (no description is needed for a good question, and one could carry text a person did not
       write for a question).
@@ -2150,12 +2151,29 @@ Not built yet.
       unknown reason; `check` hashes a dummy for an unknown id; only `lifespan` scopes skip the key check and a
       websocket is closed. The default `allowed_hosts` adds `[::1]` and the bare names.
 
+### C-W3
+
+`COUNT(*)` and `t1.*` passed the logical validator and failed at the database (bug B102 in section 14).
+
+- **Cause.** The validator mapped a `*` column name to a real sqlglot star in its own subclass of `SqlVisitor`
+  (`ValidationSqlVisitor`); the generator's `SqlVisitor` ran it through `exp.to_identifier`, which quotes it
+  (`COUNT(t1."*")`, T-SQL `t1.[*]`, MySQL `` t1.`*` ``). The two trees differed, so the validator's check said nothing
+  about what the generator rendered, and the failure came at execution, after the last retry edge.
+- **Fix.** `SqlVisitor._visit_column` makes the star, so the validator and the generator build the same tree, and
+  `ValidationSqlVisitor` is gone. A `COUNT` argument of `t1.*` is written `COUNT(*)` (SQLite and T-SQL refuse
+  `COUNT(t1.*)`, and the count is the same).
+- **Tests.** `tests/unit/test_generator_star.py` (the real validator and generator on sqlite, postgres, tsql, mysql and
+  duckdb: no quoted star, `COUNT(*)` / `u.*` parse back as stars) and a full run in `tests/e2e/test_retry_fake_llm.py`
+  (a `COUNT(t1.*)` plan on the demo SQLite answers 59 with no retry).
+- **D3.** Its templates now write the row count as `COUNT(*)` (the `COUNT(1)` note under D3 is superseded).
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
 |---|---|---|---|
 | B100 | `POST /api/v1/datasource` answers every failure, a typo in the body included, with a 500 and "the cause is in the server log", so a Connect form cannot say what is wrong | `packages/api/src/nl2sql_api/routes/datasource.py` (`except Exception` around `add_datasource`) | L2 |
 | B101 | `nl2sql demo --dir` warns that any folder without a demo stamp was "created by an older version", so a project folder that was never a demo gets a false warning | `cli/demo/stamp.py` (`outdated_warning`: `created_by is None` is "older") | L3 |
+| B102 | A plan's `COUNT(*)` or `t1.*` passes the logical validator, but the generator quotes the star (`COUNT(t1."*")`), so the database refuses it after the last retry edge | `generator/node.py` `SqlVisitor._visit_column` (`exp.to_identifier("*")`) against the validator's own `ValidationSqlVisitor` | C-W3 |
 
 Bugs are numbered from B100, as decisions are from D100, so they never
 collide with Wave B's (B31 onwards).

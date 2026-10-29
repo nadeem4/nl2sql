@@ -175,12 +175,21 @@ class SqlVisitor:
             return exp.Literal.number(str(val))
         return exp.Literal.string(str(val))
 
-    def _visit_column(self, expr: Expr) -> exp.Column:
+    def _visit_column(self, expr: Expr) -> exp.Expression:
         """Converts a column expression to sqlglot.
 
-        The name is quoted only when it is not a bare identifier, such as a
-        select alias with spaces referenced from ORDER BY.
+        A ``*`` name is the wildcard: a real star (``COUNT(*)``, ``t1.*``), not
+        an identifier, which every dialect would quote into a column named
+        ``*``. The validator builds its tree through this same visitor, so it
+        reads the star exactly as the generator renders it.
+
+        Any other name is quoted only when it is not a bare identifier, such as
+        a select alias with spaces referenced from ORDER BY.
         """
+        if (expr.column_name or "").strip() == "*":
+            if expr.alias:
+                return exp.Column(this=exp.Star(), table=exp.Identifier(this=expr.alias, quoted=False))
+            return exp.Star()
         ident = exp.to_identifier(expr.column_name)
         if expr.alias:
             return exp.Column(this=ident, table=exp.Identifier(this=expr.alias, quoted=False))
@@ -202,6 +211,9 @@ class SqlVisitor:
             return portable_date(kind, unit, self.visit(operand))
 
         args = [self.visit(arg) for arg in expr.args]
+        if str(expr.func_name).upper() == "COUNT":
+            # ``COUNT(t1.*)`` is not valid on SQLite or T-SQL and means the same as ``COUNT(*)``.
+            args = [exp.Star() if isinstance(a, exp.Column) and isinstance(a.this, exp.Star) else a for a in args]
         if expr.distinct:
             # FUNC(DISTINCT a, b), the tree sqlglot's parser builds for it.
             args = [exp.Distinct(expressions=args)]
