@@ -4,9 +4,11 @@ The ``result_match`` scorer reads both (``nl2sql.evaluation.scorers.result_match
 """
 from __future__ import annotations
 
+import datetime as dt
 import itertools
 import math
 import re
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import sqlglot
@@ -26,7 +28,7 @@ def _values(row: Row) -> List[Any]:
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)
 
 
 def _as_number(value: Any) -> Any:
@@ -42,6 +44,32 @@ def _as_number(value: Any) -> Any:
     return None
 
 
+# A date or a date and time, as ISO 8601 spells it ("2022-01-01", "2022-01-01T00:00:00Z").
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$")
+
+
+def _as_instant(value: Any) -> Optional[dt.datetime]:
+    """``value`` as a timezone-aware datetime if it is a date, a datetime or an ISO string spelling one.
+
+    A date, or a date-only string, is its midnight; a value with no timezone is UTC.
+    Gold rows are written as JSON, so they hold ISO strings where a live row holds
+    a ``date`` or ``datetime``.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not _ISO_DATE.match(text):
+            return None
+        try:
+            value = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    elif isinstance(value, dt.date) and not isinstance(value, dt.datetime):
+        value = dt.datetime(value.year, value.month, value.day)
+    if not isinstance(value, dt.datetime):
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=dt.timezone.utc)
+
+
 def _same_value(got: Any, want: Any) -> bool:
     # A number matches a string that spells it ('2009' == 2009): databases differ
     # in which of the two a date part or a computed value comes back as. Two
@@ -50,6 +78,10 @@ def _same_value(got: Any, want: Any) -> bool:
         g, w = _as_number(got), _as_number(want)
         if g is not None and w is not None:
             return math.isclose(g, w, rel_tol=0.0, abs_tol=NUMERIC_TOLERANCE)
+    # A date or datetime matches its ISO string, and a date-only label its midnight.
+    g_time, w_time = _as_instant(got), _as_instant(want)
+    if g_time is not None and w_time is not None:
+        return g_time == w_time
     return type(got) is type(want) and got == want
 
 
@@ -81,6 +113,8 @@ def _same_period(got: Any, want: Any) -> bool:
     read this way (a number is a number, never a year), and the prefix must end
     on a component boundary, so ``'2009-1'`` matches nothing.
     """
+    if isinstance(got, dt.date):
+        got = got.isoformat()
     if not isinstance(got, str) or not isinstance(want, str):
         return False
     if not _PERIOD_LABEL.match(want) or not _DATE_VALUE.match(got):

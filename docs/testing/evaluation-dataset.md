@@ -102,6 +102,11 @@ Rows are compared by value, in selected column order:
 - **A number matches a string that spells it**, within the same tolerance, so
   `'2009'` is `2009`: databases differ in which of the two they return for the
   same value.
+- **A database decimal matches the number or string it spells**, so a
+  `Decimal` of `3094.78` is `"3094.78"`: gold rows are stored as JSON.
+- **Dates match their ISO strings.** A `date` or `datetime` equals
+  `"2022-01-01T00:00:00Z"`, and a date-only label (`"2022-01-01"`) equals that
+  day's midnight, either way round. A value with no timezone is read as UTC.
 - **Other strings must be equal.** Two strings compare as strings, so
   `'2009'` is not `'2009.0'`.
 - **Row order counts only when `order_matters` is true.**
@@ -112,7 +117,7 @@ Every run is scored twice, and the report gives both, strict first.
 
 | Score | What it is |
 | --- | --- |
-| **Strict** | The execution match above, unchanged: the same columns, in the same order, and the same rows |
+| **Strict** | The execution match above: the same columns, in the same order, and the same rows; or the same rows with **extra columns** (see below) |
 | **Lenient** | Every gold column is answered by *some* column of the result, wherever it sits |
 
 Strict is the honest headline. Lenient exists because most of what it
@@ -163,6 +168,14 @@ are equal: `'2009'` matches `'2009-01-01'`, and `'2013-02'` matches
 - Only strings are read this way: a number is a number, never a year.
 - Nothing else is normalised. Anything broader belongs in an alternative
   answer, which is reviewed per case and cannot silently widen.
+
+Extra columns are the one lenient reading that counts as a pass in the strict
+score. A result that is wider than the gold and passes the lenient rules
+above, with the column cap and the no-constant-columns guardrail, passes
+`result_match`; the record says which match it was
+(`detail.match`: `strict` or `extra columns`). Reordered columns and period
+labels at the same width stay lenient-only. The row count and every row value
+are as strict as before.
 
 Lenient is a superset of strict by construction: everything strict accepts is
 accepted. It is not partial credit -- a case passes a score or it does
@@ -387,8 +400,8 @@ with no model (`nl2sql/evaluation/faithfulness.py`).
 
 | What the answer writes | Supported when |
 | --- | --- |
-| A number: `1,297`, `1234.5`, `$523.06`, `-5` | It equals a value in the rows at the precision written (`523.1` and `523` match `523.06`; `523.60` does not), the row count, or the sum of a numeric column |
-| A percentage: `37.2%` | As above, or it is a share in the rows times 100 (`0.3718`) |
+| A number: `1,297`, `1234.5`, `$523.06`, `-5` | It equals a value in the rows at the precision written (`523.1` and `523` match `523.06`; `523.60` does not), the row count, the preview size (`results.preview_rows`: "the first 20"), the sum of a numeric column, or the difference between two values of one column (`1,179` and `1,096` support `83`). Database decimals count as numbers |
+| A percentage: `37.2%` | As above, or it is a share in the rows times 100 (`0.3718`), or the ratio (a/b x 100) or the percent change between two values of one column |
 | A number inside a text cell or the question | Always: the year of `2009-01-01`, `Symphony No. 5`, `top 5`, `in 2013` |
 | A quoted (`"Jazz"`) or bold (`**Rock**`) name | A text cell, a column name or the question contains it, or it contains a text cell |
 
@@ -402,7 +415,9 @@ Some numbers and names are never checked:
   flags little it should not.
 
 `1,300` for `1297`, a `2013` that neither the rows nor the question hold, and
-a bold genre the rows do not list are all unsupported.
+a bold genre the rows do not list are all unsupported. Only differences and
+those two percentages are derived; a product, a sum of two chosen rows or any
+other arithmetic is unsupported.
 
 Each record carries `faithfulness`: `faithful`, `unsupported_numbers` and
 `unsupported_entities` (as written), and `checked` (how many numbers and

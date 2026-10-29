@@ -2347,6 +2347,14 @@ A model-free Pagila retrieval baseline on CI (design 17.5).
   `schema_retriever/`, `evaluation/` and that folder, so a retriever change re-runs the baseline.
 - **Baseline** (CI run 40913697461, ubuntu-latest, Python 3.12, local/all-MiniLM-L6-v2; record `benchmarks/retrieval/pagila/2026-10-29_67236ce_retrieval.json`). 29 tables, 11 cases: table recall 84.9%, column recall 71.2%, 7 of 11 cases with every gold table, 6 of 11 with every gold column; 10.4 tables and 32.9 columns sent per case. The floor misses tables by design; the selector's target is 100% (17.7).
 
+### C-W6a
+
+The eval scorer reads the shapes a real database returns (design 18.2). All in `nl2sql/evaluation/`; no engine change.
+
+- **Faithfulness** (`faithfulness.py`): `Decimal` cells are numbers (values and column sums). A number is also supported when it is the difference between two values of one column; a percentage when it is the ratio or the percent change between two of them (absolute value, the written precision). Pairs are read from a column's first 200 values. Nothing more general. The preview size is reachable cleanly, so it is the exact number: `CaseRun.preview_rows` carries `results.preview_rows` (set in `run._one` from the run's settings) and `check_answer(preview_rows=)` accepts exactly that number, nothing when it is unknown.
+- **Comparator** (`evaluator.py`): `Decimal` compares numerically with numeric strings and floats; a `date` or `datetime` compares with its ISO string, and a date-only label with a midnight datetime, in both directions (a value with no timezone is read as UTC). A `date` object still meets a gold year label through the lenient period rule.
+- **Scoring policy** (`scorers/result_match.py`): the right rows plus extra columns pass. The lenient reading counts as a pass when the result is wider than the gold; reordered columns or period labels at the same width stay lenient-only. `detail.match` is `strict`, `extra columns` or null; `detail.lenient` is unchanged. Row count and row values are as strict as before.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2535,3 +2543,32 @@ explain how tables are chosen, and a C-W4 built note under 13.1 when it ships.
 | Eval target | 100% gold-table recall on the Pagila suite with the selector on; the model-free floor is a baseline only. |
 | Pagila fixture | Real Pagila tables and foreign keys, replacing the filler fixture, shared by the retriever tests. |
 | One PR | Selector, glossary step, join fill and the suite together; if it passes 1,000 changed lines, the suite and its eval wiring move to a second PR. |
+
+## 18. C-W6: answer quality on large schemas
+
+Found 2026-10-29 from the keyed C-W4 Pagila run (8 cases, 0 passed), by re-scoring its records without a model.
+
+### 18.1 Findings
+
+Table recall was 100%, so the 8 failures were not retrieval. Five were `PIPELINE_TIMEOUT` (60 s on claude-opus-5; the
+engine join fixes are C-W6b). The three that finished were failed by the scorer, not by the answers:
+
+| Case | What the run returned | Why the scorer failed it |
+|---|---|---|
+| pagila_007 | 7 monthly revenue rows, `Decimal` revenue, labels `2022-01-01` | Gold rows were written with `model_dump(mode="json")`: `"3094.78"` and `"2022-01-01T00:00:00Z"`. A `Decimal` or a `datetime` is neither a float nor equal to a string, so the strict match failed. |
+| pagila_004 | Title plus `rental_count`, 42 rows; the gold has the title only | Strict match needs equal columns. The rows were right with an extra column; the lenient reading said so but was only recorded. |
+| pagila_005 | Rows matched the gold | Faithfulness: the answer said "83" (1,179 - 1,096), and cell values from Postgres `NUMERIC` (`Decimal`) were not read as numbers at all. pagila_004 also said "the preview lists the first 20", the preview size, which is no row count. |
+
+### 18.2 The fix (C-W6a)
+
+Scorer only; gold data is untouched.
+
+1. **Faithfulness.** `Decimal` is numeric. A number may be the difference between two values of one column; a percentage
+   the ratio (a/b*100) or percent change ((a-b)/b*100) between two of them. No other arithmetic. The preview size
+   (`results.preview_rows`) is supported, passed to the check by the runner.
+2. **Comparator.** `Decimal` equals the number or numeric string it spells (half a cent, as before). A `date` or
+   `datetime` equals its ISO string; a date-only label equals the midnight datetime of that day, either way round.
+3. **Policy (owner, 2026-10-29).** A result with the right rows and extra columns passes `result_match`; the detail
+   records which match it was. Row count, row values and column order are not loosened.
+
+Docs: `docs/testing/evaluation-dataset.md` (strict and lenient accuracy, answer faithfulness).

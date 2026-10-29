@@ -256,3 +256,39 @@ def test_routing_in_retrieval_mode_with_nothing_ranked_misses_both():
 
 def test_routing_does_not_apply_to_a_refused_role():
     assert Routing().score(_run(_case({"v": "refused"}), "v", _refusal())).passed is None
+
+
+# --- C-W6a: extra columns pass; the preview size reaches the faithfulness check ----
+
+
+def test_result_match_passes_the_right_rows_with_extra_columns():
+    # pagila_004: the gold has one column; the run grouped by title and added the count.
+    gold = [{"title": f"T{i}"} for i in range(42)]
+    case = _case({"admin": "allowed"}, rows=gold, order_matters=False)
+    got = _rows_result([[f"T{i}", 30 - i % 5] for i in range(42)])
+    score = result_match.score(_run(case, "admin", got))
+    assert score.passed is True and score.value == 1.0
+    assert score.detail["lenient"] is True and score.detail["match"] == "extra columns"
+
+
+def test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing():
+    strict = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([["USA", 13], ["Canada", 8]])))
+    assert strict.passed and strict.detail["match"] == "strict"
+    reordered = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([[13, "USA"], [8, "Canada"]])))
+    assert not reordered.passed and reordered.detail["match"] is None
+
+
+def test_result_match_with_extra_columns_still_needs_the_right_rows():
+    wrong = result_match.score(_run(_case({"a": "allowed"}), "a",
+                                    _rows_result([["USA", 13, "x"], ["Canada", 9, "y"]])))
+    assert not wrong.passed
+    short = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([["USA", 13, "x"]])))
+    assert not short.passed
+
+
+def test_faithfulness_accepts_the_preview_size_the_run_was_given():
+    answer = {"summary": "42 rows came back; the preview lists the first 20.", "content": ""}
+    result = _rows_result([[f"T{i}", i * 100] for i in range(42)], answer=answer)
+    case = _case({"admin": "allowed"})
+    assert Faithfulness().score(_run(case, "admin", result, preview_rows=20)).passed
+    assert not Faithfulness().score(_run(case, "admin", result)).passed

@@ -160,3 +160,48 @@ def test_lenient_still_needs_every_gold_column_matched():
     gold = [{"genre": "Jazz", "track": "My Funny Valentine", "ms": 907520},
             {"genre": "Metal", "track": "Rime of the Ancient Mariner", "ms": 816509}]
     assert not lenient([["Jazz", 907520], ["Metal", 816509]], gold)
+
+
+# --- C-W6a: gold rows written as JSON against live Decimal and datetime cells ------
+
+import datetime as dt  # noqa: E402
+from decimal import Decimal  # noqa: E402
+
+lenient = ModelEvaluator.compare_results_lenient
+UTC = dt.timezone.utc
+
+
+def test_a_decimal_matches_a_numeric_string_a_float_and_an_int():
+    assert compare([[Decimal("3094.78")]], [["3094.78"]], order_matters=True)
+    assert compare([[Decimal("3094.78")]], [[3094.78]], order_matters=True)
+    assert compare([[Decimal("13")]], [[13]], order_matters=True)
+    assert not compare([[Decimal("3094.78")]], [["3095.78"]], order_matters=True)
+
+
+def test_a_datetime_matches_its_iso_string():
+    when = dt.datetime(2022, 1, 1, tzinfo=UTC)
+    assert compare([[when]], [["2022-01-01T00:00:00Z"]], order_matters=True)
+    assert compare([[when]], [["2022-01-01T00:00:00+00:00"]], order_matters=True)
+    assert not compare([[when]], [["2022-01-02T00:00:00Z"]], order_matters=True)
+
+
+def test_a_date_only_label_matches_a_midnight_datetime_either_way():
+    midnight = dt.datetime(2022, 1, 1, tzinfo=UTC)
+    assert compare([["2022-01-01"]], [["2022-01-01T00:00:00Z"]], order_matters=True)
+    assert compare([["2022-01-01T00:00:00Z"]], [["2022-01-01"]], order_matters=True)
+    assert compare([[midnight]], [["2022-01-01"]], order_matters=True)
+    assert compare([[dt.date(2022, 1, 1)]], [["2022-01-01T00:00:00Z"]], order_matters=True)
+    assert not compare([["2022-01-01"]], [["2022-01-01T10:00:00Z"]], order_matters=True)
+
+
+def test_pagila_007_monthly_revenue_matches_its_gold():
+    gold = [{"month": f"2022-0{m}-01T00:00:00Z", "revenue": f"{m}00.50"} for m in range(1, 8)]
+    live = [["2022-0%d-01" % m, Decimal("%d00.50" % m)] for m in range(1, 8)]
+    assert compare(live, gold)
+    live_dt = [[dt.datetime(2022, m, 1, tzinfo=UTC), Decimal("%d00.50" % m)] for m in range(1, 8)]
+    assert compare(live_dt, gold)
+
+
+def test_a_year_label_still_needs_the_lenient_reading_for_a_date_object():
+    assert lenient([[dt.date(2009, 1, 1), 5]], [["2009", 5]])
+    assert not compare([[dt.date(2009, 1, 1), 5]], [["2009", 5]])

@@ -112,3 +112,53 @@ def test_bold_labels_and_column_names_are_not_entities():
 def test_no_answer_text_is_not_checked():
     assert check_answer("", columns=[], rows=[], question="?") == {
         "faithful": True, "unsupported_numbers": [], "unsupported_entities": [], "checked": 0}
+
+
+# --- C-W6a: Decimal cells, derived numbers, the preview size ------------------------
+
+from decimal import Decimal  # noqa: E402
+
+
+def test_decimal_cells_are_numbers_and_sum_with_floats():
+    rows = [["a", Decimal("3094.78")], ["b", Decimal("100.10")]]
+    for text in ("a made 3,094.78.", "Together 3,194.88.", "b made 100.1."):
+        assert check_answer(text, columns=["n", "v"], rows=rows)["faithful"], text
+    mixed = [["a", Decimal("1.50")], ["b", 2.25]]
+    assert check_answer("Together 3.75.", columns=["n", "v"], rows=mixed)["faithful"]
+
+
+def test_a_difference_between_two_values_of_a_column_is_supported():
+    rows = [["2022-05", Decimal("1179")], ["2022-06", Decimal("1096")]]   # pagila_005: "83"
+    assert check_answer("May beat June by 83 rentals.", columns=["m", "n"], rows=rows)["faithful"]
+    assert not check_answer("May beat June by 84 rentals.", columns=["m", "n"], rows=rows)["faithful"]
+
+
+def test_a_difference_across_different_columns_is_not_supported():
+    rows = [["x", 10, 100]]
+    assert not check_answer("The gap is 90.", columns=["n", "a", "b"], rows=rows)["faithful"]
+
+
+def test_a_percentage_between_two_values_of_a_column_is_supported():
+    rows = [["a", 200], ["b", 150]]
+    assert check_answer("b is 75% of a.", columns=["n", "v"], rows=rows)["faithful"]       # b / a * 100
+    assert check_answer("a is 33.3% above b.", columns=["n", "v"], rows=rows)["faithful"]   # (a - b) / b * 100
+    assert check_answer("b is 25% below a.", columns=["n", "v"], rows=rows)["faithful"]     # (a - b) / a * 100
+    assert not check_answer("b is 80% of a.", columns=["n", "v"], rows=rows)["faithful"]
+
+
+def test_a_plain_number_is_not_read_as_a_percentage_of_two_values():
+    assert not check_answer("It is 75.", columns=["n", "v"], rows=[["a", 200], ["b", 150]])["faithful"]
+
+
+def test_arbitrary_arithmetic_is_not_supported():
+    rows = [["a", 6], ["b", 7]]
+    assert not check_answer("The product is 42.", columns=["n", "v"], rows=rows)["faithful"]
+
+
+def test_the_preview_size_is_supported_only_when_given():
+    rows = [[i * 100] for i in range(42)]
+    text = "42 rows came back; the preview lists the first 20."
+    assert check_answer(text, columns=["n"], rows=rows, preview_rows=20)["faithful"]
+    assert not check_answer(text, columns=["n"], rows=rows)["faithful"]
+    assert not check_answer("The preview lists the first 25.", columns=["n"], rows=rows,
+                            preview_rows=20)["faithful"]

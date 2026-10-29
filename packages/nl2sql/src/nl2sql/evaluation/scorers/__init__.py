@@ -60,6 +60,8 @@ class CaseRun(BaseModel):
     retrieval: Optional[Dict[str, List[str]]] = None
     # Mode retrieval: the datasources routing ranked for the question, best first.
     routed: Optional[List[str]] = None
+    # How many rows the answer synthesizer was shown (``results.preview_rows``); None when unknown.
+    preview_rows: Optional[int] = None
 
     @property
     def expected(self) -> str:
