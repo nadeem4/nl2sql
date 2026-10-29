@@ -117,6 +117,7 @@ The share of each answerable case's needed tables and columns that schema retrie
 | --- | --- | --- | --- | --- | --- | --- |
 | chinook | 2026-10-26 | 7c7c915 | 98.8% | 80.5% | 100.0% / 100.0% | tables +0.8 pp, columns +4.0 pp, top-1 +0.0 pp, shortlist +0.0 pp |
 | chinook+support+webanalytics | 2026-10-15 | baaae0c | - | - | 97.4% / 98.7% | new series (suite changed) |
+| pagila | 2026-10-29 | 67236ce | 84.9% | 71.2% | 100.0% / 100.0% | first run |
 
 Full history: [docs/benchmarks.md](docs/benchmarks.md)
 <!-- BENCHMARKS:END -->

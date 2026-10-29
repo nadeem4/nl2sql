@@ -2345,7 +2345,7 @@ A model-free Pagila retrieval baseline on CI (design 17.5).
   `REALDB_EVAL_OUT`, the workflow uploads it as the `eval-pagila` artifact, and `nl2sql eval publish` records it from
   the runner's numbers into `benchmarks/retrieval/pagila/`. The `realdb` path filter now also covers
   `schema_retriever/`, `evaluation/` and that folder, so a retriever change re-runs the baseline.
-- **Baseline.** RESULTS
+- **Baseline** (CI run 40913697461, ubuntu-latest, Python 3.12, local/all-MiniLM-L6-v2; record `benchmarks/retrieval/pagila/2026-10-29_67236ce_retrieval.json`). 29 tables, 11 cases: table recall 84.9%, column recall 71.2%, 7 of 11 cases with every gold table, 6 of 11 with every gold column; 10.4 tables and 32.9 columns sent per case. The floor misses tables by design; the selector's target is 100% (17.7).
 
 ## 14. Bugs Wave C fixes
 
