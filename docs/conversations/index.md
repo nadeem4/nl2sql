@@ -69,7 +69,8 @@ flowchart TD
   turn goes on and the model replies, for example by suggesting a narrower question. Each `ask` step runs on
   its own cancellation token, a child of the turn's, so the timeout never cancels the turn, while cancelling
   the turn (`cancellation_token`, or closing a stream) still stops the step in flight. Only a cancel ends a
-  turn `CANCELLED`.
+  turn `CANCELLED`. After a timeout the old run may still finish its in-flight model call or SQL while the
+  loop goes on, so the next `ask` step can overlap it.
 
 ## Streaming
 

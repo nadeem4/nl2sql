@@ -942,3 +942,27 @@ def test_ask_only_reports_a_timeout_as_pipeline_timeout_not_cancelled(engine, mo
     [turn] = engine.conversations.get(conversation.id, user_context=ANA).turns
     assert turn.steps[0].error["code"] == "PIPELINE_TIMEOUT"
     assert turn.error is None or turn.error["code"] != "CANCELLED"
+
+
+def test_a_token_reused_across_asks_holds_no_step_tokens_afterwards(engine, model, runs):
+    conversation = started(engine)
+    token = CancellationToken()
+    for _ in range(3):
+        model.say(ask("q"), reply("ok"))
+        engine.conversations.ask(conversation.id, "q", user_context=ANA, cancellation_token=token)
+
+    assert token._children == []
+
+
+def test_a_step_that_ends_stopped_through_the_stream_stores_the_turn(engine, model, runs):
+    conversation = started(engine)
+    runs.respond = lambda question, kwargs: result(question, status="stopped",
+                                                    errors=[{"error_code": "RUN_LIMIT_REACHED", "message": "limit"}])
+    model.say(ask("q"))
+
+    events = list(engine.conversations.stream(conversation.id, "q", user_context=ANA))
+
+    assert events[-1].name == "conversation.turn"
+    stored = events[-1].data["stored"]
+    assert stored["status"] == "stopped" and stored["steps"][0]["status"] == "stopped"
+    assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 1

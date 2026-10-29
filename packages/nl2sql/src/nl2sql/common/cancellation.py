@@ -47,6 +47,12 @@ class CancellationToken:
         token.cancel(self.reason)
         return token
 
+    def release(self, child: "CancellationToken") -> None:
+        """Drop a finished child, so a token reused across steps does not hold them all."""
+        with self._lock:
+            if child in self._children:
+                self._children.remove(child)
+
     def is_cancelled(self) -> bool:
         return self._event.is_set()
 

@@ -48,6 +48,17 @@ def test_a_child_is_cancelled_with_its_parent_but_not_the_other_way():
     assert parent.child().is_cancelled(), "a child of a cancelled token starts cancelled"
 
 
+def test_a_released_child_is_dropped_but_a_live_one_still_gets_the_cancel():
+    parent = CancellationToken()
+    done, live = parent.child(), parent.child()
+    parent.release(done)
+    assert parent._children == [live]
+    parent.release(done)  # releasing twice is harmless
+
+    parent.cancel("why")
+    assert live.is_cancelled() and not done.is_cancelled()
+
+
 def test_the_planner_lets_a_cancel_through_instead_of_logging_a_failure(caplog):
     from unittest.mock import MagicMock
     import pytest
