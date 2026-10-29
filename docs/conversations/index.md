@@ -65,6 +65,11 @@ flowchart TD
   a turn of kind `retry`, with no model call.
 - `ask_only(conversation_id, question, user_context=..., choice=None)` runs just the `ask` tool (a turn of
   kind `tool`, no model call) and returns the full `QueryResult` with its rows. MCP's `ask` will use it.
+- A run that times out (`pipeline.timeout_s`) fails only its step, with `error.code` `PIPELINE_TIMEOUT`; the
+  turn goes on and the model replies, for example by suggesting a narrower question. Each `ask` step runs on
+  its own cancellation token, a child of the turn's, so the timeout never cancels the turn, while cancelling
+  the turn (`cancellation_token`, or closing a stream) still stops the step in flight. Only a cancel ends a
+  turn `CANCELLED`.
 
 ## Streaming
 

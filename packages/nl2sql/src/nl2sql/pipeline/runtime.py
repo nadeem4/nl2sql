@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Sequence
 from langchain_core.callbacks import BaseCallbackHandler
 
 from nl2sql.policies import UserContext
-from nl2sql.common.cancellation import CancellationToken
+from nl2sql.common.cancellation import CancellationToken, RunCancelled
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.exceptions import PipelineExecutionError
 from nl2sql.common.dates import run_date
@@ -39,10 +39,6 @@ if TYPE_CHECKING:
 # answer synthesizer's own shape, which is the only place `result_from_state`
 # looks for an answer.
 TIMEOUT_ANSWER = "I apologize, but the request timed out. Please try again with a simpler query."
-
-
-class RunCancelled(Exception):
-    """Raised inside the graph once its run's token is cancelled."""
 
 
 class _StopWhenCancelled(BaseCallbackHandler):

@@ -874,3 +874,71 @@ def test_the_stream_worker_runs_in_the_callers_context(engine, model, runs):
         current_conversation_id.reset(marker)
 
     assert seen == ["caller-context"]
+
+
+# ------------------------------------------------------------------ a timed-out step fails the step, not the turn
+
+def _times_out(question: str, kwargs: Dict[str, Any]) -> QueryResult:
+    """What the runtime does on a pipeline timeout: cancel the token it was given, answer PIPELINE_TIMEOUT."""
+    kwargs["cancellation_token"].cancel()
+    return result(question, status="error",
+                  errors=[{"node": "orchestrator", "message": "Pipeline execution timed out after 1 seconds.",
+                           "error_code": "PIPELINE_TIMEOUT"}])
+
+
+def test_a_timed_out_ask_fails_the_step_and_the_model_still_replies(engine, model, server, runs):
+    conversation = started(engine)
+    runs.respond = _times_out
+    model.say(ask("q"), reply("That question took too long. Try a narrower one."))
+
+    turn = engine.conversations.ask(conversation.id, "q", user_context=ANA)
+
+    assert turn.steps[0].status == "error" and turn.steps[0].error["code"] == "PIPELINE_TIMEOUT"
+    assert len(server.calls) == 2, "the model is asked again after the timed-out step"
+    assert turn.reply == "That question took too long. Try a narrower one."
+    assert (turn.error or {}).get("code") != "CANCELLED"
+    assert turn.status != "error" or turn.error is None
+    assert engine.conversations.get(conversation.id, user_context=ANA).turns == [turn]
+
+
+def test_a_user_cancel_still_reaches_the_steps_run_and_ends_the_turn_cancelled(engine, model, server, runs):
+    conversation = started(engine)
+    token = CancellationToken()
+    seen: List[CancellationToken] = []
+
+    def cancel_during_the_step() -> None:
+        token.cancel()
+        seen.append(runs.calls[-1]["cancellation_token"])
+
+    runs.gate = cancel_during_the_step
+    model.fallback = lambda prompt: ask("q")
+
+    turn = engine.conversations.ask(conversation.id, "q", user_context=ANA, cancellation_token=token)
+
+    assert seen[0].is_cancelled(), "the step's run sees the turn's cancel"
+    assert turn.status == "error" and turn.error["code"] == "CANCELLED"
+
+
+def test_a_timed_out_ask_through_the_stream_stores_the_turn(engine, model, runs):
+    conversation = started(engine)
+    runs.respond = _times_out
+    model.say(ask("q"), reply("It timed out."))
+
+    events = list(engine.conversations.stream(conversation.id, "q", user_context=ANA))
+
+    assert events[-1].name == "conversation.turn"
+    stored = events[-1].data["stored"]
+    assert stored["reply"] == "It timed out." and stored["steps"][0]["error"]["code"] == "PIPELINE_TIMEOUT"
+    assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 1
+
+
+def test_ask_only_reports_a_timeout_as_pipeline_timeout_not_cancelled(engine, model, runs):
+    conversation = started(engine)
+    runs.respond = _times_out
+
+    answer = engine.conversations.ask_only(conversation.id, "q", user_context=ANA)
+
+    assert answer.errors[0]["error_code"] == "PIPELINE_TIMEOUT"
+    [turn] = engine.conversations.get(conversation.id, user_context=ANA).turns
+    assert turn.steps[0].error["code"] == "PIPELINE_TIMEOUT"
+    assert turn.error is None or turn.error["code"] != "CANCELLED"

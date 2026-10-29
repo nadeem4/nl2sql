@@ -340,8 +340,9 @@ class Conversations:
             run.on_step_scope(scope)
         marker = current_conversation_id.set(conversation.id)
         try:
+            # The step's own token: a pipeline timeout cancels it, not the turn's; the turn's cancel reaches it.
             result = queries.run_query(question, datasource_id=conversation.datasource_id, execute=run.execute,
-                                       user_context=run.user, cancellation_token=run.token, scope=scope,
+                                       user_context=run.user, cancellation_token=run.token.child(), scope=scope,
                                        approvals=list(approvals) or None, choice=choice)
         except BaseException as exc:
             if not scope.closed:

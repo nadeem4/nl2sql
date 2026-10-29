@@ -37,6 +37,39 @@ def test_tokens_are_independent():
     assert not b.is_cancelled()
 
 
+def test_a_child_is_cancelled_with_its_parent_but_not_the_other_way():
+    parent = CancellationToken()
+    child, other = parent.child(), parent.child()
+    child.cancel()
+    assert child.is_cancelled() and not parent.is_cancelled() and not other.is_cancelled()
+
+    parent.cancel("why")
+    assert other.is_cancelled() and other.reason == "why"
+    assert parent.child().is_cancelled(), "a child of a cancelled token starts cancelled"
+
+
+def test_the_planner_lets_a_cancel_through_instead_of_logging_a_failure(caplog):
+    from unittest.mock import MagicMock
+    import pytest
+    from nl2sql.common.cancellation import RunCancelled
+    from nl2sql.pipeline.nodes.ast_planner.node import ASTPlannerNode
+    from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+    from nl2sql.pipeline.state import SubgraphExecutionState
+
+    llm = MagicMock()
+    llm.with_structured_output.return_value = llm
+    ctx = fake_runtime(llm_registry=MagicMock())
+    ctx.llm_registry.get_llm.return_value = llm
+    node = ASTPlannerNode(ctx)
+    node.chain = MagicMock()
+    node.chain.invoke.side_effect = RunCancelled("Pipeline cancelled by user.")
+    state = SubgraphExecutionState(trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"))
+
+    with pytest.raises(RunCancelled):
+        node(state)
+    assert not [r for r in caplog.records if r.levelname == "ERROR"], "an expected cancel is not an error"
+
+
 def test_wait_returns_true_only_once_cancelled():
     token = CancellationToken()
     assert token.wait(timeout=0.01) is False
