@@ -6273,6 +6273,13 @@ wide schema takes about 17 minutes on CI's runner, so the test runs on
 PostgreSQL only, and only when <code>REALDB_WIDE_ROUTING</code> is <code>true</code>: the workflow
 sets it nightly, on demand, and on pull requests that change
 <code>nl2sql/indexing/</code> (or the test itself). It skips otherwise.</p>
+<p>Table recall is recorded on Pagila too: <code>tests/realdb/test_pagila_retrieval.py</code>
+indexes it with local embeddings, runs <a href="../../evals/cases/#the-pagila-suite">the Pagila suite</a>
+in mode retrieval (no model, no key, the table selector off) and gates it
+against the newest record in <code>benchmarks/retrieval/pagila/</code>. The workflow
+uploads its report as the <code>eval-pagila</code> artifact, which
+<a href="https://github.com/nadeem4/nl2sql/blob/main/benchmarks/README.md"><code>nl2sql eval publish</code> records</a>
+when the retriever moves on purpose. PostgreSQL only.</p>
 <h2 id="the-realdb-marker-and-fixtures">The <code>realdb</code> marker and fixtures</h2>
 <p>Every test under <code>packages/nl2sql/tests/realdb/</code> is marked <code>realdb</code>. Its
 fixtures find the servers from the environment:</p>

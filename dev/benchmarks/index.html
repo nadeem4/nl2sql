@@ -4448,6 +4448,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#retrieval-recall-pagila-postgres-29-tables-171-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval recall: pagila (postgres, 29 tables / 171 columns)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5876,6 +5887,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#retrieval-recall-pagila-postgres-29-tables-171-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Retrieval recall: pagila (postgres, 29 tables / 171 columns)
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -6224,6 +6246,48 @@ are all among those it keeps. CI's eval-gates job gates on the newest run of eac
 <td>97.4% / 98.7%</td>
 <td>first run</td>
 <td>-</td>
+</tr>
+</tbody>
+</table>
+<h2 id="retrieval-recall-pagila-postgres-29-tables-171-columns">Retrieval recall: pagila (postgres, 29 tables / 171 columns)</h2>
+<p><code>nl2sql eval run --mode retrieval</code>: the share of each answerable case's needed tables and
+columns that schema retrieval sends the planner, with the vector search forced on and no
+LLM. Mean over cases; tables and columns sent are means too. Routing top-1 is the share of
+cases routing ranks one of their datasources first, shortlist the share whose datasources
+are all among those it keeps. CI's eval-gates job gates on the newest run of each suite here.</p>
+<table>
+<thead>
+<tr>
+<th>Date (UTC)</th>
+<th>Commit</th>
+<th>Note</th>
+<th>Dataset</th>
+<th>Schema</th>
+<th>Search</th>
+<th>Embedding</th>
+<th>Cases scored</th>
+<th>Table recall</th>
+<th>Column recall</th>
+<th>Routing top-1 / shortlist</th>
+<th>Δ vs previous</th>
+<th>Tables / columns sent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-10-29 16:42:13</td>
+<td>67236ce</td>
+<td>CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40913697461</td>
+<td>pagila @0332fb60</td>
+<td>@1d07dcde</td>
+<td>k 8 tables / 12 planning</td>
+<td>local/all-MiniLM-L6-v2</td>
+<td>11</td>
+<td>84.9%</td>
+<td>71.2%</td>
+<td>100.0% / 100.0%</td>
+<td>first run</td>
+<td>10.4 / 32.9</td>
 </tr>
 </tbody>
 </table>

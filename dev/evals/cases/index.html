@@ -6128,6 +6128,10 @@ carry the <code>rows</code> that <code>engine.evals.regenerate</code> wrote from
 test bed's Pagila. After you edit a case, point a suite file at the test bed
 and run <code>regenerate</code> again, then review the rows, before a full run. Mode
 retrieval needs no rows.</p>
+<p>CI runs the model-free floor on every pull request that touches the retriever
+(the <code>realdb</code> workflow, <code>tests/realdb/test_pagila_retrieval.py</code>) and gates it
+against the recorded baseline in <code>benchmarks/retrieval/pagila/</code>. The floor has
+no target; it only must not regress.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>retrieval<span class="w"> </span>--suite<span class="w"> </span>pagila.yaml<span class="w"> </span>--out<span class="w"> </span>eval_pagila.json<span class="w">   </span><span class="c1"># no key: the floor, without the table selector</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>nl2sql<span class="w"> </span><span class="nb">eval</span><span class="w"> </span>run<span class="w"> </span>--mode<span class="w"> </span>full<span class="w"> </span>--suite<span class="w"> </span>pagila.yaml<span class="w"> </span>--max-cost<span class="w"> </span><span class="m">5</span><span class="w">                  </span><span class="c1"># with the selector: every gold table should be sent</span>
 </code></pre></div>

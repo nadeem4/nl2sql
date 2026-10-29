@@ -1215,6 +1215,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w5">
+<span class="md-ellipsis">
+      
+        C-W5
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -3990,6 +3999,15 @@
 <span class="md-ellipsis">
       
         C-W4
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w5">
+<span class="md-ellipsis">
+      
+        C-W5
       
     </span>
 </a>
@@ -7690,8 +7708,7 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
     its columns); a term's column keeps the table to that column plus the keys when nothing else named it.&lt;/li&gt;
 &lt;li&gt;The Pagila fixture has the 15 base tables and 7 views (22 tables, still past 15), not the 29 of the smoke run: the
     pinned dump's payment partitions are not in it.&lt;/li&gt;
-&lt;li&gt;The model-free Pagila baseline is a follow-up: neither the &lt;code&gt;realdb&lt;/code&gt; workflow nor the snapshot fixture runs the
-    retrieval mode (it needs the Pagila schema indexed with embeddings), so no floor is recorded.&lt;/li&gt;
+&lt;li&gt;The model-free Pagila baseline was a follow-up row: C-W5.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Review fixes.&lt;/strong&gt; A table an earlier step already chose is never moved to &lt;code&gt;keys_only&lt;/code&gt; by the selector's pick (a
   vector pick over 40 columns was cut to its keys), and a term's columns are kept apart and unioned in last, so no cut
   drops them. The selector's call carries &lt;code&gt;metadata["langgraph_node"] = "table_selector"&lt;/code&gt;, so usage, the Pipeline page
@@ -7704,6 +7721,22 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
   such as "3,094.78"; pagila_005's rows matched the gold rows, so it failed on faithfulness alone; pagila_004 grouped by title with an extra count column; pagila_007's
   monthly totals differ from the gold rows, cause not yet known). C-W4's goal (recall) is met; answer quality on large
   schemas is row C-W6.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="c-w5"&gt;C-W5&lt;/h3&gt;
+&lt;p&gt;A model-free Pagila retrieval baseline on CI (design 17.5).&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Where it runs: the &lt;code&gt;realdb&lt;/code&gt; workflow, not the snapshot fixture.&lt;/strong&gt; The fixture's store is a fake, so it can not
+  measure a vector search, and the record gates on a real index. The test bed's Pagila is already in the workflow, and
+  the wide-schema routing test already indexes with local embeddings there, so one more test costs one index of 29
+  tables and no key. &lt;code&gt;tests/realdb/test_pagila_retrieval.py&lt;/code&gt; (PostgreSQL only) builds a datasource called &lt;code&gt;pagila&lt;/code&gt;
+  (the id the suite names), indexes it, runs &lt;code&gt;pagila.yaml&lt;/code&gt; in mode retrieval (selector off, steps 1, 2 and 4) and
+  gates the report against &lt;code&gt;benchmarks/&lt;/code&gt; with &lt;code&gt;engine.evals.gate&lt;/code&gt;. A series break or a regression fails it, as
+  &lt;code&gt;nl2sql eval run --baseline benchmarks&lt;/code&gt; does in the &lt;code&gt;eval-gates&lt;/code&gt; job.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Recording.&lt;/strong&gt; As for every CI baseline (&lt;code&gt;benchmarks/README.md&lt;/code&gt;, "The recording rule"): the test writes its report to
+  &lt;code&gt;REALDB_EVAL_OUT&lt;/code&gt;, the workflow uploads it as the &lt;code&gt;eval-pagila&lt;/code&gt; artifact, and &lt;code&gt;nl2sql eval publish&lt;/code&gt; records it from
+  the runner's numbers into &lt;code&gt;benchmarks/retrieval/pagila/&lt;/code&gt;. The &lt;code&gt;realdb&lt;/code&gt; path filter now also covers
+  &lt;code&gt;schema_retriever/&lt;/code&gt;, &lt;code&gt;evaluation/&lt;/code&gt; and that folder, so a retriever change re-runs the baseline.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Baseline&lt;/strong&gt; (CI run 40913697461, ubuntu-latest, Python 3.12, local/all-MiniLM-L6-v2; record &lt;code&gt;benchmarks/retrieval/pagila/2026-10-29_67236ce_retrieval.json&lt;/code&gt;). 29 tables, 11 cases: table recall 84.9%, column recall 71.2%, 7 of 11 cases with every gold table, 6 of 11 with every gold column; 10.4 tables and 32.9 columns sent per case. The floor misses tables by design; the selector's target is 100% (17.7).&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
@@ -7954,9 +7987,9 @@ traced to its cause.&lt;/p&gt;
 &lt;li&gt;&lt;strong&gt;Retrieval mode stays model-free&lt;/strong&gt;, as its docstring says (glossary matching is an embedding search, not a model
   call), so a CI baseline needs no key: &lt;code&gt;RETRIEVAL_CHANGES&lt;/code&gt; in &lt;code&gt;retrieval_recall.py&lt;/code&gt; also sets
   &lt;code&gt;settings.retrieval.table_selector&lt;/code&gt; to false, &lt;code&gt;retrieval_settings()&lt;/code&gt; reports it, and the run covers steps 1, 2 and
-  4 and records the floor without the model. The floor has no target; it is a baseline. Whether the Pagila retrieval record can run on CI
-  (it needs the Pagila schema indexed) is the builder's call: through the &lt;code&gt;realdb&lt;/code&gt; workflow, or from the snapshot
-  fixture. If neither fits in this PR, the suite ships and the baseline is a follow-up row.&lt;/li&gt;
+  4 and records the floor without the model. The floor has no target; it is a baseline. It runs through the &lt;code&gt;realdb&lt;/code&gt;
+  workflow (C-W5): &lt;code&gt;tests/realdb/test_pagila_retrieval.py&lt;/code&gt; indexes the test bed's Pagila with local embeddings, runs
+  the suite in mode retrieval and gates it against the newest &lt;code&gt;benchmarks/retrieval/pagila/&lt;/code&gt; record.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;An end-to-end run with the model&lt;/strong&gt; on the test bed's Pagila (the suite, with the selector on) is run once by the
   owner with a key, after the PR is green. The target is every gold table sent for every question; a miss is
   investigated through the trace's per-table steps before the row is closed. The results go in the built note. It
