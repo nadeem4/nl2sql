@@ -2296,6 +2296,9 @@ join-path fill and the eval wiring they need.
   connecting.
 - **Mode retrieval** is still model-free: `RETRIEVAL_CHANGES` also sets `settings.retrieval.table_selector` to false and
   `retrieval_settings()` reports it and `join_path_max_hops`.
+- **Suite** (`evaluation/suites/pagila.yaml`, the second PR). 11 approved cases over the test bed's Pagila, gold SQL and
+  tables, the smoke question first. `test_pagila_suite_reads_the_tables_it_names` parses each gold SQL with sqlglot and
+  holds `tables` equal to the tables it reads. The cases have no `rows`: `regenerate` writes them against the test bed.
 - **Tests.** `tests/unit/test_table_recall.py` (the smoke question, per-table steps, join path alone, hop limit, a
   view with no key, bridge columns, selector columns up to and past 40, a hidden table in the catalog, the result and a
   path, a raising selector, an unknown name, an empty pick, glossary tables with no selector, the prompt, the catalog
@@ -2320,9 +2323,8 @@ join-path fill and the eval wiring they need.
   drops them. The selector's call carries `metadata["langgraph_node"] = "table_selector"`, so usage, the Pipeline page
   and `models_by_node` attribute it to its own step. Each trace table also carries `qualified`, so two schemas with one
   table name stay apart. `test_schema_retriever_keys.py` now uses the shared Pagila fixture.
-- **Still to do.** The Pagila suite (second PR). Then the owner's keyed run on the test bed's Pagila with the selector
-  on (17.5): regenerate the suite's rows, run mode full, and for any gold table not sent read the trace's per-table
-  `steps` before closing B106.
+- **Still to do (owner).** The keyed run on the test bed's Pagila with the selector on (17.5): regenerate the suite's
+  rows, run mode full, and for any gold table not sent read the trace's per-table `steps` before closing B106.
 
 ## 14. Bugs Wave C fixes
 

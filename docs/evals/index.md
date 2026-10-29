@@ -5,8 +5,10 @@ write **cases** (a question, what each role should get, and the SQL a person
 reviewed) in **suite** files. A run asks every case once per role and scores it
 with registered **scorers**, and the result is an `EvalReport`.
 
-The package ships one suite, Chinook's 47 gold cases, and
-`nl2sql init --demo` copies it next to the demo's `nl2sql.yaml`. The format
+The package ships one answer suite for the demo, Chinook's 47 gold cases, and
+`nl2sql init --demo` copies it next to the demo's `nl2sql.yaml`. (It also
+ships routing and clarify suites, and a Pagila suite for table recall on the
+test bed: [Cases and suites](cases.md#the-pagila-suite).) The format
 is in [Cases and suites](cases.md), and what makes a case pass is in
 [Scorers](scorers.md). To build a suite for your own database, seed draft
 cases from its schema and review them ([Benchmark your own database](seeding.md)).

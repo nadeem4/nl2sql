@@ -1,0 +1,252 @@
+# The Pagila table-recall suite: 11 hand-written cases over the test bed's Pagila database
+# (docs/testing/test-bed.md), a schema past full_snapshot_max_tables, where the retriever
+# has to choose tables (wave_c.md, section 17, C-W4).
+#
+# Each case is chosen so a table it needs is more than one join from the others, or the
+# question's words are not near the table's name ("revenue" is not near payment, "spent" is
+# not near payment, "rented" is not near inventory). tables and columns are what the gold
+# sql reads, taken from the sql and checked by hand; test_pagila_suite_reads_the_tables_it_names
+# keeps the two equal. The measure is retrieval_recall: every gold table reaches the planner.
+#
+# The datasource is named pagila. rows are never typed by hand: before a full-mode run,
+# point this suite at the test bed and run engine.evals.regenerate, then review the rows.
+# Mode retrieval needs no rows. A new accepted answer is a reviewed alt_sql, then regenerate;
+# never an edit to rows.
+
+version: 1
+cases:
+
+- id: pagila_001
+  question: Top 5 films by revenue in the top category
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [film, film_category, category, inventory, rental, payment]
+  columns: [film.title, category.name, payment.amount]
+  order_matters: true
+  sql: |
+    WITH top_category AS (
+      SELECT fc.category_id
+      FROM payment p
+      JOIN rental r ON r.rental_id = p.rental_id
+      JOIN inventory i ON i.inventory_id = r.inventory_id
+      JOIN film_category fc ON fc.film_id = i.film_id
+      GROUP BY fc.category_id
+      ORDER BY SUM(p.amount) DESC, fc.category_id
+      LIMIT 1
+    )
+    SELECT f.title, c.name AS category, SUM(p.amount) AS revenue
+    FROM payment p
+    JOIN rental r ON r.rental_id = p.rental_id
+    JOIN inventory i ON i.inventory_id = r.inventory_id
+    JOIN film f ON f.film_id = i.film_id
+    JOIN film_category fc ON fc.film_id = f.film_id
+    JOIN category c ON c.category_id = fc.category_id
+    WHERE fc.category_id = (SELECT category_id FROM top_category)
+    GROUP BY f.film_id, f.title, c.name
+    ORDER BY revenue DESC, f.title
+    LIMIT 5
+
+- id: pagila_002
+  question: Which five customers from Canada have spent the most?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [customer, address, city, country, payment]
+  columns: [country.country, payment.amount, customer.last_name]
+  order_matters: true
+  sql: |
+    SELECT cu.first_name, cu.last_name, SUM(p.amount) AS total_spent
+    FROM customer cu
+    JOIN address a ON a.address_id = cu.address_id
+    JOIN city ci ON ci.city_id = a.city_id
+    JOIN country co ON co.country_id = ci.country_id
+    JOIN payment p ON p.customer_id = cu.customer_id
+    WHERE co.country = 'Canada'
+    GROUP BY cu.customer_id, cu.first_name, cu.last_name
+    ORDER BY total_spent DESC, cu.customer_id
+    LIMIT 5
+
+- id: pagila_003
+  question: Which five actors are in the most rented films?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [actor, film_actor, inventory, rental]
+  columns: [actor.last_name, rental.rental_id]
+  order_matters: true
+  sql: |
+    SELECT a.first_name, a.last_name, COUNT(r.rental_id) AS rentals
+    FROM actor a
+    JOIN film_actor fa ON fa.actor_id = a.actor_id
+    JOIN inventory i ON i.film_id = fa.film_id
+    JOIN rental r ON r.inventory_id = i.inventory_id
+    GROUP BY a.actor_id, a.first_name, a.last_name
+    ORDER BY rentals DESC, a.actor_id
+    LIMIT 5
+
+- id: pagila_004
+  question: Which films have never been rented?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: medium
+  tags: [table-recall, anti-join]
+  outcome: {admin: allowed}
+  tables: [film, inventory, rental]
+  columns: [film.title]
+  order_matters: true
+  sql: |
+    SELECT f.title
+    FROM film f
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM inventory i
+      JOIN rental r ON r.inventory_id = i.inventory_id
+      WHERE i.film_id = f.film_id
+    )
+    ORDER BY f.title
+
+- id: pagila_005
+  question: What are the five most rented film categories?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [category, film_category, inventory, rental]
+  columns: [category.name, rental.rental_id]
+  order_matters: true
+  sql: |
+    SELECT c.name, COUNT(r.rental_id) AS rentals
+    FROM category c
+    JOIN film_category fc ON fc.category_id = c.category_id
+    JOIN inventory i ON i.film_id = fc.film_id
+    JOIN rental r ON r.inventory_id = i.inventory_id
+    GROUP BY c.category_id, c.name
+    ORDER BY rentals DESC, c.name
+    LIMIT 5
+
+- id: pagila_006
+  question: How many rentals were returned late?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [rental, inventory, film]
+  columns: [rental.return_date, rental.rental_date, film.rental_duration]
+  order_matters: false
+  sql: |
+    SELECT COUNT(*) AS late_rentals
+    FROM rental r
+    JOIN inventory i ON i.inventory_id = r.inventory_id
+    JOIN film f ON f.film_id = i.film_id
+    WHERE r.return_date > r.rental_date + f.rental_duration * INTERVAL '1 day'
+
+- id: pagila_007
+  question: What was the total revenue in each month?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: medium
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [payment]
+  columns: [payment.amount, payment.payment_date]
+  order_matters: true
+  sql: |
+    SELECT DATE_TRUNC('month', payment_date) AS month, SUM(amount) AS revenue
+    FROM payment
+    GROUP BY 1
+    ORDER BY 1
+
+- id: pagila_008
+  question: How many different customers have rented a Horror film?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [customer, rental, inventory, film_category, category]
+  columns: [category.name, customer.customer_id]
+  order_matters: false
+  sql: |
+    SELECT COUNT(DISTINCT cu.customer_id) AS customers
+    FROM customer cu
+    JOIN rental r ON r.customer_id = cu.customer_id
+    JOIN inventory i ON i.inventory_id = r.inventory_id
+    JOIN film_category fc ON fc.film_id = i.film_id
+    JOIN category ca ON ca.category_id = fc.category_id
+    WHERE ca.name = 'Horror'
+
+- id: pagila_009
+  question: Which Sports films does store 1 carry?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: medium
+  tags: [table-recall]
+  outcome: {admin: allowed}
+  tables: [film, film_category, category, inventory]
+  columns: [film.title, category.name, inventory.store_id]
+  order_matters: true
+  sql: |
+    SELECT DISTINCT f.title
+    FROM film f
+    JOIN film_category fc ON fc.film_id = f.film_id
+    JOIN category c ON c.category_id = fc.category_id
+    JOIN inventory i ON i.film_id = f.film_id
+    WHERE c.name = 'Sports' AND i.store_id = 1
+    ORDER BY f.title
+
+- id: pagila_010
+  question: How many different cities do our customers live in?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: medium
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [customer, address, city]
+  columns: [city.city]
+  order_matters: false
+  sql: |
+    SELECT COUNT(DISTINCT ci.city) AS cities
+    FROM customer cu
+    JOIN address a ON a.address_id = cu.address_id
+    JOIN city ci ON ci.city_id = a.city_id
+
+- id: pagila_011
+  question: Which five actors' films have brought in the most payments?
+  datasources: [pagila]
+  status: approved
+  origin: hand
+  difficulty: hard
+  tags: [table-recall, aggregation]
+  outcome: {admin: allowed}
+  tables: [actor, film_actor, inventory, rental, payment]
+  columns: [actor.last_name, payment.amount]
+  order_matters: true
+  sql: |
+    SELECT a.first_name, a.last_name, SUM(p.amount) AS revenue
+    FROM actor a
+    JOIN film_actor fa ON fa.actor_id = a.actor_id
+    JOIN inventory i ON i.film_id = fa.film_id
+    JOIN rental r ON r.inventory_id = i.inventory_id
+    JOIN payment p ON p.rental_id = r.rental_id
+    GROUP BY a.actor_id, a.first_name, a.last_name
+    ORDER BY revenue DESC, a.actor_id
+    LIMIT 5
