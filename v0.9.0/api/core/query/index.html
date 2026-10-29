@@ -1,0 +1,7319 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Reference documentation for the NL2SQL engine, CLI and REST API">
+      
+      
+        <meta name="author" content="Platform Engineering">
+      
+      
+      
+        <link rel="prev" href="../policies/">
+      
+      
+        <link rel="next" href="../results/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Query - NL2SQL Platform</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#query-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NL2SQL Platform" class="md-header__button md-logo" aria-label="NL2SQL Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Query
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../getting_started/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../conversations/" class="md-tabs__link">
+          
+  
+  
+  Conversations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../charts/" class="md-tabs__link">
+          
+  
+  
+  Charts
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../dashboards/" class="md-tabs__link">
+          
+  
+  
+  Dashboards
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../configuration/system/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../adapters/" class="md-tabs__link">
+          
+  
+  
+  Adapters
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../schema/store/" class="md-tabs__link">
+          
+  
+  
+  Schema
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../execution/isolation/" class="md-tabs__link">
+          
+  
+  
+  Execution
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../storage/artifact-store/" class="md-tabs__link">
+          
+  
+  
+  Storage
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../observability/stack/" class="md-tabs__link">
+          
+  
+  
+  Observability
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../security/model/" class="md-tabs__link">
+          
+  
+  
+  Security
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../deployment/architecture/" class="md-tabs__link">
+          
+  
+  
+  Deployment
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../development/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../evals/" class="md-tabs__link">
+          
+  
+  
+  Evals
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../testing/architecture/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+  API
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../releases/" class="md-tabs__link">
+          
+  
+  
+  Releases
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../glossary/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NL2SQL Platform" class="md-nav__button md-logo" aria-label="NL2SQL Platform" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NL2SQL Platform
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/graph_state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/determinism/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/invariants/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/failure_recovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/curated_answers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Answers (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/configuration_v2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration v2 (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/phase2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Phase 2 (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/wave_a/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wave A (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/wave_b/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wave B (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/wave_c/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wave C (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/wave_d/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wave D (design)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/subgraphs/main_pipeline_graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/subgraphs/sql_agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/answer_synthesizer_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/ast_planner_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/clarifier_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/curated_matcher_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/datasource_resolver_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/decomposer_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/engine_aggregator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/executor_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/generator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/logical_validator_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/refiner_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nodes/schema_retriever_node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/pypi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/source/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/mcp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting_started/launch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Launch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Conversations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../conversations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../conversations/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chat tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Charts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../charts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../charts/diagrams/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagrams
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Dashboards
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/datasources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/hooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/secrets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/curated/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/knowledge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/settings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/observers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API settings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/sdk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/sqlalchemy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/mssql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/mysql/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/postgres/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adapters/sqlite/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../schema/store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../schema/drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../schema/profiler/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema Profiler
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../execution/isolation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../storage/artifact-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../observability/stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../observability/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../observability/debugging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../observability/feedback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../observability/error-handling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../security/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../security/multi-tenant/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../security/api-keys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deployment/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deployment/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deployment/kubernetes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../deployment/hosted-demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_15" >
+        
+          
+          <label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_15_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_15">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../extensions/add-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../extensions/add-chunk-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../extensions/extend-planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../extensions/add-execution-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_16" >
+        
+          
+          <label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_16_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_16">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Evals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evals/cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cases and Suites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evals/scorers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scorers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../evals/seeding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/evaluation-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The Chinook Suite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_17" >
+        
+          
+          <label class="md-nav__link" for="__nav_17" id="__nav_17_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_17">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/test-bed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Real-Database Test Bed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_18" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_18" id="__nav_18_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_18_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_18">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_18_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_18_2" id="__nav_18_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_18_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_18_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../public-facade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasource/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public Surface
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Public Surface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nl2sqlrun_query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NL2SQL.run_query
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NL2SQL.run_query">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-a-plan-you-hold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running a plan you hold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-without-an-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running without an answer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queryresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QueryResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clarification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clarification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asking-again" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking again
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nl2sqlstream_query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NL2SQL.stream_query
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-runs-saved-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a run's saved results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading a run&#39;s saved results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subqueryresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SubQueryResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rowsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RowSample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-tokens-calls-and-model-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage: tokens, calls and model time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conversations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_18_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_18_3" id="__nav_18_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_18_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_18_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/query/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/datasource/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rest/indexing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.9.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.9.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.8.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.8.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.7.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.7.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.6.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.6.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.5.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.5.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.4.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.4.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.4.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.4.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.3.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.3.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.2.4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.2.4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.2.3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.2.3
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.2.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.2.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.2.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.2.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.2.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.2.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.1.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.1.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../releases/0.1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    0.1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../glossary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Modules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#public-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public Surface
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Public Surface">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nl2sqlrun_query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NL2SQL.run_query
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NL2SQL.run_query">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#running-a-plan-you-hold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running a plan you hold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-without-an-answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running without an answer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#approval" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approval
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution Lifecycle
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Execution Lifecycle">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#queryresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QueryResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clarification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clarification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#asking-again" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking again
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warnings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#explanation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explanation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming a run
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Streaming a run">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nl2sqlstream_query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NL2SQL.stream_query
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-a-runs-saved-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reading a run's saved results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Reading a run&#39;s saved results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subqueryresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SubQueryResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rowsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RowSample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usage-tokens-calls-and-model-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage: tokens, calls and model time
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="query-api">Query API</h1>
+<h2 id="purpose">Purpose</h2>
+<p>Answer a question with the NL2SQL pipeline: <code>engine.run_query</code>,
+<code>engine.stream_query</code>, and <code>engine.results</code> to read back what a run saved.</p>
+<h2 id="responsibilities">Responsibilities</h2>
+<ul>
+<li>Invoke pipeline graph runtime.</li>
+<li>Return a structured <code>QueryResult</code>, or the run as events.</li>
+<li>Read a run's saved results by its <code>trace_id</code>.</li>
+</ul>
+<h2 id="key-modules">Key Modules</h2>
+<ul>
+<li><code>packages/nl2sql/src/nl2sql/public_api.py</code> (<code>NL2SQL.run_query</code>, <code>NL2SQL.stream_query</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/query_api.py</code> (<code>QueryResult</code>, <code>result_from_state</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/api/results_api.py</code> (<code>ResultsAPI</code>, internal)</li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/runtime.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/graph.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/state.py</code></li>
+</ul>
+<h2 id="public-surface">Public Surface</h2>
+<h3 id="nl2sqlrun_query">NL2SQL.run_query</h3>
+<p>Source:
+<code>packages/nl2sql/src/nl2sql/public_api.py</code>, <code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
+<p>Signature:
+<code>run_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True) -&gt; QueryResult</code></p>
+<p>Every argument after the question is keyword-only. <code>run_query</code> passes the runtime's artifact store to <code>result_from_state</code>, so each
+sub-query carries a capped row sample alongside its artifact reference.</p>
+<p>Parameters:
+| name | type | required | meaning |
+| --- | --- | --- | --- |
+| <code>question</code> | <code>str</code> | yes | The question, in plain language. |
+| <code>datasource_id</code> | <code>Optional[str]</code> | no | Datasource override; otherwise resolved. |
+| <code>execute</code> | <code>bool</code> | no | Whether to execute SQL against datasource. |
+| <code>user_context</code> | <code>Optional[UserContext]</code> | no | RBAC context. Omitted (or <code>None</code>), the run starts with an empty <code>UserContext</code>, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
+| <code>cancellation_token</code> | <code>Optional[CancellationToken]</code> | no | A token (<code>from nl2sql import CancellationToken</code>) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one <code>CANCELLED</code> error. The playground cancels it when the browser drops the request. |
+| <code>plan</code> | <code>Optional[SuppliedPlan]</code> | no | A plan the caller holds (<code>from nl2sql import SuppliedPlan</code>): a whole run (<code>decomposition</code> and <code>plans</code>), or a verified query (<code>verified</code> and <code>verified_datasource_id</code>). See <a href="#running-a-plan-you-hold">Running a plan you hold</a>. A <code>datasource_id</code> passed with it must be the datasource of every sub-query of the plan, or the call raises <code>ValueError</code> before anything runs. |
+| <code>approvals</code> | <code>Optional[Sequence[Approval]]</code> | no | Approvals for an earlier run's <code>approvals_needed</code>. See <a href="#approval">Approval</a>. |
+| <code>clarify</code> | <code>bool</code> | no | Default <code>True</code>: a question the planner reads two or three ways ends <code>needs_clarification</code> with the options instead of running the most likely one. <code>False</code> runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See <a href="#clarification">Clarification</a>. |
+| <code>choice</code> | <code>Optional[ClarificationChoice]</code> | no | The caller's pick from an earlier run's <code>clarification</code> (<code>from nl2sql import ClarificationChoice</code>: <code>request</code>, <code>option_id</code>). Ask the same question as the same caller: the chosen option's plan runs through the validator and the generator without routing, decomposing or planning. See <a href="#asking-again">Asking again</a>. Not with <code>plan</code> or <code>approvals</code>. |
+| <code>answer</code> | <code>bool</code> | no | Default <code>True</code>. <code>False</code> skips the answer synthesizer: the run ends at the aggregator, <code>final_answer</code> is <code>None</code> and no model is called to write prose. With <code>plan=</code> that is a run with no model call at all, which is how a dashboard refresh re-runs a stored plan. The rows, the SQL and the explanation are the same. See <a href="#running-without-an-answer">Running without an answer</a>. |</p>
+<h4 id="running-a-plan-you-hold">Running a plan you hold</h4>
+<p><code>run_query(question, plan=SuppliedPlan(...))</code> runs a plan without routing or
+planning: the curated matcher, the datasource resolver, the decomposer and
+the planner's model call are skipped. A <code>SuppliedPlan</code> is a whole run, shaped
+on the pinned run the approval re-run uses, and is exactly one of:</p>
+<ul>
+<li><code>decomposition</code> (a <code>DecomposerResponse</code>, its combine groups and post-combine
+  steps included) and <code>plans</code>, the plan of <strong>every</strong> sub-query keyed by its
+  id; or</li>
+<li><code>verified</code> (a <code>VerifiedRef</code>: the verified query's id and its bound <code>params</code>)
+  and <code>verified_datasource_id</code>.</li>
+</ul>
+<p><code>SuppliedPlan.for_sub_query(sub_query, plan)</code> is the common case, one
+sub-query run standalone. A plan missing for a sub-query, a plan for a
+sub-query that is not there, or both forms at once is a <code>ValidationError</code>
+when the <code>SuppliedPlan</code> is built. What is not skipped:</p>
+<ul>
+<li>Every datasource of the decomposition is checked against <code>user_context</code>'s
+  scope, as the resolver would; a datasource the caller may not read ends the
+  run with <code>SECURITY_VIOLATION</code> before anything runs.</li>
+<li>The plan passes the <code>plan.after</code> hooks, the logical validator (so a table
+  outside the caller's scope is refused) and the generator, like any plan.</li>
+<li>It is never written to the plan cache, and a validator failure ends the
+  sub-query with the validator's error: the refiner is never asked for a
+  different plan. A database error is not retried either.</li>
+</ul>
+<p>The sub-query's <code>plan_source</code> is <code>"supplied"</code>. The question is still asked:
+the answer is written for it (unless <code>answer=False</code>). The same entry serves
+the approved re-run (<code>"approved"</code>) and, in Wave B, a plan the asker chose
+(<code>"chosen"</code>).</p>
+<p>A supplied verified query is run by the curated matcher with its values, and
+it never falls back to a model run (a dashboard refresh uses no tokens). The
+call raises <code>ValueError</code>, before anything runs, when no curated file with a
+verified query is loaded, or <code>datasource_id</code> is not <code>verified_datasource_id</code>.
+With <code>execute=False</code> the matcher checks the query (the caller's scope, its
+values, every table it reads) and runs nothing: the run ends <code>plan_only</code>, or
+with the error below (a dashboard's access check). Where an approved pin would fall back to
+generation, a supplied one ends the run with an error and makes no model call:
+<code>SECURITY_VIOLATION</code> (the role may not read the datasource or a table the query
+reads), <code>EXECUTION_FAILED</code> (the query failed) or <code>INVALID_STATE</code> (an unknown
+query id, or a value that is missing or out of bounds).</p>
+<h4 id="running-without-an-answer">Running without an answer</h4>
+<p><code>run_query(question, plan=plan, answer=False, user_context=...)</code> is a run with
+no model call. It is how a stored plan is re-run to refresh a chart: the graph
+is built without the answer synthesizer, so the run ends at the aggregator and
+<code>final_answer</code> is <code>None</code> (a stopped or timed-out run too: it has no stop text),
+<code>timings</code> has no <code>answer_synthesizer</code> and a streamed run emits no
+<code>answer.delta</code>. <code>answer</code> is recorded in the trace's <code>request</code>, so a replay runs
+the same graph. On its own, <code>answer=False</code> still routes, decomposes and plans
+with the models; pair it with <code>plan=</code> for a run that calls none.</p>
+<p>Hooks still apply. While a hook is attached at <code>answer.after</code>, a model-free step
+runs it with <code>final_answer=None</code>, so a <code>Deny</code> withholds the rows and the result
+manifest as it does after an answer, and <code>stream_query</code> sends the
+<code>result.manifest</code> event only once the hook has allowed it.</p>
+<h4 id="approval">Approval</h4>
+<p>A hook at <code>execute.before</code> may answer <code>NeedsApproval(reason)</code>. The run then
+ends with <code>status: "needs_approval"</code>, the error <code>NEEDS_APPROVAL</code> and one
+<code>ApprovalRequest</code> per pending sub-query in <code>approvals_needed</code>: the question,
+the asker's <code>user_id</code> and <code>tenant_id</code>, the hook, the datasource, the run's
+decomposition, the sub-query and its plan (or, on the verified path, the
+verified query's id and values), the SQL and its SHA-256, the reason, and the
+roles that may approve (for display). Its <code>id</code> is a SHA-256 over a fixed list
+of those fields (<code>REQUEST_ID_FIELDS</code>: all but the reason and the roles), each
+without the values it holds at their defaults, so an edit shows, the same
+request always has the same id, and a field added in a later version keeps
+the ids of requests an app stored before.</p>
+<p>An approver re-runs the question as the asker:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">asker</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"needs_approval"</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">approvals</span> <span class="o">=</span> <span class="p">[</span><span class="n">Approval</span><span class="p">(</span><span class="n">request</span><span class="o">=</span><span class="n">r</span><span class="p">,</span> <span class="n">by</span><span class="o">=</span><span class="n">approver</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">approvals_needed</span><span class="p">]</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">asker</span><span class="p">,</span> <span class="n">approvals</span><span class="o">=</span><span class="n">approvals</span><span class="p">)</span>
+</code></pre></div>
+<p>The engine, not the hook, checks each approval. An approval pins nothing when
+its request was edited (its <code>id</code> no longer matches), its <code>sql</code> is not the SQL
+of its <code>sql_sha256</code> (the SQL an approver reads is the SQL whose hash is
+checked), it is for another question or another asker, its hook is not
+configured, or <code>by</code> holds none of that hook's approver roles. Then the run
+plans as usual and the hook asks again. Otherwise the re-run takes the
+request's decomposition and plan (<code>plan_source: "approved"</code>, no resolver,
+decomposer or planner call) and validates and generates the SQL again. At <code>execute.before</code> the approval
+counts as the hook's <code>Allow</code> only when it is for that hook and datasource,
+the hash of the SQL just generated equals the request's (and, on the verified
+path, the values are the same), and <code>by</code> holds one of the hook's configured
+<code>approver_roles</code> (by default <code>policies.admin_roles</code>), never the roles the
+request lists. Then the next hook still runs. Anything else asks again: the
+run ends <code>needs_approval</code> with a new request. Nothing is stored, and an
+<code>Approval</code> is not signed and does not expire: it is trusted as far as the
+<code>user_context</code> a caller passes. See <a href="../../../configuration/hooks/#approval">Hooks</a>.</p>
+<p>Returns:
+<code>QueryResult</code>, built from the pipeline graph state by <code>result_from_state</code>.</p>
+<p>Raises:
+No exceptions are raised by <code>run_query</code>; errors are returned in <code>QueryResult.errors</code>.</p>
+<p>Side Effects:
+- Pipeline execution, LLM calls, optional database execution.</p>
+<p>Idempotency:
+- Not guaranteed; execution can depend on external systems and time.</p>
+<h2 id="execution-lifecycle">Execution Lifecycle</h2>
+<ul>
+<li>Use the caller's <code>CancellationToken</code>, or create one per run, and install signal / Ctrl+X handlers bound to it.</li>
+<li>Pass the graph a callback that raises <code>RunCancelled</code> at the next node start or model call once the token is cancelled.</li>
+<li>Build LangGraph pipeline from <code>build_graph</code>.</li>
+<li>Execute graph in thread pool with timeout.</li>
+<li>On timeout/cancel, return <code>PipelineError</code> with appropriate <code>ErrorCode</code>.</li>
+</ul>
+<h3 id="queryresult">QueryResult</h3>
+<p>Source:
+<code>packages/nl2sql/src/nl2sql/api/query_api.py</code></p>
+<p>Fields:
+| name | type | required | meaning |
+| --- | --- | --- | --- |
+| <code>sub_queries</code> | <code>List[SubQueryResult]</code> | no | One entry per decomposed sub-query. |
+| <code>final_answer</code> | <code>Optional[Dict[str, Any]]</code> | no | Answer synthesizer payload (<code>summary</code>, <code>format_type</code>, <code>content</code>, <code>warnings</code>, and <code>truncated</code>: True when a result was cut at the row limit). |
+| <code>errors</code> | <code>List[Dict[str, Any]]</code> | no | Pipeline errors (<code>node</code>, <code>message</code>, <code>error_code</code>, <code>severity</code>, <code>provider</code>, <code>provider_response</code>). <code>provider</code> and <code>provider_response</code> are set for a <code>PROVIDER_*</code> code and <code>null</code> otherwise; see <a href="../../../observability/error-handling/#provider-failures">provider failures</a>. |
+| <code>trace_id</code> | <code>str</code> | no | Trace identifier. |
+| <code>reasoning</code> | <code>List[Dict[str, Any]]</code> | no | Reasoning events/logs. |
+| <code>warnings</code> | <code>List[RunWarning]</code> | no | What the answer should say without failing the run. See <a href="#warnings">Warnings</a>. |
+| <code>artifact_refs</code> | <code>Dict[str, ArtifactRef]</code> | no | Result artifact references keyed by execution node id. |
+| <code>status</code> | <code>Optional[RunStatus]</code> | no | <code>"success"</code>, <code>"plan_only"</code>, <code>"error"</code>, <code>"needs_approval"</code>, <code>"stopped"</code>, <code>"needs_clarification"</code>, or <code>None</code> when nothing ran and nothing failed. See below. |
+| <code>timings</code> | <code>Dict[str, float]</code> | no | Wall-clock seconds per graph node, plus <code>LangGraph</code> for the whole run. |
+| <code>usage</code> | <code>QuestionUsage</code> | no | LLM calls, tokens and model time per node and for the whole question. See below. |
+| <code>trace_path</code> | <code>Optional[str]</code> | no | Where this run's trace file was written, or <code>None</code> when <code>TRACE_MODE</code> did not write one. See <a href="../../../observability/debugging/">Debugging a Run</a>. |
+| <code>truncated</code> | <code>bool</code> | no | True when any sub-query's result reached its row limit, so rows may be missing. See <code>sub_queries[].truncated</code>. |
+| <code>result_manifest</code> | <code>List[ResultSummary]</code> | no | The run's saved results, one per terminal DAG node (<code>node_id</code>, <code>columns</code>, <code>row_count</code>, <code>truncated</code>, <code>column_kinds</code>): the manifest the aggregator writes beside them. <code>column_kinds</code> maps a column to its type category (<code>number</code>, <code>text</code>, <code>temporal</code>, <code>boolean</code>, <code>other</code>); the aggregator fills it from the saved file's column types, so <code>engine.results.chart</code> can choose a chart without reading rows. Never the rows; see <a href="#reading-a-runs-saved-results">Reading a run's saved results</a>. Empty when nothing was saved. |
+| <code>source</code> | <code>AnswerSource</code> | no | Where the answer came from: <code>type</code> <code>"verified"</code> with the verified query's <code>id</code>, <code>datasource_id</code> and the <code>params</code> it ran with, or <code>type</code> <code>"generated"</code> with the other fields <code>None</code>. See <a href="../../../configuration/curated/#what-happens-at-question-time">Curated answers</a>. |
+| <code>stop</code> | <code>Optional[RunStop]</code> | no | Set when <code>status</code> is <code>"stopped"</code>: the <code>limit</code> the run reached (<code>max_llm_calls</code> or <code>max_cost_usd</code>), its configured <code>value</code>, and what was <code>spent</code>. |
+| <code>approvals_needed</code> | <code>List[ApprovalRequest]</code> | no | Set when <code>status</code> is <code>"needs_approval"</code>: one request per sub-query a hook asked a person to approve, with the SQL, its SHA-256, the reason and the asker. Re-run the question with an <code>Approval</code> for each. |
+| <code>clarification</code> | <code>Optional[ClarificationRequest]</code> | no | Set when <code>status</code> is <code>"needs_clarification"</code>: the phrase, and two or three readings, each a label, a validated plan and its explanation. See <a href="#clarification">Clarification</a>. |
+| <code>explanation</code> | <code>Optional[Explanation]</code> | no | The run's plan in plain English, rendered from the typed plans with no model call: one step per sub-query with its tables, joins, filters, groupings, measures, order, glossary terms, rules and assumptions; a verified answer is one step naming the verified query. Only steps that passed validation are explained (a <code>success</code> or <code>plan_only</code> run's, and the successful steps of a partly failed one); <code>None</code> when no step did, when a hook ended the run, or when it cannot be rendered. See <a href="#explanation">Explanation</a>. |
+| <code>decomposition</code> | <code>Optional[DecomposerResponse]</code> | no | The run's whole decomposition (sub-queries and combine groups), set on every run that has one and withheld, like the data, when a hook ended the run. With each sub-query's <code>plan</code> it rebuilds the run: a dashboard chart stores both (<a href="../../../architecture/wave_c/">Wave C</a>). |</p>
+<p><code>errors</code> holds the <code>ERROR</code> and <code>CRITICAL</code> entries, and the one <code>INFO</code> entry
+<code>NEEDS_CLARIFICATION</code> of a run that asked which reading was meant;
+<code>WARNING</code>-severity pipeline errors are appended to <code>warnings</code> as <code>RunWarning</code>s.</p>
+<p>A sub-query that succeeded contributes nothing to <code>errors</code>: the errors of the
+attempts it recovered from are in <code>warnings</code> with <code>detail.recovered</code> true, and
+its warnings with an empty <code>detail</code>, each with its <code>sub_query_id</code>. The run trace and
+<code>subgraph_outputs[&lt;id&gt;].errors</code> keep every attempt's errors for debugging. A
+sub-query that failed without a blocking error of its own (it ended with no SQL
+on warnings alone) adds a <code>MISSING_SQL</code> error, so the run reports <code>"error"</code>.</p>
+<p><code>status</code> is derived: <code>"needs_approval"</code> when a hook asked for approval
+(<code>approvals_needed</code>), <code>"stopped"</code> when the run reached a per-question limit
+(<code>stop</code>), <code>"needs_clarification"</code> when the run asked which reading was meant
+(<code>clarification</code>), otherwise <code>"error"</code> when any blocking error is present, otherwise
+<code>"plan_only"</code> when no sub-query produced rows or an artifact (an
+<code>execute=False</code> run), otherwise <code>"success"</code>. A state with no sub-queries and no
+errors leaves it <code>None</code>. Hooks, approval and the caps
+that produce <code>"needs_approval"</code> and <code>"stopped"</code> arrive with release 0.7 (see
+<a href="../../../architecture/wave_a/">Wave A</a>).</p>
+<p>Only a capped sample of the rows is inlined, in <code>sub_queries[].rows</code>. The full
+result set lives in artifact storage, addressed through <code>artifact_refs</code>; each
+combined result is listed in <code>result_manifest</code> and read back by the run's
+<code>trace_id</code> with the methods below.</p>
+<h3 id="clarification">Clarification</h3>
+<p>When the planner reads a phrase of the question in more than one way that
+changes the result ("sales": the invoice total or the invoiced amount), it
+names the phrase and gives up to two other readings beside its most likely
+one. The <code>clarifier</code> step, after the logical validator, runs each other
+reading through the validator's own checks with the caller's scope and drops
+any that fail, so an option never names a table the caller cannot read, then
+merges readings that render to the same SQL. When two or three readings
+remain, the question has exactly one sub-query, <code>clarify</code> is on and
+<code>settings.clarify.enabled</code> is on (the default), the run ends before the
+generator: nothing is executed, aggregated or synthesized.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"What were sales last year?"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ana</span><span class="p">)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"needs_clarification"</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">clarification</span><span class="o">.</span><span class="n">options</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">option</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">label</span><span class="p">,</span> <span class="n">option</span><span class="o">.</span><span class="n">explanation</span><span class="o">.</span><span class="n">text</span><span class="p">)</span>
+</code></pre></div>
+<p>The result then has:</p>
+<ul>
+<li><code>status</code> <code>"needs_clarification"</code> and one <code>errors</code> entry,
+  <code>NEEDS_CLARIFICATION</code> (<code>INFO</code>, never retried);</li>
+<li><code>final_answer</code> a fixed sentence: "This question can be read more than one
+  way. Choose one: Sales: total of invoice total; Invoiced amount.";</li>
+<li><code>clarification</code>, a <code>ClarificationRequest</code> (<code>from nl2sql import
+  ClarificationRequest</code>): <code>id</code> (SHA-256 of every other field, 32 hex, so a
+  mixed-up or edited request is recognised), <code>question</code> (as passed, before any
+  <code>run.before</code> hook), <code>asker_user_id</code>, <code>asker_tenant_id</code>, <code>phrase</code>,
+  <code>datasource_id</code>, <code>schema_version</code>, <code>knowledge_digest</code>, <code>sub_query</code> and
+  <code>options</code>;</li>
+<li>each option a <code>ClarificationOption</code>: <code>id</code> (<code>"a"</code> is the most likely
+  reading, then <code>"b"</code>, <code>"c"</code>), <code>label</code>, <code>plan</code> (the plan as JSON) and
+  <code>explanation</code> (an <code>ExplainedStep</code>, as in <a href="#explanation">Explanation</a>). The
+  planner gives no label for its most likely reading, so <code>a</code> is named by the
+  glossary term its plan reads, else its first measure, filter or table;</li>
+<li><code>explanation</code> <code>None</code>, and the sub-query's <code>status</code> <code>"needs_clarification"</code>
+  with no SQL: nothing ran, so the options carry the explanations.</li>
+</ul>
+<p>Otherwise the most likely reading runs, and the readings that passed the
+checks are listed as assumptions in its explanation step ("'sales' was read
+one way; it could also mean Invoiced amount."). That happens with
+<code>clarify=False</code>, with more than one sub-query, when only one reading
+passed, and on a re-plan after an attempt already executed (a sanity check's
+retry), so the answer is never the flagged attempt's rows. <code>clarification.requested</code> (<code>sub_query_id</code>, <code>phrase</code>, <code>options</code>) is
+published on the engine's bus when a run asks; it is an operator event, not
+on the stream. Evals run with clarification off, so a case measures the most
+likely reading; a case may expect <code>clarify</code>, and the
+<a href="../../../evals/cases/#the-clarify-suite">clarify suite</a> does.</p>
+<h3 id="asking-again">Asking again</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">choice</span> <span class="o">=</span> <span class="n">ClarificationChoice</span><span class="p">(</span><span class="n">request</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">clarification</span><span class="p">,</span> <span class="n">option_id</span><span class="o">=</span><span class="s2">"b"</span><span class="p">)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">answer</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"What were sales last year?"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ana</span><span class="p">,</span> <span class="n">choice</span><span class="o">=</span><span class="n">choice</span><span class="p">)</span>
+</code></pre></div>
+<p>The re-ask is stateless: the caller holds the request and sends it back, and
+nothing is stored. The engine checks, before anything runs:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The request's <code>id</code> is the hash of its content; its <code>question</code> is the question as passed now (before any <code>run.before</code> hook); its asker is this caller; <code>option_id</code> is one of its options</td>
+<td><code>CLARIFICATION_INVALID</code> (<code>CRITICAL</code>). The id is an unkeyed hash, a check against mixed-up requests, not tamper evidence: the validator, run on the chosen plan with the caller's scope, is the guard against an edited plan</td>
+</tr>
+<tr>
+<td>The datasource is in the caller's scope, the request's <code>schema_version</code> is the live one and its <code>knowledge_digest</code> the live glossary's</td>
+<td><code>CLARIFICATION_STALE</code> (<code>ERROR</code>, never retried): the data or the glossary changed since the options were offered; ask again</td>
+</tr>
+<tr>
+<td>No <code>approvals</code> come with it</td>
+<td><code>CLARIFICATION_INVALID</code>: pass the approval alone</td>
+</tr>
+</tbody>
+</table>
+<p>A refused choice ends the run with that one error (<code>status</code> <code>"error"</code>) and
+calls no model. A <code>plan</code> or a <code>pinned</code> passed with a <code>choice</code> is a <code>ValueError</code>
+at the call. Otherwise the run enters at Wave A's pinned entry with one
+sub-query, standalone: no resolver, decomposer or <code>datasources.after</code>. The
+planner step returns the chosen plan with <code>plan_source</code> <code>"chosen"</code> and no model
+call; then it is an ordinary run: <code>plan.after</code>, the validator with the
+caller's scope, the generator, <code>execute.before</code>. A chosen plan is one person's
+reading and is never cached. The sub-query's <code>plan_source</code> is <code>"chosen"</code> and
+its explanation says "You chose: Invoiced amount".</p>
+<p>If a hook (the cost guard, say) answers <code>needs_approval</code> on the chosen plan,
+the run ends <code>needs_approval</code> with an <code>ApprovalRequest</code> for the chosen plan;
+the approver's re-run passes <code>approvals</code> only.</p>
+<p><code>engine.knowledge.save_choice(choice, user_context=ana)</code> files the pick as a
+<code>term</code> proposal, so an admin can make the phrase part of the glossary: see
+<a href="../../../configuration/review/#saving-a-clarification-pick">the review queue</a>.</p>
+<h3 id="warnings">Warnings</h3>
+<p><code>QueryResult.warnings</code> is a list of <code>RunWarning</code> (<code>from nl2sql import RunWarning</code>):</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>code</code></td>
+<td><code>str</code></td>
+<td>An <code>ErrorCode</code> value, such as <code>VALUE_NOT_FOUND</code>, <code>JOIN_FAN_OUT</code>, <code>ALL_NULL_COLUMN</code>, <code>JOIN_KEY_UNCONVERTED</code>, <code>RESULT_TRUNCATED</code> or <code>HOOK_DENIED</code>; <code>CURATED_FALLBACK</code> when a verified query failed and the question was generated instead.</td>
+</tr>
+<tr>
+<td><code>node</code></td>
+<td><code>str</code></td>
+<td>The node that found it.</td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>str</code></td>
+<td>What the answer says.</td>
+</tr>
+<tr>
+<td><code>sub_query_id</code></td>
+<td><code>Optional[str]</code></td>
+<td>The sub-query it is about, when it is about one.</td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td><code>Dict[str, Any]</code></td>
+<td>What a program may branch on: <code>recovered: true</code> for an earlier attempt's error a retry replaced; the column, counts and type of a <code>JOIN_KEY_UNCONVERTED</code>. Never result rows or sample values.</td>
+</tr>
+</tbody>
+</table>
+<p>The answer sanity checks (a missing filter value, a join that repeated the rows
+an aggregate counted, a column with no value) add theirs, and the answer
+synthesizer says them; see the
+<a href="../../../architecture/nodes/executor_node/#answer-sanity-checks">executor's sanity checks</a>.
+<code>settings.pipeline.sanity_checks: false</code> turns those checks off.</p>
+<p>0.7 changed this shape: a warning was a dict with <code>error_code</code> and <code>severity</code>,
+and is now a <code>RunWarning</code> with <code>code</code>, and <code>detail.recovered</code> where <code>severity</code>
+said <code>ERROR</code>. A run's state is never kept across an upgrade (a run that ended
+<code>needs_approval</code> is asked again, not resumed; see
+<a href="../../../architecture/wave_a/#7-approval">Wave A, D10</a>), so no older warning is
+ever read back.</p>
+<h3 id="explanation">Explanation</h3>
+<p><code>QueryResult.explanation</code> answers "why this answer" for a business reader. It
+is rendered by <code>nl2sql/explain/</code> when the result is assembled
+(<code>result_from_state</code>), from each sub-query's typed plan, the knowledge its
+prompt carried (<code>sub_queries[].knowledge_used</code>), the planner's readings it did
+not ask about, the row cap and the run's warnings. No model is called, and the
+same plan and knowledge always give the same words. The answer synthesizer is
+not given it: the explanation describes the query, the answer describes the
+rows.</p>
+<p>Only a sub-query that passed validation is explained. A plan the validator
+or a hook refused, and a dropped sub-query, get no step: their tables, and
+their glossary descriptions, would confirm what the refusal withholds. A run a
+hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>, <code>COST_LIMIT_EXCEEDED</code>) has no
+explanation, as it has no rows. An explanation never fails a run: one that
+cannot be rendered (a stored plan an older version wrote, say) is <code>None</code>, and
+the error is logged.</p>
+<p>The glossary that names tables and tells a glossary join from a declared key
+is the caller's: every caller of <code>result_from_state</code> (<code>run_query</code>,
+<code>stream_query</code>, evals, trace replay and the trace itself) passes the
+knowledge filtered by the caller's scope (<code>caller_knowledge</code> in
+<code>nl2sql/knowledge/scope.py</code>), so a description that mentions a table the
+caller cannot read never reaches the explanation. It is the knowledge and
+snapshot the run pinned (<code>run_with_graph</code> hands back its pinned runtime as
+<code>pinned_runtime</code>), so a reload during the run does not change the words.</p>
+<p><code>Explanation</code> has <code>steps</code> (one <code>ExplainedStep</code> per sub-query, in the
+decomposition's order) and <code>combined</code>: how the steps' results were put
+together ("The results of a and b were joined on country."), or <code>None</code> for a
+single step. An <code>ExplainedStep</code>:</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sub_query_id</code></td>
+<td><code>Optional[str]</code></td>
+<td>The sub-query it explains.</td>
+</tr>
+<tr>
+<td><code>datasource_id</code></td>
+<td><code>str</code></td>
+<td>Its datasource.</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>str</code></td>
+<td>Where the plan came from: <code>generated</code> (the planner), <code>cache</code>, <code>supplied</code> (<code>run_query(plan=...)</code>), <code>approved</code>, <code>chosen</code> (a clarification pick) or <code>verified</code> (a verified query, with no plan).</td>
+</tr>
+<tr>
+<td><code>tables</code></td>
+<td><code>List[str]</code></td>
+<td>Each table, qualified as the plan names it, with its glossary description's first clause when there is one: <code>"Invoice: one row per customer invoice (glossary)"</code>.</td>
+</tr>
+<tr>
+<td><code>joins</code></td>
+<td><code>List[str]</code></td>
+<td>Each join and the relationship it used: <code>"each InvoiceLine to its Invoice, on InvoiceId (declared key)"</code>, or <code>(glossary)</code> for a join the glossary declares.</td>
+</tr>
+<tr>
+<td><code>filters</code></td>
+<td><code>List[str]</code></td>
+<td>Each condition of the <code>WHERE</code>, then each of the <code>HAVING</code> as <code>"for each group, ..."</code>.</td>
+</tr>
+<tr>
+<td><code>groupings</code></td>
+<td><code>List[str]</code></td>
+<td><code>"by Customer country"</code>.</td>
+</tr>
+<tr>
+<td><code>measures</code></td>
+<td><code>List[str]</code></td>
+<td>Each aggregate the plan selects, by its alias: <code>"revenue: total of InvoiceLine unit price times InvoiceLine quantity"</code>.</td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td><code>Optional[str]</code></td>
+<td><code>"highest revenue first, top 10"</code>.</td>
+</tr>
+<tr>
+<td><code>terms</code></td>
+<td><code>List[TermUse]</code></td>
+<td>The glossary terms sent with the step whose columns the plan reads: <code>term</code>, <code>definition</code>, <code>source</code>.</td>
+</tr>
+<tr>
+<td><code>rules</code></td>
+<td><code>List[str]</code></td>
+<td>The business rules sent with the step, by text.</td>
+</tr>
+<tr>
+<td><code>assumptions</code></td>
+<td><code>List[str]</code></td>
+<td>What the answer took for granted, all deterministic: a reading not chosen when an ambiguity was not asked about; a filter value the column did not have (<code>'Brasil' is not in Customer country; 'Brazil' was used instead.</code> when the final plan filters on a suggested value, else <code>...; the question was planned again.</code>); the sanity checks' warnings (<code>VALUE_NOT_FOUND</code>, <code>JOIN_FAN_OUT</code>, <code>ALL_NULL_COLUMN</code>, <code>JOIN_KEY_UNCONVERTED</code>), and the row cap when the result was cut.</td>
+</tr>
+<tr>
+<td><code>planner_note</code></td>
+<td><code>Optional[str]</code></td>
+<td>The plan's own <code>reasoning</code>: model text, kept apart and labelled as the planner's. It appears in no other field.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td>The step in two to four sentences: what it shows, what it reads and filters, which groups it keeps, and its order.</td>
+</tr>
+</tbody>
+</table>
+<p>Names are the glossary description's first clause when there is one, else the
+name split into words (<code>InvoiceDate</code> on <code>Invoice</code> is "Invoice date"); a table
+the plan reads twice is named with its alias ("Track (t3)"). Each expression
+kind has a phrase (<code>=</code> "is", <code>IN</code> "is one of", <code>LIKE</code> "matches", <code>IS NULL</code> "is
+empty", <code>SUM</code> "total of", <code>COUNT</code> with <code>distinct</code> "number of different",
+<code>DATE_PART('year', d)</code> "the year of d", a <code>case</code> "depending on: ..."); a
+function without one is written as its name and arguments.</p>
+<p><code>result_from_state(state, ..., knowledge=None)</code> takes <code>knowledge</code>, a mapping
+from datasource id to its glossary (<code>DatasourceKnowledge</code>) as the caller's
+scope filters it; without it, names are the split names and every join is a
+declared key. A run on the Chinook
+suite's gold plans renders as the files in
+<code>packages/nl2sql/tests/unit/explain/golden/</code>, which are compared on every
+test run, so a change to the wording is a reviewed diff. Design:
+<a href="../../../architecture/wave_b/#8-why-this-answer">Wave B, section 8</a>.</p>
+<h2 id="streaming-a-run">Streaming a run</h2>
+<h3 id="nl2sqlstream_query">NL2SQL.stream_query</h3>
+<p>Source:
+<code>packages/nl2sql/src/nl2sql/api/query_api.py</code>, step events in
+<code>packages/nl2sql/src/nl2sql/pipeline/events.py</code>, the allow-list in
+<code>packages/nl2sql/src/nl2sql/events/catalog.py</code></p>
+<p>Signature:
+<code>stream_query(question: str, *, datasource_id: Optional[str] = None, execute: bool = True, user_context: Optional[UserContext] = None, cancellation_token: Optional[CancellationToken] = None, plan: Optional[SuppliedPlan] = None, approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, choice: Optional[ClarificationChoice] = None, answer: bool = True) -&gt; Iterator[Event]</code></p>
+<p>The same run as <code>run_query</code>, with the same parameters, yielded as it happens:
+the run's own events on the engine's bus (<a href="../../../observability/events/">Events</a>),
+from the caller-safe allow-list. <code>nl2sql run</code> shows its live progress from them.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">UserContext</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="s2">"nl2sql.yaml"</span><span class="p">)</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">stream_query</span><span class="p">(</span><span class="s2">"Which genre sells the most tracks?"</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>                                 <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])):</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"node.finished"</span><span class="p">:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'node'</span><span class="p">]</span><span class="si">}</span><span class="s2"> took </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s1">'seconds'</span><span class="p">]</span><span class="si">}</span><span class="s2"> s"</span><span class="p">)</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"answer.delta"</span> <span class="ow">and</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"field"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"summary"</span><span class="p">:</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"text"</span><span class="p">],</span> <span class="n">end</span><span class="o">=</span><span class="s2">""</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="k">elif</span> <span class="n">event</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"run.finished"</span><span class="p">:</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="s2">"result"</span><span class="p">]</span>   <span class="c1"># run_query's QueryResult, as JSON</span>
+</code></pre></div>
+<p>An <code>Event</code> (<code>nl2sql.Event</code>, from <code>nl2sql_sdk.events</code>) has a <code>name</code>, <code>at</code> (UTC),
+the run's <code>trace_id</code>, its <code>tenant_id</code> and a JSON-ready <code>data</code> dict;
+<code>event.sse()</code> is the event as one Server-Sent Event (<code>event: &lt;name&gt;</code>, and the
+whole event as JSON on the <code>data</code> line), which is how <code>nl2sql-api</code> and the
+playground send it.</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>data</th>
+<th>when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run.started</code></td>
+<td><code>question</code>, <code>user_id</code>, <code>tenant_id</code>, <code>roles</code>, <code>datasource_id</code>, <code>execute</code></td>
+<td>The run began. Always first.</td>
+</tr>
+<tr>
+<td><code>node.started</code></td>
+<td><code>node</code>, <code>sub_query_id</code></td>
+<td>A pipeline step began (the SQL agent's steps once per sub-query, and again on a retry). <code>sub_query_id</code> is None outside a sub-query.</td>
+</tr>
+<tr>
+<td><code>node.finished</code></td>
+<td><code>node</code>, <code>sub_query_id</code>, <code>seconds</code>, <code>ok</code></td>
+<td>The step ended; <code>ok</code> is False when it raised.</td>
+</tr>
+<tr>
+<td><code>result.manifest</code></td>
+<td><code>results</code></td>
+<td>The aggregator saved the results: <code>results</code> is the run's <code>result_manifest</code> and the event's <code>trace_id</code> its <code>request_id</code>, so <code>engine.results.page</code> can be called before the answer is written.</td>
+</tr>
+<tr>
+<td><code>answer.delta</code></td>
+<td><code>field</code>, <code>text</code></td>
+<td>The next piece of <code>final_answer.summary</code> or <code>final_answer.content</code>, as the answer model writes it.</td>
+</tr>
+<tr>
+<td><code>sanity.flagged</code>, <code>run.limit_reached</code></td>
+<td>see <a href="../../../observability/events/">Events</a></td>
+<td>Published by the sanity checks and the caps when they arrive (Wave A's S1 and E3).</td>
+</tr>
+<tr>
+<td><code>run.finished</code></td>
+<td>the run's summary (<code>status</code>, <code>duration_s</code>, <code>usage</code>, <code>error_codes</code>, <code>source</code>, <code>datasources</code>, <code>tables</code>, <code>result_manifest</code>, <code>user_id</code>, <code>roles</code>) plus <code>result</code></td>
+<td>The run finished. <code>result</code> is exactly what <code>run_query</code> returns, as JSON; it is on the stream's copy only, never on the bus. A refusal, a provider failure, a timeout or a cancel is a <code>run.finished</code> with <code>status: "error"</code>, as <code>run_query</code> returns it.</td>
+</tr>
+<tr>
+<td><code>run.failed</code></td>
+<td><code>message</code>, <code>error_code</code></td>
+<td>The run could not start or finish (an exception outside the pipeline, such as a missing API key when the graph is built).</td>
+</tr>
+</tbody>
+</table>
+<p>Every stream ends in exactly one <code>run.finished</code> or <code>run.failed</code>. Operator
+events (<code>policy.decision</code>, <code>hook.decision</code>, <code>llm.call</code>, <code>plan_cache.lookup</code>)
+are never on it: a denial would tell a denied caller which table exists, and the
+rest are operator data. An operator reads them with <code>engine.events.subscribe</code>.</p>
+<p>How it works:</p>
+<ul>
+<li>The run goes on a thread of its own, started on the first <code>next()</code>; the caller's
+  context goes with it, so request-scoped keys (<code>nl2sql.llm.request_key</code>) reach the
+  graph as they do in <code>run_query</code>.</li>
+<li>Every run (streamed or not) has a <code>RunScope</code>, and <code>QueryAPI.open_scope</code> attaches
+  a <code>RunEvents</code> to it: a LangChain callback the graph gets with the scope's
+  callbacks, which publishes through the scope. A node's own run (its name is its
+  <code>langgraph_node</code>) is a <code>node.started</code> / <code>node.finished</code>; the runnables inside a
+  node are not events. The aggregator's end publishes <code>result.manifest</code>. The
+  stream subscribes to its scope's events from the allow-list
+  (<code>nl2sql.events.STREAM_EVENTS</code>), so it yields exactly what the bus carries, in
+  publish order, and then its own <code>run.finished</code> with the result.</li>
+<li><code>run_with_graph(stream_answer=True)</code> asks the answer synthesizer to stream: its
+  chain is <code>streaming_structured</code> (<code>nl2sql.llm.wires</code>) instead of <code>structured</code>, the
+  same request with <code>stream</code> on. Each piece of the answer's tool call reaches
+  <code>on_llm_new_token</code>; <code>RunEvents</code> parses the arguments so far as partial JSON and
+  publishes what <code>summary</code> and <code>content</code> gained as <code>answer.delta</code>. The pieces are joined into one message
+  before the parser sees it, so the answer, and the token usage the call reports,
+  are the unstreamed call's. On the Anthropic wire the joined message gets the same
+  tool-call repair as an unstreamed one.</li>
+<li>Closing the iterator before the last event (a client that went away) cancels the
+  run's token, so it stops before its next step or model call.</li>
+</ul>
+<p>Token by token, per wire: both the OpenAI wire (OpenAI, OpenRouter, Ollama, any
+OpenAI-compatible endpoint) and the Anthropic wire stream the answer's forced tool
+call, so the answer streams on every provider; how finely is the provider's choice,
+and one that sends the whole answer at once gives one <code>answer.delta</code> per field. The
+other model steps return a typed object the next step needs whole, and are not
+streamed. <code>FakeLLMServer</code> streams both wires, a word at a time, so replay mode and
+the keyless tests stream too.</p>
+<h2 id="reading-a-runs-saved-results">Reading a run's saved results</h2>
+<p>The aggregator saves each terminal result of a run as
+<code>&lt;tenant_id&gt;/&lt;request_id&gt;/result_&lt;node_id&gt;.parquet</code> and writes <code>manifest.json</code>
+beside them (see <a href="../../../storage/artifact-store/#the-result-manifest">Artifact Store → The result manifest</a>).
+While a hook is attached at <code>answer.after</code>, the manifest is written only once
+those hooks allowed, so a run's results are not readable before that, and never
+for a run a hook ended (<a href="../../../configuration/hooks/#what-withholding-guarantees">What withholding guarantees</a>).
+<code>engine.results</code> reads them back by the run's <code>trace_id</code> (its <code>run_id</code>, the
+<code>request_id</code> of the REST routes). They read lazily from the
+parquet file: a page reads only its slice, and the CSV export reads and yields a
+slice at a time (<code>CSV_CHUNK_ROWS</code>, 10,000 rows), so neither holds the whole
+result in memory.</p>
+<table>
+<thead>
+<tr>
+<th>method</th>
+<th>returns</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>results.manifest(run_id, *, user_context)</code></td>
+<td><code>ResultManifest</code></td>
+<td><code>request_id</code>, <code>owner</code> (the asker's <code>tenant_id</code> and <code>user_id</code>, and an anonymous asker's sorted <code>roles</code>) and <code>results: List[ResultSummary]</code>, the same entries as <code>QueryResult.result_manifest</code>.</td>
+</tr>
+<tr>
+<td><code>results.page(run_id, result_id, offset=0, limit=100, *, user_context)</code></td>
+<td><code>ResultPage</code></td>
+<td>Rows <code>offset</code> to <code>offset + limit</code> of the result whose <code>node_id</code> is <code>result_id</code>. <code>limit</code> above <code>MAX_RESULT_PAGE_SIZE</code> (1,000) is cut to it, and the page's <code>limit</code> says so. A page past the end has no rows. <code>next_offset</code> is where the next page starts, <code>None</code> at the end. A negative <code>offset</code> or a <code>limit</code> below 1 raises <code>ValueError</code>.</td>
+</tr>
+<tr>
+<td><code>results.csv(run_id, result_id, *, user_context)</code></td>
+<td><code>Iterator[bytes]</code></td>
+<td>The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent.</td>
+</tr>
+</tbody>
+</table>
+<p><code>ResultPage</code> has <code>request_id</code>, <code>result_id</code>, <code>columns</code>, <code>rows</code> (<code>rows[i]</code> is row
+<code>offset + i</code>), <code>offset</code>, <code>limit</code>, <code>total_rows</code> and <code>next_offset</code>.</p>
+<p>Scope: a run is readable only by the caller who asked it, passed as the
+required <code>user_context</code> (<a href="../results/#who-can-read-a-run">Who can read a run</a>);
+no caller is a <code>TypeError</code>. Results are read from the engine's own <code>TENANT_ID</code>
+folder, the tenant every run of this engine writes under. Each of these raises
+<code>ResultNotFound</code> (a <code>LookupError</code>, exported from <code>nl2sql</code>): an unknown <code>run_id</code>,
+a run another user or another tenant asked, a manifest that records no asker,
+a <code>result_id</code> the run's manifest does not list, and an id that is not a plain
+token (letters, digits, <code>_</code>, <code>-</code>; at most 128 characters). Ids are checked
+before any path is built, and the parquet path is rendered from the artifact
+template, never read from the manifest, so no id reaches a file outside the
+run's folder.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">ann</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"ann"</span><span class="p">,</span> <span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">)</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">):</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+</code></pre></div>
+<p><code>nl2sql-api</code> serves these as
+<a href="../../rest/query/#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>
+and <code>.../{result_id}.csv</code>; the playground serves the same two under <code>/api/query/...</code>.</p>
+<h3 id="subqueryresult">SubQueryResult</h3>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>required</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Sub-query identifier.</td>
+</tr>
+<tr>
+<td><code>intent</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Semantic intent of the sub-query.</td>
+</tr>
+<tr>
+<td><code>sql</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>SQL generated for the sub-query (<code>subgraph_outputs[&lt;id&gt;].sql_draft</code>).</td>
+</tr>
+<tr>
+<td><code>datasource_id</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Datasource the sub-query targets.</td>
+</tr>
+<tr>
+<td><code>schema_version</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Schema version used for planning.</td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td><code>Optional[Dict[str, Any]]</code></td>
+<td>no</td>
+<td>The validated <code>PlanModel</code>, dumped.</td>
+</tr>
+<tr>
+<td><code>validation</code></td>
+<td><code>List[ValidationCheck]</code></td>
+<td>no</td>
+<td><code>name</code>, <code>passed</code>, <code>message</code> per validation gate.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>Optional[RowSample]</code></td>
+<td>no</td>
+<td>Capped row sample; <code>None</code> when nothing executed or the artifact could not be read.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>"success"</code> or <code>"error"</code> for this sub-query, from its final attempt: <code>"success"</code> when it ended with SQL and, if executed, a result; otherwise <code>"error"</code>. A retry that recovers reports <code>"success"</code>. <code>"dropped"</code> when a <a href="../../../configuration/hooks/">hook</a> denied it with <code>scope="sub_query"</code>: the run went on without it.</td>
+</tr>
+<tr>
+<td><code>retry_count</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Plan/SQL refinement attempts made.</td>
+</tr>
+<tr>
+<td><code>plan_source</code></td>
+<td><code>"llm" \| "cache" \| "verified" \| "supplied" \| "approved" \| "chosen"</code></td>
+<td>no</td>
+<td><code>"cache"</code> when the plan came from the plan cache (no planner LLM call; still validated, generated and executed), <code>"verified"</code> when a verified query answered (no plan; <code>sql</code> is the verified query's own), <code>"supplied"</code> for a plan passed as <code>run_query(plan=...)</code>, <code>"approved"</code> for an approval's pinned plan (<code>"chosen"</code> is reserved for Wave B), otherwise <code>"llm"</code>. Only an <code>"llm"</code> plan is ever cached. See <a href="../../../architecture/determinism/#the-plan-cache-determinism-from-the-architecture">Determinism → The plan cache</a>.</td>
+</tr>
+<tr>
+<td><code>row_cap</code></td>
+<td><code>Optional[int]</code></td>
+<td>no</td>
+<td>The row limit that bounded this sub-query's SQL (the datasource's <code>row_limit</code>, bounded by <code>RESULT_ROW_LIMIT</code>), or <code>None</code> when the plan's own <code>LIMIT</code> was smaller.</td>
+</tr>
+<tr>
+<td><code>truncated</code></td>
+<td><code>bool</code></td>
+<td>no</td>
+<td>True when the result has <code>row_cap</code> rows: it was cut at the limit and may be missing rows. A result of exactly <code>row_cap</code> rows may be whole; it is counted as cut.</td>
+</tr>
+<tr>
+<td><code>knowledge_used</code></td>
+<td><code>Optional[KnowledgeUsed]</code></td>
+<td>no</td>
+<td>The glossary terms and rules this sub-query's prompts carried, and what the block's cap dropped. Only items within the caller's scope: none names a table the caller cannot read. Filled by the schema retriever (Wave B's K2); <code>None</code> when no term or rule matched, and for a plan served from the plan cache, which sent no prompt.</td>
+</tr>
+<tr>
+<td><code>estimate</code></td>
+<td><code>Optional[Estimate]</code></td>
+<td>no</td>
+<td>The database's estimate of the rows this sub-query reads, when the cost rule asked for one. <code>rows</code> is what the query is expected to <em>read</em>; <code>cost</code> is the database's own units, for display. <code>None</code> when the cost rule asked for none: no <code>policies.cost</code> limit applies to the caller, or the run did not reach <code>execute.before</code>. Present too when the rule then refused or asked for approval.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rowsample">RowSample</h3>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>required</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>columns</code></td>
+<td><code>List[str]</code></td>
+<td>no</td>
+<td>Column names, in result order.</td>
+</tr>
+<tr>
+<td><code>rows</code></td>
+<td><code>List[List[Any]]</code></td>
+<td>no</td>
+<td>At most <code>sample_rows</code> rows (default 50).</td>
+</tr>
+<tr>
+<td><code>total_rows</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Row count of the whole result, not of the sample.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="state-mapping">State mapping</h3>
+<p><code>result_from_state</code> normalises the raw graph state (LangGraph may return dicts or
+model instances for nested values):</p>
+<table>
+<thead>
+<tr>
+<th><code>QueryResult</code> field</th>
+<th>Graph state source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sub_queries[].sql</code></td>
+<td><code>subgraph_outputs[&lt;id&gt;].sql_draft</code></td>
+</tr>
+<tr>
+<td><code>sub_queries[].id</code> / <code>.intent</code> / <code>.datasource_id</code> / <code>.schema_version</code></td>
+<td><code>subgraph_outputs[&lt;id&gt;].sub_query</code></td>
+</tr>
+<tr>
+<td><code>sub_queries[].plan</code> / <code>.validation</code> / <code>.status</code> / <code>.retry_count</code> / <code>.plan_source</code> / <code>.row_cap</code> / <code>.truncated</code></td>
+<td><code>subgraph_outputs[&lt;id&gt;]</code></td>
+</tr>
+<tr>
+<td><code>usage.plan_cache_hits</code></td>
+<td>count of <code>sub_queries[]</code> with <code>plan_source == "cache"</code></td>
+</tr>
+<tr>
+<td><code>sub_queries[].rows</code></td>
+<td><code>artifact_store.read_result_frame(subgraph_outputs[&lt;id&gt;].artifact)</code></td>
+</tr>
+<tr>
+<td><code>final_answer</code></td>
+<td><code>answer_synthesizer_response.final_answer</code></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>verified_match</code> (set by the curated matcher on a verified answer; absent means <code>generated</code>)</td>
+</tr>
+<tr>
+<td><code>errors</code>, <code>reasoning</code>, <code>warnings</code>, <code>trace_id</code>, <code>artifact_refs</code>, <code>timings</code>, <code>usage</code></td>
+<td>top-level state</td>
+</tr>
+</tbody>
+</table>
+<p><code>errors</code> are projected onto a client-safe summary; <code>stack_trace</code> and <code>details</code> are
+deliberately not exposed.</p>
+<p><code>result_from_state(state, artifact_store=None, sample_rows=50)</code> reads rows only
+when an artifact store is supplied. A failed read is not fatal: <code>rows</code> stays
+<code>None</code> and a warning is appended.</p>
+<p><code>timings</code> is collected by <code>NodeTimingCallback</code>
+(<code>packages/nl2sql/src/nl2sql/pipeline/timing.py</code>), a LangChain callback handler
+that <code>run_with_graph</code> always attaches. It keys on <code>metadata["langgraph_node"]</code>
+where LangGraph provides it, so the keys are node names such as <code>ast_planner</code>,
+<code>logical_validator</code>, <code>generator</code> and <code>executor</code>.</p>
+<h3 id="usage-tokens-calls-and-model-time">Usage: tokens, calls and model time</h3>
+<p><code>usage</code> is collected by <code>TokenUsageCallback</code>
+(<code>packages/nl2sql/src/nl2sql/services/callbacks/token_handler.py</code>), which
+<code>run_with_graph</code> attaches to every run, so the Python API, the REST API, the CLI
+and the demo playground all report it. It is also filled in, with whatever had
+been recorded, on a timed-out or cancelled run.</p>
+<p><code>QuestionUsage</code>:</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>total</code></td>
+<td><code>UsageTotals</code></td>
+<td>The whole question.</td>
+</tr>
+<tr>
+<td><code>nodes</code></td>
+<td><code>Dict[str, UsageTotals]</code></td>
+<td>Keyed by graph node: <code>datasource_resolver</code> (the answerability check), <code>decomposer</code>, <code>ast_planner</code>, <code>refiner</code>, <code>answer_synthesizer</code>.</td>
+</tr>
+<tr>
+<td><code>calls</code></td>
+<td><code>List[LLMCallUsage]</code></td>
+<td>Every model call in order, with its <code>node</code> and <code>model</code>.</td>
+</tr>
+<tr>
+<td><code>plan_cache_hits</code></td>
+<td><code>int</code></td>
+<td>Sub-queries whose plan came from the plan cache. A hit makes no planner call, so it adds no <code>ast_planner</code> calls or tokens; a question answered entirely from the cache has no <code>ast_planner</code> entry in <code>nodes</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><code>UsageTotals</code>:</p>
+<table>
+<thead>
+<tr>
+<th>name</th>
+<th>type</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calls</code></td>
+<td><code>int</code></td>
+<td>LLM calls. The planner and refiner run once per retry, so a sub-query retried once shows <code>ast_planner.calls == 2</code>.</td>
+</tr>
+<tr>
+<td><code>input_tokens</code></td>
+<td><code>Optional[int]</code></td>
+<td>Prompt tokens, including cached ones.</td>
+</tr>
+<tr>
+<td><code>cached_input_tokens</code></td>
+<td><code>Optional[int]</code></td>
+<td>Input tokens served from the provider's prompt cache (a subset of <code>input_tokens</code>).</td>
+</tr>
+<tr>
+<td><code>cache_write_input_tokens</code></td>
+<td><code>Optional[int]</code></td>
+<td>Input tokens written to the prompt cache (Anthropic reports these; OpenAI does not, so it is <code>null</code> there).</td>
+</tr>
+<tr>
+<td><code>output_tokens</code></td>
+<td><code>Optional[int]</code></td>
+<td>Completion tokens, including reasoning ones.</td>
+</tr>
+<tr>
+<td><code>reasoning_tokens</code></td>
+<td><code>Optional[int]</code></td>
+<td>Reasoning ("thinking") tokens (a subset of <code>output_tokens</code>).</td>
+</tr>
+<tr>
+<td><code>total_tokens</code></td>
+<td><code>Optional[int]</code></td>
+<td>As the provider reports it; <code>input + output</code> if it does not.</td>
+</tr>
+<tr>
+<td><code>latency_s</code></td>
+<td><code>float</code></td>
+<td>Seconds spent waiting on the model, summed over calls. The node's wall-clock time, which includes its non-LLM work, is in <code>timings</code>.</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td><code>Optional[float]</code></td>
+<td>Dollars, when every call counted here has a cost; otherwise <code>null</code>. Each call is priced from <code>llm.prices</code>, then the dated price table: cache reads at <code>cached_input</code>, cache writes at <code>cache_write</code> (Claude's are 1.25x <code>input</code>), the rest of <code>input_tokens</code> at <code>input</code> and <code>output_tokens</code> at <code>output</code>; see <a href="../../../configuration/llm/#prices">Prices</a>.</td>
+</tr>
+</tbody>
+</table>
+<p>A token count in <code>UsageTotals</code> is the sum of what the calls reported, and
+<code>null</code> when no call reported it: an unknown count is never <code>0</code>.</p>
+<p><code>LLMCallUsage</code> has the same token fields plus <code>node</code>, <code>model</code> (the model the
+provider says served the call, e.g. <code>gpt-4o-2024-08-06</code>), <code>latency_s</code>, <code>cost</code>,
+<code>usage_reported</code> and <code>error</code>.</p>
+<p>Tokens are read by the adapter of the wire type that served the call
+(<code>read_usage</code> in <code>nl2sql/llm/wires/openai.py</code> or <code>anthropic.py</code>), picked by the
+<code>model_provider</code> the client stamps on the response; <code>TokenUsageCallback</code> only
+asks it. Both read LangChain's <code>AIMessage.usage_metadata</code>
+(<code>input_token_details.cache_read</code>, <code>input_token_details.cache_creation</code>,
+<code>output_token_details.reasoning</code>) into the same fields, and differ where their
+providers differ, as below. A detail the provider did not report is <code>null</code>, never <code>0</code>. A call whose result carried no usage
+at all is recorded with every count <code>null</code> and <code>usage_reported: false</code>; a failed call is
+recorded the same way, with its latency and <code>error</code>.</p>
+<p>For OpenAI through <code>langchain-openai</code> (verified against the pinned 1.6.x by
+<code>packages/nl2sql/tests/unit/test_fake_llm_server.py</code>): <code>prompt_tokens</code>,
+<code>completion_tokens</code>, <code>total_tokens</code>, <code>prompt_tokens_details.cached_tokens</code> and
+<code>completion_tokens_details.reasoning_tokens</code> all arrive. OpenAI's chat
+completions API reports no cache-write count, so <code>cache_write_input_tokens</code> is
+<code>null</code> there.</p>
+<p>For Claude through <code>langchain-anthropic</code> (<code>provider: anthropic</code>; verified
+against the fake Anthropic endpoint by
+<code>packages/nl2sql/tests/unit/test_llm_wire_contract.py</code>, which runs the same
+usage tests against both wires), Anthropic's <code>usage</code> maps
+as follows:</p>
+<table>
+<thead>
+<tr>
+<th>Anthropic <code>usage</code></th>
+<th>field here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_read_input_tokens</code></td>
+<td><code>cached_input_tokens</code></td>
+</tr>
+<tr>
+<td><code>cache_creation_input_tokens</code>, or its per-TTL split <code>cache_creation.ephemeral_5m_input_tokens</code> + <code>ephemeral_1h_input_tokens</code></td>
+<td><code>cache_write_input_tokens</code></td>
+</tr>
+<tr>
+<td><code>input_tokens</code> + <code>cache_read_input_tokens</code> + <code>cache_creation_input_tokens</code></td>
+<td><code>input_tokens</code></td>
+</tr>
+<tr>
+<td><code>output_tokens</code></td>
+<td><code>output_tokens</code></td>
+</tr>
+</tbody>
+</table>
+<p>Anthropic's own <code>input_tokens</code> counts only the uncached tail of the prompt;
+<code>langchain-anthropic</code> adds the cache reads and writes back, so <code>input_tokens</code>
+here is the whole prompt, counted once, and both cache fields stay subsets of
+it. When the write is reported per TTL, <code>langchain-anthropic</code> sets the generic
+<code>cache_creation</code> detail to <code>0</code> and puts the tokens under the TTL keys, which
+are summed here.</p>
+<p>Cost is <code>(input - cached - cache_write) * input_price + cached * cached_input_price
++ cache_write * cache_write_price + output * output_price</code>, per million tokens; a
+cache count the provider did not report is not split out of <code>input</code>. Prices are
+looked up in <code>llm.prices</code> by the served model name, then by the configured one,
+and only then in the dated table by either, by exact match only, so a <code>gpt-4o</code>
+price never prices <code>gpt-4o-mini</code>. A call with no price, or no input or output count, has a
+<code>null</code> cost. See <a href="../../../configuration/llm/#prices">Prices</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

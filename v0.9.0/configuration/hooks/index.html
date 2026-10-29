@@ -1,0 +1,2910 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
+<meta content="Platform Engineering" name="author"/>
+<link href="../policies/" rel="prev"/>
+<link href="../embeddings/" rel="next"/>
+<link href="../../assets/favicon.svg" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.8.0" name="generator"/>
+<title>Hooks - NL2SQL Platform</title>
+<link href="../../assets/stylesheets/main.57a0d79d.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.fb2fffe2.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="purple" data-md-color-primary="teal" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#hooks">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="NL2SQL Platform" class="md-header__button md-logo" data-md-component="logo" href="../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Hooks
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="purple" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="lime" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../architecture/overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting_started/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../conversations/">
+          
+  
+  
+  Conversations
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../charts/">
+          
+  
+  
+  Charts
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../dashboards/">
+          
+  
+  
+  Dashboards
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../system/">
+          
+  
+  
+  Configuration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../adapters/">
+          
+  
+  
+  Adapters
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../schema/store/">
+          
+  
+  
+  Schema
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../execution/isolation/">
+          
+  
+  
+  Execution
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../storage/artifact-store/">
+          
+  
+  
+  Storage
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../observability/stack/">
+          
+  
+  
+  Observability
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../security/model/">
+          
+  
+  
+  Security
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../deployment/architecture/">
+          
+  
+  
+  Deployment
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../development/">
+          
+  
+  
+  Development
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../evals/">
+          
+  
+  
+  Evals
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../testing/architecture/">
+          
+  
+  
+  Testing
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/">
+          
+  
+  
+  API
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../releases/">
+          
+  
+  
+  Releases
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../glossary/">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="NL2SQL Platform" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    NL2SQL Platform
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/graph_state/">
+<span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/determinism/">
+<span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/invariants/">
+<span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/failure_recovery/">
+<span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/curated_answers/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/configuration_v2/">
+<span class="md-ellipsis">
+    
+  
+    Configuration v2 (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/phase2/">
+<span class="md-ellipsis">
+    
+  
+    Phase 2 (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/wave_a/">
+<span class="md-ellipsis">
+    
+  
+    Wave A (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/wave_b/">
+<span class="md-ellipsis">
+    
+  
+    Wave B (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/wave_c/">
+<span class="md-ellipsis">
+    
+  
+    Wave C (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/wave_d/">
+<span class="md-ellipsis">
+    
+  
+    Wave D (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/subgraphs/main_pipeline_graph/">
+<span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/subgraphs/sql_agent/">
+<span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_16" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_16">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/">
+<span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/answer_synthesizer_node/">
+<span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/ast_planner_node/">
+<span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/clarifier_node/">
+<span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/datasource_resolver_node/">
+<span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/decomposer_node/">
+<span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/engine_aggregator_node/">
+<span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/executor_node/">
+<span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/generator_node/">
+<span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/logical_validator_node/">
+<span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/refiner_node/">
+<span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/nodes/schema_retriever_node/">
+<span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/pypi/">
+<span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/source/">
+<span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/demo/">
+<span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/mcp/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting_started/launch/">
+<span class="md-ellipsis">
+    
+  
+    Launch
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Conversations
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../conversations/">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../conversations/tools/">
+<span class="md-ellipsis">
+    
+  
+    Chat tools
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Charts
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../charts/">
+<span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../charts/diagrams/">
+<span class="md-ellipsis">
+    
+  
+    Diagrams
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Dashboards
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../dashboards/">
+<span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../system/">
+<span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../datasources/">
+<span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../llm/">
+<span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-six-points">
+<span class="md-ellipsis">
+      
+        The six points
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#decisions">
+<span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-withholding-guarantees">
+<span class="md-ellipsis">
+      
+        What withholding guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#built-in-hooks">
+<span class="md-ellipsis">
+      
+        Built-in hooks
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#write-one">
+<span class="md-ellipsis">
+      
+        Write one
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configure-it">
+<span class="md-ellipsis">
+      
+        Configure it
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../secrets/">
+<span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../curated/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../knowledge/">
+<span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../review/">
+<span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../observers/">
+<span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sdk/">
+<span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sqlalchemy/">
+<span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/development/">
+<span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/duckdb/">
+<span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/mssql/">
+<span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/mysql/">
+<span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/postgres/">
+<span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../adapters/sqlite/">
+<span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/store/">
+<span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/drift/">
+<span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../schema/profiler/">
+<span class="md-ellipsis">
+    
+  
+    Schema Profiler
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../execution/isolation/">
+<span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_11_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../storage/artifact-store/">
+<span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_12" type="checkbox"/>
+<label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_12_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_12">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/stack/">
+<span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/events/">
+<span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/debugging/">
+<span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../observability/error-handling/">
+<span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_13" type="checkbox"/>
+<label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_13_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_13">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../security/model/">
+<span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../security/multi-tenant/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../security/api-keys/">
+<span class="md-ellipsis">
+    
+  
+    API keys
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_14">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/kubernetes/">
+<span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../deployment/hosted-demo/">
+<span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_15_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../development/">
+<span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../development/releasing/">
+<span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/add-adapter/">
+<span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/add-chunk-types/">
+<span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/extend-planner/">
+<span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../extensions/add-execution-backend/">
+<span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_16" type="checkbox"/>
+<label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Evals
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_16_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_16">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Evals
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/cases/">
+<span class="md-ellipsis">
+    
+  
+    Cases and Suites
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/scorers/">
+<span class="md-ellipsis">
+    
+  
+    Scorers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../evals/seeding/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../testing/evaluation-dataset/">
+<span class="md-ellipsis">
+    
+  
+    The Chinook Suite
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../benchmarks/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_17" type="checkbox"/>
+<label class="md-nav__link" for="__nav_17" id="__nav_17_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_17_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_17">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../testing/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../testing/test-bed/">
+<span class="md-ellipsis">
+    
+  
+    Real-Database Test Bed
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18" type="checkbox"/>
+<label class="md-nav__link" for="__nav_18" id="__nav_18_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_18_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_18">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_18_2" id="__nav_18_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_18_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_18_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/public-facade/">
+<span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/results/">
+<span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/conversations/">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/core/dashboards/">
+<span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_18_3" id="__nav_18_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_18_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_18_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/health/">
+<span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_19" type="checkbox"/>
+<label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_19_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_19">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.9.0/">
+<span class="md-ellipsis">
+    
+  
+    0.9.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.8.0/">
+<span class="md-ellipsis">
+    
+  
+    0.8.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.7.0/">
+<span class="md-ellipsis">
+    
+  
+    0.7.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.6.0/">
+<span class="md-ellipsis">
+    
+  
+    0.6.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.5.0/">
+<span class="md-ellipsis">
+    
+  
+    0.5.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.4.1/">
+<span class="md-ellipsis">
+    
+  
+    0.4.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.4.0/">
+<span class="md-ellipsis">
+    
+  
+    0.4.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.3.0/">
+<span class="md-ellipsis">
+    
+  
+    0.3.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.4/">
+<span class="md-ellipsis">
+    
+  
+    0.2.4
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.3/">
+<span class="md-ellipsis">
+    
+  
+    0.2.3
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.2/">
+<span class="md-ellipsis">
+    
+  
+    0.2.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.1/">
+<span class="md-ellipsis">
+    
+  
+    0.2.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.2.0/">
+<span class="md-ellipsis">
+    
+  
+    0.2.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.2/">
+<span class="md-ellipsis">
+    
+  
+    0.1.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.1/">
+<span class="md-ellipsis">
+    
+  
+    0.1.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../releases/0.1.0/">
+<span class="md-ellipsis">
+    
+  
+    0.1.0
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../glossary/">
+<span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-six-points">
+<span class="md-ellipsis">
+      
+        The six points
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#decisions">
+<span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-withholding-guarantees">
+<span class="md-ellipsis">
+      
+        What withholding guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#built-in-hooks">
+<span class="md-ellipsis">
+      
+        Built-in hooks
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#write-one">
+<span class="md-ellipsis">
+      
+        Write one
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configure-it">
+<span class="md-ellipsis">
+      
+        Configure it
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="hooks">Hooks</h1>
+<p>A hook is your code, called at six fixed points of every run. At each point
+it may let the run go on, change what the run carries (before the validator
+only), stop it, or (at <code>execute.before</code>) ask for a person's approval. Hooks
+apply to every run: a generated answer and a verified query, from the
+Python API, the CLI and <code>nl2sql-api</code> alike. None ships built in.</p>
+<p>The design is <a href="../../architecture/wave_a/#6-hooks">Wave A, section 6</a>.</p>
+<h2 id="the-six-points">The six points</h2>
+<pre class="mermaid"><code>flowchart TD
+  Q["question"] --&gt; P1(["run.before"])
+  P1 --&gt; CM["curated matcher"]
+  CM --&gt;|"no match"| RES["datasource resolver"]
+  RES --&gt; P2(["datasources.after"])
+  P2 --&gt; DEC["decomposer"]
+  DEC --&gt; PL["planner, or the plan cache"]
+  PL --&gt; P3(["plan.after"])
+  P3 --&gt; VAL["logical validator"]
+  VAL --&gt; GEN["generator"]
+  GEN --&gt; P4(["execute.before"])
+  CM --&gt;|"verified query"| P4
+  P4 --&gt; EX["executor"]
+  EX --&gt; P5(["execute.after"])
+  P5 --&gt; AGG["aggregator"]
+  AGG --&gt; ANS["answer synthesizer"]
+  ANS --&gt; P6(["answer.after"])</code></pre>
+<table>
+<thead>
+<tr>
+<th>Point</th>
+<th>When</th>
+<th>The hook sees (beyond <code>question</code>, <code>user</code>, <code>trace_id</code>)</th>
+<th>It may answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run.before</code></td>
+<td>Once, before the first step</td>
+<td><code>datasource_id</code>, <code>execute</code></td>
+<td><code>Allow</code>, <code>Modify(question=...)</code>, <code>Deny</code></td>
+</tr>
+<tr>
+<td><code>datasources.after</code></td>
+<td>The resolver chose its datasources</td>
+<td><code>datasource_ids</code></td>
+<td><code>Allow</code>, <code>Modify(datasource_ids=...)</code> (a subset only), <code>Deny</code></td>
+</tr>
+<tr>
+<td><code>plan.after</code></td>
+<td>Per sub-query and attempt, on the planner's or the plan cache's plan</td>
+<td><code>sub_query</code>, <code>plan</code></td>
+<td><code>Allow</code>, <code>Modify(plan=...)</code>, <code>Deny</code></td>
+</tr>
+<tr>
+<td><code>execute.before</code></td>
+<td>Per sub-query, before the adapter runs the SQL</td>
+<td><code>datasource_id</code>, <code>sql</code>, <code>params</code>, <code>tables</code></td>
+<td><code>Allow</code>, <code>Deny</code>, <code>NeedsApproval</code></td>
+</tr>
+<tr>
+<td><code>execute.after</code></td>
+<td>Per sub-query, after it ran</td>
+<td><code>result</code>: columns, row count, truncated; never rows</td>
+<td><code>Allow</code>, <code>Deny</code></td>
+</tr>
+<tr>
+<td><code>answer.after</code></td>
+<td>The answer is written, before it is returned; with <code>answer=False</code> there is no answer and <code>final_answer</code> is <code>None</code>, but the point still runs</td>
+<td><code>final_answer</code>, <code>results</code> (summaries)</td>
+<td><code>Allow</code>, <code>Deny</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>tables</code> are <code>datasource.schema.table</code>. A field a point does not have is
+<code>None</code>. The context is frozen and holds copies of the run's plan, caller and
+values: a hook that changes one in place changes nothing. A hook changes the
+run only through <code>Modify</code>.
+<code>ctx.conversation_id</code> is set when the run is a conversation's turn.</p>
+<p><strong>Modify before the validator, deny only after.</strong> A plan a hook changed is
+validated like any other, so a hook can never slip in what the policies or
+the validator refuse. <code>datasources.after</code> may only remove datasources; the
+resolver checks what is left against the caller's role again. After the
+validator nothing may change the SQL, the plan or the result.</p>
+<p><strong>The answer sanity checks' probes are not hooked.</strong> After a sub-query runs,
+the executor may send small checking queries of its own (does a filter value
+exist, did a join repeat rows; see the
+<a href="../../architecture/nodes/executor_node/#answer-sanity-checks">executor's sanity checks</a>).
+They run outside <code>execute.before</code> and <code>execute.after</code>. So when any hook is
+attached at <code>execute.before</code>, no probe runs at all: SQL a hook gates never has
+unseen SQL beside it. <code>settings.pipeline.sanity_checks: false</code> turns the checks
+off entirely.</p>
+<p><strong>Eval seeding is hooked; <code>regenerate</code> is not.</strong> <code>engine.evals.seed</code>
+(<a href="../../evals/seeding/">Benchmark your own database</a>) runs SQL a model
+proposed, so each draft's SQL passes <code>execute.before</code> and <code>execute.after</code> like
+a question's: every hook sees it (an approval hook, a cost guard), and a deny,
+a hook failure or a <code>NeedsApproval</code> drops the draft (<code>dropped_hooked</code>).
+<code>execute.after</code> gets a summary of the first row only (seeding reads one row
+to see that the query returns any), so its <code>row_count</code> is a floor and
+<code>truncated</code> is true. <code>engine.evals.regenerate</code> runs SQL a person reviewed and
+approved (a suite's gold <code>sql</code> and <code>alt_sql</code>) and calls no hook.</p>
+<p><strong>The verified path</strong> has no routing and no plan, so only <code>run.before</code>,
+<code>execute.before</code>, <code>execute.after</code> and <code>answer.after</code> apply. A deny there ends
+the run; it does not fall back to the generated path. <strong>A plan-only run</strong>
+(<code>execute=False</code>) never reaches the <code>execute.*</code> points.</p>
+<h2 id="decisions">Decisions</h2>
+<ul>
+<li><strong>Order.</strong> Hooks run in the order of the <code>hooks</code> list. A <code>Modify</code> replaces
+  the fields it sets and the next hook sees the result. The first <code>Deny</code> (or
+  <code>NeedsApproval</code>) ends the point; later hooks are not asked.</li>
+<li><strong>A deny</strong> ends the run with the error <code>HOOK_DENIED</code> (never retried), whose
+  message is the hook's <code>reason</code>. A run a hook ended carries none of its
+  data: no answer, no rows, no artifact references, no result manifest, and
+  its saved results cannot be read by its <code>trace_id</code> either (see
+  <a href="#what-withholding-guarantees">What withholding guarantees</a>).</li>
+<li><strong>Streaming.</strong> While any hook is attached at <code>answer.after</code>, <code>stream_query</code>
+  does not stream the answer as it is written (no <code>answer.delta</code> events), and
+  holds the <code>result.manifest</code> event until the hooks allowed the answer; on a
+  deny it is never sent. The answer arrives whole in <code>run.finished</code>.</li>
+<li><strong>A sub-query deny.</strong> At a per-sub-query point (<code>plan.after</code>,
+  <code>execute.before</code>, <code>execute.after</code>), <code>Deny(reason, scope="sub_query")</code> drops
+  only that sub-query: the run goes on without it and the answer's warnings
+  say what went unanswered. A sub-query that feeds a <code>join</code> or <code>compare</code>
+  cannot be dropped alone, so its whole group is dropped. If nothing is left,
+  the run ends with <code>HOOK_DENIED</code>.</li>
+<li><strong>Hooks fail closed.</strong> An exception, a return value that is not a
+  decision, or a decision the point does not allow (a <code>Modify</code> at
+  <code>execute.before</code>, a <code>NeedsApproval</code> at <code>plan.after</code>) is a hook error: the
+  run ends with <code>HOOK_FAILED</code>, whose message names only the hook and the
+  point; the exception's text goes to the log and to <code>hook.decision</code>, never
+  to the caller. With <code>on_error: open</code>, an
+  exception is logged and counts as <code>Allow</code>; a disallowed decision still
+  fails, because it is a bug in the hook, not an outage.</li>
+<li><strong>Approval.</strong> <code>NeedsApproval</code> at <code>execute.before</code> (on the generated or the
+  verified path) ends the run with <code>status: "needs_approval"</code>, the error
+  <code>NEEDS_APPROVAL</code> and an <code>ApprovalRequest</code> per pending sub-query in
+  <code>approvals_needed</code>. Re-running the question as the asker with
+  <code>approvals=[Approval(request=..., by=&lt;the approver&gt;)]</code> pins what was
+  approved and generates the SQL again; the engine accepts the approval
+  only if the request is unedited, the question and the asker are this
+  run's, the hash of the new SQL matches, and the approver holds one of the
+  hook's <code>approver_roles</code> (by default <code>policies.admin_roles</code>). An accepted
+  approval counts as <code>Allow</code> (<code>hook.decision</code> with <code>decision: "approved"</code>
+  and the <code>approver</code>), and the next hook at the point still runs. A hook
+  also sees the run's approvals as <code>ctx.approvals</code>. See
+  <a href="../../api/core/query/#approval">Query API → Approval</a>.</li>
+<li><strong>Timeouts</strong> are the hook's own; the pipeline's <code>timeout_s</code> bounds the run.</li>
+<li><strong>Events.</strong> Every hook asked publishes <code>hook.decision</code> (<code>hook</code>, <code>point</code>,
+  <code>decision</code>, <code>reason</code>, <code>sub_query_id</code>, <code>approver</code>, <code>seconds</code>).</li>
+<li><strong>The plan cache keeps the planner's plan</strong>, never a hook's change of it;
+  <code>plan.after</code> runs on every cache hit, so a change applies afresh on each
+  run and stops the moment the hook config changes.</li>
+</ul>
+<h2 id="what-withholding-guarantees">What withholding guarantees</h2>
+<p>A run a hook ended (<code>HOOK_DENIED</code>, <code>HOOK_FAILED</code>, <code>NEEDS_APPROVAL</code>,
+<code>COST_LIMIT_EXCEEDED</code>) returns none of its data, and its saved results cannot
+be read by its <code>trace_id</code>: <code>engine.results.manifest</code>, <code>page</code>, <code>csv</code> and
+<code>chart</code> and the REST results routes answer <code>ResultNotFound</code> (404), from
+<code>run_query</code>, <code>stream_query</code>, <code>nl2sql eval</code> and trace replay alike. This holds
+while the run is still going too, although a streaming caller has the
+<code>trace_id</code> from <code>run.started</code>.</p>
+<p>Every read of a run's results goes through its manifest, and the manifest is
+written only once no hook can end the run any more:</p>
+<ul>
+<li>While a hook is attached at <code>answer.after</code>, the aggregator saves the
+  results but not the manifest. The node that asks <code>answer.after</code> writes it
+  when the hooks allow. A run they deny, or that ends earlier, never has one.
+  If that write fails, the run fails.</li>
+<li>Without such a hook, nothing can end the run after the aggregator, so the
+  aggregator writes the manifest itself, as soon as the results are saved.</li>
+<li>A hook at any earlier point that ends the run ends it before the
+  aggregator runs, so there is no manifest.</li>
+</ul>
+<p>The parquet files of a run with no manifest stay until retention purges
+them, but nothing reads them. With a hook at <code>answer.after</code>, a run that
+crashed or timed out before the hooks ruled has no manifest either, and
+neither has a run whose answer model failed: the hooks never saw its
+results, so it returns no <code>result_manifest</code>, no <code>artifact_refs</code> and no rows,
+and <code>stream_query</code> sends no <code>result.manifest</code> event. Without such a hook
+that run keeps its results, as nothing was left to withhold them for. The
+run's trace records the error that ended it, without rows. An approved
+re-run is a new run with a new <code>trace_id</code>, read as any other.</p>
+<h2 id="built-in-hooks">Built-in hooks</h2>
+<p>One hook is built in: <code>policy.cost</code>, the <a href="../policies/#cost">cost rule</a>. The
+engine builds it from <code>policies.cost</code> (or a role's <code>cost</code>), not from the
+<code>hooks</code> list, and puts it first at <code>execute.before</code>, ahead of every hook you
+configure, so an over-limit query never reaches your hook. Its approvers are
+<code>policies.admin_roles</code>. Its <code>Deny</code> ends the run with <code>COST_LIMIT_EXCEEDED</code>
+rather than <code>HOOK_DENIED</code>, and its <code>hook.decision</code> events name <code>policy.cost</code>.
+Without a <code>cost</code> block it is not built, and <code>execute.before</code> is as you
+configured it.</p>
+<h2 id="write-one">Write one</h2>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="c1"># corp_hooks.py: a hook that keeps the payroll database out of the afternoon.</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClassVar</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.hooks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Allow</span><span class="p">,</span> <span class="n">Deny</span><span class="p">,</span> <span class="n">HookContext</span>
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">QuietHoursConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a>    <span class="n">datasource</span><span class="p">:</span> <span class="nb">str</span>                 <span class="c1"># the datasource it guards</span>
+<a href="#__codelineno-0-12" id="__codelineno-0-12" name="__codelineno-0-12"></a>    <span class="n">from_hour</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">12</span>             <span class="c1"># local time</span>
+<a href="#__codelineno-0-13" id="__codelineno-0-13" name="__codelineno-0-13"></a>    <span class="n">to_hour</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">18</span>
+<a href="#__codelineno-0-14" id="__codelineno-0-14" name="__codelineno-0-14"></a>
+<a href="#__codelineno-0-15" id="__codelineno-0-15" name="__codelineno-0-15"></a>
+<a href="#__codelineno-0-16" id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="k">class</span><span class="w"> </span><span class="nc">QuietHours</span><span class="p">:</span>
+<a href="#__codelineno-0-17" id="__codelineno-0-17" name="__codelineno-0-17"></a>    <span class="n">interface_version</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+<a href="#__codelineno-0-18" id="__codelineno-0-18" name="__codelineno-0-18"></a>    <span class="n">config_model</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">type</span><span class="p">]</span> <span class="o">=</span> <span class="n">QuietHoursConfig</span>
+<a href="#__codelineno-0-19" id="__codelineno-0-19" name="__codelineno-0-19"></a>    <span class="n">points</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"execute.before"</span><span class="p">})</span>
+<a href="#__codelineno-0-20" id="__codelineno-0-20" name="__codelineno-0-20"></a>
+<a href="#__codelineno-0-21" id="__codelineno-0-21" name="__codelineno-0-21"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">QuietHoursConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a href="#__codelineno-0-22" id="__codelineno-0-22" name="__codelineno-0-22"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span> <span class="o">=</span> <span class="n">cfg</span>
+<a href="#__codelineno-0-23" id="__codelineno-0-23" name="__codelineno-0-23"></a>
+<a href="#__codelineno-0-24" id="__codelineno-0-24" name="__codelineno-0-24"></a>    <span class="nd">@classmethod</span>
+<a href="#__codelineno-0-25" id="__codelineno-0-25" name="__codelineno-0-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">from_config</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">QuietHoursConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"QuietHours"</span><span class="p">:</span>
+<a href="#__codelineno-0-26" id="__codelineno-0-26" name="__codelineno-0-26"></a>        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cfg</span><span class="p">)</span>
+<a href="#__codelineno-0-27" id="__codelineno-0-27" name="__codelineno-0-27"></a>
+<a href="#__codelineno-0-28" id="__codelineno-0-28" name="__codelineno-0-28"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">HookContext</span><span class="p">):</span>
+<a href="#__codelineno-0-29" id="__codelineno-0-29" name="__codelineno-0-29"></a>        <span class="n">busy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">from_hour</span> <span class="o">&lt;=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">hour</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">to_hour</span>
+<a href="#__codelineno-0-30" id="__codelineno-0-30" name="__codelineno-0-30"></a>        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">datasource_id</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">datasource</span> <span class="ow">and</span> <span class="n">busy</span><span class="p">:</span>
+<a href="#__codelineno-0-31" id="__codelineno-0-31" name="__codelineno-0-31"></a>            <span class="k">return</span> <span class="n">Deny</span><span class="p">(</span><span class="n">reason</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">datasource_id</span><span class="si">}</span><span class="s2"> is closed to questions until "</span>
+<a href="#__codelineno-0-32" id="__codelineno-0-32" name="__codelineno-0-32"></a>                               <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">to_hour</span><span class="si">}</span><span class="s2">:00."</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="s2">"sub_query"</span><span class="p">)</span>
+<a href="#__codelineno-0-33" id="__codelineno-0-33" name="__codelineno-0-33"></a>        <span class="k">return</span> <span class="n">Allow</span><span class="p">()</span>
+</code></pre></div>
+<p>Register it, either in code or as an entry point in your package:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">NL2SQL</span><span class="p">,</span> <span class="n">Registry</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">Registry</span><span class="o">.</span><span class="n">default</span><span class="p">()</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="n">registry</span><span class="o">.</span><span class="n">add_hook</span><span class="p">(</span><span class="s2">"quiet_hours"</span><span class="p">,</span> <span class="n">QuietHours</span><span class="p">)</span>       <span class="c1"># or @registry.hook("quiet_hours")</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="n">engine</span> <span class="o">=</span> <span class="n">NL2SQL</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">registry</span><span class="o">=</span><span class="n">registry</span><span class="p">)</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="k">[project.entry-points.</span><span class="s2">"nl2sql.hooks"</span><span class="k">]</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="n">quiet_hours</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"corp_hooks:QuietHours"</span>
+</code></pre></div>
+<h2 id="configure-it">Configure it</h2>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="c1"># nl2sql.yaml</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="nt">hooks</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> file</span><span class="p">:</span><span class="w"> </span><span class="nv">hooks.yaml</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="c1"># hooks.yaml: a list; order matters</span>
+<a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">quiet_hours</span>
+<a href="#__codelineno-3-6" id="__codelineno-3-6" name="__codelineno-3-6"></a><span class="w">  </span><span class="nt">points</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">execute.before</span><span class="p p-Indicator">]</span><span class="w">        </span><span class="c1"># a subset of the hook's own points; all of them by default</span>
+<a href="#__codelineno-3-7" id="__codelineno-3-7" name="__codelineno-3-7"></a><span class="w">  </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">closed</span><span class="w">                </span><span class="c1"># closed (the default) | open</span>
+<a href="#__codelineno-3-8" id="__codelineno-3-8" name="__codelineno-3-8"></a><span class="w">  </span><span class="nt">approver_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">dba</span><span class="p p-Indicator">]</span><span class="w">           </span><span class="c1"># who may approve its NeedsApproval; default policies.admin_roles</span>
+<a href="#__codelineno-3-9" id="__codelineno-3-9" name="__codelineno-3-9"></a><span class="w">  </span><span class="nt">datasource</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">payroll</span><span class="w">             </span><span class="c1"># the hook's own keys, checked by its config_model</span>
+</code></pre></div>
+<p>A point the hook does not declare, an unknown <code>type</code> or a key its
+<code>config_model</code> rejects is a <code>ConfigError</code> when the engine is built, naming
+<code>hooks[&lt;i&gt;]</code>. In code, a <code>HookConfig</code> or any callable object works:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">Config</span><span class="p">,</span> <span class="n">HookConfig</span>
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql.hooks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Allow</span><span class="p">,</span> <span class="n">Modify</span>
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a>
+<a href="#__codelineno-4-4" id="__codelineno-4-4" name="__codelineno-4-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">tag_year</span><span class="p">(</span><span class="n">ctx</span><span class="p">):</span>
+<a href="#__codelineno-4-5" id="__codelineno-4-5" name="__codelineno-4-5"></a>    <span class="k">return</span> <span class="n">Modify</span><span class="p">(</span><span class="n">question</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">question</span> <span class="o">+</span> <span class="s2">" (calendar year)"</span><span class="p">)</span> <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">point</span> <span class="o">==</span> <span class="s2">"run.before"</span> <span class="k">else</span> <span class="n">Allow</span><span class="p">()</span>
+<a href="#__codelineno-4-6" id="__codelineno-4-6" name="__codelineno-4-6"></a>
+<a href="#__codelineno-4-7" id="__codelineno-4-7" name="__codelineno-4-7"></a><span class="n">tag_year</span><span class="o">.</span><span class="n">points</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"run.before"</span><span class="p">})</span>
+<a href="#__codelineno-4-8" id="__codelineno-4-8" name="__codelineno-4-8"></a><span class="n">Config</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">hooks</span><span class="o">=</span><span class="p">[</span><span class="n">HookConfig</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"quiet_hours"</span><span class="p">,</span> <span class="n">datasource</span><span class="o">=</span><span class="s2">"payroll"</span><span class="p">),</span> <span class="n">tag_year</span><span class="p">])</span>
+</code></pre></div>
+<p>An object runs at its <code>points</code> (all six when it has none), named by its
+<code>name</code> attribute or its function or class name.</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Entry point group</th>
+<th>Interface</th>
+<th>Version</th>
+<th>Built-ins</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>hook</td>
+<td><code>nl2sql.hooks</code></td>
+<td><code>nl2sql.hooks.Hook</code></td>
+<td>1</td>
+<td>none configurable; <code>policy.cost</code> is built in from <a href="../policies/#cost"><code>policies.cost</code></a></td>
+</tr>
+</tbody>
+</table>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+<script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+</body>
+</html>
