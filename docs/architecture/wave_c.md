@@ -2061,7 +2061,51 @@ Not built yet.
 
 ### L3
 
-Not built yet.
+!!! note "Built (L3): `nl2sql launch`, and need B2"
+    - **Files:** `cli/commands/launch.py` (the command; it reuses `profile_datasources` and `review._print_report`),
+      `cli/demo/stamp.py` (`outdated_warning`: no stamp is no warning), and, for need B2 (below), `nl2sql_sdk/stores.py`
+      (`ProposalKind` admits `example`, `ProposalOrigin` admits `template`), `knowledge/apply.py`, `review/accept.py`,
+      `review/queue.py` and `api/proposals_api.py` (`propose_examples`).
+    - **Tests:** `tests/cli/test_launch_command.py` (the row's list, plus a review that rejects, a review that
+      accepts, an unknown provider, a never-overwritten file and a failed test that never prints the password),
+      `tests/unit/test_example_proposals.py`, `test_database_url_is_read_only_by_launch` in the boundary test;
+      `test_wave_c_commands.py` lost its `launch` stub case and `test_demo_index_repair.py`'s unstamped-folder test now
+      expects no warning.
+
+    Where the code and the design differ, the code won:
+
+    - **B2 was not built by Wave B, so L3 builds it** (the design's "Wave B PR" column named B0 and Q1, but
+      `example` was dropped there and never returned). `engine.proposals.propose_examples(datasource_id, questions, *,
+      by)` needs an admin (`require_admin`), refuses an unknown datasource (`ValueError`), and files each question as
+      kind `example`, origin `template`, target the question, `change` `{"question": text}`. Accept appends it to the
+      datasource's `examples` unless it is there; `current` shows the existing example. An example names no table, so
+      every caller who reaches the datasource sees it.
+    - **The questions are asked in this order:** which database, the missing fields, the datasource's name (default:
+      the file's name, or the type), then the test. A failed test asks every required field again, the typed values as
+      defaults (a hidden one keeps its value on Enter), so a database that is fully filled can still be corrected.
+    - **"Another database"** asks for a type by name (`sqlite`, `postgres`, ...), then the connection schema's required
+      fields. A driver that is missing is reported before any field is asked, from the candidate's
+      `installed`/`install_hint` or from `types()`. The `uvx` line is built from the extra in `install_hint`
+      (`nl2sql-engine[postgres]`); a hint without one prints the hint only.
+    - **A new project's first engine** is `starter_config(...)` without its knowledge source, because the glossary it
+      names does not exist until `write_project` writes it; only `scan` and `test` run on it, and it is closed before
+      the project's own engine is built from the files.
+    - **The model key:** read with `api_key_from_env(provider)` (so `llm/` stays the one reader of a key variable);
+      absent, it is asked, hidden, and checked only for shape (`looks_like_api_key`). A new project writes it as
+      `llm.api_key`, so `write_project` turns it into `${env:NL2SQL_LLM_API_KEY}` and `NL2SQL_LLM_API_KEY=` in `.env`;
+      an existing project whose `llm.api_key` is unset gets `<PROVIDER>_API_KEY=` in its `.env`, which the engine
+      already reads, and its YAML is not touched.
+    - **The admin** is `--as`, else the first of `policies.admin_roles`, else (under `allow_all`) a caller with no
+      role; a bad role exits 1 before anything is asked. The new project is `allow_all`, so profile and review run
+      as that caller.
+    - **Review** shows each proposal's kind, target and change; `a`, `r`, `s` (the default) and `e` (the change as
+      JSON). Decisions are collected and applied as one `accept` and one `reject`. After an accept it prints the
+      `nl2sql index --refresh` hint rather than refreshing itself. `--yes` exports `DIR/review.yaml` for the
+      datasource, and decides nothing.
+    - **`--draft`** is the only model call; without it the fake LLM server records none
+      (`test_launch_makes_no_model_call_without_draft`).
+    - **`nl2sql demo`:** `outdated_warning` returns None for a folder with no stamp, and still warns for a stamp from an
+      older version.
 
 ### M1
 

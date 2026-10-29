@@ -1289,6 +1289,18 @@ def test_environment_reads_only_from_the_allow_list():
         "nl2sql.yaml, as ${env:VAR} if it should come from the environment.", offenders)
 
 
+def test_database_url_is_read_only_by_launch():
+    """``DATABASE_URL`` is the one environment variable an entry point offers as a candidate; nothing else names it."""
+    launch = "nl2sql/src/nl2sql/cli/commands/launch.py"
+    readers = {_where(path) for path in python_files(*SOURCES)
+               for node in ast.walk(_tree(path))
+               if isinstance(node, ast.Constant) and node.value == "DATABASE_URL"}
+    assert readers == {launch}, _broke(
+        "DATABASE_URL is read by nl2sql launch only (wave_c.md, section 7): it is offered as a candidate "
+        "to scan(url=...). A library or another command that wants a connection URL takes it as a "
+        "parameter or reads ${env:VAR} from nl2sql.yaml.", sorted(readers ^ {launch}))
+
+
 def test_only_entry_points_load_dotenv():
     loaders, callers = [], []
     for path in python_files(*SOURCES):

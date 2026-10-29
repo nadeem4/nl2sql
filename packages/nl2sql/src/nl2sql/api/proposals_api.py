@@ -45,6 +45,28 @@ class ProposalsAPI:
         seen = [p for p in rows if visible(self._ctx, who, p)]
         return seen[:limit] if limit is not None else seen
 
+    def propose_examples(self, datasource_id: str, questions: Sequence[str], *,
+                         by: "UserContext") -> List["Proposal"]:
+        """File each question as an ``example`` proposal (origin ``template``): a question the datasource can
+        answer, which an accept appends to the glossary's ``examples``. Nothing reaches the glossary, and so
+        routing, until a person accepts. Returns the rows as stored; one already decided stays as it was.
+
+        Raises:
+            TypeError: ``by`` is not a ``UserContext``.
+            ReviewError: ``NOT_AUTHORIZED`` (no admin role).
+            ValueError: the datasource is not configured.
+        """
+        from nl2sql.review.queue import propose, require_admin, who
+        from nl2sql_sdk.stores import Proposal
+
+        by = require_admin(self._ctx, by)
+        if datasource_id not in self._ctx.ds_registry.list_ids():
+            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+        return [propose(self._ctx, Proposal.build(kind="example", datasource_id=datasource_id, target=question,
+                                                   change={"question": question}, origin="template",
+                                                   created_by=who(by)))
+                for question in dict.fromkeys(q.strip() for q in questions if q.strip())]
+
     def get(self, id: str, *, user_context: "UserContext") -> "Proposal":
         """One proposal. One the caller's scope cannot see is not found (``ReviewError``, ``NOT_FOUND``)."""
         from nl2sql.review.models import ReviewError, ReviewErrorCode

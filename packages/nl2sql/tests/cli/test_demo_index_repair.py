@@ -99,14 +99,12 @@ def test_a_new_demo_folder_is_stamped_with_the_engine_version(project):
     assert body["engine_version"] == stamp.engine_version()
 
 
-def test_a_folder_without_a_stamp_is_flagged_as_older(project, capsys):
+def test_a_folder_without_a_stamp_is_not_a_demo_folder_and_is_not_flagged(project, capsys):
     (project / stamp.STAMP_FILE).unlink()
 
     demo_cmd.prepare_project(project)
 
-    out = _plain(capsys.readouterr().out)
-    assert "older version" in out
-    assert "--dir" in out
+    assert "created by" not in _plain(capsys.readouterr().out)
 
 
 def test_a_folder_stamped_by_an_older_engine_is_flagged(project, capsys):

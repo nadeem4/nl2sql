@@ -1,12 +1,11 @@
 """Wave C's CLI stubs (docs/architecture/wave_c.md, row C0b): ``keys``, ``launch`` and ``dashboards``.
 
-Each is registered with its final options and, until its row lands, says which row fills it and exits 1.
+Each is registered with its final options. A command whose row has landed is tested in its own file (``launch``: `test_launch_command.py`).
 """
 from __future__ import annotations
 
 import re
 
-import pytest
 from typer.testing import CliRunner
 
 from nl2sql.cli.main import app
@@ -17,16 +16,6 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 def _out(result) -> str:
     return re.sub(r"\s+", " ", ANSI.sub("", result.output))
-
-
-@pytest.mark.parametrize("command, row", [
-    (["launch", ".", "--provider", "openai", "--as", "admin", "--draft", "--yes", "--no-ports"], "L3"),
-])
-def test_a_stub_command_names_its_row_and_exits_1(command, row):
-    result = runner.invoke(app, command)
-
-    assert result.exit_code == 1, result.output
-    assert f"arrives with {row}" in _out(result)
 
 
 def test_the_new_commands_are_registered():

@@ -97,8 +97,9 @@ nl2sql doctor                      # drivers, provider keys, and the engine's ch
 nl2sql feedback stats              # ratings and guardrail rates
 ```
 
-Your own database: `nl2sql init` writes `nl2sql.yaml` and one file per section
-(edit `datasources/example.yaml`), then `nl2sql index`.
+Your own database: `nl2sql launch my-project` finds it, asks for what is missing, writes the project (secrets
+to `.env`), indexes, profiles and files five starter questions for review; or `nl2sql init` writes `nl2sql.yaml`
+and one file per section (edit `datasources/example.yaml`), then `nl2sql index`.
 
 Every command: [CLI reference](https://github.com/nadeem4/nl2sql#cli-reference).
 

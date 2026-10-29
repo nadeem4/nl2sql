@@ -196,6 +196,9 @@ def current_value(ctx: Any, user: "UserContext", proposal: Proposal) -> Optional
         item = next((v for k, v in items.items() if k.strip().lower() == target), None)
     elif proposal.kind == "term":
         item = next((t for t in knowledge.terms if t.term.strip().lower() == target), None)
+    elif proposal.kind == "example":
+        found = next((e for e in knowledge.examples if e.strip().lower() == target), None)
+        return {"question": found} if found is not None else None
     else:
         item = next((j for j in knowledge.joins
                      if "->".join(",".join(_sides(s)) for s in (j.from_, j.to)).lower() == target.replace(" ", "")),

@@ -3,7 +3,8 @@
 Demo folders are never upgraded in place: a folder scaffolded by an older
 engine keeps that engine's defaults (an older model, missing settings such as
 ``TRACE_MODE``). The stamp records which engine wrote the folder, so a later
-start can say so and suggest a fresh ``--dir``.
+start can say so and suggest a fresh ``--dir``. A folder with no stamp is not a demo folder
+(``nl2sql launch`` and ``nl2sql init`` write none), so it gets no warning.
 """
 from __future__ import annotations
 
@@ -50,15 +51,12 @@ def _older(created_by: str, current: str) -> bool:
 
 
 def outdated_warning(directory: Path) -> Optional[str]:
-    """A sentence for a folder written by an older engine, else None."""
+    """A sentence for a demo folder a stamp says an older engine wrote, else None (also for an unstamped folder)."""
     created_by = read_stamp(directory)
     current = engine_version()
-    if created_by is None:
-        origin = "an older version of nl2sql-engine (before demo folders were stamped)"
-    elif _older(created_by, current):
-        origin = f"nl2sql-engine {created_by}"
-    else:
+    if created_by is None or not _older(created_by, current):
         return None
+    origin = f"nl2sql-engine {created_by}"
     return (
         f"This demo folder was created by {origin}; you are running {current}. "
         "Demo folders are not upgraded in place, so it may be missing newer defaults. "

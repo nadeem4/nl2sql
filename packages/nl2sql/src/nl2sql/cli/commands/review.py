@@ -32,7 +32,7 @@ app = typer.Typer(help="The review queue: `list`, `show`, `accept`, `reject`, `e
                   no_args_is_help=True)
 
 KindOption = Annotated[Optional[str], typer.Option(
-    "--kind", help="Only this kind: join, column, table, term or verified_query.")]
+    "--kind", help="Only this kind: join, column, table, term, example or verified_query.")]
 DatasourceOption = Annotated[Optional[str], typer.Option("--datasource", help="Only this datasource.")]
 
 
