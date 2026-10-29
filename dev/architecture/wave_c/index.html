@@ -1251,6 +1251,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6e">
+<span class="md-ellipsis">
+      
+        C-W6e
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1408,6 +1417,15 @@
 <span class="md-ellipsis">
       
         18.5 C-W6d: date differences in plans
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#187-c-w6e-split-only-when-needed-quote-exact-figures">
+<span class="md-ellipsis">
+      
+        18.7 C-W6e: split only when needed, quote exact figures
       
     </span>
 </a>
@@ -4124,6 +4142,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6e">
+<span class="md-ellipsis">
+      
+        C-W6e
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4281,6 +4308,15 @@
 <span class="md-ellipsis">
       
         18.5 C-W6d: date differences in plans
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#187-c-w6e-split-only-when-needed-quote-exact-figures">
+<span class="md-ellipsis">
+      
+        18.7 C-W6e: split only when needed, quote exact figures
       
     </span>
 </a>
@@ -7925,6 +7961,8 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
 &lt;/ul&gt;
 &lt;h3 id="c-w6d"&gt;C-W6d&lt;/h3&gt;
 &lt;p&gt;Date differences in plans (design 18.5). &lt;code&gt;ast_planner/functions.py&lt;/code&gt;: &lt;code&gt;DATE_DIFF&lt;/code&gt; joins &lt;code&gt;ALLOWED_FUNCTIONS&lt;/code&gt;; &lt;code&gt;date_diff(func_name, args)&lt;/code&gt; reads &lt;code&gt;DATE_DIFF(unit, start, end)&lt;/code&gt; as &lt;code&gt;(unit, start, end)&lt;/code&gt; (all three None when malformed), and &lt;code&gt;DIFF_UNITS = ("day",)&lt;/code&gt;. The generator's &lt;code&gt;elapsed_days(start, end)&lt;/code&gt; builds &lt;code&gt;DateDiff(end, start, SECOND) / 86400.0&lt;/code&gt;: elapsed days with the fraction kept, a number on every adapter. The SDK's &lt;code&gt;SQLAlchemyAdapter.render_sql&lt;/code&gt; rewrites the seconds difference where sqlglot's rendering is wrong (MySQL &lt;code&gt;CAST(TIMESTAMPDIFF(SECOND, ...) AS DOUBLE)&lt;/code&gt;, since an integer over a decimal literal keeps four decimals there; SQL Server &lt;code&gt;DATEDIFF_BIG(SECOND, CAST(.. AS DATETIME2), ..)&lt;/code&gt;, which also takes &lt;code&gt;DATE&lt;/code&gt;); the SQLite adapter uses &lt;code&gt;(JULIANDAY(end) - JULIANDAY(start)) * 86400.0&lt;/code&gt;. Postgres and DuckDB need nothing. Tests: &lt;code&gt;tests/unit/test_date_diff.py&lt;/code&gt; runs real SQLite and DuckDB (3.87 days, two minutes across midnight, negative, NULL, DATE-only whole numbers) and pins the rendered Postgres, SQL Server and MySQL expressions; &lt;code&gt;tests/realdb/test_date_diff.py&lt;/code&gt; runs the same cases on the test bed. The logical validator rejects another unit or shape and returns early on it (&lt;code&gt;_validate_static&lt;/code&gt;, so the error is &lt;code&gt;INVALID_PLAN_STRUCTURE&lt;/code&gt;, not &lt;code&gt;VALIDATOR_CRASH&lt;/code&gt;; &lt;code&gt;DATE_PART&lt;/code&gt; with a bad unit too), and a &lt;code&gt;-&lt;/code&gt; between two columns typed date or timestamp (&lt;code&gt;_date_subtraction&lt;/code&gt;: not &lt;code&gt;TIME&lt;/code&gt;, tables matched by schema when the plan names one). The planner prompt offers it. Only the day unit. Not caught: a date column wrapped in a function, or a date minus a number.&lt;/p&gt;
+&lt;h3 id="c-w6e"&gt;C-W6e&lt;/h3&gt;
+&lt;p&gt;Prompt fixes from the keyed Pagila rerun (design 18.7). &lt;code&gt;decomposer/prompts.py&lt;/code&gt;: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final ranking as one sort op carrying &lt;code&gt;order_by&lt;/code&gt; and &lt;code&gt;limit&lt;/code&gt;). &lt;code&gt;answer_synthesizer/prompts.py&lt;/code&gt;: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in &lt;code&gt;tests/unit/test_decomposer_tool_schema.py&lt;/code&gt; and &lt;code&gt;tests/unit/test_node_answer_synthesizer.py&lt;/code&gt;; no model call, so the effect shows only in the owner's next keyed run.&lt;/p&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -8319,6 +8357,29 @@ SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed tim
 no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
 rejects any other unit or shape, and a &lt;code&gt;-&lt;/code&gt; between two date or timestamp columns, naming &lt;code&gt;DATE_DIFF&lt;/code&gt; in the message
 (validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, &lt;code&gt;invariants.md&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="187-c-w6e-split-only-when-needed-quote-exact-figures"&gt;18.7 C-W6e: split only when needed, quote exact figures&lt;/h3&gt;
+&lt;p&gt;Approved by the owner 2026-10-29 after the keyed Pagila rerun (5 of 9 passed).&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;What the plan can express.&lt;/strong&gt; Checked before writing the prompt: &lt;code&gt;PlanModel&lt;/code&gt; is one flat SELECT (tables, joins, select
+  items, where, group by, having, order by, limit, offset). &lt;code&gt;Expr&lt;/code&gt; has no subquery kind and &lt;code&gt;ALLOWED_FUNCTIONS&lt;/code&gt; has no
+  window function, and there are no CTEs. So the owner's premise (a "top N within the top group" question is one query
+  with a subquery, CTE or window) does not hold today, and the prompt does not promise it. "Top category, then its top 5
+  films" still needs two sub-queries.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;pagila_001 (decomposer).&lt;/strong&gt; The split was not the fault; the combination was. The run returned two result sets (the
+  scorer: "expected one result set, got 2"), one of them 73 unlimited film rows, and the answer hedged. The prompt now
+  says: split only when one query cannot express the question (a flat query already joins, filters, groups, orders and
+  limits), and when a ranked subset must filter another result, combine the two with one &lt;code&gt;join&lt;/code&gt; group and put the final
+  ranking in &lt;code&gt;post_combine_ops&lt;/code&gt; on that group as ONE &lt;code&gt;sort&lt;/code&gt; op with both &lt;code&gt;order_by&lt;/code&gt; and &lt;code&gt;limit&lt;/code&gt; (the engine does not
+  chain ops: each op nothing reads is its own result, so a &lt;code&gt;sort&lt;/code&gt; plus a &lt;code&gt;limit&lt;/code&gt; op gave two result sets again;
+  &lt;code&gt;test_decomposer_dag.py&lt;/code&gt; pins both). Genuine multi-datasource and independent multi-part questions
+  still split. Not done: a plan that can nest (subquery or CTE), which would make the split unnecessary; it is a change
+  to the plan, generator and validator, and a separate decision.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;pagila_007 (answer).&lt;/strong&gt; The rows matched the gold strictly, but the answer wrote "9,700" for 9712.47 and the
+  faithfulness scorer failed it. Instruction 2 now says to quote figures exactly as the rows hold them, with thousands
+  separators and the column's decimals allowed, and no rounding or "about".&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Verification.&lt;/strong&gt; Prompt-content tests only (no real model). Whether pagila_001 and pagila_007 now pass is the owner's
+  next keyed run.&lt;/li&gt;
+&lt;/ul&gt;
 
 
 
