@@ -72,7 +72,7 @@ are all among those it keeps. CI's eval-gates job gates on the newest run of eac
 | 2026-10-15 19:01:25 | baaae0c | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38788733052 | routing @1f65922e | @bffaf096 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 78 | - | - | 97.4% / 98.7% | new series (suite changed) | - |
 | 2026-10-15 17:45:34 | a33c8ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/38778183715 | routing @c87d2a8e | @bffaf096 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 78 | - | - | 97.4% / 98.7% | first run | - |
 
-## Retrieval recall: pagila (postgres, 29 tables / 171 columns)
+## Retrieval recall: pagila (postgres, 22 tables / 129 columns)
 
 `nl2sql eval run --mode retrieval`: the share of each answerable case's needed tables and
 columns that schema retrieval sends the planner, with the vector search forced on and no
@@ -82,4 +82,5 @@ are all among those it keeps. CI's eval-gates job gates on the newest run of eac
 
 | Date (UTC) | Commit | Note | Dataset | Schema | Search | Embedding | Cases scored | Table recall | Column recall | Routing top-1 / shortlist | Δ vs previous | Tables / columns sent |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-29 18:41:46 | c6144f5 | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40932743821 | pagila @0332fb60 | @d63caeb0 | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 11 | 85.5% | 68.2% | 100.0% / 100.0% | new series (schema changed) | 10.2 / 32.0 |
 | 2026-10-29 16:42:13 | 67236ce | CI baseline: ubuntu-latest, Python 3.12, https://github.com/nadeem4/nl2sql/actions/runs/40913697461 | pagila @0332fb60 | @1d07dcde | k 8 tables / 12 planning | local/all-MiniLM-L6-v2 | 11 | 84.9% | 71.2% | 100.0% / 100.0% | first run | 10.4 / 32.9 |
