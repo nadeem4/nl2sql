@@ -2,7 +2,9 @@
 
 The logic is ``nl2sql.dashboards.api``. D1 filled the store, the edits, ``pin`` and ``move``; D2 ``open``,
 ``refresh`` and ``run_scheduled`` (``filter_values`` and the filters of ``refresh`` are D2b's stubs); D3 the
-starter dashboard, ``generate`` and ``suggest_questions``. Every method takes the caller keyword-only and required (D130), except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
+starter dashboard, ``generate`` and ``suggest_questions``; D4 lets a conversation build and edit a draft
+(``create_draft``, and ``edit`` with a conversation). Every method takes the caller keyword-only and required (D130),
+except ``run_scheduled``, which runs each dashboard as its stored owner (D134).
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from nl2sql.common.errors import NotIndexed
 from nl2sql.common.planned import arrives_with
+from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.api import Dashboards
 from nl2sql.dashboards.models import (
     ChartChoice,
@@ -60,10 +63,33 @@ class DashboardsAPI:
         on first use). A single tile is never pinned; an empty draft or a saved dashboard is a ``ValueError``."""
         return self._service.pin(dashboard_id, user_context=user_context, workspace_id=workspace_id, title=title)
 
-    def edit(self, dashboard_id: str, edits: List[DashboardEdit], *, user_context: UserContext) -> Dashboard:
-        """Applies a list of dashboard edits, all or none. The named methods below call it. ``add_tile`` and
-        ``replace_plan`` change what data a chart shows and arrive with D4 (chat only)."""
-        return self._service.edit(dashboard_id, edits, user_context=user_context)
+    def create_draft(self, *, user_context: UserContext, title: Optional[str] = None,
+                     workspace_id: Optional[str] = None, conversation_id: Optional[str] = None) -> Dashboard:
+        """An empty draft owned by the caller (title "New dashboard" unless given), in ``workspace_id`` or else
+        "General", created on first use. ``dashboard_edit`` makes one on first use in a conversation and
+        ``conversation_id`` ties it to that conversation; ``pin`` saves it.
+
+        Raises:
+            WorkspaceNotFound: ``workspace_id`` is not one of the caller's.
+            ConversationNotFound: ``conversation_id`` is not one of the caller's conversations.
+        """
+        return self._service.create_draft(user_context=user_context, title=title, workspace_id=workspace_id,
+                                          conversation_id=conversation_id)
+
+    def edit(self, dashboard_id: str, edits: List[DashboardEdit], *, user_context: UserContext,
+             conversation: Optional[Conversation] = None) -> Dashboard:
+        """Applies a list of dashboard edits, all or none. The named methods below call it.
+
+        ``add_tile`` and ``replace_plan`` change what data a chart shows, so they exist only in a conversation: they
+        read the plan of an ``ask`` step of ``conversation`` (the caller's own; the chat tool passes the one it is
+        in), and a plan the validator rejects, or the caller may not read, is refused by a run that executes nothing
+        before anything is saved. Without ``conversation`` they are a ``ValueError``.
+
+        ``conversation`` is trusted: its steps are not re-read from the store, only its owner is checked against the
+        caller. So it is for SDK code that holds the caller's own ``Conversation`` (the chat tool does), and is not
+        offered over REST or MCP. The access check of the plan still runs as the caller. In ``from_step``, ``turn``
+        defaults to the conversation's latest turn."""
+        return self._service.edit(dashboard_id, edits, user_context=user_context, conversation=conversation)
 
     def rename(self, dashboard_id: str, title: str, *, user_context: UserContext) -> Dashboard:
         """Renames the dashboard."""

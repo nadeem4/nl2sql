@@ -4,7 +4,8 @@ D1 is the store and the manual edits: a dashboard is private to its owner (D118)
 workspaces (D131), is built as a draft and saved whole by ``pin``. D2 runs the charts: ``open`` serves the stored
 results after the access check, ``refresh`` re-runs the stored plans as the caller, ``run_scheduled`` does so for
 each due schedule as its owner (D134). D3 is the starter dashboard: ``generate`` builds the template charts from the
-column roles, runs each as the caller and saves the ones that answered. None of it calls a model.
+column roles, runs each as the caller and saves the ones that answered. D4 lets a conversation build a draft and add or
+replace a chart from an answer it holds, after a no-execute check of the plan. None of it calls a model.
 """
 from __future__ import annotations
 
@@ -14,8 +15,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from nl2sql.common.errors import NoTiles, WorkspaceNotEmpty
-from nl2sql.conversations.store import Owner
-from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits
+from nl2sql.conversations.models import Conversation
+from nl2sql.conversations.store import ConversationStore, Owner
+from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits, plan_from_step
 from nl2sql.dashboards.layout import arrange
 from nl2sql.dashboards.models import (
     Arrange, ChartChoice, Dashboard, DashboardEdit, DashboardFilter, DashboardInfo, DashboardRun, DashboardView,
@@ -36,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 _STATUSES = ("draft", "saved")
 _PLACE = TileLayout(x=0, y=0, w=1, h=1)  # a starter chart's place until the layout puts it somewhere
+DEFAULT_DRAFT_TITLE = "New dashboard"
 
 
 class Dashboards:
@@ -76,6 +79,24 @@ class Dashboards:
             self._store.delete(dashboard_id)
         self._changed(dashboard_id, ["deleted"], user_context)
 
+    def create_draft(self, *, user_context: UserContext, title: Optional[str] = None,
+                     workspace_id: Optional[str] = None, conversation_id: Optional[str] = None) -> Dashboard:
+        """An empty draft owned by the caller, in ``workspace_id`` (else "General", created on first use). The chat
+        tool makes one on first use and ties it to its conversation."""
+        owner = self._owner(user_context)
+        if conversation_id is not None:
+            ConversationStore(self._ctx.state).get(conversation_id, owner)  # another caller's: not found
+        name = _title(title if title is not None else DEFAULT_DRAFT_TITLE, "dashboard")
+        workspace = self._store.workspace(workspace_id, owner) if workspace_id is not None \
+            else self._workspaces.default(owner, user_context)
+        now = datetime.now(timezone.utc)
+        draft = Dashboard(id=secrets.token_urlsafe(12), title=name, workspace_id=workspace.id, status="draft",
+                          conversation_id=conversation_id, tenant_id=owner[0], user_id=owner[1], created_at=now,
+                          updated_at=now)
+        self._store.put(draft)
+        self._changed(draft.id, ["created"], user_context)
+        return draft
+
     def pin(self, dashboard_id: str, *, user_context: UserContext, workspace_id: Optional[str] = None,
             title: Optional[str] = None) -> Dashboard:
         owner = self._owner(user_context)
@@ -101,14 +122,18 @@ class Dashboards:
 
     # ------------------------------------------------------------ the edits
 
-    def edit(self, dashboard_id: str, edits: Sequence[DashboardEdit], *, user_context: UserContext) -> Dashboard:
+    def edit(self, dashboard_id: str, edits: Sequence[DashboardEdit], *, user_context: UserContext,
+             conversation: Optional[Conversation] = None) -> Dashboard:
         owner = self._owner(user_context)
         dashboard = self._store.get(dashboard_id, owner)
         if not edits:
             return dashboard
+        if conversation is not None and (conversation.tenant_id, conversation.user_id) != owner:
+            raise ValueError("That conversation is not the caller's: its answers cannot be added to a dashboard.")
         # Under the refresh lock: a refresh that finished after ``set_filters`` would store results that ignore
         # the new filters.
-        with self._refresher.locked(dashboard_id):
+        checks = sum(1 for e in edits if e.kind in ("add_tile", "replace_plan"))  # each runs a no-execute check
+        with self._refresher.locked(dashboard_id, checks):
             dashboard = self._store.get(dashboard_id, owner)
             now = datetime.now(timezone.utc)
             env = EditEnv(
@@ -117,7 +142,9 @@ class Dashboards:
                 now=now, min_refresh_minutes=self._ctx.config.dashboards.min_refresh_minutes,
                 workspace_ids={w.id for w in self._store.workspaces(owner)},
                 chart_settings=self._ctx.settings.charts,
-                last_run=lambda tile_id: self._store.last_run(dashboard_id, tile_id))
+                last_run=lambda tile_id: self._store.last_run(dashboard_id, tile_id),
+                step=None if conversation is None else (lambda ref: plan_from_step(conversation, ref)),
+                check=lambda tile: self._check(tile, user_context))
             applied = apply_edits(dashboard, edits, env)  # raises before anything is stored: all or none
             saved = applied.dashboard.model_copy(update={"updated_at": now})
             # Results first: if the drop fails nothing was saved, and a lost result only costs a refresh, whereas a
@@ -126,6 +153,14 @@ class Dashboards:
             self._store.put(saved)
         self._published(applied, saved, user_context)
         return saved
+
+    def _check(self, tile: Tile, user: UserContext) -> None:
+        """The access check of D135 for a chart about to be saved: its plan is validated and generated as the caller,
+        running nothing. A plan the validator rejects, or that the caller may not read, never lands (D4)."""
+        run = self._refresher.check([tile], user)[tile.id]
+        if run.status not in SERVES:
+            why = (run.error or {}).get("message") or f"the check ended {run.status}"
+            raise ValueError(f"The plan of the chart '{tile.title}' was refused ({why}). Nothing was saved.")
 
     def rename(self, dashboard_id: str, title: str, *, user_context: UserContext) -> Dashboard:
         return self.edit(dashboard_id, [RenameDashboard(title=title)], user_context=user_context)

@@ -346,10 +346,10 @@ def test_chat_tools_list_describes_the_enabled_tools(build):
     assert infos[0].description == "Echo some text back." and infos[0].args_schema["required"] == ["text"]
 
 
-def test_no_section_enables_chart_diagram_and_report_only(build):
+def test_no_section_enables_the_default_tools(build):
     engine = build(None)
 
-    assert [i.name for i in engine.chat_tools.list()] == ["chart", "diagram", "report"]
+    assert [i.name for i in engine.chat_tools.list()] == ["chart", "diagram", "report", "dashboard_edit", "dashboard_pin"]
 
 
 def test_a_missing_section_enables_only_the_default_tools_the_registry_has():

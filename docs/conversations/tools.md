@@ -1,9 +1,7 @@
 # Chat tools
 
-!!! note "Wave C, 0.9: the runner, `chart`, `diagram` and `report` are built"
-    `dashboard_edit` and `dashboard_pin` arrive with D4; until then each raises
-    `NotImplementedError`, which a conversation reports as a failed step, so they are off by default. The design is
-    [Wave C, section 4](../architecture/wave_c.md#4-chat-tools).
+!!! note "Wave C, 0.9: the runner and the five tools are built"
+    The design is [Wave C, section 4](../architecture/wave_c.md#4-chat-tools).
 
 A chat tool turns something a conversation already has into something else, with no model call of its
 own. The five built-ins:
@@ -13,14 +11,14 @@ own. The five built-ins:
 | `chart` | Draws an answer's data as a line, bar, big number or table ([Charts](../charts/index.md)); args `turn`, `step`, `result_id`, `kind` | K1 (built) |
 | `diagram` | Draws the tables of an answer, or of a datasource, as Mermaid ([Diagrams](../charts/diagrams.md)); args `view` (`answer` or `schema`), `turn`, `step`, `datasource_id`, `tables` | K2 (built) |
 | `report` | Writes the conversation's answered turns up as Markdown; args `turns`, `title` | C2 (built) |
-| `dashboard_edit` | Builds or changes a dashboard ([Dashboards](../dashboards/index.md)) | D4 |
-| `dashboard_pin` | Saves the dashboard being built, whole | D4 |
+| `dashboard_edit` | Builds or changes a dashboard ([Dashboards](../dashboards/index.md#building-in-chat)); args `edits`, `dashboard_id`, `title`, `workspace_id` | D4 (built) |
+| `dashboard_pin` | Saves the dashboard being built, whole; args `dashboard_id`, `workspace_id`, `title` | D4 (built) |
 
 ## Which tools are on
 
-`chat_tools:` in `nl2sql.yaml` lists registered names. Absent, the default tools are on: `chart`, `diagram` and
-`report`, those of them the registry has (an engine built on `Registry.empty()` has none). `dashboard_edit`
-and `dashboard_pin` are off until D4 makes them real; name them in `chat_tools:` to try them. `[]` turns
+`chat_tools:` in `nl2sql.yaml` lists registered names. Absent, the default tools are on: `chart`, `diagram`,
+`report`, `dashboard_edit` and `dashboard_pin`, those of them the registry has (an engine built on
+`Registry.empty()` has none). `[]` turns
 every registry tool off and leaves `ask`, the conversation's own tool, which is always on. A name you list
 that the registry does not know is a config error when the engine is built, and so is `ask` (it is not a
 registry tool). `engine.chat_tools.list()` returns the enabled tools
@@ -39,6 +37,26 @@ registry tool). `engine.chat_tools.list()` returns the enabled tools
 - **A client calls it by name.** `engine.conversations.tool(cid, "chart", {"turn": 3}, user_context=me)`
   runs one enabled tool as a turn of kind `tool`, with no model call. Arguments that do not validate raise
   `ValueError` and store nothing. A name that is not enabled is stored as a failed step.
+
+## The dashboard tools
+
+`dashboard_edit` takes `edits`, the list of [dashboard edits](../dashboards/index.md#editing-by-hand) a person can
+make by hand plus `add_tile` and `replace_plan`, and applies them with `engine.dashboards.edit`, all or none. Its
+other arguments are `dashboard_id` (the conversation's dashboard when absent), and `title` and `workspace_id` for a
+new draft. The first call in a conversation makes a **draft** tied to it (`Conversation.dashboard_id`,
+`Dashboard.conversation_id`); later calls edit the same one, and a conversation started with
+`start(dashboard_id=...)` edits that dashboard. `add_tile` and `replace_plan` name an answer by `from_step`
+(`turn`, which defaults to the turn being answered, and which of that turn's `ask` calls with a result, counting
+from 1): the engine reads the whole plan from its own
+stored step, never from model text, and checks it with a run that executes nothing before saving, so a plan the
+validator rejects ends the step as `TOOL_NOT_APPLICABLE` with the validator's message and saves nothing. A draft
+this call made is removed again, whatever the failure. If the conversation's dashboard was deleted, the next edit
+makes a new draft and the conversation is tied to that. `dashboard_pin` saves the whole draft (`engine.dashboards.pin`) and is called
+only when the user asks. A dashboard that is not the caller's is "not found". Neither tool calls a model or
+shows the model a row: it gets the step's kind, title and `refs` (`{"dashboard_id": ...}`), and the open
+dashboard in `[CONVERSATION]` as `dashboard` (`id`, `title`, `status`, and each chart's `id`, `title`, `question`,
+`chart` and last `status`, with the reason for a `needs_fixing` or `denied` one), re-read at every step so it
+shows this turn's edits.
 
 ## Errors
 

@@ -3,23 +3,26 @@
 ``apply_edits`` is pure: it works on a copy of the dashboard and returns it with what changed, so an edit list
 is applied all or none (a refused edit leaves nothing behind) and the caller stores the result once. No edit
 calls a model, and none takes a question or a plan: ``add_tile`` and ``replace_plan`` change *what data* a chart
-shows, which only chat does (D4).
+shows, which only chat does (D4): they read the plan from an `ask` step of a conversation and check it with a
+no-execute run before it is saved, so a plan the validator would reject never lands in a dashboard.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, Dict, List, Optional, Sequence, Set
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from nl2sql.charts.choose import choose
 from nl2sql.charts.spec import ChartSpec, ColumnKind
 from nl2sql.common.errors import ScheduleTooFrequent, WorkspaceNotFound
-from nl2sql.common.planned import arrives_with
 from nl2sql.config.models import ChartSettings
+from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.models import (
-    Arrange, Dashboard, DashboardEdit, MoveDashboard, RemoveTile, RenameDashboard, RenameTile, Schedule,
-    ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, Tile, TileLayout, TileRun,
+    GRID_COLUMNS, AddTile, Arrange, ChartPlan, Dashboard, DashboardEdit, MoveDashboard, RemoveTile, RenameDashboard,
+    RenameTile, ReplacePlan, Schedule, ScheduleIdentity, SetFilters, SetSchedule, SetTileChart, StepRef, Tile,
+    TileLayout, TileRun,
 )
+from nl2sql.hooks.approval import VerifiedRef
 
 
 @dataclass
@@ -32,6 +35,10 @@ class EditEnv:
     workspace_ids: Set[str]  # the caller's workspaces
     chart_settings: ChartSettings
     last_run: Callable[[str], Optional[TileRun]]  # a tile's last stored result
+    # Chat only (D4): the question and plan of an ``ask`` step, and the no-execute check of a chart, which raises
+    # ``ValueError`` when its plan is refused. Absent, ``add_tile`` and ``replace_plan`` are refused.
+    step: Optional[Callable[[StepRef], Tuple[str, ChartPlan]]] = None
+    check: Optional[Callable[[Tile], None]] = None
 
 
 @dataclass
@@ -47,10 +54,7 @@ def apply_edits(dashboard: Dashboard, edits: Sequence[DashboardEdit], env: EditE
     that cannot be applied (``ValueError``, ``WorkspaceNotFound``, ``ScheduleTooFrequent``)."""
     applied = Applied(dashboard=dashboard)
     for edit in edits:
-        handler = _HANDLERS.get(edit.kind)
-        if handler is None:
-            raise arrives_with(f"The '{edit.kind}' edit", "D4")
-        applied.dashboard = handler(applied.dashboard, edit, env, applied)
+        applied.dashboard = _HANDLERS[edit.kind](applied.dashboard, edit, env, applied)
         if edit.kind not in applied.kinds:
             applied.kinds.append(edit.kind)
     return applied
@@ -159,6 +163,78 @@ def _move(d: Dashboard, e: MoveDashboard, env: EditEnv, out: Applied) -> Dashboa
     return d.model_copy(update={"workspace_id": e.workspace_id})
 
 
+def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, ChartPlan]:
+    """The question and the whole plan of an ``ask`` step the conversation holds: its decomposition with the plan of
+    each sub-query, or the verified query that answered. ``ref.step`` counts the turn's ``ask`` steps from 1, as the
+    ``chart`` tool does. Nothing but what the engine stored is read: no model text becomes a plan (D4)."""
+    if ref.turn is None:
+        turn = conversation.turns[-1] if conversation.turns else None
+    else:
+        turn = next((t for t in conversation.turns if t.index == ref.turn), None)
+    if turn is None:
+        raise ValueError(f"There is no turn {ref.turn or 'yet'} in this conversation.")
+    asks = [s for s in turn.steps if s.call.name == "ask" and s.result is not None]  # as the chart tool counts
+    if ref.step > len(asks):
+        raise ValueError(f"Turn {ref.turn} has {len(asks)} answer(s) to build a chart from; there is no step {ref.step}.")
+    step = asks[ref.step - 1]
+    result = step.result
+    if step.status != "ok" or result is None:
+        raise ValueError(f"Step {ref.step} of turn {ref.turn} did not answer ({step.status}); a chart needs an answer.")
+    if result.source.type == "verified":
+        plan = ChartPlan(verified=VerifiedRef(id=result.source.id or "", params=dict(result.source.params or {})),
+                         verified_datasource_id=result.source.datasource_id)
+    else:
+        plans = {sq.id: sq.plan for sq in result.sub_queries if sq.plan}
+        missing = [] if result.decomposition is None else [
+            s.id for s in result.decomposition.sub_queries if s.id not in plans]
+        if result.decomposition is None or missing:
+            raise ValueError(f"Step {ref.step} of turn {ref.turn} kept no plan to build a chart from.")
+        plan = ChartPlan(decomposition=result.decomposition.model_dump(mode="json"),
+                         plans={s.id: plans[s.id] for s in result.decomposition.sub_queries})
+    return step.question or "", plan
+
+
+def _from_step(env: EditEnv, kind: str, ref: StepRef) -> Tuple[str, ChartPlan]:
+    if env.step is None or env.check is None:
+        raise ValueError(f"The '{kind}' edit exists only in a conversation: it takes the plan from an answer the "
+                         "conversation holds (the dashboard_edit chat tool).")
+    return env.step(ref)
+
+
+def _free_id(tiles: Sequence[Tile]) -> str:
+    taken = {t.id for t in tiles}
+    n = 1
+    while f"t{n}" in taken:
+        n += 1
+    return f"t{n}"
+
+
+def _next_layout(tiles: Sequence[Tile]) -> TileLayout:
+    """Beside the last chart when there is room on its row, else a new row."""
+    if not tiles:
+        return TileLayout(x=0, y=0, w=2, h=2)
+    last = max(tiles, key=lambda t: (t.layout.y, t.layout.x))
+    if last.layout.x + last.layout.w + 2 <= GRID_COLUMNS:
+        return TileLayout(x=last.layout.x + last.layout.w, y=last.layout.y, w=2, h=2)
+    return TileLayout(x=0, y=max(t.layout.y + t.layout.h for t in tiles), w=2, h=2)
+
+
+def _add_tile(d: Dashboard, e: AddTile, env: EditEnv, out: Applied) -> Dashboard:
+    question, plan = _from_step(env, e.kind, e.from_step)
+    tile = Tile(id=_free_id(d.tiles), title=_title(e.title, "chart"), question=question, plan=plan,
+                layout=_next_layout(d.tiles))
+    env.check(tile)
+    return d.model_copy(update={"tiles": [*d.tiles, tile]})
+
+
+def _replace_plan(d: Dashboard, e: ReplacePlan, env: EditEnv, out: Applied) -> Dashboard:
+    old = _tile(d, e.tile_id)
+    question, plan = _from_step(env, e.kind, e.from_step)
+    env.check(old.model_copy(update={"question": question, "plan": plan}))
+    out.dropped.add(e.tile_id)  # the stored result belonged to the old plan
+    return _with_tile(d, e.tile_id, question=question, plan=plan)
+
+
 _HANDLERS = {"rename": _rename, "rename_tile": _rename_tile, "set_tile_chart": _set_tile_chart,
              "remove_tile": _remove_tile, "arrange": _arrange, "set_filters": _set_filters,
-             "set_schedule": _set_schedule, "move": _move}
+             "set_schedule": _set_schedule, "move": _move, "add_tile": _add_tile, "replace_plan": _replace_plan}

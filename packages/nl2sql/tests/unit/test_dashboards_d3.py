@@ -114,7 +114,7 @@ class Runs:
             runs.calls.append({"question": question, **kwargs})
             return runs.respond(runs.calls[-1])
 
-        def chart(api: ResultsAPI, result: QueryResult, result_id=None, *, kind=None, tenant_id=None) -> ChartSpec:
+        def chart(api: ResultsAPI, result: QueryResult, result_id=None, *, kind=None, user_context=None) -> ChartSpec:
             return ChartSpec(kind="bar", title="Result", reason="a category and a number",
                              x=Encoding(field="a", kind="text", title="A"), y=[Encoding(field="n", kind="number", title="N")],
                              data=ChartData(trace_id=result.trace_id, result_id="sq1", columns=["a", "n"],

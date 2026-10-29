@@ -25,8 +25,8 @@ STUBS = {
 # Methods a row has filled since: they are real now and have their own tests.
 FILLED = {"workspaces": {"create", "rename", "list", "delete"},
           "dashboards": {"get", "list", "delete", "pin", "move", "edit", "rename", "rename_tile", "set_tile_chart",
-                         "remove_tile", "arrange", "set_filters", "set_schedule", "open", "refresh", "run_scheduled", "generate",
-                         "suggest_questions"}}
+                         "remove_tile", "arrange", "set_filters", "set_schedule", "open", "refresh", "run_scheduled",
+                         "generate", "suggest_questions", "create_draft"}}
 # Methods added to namespaces that already exist.
 ADDED: dict[tuple[str, str], str] = {}  # K2 filled `diagram` and L2 `save`; nothing is left
 
@@ -82,8 +82,8 @@ def test_stubs_keep_the_signatures_the_design_gives(engine):
 
 # ---------------------------------------------------------------- chat-tool entry points
 
-CHAT_TOOL_ROWS = {"dashboard_edit": "D4", "dashboard_pin": "D4"}
-FILLED_CHAT_TOOLS = ["chart", "diagram", "report"]  # K1, K2 and C2 filled them; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
+CHAT_TOOL_ROWS = {}
+FILLED_CHAT_TOOLS = ["chart", "diagram", "report", "dashboard_edit", "dashboard_pin"]  # K1, K2, C2 and D4 filled them; a row's PR moves its tool out of CHAT_TOOL_ROWS into this list
 
 
 def test_the_five_chat_tool_entry_points_load_their_stub_modules():

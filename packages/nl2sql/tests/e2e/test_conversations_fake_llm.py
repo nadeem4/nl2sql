@@ -165,3 +165,30 @@ def test_the_model_charts_the_answer_it_just_got_and_the_report_has_its_rows(mak
     full = engine.conversations.report(conversation.id, user_context=_asker())
     assert "| 59 |" in full and f"Trace: {turn.steps[0].trace_id}" in full
     assert [c["name"] for c in server.calls].count("ModelStep") == 3, "the report made no model call"
+
+
+@pytest.mark.e2e
+def test_the_model_builds_a_dashboard_whose_chart_refreshes_with_no_model_call(make):
+    """D4: an answer's stored plan becomes a chart after a real no-execute check; saving and refreshing it call no model."""
+    edit = {"call": {"name": "dashboard_edit", "args": {"title": "Customers", "edits": [
+        {"kind": "add_tile", "title": "Customers", "from_step": {"turn": 1, "step": 1}}]}}}
+    engine, server, prompts = make([_ask_step(COUNT), edit, {"reply": "I built it."}])
+    conversation = engine.conversations.start(user_context=_asker())
+
+    turn = engine.conversations.ask(conversation.id, "Chart the number of customers", user_context=_asker())
+
+    assert [s.status for s in turn.steps] == ["ok", "ok"] and turn.reply == "I built it."
+    board = engine.dashboards.get(engine.conversations.get(conversation.id, user_context=_asker()).dashboard_id,
+                                  user_context=_asker())
+    assert board.status == "draft" and [t.question for t in board.tiles] == [COUNT]
+    assert '"rows"' not in prompts[-1] and '"dashboard"' in prompts[-1], "the model saw the draft, never rows"
+    calls = [c["name"] for c in server.calls]
+
+    saved = engine.conversations.tool(conversation.id, "dashboard_pin", {}, user_context=_asker())
+    run = engine.dashboards.refresh(board.id, user_context=_asker())
+
+    assert saved.steps[0].status == "ok" and engine.dashboards.get(board.id, user_context=_asker()).status == "saved"
+    [tile] = run.tiles
+    assert tile.status == "ok" and tile.chart.data.rows == [[59]]
+    assert [c["name"] for c in server.calls] == calls, "saving and refreshing call no model"
+    assert calls.count("ModelStep") == 3

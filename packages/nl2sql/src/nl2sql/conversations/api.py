@@ -23,11 +23,14 @@ from nl2sql.clarify.models import ClarificationChoice, ClarificationRequest
 from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.context import current_conversation_id
 from nl2sql.common.errors import ConversationBusy, DashboardNotFound, ErrorCode
-from nl2sql.conversations.agent import ConversationAgent, block, check_call, checked_step, ASK_SPEC, AskArgs
+from nl2sql.conversations.agent import (
+    ConversationAgent, block, check_call, checked_step, dashboard_view, ASK_SPEC, AskArgs,
+)
 from nl2sql.conversations.models import Conversation, ConversationInfo, ToolCall, ToolStep, Turn, TurnKind, TurnStatus
 from nl2sql.conversations.report import build_report
 from nl2sql.conversations.store import ConversationStore, owner_of, strip_output_rows, strip_rows
 from nl2sql.conversations.tools import ChatToolRunner
+from nl2sql.dashboards.store import DashboardStore
 from nl2sql.events import STREAM_EVENTS, RunScope
 from nl2sql.events.catalog import ChatToolCalled, ConversationStarted, ConversationStep, ConversationTurn
 from nl2sql.hooks.approval import Approval
@@ -276,7 +279,7 @@ class Conversations:
                 left = settings.max_tool_calls - used
                 message = block(run.conversation.turns, run.text, context_turns=settings.context_turns,
                                 pending=pending, tools=[ASK_SPEC, *chat.specs()], calls_left=left,
-                                this_turn=run.steps)
+                                this_turn=run.steps, dashboard=self._dashboard(run))
                 with run.scope.entered():
                     step = self._agent.decide(message, checked_step(chat.args_models(), option_ids, left),
                                               run.scope.callbacks())
@@ -300,6 +303,19 @@ class Conversations:
             status = "error"
             error = {"code": failure.code.value, "message": failure.message}
         return self._finish(run, reply=reply, offers=offers, error=error, status=status)
+
+    def _dashboard(self, run: _Run) -> Optional[Dict[str, Any]]:
+        """The conversation's dashboard as the model sees it, read now so it shows the edits this turn made; None
+        when there is none or it is not the caller's (it was deleted)."""
+        dashboard_id = run.conversation.dashboard_id
+        if dashboard_id is None:
+            return None
+        store = DashboardStore(self._ctx.state)
+        try:
+            dashboard = store.get(dashboard_id, self._owner(run.user))
+        except DashboardNotFound:
+            return None
+        return dashboard_view(dashboard, {r.tile_id: r for r in store.runs(dashboard_id)})
 
     @staticmethod
     def _check_cancelled(run: _Run) -> None:
@@ -354,6 +370,9 @@ class Conversations:
         step = self._chat.run(conversation.model_copy(update={"turns": [*conversation.turns, in_flight]}),
                               run.user, call)
         step = strip_output_rows(step)  # stored without rows (D106)
+        if call.name == "dashboard_edit" and step.output is not None \
+                and step.output.refs.get("created"):
+            conversation.dashboard_id = step.output.refs["dashboard_id"]  # the draft it made is now the conversation's
         run.steps.append(step)
         run.scope.publish("chat_tool.called", ChatToolCalled(
             tool=call.name, conversation_id=conversation.id, turn=index, ok=step.status == "ok",

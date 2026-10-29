@@ -112,7 +112,7 @@ Release 0.9 ([Wave C](../architecture/wave_c.md#10-the-registry-and-the-state-st
 `StateStore` version 4 adds these methods. Each takes and returns a plain JSON
 document (`dict`), because the SDK holds none of the engine's models; the
 document carries the fields the store filters on. The engine methods that use
-them arrive in C1 and D1 to D4.
+them arrived in C1 and D1 to D4.
 
 | Table (migration 6) | Methods | Filtered on | Notes |
 | --- | --- | --- | --- |

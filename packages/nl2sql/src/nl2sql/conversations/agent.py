@@ -15,6 +15,7 @@ from nl2sql.api.query_api import tables_read
 from nl2sql.clarify.models import ClarificationRequest
 from nl2sql.common.strict import StrictModel
 from nl2sql.conversations.models import ModelStep, ToolCall, ToolOutput, ToolStep, Turn
+from nl2sql.dashboards.models import Dashboard, TileRun
 from nl2sql.conversations.prompts import CONVERSATION_PROMPT
 from nl2sql.llm.wires import structured
 
@@ -79,8 +80,29 @@ def _turn_view(turn: Turn) -> Dict[str, Any]:
             "status": turn.status, "steps": [step_view(s) for s in turn.steps]}
 
 
+def dashboard_view(dashboard: Dashboard, runs: Mapping[str, TileRun]) -> Dict[str, Any]:
+    """The dashboard a conversation is building or editing, as the model sees it: what each chart is called, asks and
+    shows (its last status), never a plan or a row. A chart that needs fixing or is denied carries the reason, which
+    is how the model knows which chart to replace and why."""
+    tiles = []
+    for tile in dashboard.tiles:
+        run = runs.get(tile.id)
+        view: Dict[str, Any] = {"id": tile.id, "title": tile.title, "question": tile.question, "chart": tile.chart,
+                                "status": run.status if run else None}
+        if run is not None and run.status in ("needs_fixing", "denied") and run.error:
+            view["error"] = str(run.error.get("message") or "")[:300]
+        tiles.append(view)
+    shown: Dict[str, Any] = {"id": dashboard.id, "title": dashboard.title, "status": dashboard.status, "tiles": tiles}
+    if dashboard.filters:
+        shown["filters"] = [{"id": f.id, "label": f.label} for f in dashboard.filters]
+    if dashboard.schedule is not None:
+        shown["schedule_every_minutes"] = dashboard.schedule.every_minutes
+    return shown
+
+
 def block(turns: Sequence[Turn], text: str, *, context_turns: int, pending: Optional[ClarificationRequest],
-          tools: Sequence[Mapping[str, Any]], calls_left: int, this_turn: Sequence[ToolStep]) -> str:
+          tools: Sequence[Mapping[str, Any]], calls_left: int, this_turn: Sequence[ToolStep],
+          dashboard: Optional[Mapping[str, Any]] = None) -> str:
     """The human message: ``[CONVERSATION]`` (one JSON object), then ``[USER_TEXT]`` (the text as a JSON string).
 
     Every piece of earlier text, the new text included, is a JSON string value, so none of it can start a
@@ -95,6 +117,8 @@ def block(turns: Sequence[Turn], text: str, *, context_turns: int, pending: Opti
         "tool_calls_left": calls_left,
         "this_turn": [step_view(s) for s in this_turn],
     }
+    if dashboard is not None:  # the one the dashboard tools change; absent when the conversation has none
+        state["dashboard"] = dashboard
     return f"[CONVERSATION]\n{_dump(state)}\n\n[USER_TEXT]\n{_dump(text)}"
 
 

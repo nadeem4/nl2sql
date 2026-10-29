@@ -198,9 +198,10 @@ class DashboardInfo(StrictModel):
 # so they exist only in chat.
 
 class StepRef(StrictModel):
-    """An ``ask`` step of the conversation, by turn and step number (both 1-based)."""
+    """An ``ask`` step of the conversation, by turn and step number (both 1-based). Without ``turn``: the latest
+    turn, which in a chat is the one being answered."""
 
-    turn: int = Field(ge=1)
+    turn: Optional[int] = Field(default=None, ge=1)
     step: int = Field(ge=1)
 
 

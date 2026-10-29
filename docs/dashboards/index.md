@@ -2,8 +2,8 @@
 
 !!! note "Partly built (Wave C, 0.9)"
     Workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`, `refresh`,
-    stored results and schedules (D2), and so do `generate` and `suggest_questions`, the starter dashboard (D3).
-    Filter values and `filter_values` (D2b) and building in chat (D4) have their signatures and raise
+    stored results and schedules (D2), and so do `generate` and `suggest_questions`, the starter dashboard (D3),
+    and building in chat (D4). Filter values and `filter_values` (D2b) have their signatures and raise
     `NotImplementedError` naming the pull request that fills them. The design is
     [Wave C, section 6](../architecture/wave_c.md#6-dashboards).
 
@@ -17,7 +17,7 @@ stored plans as the caller with no model call. The methods are in
 | D1 | Workspaces, the dashboard store, `pin`, `move` and the manual edits |
 | D2 | `open`, `refresh`, stored results, schedules and `nl2sql dashboards refresh` (filter values follow in D2b) |
 | D3 | The starter dashboard: `generate` and `suggest_questions`, with no model |
-| D4 | Building and editing a dashboard in a conversation (`dashboard_edit`, `dashboard_pin`) |
+| D4 | Building and editing a dashboard in a conversation (`dashboard_edit`, `dashboard_pin`) and `create_draft` |
 
 ## Workspaces
 
@@ -59,7 +59,7 @@ Every change a person can make is a typed edit, and no edit calls a model or tak
 none**: if one edit is refused, nothing is saved. A draft and a saved dashboard take the same edits. Stored
 chart results stay valid across a rename, a redraw, an arrange, a move and a schedule; removing a chart or
 changing the filters discards the results they invalidate. `add_tile` and `replace_plan`, which change what
-data a chart shows, are only for chat (D4).
+data a chart shows, are only for a conversation (see [Building in chat](#building-in-chat)).
 
 Each change publishes `dashboard.changed` (the kinds, never the values), `set_schedule` also
 `dashboard.schedule_set` (it saves a role snapshot, so it is audited) and the workspace calls publish
@@ -68,6 +68,41 @@ Each change publishes `dashboard.changed` (the kinds, never the values), `set_sc
 An edit, `pin` and `delete` take the dashboard's refresh lock (see [Open, refresh and stored results](#open-refresh-and-stored-results)),
 so a refresh that is running cannot store results after an edit has made them wrong. If the lock is held you
 get a `ValueError` (`DashboardBusy`) that says the dashboard is being refreshed; try again when it is done.
+
+## Building in chat
+
+In a conversation the model builds a dashboard the way a person would: one question per chart, then the
+`dashboard_edit` [chat tool](../conversations/tools.md#the-dashboard-tools) with an `add_tile` edit for each
+answer it wants, and further edits to the same draft.
+
+```python
+chat = engine.conversations.start(user_context=me)
+engine.conversations.ask(chat.id, "Build me a dashboard of orders by city and customers by country", user_context=me)
+board = engine.dashboards.get(engine.conversations.get(chat.id, user_context=me).dashboard_id, user_context=me)
+engine.conversations.tool(chat.id, "dashboard_pin", {"title": "Sales"}, user_context=me)   # only when asked
+```
+
+- **A draft on first use.** The first `dashboard_edit` makes an empty draft (`create_draft`) in "General" or the
+  workspace named, tied to the conversation. A conversation started with `start(dashboard_id=...)` edits that
+  dashboard instead. It stays a draft until `dashboard_pin` (the model calls it only when the user asks) saves it
+  whole.
+- **`add_tile`** takes a `title` and `from_step` (`turn`, which defaults to the turn being answered, and which of that turn's `ask` calls). The chart keeps
+  the **whole** plan of that answer: its decomposition, the plan of every sub-query and the combine step, or the
+  verified query that answered. The model never writes or sees a plan or SQL, and the engine reads the plan from
+  its own stored step.
+- **A chart is checked before it is saved.** The plan goes through a run that executes nothing (the check `open`
+  uses), as the caller. If the validator rejects it, or the caller may not read it, nothing in that
+  `dashboard_edit` call is saved and the model is told why.
+- **Fixing a chart.** A chart that is `needs_fixing` is shown to the model in the open dashboard with the
+  validator's reason. It asks the question again and calls `replace_plan` with the new answer: the chart keeps its
+  id, title, chart type and place, takes the new question and plan, and its stored result is discarded. This is
+  the only part of the dashboard that spends tokens.
+- **The same edits as by hand.** `dashboard_edit` takes every manual edit in the table above, so the model and the
+  person change a dashboard in the same ways and with the same checks. The model sees the open dashboard (charts
+  with their ids, questions and last status) at every step, never a row.
+- **The facade.** `engine.dashboards.edit(id, edits, user_context=me, conversation=chat)` takes the two chat-only
+  edits when it is given a conversation of the caller's; without one they are a `ValueError`. The named methods
+  take no question and no plan.
 
 ## Open, refresh and stored results
 
@@ -88,7 +123,7 @@ run = engine.dashboards.refresh(board.id, tile_id="t3", user_context=me)   # one
 | **Stored with a time** | The last result of each chart (its rows, at most `charts.max_points`, and the columns' kinds) is saved with an `at` time, replaced by each run and deleted with the dashboard. `open` serves it at once and `refreshed_at` is the oldest `at`. A run that fails (`error`, such as a database outage) does not replace it: the chart keeps its last good result and the refresh returns the error. |
 | **Open checks access first** | Before any stored row is served, each stored plan is checked under the caller's current roles, and the check runs no query: a generated plan is validated and generated, a verified query is checked by the curated matcher (the caller's scope, its values, every table it reads) and by the `execute.before` hooks, its only hook point, leaving out the cost hook: a hook's `Deny` makes the chart `denied`, and a request for approval does not block the check, which runs nothing. Rows are served only when the check ends `ok` or `empty`, or `needs_approval` with nothing else wrong. A chart the caller can no longer read comes back `denied` (also when only one of its queries is refused, or a hook dropped one of them), one whose plan no longer validates `needs_fixing`, and a check that fails otherwise `error`, all without rows. Only charts this `open` checked, or refreshed itself, are served: a result another process stored meanwhile waits in `due`. |
 | **Only what is old** | With `refresh_due=True` (the default) `open` then refreshes the charts older than the schedule's `every_minutes` (or never run), as the caller. A dashboard with no schedule has nothing due. An app that wants an instant open passes `False` and refreshes the ids in `view.due`. |
-| **`needs_fixing`** | A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is `needs_fixing` with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn (D4). |
+| **`needs_fixing`** | A stored plan that no longer validates (a column was dropped), or no longer parses, is not repaired by a model. The chart is `needs_fixing` with the validator's message and no rows, and the other charts keep working. Fixing it is a conversation turn: [`replace_plan`](#building-in-chat). |
 | **Cost guard** | A hook that wants a person's yes makes the chart `needs_approval`: it is not run, keeps its last result, and the request is in the run's `approvals_needed`. Pass an `Approval` for it to a **manual** `refresh(approvals=[...])`. `open` and a schedule never approve. |
 | **Caps** | A chart stopped at a Wave A cap (`stopped`) ends the refresh; the rest are `stopped` too and keep their last result. |
 | **No double runs** | A refresh holds the state store's lock `dashboard-refresh:<id>`. A second `refresh` on the same dashboard raises `DashboardBusy`; `open` leaves the charts due; a schedule skips it. |

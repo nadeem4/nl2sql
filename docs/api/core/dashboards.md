@@ -3,7 +3,8 @@
 !!! note "Partly built"
     The workspaces, the dashboard store, `pin`, `move` and the manual edits work (D1), and so do `open`,
     `refresh` and `run_scheduled` (D2), and `generate` and `suggest_questions` (D3). `filter_values` and
-    `refresh(filters=...)` (D2b) have their final signatures and raise `NotImplementedError` naming their row.
+    `refresh(filters=...)` (D2b) have their final signatures and raise `NotImplementedError` naming their row. A
+    conversation builds and edits a draft with the `dashboard_edit` and `dashboard_pin` chat tools (D4).
 
 ## Purpose
 `engine.workspaces` and `engine.dashboards` ([Dashboards](../../dashboards/index.md)).
@@ -33,10 +34,24 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **`pin`** saves a draft whole, in `workspace_id`, else the workspace the draft is in, else "General" (made on
   first use). There is no way to pin one chart. An empty draft, a dashboard already saved, or a blank `title`
   is a `ValueError`.
-- **`edit`** applies a list of edits in order, each seeing the ones before, all or none. The named methods
-  (`rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`, `set_filters`, `set_schedule`, `move`)
-  each build one edit. None calls a model, and none takes a question or a plan: what data a chart shows changes
-  only in chat (`add_tile`, `replace_plan`, D4). An unknown chart id is a `ValueError`.
+- **`create_draft(title=None, workspace_id=None, conversation_id=None)`** makes an empty draft owned by the caller
+  (title "New dashboard"; in `workspace_id`, else "General", made on first use) and publishes `dashboard.changed`
+  (`created`). The `dashboard_edit` chat tool calls it on first use, with the conversation's id, which is stored as
+  `Dashboard.conversation_id`; a `conversation_id` that is not the caller's is `ConversationNotFound`. The tool also
+  makes a new draft when the conversation's dashboard has been deleted.
+- **`edit(dashboard_id, edits, conversation=None)`** applies a list of edits in order, each seeing the ones before,
+  all or none. The named methods (`rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`,
+  `set_filters`, `set_schedule`, `move`) each build one edit. None calls a model, and none takes a question or a
+  plan: what data a chart shows changes only in a conversation. `add_tile` and `replace_plan` read an `ask` step of
+  the `conversation` passed (it must be the caller's, else `ValueError`; the chat tool passes the one it runs in)
+  and are a `ValueError` without one. The step's whole decomposition and each sub-query's plan, or the verified
+  query that answered, become the chart's plan; it is first checked by a run that executes nothing, as the caller
+  and under the dashboard's lock, and a plan the validator rejects or the caller may not read raises a
+  `ValueError` that ends with "Nothing was saved." An unknown chart id is a `ValueError`. `from_step.turn` defaults
+  to the conversation's latest turn. **`conversation` is trusted:** its steps are not re-read from the store, only
+  its owner is checked against the caller, so it is for SDK code holding the caller's own `Conversation` and is
+  not exposed over REST or MCP; the plan's access check still runs as the caller. The lock lasts as long as the
+  edit's checks (one time limit per `add_tile` or `replace_plan`).
 - **`set_tile_chart`** with a kind the chart's last result cannot be drawn as raises a `ValueError` naming the
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.
@@ -78,7 +93,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   **`suggest_questions(datasource_id, n=5)`** returns the questions of the first `n` charts `generate` would
   choose and runs and saves nothing (`[]` when the caller reaches no table; `NotIndexed` as above).
 - **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`, required with `verified`.
-- **Events.** `dashboard.changed` (the edit kinds, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`,
+- **Events.** `dashboard.changed` (the edit kinds, `created`, `pinned` or `deleted`, and `by`), `dashboard.schedule_set`,
   `dashboard.generated`, `dashboard.refreshed` (the counts per status), `dashboard.schedule_stopped` and `workspace.changed`. They
   carry no titles, names or values.
 - **Retention.** `engine.storage.purge()` deletes drafts last edited more than `conversations.max_age_days` ago;
