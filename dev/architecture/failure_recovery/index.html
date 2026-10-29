@@ -6621,6 +6621,7 @@
 <li>Resolver returns <code>SCHEMA_RETRIEVAL_FAILED</code> if no candidate datasources are found, or if more than one datasource is registered and there is no vector store. With one datasource registered it runs no vector search.</li>
 <li>Resolver returns <code>QUESTION_NOT_ANSWERABLE</code> when its answerability check finds no allowed datasource can answer the question; the run ends before the decomposer. A failed answerability call returns <code>SCHEMA_RETRIEVAL_FAILED</code> with the model's error, or a <code>PROVIDER_*</code> error when the provider refused it.</li>
 <li>Schema retriever falls back to full schema snapshot if vector retrieval yields no tables; if schema store returns <code>None</code>, it silently returns an empty table list.</li>
+<li>A schema retrieval that raises (an embedding model that cannot load, a broken index) falls back the same way when there is a snapshot: every table the caller may read, with a <code>SCHEMA_RETRIEVAL_FAILED</code> warning. With no snapshot it returns a <code>CRITICAL</code> <code>SCHEMA_RETRIEVAL_FAILED</code> error and the SQL agent ends the sub-query before the planner, instead of planning against no tables until the run times out.</li>
 </ul>
 <h3 id="planning">Planning</h3>
 <ul>

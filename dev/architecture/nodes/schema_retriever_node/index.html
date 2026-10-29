@@ -809,6 +809,15 @@
 <nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#kept-columns">
+<span class="md-ellipsis">
+      
+        Kept columns
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#preferred-tables">
 <span class="md-ellipsis">
       
@@ -2692,6 +2701,15 @@
 <nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#kept-columns">
+<span class="md-ellipsis">
+      
+        Kept columns
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#preferred-tables">
 <span class="md-ellipsis">
       
@@ -2824,7 +2842,10 @@
 <li>Build a semantic query from sub‑query intent, filters, group_by, expected_schema, metrics.</li>
 <li>Retrieve candidate tables/columns/relationships from the run's pinned <code>Retriever</code>.</li>
 <li>Resolve authoritative tables from <code>SchemaStore</code>.</li>
-<li>Fall back to full schema snapshot when retrieval returns no candidates.</li>
+<li>Fall back to full schema snapshot when retrieval returns no candidates or
+  the search fails; see <a href="#error-handling">Error Handling</a>.</li>
+<li>Keep the columns a join or an answer needs on a table cut to the columns
+  the search returned; see <a href="#kept-columns">Kept columns</a>.</li>
 <li>Rank the datasource's <code>preferred_tables</code> first and set <code>preferred=True</code> on
   them, on the full-snapshot path and the retrieval path; see
   <a href="#preferred-tables">Preferred tables</a>.</li>
@@ -2853,11 +2874,13 @@
 <p>Upstream:
 - SQL agent subgraph entry.</p>
 <p>Downstream:
-- <code>ASTPlannerNode</code></p>
+- <code>ASTPlannerNode</code>, or the end of the sub-query when it returned a
+  non-retryable error (retrieval failed with no snapshot to fall back to).</p>
 <p>Trigger conditions:
 - Always executed as the subgraph entry node.</p>
 <pre class="mermaid"><code>flowchart LR
-    SchemaRetriever[SchemaRetrieverNode] --&gt; Planner[ASTPlannerNode]</code></pre>
+    SchemaRetriever[SchemaRetrieverNode] --&gt;|tables| Planner[ASTPlannerNode]
+    SchemaRetriever --&gt;|SCHEMA_RETRIEVAL_FAILED| End([end of sub-query])</code></pre>
 <hr/>
 <h2 id="inputs">Inputs</h2>
 <p>From <code>SubgraphExecutionState</code>:</p>
@@ -2885,6 +2908,8 @@
 <li><code>knowledge_used</code> (<code>KnowledgeUsed</code>): the terms and rules sent as
   <code>[BUSINESS_CONTEXT]</code>; absent when none matched, and for a pinned plan</li>
 <li><code>reasoning</code> and <code>warnings</code> in fallback paths</li>
+<li><code>errors</code>: one <code>CRITICAL</code> <code>SCHEMA_RETRIEVAL_FAILED</code> when retrieval failed
+  and there is no snapshot to fall back to</li>
 </ul>
 <p>Side effects:</p>
 <ul>
@@ -2903,10 +2928,31 @@
 <li>If no table chunks, retrieve columns via <code>retrieve_column_candidates()</code>, <code>k = table_k</code>.</li>
 <li>If tables are identified, retrieve columns/relationships via <code>retrieve_planning_context()</code>, <code>k = settings.retrieval.planning_k</code> (12).</li>
 <li>Resolve schema snapshot via <code>_resolve_snapshot()</code>.</li>
-<li>Build <code>Table</code> objects with <code>_build_tables_from_snapshot()</code>.</li>
+<li>Build <code>Table</code> objects with <code>_build_tables_from_snapshot()</code>: each table
+   keeps the columns the searches returned plus its <a href="#kept-columns">kept columns</a>.</li>
 <li>If no tables were found, return full snapshot with warning.</li>
-<li>On exception, log error and return empty <code>relevant_tables</code>.</li>
+<li>On exception, see <a href="#error-handling">Error Handling</a>.</li>
 </ol>
+<h3 id="kept-columns">Kept columns</h3>
+<p>The <code>planning</code> search returns <code>planning_k</code> (12) entries across all the tables
+found, so a table often arrives with a few columns and none of its keys. On
+Pagila (29 tables), the 0.9.0 smoke test's question about films in the Sports
+category got <code>film</code> without <code>film_id</code> or <code>title</code> and <code>category</code> without <code>name</code>,
+and no join or answer could be validated (bug B103 in
+<a href="../../wave_c/#14-bugs-wave-c-fixes">Wave C, section 14</a>). So a table cut to
+the search's columns also keeps (<code>_kept_columns</code>):</p>
+<ul>
+<li>its primary key;</li>
+<li>both sides of every join it is offered: the constrained columns of its
+  foreign keys and glossary joins into a readable table, and the referred
+  columns of a foreign key or glossary join into it from another table sent,
+  so every relationship in the schema block can be bound;</li>
+<li>its label: a column named <code>name</code> or <code>title</code>, or <code>&lt;table&gt;_name</code> /
+  <code>&lt;table&gt;_title</code> (case ignored). An answer lists or filters by it far more
+  often than the search ranks it.</li>
+</ul>
+<p>A table sent whole (the full-snapshot path, or a table the search named with
+no column) is unchanged.</p>
 <h3 id="preferred-tables">Preferred tables</h3>
 <p>A datasource's <code>preferred_tables</code> (in <code>datasources.yaml</code>, see
 <a href="../../../configuration/datasources/#preferred-tables">Datasources</a>) are
@@ -3001,7 +3047,15 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <h2 id="error-handling">Error Handling</h2>
 <ul>
 <li>Exceptions are caught and logged via <code>logger.error</code>.</li>
-<li>Returns empty <code>relevant_tables</code> with error reasoning; no <code>PipelineError</code> is emitted.</li>
+<li>With a snapshot (the search failed, e.g. the embedding model could not
+  load), it does what the no-candidates path does: every table the caller may
+  read, a <code>SCHEMA_RETRIEVAL_FAILED</code> <code>RunWarning</code> with a fixed message (the
+  exception detail goes to the log only), and no error. Planning against no
+  tables fails every attempt (bug B105 in
+  <a href="../../wave_c/#14-bugs-wave-c-fixes">Wave C, section 14</a>).</li>
+<li>Without one (the snapshot itself could not be read), it returns empty
+  <code>relevant_tables</code> and a <code>CRITICAL</code> <code>SCHEMA_RETRIEVAL_FAILED</code> error with a
+  fixed message, which is not retryable: the SQL agent ends the sub-query before the planner.</li>
 </ul>
 <hr/>
 <h2 id="retry-idempotency">Retry + Idempotency</h2>
@@ -3045,7 +3099,15 @@ snapshot by <code>schema_knowledge()</code>:</p>
 <ul>
 <li>No tenant scoping in vector retrieval.</li>
 <li>No caching of retrieved tables across retries.</li>
-<li>Fallback to full schema can be expensive for large schemas.</li>
+<li>Fallback to full schema can be expensive for large schemas. A failed search
+  falls back the same way, with no <code>full_snapshot_max_tables</code> cap, so a very
+  large schema may overflow the context.</li>
+<li>A pruned table keeps its foreign-key columns for joins into any table the
+  caller can read, with no per-table cap; a wide fact table keeps them all.</li>
+<li>The label rule goes by column name, so a label named otherwise
+  (<code>first_name</code>, <code>country</code>) is kept only when the search returns it. It also
+  strips one trailing <code>s</code> from the table name (<code>customers</code> matches
+  <code>customer_name</code>), so other plurals (<code>categories</code> and <code>category_name</code>) miss.</li>
 </ul>
 <hr/>
 <h2 id="related-code">Related Code</h2>

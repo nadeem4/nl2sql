@@ -3348,8 +3348,14 @@ searches are approximate.</p>
 <p>Current failure behaviors:</p>
 <ul>
 <li>Vector store retrieval wrapped by <code>VECTOR_BREAKER</code>; failures fast‑fail.</li>
-<li>Vector retrieval errors in <code>SchemaRetrieverNode</code> return empty results with warnings.</li>
-<li>If no candidates are found, the retriever falls back to full schema snapshot.</li>
+<li>If vector retrieval in <code>SchemaRetrieverNode</code> raises, or finds no candidates,
+  the retriever falls back to the full schema snapshot (the tables the caller
+  may read) with a <code>SCHEMA_RETRIEVAL_FAILED</code> warning. With no snapshot to fall
+  back to, a raised error ends the sub-query with a non-retryable
+  <code>SCHEMA_RETRIEVAL_FAILED</code>.</li>
+<li>A table cut to the columns the <code>planning</code> search returned keeps its primary
+  key, both sides of each join it is offered and its <code>name</code>/<code>title</code> label
+  (see <a href="../nodes/schema_retriever_node/#kept-columns">SchemaRetrieverNode</a>).</li>
 <li>Indexing calls no model, so a missing API key never affects it. Descriptions
   a model drafts are proposals (the profiler), not part of the index or the
   snapshot, until a person accepts them into the glossary.</li>
