@@ -4,9 +4,17 @@ Key-free. Each scorer's verdict on a whole case run is ``test_eval_scorers.py``.
 """
 from __future__ import annotations
 
+import datetime as dt
+from decimal import Decimal
+
 from nl2sql.evaluation.evaluator import ModelEvaluator
+from nl2sql.evaluation.suite import SUITES_DIR, load_suite
 
 compare = ModelEvaluator.compare_results
+lenient = ModelEvaluator.compare_results_lenient
+extra_columns = ModelEvaluator.compare_results_extra_columns
+UTC = dt.timezone.utc
+PAGILA = {c.id: c for c in load_suite(SUITES_DIR / "pagila.yaml").cases}
 
 GOLD = [{"Country": "USA", "customer_count": 13}, {"Country": "Canada", "customer_count": 8}]
 
@@ -164,12 +172,6 @@ def test_lenient_still_needs_every_gold_column_matched():
 
 # --- C-W6a: gold rows written as JSON against live Decimal and datetime cells ------
 
-import datetime as dt  # noqa: E402
-from decimal import Decimal  # noqa: E402
-
-lenient = ModelEvaluator.compare_results_lenient
-UTC = dt.timezone.utc
-
 
 def test_a_decimal_matches_a_numeric_string_a_float_and_an_int():
     assert compare([[Decimal("3094.78")]], [["3094.78"]], order_matters=True)
@@ -183,6 +185,9 @@ def test_a_datetime_matches_its_iso_string():
     assert compare([[when]], [["2022-01-01T00:00:00Z"]], order_matters=True)
     assert compare([[when]], [["2022-01-01T00:00:00+00:00"]], order_matters=True)
     assert not compare([[when]], [["2022-01-02T00:00:00Z"]], order_matters=True)
+    # Two full datetimes are equal as instants.
+    east = dt.datetime(2022, 1, 1, 5, tzinfo=dt.timezone(dt.timedelta(hours=5)))
+    assert compare([[east]], [["2022-01-01T00:00:00Z"]], order_matters=True)
 
 
 def test_a_date_only_label_matches_a_midnight_datetime_either_way():
@@ -194,14 +199,59 @@ def test_a_date_only_label_matches_a_midnight_datetime_either_way():
     assert not compare([["2022-01-01"]], [["2022-01-01T10:00:00Z"]], order_matters=True)
 
 
+def test_a_date_only_label_is_midnight_in_the_other_values_own_zone():
+    west = dt.timezone(dt.timedelta(hours=-5))
+    assert not compare([[dt.datetime(2021, 12, 31, 19, tzinfo=west)]], [["2022-01-01"]], order_matters=True)
+    assert compare([[dt.datetime(2022, 1, 1, tzinfo=west)]], [["2022-01-01"]], order_matters=True)
+    assert compare([["2022-01-01T00:00:00-05:00"]], [["2022-01-01"]], order_matters=True)
+    assert not compare([["2022-01-01"]], [["2021-12-31T19:00:00-05:00"]], order_matters=True)
+
+
 def test_pagila_007_monthly_revenue_matches_its_gold():
-    gold = [{"month": f"2022-0{m}-01T00:00:00Z", "revenue": f"{m}00.50"} for m in range(1, 8)]
-    live = [["2022-0%d-01" % m, Decimal("%d00.50" % m)] for m in range(1, 8)]
-    assert compare(live, gold)
-    live_dt = [[dt.datetime(2022, m, 1, tzinfo=UTC), Decimal("%d00.50" % m)] for m in range(1, 8)]
-    assert compare(live_dt, gold)
+    gold = PAGILA["pagila_007"].rows
+    assert len(gold) == 7
+    labels = [[row["month"][:10], Decimal(row["revenue"])] for row in gold]
+    assert compare(labels, gold, order_matters=True)
+    live = [[dt.datetime.fromisoformat(row["month"].replace("Z", "+00:00")), Decimal(row["revenue"])]
+            for row in gold]
+    assert compare(live, gold, order_matters=True)
+    live[3][1] += 1
+    assert not compare(live, gold, order_matters=True)
 
 
-def test_a_year_label_still_needs_the_lenient_reading_for_a_date_object():
+def test_a_date_object_meets_a_year_label_only_in_the_lenient_reading():
     assert lenient([[dt.date(2009, 1, 1), 5]], [["2009", 5]])
     assert not compare([[dt.date(2009, 1, 1), 5]], [["2009", 5]])
+
+
+# --- the extra-column pass: the right rows, the gold's columns in order, strictly ----
+
+
+def test_pagila_004_the_titles_with_an_extra_count_column_pass():
+    gold = PAGILA["pagila_004"].rows
+    got = [[row["title"], 30 - i % 5] for i, row in enumerate(gold)]
+    assert extra_columns(got, gold, order_matters=True)
+    assert extra_columns([[n, t] for t, n in got], gold, order_matters=True)   # the extra column first
+
+
+def test_extra_columns_still_need_the_right_rows():
+    gold = [{"c": "USA", "n": 13}, {"c": "Canada", "n": 8}]
+    assert extra_columns([["USA", 13, "x"], ["Canada", 8, "y"]], gold, order_matters=True)
+    assert not extra_columns([["USA", 13, "x"], ["Canada", 9, "y"]], gold, order_matters=True)
+    assert not extra_columns([["USA", 13, "x"]], gold, order_matters=True)
+    assert not extra_columns([["USA", 13], ["Canada", 8]], gold, order_matters=True)   # not wider
+
+
+def test_extra_columns_do_not_let_reordered_columns_through():
+    assert not extra_columns([[13, "USA", "x"], [8, "Canada", "y"]],
+                             [{"c": "USA", "n": 13}, {"c": "Canada", "n": 8}], order_matters=True)
+
+
+def test_extra_columns_do_not_let_a_period_label_through():
+    assert not extra_columns([["2009-01-01", 5, "a"]], [{"y": "2009", "n": 5}], order_matters=True)
+
+
+def test_extra_columns_respect_the_column_cap():
+    gold = [{"c": "USA"}, {"c": "Canada"}]
+    assert extra_columns([["USA", 1, 2], ["Canada", 3, 4]], gold, order_matters=True)
+    assert not extra_columns([["USA", 1, 2, 3], ["Canada", 3, 4, 5]], gold, order_matters=True)   # 4 > cap 3

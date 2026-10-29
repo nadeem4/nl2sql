@@ -37,10 +37,11 @@ errors apart from failures.
 
 - column names are ignored, and column order counts;
 - numbers (database decimals too) match within half a cent;
-- dates match their ISO strings, and a date-only label matches that day's midnight;
+- dates match their ISO strings, and a date-only label matches that day's midnight in the other value's own offset;
 - row order counts only when `order_matters`;
-- the right rows with extra columns also pass (`detail["match"]` is
-  `extra columns`; `strict` for an exact match).
+- the right rows with extra columns also pass, if the gold's columns keep their
+  order and match strictly (`detail["match"]` is `extra columns`; `strict` for
+  an exact match).
 
 It also keeps the lenient reading in `detail["lenient"]`, which accepts
 reordered columns and period labels against dates besides. The

@@ -9,7 +9,8 @@ numbers and the quoted or bold names out of the answer and checks each one:
   it is written with (``523.1`` matches ``523.06``, ``523.60`` does not), the
   row count, the preview size, or the sum of a numeric column; a number may
   also be the difference between two values of one column, and a percentage
-  the ratio or the percent change between two of them (nothing more general);
+  the ratio or the percent change between two of them, but only when the
+  answer writes both of those values too (nothing more general);
   a percentage may also be a share (``37.2%`` matches ``0.3718``). Numbers
   inside text cells count as values
   (the year of ``2009-01-01``), and so do numbers in the question (``top 5``,
@@ -65,18 +66,20 @@ def _close(written: float, value: float, decimals: int) -> bool:
     return abs(written - value) <= 0.5 * 10 ** -decimals + 1e-9
 
 
-# Pairwise arithmetic is quadratic in a column; a long column is read from its first rows.
-_PAIRWISE_MAX = 200
+def _derived(columns: Sequence[Sequence[float]], written: Sequence[WrittenNumber]) -> Dict[str, List[float]]:
+    """What two values of one column make, when the answer writes both of them.
 
-
-def _derived(columns: Sequence[Sequence[float]]) -> Dict[str, List[float]]:
-    """What two values of one column make: their differences and, as percents, ratios and changes."""
+    A difference, and as percents a ratio and a percent change. Only values the
+    answer itself states count as operands (at the precision it writes them), so
+    a number is never matched against every pair in the rows.
+    """
+    operands = [w for w in written if not w.percent]
     differences: List[float] = []
     percents: List[float] = []
     for column in columns:
-        column = list(column)[:_PAIRWISE_MAX]
-        for a in column:
-            for b in column:
+        stated = [v for v in set(column) if any(_close(w.value, v, w.decimals) for w in operands)]
+        for a in stated:
+            for b in stated:
                 if a == b:
                     continue
                 differences.append(a - b)
@@ -91,7 +94,7 @@ def _supported(n: WrittenNumber, values: Sequence[float], derived: Optional[Dict
     if any(_close(n.value, v, n.decimals) for v in values):
         return True
     if n.percent:
-        # 37.2% of a share 0.3718: compare the share as a percent; or a ratio or change of two values.
+        # 37.2% of a share 0.3718: compare the share as a percent; or a ratio or change of two stated values.
         return any(_close(n.value, v * 100, n.decimals) for v in values) \
             or any(_close(abs(n.value), abs(v), n.decimals) for v in derived["percents"])
     return any(_close(abs(n.value), abs(v), n.decimals) for v in derived["differences"])
@@ -145,7 +148,7 @@ def check_answer(text: Optional[str], *, columns: Sequence[str], rows: Sequence[
             columns_of_numbers.append(column)
 
     numbers = extract_numbers(text or "")
-    derived = _derived(columns_of_numbers)
+    derived = _derived(columns_of_numbers, numbers)
     unsupported_numbers = [n.text for n in numbers if not _supported(n, values, derived)]
 
     known = [t.casefold() for t in texts] + [str(c).casefold() for c in columns]

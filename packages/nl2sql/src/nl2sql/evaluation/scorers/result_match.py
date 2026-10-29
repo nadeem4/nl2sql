@@ -6,9 +6,9 @@ and is left out of execution accuracy. Column names are
 ignored, column order is kept, numbers (``Decimal`` too) match within half a
 cent, dates match their ISO strings, and row order counts only when the case's
 ``order_matters`` (:meth:`ModelEvaluator.compare_results`). A result with the
-right rows plus extra columns also passes (the lenient reading,
-:meth:`ModelEvaluator.compare_results_lenient`, on a result wider than the gold).
-Reordered columns and period labels against dates alone do not pass; they are
+right rows plus extra columns also passes
+(:meth:`ModelEvaluator.compare_results_extra_columns`: the gold's columns in the
+same order, matched strictly). Reordered columns and period labels against dates alone do not pass; they are
 kept in ``detail`` as ``lenient``, with ``match`` naming how the case passed:
 ``strict``, ``extra columns`` or none.
 """
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import ClassVar, FrozenSet
 
-from nl2sql.evaluation.evaluator import ModelEvaluator, _values
+from nl2sql.evaluation.evaluator import ModelEvaluator
 from nl2sql.evaluation.scorers import NOT_APPLICABLE, BuiltinScorer, CaseRun, Score
 
 
@@ -36,13 +36,13 @@ class ResultMatch(BuiltinScorer):
         answers = run.case.answers()
         order = run.case.order_matters
         strict = any(ModelEvaluator.compare_results(run.rows, a, order_matters=order) for a in answers)
-        loose = [a for a in answers if not strict
-                 and ModelEvaluator.compare_results_lenient(run.rows, a, order_matters=order)]
-        lenient = strict or bool(loose)
+        lenient = strict or any(ModelEvaluator.compare_results_lenient(run.rows, a, order_matters=order)
+                                for a in answers)
         # The right rows with extra columns pass; a reordering or a period label alone stays lenient-only.
-        extra = any(a and run.rows and len(_values(run.rows[0])) > len(_values(a[0])) for a in loose)
-        passed = strict or extra
-        detail = {"lenient": lenient, "match": "strict" if strict else "extra columns" if extra else None}
+        wider = not strict and any(ModelEvaluator.compare_results_extra_columns(run.rows, a, order_matters=order)
+                                   for a in answers)
+        passed = strict or wider
+        detail = {"lenient": lenient, "match": "strict" if strict else "extra columns" if wider else None}
         if not passed:
             extra = len(answers) - 1
             alternatives = f" and {extra} alternative{'s' if extra != 1 else ''}" if extra else ""

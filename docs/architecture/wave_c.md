@@ -2351,9 +2351,9 @@ A model-free Pagila retrieval baseline on CI (design 17.5).
 
 The eval scorer reads the shapes a real database returns (design 18.2). All in `nl2sql/evaluation/`; no engine change.
 
-- **Faithfulness** (`faithfulness.py`): `Decimal` cells are numbers (values and column sums). A number is also supported when it is the difference between two values of one column; a percentage when it is the ratio or the percent change between two of them (absolute value, the written precision). Pairs are read from a column's first 200 values. Nothing more general. The preview size is reachable cleanly, so it is the exact number: `CaseRun.preview_rows` carries `results.preview_rows` (set in `run._one` from the run's settings) and `check_answer(preview_rows=)` accepts exactly that number, nothing when it is unknown.
-- **Comparator** (`evaluator.py`): `Decimal` compares numerically with numeric strings and floats; a `date` or `datetime` compares with its ISO string, and a date-only label with a midnight datetime, in both directions (a value with no timezone is read as UTC). A `date` object still meets a gold year label through the lenient period rule.
-- **Scoring policy** (`scorers/result_match.py`): the right rows plus extra columns pass. The lenient reading counts as a pass when the result is wider than the gold; reordered columns or period labels at the same width stay lenient-only. `detail.match` is `strict`, `extra columns` or null; `detail.lenient` is unchanged. Row count and row values are as strict as before.
+- **Faithfulness** (`faithfulness.py`): `Decimal` cells are numbers (values and column sums). A number is also supported when it is the difference between two values of one column; a percentage when it is the ratio or the percent change between two of them (absolute value, the written precision), but only when the answer also writes both operands (review: pairing against every pair of a many-row column supported most small numbers). Nothing more general. The preview size is reachable cleanly, so it is the exact number: `CaseRun.preview_rows` carries `results.preview_rows` (set in `run._one` from the run's settings) and `check_answer(preview_rows=)` accepts exactly that number, nothing when it is unknown.
+- **Comparator** (`evaluator.py`): `Decimal` compares numerically with numeric strings and floats; a `date` or `datetime` compares with its ISO string, and a date-only label with midnight of that day in the other value's own offset, in both directions (two full datetimes compare as instants; a value with no timezone is read as UTC). A `date` object still meets a gold year label through the lenient period rule.
+- **Scoring policy** (`scorers/result_match.py`): the right rows plus extra columns pass. `ModelEvaluator.compare_results_extra_columns` passes a result wider than the gold when some choice of its columns in their own order equals the gold under the strict rules; reordered gold columns and period labels stay lenient-only, wider or not. `detail.match` is `strict`, `extra columns` or null; `detail.lenient` is unchanged. Row count and row values are as strict as before.
 
 ## 14. Bugs Wave C fixes
 
@@ -2564,7 +2564,8 @@ engine join fixes are C-W6b). The three that finished were failed by the scorer,
 Scorer only; gold data is untouched.
 
 1. **Faithfulness.** `Decimal` is numeric. A number may be the difference between two values of one column; a percentage
-   the ratio (a/b*100) or percent change ((a-b)/b*100) between two of them. No other arithmetic. The preview size
+   the ratio (a/b*100) or percent change ((a-b)/b*100) between two of them, when the answer also writes both values.
+   No other arithmetic. The preview size
    (`results.preview_rows`) is supported, passed to the check by the runner.
 2. **Comparator.** `Decimal` equals the number or numeric string it spells (half a cent, as before). A `date` or
    `datetime` equals its ISO string; a date-only label equals the midnight datetime of that day, either way round.
