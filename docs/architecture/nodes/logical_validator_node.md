@@ -106,7 +106,7 @@ From `SubgraphExecutionState`:
 Validation performed:
 
 - Aliases must be unique.
-- Joins must match known relationships.
+- Joins must match known relationships. An equality reads the same either way round, so `b.x = a.y` matches a relationship declared as `a.y = b.x`. A join that matches none is rejected with the joins that are allowed: the declared joins between its two tables, or, when there are none, the shortest declared path through the tables the planner was sent (or, if none runs only through those, that no path exists in the schema it was given) ("No relationship is declared between inventory and film_category. Shortest declared path: inventory.film_id = film.film_id; film.film_id = film_category.film_id."). The text is in the error's `message`, which is what the refiner and the planner are sent on a retry.
 - Column references must exist and be unambiguous.
 - Every binary operator must be one the generator can render.
 - A `*` column appears only as a bare select item or as `COUNT(*)`.

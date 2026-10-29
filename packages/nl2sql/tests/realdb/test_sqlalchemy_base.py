@@ -87,6 +87,19 @@ def test_wide_schema_catalog_snapshot_under_60_seconds(server, adapter_on, wide)
     assert elapsed < 60, f"a catalog snapshot of the wide schema took {elapsed:.1f} s"
 
 
+def test_pagila_payment_partitions_fold_into_payment(server, adapter_on):
+    # wave_c.md, section 18.3 (C-W6): Pagila's payment is partitioned and its keys sit on the partitions.
+    if server.name != "postgres":
+        pytest.skip("Pagila's partitioned payment is on the PostgreSQL test bed.")
+    adapter = adapter_on()
+
+    snapshot = adapter.fetch_schema_snapshot(IndexScope(profile="catalog"))
+
+    tables = {t.table.table_name: t for t in snapshot.contract.tables.values()}
+    assert not [name for name in tables if name.startswith("payment_p")], "the partitions are not tables of their own"
+    assert {fk.referred_table.table_name for fk in tables["payment"].foreign_keys} >= {"customer", "rental"}
+
+
 def test_estimates_come_from_the_catalog(server, adapter_on):
     schema, table = SAMPLE[server.name]
     analyze = {"postgres": f"ANALYZE {table}", "mysql": f"ANALYZE TABLE {table}", "mssql": None}[server.name]

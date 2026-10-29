@@ -2355,6 +2355,15 @@ The eval scorer reads the shapes a real database returns (design 18.2). All in `
 - **Comparator** (`evaluator.py`): `Decimal` compares numerically with numeric strings and floats; a `date` or `datetime` compares with its ISO string, and a date-only label with midnight of that day in the other value's own offset, in both directions (two full datetimes compare as instants; a value with no timezone is read as UTC). A `date` object still meets a gold year label through the lenient period rule.
 - **Scoring policy** (`scorers/result_match.py`): the right rows plus extra columns pass. `ModelEvaluator.compare_results_extra_columns` passes a result wider than the gold when some choice of its columns in their own order equals the gold under the strict rules; reordered gold columns and period labels stay lenient-only, wider or not. `detail.match` is `strict`, `extra columns` or null; `detail.lenient` is unchanged. Row count and row values are as strict as before.
 
+### C-W6b
+
+The engine's join fixes (design 18.3).
+
+- **Partitions** (`adapters/postgres/adapter.py`): `PostgresAdapter.partitions` reads `pg_inherits` for the schema's partitions (`relispartition`, parent in the same schema); `reflect` asks the base for each partition whose top parent is in scope and `fold_partitions` drops them. The parent keeps its own keys and gains its partitions' (deduplicated); a key of the schema that references a partition points at the parent. Sub-partitions fold into the top parent. `row_estimates` sums the partitions' estimates into a parent that has none (`add_partition_estimates`). Tests: `tests/adapters/unit/test_postgres_partitions.py` (the real shape: keys only on the partitions) and a realdb test on the test bed's Pagila. SQL Server and MySQL partitions are transparent (one table to the catalog), so nothing is needed there. The partitions no longer being tables changes the schema fingerprint, so the Pagila retrieval baseline is re-recorded in the same PR.
+- **Follow-up (not investigated).** In the re-recorded model-free Pagila baseline, pagila_001 now gets 8 tables instead of 11 and misses `category`, `rental` and `category.name` (column recall 0.667 to 0.333), which explains the 71.2% to 68.2% column-recall drop; pagila_002 and pagila_011 gained `payment`. The cause is likely that the join-path fill no longer bridges through the partitions. To investigate.
+- **Hints** (`pipeline/nodes/validator/join_hints.py`): `join_hint(relationships, left, right, normalize, sent)` returns the sentence appended to "Join does not match any allowed relationship." A path runs only through tables the planner was sent (`sent`), since it can use no other; with none, the hint says no path connects them in the schema it was given. No hint when a join alias is unknown. It does not reuse `schema_retriever/join_path.py`: that returns the tables to add, not the keys between them.
+- **Operand order** (`validator/node.py`): a join pair whose aliases are the join's the other way round is swapped before the match. The generator already emits the condition as written, so no change there; a test pins the SQL.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2573,3 +2582,21 @@ Scorer only; gold data is untouched.
    records which match it was. Row count, row values and column order are not loosened.
 
 Docs: `docs/testing/evaluation-dataset.md` (strict and lenient accuracy, answer faithfulness).
+
+### 18.3 The engine fixes (C-W6b)
+
+Approved by the owner 2026-10-29. The five timeouts came from the logical validator rejecting joins ("Join does not
+match any allowed relationship.", `details` null), each retry costing 20-35 s of one 60 s budget. Three causes:
+
+1. **Partitioned tables.** Pagila's `payment` is partitioned into `payment_p2022_01..07`; the foreign keys are declared on
+   the partitions, so the parent reached the planner with no relationships (pagila_001, 002), and the seven partitions
+   added about 25-28k input tokens. The Postgres adapter folds partitions into their parent. The hermetic Pagila
+   fixture gives `payment` its keys directly, which is why tests missed it; the new tests model the real shape.
+2. **No allowed-join hint.** The planner invented shortcut joins on shared keys that are not declared (`inventory.film_id
+   = film_category.film_id`; pagila_003, 005, 008). The rejection now names the declared joins between the two tables
+   or the shortest declared path through the tables it was sent, in the message the refiner and planner are sent.
+3. **Operand order.** A declared join written the other way round was rejected (pagila_008). An equality is symmetric,
+   so the validator accepts either order.
+
+Out of scope, later rows: the prompt-cache miss, duplicate selector and planner calls, `EXTRACT(EPOCH ...)`, the timeout
+default.
