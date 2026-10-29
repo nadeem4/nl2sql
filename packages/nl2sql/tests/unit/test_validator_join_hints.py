@@ -126,3 +126,27 @@ def test_the_reversed_join_still_generates_the_same_equality():
     sql = node._generator._build_query(plan, 10, "postgres").sql(dialect="postgres")
 
     assert "f.film_id = i.film_id" in sql
+
+
+def test_the_path_never_runs_through_a_table_the_planner_was_not_sent():
+    tables = [t for t in TABLES if t.name != "film"]
+    plan = _join_plan("i", "fc", ("i", "film_id"), ("fc", "film_id"))
+    state = SubgraphExecutionState(
+        trace_id="t", sub_query=SubQuery(id="sq1", datasource_id="ds1", intent="q"), relevant_tables=tables,
+        ast_planner_response=ASTPlannerResponse(plan=plan), user_context=UserContext())
+    ctx = fake_runtime(ds_registry=SimpleNamespace(), policies={"allow_all": True},
+                       settings={"pipeline": {"strict_columns": True}})
+
+    message = _rejection(LogicalValidatorNode(ctx)(state)["errors"]).message
+
+    assert "film." not in message and "film_id = film" not in message
+    assert "No path of declared relationships connects them in the schema you were given." in message
+
+
+def test_an_unknown_join_alias_gets_no_empty_table_name_in_a_hint():
+    plan = _join_plan("i", "fc", ("i", "film_id"), ("fc", "film_id"))
+    plan.joins[0].right_alias = "zz"
+
+    messages = [e.message for e in _validate(plan)]
+
+    assert not [m for m in messages if "between  " in m or " and ." in m], messages
