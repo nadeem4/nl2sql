@@ -9,7 +9,7 @@ docs can read the same list.
 The order is the order :func:`nl2sql.pipeline.graph.build_graph` and
 :func:`nl2sql.pipeline.subgraphs.sql_agent.build_sql_agent_graph` run their
 nodes, with the SQL agent's own nodes nested under it, exactly as the Debug
-ledger nests them. The six steps with an ``agent`` are the LLM nodes, and that
+ledger nests them. The seven steps with an ``agent`` are the LLM nodes, and that
 mapping is :data:`nl2sql.llm.providers.LLM_AGENTS` rather than a second copy of
 it. The curated matcher is in the graph only when curated answers are
 configured. ``tests/unit/test_pipeline_steps.py`` builds both graphs and fails

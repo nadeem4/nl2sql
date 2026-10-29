@@ -23,6 +23,8 @@ from nl2sql.llm.wires import structured
 
 # The agent's name in the LLM registry (LLM_AGENTS["table_selector"]).
 AGENT = "tableselector"
+# The step its usage and trace entries are recorded under (PIPELINE_STEPS, LLM_AGENTS).
+STEP = "table_selector"
 # A table's description is cut to this many characters in the catalog.
 DESCRIPTION_MAX = 200
 
@@ -85,5 +87,7 @@ class TableSelector:
             self._chain = TABLE_SELECTOR_PROMPT | structured(self._registry.get_llm(AGENT), TableSelection)
         answer = self._chain.invoke({
             "tables": _json(catalog), "business_context": render_business_context(terms, []),
-            "selected": _json(selected), "user_query": question})
+            "selected": _json(selected), "user_query": question},
+            # The call is spent under its own step, not under schema_retriever, which makes it.
+            config={"metadata": {"langgraph_node": STEP}})
         return list(answer.tables)

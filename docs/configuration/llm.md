@@ -358,7 +358,7 @@ now, and a provider only once its key is saved. See
 [the Settings page](../getting_started/demo.md#the-settings-page).
 
 The playground's **Pipeline** page reads the same configuration back: it lists
-every step of a run and, for each of the six a model decides, the provider and
+every step of a run and, for each of the seven a model decides, the provider and
 model it is set to use, then what it actually spent once a question has been
 asked. It is served by `GET /api/pipeline` from `engine.about()`, whose steps
 (`nl2sql.pipeline.steps`) take their seven model steps from `LLM_AGENTS` rather

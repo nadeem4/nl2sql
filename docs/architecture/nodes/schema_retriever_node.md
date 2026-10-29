@@ -165,8 +165,12 @@ tables sent are the union of four steps, per sub-query and per datasource:
 
 Nothing changes at or below the threshold, or for a pinned plan: every table is
 sent and no selector call is made. The `retrieval` record lists, for each table
-sent, the `steps` that added it (`vector`, `glossary`, `selector`,
-`join_path`), so a missed answer is traced to its cause.
+sent, its `qualified` name and the `steps` that added it (`vector`,
+`glossary`, `selector`, `join_path`), so a missed answer is traced to its cause.
+The selector's model call is recorded under its own step, `table_selector`, in
+usage and `models_by_node`, not under `schema_retriever`. A table already chosen
+by an earlier step is never cut by the selector's pick, and a glossary term's
+columns are always kept.
 
 ### Kept columns
 

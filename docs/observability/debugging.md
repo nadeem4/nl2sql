@@ -174,7 +174,7 @@ object in `outputs`: what the vector search retrieved and how MMR chose among it
     "picks": ["<ids in the order MMR picked them>"],
     "dropped": ["<ids of the pool entries not picked>"]
   }],
-  "tables": [{"table": "Track", "columns": ["Name", "GenreId"], "steps": ["vector"]}]
+  "tables": [{"table": "Track", "columns": ["Name", "GenreId"], "qualified": "[main].[Track]", "steps": ["vector"]}]
 }
 ```
 

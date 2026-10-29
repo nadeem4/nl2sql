@@ -19,6 +19,7 @@ from pagila_snapshot import DS, pagila_snapshot, ref
 
 from nl2sql.config.models import AgentName
 from nl2sql.knowledge.merge import LoadedSource, merge
+from nl2sql.common.cancellation import RunCancelled
 from nl2sql.limits import LimitReached, RunStop
 from nl2sql.llm.providers import LLM_AGENTS
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
@@ -46,7 +47,7 @@ class Model:
     """The registry's model and the chain over it: records the prompt, answers with ``picks`` (or raises)."""
 
     def __init__(self, picks=(), raises=None):
-        self.picks, self.raises, self.prompts, self.agents = list(picks), raises, [], []
+        self.picks, self.raises, self.prompts, self.agents, self.metadata = list(picks), raises, [], [], []
         self.registry = SimpleNamespace(get_llm=self._get)
 
     def _get(self, agent):
@@ -55,7 +56,8 @@ class Model:
 
     def install(self, monkeypatch):
         def structured(_llm, schema):
-            def answer(prompt):
+            def answer(prompt, config):
+                self.metadata.append((config.get("metadata") or {}).get("langgraph_node"))
                 self.prompts.append(prompt.to_string())
                 if self.raises:
                     raise self.raises
@@ -325,3 +327,50 @@ def test_the_selector_is_a_named_agent_with_settings():
     assert LLM_AGENTS["table_selector"] == "tableselector"
     retrieval = Settings().retrieval
     assert (retrieval.table_selector, retrieval.selector_catalog_max, retrieval.join_path_max_hops) == (True, 200, 4)
+
+
+def test_a_cancel_by_the_selector_ends_the_run(monkeypatch):
+    model = Model(raises=RunCancelled("cancelled")).install(monkeypatch)
+
+    with pytest.raises(RunCancelled):
+        _node(_store(pagila_snapshot()), model)(_state())
+
+
+def test_the_selectors_call_is_recorded_under_its_own_step(monkeypatch):
+    model = Model(picks=["payment"]).install(monkeypatch)
+
+    _node(_store(pagila_snapshot()), model)(_state())
+
+    assert model.metadata == ["table_selector"]
+
+
+def test_a_vector_pick_the_selector_also_picks_keeps_all_its_columns_past_forty(monkeypatch):
+    model = Model(picks=["film"]).install(monkeypatch)
+    snapshot = pagila_snapshot(extra_columns={"film": 45})
+    off = _node(_store(snapshot), settings={"table_selector": False})(_state())
+    on = _node(_store(snapshot), model)(_state())
+
+    assert len(_tables(off)["film"]) == 57
+    assert _tables(on)["film"] == _tables(off)["film"]
+
+
+def test_a_term_column_survives_the_selector_and_the_planning_cuts(monkeypatch):
+    glossary = Glossary.model_validate({"version": 1, "datasources": {DS: {"terms": [
+        {"term": "revenue", "definition": "Rated.", "columns": ["film.rating"]}]}}})
+    knowledge = merge([LoadedSource(type="yaml", glossary=glossary, sha256=None, path=None,
+                                    loaded_at=datetime.now(timezone.utc))])
+    model = Model(picks=["film"]).install(monkeypatch)
+    snapshot = pagila_snapshot(extra_columns={"film": 45})
+    store = _store(snapshot, planning=[("film", "extra_3")])
+
+    out = _node(store, model, knowledge=knowledge)(_state())
+
+    assert {"rating", "extra_3", "film_id"} <= _tables(out)["film"]
+
+
+def test_the_trace_names_each_table_by_its_qualified_name(monkeypatch):
+    model = Model(picks=["payment", "film"]).install(monkeypatch)
+
+    out = _node(_store(pagila_snapshot()), model)(_state())
+
+    assert {t["qualified"] for t in out["retrieval"]["tables"]} >= {name("payment"), name("rental")}

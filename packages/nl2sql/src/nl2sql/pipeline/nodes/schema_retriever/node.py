@@ -447,13 +447,15 @@ class SchemaRetrieverNode:
 
     @staticmethod
     def _retrieval(query: str, searches: List[Dict[str, Any]], tables_out: List[Table],
-                   reason: Optional[str] = None, steps: Optional[Dict[str, List[str]]] = None) -> Dict[str, Any]:
+                   reason: Optional[str] = None,
+                   steps: Optional[List[Tuple[str, List[str]]]] = None) -> Dict[str, Any]:
         """What the vector searches retrieved and what survived, for the run trace.
 
-        ``steps`` is each sent table's name to the steps that added it
-        (``vector``, ``glossary``, ``selector``, ``join_path``), so a missed
-        answer can be traced to its cause. Not a state field: LangGraph drops
-        the key, the trace keeps the node's whole return.
+        ``steps`` is, for each of ``tables_out`` in order, its qualified name
+        and the steps that added it (``vector``, ``glossary``, ``selector``,
+        ``join_path``), so a missed answer can be traced to its cause. Not a
+        state field: LangGraph drops the key, the trace keeps the node's whole
+        return.
         """
         record: Dict[str, Any] = {"skipped": reason is not None}
         if reason is not None:
@@ -461,8 +463,8 @@ class SchemaRetrieverNode:
         else:
             record.update(query=query, searches=searches)
         record["tables"] = [{"table": t.name, "columns": [c.name for c in t.columns],
-                             **({"steps": steps[t.name]} if steps and t.name in steps else {})}
-                            for t in tables_out]
+                             **({"qualified": steps[i][0], "steps": steps[i][1]} if steps else {})}
+                            for i, t in enumerate(tables_out)]
         return record
 
     def __call__(self, state: SubgraphExecutionState) -> Dict[str, Any]:
@@ -617,29 +619,31 @@ class SchemaRetrieverNode:
 
         # 2. Glossary terms bring their own tables, and keep the columns they name. A table with no
         # columns of its own yet is sent whole, as a vector pick is, so a term naming only a table keeps all of it.
+        # The named columns are also kept apart (``pinned``), so no later step can cut them.
+        pinned: Dict[str, Set[str]] = defaultdict(set)
         for term in terms:
             for key, column in self._term_tables(term, snapshot, visible, key_of):
                 if key not in tables:
                     tables[key] = set()
-                    add(key, "glossary")
                     if column:
                         tables[key].add(column)
-                else:
-                    add(key, "glossary")
-                    if column and tables[key]:
-                        tables[key].add(column)
+                add(key, "glossary")
+                if column:
+                    pinned[key].add(column)
 
-        # 3. The table selector picks from a catalog of every table the caller may read.
+        # 3. The table selector picks from a catalog of every table the caller may read. A table already
+        # chosen keeps what it has, or all its columns up to 40; only a new table past 40 is cut to the search.
         keys_only: Set[str] = set()
-        picked = self._select(state, query, visible, knowledge, terms, set(tables), searchable)
+        chosen = set(tables)
+        picked = self._select(state, query, visible, knowledge, terms, chosen, searchable)
         wide: List[str] = []
         for key in picked:
             add(key, "selector")
             columns = visible[key].columns
             if len(columns) <= self.SELECTOR_ALL_COLUMNS_MAX:
                 tables[key] = set(columns)
-            else:
-                tables.setdefault(key, set())
+            elif key not in chosen:
+                tables[key] = set()
                 keys_only.add(key)
                 wide.append(key)
         if wide and self.vector_store:
@@ -653,6 +657,9 @@ class SchemaRetrieverNode:
             tables[key] = set()
             keys_only.add(key)
             add(key, "join_path")
+        for key, columns in pinned.items():
+            if tables[key] or key in keys_only:  # a table with no columns of its own is sent whole already
+                tables[key] |= columns
 
         if not tables:
             return self._whole_snapshot(query, searches, snapshot, schema_version, visible, preferred, knowledge,
@@ -667,7 +674,9 @@ class SchemaRetrieverNode:
             knowledge=knowledge,
             keys_only=keys_only,
         )
-        steps_by_name = {visible[key].table.table_name: s for key, s in steps.items() if key in visible}
+        # relevant_tables is the visible tables in ``tables`` order, preferred first (a stable sort).
+        sent = sorted((key for key in tables if key in visible), key=lambda key: not preferred(visible[key].table))
+        steps_by_name = [(visible[key].table.full_name, steps.get(key, [])) for key in sent]
 
         return {
             "relevant_tables": relevant_tables,

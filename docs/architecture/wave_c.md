@@ -2315,6 +2315,11 @@ join-path fill and the eval wiring they need.
     pinned dump's payment partitions are not in it.
   - The model-free Pagila baseline is a follow-up: neither the `realdb` workflow nor the snapshot fixture runs the
     retrieval mode (it needs the Pagila schema indexed with embeddings), so no floor is recorded.
+- **Review fixes.** A table an earlier step already chose is never moved to `keys_only` by the selector's pick (a
+  vector pick over 40 columns was cut to its keys), and a term's columns are kept apart and unioned in last, so no cut
+  drops them. The selector's call carries `metadata["langgraph_node"] = "table_selector"`, so usage, the Pipeline page
+  and `models_by_node` attribute it to its own step. Each trace table also carries `qualified`, so two schemas with one
+  table name stay apart. `test_schema_retriever_keys.py` now uses the shared Pagila fixture.
 - **Still to do.** The Pagila suite (second PR). Then the owner's keyed run on the test bed's Pagila with the selector
   on (17.5): regenerate the suite's rows, run mode full, and for any gold table not sent read the trace's per-table
   `steps` before closing B106.
