@@ -37,7 +37,8 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 - **`create_draft(title=None, workspace_id=None, conversation_id=None)`** makes an empty draft owned by the caller
   (title "New dashboard"; in `workspace_id`, else "General", made on first use) and publishes `dashboard.changed`
   (`created`). The `dashboard_edit` chat tool calls it on first use, with the conversation's id, which is stored as
-  `Dashboard.conversation_id`.
+  `Dashboard.conversation_id`; a `conversation_id` that is not the caller's is `ConversationNotFound`. The tool also
+  makes a new draft when the conversation's dashboard has been deleted.
 - **`edit(dashboard_id, edits, conversation=None)`** applies a list of edits in order, each seeing the ones before,
   all or none. The named methods (`rename`, `rename_tile`, `set_tile_chart`, `remove_tile`, `arrange`,
   `set_filters`, `set_schedule`, `move`) each build one edit. None calls a model, and none takes a question or a
@@ -46,7 +47,11 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   and are a `ValueError` without one. The step's whole decomposition and each sub-query's plan, or the verified
   query that answered, become the chart's plan; it is first checked by a run that executes nothing, as the caller
   and under the dashboard's lock, and a plan the validator rejects or the caller may not read raises a
-  `ValueError` that ends with "Nothing was saved." An unknown chart id is a `ValueError`.
+  `ValueError` that ends with "Nothing was saved." An unknown chart id is a `ValueError`. `from_step.turn` defaults
+  to the conversation's latest turn. **`conversation` is trusted:** its steps are not re-read from the store, only
+  its owner is checked against the caller, so it is for SDK code holding the caller's own `Conversation` and is
+  not exposed over REST or MCP; the plan's access check still runs as the caller. The lock lasts as long as the
+  edit's checks (one time limit per `add_tile` or `replace_plan`).
 - **`set_tile_chart`** with a kind the chart's last result cannot be drawn as raises a `ValueError` naming the
   kinds it can be, judged from the column kinds stored with that result (so a result last drawn as a table can
   still be drawn as a bar). With no stored result any kind is accepted.

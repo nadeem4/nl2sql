@@ -21,7 +21,7 @@ class DashboardEditArgs(BaseModel):
 
     edits: List[DashboardEdit] = Field(min_length=1, description=(
         "The changes, applied in order, all or none. add_tile turns an answer you asked for into a chart: from_step "
-        "is its turn number and the position of the ask call among that turn's ask calls, counting from 1. "
+        "is its turn number (this turn when absent) and the position of the ask call among that turn's ask calls, counting from 1. "
         "replace_plan fixes a chart marked needs_fixing from a new answer to its question. You never give a plan or "
         "SQL: the chart keeps the plan the engine made for that answer."))
     dashboard_id: Optional[str] = Field(default=None, description=(
@@ -39,7 +39,13 @@ class DashboardEditTool:
     def __call__(self, ctx: ToolContext, args: BaseModel) -> ToolOutput:
         assert isinstance(args, DashboardEditArgs)
         dashboards, user = ctx.engine.dashboards, ctx.user
-        dashboard_id = args.dashboard_id or ctx.conversation.dashboard_id
+        dashboard_id = args.dashboard_id
+        if dashboard_id is None and ctx.conversation.dashboard_id is not None:
+            dashboard_id = ctx.conversation.dashboard_id
+            try:
+                dashboards.get(dashboard_id, user_context=user)
+            except LookupError:  # deleted since: make a new draft, which the conversation is tied to instead
+                dashboard_id = None
         made = False
         try:
             if dashboard_id is None:
@@ -48,11 +54,13 @@ class DashboardEditTool:
                                                        conversation_id=ctx.conversation.id).id
                 made = True
             dashboard = dashboards.edit(dashboard_id, args.edits, user_context=user, conversation=ctx.conversation)
-        except (ValueError, LookupError) as error:  # a refused edit, a plan the check rejected, not the caller's
+        except Exception as error:
             if made:
-                dashboards.delete(dashboard_id, user_context=user)  # no empty draft left behind
-            raise ToolNotApplicable(str(error)) from None
+                dashboards.delete(dashboard_id, user_context=user)  # no empty draft left behind, whatever failed
+            if isinstance(error, (ValueError, LookupError)):  # a refused edit, a plan the check rejected
+                raise ToolNotApplicable(str(error)) from None
+            raise
         body = {"id": dashboard.id, "title": dashboard.title, "status": dashboard.status,
                 "workspace_id": dashboard.workspace_id,
                 "tiles": [{"id": t.id, "title": t.title} for t in dashboard.tiles]}
-        return ToolOutput(kind="json", title=dashboard.title, body=body, refs={"dashboard_id": dashboard.id})
+        return ToolOutput(kind="json", title=dashboard.title, body=body, refs={"dashboard_id": dashboard.id, **({"created": "true"} if made else {})})

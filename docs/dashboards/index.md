@@ -86,7 +86,7 @@ engine.conversations.tool(chat.id, "dashboard_pin", {"title": "Sales"}, user_con
   workspace named, tied to the conversation. A conversation started with `start(dashboard_id=...)` edits that
   dashboard instead. It stays a draft until `dashboard_pin` (the model calls it only when the user asks) saves it
   whole.
-- **`add_tile`** takes a `title` and `from_step` (`turn`, and which of that turn's `ask` calls). The chart keeps
+- **`add_tile`** takes a `title` and `from_step` (`turn`, which defaults to the turn being answered, and which of that turn's `ask` calls). The chart keeps
   the **whole** plan of that answer: its decomposition, the plan of every sub-query and the combine step, or the
   verified query that answered. The model never writes or sees a plan or SQL, and the engine reads the plan from
   its own stored step.

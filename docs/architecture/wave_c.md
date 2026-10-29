@@ -1930,19 +1930,27 @@ Not built yet.
       with `plan_from_step` (`StoredQuery` is not used). The conversation must be the caller's (`ValueError`
       otherwise); without one the two edits are a `ValueError` ("exists only in a conversation"). The named methods
       still take no question or plan, and no model text becomes a plan: the plan is the engine's own stored step.
-    - **`from_step.step` counts the turn's `ask` steps from 1**, as the `chart` tool does, not every step.
+    - **`from_step.step` counts the turn's `ask` steps that have a result, from 1**, as the `chart` tool does, not
+      every step. **`from_step.turn` is optional** and defaults to the conversation's latest turn, which in a chat is
+      the one being answered (the `[CONVERSATION]` block names no index for it); the prompt says to leave it out for
+      an answer asked in this turn.
     - **The check** is `Refresher.check` (`TileRunner.run(execute=False, draw=False)`) for the new chart, under the
       dashboard's lock, accepting the statuses `open` serves (`ok`, `empty`, `needs_approval`). Any other raises a
       `ValueError` "The plan of the chart '<title>' was refused (<reason>). Nothing was saved." and the whole edit
       list is dropped. A verified answer becomes a verified chart (`verified_datasource_id` from the answer's source).
+      The lock's time limit is one pipeline timeout per `add_tile` or `replace_plan` in the list.
     - **`replace_plan`** keeps the chart's id, title, chart type and place, takes the step's question and plan, and
       discards its stored result.
     - **A new tile** gets the first free id `t<n>` and goes beside the last chart when there is room on its row, else
       on a new row (2 wide, 2 high). There is no cap on charts in chat (`dashboards.max_tiles` is the starter's size).
-    - **The tie to the conversation** is made by `Conversations._tool`: after the first successful `dashboard_edit`
-      with no dashboard yet it sets `Conversation.dashboard_id` from the step's `refs`. A draft the call made is
-      deleted again when its edit fails, so no empty draft is left behind. Edits on a dashboard the conversation does
-      not hold (an explicit `dashboard_id`) do not change `Conversation.dashboard_id`.
+    - **The tie to the conversation** is made by `Conversations._tool`: after a `dashboard_edit` that made a draft
+      (its `refs` carry `created`) it sets `Conversation.dashboard_id` from the step's `refs`. A draft the call made
+      is deleted again when anything fails, so no empty draft is left behind. Edits on a dashboard the conversation
+      does not hold (an explicit `dashboard_id`) never change `Conversation.dashboard_id`, even when it has none.
+      When the conversation's dashboard has been deleted, the next edit makes a new draft and ties to that.
+      `create_draft(conversation_id=)` is `ConversationNotFound` for a conversation that is not the caller's, and
+      `edit(conversation=)` trusts the `Conversation` it is handed (only its owner is checked): SDK-only, not
+      exposed over REST or MCP, and the plan's access check still runs as the caller.
     - **The `[CONVERSATION]` block** gets a `dashboard` key only while the conversation has one that is still the
       caller's: `id`, `title`, `status`, each chart's `id`, `title`, `question`, `chart` and last stored `status`
       (null before a first run), the validator's reason (cut at 300 characters) for a `needs_fixing` or `denied`

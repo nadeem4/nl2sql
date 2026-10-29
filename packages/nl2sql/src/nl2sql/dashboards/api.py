@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from nl2sql.common.errors import NoTiles, WorkspaceNotEmpty
 from nl2sql.conversations.models import Conversation
-from nl2sql.conversations.store import Owner
+from nl2sql.conversations.store import ConversationStore, Owner
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits, plan_from_step
 from nl2sql.dashboards.layout import arrange
 from nl2sql.dashboards.models import (
@@ -84,6 +84,8 @@ class Dashboards:
         """An empty draft owned by the caller, in ``workspace_id`` (else "General", created on first use). The chat
         tool makes one on first use and ties it to its conversation."""
         owner = self._owner(user_context)
+        if conversation_id is not None:
+            ConversationStore(self._ctx.state).get(conversation_id, owner)  # another caller's: not found
         name = _title(title if title is not None else DEFAULT_DRAFT_TITLE, "dashboard")
         workspace = self._store.workspace(workspace_id, owner) if workspace_id is not None \
             else self._workspaces.default(owner, user_context)
@@ -130,7 +132,8 @@ class Dashboards:
             raise ValueError("That conversation is not the caller's: its answers cannot be added to a dashboard.")
         # Under the refresh lock: a refresh that finished after ``set_filters`` would store results that ignore
         # the new filters.
-        with self._refresher.locked(dashboard_id):
+        checks = sum(1 for e in edits if e.kind in ("add_tile", "replace_plan"))  # each runs a no-execute check
+        with self._refresher.locked(dashboard_id, checks):
             dashboard = self._store.get(dashboard_id, owner)
             now = datetime.now(timezone.utc)
             env = EditEnv(

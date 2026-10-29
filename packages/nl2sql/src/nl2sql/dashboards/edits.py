@@ -167,10 +167,13 @@ def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, Chart
     """The question and the whole plan of an ``ask`` step the conversation holds: its decomposition with the plan of
     each sub-query, or the verified query that answered. ``ref.step`` counts the turn's ``ask`` steps from 1, as the
     ``chart`` tool does. Nothing but what the engine stored is read: no model text becomes a plan (D4)."""
-    turn = next((t for t in conversation.turns if t.index == ref.turn), None)
+    if ref.turn is None:
+        turn = conversation.turns[-1] if conversation.turns else None
+    else:
+        turn = next((t for t in conversation.turns if t.index == ref.turn), None)
     if turn is None:
-        raise ValueError(f"There is no turn {ref.turn} in this conversation.")
-    asks = [s for s in turn.steps if s.call.name == "ask"]
+        raise ValueError(f"There is no turn {ref.turn or 'yet'} in this conversation.")
+    asks = [s for s in turn.steps if s.call.name == "ask" and s.result is not None]  # as the chart tool counts
     if ref.step > len(asks):
         raise ValueError(f"Turn {ref.turn} has {len(asks)} answer(s) to build a chart from; there is no step {ref.step}.")
     step = asks[ref.step - 1]

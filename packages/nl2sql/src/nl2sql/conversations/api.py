@@ -370,8 +370,9 @@ class Conversations:
         step = self._chat.run(conversation.model_copy(update={"turns": [*conversation.turns, in_flight]}),
                               run.user, call)
         step = strip_output_rows(step)  # stored without rows (D106)
-        if call.name == "dashboard_edit" and step.output is not None and conversation.dashboard_id is None:
-            conversation.dashboard_id = step.output.refs.get("dashboard_id")  # the draft it made is now the conversation's
+        if call.name == "dashboard_edit" and step.output is not None \
+                and step.output.refs.get("created"):
+            conversation.dashboard_id = step.output.refs["dashboard_id"]  # the draft it made is now the conversation's
         run.steps.append(step)
         run.scope.publish("chat_tool.called", ChatToolCalled(
             tool=call.name, conversation_id=conversation.id, turn=index, ok=step.status == "ok",

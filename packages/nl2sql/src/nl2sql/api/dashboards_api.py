@@ -71,6 +71,7 @@ class DashboardsAPI:
 
         Raises:
             WorkspaceNotFound: ``workspace_id`` is not one of the caller's.
+            ConversationNotFound: ``conversation_id`` is not one of the caller's conversations.
         """
         return self._service.create_draft(user_context=user_context, title=title, workspace_id=workspace_id,
                                           conversation_id=conversation_id)
@@ -82,7 +83,12 @@ class DashboardsAPI:
         ``add_tile`` and ``replace_plan`` change what data a chart shows, so they exist only in a conversation: they
         read the plan of an ``ask`` step of ``conversation`` (the caller's own; the chat tool passes the one it is
         in), and a plan the validator rejects, or the caller may not read, is refused by a run that executes nothing
-        before anything is saved. Without ``conversation`` they are a ``ValueError``."""
+        before anything is saved. Without ``conversation`` they are a ``ValueError``.
+
+        ``conversation`` is trusted: its steps are not re-read from the store, only its owner is checked against the
+        caller. So it is for SDK code that holds the caller's own ``Conversation`` (the chat tool does), and is not
+        offered over REST or MCP. The access check of the plan still runs as the caller. In ``from_step``, ``turn``
+        defaults to the conversation's latest turn."""
         return self._service.edit(dashboard_id, edits, user_context=user_context, conversation=conversation)
 
     def rename(self, dashboard_id: str, title: str, *, user_context: UserContext) -> Dashboard:

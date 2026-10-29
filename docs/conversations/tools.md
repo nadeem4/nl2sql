@@ -46,10 +46,12 @@ other arguments are `dashboard_id` (the conversation's dashboard when absent), a
 new draft. The first call in a conversation makes a **draft** tied to it (`Conversation.dashboard_id`,
 `Dashboard.conversation_id`); later calls edit the same one, and a conversation started with
 `start(dashboard_id=...)` edits that dashboard. `add_tile` and `replace_plan` name an answer by `from_step`
-(`turn`, and which of that turn's `ask` calls, counting from 1): the engine reads the whole plan from its own
+(`turn`, which defaults to the turn being answered, and which of that turn's `ask` calls with a result, counting
+from 1): the engine reads the whole plan from its own
 stored step, never from model text, and checks it with a run that executes nothing before saving, so a plan the
 validator rejects ends the step as `TOOL_NOT_APPLICABLE` with the validator's message and saves nothing. A draft
-this call made is removed again. `dashboard_pin` saves the whole draft (`engine.dashboards.pin`) and is called
+this call made is removed again, whatever the failure. If the conversation's dashboard was deleted, the next edit
+makes a new draft and the conversation is tied to that. `dashboard_pin` saves the whole draft (`engine.dashboards.pin`) and is called
 only when the user asks. A dashboard that is not the caller's is "not found". Neither tool calls a model or
 shows the model a row: it gets the step's kind, title and `refs` (`{"dashboard_id": ...}`), and the open
 dashboard in `[CONVERSATION]` as `dashboard` (`id`, `title`, `status`, and each chart's `id`, `title`, `question`,

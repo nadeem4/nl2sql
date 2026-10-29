@@ -17,6 +17,7 @@ from nl2sql import NL2SQL
 from nl2sql.api.dashboards_api import DashboardsAPI
 from nl2sql.api.query_api import QueryAPI, QueryResult, RowSample, SubQueryResult
 from nl2sql.chat_tools.dashboard_edit import DashboardEditArgs
+from nl2sql.common.errors import ConversationNotFound
 from nl2sql.conversations.agent import step_view
 from nl2sql.dashboards.models import (
     AddTile, Arrange, Dashboard, DashboardFilter, EDIT_KINDS, MoveDashboard, RemoveTile, RenameDashboard, RenameTile,
@@ -140,7 +141,7 @@ def test_model_builds_a_dashboard_from_several_ask_steps(engine, model, server, 
         ("Customers by country", "How many customers are there per country?")]
     assert board.tiles[0].plan.plans == {"sq1": plan_json()}
     assert board.tiles[0].plan.decomposition == runs.checks[0]["plan"].decomposition.model_dump(mode="json")
-    assert turn.steps[2].output.refs == {"dashboard_id": board.id}
+    assert turn.steps[2].output.refs == {"dashboard_id": board.id, "created": "true"}
     # Each chart was checked, as the caller, running nothing and writing no answer; only the loop called the model.
     assert [(c["execute"], c["answer"], c["user_context"]) for c in runs.checks] == [(False, False, ANA)] * 2
     assert [c["name"] for c in server.calls] == ["ModelStep"] * 4
@@ -384,7 +385,8 @@ def test_dashboard_edit_creates_a_draft_on_first_use(engine, model, runs):
     [info] = drafts(engine)
     board = the_dashboard(engine, cid)
     assert board.id == info.id and board.title == "Sales overview" and board.status == "draft" and board.tiles == []
-    assert board.conversation_id == cid and turn.steps[0].output.refs == {"dashboard_id": board.id}
+    assert board.conversation_id == cid
+    assert turn.steps[0].output.refs == {"dashboard_id": board.id, "created": "true"}
     assert [w.name for w in engine.workspaces.list(user_context=ANA)] == ["General"]
     assert board.workspace_id == engine.workspaces.list(user_context=ANA)[0].id
     assert [e.data["change"] for e in seen] == [["created"], ["rename"]]
@@ -408,9 +410,10 @@ def test_a_new_draft_takes_the_given_title_and_workspace(engine):
 
 
 def test_create_draft_is_an_empty_private_draft(engine):
-    board = engine.dashboards.create_draft(user_context=ANA, conversation_id="c1")
+    cid = started(engine).id
+    board = engine.dashboards.create_draft(user_context=ANA, conversation_id=cid)
 
-    assert (board.status, board.tiles, board.conversation_id, board.title) == ("draft", [], "c1", "New dashboard")
+    assert (board.status, board.tiles, board.conversation_id, board.title) == ("draft", [], cid, "New dashboard")
     assert (board.tenant_id, board.user_id) == ("acme", "ana")
     assert engine.dashboards.list(user_context=BOB, status="draft") == []
     with pytest.raises(TypeError):
@@ -518,3 +521,102 @@ def test_a_deleted_dashboard_leaves_the_block_without_one(engine, model):
     engine.conversations.ask(cid, "Hello", user_context=ANA)
 
     assert "dashboard" not in json.loads(_block(model.prompts[0]))
+
+# ---------------------------------------------------------------- review fixes
+
+def test_editing_a_named_dashboard_does_not_tie_the_conversation_to_it(engine):
+    seed(engine)
+    cid = started(engine).id
+
+    turn = tool(engine, cid, "dashboard_edit", {"dashboard_id": "d1", "edits": [{"kind": "rename", "title": "Named"}]})
+
+    assert turn.steps[0].status == "ok" and turn.steps[0].output.refs == {"dashboard_id": "d1"}
+    assert engine.conversations.get(cid, user_context=ANA).dashboard_id is None
+
+
+def test_a_deleted_dashboard_gets_a_new_draft_on_the_next_edit(engine):
+    cid = started(engine).id
+    tool(engine, cid, "dashboard_edit", {"edits": [{"kind": "rename", "title": "First"}]})
+    old = the_dashboard(engine, cid)
+    engine.dashboards.delete(old.id, user_context=ANA)
+
+    turn = tool(engine, cid, "dashboard_edit", {"edits": [{"kind": "rename", "title": "Second"}]})
+
+    assert turn.steps[0].status == "ok"
+    new = the_dashboard(engine, cid)
+    assert new.id != old.id and new.title == "Second" and new.conversation_id == cid
+
+
+def test_add_tile_defaults_to_the_current_turn(engine, model, runs):
+    cid = started(engine).id
+    model.say(ask("Orders?"), {"call": {"name": "dashboard_edit", "args": {"edits": [
+        {"kind": "add_tile", "title": "Orders", "from_step": {"step": 1}}]}}}, reply("Done."))
+
+    turn = engine.conversations.ask(cid, "Dashboard please", user_context=ANA)
+
+    assert turn.steps[1].status == "ok", turn.steps[1].error
+    assert [t.title for t in the_dashboard(engine, cid).tiles] == ["Orders"]
+
+
+def test_create_draft_needs_a_conversation_of_the_caller(engine):
+    theirs = started(engine, BOB).id
+
+    with pytest.raises(ConversationNotFound):
+        engine.dashboards.create_draft(user_context=ANA, conversation_id=theirs)
+    with pytest.raises(ConversationNotFound):
+        engine.dashboards.create_draft(user_context=ANA, conversation_id="nope")
+    assert drafts(engine) == []
+
+
+def test_any_failure_of_a_first_edit_leaves_no_draft(engine, model, runs):
+    def boom(call):
+        raise RuntimeError("the check fell over")
+    runs.verdict = boom
+    cid = started(engine).id
+    model.say(ask("Orders?"), edit(add("Orders")), reply("No."))
+
+    turn = engine.conversations.ask(cid, "Dashboard please", user_context=ANA)
+
+    assert turn.steps[1].status == "error"
+    assert drafts(engine) == []
+
+
+def test_the_edit_lock_lasts_as_long_as_its_checks(engine, model, runs, monkeypatch):
+    cid = started(engine).id
+    model.say(ask("Orders?"), reply("Here."))
+    engine.conversations.ask(cid, "Orders please", user_context=ANA)
+    conversation = engine.conversations.get(cid, user_context=ANA)
+    board = engine.dashboards.create_draft(user_context=ANA)
+    state = engine._runtime.state
+    ttls: List[int] = []
+    real = state.lock
+
+    def spy(name, ttl, *args, **kwargs):
+        ttls.append(ttl)
+        return real(name, ttl, *args, **kwargs)
+
+    monkeypatch.setattr(state, "lock", spy)
+    one = int(engine._runtime.settings.pipeline.timeout_s) + 10
+
+    engine.dashboards.edit(board.id, [RenameDashboard(title="X")], user_context=ANA)
+    adds = [AddTile(title=f"T{i}", from_step=StepRef(turn=1, step=1)) for i in range(3)]
+    engine.dashboards.edit(board.id, adds, user_context=ANA, conversation=conversation)
+
+    assert ttls[0] == one and ttls[1] == int(engine._runtime.settings.pipeline.timeout_s * 3) + 10
+
+
+def test_plan_from_step_counts_the_same_ask_steps_as_the_chart_tool():
+    from datetime import datetime, timezone
+    from nl2sql.conversations.models import Conversation, ToolCall, ToolStep, Turn
+    from nl2sql.dashboards.edits import plan_from_step
+
+    call = ToolCall(name="ask", args={"question": "q"})
+    skipped = ToolStep(call=call, status="error", question="no result", error={"code": "X", "message": "x"})
+    kept = ToolStep(call=call, status="ok", question="with result", result=answer())
+    at = datetime.now(timezone.utc)
+    conversation = Conversation(id="c", title="t", created_at=at, updated_at=at, turns=[
+        Turn(index=1, at=at, kind="message", text="t", steps=[skipped, kept], status="answered")])
+
+    question, _ = plan_from_step(conversation, StepRef(turn=1, step=1))
+
+    assert question == "with result", "a step with no result is not counted, as the chart tool does"
