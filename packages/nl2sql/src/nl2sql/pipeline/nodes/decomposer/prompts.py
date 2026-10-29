@@ -42,7 +42,16 @@ RULES:
    It defines the semantic output contract for downstream aggregation, not physical columns.
 9) Do not invent attributes not implied by the user query or datasource metadata.
 10) Use at most {max_sub_queries} sub_queries. A question that needs more cannot be answered.
-11) No commentary.
+11) Split only when one query cannot express the question. One sub-query is one flat query: it can join
+    tables, filter, group_by, aggregate, order_by and limit, so "the top 5 films by revenue" or "the
+    customers who spent more than 45" is one sub-query. Split when the question spans datasources, asks
+    independent parts, or needs a ranked or aggregated subset to filter another result.
+12) A split that depends on a ranked subset, such as "top 5 films by revenue in the top category", is
+    one join group, not separate answers: one sub-query finds the subset (the top category, limit 1), a
+    second computes the rows with that subset's attribute in its expected_schema, and one join group
+    on that attribute combines them. The final ranking goes in post_combine_ops on that group
+    (sort, then limit), so the question is answered by one result set.
+13) No commentary.
 
 OUTPUT FORMAT:
 Call the DecomposerResponse tool. Its arguments are the decomposition itself, with

@@ -135,3 +135,14 @@ def test_answer_synthesizer_handles_llm_error():
     result = node(state)
 
     assert result["errors"][0].error_code == ErrorCode.AGGREGATOR_FAILED
+
+
+def test_the_answer_prompt_quotes_figures_exactly_as_the_rows_hold_them():
+    from nl2sql.pipeline.nodes.answer_synthesizer.prompts import ANSWER_SYNTHESIZER_PROMPT
+
+    prompt = ANSWER_SYNTHESIZER_PROMPT.lower()
+
+    assert "exactly as" in prompt
+    assert "do not round" in prompt
+    assert "thousands separators" in prompt
+    assert "about" in prompt  # named as a word not to use
