@@ -109,6 +109,7 @@ Validation performed:
 - Joins must match known relationships.
 - Column references must exist and be unambiguous.
 - Every binary operator must be one the generator can render.
+- A `*` column appears only as a bare select item or as `COUNT(*)`.
 - The plan must build into a query at all.
 
 ---
@@ -167,6 +168,13 @@ Side effects:
      any check that walks the plan through the visitor, because an operator it
      cannot render makes all of them raise — which is how `op: "NOT"` used to
      surface as a `VALIDATOR_CRASH`.
+   - `_misplaced_star()` walks the plan through `SqlVisitor` and rejects a
+     `*` column anywhere but a whole select item with no alias (`*`, or `t.*`
+     for a declared alias) or `COUNT(*)`, with `INVALID_PLAN_STRUCTURE`. The
+     rule is the visitor's (`MisplacedStar`); the message asks for `COUNT(*)` or
+     a count of a non-null key column, since `COUNT(t.*)` counts differently
+     under an outer join. It runs early for the same reason as the operator
+     check.
    - `_validate_columns()` builds the plan's `sqlglot` tree and runs
      `qualify(..., validate_qualify_columns=True)`. On failure each distinct
      column reference is re-probed so every bad reference is reported, and

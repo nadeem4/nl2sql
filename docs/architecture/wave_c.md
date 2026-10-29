@@ -1920,8 +1920,9 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
 
     Where the code and the design differ, the code won:
 
-    - **`COUNT(1)`, not `COUNT(*)`.** A plan writes a star as the column name `*`, which the validator accepts but the
-      generator quotes (`t1."*"`), so the database refuses it. The row count is `COUNT(1)`, the same number.
+    - **`COUNT(1)`, not `COUNT(*)`** (superseded by C-W3: the generator no longer quotes the star, and the row
+      count is `COUNT(*)`). A plan writes a star as the column name `*`, which the validator accepted but the
+      generator quoted (`t1."*"`), so the database refused it.
     - **Names only.** A chart's question and title use the columns' names humanised; a glossary description's first
       clause is not used (no description is needed for a good question, and one could carry text a person did not
       write for a question).
@@ -2241,12 +2242,40 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
       unknown reason; `check` hashes a dummy for an unknown id; only `lifespan` scopes skip the key check and a
       websocket is closed. The default `allowed_hosts` adds `[::1]` and the bare names.
 
+### C-W3
+
+`COUNT(*)` and `t1.*` passed the logical validator and failed at the database (bug B102 in section 14).
+
+- **Cause.** The validator mapped a `*` column name to a real sqlglot star in its own subclass of `SqlVisitor`
+  (`ValidationSqlVisitor`); the generator's `SqlVisitor` ran it through `exp.to_identifier`, which quotes it
+  (`COUNT(t1."*")`, T-SQL `t1.[*]`, MySQL `` t1.`*` ``). The two trees differed, so the validator's check said nothing
+  about what the generator rendered, and the failure came at execution, after the last retry edge.
+- **Fix.** `SqlVisitor` owns the one rule for the star, so the validator and the generator build the same tree, and
+  `ValidationSqlVisitor` is gone. A star is allowed in two places only: a whole select item with no alias (`*`, or
+  `t1.*` where `t1` is a declared table alias), and the single, non-DISTINCT argument of `COUNT` as a bare `*`
+  (`COUNT(*)`). Anywhere else the visitor raises `MisplacedStar`, and the validator reports it as a retryable
+  `INVALID_PLAN_STRUCTURE` that tells the planner to use `COUNT(*)` or count a non-null column such as the key. That
+  covers `COUNT(t1.*)`, `COUNT(DISTINCT *)`, `SUM(*)`, `MAX(t1.*)`, `t1.* AS x`, a star in `WHERE`, `GROUP BY`,
+  `ORDER BY` or arithmetic, `COUNT(*, x)`, and `x.*` for an undeclared alias.
+- **Why `COUNT(t1.*)` is refused, not rewritten.** SQLite and T-SQL refuse it, and it does not mean `COUNT(*)`: on
+  Postgres, `COUNT(o.*)` over a `LEFT JOIN orders o` counts a customer with no orders as 0 (the NULL-extended row),
+  while `COUNT(*)` counts it as 1. Rewriting it would change the answer silently; refusing it costs one retry.
+- **Planner prompt.** Instruction 9 gains one line: count rows with `COUNT(*)` (a `*` column with no alias) or a
+  non-null key column, never `COUNT(t.*)`.
+- **Tests.** `tests/unit/test_generator_star.py` (the real validator and generator on sqlite, postgres, tsql, mysql and
+  duckdb: `COUNT(*)`, `*` and `u.*` render unquoted and parse back as stars; every other position is a retryable
+  plan error and the generator never renders it) and two full runs in `tests/e2e/test_retry_fake_llm.py` (a
+  `COUNT(*)` plan on the demo SQLite answers 59 with no retry; a `COUNT(t1.*)` plan is refused, and the planner's
+  second plan answers 59 after one retry).
+- **D3.** Its templates now write the row count as `COUNT(*)` (the `COUNT(1)` note under D3 is superseded).
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
 |---|---|---|---|
 | B100 | `POST /api/v1/datasource` answers every failure, a typo in the body included, with a 500 and "the cause is in the server log", so a Connect form cannot say what is wrong | `packages/api/src/nl2sql_api/routes/datasource.py` (`except Exception` around `add_datasource`) | L2 |
 | B101 | `nl2sql demo --dir` warns that any folder without a demo stamp was "created by an older version", so a project folder that was never a demo gets a false warning | `cli/demo/stamp.py` (`outdated_warning`: `created_by is None` is "older") | L3 |
+| B102 | A plan's `COUNT(*)` or `t1.*` passes the logical validator, but the generator quotes the star (`COUNT(t1."*")`), so the database refuses it after the last retry edge; a star anywhere else (`SUM(*)`, `COUNT(t1.*)`, `ORDER BY t1.*`) passes too. Fixed: `COUNT(*)` and an unaliased `*` / `t1.*` select item render bare, every other star is a retryable plan error | `generator/node.py` `SqlVisitor._visit_column` (`exp.to_identifier("*")`) against the validator's own `ValidationSqlVisitor` | C-W3 |
 
 Bugs are numbered from B100, as decisions are from D100, so they never
 collide with Wave B's (B31 onwards).

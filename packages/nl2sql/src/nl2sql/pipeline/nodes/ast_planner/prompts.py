@@ -165,6 +165,7 @@ PLANNER_SYSTEM_PROMPT = (
     "8. If no exact match is available, fall back to LIKE but keep the pattern derived from sample_values.\n"
     "9. For COUNT(DISTINCT x), set \"distinct\": true on the COUNT func expr; for SELECT DISTINCT,"
     " set the plan's \"distinct\": true. DISTINCT is never a func_name.\n"
+    "   To count rows, use COUNT(*) (one arg: a column with column_name \"*\" and no alias) or a non-null key column, never COUNT(t.*).\n"
     "10. [SEMANTIC_CONTEXT] is the query's structured intent. Apply every part of it: its filters"
     " (on an aggregated metric, as having), its order_by as the plan's order_by, and its limit as"
     " the plan's limit.\n"
