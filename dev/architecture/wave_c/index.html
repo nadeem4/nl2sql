@@ -7012,7 +7012,53 @@ the 1,000-line mark. <code>refresh(filters=...)</code> and <code>filter_values</
 </ul>
 </div>
 <h3 id="d2b">D2b</h3>
-<p>Not built yet.</p>
+<div class="admonition note">
+<p class="admonition-title">Built (D2b): dashboard filters</p>
+<ul>
+<li><strong>Files:</strong> <code>nl2sql/dashboards/filters.py</code> (pure: <code>activate</code> checks the values, <code>supply</code> adds the predicates to a
+  chart's stored plans, <code>values_plan</code> builds the <code>filter_values</code> plan), <code>run.py</code> (<code>TileRunner.run(active=)</code>,
+  <code>TileRunner.values</code>, <code>Refresher.run(active=)</code>), <code>api.py</code> (<code>refresh</code> activates the filters, and takes the
+  lock only when none is active; <code>filter_values</code>), <code>api/dashboards_api.py</code> (the public face; the two D2b stubs are gone).</li>
+<li><strong>Tests:</strong> <code>tests/unit/test_dashboards_d2b.py</code> (the service with a canned <code>run_query</code>, a render test of the
+  predicate, booleans included, in <code>postgres</code>, <code>tsql</code> and <code>mysql</code>; and in <code>test_dashboards_d3.py</code> a test that the
+  filters <code>generate</code> makes work with <code>filter_values</code> and <code>refresh(filters=)</code>), three e2e tests in <code>tests/e2e/test_dashboards_fake_llm.py</code> (a
+  filter reaches the validator and the database; a filter on a missing column is <code>needs_fixing</code>;
+  <code>filter_values</code> as the caller), and <code>test_wave_c_stubs.py</code> no longer lists <code>filter_values</code>.</li>
+<li><strong>How it works.</strong> <code>refresh(filters={id: values})</code> checks every value against the filter's <code>kind</code> (a
+  <code>ValueError</code> naming the filter, before any chart runs), then each chart's stored plans are copied and the
+  predicate of each filter is <code>AND</code>-ed to the <code>where</code> of every plan whose sub-query is on the filter's
+  datasource and reads its table (once per alias of that table). The plan goes to <code>run_query</code> as a
+  <code>SuppliedPlan</code>, so <code>plan.after</code>, the validator and the generator see the predicate, and a filter on a column
+  that does not exist is <code>needs_fixing</code> with no refiner. <code>dashboard.refreshed</code> carries the filter ids in the
+  dashboard's order, never the values.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><strong>A filtered refresh is not stored.</strong> The design stores every refresh's results; storing a viewer's filtered
+  rows would make <code>open</code> serve rows for values nobody can see, and the next scheduled run would replace them with
+  unfiltered ones. The run is returned (<code>DashboardRun.filters</code> holds the values, <code>TileRun.filtered</code> says which
+  charts every filter reached) and the stored results stay the dashboard's own. A stored <code>TileRun.filtered</code> is
+  therefore always <code>False</code>.</li>
+<li><strong>A filtered refresh takes no refresh lock,</strong> since it stores nothing: a schedule never skips, and no
+  <code>DashboardBusy</code>, because someone is only changing a filter. An unfiltered refresh keeps the lock.</li>
+<li><code>TileRun.filtered</code> is true when every query of the chart got a filter and each active filter reached at least
+  one of them; with no active filter, if any query ran unfiltered, or on a verified chart (it has no plan to add
+  to), it is <code>False</code>.</li>
+<li><strong>A date-only upper bound ends with that day:</strong> <code>between ["2024-01-01", "2024-01-31"]</code> on a temporal filter is
+  <code>col &gt;= '2024-01-01' AND col &lt; '2024-02-01'</code>; a timestamp upper bound stays <code>&lt;=</code>. Temporal values are only
+  <code>YYYY-MM-DD</code> or <code>YYYY-MM-DDTHH:MM[:SS[.ffffff]]</code> with an optional <code>Z</code> or <code>+HH:MM</code> (not <code>20240131</code>).</li>
+<li><strong>Matching a table:</strong> the plan's table name and schema match ignoring case; a plan table that names no
+  schema never matches (it may be a same-named table in the default schema), so it runs unfiltered. A filter
+  narrows what the chart reads, never widens it, but a <code>HAVING</code> or a step after the combine sees the filtered
+  rows, a <code>LEFT JOIN</code> on the filtered table behaves as an inner join, and on a self-join every alias is
+  filtered. A boolean renders as <code>1</code> in <code>tsql</code> through the generator, not in dashboards code. <code>open</code> takes no
+  filters (the design's signature has none).</li>
+<li><code>kind="other"</code> accepts any plain value (text, number or boolean); the design lists four kinds.</li>
+<li><code>filter_values</code> rejects a <code>limit</code> outside 1 to 1,000 (one page of a saved result), drops <code>NULL</code>s, returns dates
+  as ISO text and decimals as numbers, and raises <code>ValueError</code> with the run's message when the run is not
+  <code>ok</code> or <code>empty</code> (a caller without access, an invalid column). A <code>between</code> filter on an empty column is <code>[]</code>.</li>
+</ul>
+</div>
 <h3 id="d3">D3</h3>
 <div class="admonition note">
 <p class="admonition-title">Built (D3): the starter dashboard</p>
