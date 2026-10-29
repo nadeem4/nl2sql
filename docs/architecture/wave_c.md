@@ -2327,7 +2327,7 @@ join-path fill and the eval wiring they need.
   empty glossary; $2.70 spent, stopped at the $3 cap after 8 of 11 cases. Table recall 100% and column recall 100% on
   all 8 (tables sent 10-18, mean 13.1), including pagila_001, the smoke question. Answers 0 of 8 passed: 5 hit
   PIPELINE_TIMEOUT (60 s), 3 finished and were failed on faithfulness (the scorer did not match comma-formatted numbers
-  such as "3,094.78"; pagila_005's rows matched; pagila_004 grouped by title with an extra count column; pagila_007's
+  such as "3,094.78"; pagila_005's rows matched the gold rows, so it failed on faithfulness alone; pagila_004 grouped by title with an extra count column; pagila_007's
   monthly totals differ from the gold rows, cause not yet known). C-W4's goal (recall) is met; answer quality on large
   schemas is row C-W6.
 
