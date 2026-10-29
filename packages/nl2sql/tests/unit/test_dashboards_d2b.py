@@ -83,6 +83,22 @@ def test_between_is_two_comparisons_and_in_is_ors(engine, runs):
     assert show(sent(runs, 3).where) == "((t1.city = 'Paris') AND ((t1.amount >= 0) AND (t1.amount <= 9)))"
 
 
+@pytest.mark.parametrize("values, expected", [
+    (["2024-01-01", "2024-01-31"], "((t1.created >= '2024-01-01') AND (t1.created < '2024-02-01'))"),
+    (["2024-01-31", "2024-01-31"], "((t1.created >= '2024-01-31') AND (t1.created < '2024-02-01'))"),
+    (["2024-02-28", "2024-02-29"], "((t1.created >= '2024-02-28') AND (t1.created < '2024-03-01'))"),
+    (["2023-12-01", "2023-12-31"], "((t1.created >= '2023-12-01') AND (t1.created < '2024-01-01'))"),
+    (["2024-01-01", "2024-01-31T10:30:00Z"], "((t1.created >= '2024-01-01') AND (t1.created <= '2024-01-31T10:30:00Z'))"),
+    (["2024-01-01T08:00", "2024-01-31"], "((t1.created >= '2024-01-01T08:00') AND (t1.created < '2024-02-01'))"),
+])
+def test_a_date_only_upper_bound_includes_that_whole_day(engine, runs, values, expected):
+    seed(engine, filters=[WHEN], tiles=[tile("t1")])
+
+    engine.dashboards.refresh("d1", user_context=ANA, filters={"when": values})
+
+    assert show(sent(runs).where) == expected
+
+
 def test_the_predicate_is_joined_to_the_plans_own_where_with_and(engine, runs):
     body = chart_plan().plans["sq1"]
     body["where"] = {"kind": "binary", "op": "=", "left": {"kind": "column", "alias": "t1", "column_name": "open"},
@@ -148,7 +164,7 @@ def test_a_filter_on_another_schema_does_not_reach_a_same_named_table(engine, ru
 
 def test_each_alias_of_the_table_is_filtered(engine, runs):
     plan = chart_plan()
-    plan.plans["sq1"]["tables"].append({"name": "orders", "alias": "t2"})
+    plan.plans["sq1"]["tables"].append({"name": "orders", "schema_name": "main", "alias": "t2"})
     seed(engine, filters=[CITY], tiles=[tile("t1", plan=plan)])
 
     engine.dashboards.refresh("d1", user_context=ANA, filters={"city": ["Paris"]})
@@ -164,7 +180,27 @@ def test_a_sub_query_of_another_datasource_is_not_filtered(engine, runs):
     run = engine.dashboards.refresh("d1", user_context=ANA, filters={"city": ["Paris"]})
 
     assert sent(runs, sub_query="sq1").where is not None and sent(runs, sub_query="sq2").where is None
-    assert run.tiles[0].filtered is True, "the filter reached one of the chart's queries"
+    assert run.tiles[0].filtered is False, "one of the chart's queries ran unfiltered"
+
+
+def test_a_chart_is_filtered_only_when_every_query_of_it_was(engine, runs):
+    one_side = chart_plan(queries=2)
+    one_side.plans["sq2"]["tables"][0]["name"] = "customers"  # this side does not read the filter's table
+    seed(engine, filters=[CITY], tiles=[tile("t1", plan=chart_plan(queries=2)), tile("t2", x=2, plan=one_side)])
+
+    run = engine.dashboards.refresh("d1", user_context=ANA, filters={"city": ["Paris"]})
+
+    assert [t.filtered for t in run.tiles] == [True, False]
+
+
+def test_a_table_with_no_schema_is_not_filtered(engine, runs):
+    plan = chart_plan()
+    del plan.plans["sq1"]["tables"][0]["schema_name"]
+    seed(engine, filters=[CITY], tiles=[tile("t1", plan=plan)])
+
+    run = engine.dashboards.refresh("d1", user_context=ANA, filters={"city": ["Paris"]})
+
+    assert sent(runs).where is None and run.tiles[0].filtered is False, "its schema is not known to be the filter's"
 
 
 def test_a_filtered_refresh_does_not_replace_the_stored_results(engine, runs):
@@ -209,6 +245,12 @@ def test_the_event_names_the_filters_applied_and_never_their_values(engine, runs
     ({"when": ["2024-01-01"]}, "Date.*exactly two"),
     ({"when": ["2024-01-01", "soon"]}, "Date.*ISO"),
     ({"when": ["2024-01-01", 5]}, "Date.*ISO"),
+    ({"when": ["2024-01-01", "20240131"]}, "Date.*ISO"),
+    ({"when": ["2024-1-1", "2024-01-31"]}, "Date.*ISO"),
+    ({"when": ["2024-01-01", "2024-01-31 12:00"]}, "Date.*ISO"),
+    ({"when": ["2024-01-01", "2024-13-01"]}, "Date.*ISO"),
+    ({"when": ["2024-01-01", "2024-01-31T12"]}, "Date.*ISO"),
+    ({"when": ["2024-01-01", "2024-01-31T12:00:00+0200"]}, "Date.*ISO"),
     ({"amount": [1, "9"]}, "Amount.*number"),
     ({"amount": [True, 9]}, "Amount.*number"),
     ({"amount": [1, float("nan")]}, "Amount.*number"),
@@ -222,6 +264,29 @@ def test_wrong_typed_filter_value_is_refused_before_running(engine, runs, filter
 
     assert runs.calls == [], "nothing ran"
     assert stored(engine) == {}
+
+
+@pytest.mark.parametrize("stamp", ["2024-01-31", "2024-01-31T12:00", "2024-01-31T12:00:00", "2024-01-31T12:00:00.250000",
+                                   "2024-01-31T12:00:00Z", "2024-01-31T12:00:00+02:00", "2024-01-31T12:00-05:30"])
+def test_the_documented_iso_forms_are_accepted(engine, runs, stamp):
+    seed(engine, filters=[WHEN], tiles=[tile("t1")])
+
+    engine.dashboards.refresh("d1", user_context=ANA, filters={"when": ["2024-01-01", stamp]})
+
+    assert len(runs.calls) == 1
+
+
+def test_a_filtered_refresh_takes_no_lock_and_an_unfiltered_one_does(engine, runs):
+    seed(engine, filters=[CITY], tiles=[tile("t1")])
+
+    with engine._runtime.state.lock("dashboard-refresh:d1", 60):  # a scheduled or manual refresh is running
+        run = engine.dashboards.refresh("d1", user_context=ANA, filters={"city": ["Paris"]})
+        with pytest.raises(ValueError, match="being refreshed"):
+            engine.dashboards.refresh("d1", user_context=ANA)
+        with pytest.raises(ValueError, match="being refreshed"):
+            engine.dashboards.refresh("d1", user_context=ANA, filters={})
+
+    assert run.tiles[0].status == "ok" and len(runs.calls) == 1
 
 
 def test_a_boolean_filter_takes_booleans_and_text_takes_only_text(engine, runs):
@@ -362,16 +427,23 @@ def _sql(plan: PlanModel, dialect: str) -> str:
 @pytest.mark.parametrize("dialect", ["postgres", "tsql", "mysql"])
 def test_filters_render_as_bound_literals_in_each_dialect(engine, runs, dialect):
     evil = "O'Brien'; DROP TABLE orders; --"
-    seed(engine, filters=[CITY, WHEN, AMOUNT], tiles=[tile("t1")])
+    paid = DashboardFilter(id="paid", label="Paid", column="ds1.main.orders.paid", kind="boolean", op="in")
+    seed(engine, filters=[CITY, WHEN, AMOUNT, paid], tiles=[tile("t1")])
     engine.dashboards.refresh("d1", user_context=ANA, filters={
-        "city": ["Paris", evil], "when": ["2024-01-01", "2024-12-31"], "amount": [1, 2.5]})
+        "city": ["Paris", evil], "when": ["2024-01-01", "2024-12-30"], "amount": [1, 2.5], "paid": [True]})
 
-    tree = sqlglot.parse(_sql(sent(runs), dialect), read=dialect)
+    sql = _sql(sent(runs), dialect)
+    tree = sqlglot.parse(sql, read=dialect)
 
     assert len(tree) == 1, "one statement: a value never ends it"
     [select] = tree
     where = select.args["where"].this
     strings = [lit.this for lit in where.find_all(exp.Literal) if lit.is_string]
     assert sorted(strings) == sorted(["Paris", evil, "2024-01-01", "2024-12-31"]), "each value is one string literal"
-    assert len(list(where.find_all(exp.GTE))) == 2 and len(list(where.find_all(exp.LTE))) == 2
-    assert len(list(where.find_all(exp.Or))) == 1 and where.find(exp.And)
+    assert len(list(where.find_all(exp.GTE))) == 2 and len(list(where.find_all(exp.LT))) == 1
+    assert len(list(where.find_all(exp.LTE))) == 1 and len(list(where.find_all(exp.Or))) == 1 and where.find(exp.And)
+    text = sql.upper().replace("[", "").replace("]", "")
+    if dialect == "tsql":  # T-SQL has no TRUE or FALSE
+        assert "TRUE" not in text and "T1.PAID = 1" in text
+    else:
+        assert "T1.PAID = TRUE" in text.replace('"', "").replace("`", "")

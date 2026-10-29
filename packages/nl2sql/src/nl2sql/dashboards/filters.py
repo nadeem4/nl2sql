@@ -8,8 +8,9 @@ widen what a chart reads. Everything here is pure: running the plans is ``run.py
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from functools import reduce
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
@@ -100,15 +101,32 @@ def _fits(kind: str, value: Any) -> bool:
     return isinstance(value, (str, int, float, bool)) and not (isinstance(value, float) and not math.isfinite(value))
 
 
+# The only temporal forms: a date, or a date and a time with optional seconds, fraction and Z or an offset.
+_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+_STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})?")
+
+
 def _iso(text: str) -> bool:
     try:
-        datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        try:
+        if _DATE.fullmatch(text):
             date.fromisoformat(text)
-        except ValueError:
+        elif _STAMP.fullmatch(text):
+            datetime.fromisoformat(text.replace("Z", "+00:00"))
+        else:
             return False
+    except ValueError:
+        return False
     return True
+
+
+def _day_after(text: str) -> Optional[str]:
+    """The day after a date-only ``text``, or ``None`` for a timestamp (or the last day there is)."""
+    if not _DATE.fullmatch(text):
+        return None
+    try:
+        return (date.fromisoformat(text) + timedelta(days=1)).isoformat()
+    except OverflowError:
+        return None
 
 
 # ------------------------------------------------------------------ the predicate
@@ -122,19 +140,25 @@ def _binary(op: str, left: Expr, right: Expr) -> Expr:
 
 
 def predicate(active: Active, alias: str) -> Expr:
-    """``between [a, b]`` is ``col >= a AND col <= b``; ``in [v1, v2]`` is ``col = v1 OR col = v2``."""
+    """``between [a, b]`` is ``col >= a AND col <= b``; ``in [v1, v2]`` is ``col = v1 OR col = v2``. A temporal
+    range whose upper bound is a date alone ends with that whole day: ``col >= a AND col < the next day``."""
     column = _column(alias, active.column)
     if active.filter.op == "between":
         low, high = active.values
-        return _binary("AND", _binary(">=", column, Expr(kind="literal", value=low)),
-                       _binary("<=", column, Expr(kind="literal", value=high)))
+        below = _day_after(high) if active.filter.kind == "temporal" else None
+        upper = _binary("<", column, Expr(kind="literal", value=below)) if below else \
+            _binary("<=", column, Expr(kind="literal", value=high))
+        return _binary("AND", _binary(">=", column, Expr(kind="literal", value=low)), upper)
     terms = [_binary("=", column, Expr(kind="literal", value=v)) for v in active.values]
     return reduce(lambda left, right: _binary("OR", left, right), terms)
 
 
 def _reads(ref: TableRef, active: Active) -> bool:
-    return (ref.name.casefold() == active.table.casefold()
-            and (not ref.schema_name or ref.schema_name.casefold() == active.schema.casefold()))
+    """A table matches by name and schema, ignoring case. A plan table that names no schema never matches: it could
+    be the filter's table or a same-named one in the datasource's default schema, and a wrong guess would filter the
+    wrong table."""
+    return (ref.name.casefold() == active.table.casefold() and bool(ref.schema_name)
+            and ref.schema_name.casefold() == active.schema.casefold())
 
 
 def filtered(plan: PlanModel, datasource_id: str, active: Sequence[Active]) -> Tuple[PlanModel, Set[str]]:
@@ -153,20 +177,22 @@ def filtered(plan: PlanModel, datasource_id: str, active: Sequence[Active]) -> T
 
 
 def supply(plan: ChartPlan, active: Sequence[Active]) -> Tuple[SuppliedPlan, bool]:
-    """The chart's stored plan as a ``SuppliedPlan`` with every active filter added where it applies, and whether
-    each active filter reached at least one of the chart's queries. A verified query has no plan, so it runs
-    unfiltered."""
+    """The chart's stored plan as a ``SuppliedPlan`` with every active filter added where it applies, and whether the
+    chart was filtered throughout: every query got a filter and every active filter reached a query. A verified
+    query has no plan, so it runs unfiltered; so does a query that reads none of the filters' tables."""
     if plan.verified is not None:
         return SuppliedPlan(verified=plan.verified, verified_datasource_id=plan.verified_datasource_id), False
     decomposition = DecomposerResponse.model_validate(plan.decomposition)
     datasources = {sq.id: sq.datasource_id for sq in decomposition.sub_queries}
     plans: Dict[str, PlanModel] = {}
     reached: Set[str] = set()
+    every_query = bool(plan.plans)
     for sub_query, body in plan.plans.items():
         plans[sub_query], here = filtered(PlanModel.model_validate(body), datasources.get(sub_query, ""), active)
         reached |= here
+        every_query = every_query and bool(here)
     return (SuppliedPlan(decomposition=decomposition, plans=plans),
-            bool(active) and reached == {a.filter.id for a in active})
+            bool(active) and every_query and reached == {a.filter.id for a in active})
 
 
 # ------------------------------------------------------------------ the values of a filter

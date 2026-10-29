@@ -386,6 +386,38 @@ def test_the_filters_are_the_time_column_and_the_distribution_dimensions(engine,
     assert len({f.id for f in dashboard.filters}) == 3
 
 
+def _literals(e: Any) -> List[Any]:
+    """Every literal value in an expression tree."""
+    if e is None:
+        return []
+    found = [e.value] if e.kind == "literal" else []
+    return found + _literals(e.left) + _literals(e.right)
+
+
+def test_the_filters_generate_makes_work_with_filter_values_and_refresh(engine, runs, monkeypatch):
+    from nl2sql.execution.artifacts.results import ResultPage
+
+    dashboard, _ = engine.dashboards.generate("ds1", user_context=ANA)
+    pages = iter([[["2024-01-01", "2024-12-31"]], [["open"], ["shut"]], [["FR"]]])
+    monkeypatch.setattr(ResultsAPI, "page", lambda api, run_id, result_id, offset=0, limit=100, tenant_id=None:
+                        ResultPage(request_id=run_id, result_id=result_id, columns=["v"], rows=next(pages),
+                                   limit=limit))
+
+    given = {f.id: engine.dashboards.filter_values(dashboard.id, f.id, user_context=ANA) for f in dashboard.filters}
+    runs.calls.clear()
+    run = engine.dashboards.refresh(dashboard.id, user_context=ANA, filters=given)
+
+    assert list(given.values()) == [["2024-01-01", "2024-12-31"], ["open", "shut"], ["FR"]]
+    assert [t.status for t in run.tiles] == ["ok"] * len(dashboard.tiles) and set(run.filters) == set(given)
+    for call in runs.calls:
+        for plan in call["plan"].plans.values():
+            wanted = {"orders": {"2024-01-01", "2025-01-01", "open", "shut"}, "customers": {"FR"}}
+            reads = {t.name for t in plan.tables}
+            for name, values in wanted.items():
+                if name in reads:
+                    assert values <= set(_literals(plan.where)), (name, _literals(plan.where))
+
+
 def test_generated_dashboard_can_be_edited_manually(engine, runs, server):
     dashboard, _ = engine.dashboards.generate("ds1", user_context=ANA)
     first, second = dashboard.tiles[0], dashboard.tiles[1]

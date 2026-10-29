@@ -146,7 +146,7 @@ def runs(monkeypatch):
 def chart_plan(queries: int = 1) -> ChartPlan:
     sub_queries = [SubQuery(id=f"sq{i}", datasource_id="ds1", intent=f"Count orders {i}") for i in range(1, queries + 1)]
     plan = PlanModel.model_validate({
-        "tables": [{"name": "orders", "alias": "t1"}],
+        "tables": [{"name": "orders", "schema_name": "main", "alias": "t1"}],
         "select_items": [{"alias": "n", "expr": {"kind": "func", "func_name": "COUNT", "is_aggregate": True,
                                                  "args": [{"kind": "column", "alias": "t1", "column_name": "id"}]}}]})
     operation = "standalone" if queries == 1 else "union"

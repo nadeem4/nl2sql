@@ -56,8 +56,11 @@ def _seed(engine, plan=None, did="d1", chart_plan=None):
     from nl2sql.dashboards.store import DashboardStore
 
     supplied = plan or _supplied()
-    chart_plan = chart_plan or ChartPlan(decomposition=supplied.decomposition.model_dump(mode="json"),
-                                         plans={k: v.model_dump(mode="json") for k, v in supplied.plans.items()})
+    bodies = {k: v.model_dump(mode="json") for k, v in supplied.plans.items()}
+    for body in bodies.values():  # a filter matches a table by schema and name, so the plan names its schema
+        for table in body["tables"]:
+            table["schema_name"] = table.get("schema_name") or "main"
+    chart_plan = chart_plan or ChartPlan(decomposition=supplied.decomposition.model_dump(mode="json"), plans=bodies)
     now = datetime.now(timezone.utc)
     tile = Tile(id="t1", title="Customers", question=COUNT, plan=chart_plan, layout=TileLayout(x=0, y=0, w=2, h=1))
     DashboardStore(engine._runtime.state).put(Dashboard(

@@ -78,13 +78,15 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   theirs) and `error` (returned, not stored: the chart keeps its last good result). It raises `DashboardBusy` (a `ValueError`) while the dashboard is being refreshed or
   edited, and `ValueError` for a `tile_id` the dashboard does not have.
 - **`filters`** maps filter ids to values (D117): `refresh(dashboard_id, filters={"country": ["Brazil"]})`. Each
-  value is checked against the filter's kind first (`number`, `temporal` as ISO text, `boolean`, `text`; `in` takes
-  1 to 100 values, `between` exactly two), and a wrong one, or an id the dashboard does not have, is a
-  `ValueError` naming the filter, raised before any chart runs. The predicate (`between` as `>=` and `<=`, `in` as
-  `OR`s, the values as plan literals) is added to each stored query that reads the filter's table before the
-  plan goes to `run_query`; other queries run unfiltered. `TileRun.filtered` is true when every active filter
-  reached the chart, `DashboardRun.filters` holds the values and `dashboard.refreshed` the ids. A filtered refresh
-  is returned, not stored.
+  value is checked against the filter's kind first (`number`, `temporal` as `YYYY-MM-DD` or
+  `YYYY-MM-DDTHH:MM[:SS[.ffffff]]` with an optional `Z` or `+HH:MM`, `boolean`, `text`; `in` takes 1 to 100 values,
+  `between` exactly two), and a wrong one, or an id the dashboard does not have, is a `ValueError` naming the
+  filter, raised before any chart runs. The predicate (`between` as `>=` and `<=`, with a date-only upper bound as
+  `<` the next day; `in` as `OR`s; the values as plan literals) is added to each stored query that reads the
+  filter's table (schema and name; a plan table with no schema never matches) before the plan goes to
+  `run_query`; other queries run unfiltered. `TileRun.filtered` is true when every query of the chart got a filter
+  and every active filter reached the chart, `DashboardRun.filters` holds the values and `dashboard.refreshed`
+  the ids. A filtered refresh is returned, not stored, and takes no refresh lock (an unfiltered one does).
 - **`filter_values(dashboard_id, filter_id, *, user_context, limit=100)`** returns the distinct values of an `in`
   filter's column (at most `limit`, 1 to 1,000, in order) or `[min, max]` of a `between` one (`[]` when there are
   none), by a plan built in code and run as the caller through `run_query`, so the caller's scope and policies

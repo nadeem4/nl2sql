@@ -1852,10 +1852,11 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
 !!! note "Built (D2b): dashboard filters"
     - **Files:** `nl2sql/dashboards/filters.py` (pure: `activate` checks the values, `supply` adds the predicates to a
       chart's stored plans, `values_plan` builds the `filter_values` plan), `run.py` (`TileRunner.run(active=)`,
-      `TileRunner.values`, `Refresher.run(active=)`), `api.py` (`refresh` activates the filters under the lock,
-      `filter_values`), `api/dashboards_api.py` (the public face; the two D2b stubs are gone).
-    - **Tests:** `tests/unit/test_dashboards_d2b.py` (the service with a canned `run_query`, and a render test of the
-      predicate in `postgres`, `tsql` and `mysql`), three e2e tests in `tests/e2e/test_dashboards_fake_llm.py` (a
+      `TileRunner.values`, `Refresher.run(active=)`), `api.py` (`refresh` activates the filters, and takes the
+      lock only when none is active; `filter_values`), `api/dashboards_api.py` (the public face; the two D2b stubs are gone).
+    - **Tests:** `tests/unit/test_dashboards_d2b.py` (the service with a canned `run_query`, a render test of the
+      predicate, booleans included, in `postgres`, `tsql` and `mysql`; and in `test_dashboards_d3.py` a test that the
+      filters `generate` makes work with `filter_values` and `refresh(filters=)`), three e2e tests in `tests/e2e/test_dashboards_fake_llm.py` (a
       filter reaches the validator and the database; a filter on a missing column is `needs_fixing`;
       `filter_values` as the caller), and `test_wave_c_stubs.py` no longer lists `filter_values`.
     - **How it works.** `refresh(filters={id: values})` checks every value against the filter's `kind` (a
@@ -1873,10 +1874,20 @@ Each row's PR replaces its own `Not built yet.` line and edits only under its ow
       unfiltered ones. The run is returned (`DashboardRun.filters` holds the values, `TileRun.filtered` says which
       charts every filter reached) and the stored results stay the dashboard's own. A stored `TileRun.filtered` is
       therefore always `False`.
-    - `TileRun.filtered` is true when each active filter reached at least one of the chart's queries; with no
-      active filter, or on a verified chart (it has no plan to add to), it is `False`.
-    - **Matching a table:** the plan's table name matches ignoring case, and its schema (when it names one) too; a
-      plan that names no schema matches any. `open` takes no filters (the design's signature has none).
+    - **A filtered refresh takes no refresh lock,** since it stores nothing: a schedule never skips, and no
+      `DashboardBusy`, because someone is only changing a filter. An unfiltered refresh keeps the lock.
+    - `TileRun.filtered` is true when every query of the chart got a filter and each active filter reached at least
+      one of them; with no active filter, if any query ran unfiltered, or on a verified chart (it has no plan to add
+      to), it is `False`.
+    - **A date-only upper bound ends with that day:** `between ["2024-01-01", "2024-01-31"]` on a temporal filter is
+      `col >= '2024-01-01' AND col < '2024-02-01'`; a timestamp upper bound stays `<=`. Temporal values are only
+      `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM[:SS[.ffffff]]` with an optional `Z` or `+HH:MM` (not `20240131`).
+    - **Matching a table:** the plan's table name and schema match ignoring case; a plan table that names no
+      schema never matches (it may be a same-named table in the default schema), so it runs unfiltered. A filter
+      narrows what the chart reads, never widens it, but a `HAVING` or a step after the combine sees the filtered
+      rows, a `LEFT JOIN` on the filtered table behaves as an inner join, and on a self-join every alias is
+      filtered. A boolean renders as `1` in `tsql` through the generator, not in dashboards code. `open` takes no
+      filters (the design's signature has none).
     - `kind="other"` accepts any plain value (text, number or boolean); the design lists four kinds.
     - `filter_values` rejects a `limit` outside 1 to 1,000 (one page of a saved result), drops `NULL`s, returns dates
       as ISO text and decimals as numbers, and raises `ValueError` with the run's message when the run is not

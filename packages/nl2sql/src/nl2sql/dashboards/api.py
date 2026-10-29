@@ -227,11 +227,14 @@ class Dashboards:
                 filters: Optional[Dict[str, List[Any]]] = None, approvals: Sequence[Approval] = ()) -> DashboardRun:
         owner = self._owner(user_context)
         dashboard = self._store.get(dashboard_id, owner)
+        active = filtering.activate(dashboard.filters, filters)  # refused before anything runs
+        if active:  # a view for whoever asked: nothing is stored, so there is nothing to lock
+            return self._refresher.run(dashboard, self._chosen(dashboard, tile_id), user_context, "manual",
+                                       approvals=approvals, active=active)
         with self._refresher.locked(dashboard_id, len(dashboard.tiles)):
             dashboard = self._store.get(dashboard_id, owner)  # as it is now, under the lock
-            active = filtering.activate(dashboard.filters, filters)  # refused before anything runs
-            tiles = self._chosen(dashboard, tile_id)
-            return self._refresher.run(dashboard, tiles, user_context, "manual", approvals, active)
+            return self._refresher.run(dashboard, self._chosen(dashboard, tile_id), user_context, "manual",
+                                       approvals=approvals)
 
     def filter_values(self, dashboard_id: str, filter_id: str, *, user_context: UserContext,
                       limit: int = 100) -> List[Any]:
