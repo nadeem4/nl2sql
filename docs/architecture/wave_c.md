@@ -2298,7 +2298,7 @@ join-path fill and the eval wiring they need.
   `retrieval_settings()` reports it and `join_path_max_hops`.
 - **Suite** (`evaluation/suites/pagila.yaml`, the second PR). 11 approved cases over the test bed's Pagila, gold SQL and
   tables, the smoke question first. `test_pagila_suite_reads_the_tables_it_names` parses each gold SQL with sqlglot and
-  holds `tables` equal to the tables it reads. The cases have no `rows`: `regenerate` writes them against the test bed.
+  holds `tables` equal to the tables it reads. The cases carry `rows`, written by `regenerate` against the test bed's Pagila (2026-10-29).
 - **Tests.** `tests/unit/test_table_recall.py` (the smoke question, per-table steps, join path alone, hop limit, a
   view with no key, bridge columns, selector columns up to and past 40, a hidden table in the catalog, the result and a
   path, a raising selector, an unknown name, an empty pick, glossary tables with no selector, the prompt, the catalog
@@ -2323,8 +2323,13 @@ join-path fill and the eval wiring they need.
   drops them. The selector's call carries `metadata["langgraph_node"] = "table_selector"`, so usage, the Pipeline page
   and `models_by_node` attribute it to its own step. Each trace table also carries `qualified`, so two schemas with one
   table name stay apart. `test_schema_retriever_keys.py` now uses the shared Pagila fixture.
-- **Still to do (owner).** The keyed run on the test bed's Pagila with the selector on (17.5): regenerate the suite's
-  rows, run mode full, and for any gold table not sent read the trace's per-table `steps` before closing B106.
+- **Keyed run (2026-10-29).** GCP test bed Pagila (29 tables), model claude-opus-5 (Anthropic), mode full, selector on,
+  empty glossary; $2.70 spent, stopped at the $3 cap after 8 of 11 cases. Table recall 100% and column recall 100% on
+  all 8 (tables sent 10-18, mean 13.1), including pagila_001, the smoke question. Answers 0 of 8 passed: 5 hit
+  PIPELINE_TIMEOUT (60 s), 3 finished and were failed on faithfulness (the scorer did not match comma-formatted numbers
+  such as "3,094.78"; pagila_005's rows matched; pagila_004 grouped by title with an extra count column; pagila_007's
+  monthly totals differ from the gold rows, cause not yet known). C-W4's goal (recall) is met; answer quality on large
+  schemas is row C-W6.
 
 ## 14. Bugs Wave C fixes
 

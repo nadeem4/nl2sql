@@ -35,6 +35,10 @@ def test_pagila_suite_reads_the_tables_it_names(case):
     assert all(c.casefold() in COLUMNS for c in case.columns), case.id
 
 
+def test_every_case_carries_the_rows_its_gold_sql_returned():
+    assert all(case.rows for case in SUITE.cases), [c.id for c in SUITE.cases if not c.rows]
+
+
 def test_the_demo_does_not_copy_a_suite_for_a_database_it_does_not_have(tmp_path):
     from nl2sql.config.project import init_project
 

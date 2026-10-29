@@ -152,8 +152,9 @@ category" needs `film`, `film_category`, `category`, `inventory`, `rental` and
 `test_pagila_suite_reads_the_tables_it_names` keeps the two equal.
 
 `nl2sql init --demo` does not copy it into the demo, which has no Pagila. The cases
-have SQL and no `rows`: point a suite file at the test bed and run
-`engine.evals.regenerate`, then review the rows, before a full run. Mode
+carry the `rows` that `engine.evals.regenerate` wrote from the gold SQL on the
+test bed's Pagila. After you edit a case, point a suite file at the test bed
+and run `regenerate` again, then review the rows, before a full run. Mode
 retrieval needs no rows.
 
 ```bash
