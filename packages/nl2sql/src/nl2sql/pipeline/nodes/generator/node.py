@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlglot
 from sqlglot import expressions as exp
 from sqlglot.dialects.dialect import Dialect
-from typing import Dict, Any, List, Union, TYPE_CHECKING
+from typing import Dict, Any, Iterable, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from nl2sql.pipeline.state import SubgraphExecutionState
@@ -130,13 +130,48 @@ def _table(ref: TableRef) -> exp.Table:
     return tbl
 
 
+def _is_star(expr: Expr) -> bool:
+    """Whether ``expr`` is the plan's wildcard: a column named ``*``."""
+    return expr.kind == "column" and (expr.column_name or "").strip() == "*"
+
+
+class MisplacedStar(ValueError):
+    """A ``*`` where the database would refuse it, or read it differently from the plan."""
+
+
+STAR_RULE = (
+    "A star is allowed only as a whole select item with no alias (* or t.*) or as COUNT(*) on its own. "
+    "To count rows, use COUNT(*); to count the rows of one table in a join, count a non-null column "
+    "such as its key instead of t.* (COUNT(t.*) is refused: it means something else under an outer join)."
+)
+
+
 class SqlVisitor:
     """Visits the PlanModel AST and converts it to sqlglot expressions.
 
     This visitor traverses the deterministic AST (Expr) produced by the Planner
     and builds a corresponding sqlglot expression tree, which can then be
     transpiled to the target dialect.
+
+    It owns the one rule for the wildcard. A ``*`` column is a real star in two
+    places only: a whole select item with no alias (``visit_select_item``) and
+    the single, non-DISTINCT argument of ``COUNT(*)``. Anywhere else it raises
+    ``MisplacedStar``, which the validator reports as a retryable plan error.
+    ``aliases``, when given, are the plan's table aliases: ``x.*`` must name one.
     """
+
+    def __init__(self, aliases: Iterable[str] | None = None):
+        self.aliases = set(aliases) if aliases is not None else None
+
+    def visit_select_item(self, expr: Expr, alias: str | None) -> exp.Expression:
+        """A select item: ``*`` or ``t.*`` is allowed here when the item has no alias."""
+        if _is_star(expr) and not alias:
+            if not expr.alias:
+                return exp.Star()
+            if self.aliases is not None and expr.alias not in self.aliases:
+                raise MisplacedStar(f"Table alias '{expr.alias}' in {expr.alias}.* is not declared in the plan tables.")
+            return exp.Column(this=exp.Star(), table=exp.Identifier(this=expr.alias, quoted=False))
+        return self.visit(expr)
 
     def visit(self, expr: Expr) -> exp.Expression:
         """Dispatches the visit to the appropriate method based on expression kind.
@@ -178,18 +213,15 @@ class SqlVisitor:
     def _visit_column(self, expr: Expr) -> exp.Expression:
         """Converts a column expression to sqlglot.
 
-        A ``*`` name is the wildcard: a real star (``COUNT(*)``, ``t1.*``), not
-        an identifier, which every dialect would quote into a column named
-        ``*``. The validator builds its tree through this same visitor, so it
-        reads the star exactly as the generator renders it.
+        A ``*`` name reaches here only where a star is not allowed (see the
+        class), so it raises rather than be quoted into a column named ``*``.
 
         Any other name is quoted only when it is not a bare identifier, such as
         a select alias with spaces referenced from ORDER BY.
         """
-        if (expr.column_name or "").strip() == "*":
-            if expr.alias:
-                return exp.Column(this=exp.Star(), table=exp.Identifier(this=expr.alias, quoted=False))
-            return exp.Star()
+        if _is_star(expr):
+            star = f"{expr.alias}.*" if expr.alias else "*"
+            raise MisplacedStar(f"{star} is not allowed here. {STAR_RULE}")
         ident = exp.to_identifier(expr.column_name)
         if expr.alias:
             return exp.Column(this=ident, table=exp.Identifier(this=expr.alias, quoted=False))
@@ -210,10 +242,11 @@ class SqlVisitor:
                 )
             return portable_date(kind, unit, self.visit(operand))
 
-        args = [self.visit(arg) for arg in expr.args]
-        if str(expr.func_name).upper() == "COUNT":
-            # ``COUNT(t1.*)`` is not valid on SQLite or T-SQL and means the same as ``COUNT(*)``.
-            args = [exp.Star() if isinstance(a, exp.Column) and isinstance(a.this, exp.Star) else a for a in args]
+        count_star = (
+            str(expr.func_name).upper() == "COUNT" and not expr.distinct
+            and len(expr.args) == 1 and _is_star(expr.args[0]) and not expr.args[0].alias
+        )
+        args = [exp.Star()] if count_star else [self.visit(arg) for arg in expr.args]
         if expr.distinct:
             # FUNC(DISTINCT a, b), the tree sqlglot's parser builds for it.
             args = [exp.Distinct(expressions=args)]
@@ -473,14 +506,14 @@ class GeneratorNode:
                 "Add order_by on the ranked value."
             )
 
-        visitor = SqlVisitor()
+        visitor = SqlVisitor(aliases=[t.alias for t in plan.tables])
         query = exp.select()
         if plan.distinct:
             query = query.distinct()
         selected = []
 
         for s in plan.select_items:
-            e = visitor.visit(s.expr)
+            e = visitor.visit_select_item(s.expr, s.alias)
             selected.append((e, s.alias))
             if s.alias:
                 # Quoted only when it is not a bare identifier ("sales support agent").

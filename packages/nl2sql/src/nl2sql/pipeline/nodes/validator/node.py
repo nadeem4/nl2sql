@@ -21,6 +21,7 @@ from nl2sql.pipeline.nodes.ast_planner.schemas import ASTPlannerResponse, PlanMo
 from nl2sql.pipeline.nodes.generator.node import (
     SUPPORTED_BINARY_OPS,
     GeneratorNode,
+    MisplacedStar,
     SqlVisitor,
     ordered,
 )
@@ -266,9 +267,9 @@ class LogicalValidatorNode:
         on join structure; join conditions are folded into the WHERE clause so
         that their columns are resolved too.
         """
-        visitor = SqlVisitor()
+        visitor = SqlVisitor(aliases=[t.alias for t in plan.tables])
 
-        selects = [visitor.visit(s.expr) for s in plan.select_items] or [exp.Star()]
+        selects = [visitor.visit_select_item(s.expr, s.alias) for s in plan.select_items] or [exp.Star()]
         query = exp.select(*selects)
 
         query = query.from_(exp.Table(this=exp.Identifier(this=aliases[0], quoted=False)))
@@ -378,6 +379,26 @@ class LogicalValidatorNode:
                 )
             )
         return errors
+
+    def _misplaced_star(self, plan: PlanModel) -> Optional[PipelineError]:
+        """Rejects a ``*`` anywhere but a bare select item or ``COUNT(*)``.
+
+        The rule lives in ``SqlVisitor``; walking every expression of the plan
+        through it (``_build_validation_query``) finds the star wherever it is.
+        Other build failures are left to the checks that own them.
+        """
+        try:
+            self._build_validation_query(plan, [t.alias for t in plan.tables])
+        except MisplacedStar as exc:
+            return PipelineError(
+                node="logical_validator",
+                message=str(exc),
+                severity=ErrorSeverity.ERROR,
+                error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+            )
+        except ValueError:
+            pass
+        return None
 
     def _describe_plan_joins(
         self, plan: PlanModel, relationships: List[Dict[str, Any]]
@@ -724,6 +745,11 @@ class LogicalValidatorNode:
         operator_errors = self._unsupported_operators(plan)
         if operator_errors:
             return errors + operator_errors
+
+        # The same reason: a misplaced star makes every walk raise.
+        star_err = self._misplaced_star(plan)
+        if star_err:
+            return errors + [star_err]
 
         date_err = self._date_operations(plan)
         if date_err:

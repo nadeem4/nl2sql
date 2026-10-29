@@ -226,6 +226,11 @@ and a `func` expr with `distinct: true` is a distinct aggregate such as
 `COUNT(DISTINCT x)`. The system message's instructions and one of its examples
 say so; a function named `DISTINCT` is rejected by the logical validator.
 
+Row counts in the plan language are `COUNT(*)`, written as a `COUNT` whose one
+argument is a column named `*` with no alias, or a count of a non-null key
+column. The same instruction says so and that `COUNT(t.*)` is never used; the
+logical validator refuses a star anywhere else (see the generator's star rule).
+
 Dates in the plan language are two portable functions, described once in the
 system message and the same for every database: `DATE_PART(unit, date)`, an
 integer, and `DATE_TRUNC(unit, date)`, the period's first day as `YYYY-MM-DD`,
