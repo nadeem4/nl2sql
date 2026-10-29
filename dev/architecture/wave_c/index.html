@@ -1242,6 +1242,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6d">
+<span class="md-ellipsis">
+      
+        C-W6d
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1381,6 +1390,24 @@
 <span class="md-ellipsis">
       
         18.3 The engine fixes (C-W6b)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#184-c-w6c-findings-no-code-change">
+<span class="md-ellipsis">
+      
+        18.4 C-W6c: findings (no code change)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#185-c-w6d-date-differences-in-plans">
+<span class="md-ellipsis">
+      
+        18.5 C-W6d: date differences in plans
       
     </span>
 </a>
@@ -4088,6 +4115,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6d">
+<span class="md-ellipsis">
+      
+        C-W6d
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4227,6 +4263,24 @@
 <span class="md-ellipsis">
       
         18.3 The engine fixes (C-W6b)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#184-c-w6c-findings-no-code-change">
+<span class="md-ellipsis">
+      
+        18.4 C-W6c: findings (no code change)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#185-c-w6d-date-differences-in-plans">
+<span class="md-ellipsis">
+      
+        18.5 C-W6d: date differences in plans
       
     </span>
 </a>
@@ -7865,10 +7919,12 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
 &lt;p&gt;The engine's join fixes (design 18.3).&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;Partitions&lt;/strong&gt; (&lt;code&gt;adapters/postgres/adapter.py&lt;/code&gt;): &lt;code&gt;PostgresAdapter.partitions&lt;/code&gt; reads &lt;code&gt;pg_inherits&lt;/code&gt; for the schema's partitions (&lt;code&gt;relispartition&lt;/code&gt;, parent in the same schema); &lt;code&gt;reflect&lt;/code&gt; asks the base for each partition whose top parent is in scope and &lt;code&gt;fold_partitions&lt;/code&gt; drops them. The parent keeps its own keys and gains its partitions' (deduplicated); a key of the schema that references a partition points at the parent. Sub-partitions fold into the top parent. &lt;code&gt;row_estimates&lt;/code&gt; sums the partitions' estimates into a parent that has none (&lt;code&gt;add_partition_estimates&lt;/code&gt;). Tests: &lt;code&gt;tests/adapters/unit/test_postgres_partitions.py&lt;/code&gt; (the real shape: keys only on the partitions) and a realdb test on the test bed's Pagila. SQL Server and MySQL partitions are transparent (one table to the catalog), so nothing is needed there. The partitions no longer being tables changes the schema fingerprint, so the Pagila retrieval baseline is re-recorded in the same PR.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Follow-up (not investigated).&lt;/strong&gt; In the re-recorded model-free Pagila baseline, pagila_001 now gets 8 tables instead of 11 and misses &lt;code&gt;category&lt;/code&gt;, &lt;code&gt;rental&lt;/code&gt; and &lt;code&gt;category.name&lt;/code&gt; (column recall 0.667 to 0.333), which explains the 71.2% to 68.2% column-recall drop; pagila_002 and pagila_011 gained &lt;code&gt;payment&lt;/code&gt;. The cause is likely that the join-path fill no longer bridges through the partitions. To investigate.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Follow-up (not investigated).&lt;/strong&gt; In the re-recorded model-free Pagila baseline, pagila_001 now gets 8 tables instead of 11 and misses &lt;code&gt;category&lt;/code&gt;, &lt;code&gt;rental&lt;/code&gt; and &lt;code&gt;category.name&lt;/code&gt; (column recall 0.667 to 0.333), which explains the 71.2% to 68.2% column-recall drop; pagila_002 and pagila_011 gained &lt;code&gt;payment&lt;/code&gt;. The cause is likely that the join-path fill no longer bridges through the partitions. Corrected in 18.4: not the join-path fill, unproven.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Hints&lt;/strong&gt; (&lt;code&gt;pipeline/nodes/validator/join_hints.py&lt;/code&gt;): &lt;code&gt;join_hint(relationships, left, right, normalize, sent)&lt;/code&gt; returns the sentence appended to "Join does not match any allowed relationship." A path runs only through tables the planner was sent (&lt;code&gt;sent&lt;/code&gt;), since it can use no other; with none, the hint says no path connects them in the schema it was given. No hint when a join alias is unknown. It does not reuse &lt;code&gt;schema_retriever/join_path.py&lt;/code&gt;: that returns the tables to add, not the keys between them.&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Operand order&lt;/strong&gt; (&lt;code&gt;validator/node.py&lt;/code&gt;): a join pair whose aliases are the join's the other way round is swapped before the match. The generator already emits the condition as written, so no change there; a test pins the SQL.&lt;/li&gt;
 &lt;/ul&gt;
+&lt;h3 id="c-w6d"&gt;C-W6d&lt;/h3&gt;
+&lt;p&gt;Date differences in plans (design 18.5). &lt;code&gt;ast_planner/functions.py&lt;/code&gt;: &lt;code&gt;DATE_DIFF&lt;/code&gt; joins &lt;code&gt;ALLOWED_FUNCTIONS&lt;/code&gt;; &lt;code&gt;date_diff(func_name, args)&lt;/code&gt; reads &lt;code&gt;DATE_DIFF(unit, start, end)&lt;/code&gt; as &lt;code&gt;(unit, start, end)&lt;/code&gt; (all three None when malformed), and &lt;code&gt;DIFF_UNITS = ("day",)&lt;/code&gt;. The generator's &lt;code&gt;elapsed_days(start, end)&lt;/code&gt; builds &lt;code&gt;DateDiff(end, start, SECOND) / 86400.0&lt;/code&gt;: elapsed days with the fraction kept, a number on every adapter. The SDK's &lt;code&gt;SQLAlchemyAdapter.render_sql&lt;/code&gt; rewrites the seconds difference where sqlglot's rendering is wrong (MySQL &lt;code&gt;CAST(TIMESTAMPDIFF(SECOND, ...) AS DOUBLE)&lt;/code&gt;, since an integer over a decimal literal keeps four decimals there; SQL Server &lt;code&gt;DATEDIFF_BIG(SECOND, CAST(.. AS DATETIME2), ..)&lt;/code&gt;, which also takes &lt;code&gt;DATE&lt;/code&gt;); the SQLite adapter uses &lt;code&gt;(JULIANDAY(end) - JULIANDAY(start)) * 86400.0&lt;/code&gt;. Postgres and DuckDB need nothing. Tests: &lt;code&gt;tests/unit/test_date_diff.py&lt;/code&gt; runs real SQLite and DuckDB (3.87 days, two minutes across midnight, negative, NULL, DATE-only whole numbers) and pins the rendered Postgres, SQL Server and MySQL expressions; &lt;code&gt;tests/realdb/test_date_diff.py&lt;/code&gt; runs the same cases on the test bed. The logical validator rejects another unit or shape and returns early on it (&lt;code&gt;_validate_static&lt;/code&gt;, so the error is &lt;code&gt;INVALID_PLAN_STRUCTURE&lt;/code&gt;, not &lt;code&gt;VALIDATOR_CRASH&lt;/code&gt;; &lt;code&gt;DATE_PART&lt;/code&gt; with a bad unit too), and a &lt;code&gt;-&lt;/code&gt; between two columns typed date or timestamp (&lt;code&gt;_date_subtraction&lt;/code&gt;: not &lt;code&gt;TIME&lt;/code&gt;, tables matched by schema when the plan names one). The planner prompt offers it. Only the day unit. Not caught: a date column wrapped in a function, or a date minus a number.&lt;/p&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -8234,8 +8290,35 @@ match any allowed relationship.", &lt;code&gt;details&lt;/code&gt; null), each r
 &lt;li&gt;&lt;strong&gt;Operand order.&lt;/strong&gt; A declared join written the other way round was rejected (pagila_008). An equality is symmetric,
    so the validator accepts either order.&lt;/li&gt;
 &lt;/ol&gt;
-&lt;p&gt;Out of scope, later rows: the prompt-cache miss, duplicate selector and planner calls, &lt;code&gt;EXTRACT(EPOCH ...)&lt;/code&gt;, the timeout
-default.&lt;/p&gt;
+&lt;p&gt;Out of scope, later rows: the prompt-cache miss and the duplicate selector and planner calls (18.4), &lt;code&gt;EXTRACT(EPOCH ...)&lt;/code&gt;
+(18.5), the timeout default.&lt;/p&gt;
+&lt;h3 id="184-c-w6c-findings-no-code-change"&gt;18.4 C-W6c: findings (no code change)&lt;/h3&gt;
+&lt;p&gt;Looked into and accepted by the owner, 2026-10-29.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Prompt cache works.&lt;/strong&gt; Planner retries read about 25k tokens from the cache. The zeros are the first call of each
+  question, because the system messages embed that question's tables and schema (&lt;code&gt;ast_planner/prompts.py:211&lt;/code&gt;,
+  &lt;code&gt;refiner/prompts.py:21&lt;/code&gt;, &lt;code&gt;selector.py:43-47&lt;/code&gt;). Restructuring the selector so its prefix is shared (about 2k tokens a
+  question) is skipped as low value.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;pagila_001's duplicate selector and planner calls are by design.&lt;/strong&gt; The decomposer split it into two sub-queries, run
+  concurrently: about $0.20 in tokens, about no wall time. "Split only when one query cannot express it" is deferred until
+  the keyed rerun shows whether it matters.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Model-free baseline, pagila_001 from 11 to 8 tables: unproven.&lt;/strong&gt; A hermetic repro gives 8 tables before and after the
+  partition fold. Most likely the MMR picks shifted when the seven near-duplicate payment documents left the index; it is
+  not the join-path fill (this corrects the follow-up in the C-W6b note). Accepted, because production uses the model table
+  selector (100% recall in the keyed run). Settling it needs realdb runs at 67236ce and c6144f5, diffing
+  &lt;code&gt;retrieval.tables[].steps&lt;/code&gt; and the pool.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="185-c-w6d-date-differences-in-plans"&gt;18.5 C-W6d: date differences in plans&lt;/h3&gt;
+&lt;p&gt;Approved by the owner 2026-10-29. In the keyed run pagila_006 ("late rentals": returned later than the film's
+&lt;code&gt;rental_duration&lt;/code&gt; days) timed out. The planner tried &lt;code&gt;EXTRACT_EPOCH&lt;/code&gt; (&lt;code&gt;UNSUPPORTED_FUNCTION&lt;/code&gt;), then subtracted the two
+timestamp columns and compared the interval with &lt;code&gt;film.rental_duration&lt;/code&gt;; Postgres refused &lt;code&gt;interval &gt; smallint&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;The plan now says &lt;code&gt;DATE_DIFF('day', start, end)&lt;/code&gt;: the elapsed days from &lt;code&gt;start&lt;/code&gt; to &lt;code&gt;end&lt;/code&gt;, with the fraction kept (seconds
+divided by 86400, a number), the same on every database; two DATE columns give whole numbers, and the model can wrap it in
+&lt;code&gt;FLOOR&lt;/code&gt; or &lt;code&gt;ROUND&lt;/code&gt;. Owner's decision after review: sqlglot's own &lt;code&gt;DateDiff&lt;/code&gt; in days meant three different things (truncate on
+SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed time matches pagila_006's gold. The plan carries
+no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
+rejects any other unit or shape, and a &lt;code&gt;-&lt;/code&gt; between two date or timestamp columns, naming &lt;code&gt;DATE_DIFF&lt;/code&gt; in the message
+(validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, &lt;code&gt;invariants.md&lt;/code&gt;.&lt;/p&gt;
 
 
 

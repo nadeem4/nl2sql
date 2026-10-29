@@ -3052,7 +3052,9 @@ logical validator refuses a star anywhere else (see the generator's star rule).<
 <p>Dates in the plan language are two portable functions, described once in the
 system message and the same for every database: <code>DATE_PART(unit, date)</code>, an
 integer, and <code>DATE_TRUNC(unit, date)</code>, the period's first day as <code>YYYY-MM-DD</code>,
-with the unit a string literal <code>year</code>, <code>quarter</code>, <code>month</code> or <code>day</code>. The prompt
+with the unit a string literal <code>year</code>, <code>quarter</code>, <code>month</code> or <code>day</code>. The time
+between two dates is <code>DATE_DIFF('day', start, end)</code>, the elapsed days with the fraction kept (<code>FLOOR</code> or <code>ROUND</code> for whole days);
+the prompt says never to subtract dates. The prompt
 names no database; each adapter renders the functions (see the generator).
 Subqueries and window functions are not in the language. <code>offset</code> pages
 through the plan's <code>order_by</code> (rows 11 to 20 are <code>limit: 10, offset: 10</code>); a

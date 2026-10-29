@@ -9795,7 +9795,7 @@
 <h2 id="plan-functions-are-known-functions">Plan Functions Are Known Functions</h2>
 <h3 id="definition_6">Definition</h3>
 <p>Every <code>func</code> expression names a function from <code>ALLOWED_FUNCTIONS</code> in <code>nl2sql.pipeline.nodes.ast_planner.functions</code>, written as a plain identifier (any case).</p>
-<p>The only date functions on the list are the ones the planner prompt offers: <code>DATE_PART</code> and <code>DATE_TRUNC</code>, plus <code>YEAR</code>, <code>QUARTER</code>, <code>MONTH</code>, <code>DAY</code> and <code>EXTRACT</code>, which are read as <code>DATE_PART</code>. <code>STRFTIME</code> is still accepted as a legacy name (<code>LEGACY_FUNCTIONS</code>): a recorded demo answer and three of the Chinook suite's hand-written plans call it. Nothing offers it to the model, and the validator's rejection message leaves it out of the functions it lists.</p>
+<p>The only date functions on the list are the ones the planner prompt offers: <code>DATE_PART</code> and <code>DATE_TRUNC</code>, plus <code>DATE_DIFF('day', start, end)</code> for the time between two dates, and <code>YEAR</code>, <code>QUARTER</code>, <code>MONTH</code>, <code>DAY</code> and <code>EXTRACT</code>, which are read as <code>DATE_PART</code>. <code>STRFTIME</code> is still accepted as a legacy name (<code>LEGACY_FUNCTIONS</code>): a recorded demo answer and three of the Chinook suite's hand-written plans call it. Nothing offers it to the model, and the validator's rejection message leaves it out of the functions it lists.</p>
 <h3 id="enforcement-points_6">Enforcement Points</h3>
 <ul>
 <li><code>LogicalValidatorNode._unsupported_functions()</code> in <code>nl2sql.pipeline.nodes.validator.node</code></li>

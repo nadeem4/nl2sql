@@ -6686,8 +6686,14 @@ every database:</p>
 <td style="text-align: left;">ISO date string <code>YYYY-MM-DD</code></td>
 <td style="text-align: left;"><code>'2011-04-01'</code></td>
 </tr>
+<tr>
+<td style="text-align: left;"><code>DATE_DIFF('day', start, end)</code></td>
+<td style="text-align: left;">number, elapsed days with the fraction kept (negative when end is before start, NULL if either is)</td>
+<td style="text-align: left;"><code>3.87</code></td>
+</tr>
 </tbody>
 </table>
+<p>The engine builds a day difference as <code>DateDiff(end, start, SECOND) / 86400.0</code>; the base class's <code>render_sql</code> fixes it for MySQL and SQL Server, and an adapter whose database sqlglot renders it wrongly for (SQLite) rewrites the <code>DateDiff</code> node into a fractional seconds count.</p>
 <p>The engine already wraps a date part in <code>CAST(... AS INT)</code> and a truncation
 in a <code>YYYY-MM-DD</code> format; an adapter that rewrites the inner nodes keeps
 those wrappers.</p>
