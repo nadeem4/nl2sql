@@ -2683,7 +2683,7 @@ iterator early cancels the turn and stores nothing.</p>
 </tr>
 <tr>
 <td><strong>Results</strong></td>
-<td>A stored step keeps its question, plan, SQL, explanation and summary, never the rows. Read them with <code>engine.results.page(step.trace_id, ...)</code> until they are purged.</td>
+<td>A stored step keeps its question, plan, SQL, explanation and summary, never the rows. Read them with <code>engine.results.page(step.trace_id, ..., user_context=caller)</code>, as the conversation's caller, until they are purged.</td>
 </tr>
 <tr>
 <td><strong>Retention</strong></td>

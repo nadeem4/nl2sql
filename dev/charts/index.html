@@ -5876,10 +5876,10 @@
 
 
 <h1 id="charts">Charts</h1>
-<p>An answer's rows become a chart without a model call. <code>engine.results.chart(result)</code> reads the saved
-result and returns a <code>ChartSpec</code>: our own small typed chart (a line, a bar, a big number or a table),
+<p>An answer's rows become a chart without a model call. <code>engine.results.chart(result, user_context=caller)</code> reads the
+saved result, as the caller who asked it, and returns a <code>ChartSpec</code>: our own small typed chart (a line, a bar, a big number or a table),
 which <code>to_vega_lite()</code> exports for a browser. See <a href="../api/core/results/">Results API</a>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">chart</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>          <span class="c1"># a QueryResult, or a trace_id</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">spec</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">chart</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">caller</span><span class="p">)</span>   <span class="c1"># a QueryResult, or a trace_id</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">spec</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span> <span class="n">spec</span><span class="o">.</span><span class="n">reason</span><span class="p">,</span> <span class="n">spec</span><span class="o">.</span><span class="n">takeaway</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">vega</span> <span class="o">=</span> <span class="n">spec</span><span class="o">.</span><span class="n">to_vega_lite</span><span class="p">()</span>                   <span class="c1"># None for a table</span>
 </code></pre></div>

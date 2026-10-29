@@ -6564,20 +6564,31 @@ and streams each slice out, so the result is never built in memory on the server
 <h3 id="errors-and-scope-of-the-result-routes">Errors and scope of the result routes</h3>
 <ul>
 <li>Both need a role, as <code>/query</code> does: no role is <code>HTTP 401</code>.</li>
-<li>Results are read from the engine's own tenant folder (<code>TENANT_ID</code>, the
-  <code>&lt;tenant_id&gt;</code> of the artifact path) and nowhere else. An unknown <code>request_id</code>, a
-  run of another tenant, a <code>result_id</code> the run's manifest does not list, and an id
-  that is not a plain token (letters, digits, <code>_</code> and <code>-</code>, so no <code>/</code>, <code>.</code> or <code>..</code>)
-  are all <code>HTTP 404</code>, so a caller cannot tell one from the other or reach a path
-  outside the run's folder.</li>
-<li>There is no access control beyond that yet: any caller with a role who knows a
-  run's <code>trace_id</code> can read its result.</li>
+<li>A run is readable only by the caller who asked it: the request's caller (from
+  the auth settings) is passed to <code>engine.results</code> as <code>user_context</code>, and must
+  match the run's recorded asker. Results are read from the engine's own
+  tenant folder (<code>TENANT_ID</code>, the <code>&lt;tenant_id&gt;</code> of the artifact path) and nowhere
+  else. An unknown <code>request_id</code>, another user's run, a run of another tenant, a
+  <code>result_id</code> the run's manifest does not list, and an id that is not a plain
+  token (letters, digits, <code>_</code> and <code>-</code>, so no <code>/</code>, <code>.</code> or <code>..</code>) are all
+  <code>HTTP 404</code>, so a caller cannot tell one from the other or reach a path outside
+  the run's folder.</li>
+<li>The REST API has no per-user identity yet: the static or header role gives
+  a caller roles and no <code>user_id</code>, so every REST run is anonymous. A REST run
+  is readable by any REST caller of the same tenant with the same roles, and
+  by no caller with other roles: a <code>viewer</code> holding an <code>admin</code> run's trace id
+  gets <code>HTTP 404</code>. API keys are for the MCP server only and give REST callers
+  no <code>user_id</code>. See <a href="../../core/results/#who-can-read-a-run">Who can read a run</a>.</li>
+<li>With the dev flag <code>api.trust_body_role: true</code>, the request body's
+  <code>user_context</code> picks the caller's <code>user_id</code> and <code>tenant_id</code> as well as its
+  roles, so a client can read any user's run by naming that user. Use it for
+  local testing only.</li>
 </ul>
 <h2 id="tests">Tests</h2>
 <p><code>packages/api/tests/test_query_results_routes.py</code> covers the result routes over the
 real facade and a local artifact store: paging, the cap, <code>HTTP 422</code> for a bad
-offset or limit, the complete CSV, <code>HTTP 404</code> for unknown, foreign and crafted ids,
-and <code>HTTP 401</code> without a role.</p>
+offset or limit, the complete CSV, <code>HTTP 404</code> for unknown, foreign and crafted ids
+and for an anonymous run read with other roles, and <code>HTTP 401</code> without a role.</p>
 <p><code>packages/api/tests/test_query_routes.py</code> and
 <code>packages/api/tests/test_query_response_shape.py</code> cover this endpoint with FastAPI's
 <code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override) and a stubbed

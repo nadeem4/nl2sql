@@ -4868,6 +4868,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#who-can-read-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who can read a run
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5776,6 +5787,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#who-can-read-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who can read a run
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5795,11 +5817,12 @@
 
 <h1 id="results-api">Results API</h1>
 <h2 id="purpose">Purpose</h2>
-<p><code>engine.results</code>: the results a run saved, read back by its <code>trace_id</code>, and the chart their data is drawn as.</p>
+<p><code>engine.results</code>: the results a run saved, read back by its <code>trace_id</code>, and the chart their data is drawn as.
+Readable only by the caller who asked the run.</p>
 <h2 id="key-modules">Key Modules</h2>
 <ul>
 <li><code>packages/nl2sql/src/nl2sql/api/results_api.py</code> (<code>ResultsAPI</code>, internal)</li>
-<li><code>packages/nl2sql/src/nl2sql/execution/artifacts/results.py</code> (<code>ResultManifest</code>, <code>ResultPage</code>, <code>ResultReader</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/execution/artifacts/results.py</code> (<code>ResultManifest</code>, <code>ResultOwner</code>, <code>ResultPage</code>, <code>ResultReader</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/charts/spec.py</code> (<code>ChartSpec</code>)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
@@ -5812,24 +5835,60 @@
 </thead>
 <tbody>
 <tr>
-<td><code>manifest(run_id, tenant_id=None) -&gt; ResultManifest</code></td>
-<td>Which results the run saved: per result its node id, columns, row count and truncated flag. Never the rows.</td>
+<td><code>manifest(run_id, *, user_context) -&gt; ResultManifest</code></td>
+<td>Which results the run saved: per result its node id, columns, row count and truncated flag, and who asked (<code>owner</code>). Never the rows.</td>
 </tr>
 <tr>
-<td><code>page(run_id, result_id, offset=0, limit=100, tenant_id=None) -&gt; ResultPage</code></td>
+<td><code>page(run_id, result_id, offset=0, limit=100, *, user_context) -&gt; ResultPage</code></td>
 <td>Rows <code>offset</code> to <code>offset + limit</code> of one saved result, read lazily from its parquet file.</td>
 </tr>
 <tr>
-<td><code>csv(run_id, result_id, tenant_id=None) -&gt; Iterator[bytes]</code></td>
+<td><code>csv(run_id, result_id, *, user_context) -&gt; Iterator[bytes]</code></td>
 <td>The whole result as UTF-8 CSV, a slice at a time.</td>
 </tr>
 <tr>
-<td><code>chart(result, result_id=None, *, kind=None, tenant_id=None) -&gt; ChartSpec</code></td>
-<td>The chart the result is drawn as (<a href="../../../charts/">Charts</a>): a <code>ChartSpec</code> chosen by rules from the saved result's column kinds, with no model call. <code>result</code> is a <code>QueryResult</code> (a single sub-query's plan refines the kinds, and its intent titles the chart) or a <code>trace_id</code>. <code>result_id</code> may be left out when the run saved one result. <code>kind</code> forces <code>line</code>, <code>bar</code>, <code>big_number</code> or <code>table</code>; one the data cannot draw is a <code>ValueError</code> naming those it can. Raises <code>ResultNotFound</code> as <code>page</code> does, and also when a <code>QueryResult</code> has an empty <code>result_manifest</code> (a run a hook withheld) or its <code>result_id</code> is not in it: the chart is drawn only from results the caller was given. A <code>trace_id</code> alone is checked like <code>page</code>, by tenant and run id; a run a hook withheld is <code>ResultNotFound</code> for every read, as <code>manifest</code>, <code>page</code> and <code>csv</code> also raise it.</td>
+<td><code>chart(result, result_id=None, *, user_context, kind=None) -&gt; ChartSpec</code></td>
+<td>The chart the result is drawn as (<a href="../../../charts/">Charts</a>): a <code>ChartSpec</code> chosen by rules from the saved result's column kinds, with no model call. <code>result</code> is a <code>QueryResult</code> (a single sub-query's plan refines the kinds, and its intent titles the chart) or a <code>trace_id</code>. <code>result_id</code> may be left out when the run saved one result. <code>kind</code> forces <code>line</code>, <code>bar</code>, <code>big_number</code> or <code>table</code>; one the data cannot draw is a <code>ValueError</code> naming those it can. Raises <code>ResultNotFound</code> as <code>page</code> does, and also when a <code>QueryResult</code> has an empty <code>result_manifest</code> (a run a hook withheld) or its <code>result_id</code> is not in it: the chart is drawn only from results the caller was given. A <code>trace_id</code> alone is checked like <code>page</code>, by caller and run id; a run a hook withheld is <code>ResultNotFound</code> for every read, as <code>manifest</code>, <code>page</code> and <code>csv</code> also raise it.</td>
 </tr>
 </tbody>
 </table>
 <p>The first three are described with <code>run_query</code> in <a href="../query/">Query API</a>.</p>
+<h2 id="who-can-read-a-run">Who can read a run</h2>
+<p>Every run writes <code>manifest.json</code> beside its results, and the manifest records who asked: a <code>ResultOwner</code>, the
+caller's <code>tenant_id</code> (else the engine's <code>settings.tenant_id</code>) and <code>user_id</code>, and for an anonymous caller its
+<code>roles</code>, sorted. Every read goes through the manifest, and every method takes the caller as a required keyword,
+<code>user_context</code>:</p>
+<ul>
+<li>A named user who asked reads the run: the same <code>user_id</code> and the same tenant, whatever their roles are now.</li>
+<li>An anonymous caller (no <code>user_id</code>) reads a run asked anonymously in the same tenant with the same set of roles.</li>
+<li>Any other caller is <code>ResultNotFound</code>, exactly as for a run that does not exist: another user of the same tenant,
+  the same user id in another tenant, an anonymous caller reading a named user's run, or an anonymous caller with
+  other roles. A trace id appears in events, traces and the audit log, so it is never the access check.</li>
+<li>No caller is a <code>TypeError</code> (<code>user_context</code> missing, <code>None</code>, or not a <code>UserContext</code>). There is no default caller,
+  as for conversations and dashboards: failing open would let anyone read a run whose trace id they saw.</li>
+<li>A manifest that records no asker (one written before 0.9) is <code>ResultNotFound</code> for every caller. There is no
+  legacy path; run the question again.</li>
+</ul>
+<p><strong>Anonymous callers.</strong> A run asked with no <code>user_id</code> (a <code>UserContext</code> with only roles, or <code>run_query</code> with no
+<code>user_context</code>) is owned by its tenant and its sorted roles. It is readable by any caller of that tenant who also
+has no <code>user_id</code> and has the same roles, and by no named user. So a <code>viewer</code> holding an <code>admin</code> run's trace id
+reads nothing, while anonymous callers with the same roles share each other's results, because nothing else tells
+them apart.</p>
+<p>The REST API has no per-user identity yet: its static or header role (and the playground's role picker) build a
+<code>UserContext</code> with roles only. So every REST run is anonymous, and readable by any REST caller of the same tenant
+with the same roles. API keys carry a <code>user_id</code>, but only to the MCP server; REST does not take them. To keep
+callers' results apart, call the engine in process with a <code>user_id</code> from your own auth.</p>
+<p><strong>Operator tools.</strong> <code>nl2sql run</code>, <code>nl2sql trace</code>, <code>nl2sql eval</code>, the replay provider and the feedback tools read
+the result they were just given, traces and recordings, never <code>engine.results</code>, so they are unchanged. In-process
+code is trusted with the <code>UserContext</code> it passes (Wave A's D24): an operator who needs a past run's rows reads them
+as its asker, a <code>UserContext</code> with that caller's <code>user_id</code> and <code>tenant_id</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nl2sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">UserContext</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">ann</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"ann"</span><span class="p">,</span> <span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"analyst"</span><span class="p">])</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"Revenue by month"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="s2">"combine_g1"</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"bob"</span><span class="p">))</span>  <span class="c1"># ResultNotFound</span>
+</code></pre></div>
 
 
 

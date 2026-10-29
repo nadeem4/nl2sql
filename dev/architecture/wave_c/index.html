@@ -4357,8 +4357,8 @@ Wave D.</p>
 <td>Wave D (local), later</td>
 </tr>
 <tr>
-<td>Results bound to the user who asked (B13)</td>
-<td>Unchanged: Wave C's own reads go through conversation and dashboard ownership</td>
+<td>Traces bound to the user who asked (B13's traces half)</td>
+<td>Results are bound by C-W2 here (see wave_d.md's <a href="../wave_d/#results-bound-to-the-user-b13">B13 note</a>); <code>engine.traces.get</code> is not</td>
 <td>Wave D</td>
 </tr>
 </tbody>
@@ -4662,7 +4662,7 @@ hook interface changes.</p>
 </tr>
 <tr>
 <td><strong>Results</strong></td>
-<td>A turn's rows are read with <code>engine.results.page(turn.trace_id, ...)</code>. A tool reads only turns of a conversation the caller owns, so Wave C adds no new way to read another user's results (bug B13 stays Wave D's).</td>
+<td>A turn's rows are read with <code>engine.results.page(turn.trace_id, ...)</code>. A tool reads only turns of a conversation the caller owns, and C-W2 binds every results read to the run's asker (B13's results half; see wave_d.md's <a href="../wave_d/#results-bound-to-the-user-b13">B13 note</a>), so a trace id alone reads no one's rows.</td>
 </tr>
 <tr>
 <td><strong>Limits</strong></td>
@@ -4949,11 +4949,12 @@ temporal or nominal <code>x</code>, quantitative <code>y</code>, several measure
 colour scheme, font or size (D110). A table returns <code>None</code>; the renderer
 draws a table from <code>data</code>.</p>
 <h3 id="choosing-a-chart">Choosing a chart</h3>
-<p><code>engine.results.chart(result, result_id=None, *, kind=None, tenant_id=None)
+<p><code>engine.results.chart(result, result_id=None, *, user_context, kind=None)
 -&gt; ChartSpec</code>. <code>result</code> is a <code>QueryResult</code> (its plan is used) or a
 <code>trace_id</code> (only the columns' kinds are). <code>kind</code> forces a kind the data can
 draw, else <code>ValueError</code> naming the ones it can. It reads results as
-<code>engine.results.page</code> does, by <code>trace_id</code> and tenant (B13 unchanged).</p>
+<code>engine.results.page</code> does, by <code>trace_id</code> and caller: only the caller who
+asked the run reads it (C-W2, which closed B13 for results).</p>
 <p><strong>Column kinds (D112).</strong> The artifact writer records each column's kind when
 it writes the parquet file, from the Arrow type, into
 <code>ResultSummary.column_kinds</code>: integer, decimal and float are <code>number</code>; date,
@@ -6784,8 +6785,8 @@ boundary test's constants.</p>
 <li>Review fixes: a stored tool output holds no rows (D106). A chart output's <code>data.rows</code> is emptied before
   the step is stored (a client draws again through <code>engine.results.chart</code>), and the <code>report</code> tool stores
   the report without row tables and chart takeaways (<code>conversations.report(include_rows=False)</code>); asked
-  for directly, the report still reads the rows from <code>engine.results</code>. <code>engine.results</code> does not check the
-  caller (it reads by tenant and trace id); that gap is a separate row.</li>
+  for directly, the report still reads the rows from <code>engine.results</code>, as the conversation's caller
+  (C-W2: <code>engine.results</code> answers only the caller who asked).</li>
 <li><code>chat_tools:</code> absent means the default tools <strong>the registry has</strong>, so an engine on <code>Registry.empty()</code>
   builds. The defaults are <code>("chart", "report")</code> only: <code>diagram</code>, <code>dashboard_edit</code> and <code>dashboard_pin</code> are
   still stubs and <strong>stay off by default. K2 and D4 each add their own name to <code>DEFAULT_CHAT_TOOLS</code>
@@ -6834,6 +6835,15 @@ boundary test's constants.</p>
   were once readable this way; that gap is closed (C-W1): while a hook is attached at <code>answer.after</code> the
   manifest every read goes through is written only once those hooks allowed, so a withheld run has none
   and every read path answers <code>ResultNotFound</code> (see <code>docs/configuration/hooks.md</code>).</li>
+<li>C-W2 (results readable only by their asker): the manifest records the asker's <code>(tenant_id, user_id)</code>
+  (<code>ResultOwner</code>, written by both write sites, the aggregator and <code>release_results</code>); <code>manifest</code>, <code>page</code>,
+  <code>csv</code> and <code>chart</code> take a required <code>user_context</code> (none is a <code>TypeError</code>; <code>chart</code>'s <code>tenant_id</code> is gone)
+  and answer <code>ResultNotFound</code> for any other caller and for a manifest with no asker. Every reader passes
+  its caller: the REST and playground routes, the report and the <code>chart</code> tool (the conversation's
+  caller), dashboard refresh (the refreshing caller). A caller with no <code>user_id</code> (every REST caller today)
+  also has its sorted roles recorded, and only a caller of that tenant with the same roles reads the run;
+  the playground's results routes take the run's role as <code>?role=</code>. Unlike wave_d.md's D204 there is no <code>None</code> operator and no ownerless read: the operator
+  tools read no saved results. <code>engine.traces.get</code> is unchanged (still G1's).</li>
 <li><code>Decimal</code> values are read as floats so the spec is JSON; dates stay dates and serialise as ISO strings.</li>
 <li>Tests: <code>test_charts_choose.py</code>, <code>test_charts_api.py</code>, <code>test_charts_make_no_model_call</code> (architecture).
   The stub test moves <code>chart</code> out of its tables.</li>

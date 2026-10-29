@@ -6838,17 +6838,17 @@ result in memory.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>results.manifest(run_id, tenant_id=None)</code></td>
+<td><code>results.manifest(run_id, *, user_context)</code></td>
 <td><code>ResultManifest</code></td>
-<td><code>request_id</code> and <code>results: List[ResultSummary]</code>, the same entries as <code>QueryResult.result_manifest</code>.</td>
+<td><code>request_id</code>, <code>owner</code> (the asker's <code>tenant_id</code> and <code>user_id</code>, and an anonymous asker's sorted <code>roles</code>) and <code>results: List[ResultSummary]</code>, the same entries as <code>QueryResult.result_manifest</code>.</td>
 </tr>
 <tr>
-<td><code>results.page(run_id, result_id, offset=0, limit=100, tenant_id=None)</code></td>
+<td><code>results.page(run_id, result_id, offset=0, limit=100, *, user_context)</code></td>
 <td><code>ResultPage</code></td>
 <td>Rows <code>offset</code> to <code>offset + limit</code> of the result whose <code>node_id</code> is <code>result_id</code>. <code>limit</code> above <code>MAX_RESULT_PAGE_SIZE</code> (1,000) is cut to it, and the page's <code>limit</code> says so. A page past the end has no rows. <code>next_offset</code> is where the next page starts, <code>None</code> at the end. A negative <code>offset</code> or a <code>limit</code> below 1 raises <code>ValueError</code>.</td>
 </tr>
 <tr>
-<td><code>results.csv(run_id, result_id, tenant_id=None)</code></td>
+<td><code>results.csv(run_id, result_id, *, user_context)</code></td>
 <td><code>Iterator[bytes]</code></td>
 <td>The whole result as UTF-8 CSV, header first, one chunk per slice. The ids are checked before the iterator is returned, so a missing result raises before any byte is sent.</td>
 </tr>
@@ -6856,21 +6856,24 @@ result in memory.</p>
 </table>
 <p><code>ResultPage</code> has <code>request_id</code>, <code>result_id</code>, <code>columns</code>, <code>rows</code> (<code>rows[i]</code> is row
 <code>offset + i</code>), <code>offset</code>, <code>limit</code>, <code>total_rows</code> and <code>next_offset</code>.</p>
-<p>Scope: results are read from one tenant's folder, <code>tenant_id</code> or else the
-engine's own <code>TENANT_ID</code>, the tenant every run of this engine writes under. Each
-of these raises <code>ResultNotFound</code> (a <code>LookupError</code>, exported from <code>nl2sql</code>): an
-unknown <code>run_id</code>, a run in another tenant's folder, a <code>result_id</code> the run's
-manifest does not list, and an id that is not a plain token (letters, digits,
-<code>_</code>, <code>-</code>; at most 128 characters). Ids are checked before any path is built, and
-the parquet path is rendered from the artifact template, never read from the
-manifest, so no id reaches a file outside the run's folder. Nothing else guards
-a result yet: any caller who knows a <code>trace_id</code> can read it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">):</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
+<p>Scope: a run is readable only by the caller who asked it, passed as the
+required <code>user_context</code> (<a href="../results/#who-can-read-a-run">Who can read a run</a>);
+no caller is a <code>TypeError</code>. Results are read from the engine's own <code>TENANT_ID</code>
+folder, the tenant every run of this engine writes under. Each of these raises
+<code>ResultNotFound</code> (a <code>LookupError</code>, exported from <code>nl2sql</code>): an unknown <code>run_id</code>,
+a run another user or another tenant asked, a manifest that records no asker,
+a <code>result_id</code> the run's manifest does not list, and an id that is not a plain
+token (letters, digits, <code>_</code>, <code>-</code>; at most 128 characters). Ids are checked
+before any path is built, and the parquet path is rendered from the artifact
+template, never read from the manifest, so no id reaches a file outside the
+run's folder.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">ann</span> <span class="o">=</span> <span class="n">UserContext</span><span class="p">(</span><span class="n">user_id</span><span class="o">=</span><span class="s2">"ann"</span><span class="p">,</span> <span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">])</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">run_query</span><span class="p">(</span><span class="s2">"List every genre."</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">)</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="p">[</span><span class="n">saved</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">result_manifest</span>                   <span class="c1"># node_id, columns, row_count, truncated</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">page</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">page</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"genres.csv"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">engine</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">csv</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">trace_id</span><span class="p">,</span> <span class="n">saved</span><span class="o">.</span><span class="n">node_id</span><span class="p">,</span> <span class="n">user_context</span><span class="o">=</span><span class="n">ann</span><span class="p">):</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">out</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </code></pre></div>
 <p><code>nl2sql-api</code> serves these as
 <a href="../../rest/query/#get-apiv1queryrequest_idresultsresult_id"><code>GET /api/v1/query/{request_id}/results/{result_id}</code></a>

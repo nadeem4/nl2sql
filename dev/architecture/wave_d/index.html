@@ -3458,7 +3458,7 @@ D13 to D16</strong> and records how each is applied.</p>
 </tr>
 <tr>
 <td>D204</td>
-<td><strong>Results and traces are bound to the user who asked (bug B13)</strong> in the engine. A run records its asker's <code>(tenant_id, user_id)</code>; <code>results.*</code> and <code>traces.get</code> with a <code>user_context</code> answer only that asker, and another user's run is "not found". <code>user_context=None</code> is the trusted in-process operator, as Wave A's D24 and Wave C's keys treat it, so <code>nl2sql trace</code> reads any run. The API, MCP and the terminal app always pass the caller, which a boundary test checks. Every new method this wave adds requires the caller and fails closed (Wave C's D130).</td>
+<td><strong>Results and traces are bound to the user who asked (bug B13)</strong> in the engine. Results were built early by Wave C's C-W2, with a required <code>user_context</code> and no operator path (see the <a href="#results-bound-to-the-user-b13">B13 note</a>); what follows is for traces. A run records its asker's <code>(tenant_id, user_id)</code>; <code>traces.get</code> with a <code>user_context</code> answers only that asker, and another user's run is "not found". <code>user_context=None</code> is the trusted in-process operator for traces, as Wave A's D24 and Wave C's keys treat it, so <code>nl2sql trace</code> reads any run. The API, MCP and the terminal app always pass the caller, which a boundary test checks. Every new method this wave adds requires the caller and fails closed (Wave C's D130).</td>
 <td>decided overnight, amended after review, owner to confirm</td>
 <td><a href="#results-bound-to-the-user-b13">Results bound to the user</a></td>
 </tr>
@@ -3950,6 +3950,15 @@ demo</a>). <code>api.trust_body_role</code>, <code>api.role_header</code> and
 model (<code>config/models.py</code>) carries the new fields so <code>nl2sql config check</code>
 reports a typo.</p>
 <h3 id="results-bound-to-the-user-b13">Results bound to the user (B13)</h3>
+<p>Built early for results by Wave C's C-W2, with a stricter rule than below:
+<code>user_context</code> is required (none is a <code>TypeError</code>, no <code>None</code> operator) and
+a manifest with no owner is refused for every caller
+(<a href="../../api/core/results/#who-can-read-a-run">Who can read a run</a>). A caller
+with no <code>user_id</code> also has its sorted roles recorded and must match them, so
+an anonymous <code>viewer</code> cannot read an anonymous <code>admin</code> run. So the results
+half of the steps below (the <code>None</code> operator in 2 and 3, and the results
+part of 6) does not apply; traces (<code>engine.traces.get</code>) remain this
+section's.</p>
 <p>B13 is fixed in the engine (D204), so the facade, the API, MCP and the
 terminal app all get it:</p>
 <ol>
@@ -5582,8 +5591,8 @@ lists the gaps, each a facade change with its PR.</p>
 <tr>
 <td>Wave C</td>
 <td><code>results.chart(..., tenant_id=None)</code></td>
-<td><code>user_context=None</code> replaces <code>tenant_id</code>, with D204's meaning</td>
-<td>G1</td>
+<td>Built by C-W2: a required <code>user_context</code> replaces <code>tenant_id</code>, with no operator path (see the <a href="#results-bound-to-the-user-b13">B13 note</a>)</td>
+<td>C-W2</td>
 </tr>
 </tbody>
 </table>
@@ -5609,8 +5618,8 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>G1</td>
-<td><strong><code>results.manifest/page/csv/chart(..., user_context=None)</code> and <code>traces.get(trace_id, *, user_context=None)</code>, bound to the asker (B13); the manifest and trace record <code>tenant_id</code> and <code>user_id</code></strong></td>
-<td>Every read of rows or a trace</td>
+<td><strong><code>traces.get(trace_id, *, user_context=None)</code>, bound to the asker (B13); the trace records <code>tenant_id</code> and <code>user_id</code></strong> (the results half is built by C-W2; see the <a href="#results-bound-to-the-user-b13">B13 note</a>)</td>
+<td>Every read of a trace</td>
 </tr>
 <tr>
 <td>G1</td>
@@ -5720,7 +5729,7 @@ lists the gaps, each a facade change with its PR.</p>
 </tr>
 <tr>
 <td>New invariant: <em>Results Belong to Their Asker</em></td>
-<td>A saved result or trace is read, by any caller that names itself, only by the <code>(tenant_id, user_id)</code> that asked; only the in-process operator (<code>user_context=None</code>) reads any. Enforced by <code>test_another_users_result_is_not_found</code>, <code>test_apps_always_pass_the_caller</code> and the API's route test. Added to <code>invariants.md</code>.</td>
+<td>A saved result or trace is read, by any caller that names itself, only by the <code>(tenant_id, user_id)</code> that asked; only the in-process operator (<code>user_context=None</code>) reads any trace, and no one reads another's results (C-W2 built that half; see the <a href="#results-bound-to-the-user-b13">B13 note</a>). Enforced by <code>test_another_users_result_is_not_found</code>, <code>test_apps_always_pass_the_caller</code> and the API's route test. Added to <code>invariants.md</code>.</td>
 </tr>
 <tr>
 <td>No process globals</td>
