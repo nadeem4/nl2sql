@@ -9,6 +9,7 @@ from .schemas import PlanAlternative, PlannerAnswer, PlanModel, ASTPlannerRespon
 from nl2sql.events import publish
 from nl2sql.knowledge.render import business_context_of
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
+from nl2sql.common.cancellation import RunCancelled
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.common.dates import run_date
@@ -237,6 +238,8 @@ class ASTPlannerNode:
                                      if response.plan is not None else [])})
             return update
 
+        except RunCancelled:
+            raise  # an expected stop (a cancel or a timeout), not a planner failure; the runtime reports it
         except Exception as exc:
             logger.exception("Planner failed")
             return {

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import threading
-from typing import Any, Optional
+from typing import Any, List, Optional
+
+
+class RunCancelled(Exception):
+    """Raised inside the graph once its run's token is cancelled."""
 
 
 class CancellationToken:
@@ -20,6 +24,7 @@ class CancellationToken:
     def __init__(self) -> None:
         self._event = threading.Event()
         self._lock = threading.Lock()
+        self._children: List["CancellationToken"] = []
         self.reason: Optional[Any] = None
 
     def cancel(self, reason: Optional[Any] = None) -> None:
@@ -27,6 +32,26 @@ class CancellationToken:
             if not self._event.is_set():
                 self.reason = reason
             self._event.set()
+            children, self._children = self._children, []
+        for child in children:
+            child.cancel(self.reason)
+
+    def child(self) -> "CancellationToken":
+        """A token cancelled when this one is, whose own cancel stays its own: a conversation's ``ask`` step
+        runs on one, so the step's timeout ends the step and a user's cancel of the turn still reaches it."""
+        token = CancellationToken()
+        with self._lock:
+            if not self._event.is_set():
+                self._children.append(token)
+                return token
+        token.cancel(self.reason)
+        return token
+
+    def release(self, child: "CancellationToken") -> None:
+        """Drop a finished child, so a token reused across steps does not hold them all."""
+        with self._lock:
+            if child in self._children:
+                self._children.remove(child)
 
     def is_cancelled(self) -> bool:
         return self._event.is_set()

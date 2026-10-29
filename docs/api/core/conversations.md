@@ -39,6 +39,11 @@ earlier question.
   `error` holds `{"code", "message"}` when the loop itself ended it (`MODEL_STEP_INVALID`, or
   `RUN_LIMIT_REACHED` for `stopped`, or the `PROVIDER_*` code when the model provider refused a step). A `cancellation_token` that is cancelled ends the turn `error` with
   `CANCELLED` after the step in flight.
+- A timeout is not a cancel. Each `ask` step runs on its own token, a child of the turn's: a run that exceeds
+  `pipeline.timeout_s` fails that step with `error.code` `PIPELINE_TIMEOUT`, and the loop goes on, so the model
+  can say so in its reply (within `max_tool_calls`). Cancelling the turn's token still cancels the step in flight.
+  `ask_only` (MCP's `ask`) returns the timed-out `QueryResult` with `PIPELINE_TIMEOUT`, and a `stream` stores the
+  turn as usual.
 - `stream` ends with `conversation.turn`; see [Streaming](../../conversations/index.md#streaming).
 - `ask_only` returns the run's `QueryResult` with its rows; the stored turn has none.
 - `tool` runs one enabled [chat tool](../../conversations/tools.md) as a turn of kind `tool` and makes no model
