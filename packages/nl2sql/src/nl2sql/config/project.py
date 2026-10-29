@@ -157,7 +157,8 @@ def init_project(
                              glossary=GLOSSARY_FILE)
         extra = {GLOSSARY_FILE: DEMO_GLOSSARY_PATH}
         extra.update({f"{DATA_FOLDER}/{source.name}": source for source in _packaged_databases()})
-        extra.update({f"{EVALS_FOLDER}/{suite.name}": suite for suite in sorted(PACKAGED_SUITES.glob("*.yaml"))})
+        extra.update({f"{EVALS_FOLDER}/{suite.name}": suite for suite in sorted(PACKAGED_SUITES.glob("*.yaml"))
+                  if suite.name not in NOT_FOR_THE_DEMO})
     else:
         config = starter_config(llm=llm, path=STORAGE_PATH).with_datasource(Datasource(
             id="example", type="sqlite", connection={"database": "example.db"},
@@ -168,6 +169,10 @@ def init_project(
         for name in _plan(config, folder, False, extra, headers=headers)[0]:
             (folder / name).unlink(missing_ok=True)
     return write_project(config, folder, extra=extra, headers=headers)
+
+
+# Packaged suites that are for the test bed, not the demo: the demo has no database of that name to run them on.
+NOT_FOR_THE_DEMO = frozenset({"pagila.yaml"})
 
 
 def starter_config(*, llm: LLM, path: PathLike = STORAGE_PATH) -> Config:

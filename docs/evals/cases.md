@@ -138,6 +138,29 @@ since its cases run only with clarification on:
 engine.evals.run(suites=["evals/clarify.yaml"], clarify=True)
 ```
 
+## The Pagila suite
+
+`suites/pagila.yaml` holds 11 approved cases over the test bed's Pagila
+database (a datasource named `pagila`), which is past
+`settings.retrieval.full_snapshot_max_tables`, so the retriever has to choose
+tables ([the design](../architecture/wave_c.md#17-c-w4-table-recall-on-large-schemas)).
+Each case is chosen so a table it needs is more than one join from the
+others, or the question's words are not near the table's name ("revenue" is
+not near `payment`): the smoke question "top 5 films by revenue in the top
+category" needs `film`, `film_category`, `category`, `inventory`, `rental` and
+`payment`. `tables` and `columns` are what the gold SQL reads, and
+`test_pagila_suite_reads_the_tables_it_names` keeps the two equal.
+
+`nl2sql init --demo` does not copy it into the demo, which has no Pagila. The cases
+have SQL and no `rows`: point a suite file at the test bed and run
+`engine.evals.regenerate`, then review the rows, before a full run. Mode
+retrieval needs no rows.
+
+```bash
+nl2sql eval run --mode retrieval --suite pagila.yaml --out eval_pagila.json   # no key: the floor, without the table selector
+nl2sql eval run --mode full --suite pagila.yaml --max-cost 5                  # with the selector: every gold table should be sent
+```
+
 ## Regenerating rows
 
 `rows` and `alt_rows` are never typed by hand. After you add or edit a case,
