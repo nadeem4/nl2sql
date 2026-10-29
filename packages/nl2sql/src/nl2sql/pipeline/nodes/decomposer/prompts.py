@@ -49,8 +49,9 @@ RULES:
 12) A split that depends on a ranked subset, such as "top 5 films by revenue in the top category", is
     one join group, not separate answers: one sub-query finds the subset (the top category, limit 1), a
     second computes the rows with that subset's attribute in its expected_schema, and one join group
-    on that attribute combines them. The final ranking goes in post_combine_ops on that group
-    (sort, then limit), so the question is answered by one result set.
+    on that attribute combines them. The final ranking is ONE sort op in post_combine_ops on that
+    group carrying both order_by and limit (never a sort op and a separate limit op: each op is its own
+    result), so the question is answered by one result set.
 13) No commentary.
 
 OUTPUT FORMAT:

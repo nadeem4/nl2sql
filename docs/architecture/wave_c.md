@@ -2370,7 +2370,7 @@ Date differences in plans (design 18.5). `ast_planner/functions.py`: `DATE_DIFF`
 
 ### C-W6e
 
-Prompt fixes from the keyed Pagila rerun (design 18.7). `decomposer/prompts.py`: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final sort and limit as post-combine ops). `answer_synthesizer/prompts.py`: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in `tests/unit/test_decomposer_tool_schema.py` and `tests/unit/test_node_answer_synthesizer.py`; no model call, so the effect shows only in the owner's next keyed run.
+Prompt fixes from the keyed Pagila rerun (design 18.7). `decomposer/prompts.py`: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final ranking as one sort op carrying `order_by` and `limit`). `answer_synthesizer/prompts.py`: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in `tests/unit/test_decomposer_tool_schema.py` and `tests/unit/test_node_answer_synthesizer.py`; no model call, so the effect shows only in the owner's next keyed run.
 
 ## 14. Bugs Wave C fixes
 
@@ -2653,7 +2653,9 @@ Approved by the owner 2026-10-29 after the keyed Pagila rerun (5 of 9 passed).
   scorer: "expected one result set, got 2"), one of them 73 unlimited film rows, and the answer hedged. The prompt now
   says: split only when one query cannot express the question (a flat query already joins, filters, groups, orders and
   limits), and when a ranked subset must filter another result, combine the two with one `join` group and put the final
-  `sort` and `limit` in `post_combine_ops` on that group. Genuine multi-datasource and independent multi-part questions
+  ranking in `post_combine_ops` on that group as ONE `sort` op with both `order_by` and `limit` (the engine does not
+  chain ops: each op nothing reads is its own result, so a `sort` plus a `limit` op gave two result sets again;
+  `test_decomposer_dag.py` pins both). Genuine multi-datasource and independent multi-part questions
   still split. Not done: a plan that can nest (subquery or CTE), which would make the split unnecessary; it is a change
   to the plan, generator and validator, and a separate decision.
 - **pagila_007 (answer).** The rows matched the gold strictly, but the answer wrote "9,700" for 9712.47 and the

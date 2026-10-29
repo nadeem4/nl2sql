@@ -145,4 +145,4 @@ def test_the_answer_prompt_quotes_figures_exactly_as_the_rows_hold_them():
     assert "exactly as" in prompt
     assert "do not round" in prompt
     assert "thousands separators" in prompt
-    assert "about" in prompt  # named as a word not to use
+    assert 'soften it ("about", "roughly", "nearly")' in prompt

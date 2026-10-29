@@ -85,7 +85,10 @@ def test_a_split_that_depends_on_a_ranked_subset_ends_in_one_join_group():
 
     assert "top category" in prompt
     assert "one join" in prompt
-    assert "post_combine_ops" in prompt and "sort" in prompt and "limit" in prompt
+    assert "post_combine_ops" in prompt
+    # ONE op carries both: the engine does not chain ops, and each unread op is a result
+    assert "one sort op" in prompt and "order_by and limit" in prompt
+    assert "sort, then limit" not in prompt
     assert "one result set" in prompt
 
 

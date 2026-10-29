@@ -450,3 +450,66 @@ def test_a_dag_that_cannot_be_built_ends_the_run_with_its_error():
     query_result = result_from_state({**result, "trace_id": "t"})
     assert query_result.status == "error"
     assert query_result.errors[0]["error_code"] == "PLANNER_FAILED"
+
+
+# C-W6e: "top 5 films by revenue in the top category" is two sub-queries joined on
+# the category. The engine does not chain post-combine ops (each reads the group,
+# and every op nothing reads is a result), so the final ranking is ONE op that
+# carries both order_by and limit.
+
+def _top_category_decomposition(ops):
+    def sq(sq_id, columns):
+        return {"id": sq_id, "datasource_id": "pagila", "intent": sq_id,
+                "expected_schema": [{"name": n, "dtype": d} for n, d in columns]}
+
+    return {
+        "sub_queries": [sq("sq_top", [("category", "string")]),
+                        sq("sq_films", [("category", "string"), ("film", "string"), ("revenue", "float")])],
+        "combine_groups": [{"group_id": "g1", "operation": "join",
+                            "inputs": [{"subquery_id": "sq_top", "role": "left"},
+                                       {"subquery_id": "sq_films", "role": "right"}],
+                            "join_keys": [{"left": "category", "right": "category"}]}],
+        "post_combine_ops": ops,
+        "unmapped_subqueries": [],
+    }
+
+
+def _results(ops):
+    import polars as pl
+
+    from nl2sql.aggregation.aggregator import AggregationService
+    from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
+    from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
+    from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
+
+    frames = {
+        "sq_top": pl.DataFrame({"category": ["Sports"]}),
+        "sq_films": pl.DataFrame({
+            "category": ["Sports"] * 7 + ["Drama"] * 2,
+            "film": list("ABCDEFGHI"),
+            "revenue": [7.0, 1.0, 6.0, 2.0, 5.0, 3.0, 4.0, 99.0, 98.0],
+        }),
+    }
+    engine = PolarsDuckdbEngine.__new__(PolarsDuckdbEngine)
+    engine.load_scan = lambda ref: frames[ref].lazy()
+    dag = build_execution_dag(DecomposerResponse.model_validate(_top_category_decomposition(ops)))
+    out = AggregationService(engine).execute(dag, {"sq_top": "sq_top", "sq_films": "sq_films"})
+    return {k: v.collect() for k, v in out.items()}
+
+
+def test_one_op_with_order_by_and_limit_gives_one_result_of_the_top_five():
+    op = {"op_id": "op1", "target_group_id": "g1", "operation": "sort",
+          "order_by": [{"attribute": "revenue", "direction": "desc"}], "limit": 5}
+
+    results = _results([op])
+
+    assert list(results) == ["op1"]
+    assert results["op1"]["film"].to_list() == ["A", "C", "E", "G", "F"]
+
+
+def test_a_sort_op_and_a_limit_op_on_one_group_give_two_results():
+    ops = [{"op_id": "op1", "target_group_id": "g1", "operation": "sort",
+            "order_by": [{"attribute": "revenue", "direction": "desc"}]},
+           {"op_id": "op2", "target_group_id": "g1", "operation": "limit", "limit": 5}]
+
+    assert len(_results(ops)) == 2
