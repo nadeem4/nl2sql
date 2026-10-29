@@ -4,9 +4,11 @@ The ``result_match`` scorer reads both (``nl2sql.evaluation.scorers.result_match
 """
 from __future__ import annotations
 
+import datetime as dt
 import itertools
 import math
 import re
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import sqlglot
@@ -26,7 +28,7 @@ def _values(row: Row) -> List[Any]:
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, (int, float, Decimal)) and not isinstance(value, bool)
 
 
 def _as_number(value: Any) -> Any:
@@ -42,6 +44,54 @@ def _as_number(value: Any) -> Any:
     return None
 
 
+# A date or a date and time, as ISO 8601 spells it ("2022-01-01", "2022-01-01T00:00:00Z").
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$")
+
+
+def _as_time(value: Any):
+    """``(datetime, date_only)`` if ``value`` is a date, a datetime or an ISO string spelling one, else None.
+
+    A datetime keeps its own offset; one with none is read as UTC. ``date_only`` is
+    True for a ``date`` and for a ``YYYY-MM-DD`` string. Gold rows are written as
+    JSON, so they hold ISO strings where a live row holds a ``date`` or ``datetime``.
+    """
+    if isinstance(value, str):
+        text = value.strip()
+        if not _ISO_DATE.match(text):
+            return None
+        try:
+            parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return (parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)), len(text) == 10
+    if isinstance(value, dt.datetime):
+        return (value if value.tzinfo else value.replace(tzinfo=dt.timezone.utc)), False
+    if isinstance(value, dt.date):
+        return dt.datetime(value.year, value.month, value.day, tzinfo=dt.timezone.utc), True
+    return None
+
+
+def _same_time(got: Any, want: Any) -> Optional[bool]:
+    """Whether two dates or datetimes are the same moment, or None when either is not one.
+
+    Two full datetimes are equal as instants. A date-only value is a calendar day:
+    it equals a datetime that is midnight of that day in the datetime's own offset
+    (``2021-12-31T19:00-05:00`` is not ``2022-01-01``, though it is the same instant
+    as midnight UTC), and another date-only value of the same day.
+    """
+    g, w = _as_time(got), _as_time(want)
+    if g is None or w is None:
+        return None
+    (g_time, g_day), (w_time, w_day) = g, w
+    if g_day or w_day:
+        full = w_time if g_day else g_time
+        day = g_time if g_day else w_time
+        if g_day and w_day:
+            return g_time.date() == w_time.date()
+        return full.date() == day.date() and full.time() == dt.time(0)
+    return g_time == w_time
+
+
 def _same_value(got: Any, want: Any) -> bool:
     # A number matches a string that spells it ('2009' == 2009): databases differ
     # in which of the two a date part or a computed value comes back as. Two
@@ -50,6 +100,10 @@ def _same_value(got: Any, want: Any) -> bool:
         g, w = _as_number(got), _as_number(want)
         if g is not None and w is not None:
             return math.isclose(g, w, rel_tol=0.0, abs_tol=NUMERIC_TOLERANCE)
+    # A date or datetime matches its ISO string, and a date-only label its midnight.
+    same_time = _same_time(got, want)
+    if same_time is not None:
+        return same_time
     return type(got) is type(want) and got == want
 
 
@@ -81,6 +135,8 @@ def _same_period(got: Any, want: Any) -> bool:
     read this way (a number is a number, never a year), and the prefix must end
     on a component boundary, so ``'2009-1'`` matches nothing.
     """
+    if isinstance(got, dt.date):
+        got = got.isoformat()
     if not isinstance(got, str) or not isinstance(want, str):
         return False
     if not _PERIOD_LABEL.match(want) or not _DATE_VALUE.match(got):
@@ -202,6 +258,30 @@ class ModelEvaluator:
                 return False
             unused.pop(match)
         return True
+
+    @staticmethod
+    def compare_results_extra_columns(
+        generated_rows: Sequence[Row],
+        expected_rows: Sequence[Row],
+        order_matters: bool = False,
+    ) -> bool:
+        """Whether the result is the gold rows plus extra columns, and nothing looser.
+
+        The result must be wider than the gold, within :meth:`lenient_column_cap`,
+        and some choice of its columns *in their own order* must equal the gold
+        under :meth:`compare_results`: the gold's columns appear in the same order
+        and match strictly, so reordered columns and period labels do not pass.
+        The extra columns may sit anywhere.
+        """
+        got = [_values(r) for r in generated_rows]
+        want = [_values(r) for r in expected_rows]
+        if len(got) != len(want) or not want or not got:
+            return False
+        width, gold_width = len(got[0]), len(want[0])
+        if width <= gold_width or width > ModelEvaluator.lenient_column_cap(gold_width):
+            return False
+        return any(ModelEvaluator.compare_results([[row[i] for i in picks] for row in got], want, order_matters)
+                   for picks in itertools.combinations(range(width), gold_width))
 
     @staticmethod
     def lenient_column_cap(gold_columns: int) -> int:

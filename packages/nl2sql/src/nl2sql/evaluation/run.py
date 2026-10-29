@@ -195,13 +195,14 @@ def _digest(result: QueryResult) -> str:
 
 
 def _scored(case: EvalCase, role: str, mode: str, scorers: Dict[str, Scorer], result: QueryResult,
-            retrieval: Optional[Dict[str, List[str]]] = None, routed: Optional[List[str]] = None
-            ) -> Dict[str, Any]:
+            retrieval: Optional[Dict[str, List[str]]] = None, routed: Optional[List[str]] = None,
+            preview_rows: Optional[int] = None) -> Dict[str, Any]:
     """Each scorer's score on one run, and the case's status from them."""
     samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
     case_run = CaseRun(case=case, role=role, mode=mode, result=result,
                        rows=samples[0].rows if samples else None,
-                       columns=samples[0].columns if samples else [], retrieval=retrieval, routed=routed)
+                       columns=samples[0].columns if samples else [], retrieval=retrieval, routed=routed,
+                       preview_rows=preview_rows)
     scores = {name: run_scorer(scorer, case_run).model_dump(mode="json") for name, scorer in scorers.items()}
     status, reason = case_status(scores)
     lenient_status, _ = case_status(scores, lenient=True)
@@ -408,7 +409,8 @@ def _one(run: Any, job: _Case, mode: str, scorers: Dict[str, Scorer], pass_no: i
         record["error_codes"] = ["EXCEPTION"]
         return record, None
     latency = time.perf_counter() - t0
-    scored = _scored(job.case, job.role, mode, scorers, result, sent)
+    scored = _scored(job.case, job.role, mode, scorers, result, sent,
+                    preview_rows=run.settings.results.preview_rows)
     return _record(job.suite, job.case, job.role, pass_no, scored, result, 0.0, latency), result
 
 

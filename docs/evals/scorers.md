@@ -36,11 +36,15 @@ errors apart from failures.
 `result_match` compares rows strictly:
 
 - column names are ignored, and column order counts;
-- numbers match within half a cent;
-- row order counts only when `order_matters`.
+- numbers (database decimals too) match within half a cent;
+- dates match their ISO strings, and a date-only label matches that day's midnight in the other value's own offset;
+- row order counts only when `order_matters`;
+- the right rows with extra columns also pass, if the gold's columns keep their
+  order and match strictly (`detail["match"]` is `extra columns`; `strict` for
+  an exact match).
 
 It also keeps the lenient reading in `detail["lenient"]`, which accepts
-reordered and a few extra columns, and period labels against dates. The
+reordered columns and period labels against dates besides. The
 report gives the strict and lenient accuracy side by side. The rules, and
 `faithfulness`'s, are in [the Chinook
 suite](../testing/evaluation-dataset.md#strict-and-lenient-accuracy).

@@ -2,13 +2,15 @@
 
 Applies to a role whose outcome is ``allowed``, on a case of kind
 ``answer``: a routing case says where a question goes, not what it returns,
-and is left out of execution accuracy. Strict: column names are
-ignored, column order is kept, numbers match within half a cent, and row
-order counts only when the case's ``order_matters``
-(:meth:`ModelEvaluator.compare_results`). The lenient reading, which also
-accepts reordered and a few extra columns and period labels against dates
-(:meth:`ModelEvaluator.compare_results_lenient`), is kept in ``detail``
-beside it, never in place of it.
+and is left out of execution accuracy. Column names are
+ignored, column order is kept, numbers (``Decimal`` too) match within half a
+cent, dates match their ISO strings, and row order counts only when the case's
+``order_matters`` (:meth:`ModelEvaluator.compare_results`). A result with the
+right rows plus extra columns also passes
+(:meth:`ModelEvaluator.compare_results_extra_columns`: the gold's columns in the
+same order, matched strictly). Reordered columns and period labels against dates alone do not pass; they are
+kept in ``detail`` as ``lenient``, with ``match`` naming how the case passed:
+``strict``, ``extra columns`` or none.
 """
 from __future__ import annotations
 
@@ -36,10 +38,14 @@ class ResultMatch(BuiltinScorer):
         strict = any(ModelEvaluator.compare_results(run.rows, a, order_matters=order) for a in answers)
         lenient = strict or any(ModelEvaluator.compare_results_lenient(run.rows, a, order_matters=order)
                                 for a in answers)
-        detail = {"lenient": lenient}
-        if not strict:
+        # The right rows with extra columns pass; a reordering or a period label alone stays lenient-only.
+        wider = not strict and any(ModelEvaluator.compare_results_extra_columns(run.rows, a, order_matters=order)
+                                   for a in answers)
+        passed = strict or wider
+        detail = {"lenient": lenient, "match": "strict" if strict else "extra columns" if wider else None}
+        if not passed:
             extra = len(answers) - 1
             alternatives = f" and {extra} alternative{'s' if extra != 1 else ''}" if extra else ""
             detail["reason"] = (f"rows differ from the case's rows{alternatives} "
                                 f"({len(run.rows)} rows, the case has {len(answers[0])})")
-        return Score(value=1.0 if strict else 0.0, passed=strict, detail=detail)
+        return Score(value=1.0 if passed else 0.0, passed=passed, detail=detail)

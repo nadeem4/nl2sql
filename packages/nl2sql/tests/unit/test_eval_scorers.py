@@ -5,6 +5,7 @@ Key-free: each scorer is given a hand-built ``CaseRun``.
 from __future__ import annotations
 
 import pathlib
+from decimal import Decimal
 
 import pytest
 import tomllib
@@ -17,7 +18,7 @@ from nl2sql.evaluation.scorers.outcome import Outcome
 from nl2sql.evaluation.scorers.result_match import ResultMatch
 from nl2sql.evaluation.scorers.retrieval_recall import RetrievalRecall
 from nl2sql.evaluation.scorers.routing import Routing
-from nl2sql.evaluation.suite import EvalCase
+from nl2sql.evaluation.suite import SUITES_DIR, EvalCase, load_suite
 from nl2sql.pipeline.nodes.validator.node import REFUSAL_MESSAGE
 from nl2sql.registry import Registry
 
@@ -57,6 +58,7 @@ NOT_ANSWERABLE = QueryResult(status="error", errors=[{
     "message": "This question can't be answered from the connected data (chinook)."}])
 
 result_match, outcome = ResultMatch(), Outcome()
+PAGILA = {c.id: c for c in load_suite(SUITES_DIR / "pagila.yaml").cases}
 
 
 # --- the registry ------------------------------------------------------------
@@ -256,3 +258,48 @@ def test_routing_in_retrieval_mode_with_nothing_ranked_misses_both():
 
 def test_routing_does_not_apply_to_a_refused_role():
     assert Routing().score(_run(_case({"v": "refused"}), "v", _refusal())).passed is None
+
+
+# --- C-W6a: extra columns pass; the preview size reaches the faithfulness check ----
+
+
+def test_result_match_passes_the_right_rows_with_extra_columns():
+    # pagila_004: the gold has the title only; the run grouped by title and added a count.
+    case = PAGILA["pagila_004"]
+    got = _rows_result([[row["title"], 30 - i % 5] for i, row in enumerate(case.rows)])
+    score = result_match.score(_run(case, "admin", got))
+    assert score.passed is True and score.value == 1.0
+    assert score.detail["lenient"] is True and score.detail["match"] == "extra columns"
+
+
+def test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing():
+    strict = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([["USA", 13], ["Canada", 8]])))
+    assert strict.passed and strict.detail["match"] == "strict"
+    reordered = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([[13, "USA"], [8, "Canada"]])))
+    assert not reordered.passed and reordered.detail["match"] is None
+    # Wider, but the gold's columns are reordered: still a failure.
+    wide = result_match.score(_run(_case({"a": "allowed"}), "a",
+                                   _rows_result([[13, "USA", "x"], [8, "Canada", "y"]])))
+    assert not wide.passed and wide.detail["lenient"] is True and wide.detail["match"] is None
+
+
+def test_result_match_with_extra_columns_still_needs_the_right_rows():
+    wrong = result_match.score(_run(_case({"a": "allowed"}), "a",
+                                    _rows_result([["USA", 13, "x"], ["Canada", 9, "y"]])))
+    assert not wrong.passed
+    short = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([["USA", 13, "x"]])))
+    assert not short.passed
+
+
+def test_result_match_pagila_005_with_decimal_counts_passes_strictly():
+    case = PAGILA["pagila_005"]
+    live = _rows_result([[row["name"], Decimal(row["rentals"])] for row in case.rows])
+    assert result_match.score(_run(case, "admin", live)).detail["match"] == "strict"
+
+
+def test_faithfulness_accepts_the_preview_size_the_run_was_given():
+    answer = {"summary": "42 rows came back; the preview lists the first 20.", "content": ""}
+    result = _rows_result([[f"T{i}", i * 100] for i in range(42)], answer=answer)
+    case = _case({"admin": "allowed"})
+    assert Faithfulness().score(_run(case, "admin", result, preview_rows=20)).passed
+    assert not Faithfulness().score(_run(case, "admin", result)).passed

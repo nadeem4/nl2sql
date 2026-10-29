@@ -22,7 +22,7 @@ class Faithfulness(BuiltinScorer):
         samples = [sq.rows for sq in run.result.sub_queries if sq.rows is not None]
         check = check_answer(text, columns=[c for s in samples for c in s.columns],
                              rows=[r for s in samples for r in s.rows], question=run.case.question,
-                             row_counts=[s.total_rows for s in samples])
+                             row_counts=[s.total_rows for s in samples], preview_rows=run.preview_rows)
         detail = dict(check)
         if not check["faithful"]:
             detail["reason"] = ("the answer states what the rows do not: "
