@@ -49,6 +49,12 @@ cases:
     GROUP BY f.film_id, f.title, c.name
     ORDER BY revenue DESC, f.title
     LIMIT 5
+  rows:
+  - {title: SATURDAY LAMBS, category: Sports, revenue: '204.72'}
+  - {title: ROSES TREASURE, category: Sports, revenue: '171.72'}
+  - {title: TRADING PINOCCHIO, category: Sports, revenue: '147.75'}
+  - {title: DURHAM PANKY, category: Sports, revenue: '144.74'}
+  - {title: TOURIST PELICAN, category: Sports, revenue: '141.78'}
 
 - id: pagila_002
   question: Which five customers from Canada have spent the most?
@@ -72,6 +78,12 @@ cases:
     GROUP BY cu.customer_id, cu.first_name, cu.last_name
     ORDER BY total_spent DESC, cu.customer_id
     LIMIT 5
+  rows:
+  - {first_name: CURTIS, last_name: IRBY, total_spent: '167.62'}
+  - {first_name: TROY, last_name: QUIGLEY, total_spent: '144.70'}
+  - {first_name: DERRICK, last_name: BOURQUE, total_spent: '95.78'}
+  - {first_name: LORETTA, last_name: CARPENTER, total_spent: '93.78'}
+  - {first_name: DARRELL, last_name: POWER, total_spent: '91.75'}
 
 - id: pagila_003
   question: Which five actors are in the most rented films?
@@ -93,6 +105,12 @@ cases:
     GROUP BY a.actor_id, a.first_name, a.last_name
     ORDER BY rentals DESC, a.actor_id
     LIMIT 5
+  rows:
+  - {first_name: GINA, last_name: DEGENERES, rentals: 753}
+  - {first_name: MATTHEW, last_name: CARREY, rentals: 678}
+  - {first_name: MARY, last_name: KEITEL, rentals: 674}
+  - {first_name: ANGELA, last_name: WITHERSPOON, rentals: 654}
+  - {first_name: WALTER, last_name: TORN, rentals: 640}
 
 - id: pagila_004
   question: Which films have never been rented?
@@ -115,6 +133,49 @@ cases:
       WHERE i.film_id = f.film_id
     )
     ORDER BY f.title
+  rows:
+  - {title: ALICE FANTASIA}
+  - {title: APOLLO TEEN}
+  - {title: ARGONAUTS TOWN}
+  - {title: ARK RIDGEMONT}
+  - {title: ARSENIC INDEPENDENCE}
+  - {title: BOONDOCK BALLROOM}
+  - {title: BUTCH PANTHER}
+  - {title: CATCH AMISTAD}
+  - {title: CHINATOWN GLADIATOR}
+  - {title: CHOCOLATE DUCK}
+  - {title: COMMANDMENTS EXPRESS}
+  - {title: CROSSING DIVORCE}
+  - {title: CROWDS TELEMARK}
+  - {title: CRYSTAL BREAKING}
+  - {title: DAZED PUNK}
+  - {title: DELIVERANCE MULHOLLAND}
+  - {title: FIREHOUSE VIETNAM}
+  - {title: FLOATS GARDEN}
+  - {title: FRANKENSTEIN STRANGER}
+  - {title: GLADIATOR WESTWARD}
+  - {title: GUMP DATE}
+  - {title: HATE HANDICAP}
+  - {title: HOCUS FRIDA}
+  - {title: KENTUCKIAN GIANT}
+  - {title: KILL BROTHERHOOD}
+  - {title: MUPPET MILE}
+  - {title: ORDER BETRAYED}
+  - {title: PEARL DESTINY}
+  - {title: PERDITION FARGO}
+  - {title: PSYCHO SHRUNK}
+  - {title: RAIDERS ANTITRUST}
+  - {title: RAINBOW SHOCK}
+  - {title: ROOF CHAMPION}
+  - {title: SISTER FREDDY}
+  - {title: SKY MIRACLE}
+  - {title: SUICIDES SILENCE}
+  - {title: TADPOLE PARK}
+  - {title: TREASURE COMMAND}
+  - {title: VILLAIN DESPERATE}
+  - {title: VOLUME HOUSE}
+  - {title: WAKE JAWS}
+  - {title: WALLS ARTIST}
 
 - id: pagila_005
   question: What are the five most rented film categories?
@@ -136,6 +197,12 @@ cases:
     GROUP BY c.category_id, c.name
     ORDER BY rentals DESC, c.name
     LIMIT 5
+  rows:
+  - {name: Sports, rentals: 1179}
+  - {name: Animation, rentals: 1166}
+  - {name: Action, rentals: 1112}
+  - {name: Sci-Fi, rentals: 1101}
+  - {name: Family, rentals: 1096}
 
 - id: pagila_006
   question: How many rentals were returned late?
@@ -154,6 +221,8 @@ cases:
     JOIN inventory i ON i.inventory_id = r.inventory_id
     JOIN film f ON f.film_id = i.film_id
     WHERE r.return_date > r.rental_date + f.rental_duration * INTERVAL '1 day'
+  rows:
+  - {late_rentals: 8121}
 
 - id: pagila_007
   question: What was the total revenue in each month?
@@ -171,6 +240,14 @@ cases:
     FROM payment
     GROUP BY 1
     ORDER BY 1
+  rows:
+  - {month: '2022-01-01T00:00:00Z', revenue: '3094.78'}
+  - {month: '2022-02-01T00:00:00Z', revenue: '10164.97'}
+  - {month: '2022-03-01T00:00:00Z', revenue: '11413.86'}
+  - {month: '2022-04-01T00:00:00Z', revenue: '10759.52'}
+  - {month: '2022-05-01T00:00:00Z', revenue: '11347.28'}
+  - {month: '2022-06-01T00:00:00Z', revenue: '10923.45'}
+  - {month: '2022-07-01T00:00:00Z', revenue: '9712.65'}
 
 - id: pagila_008
   question: How many different customers have rented a Horror film?
@@ -190,6 +267,8 @@ cases:
     JOIN film_category fc ON fc.film_id = i.film_id
     JOIN category ca ON ca.category_id = fc.category_id
     WHERE ca.name = 'Horror'
+  rows:
+  - {customers: 451}
 
 - id: pagila_009
   question: Which Sports films does store 1 carry?
@@ -210,6 +289,64 @@ cases:
     JOIN inventory i ON i.film_id = f.film_id
     WHERE c.name = 'Sports' AND i.store_id = 1
     ORDER BY f.title
+  rows:
+  - {title: ALADDIN CALENDAR}
+  - {title: ANONYMOUS HUMAN}
+  - {title: CARIBBEAN LIBERTY}
+  - {title: CHANCE RESURRECTION}
+  - {title: CONGENIALITY QUEST}
+  - {title: CRUSADE HONEY}
+  - {title: DIVORCE SHINING}
+  - {title: DRIVER ANNIE}
+  - {title: DURHAM PANKY}
+  - {title: ELIZABETH SHANE}
+  - {title: EVOLUTION ALTER}
+  - {title: EXORCIST STING}
+  - {title: FLATLINERS KILLER}
+  - {title: GLEAMING JAWBREAKER}
+  - {title: GRACELAND DYNAMITE}
+  - {title: GROOVE FICTION}
+  - {title: GUNFIGHTER MUSSOLINI}
+  - {title: HOLES BRANNIGAN}
+  - {title: HONEY TIES}
+  - {title: HYSTERICAL GRAIL}
+  - {title: IMAGE PRINCESS}
+  - {title: INSTINCT AIRPORT}
+  - {title: JOON NORTHWEST}
+  - {title: KRAMER CHOCOLATE}
+  - {title: MERMAID INSECTS}
+  - {title: MILE MULAN}
+  - {title: MOSQUITO ARMAGEDDON}
+  - {title: MOTHER OLEANDER}
+  - {title: MUMMY CREATURES}
+  - {title: NEIGHBORS CHARADE}
+  - {title: NORTHWEST POLISH}
+  - {title: NOVOCAINE FLIGHT}
+  - {title: PEACH INNOCENT}
+  - {title: PEAK FOREVER}
+  - {title: PHILADELPHIA WIFE}
+  - {title: PICKUP DRIVING}
+  - {title: PIRATES ROXANNE}
+  - {title: POSEIDON FOREVER}
+  - {title: RECORDS ZORRO}
+  - {title: RIVER OUTLAW}
+  - {title: ROSES TREASURE}
+  - {title: SATISFACTION CONFIDENTIAL}
+  - {title: SATURDAY LAMBS}
+  - {title: SEABISCUIT PUNK}
+  - {title: SECRETARY ROUGE}
+  - {title: SHAKESPEARE SADDLE}
+  - {title: SIERRA DIVIDE}
+  - {title: SQUAD FISH}
+  - {title: STAR OPERATION}
+  - {title: STEERS ARMAGEDDON}
+  - {title: STRAIGHT HOURS}
+  - {title: TALENTED HOMICIDE}
+  - {title: TIGHTS DAWN}
+  - {title: TOURIST PELICAN}
+  - {title: TRADING PINOCCHIO}
+  - {title: TUXEDO MILE}
+  - {title: VICTORY ACADEMY}
 
 - id: pagila_010
   question: How many different cities do our customers live in?
@@ -227,6 +364,8 @@ cases:
     FROM customer cu
     JOIN address a ON a.address_id = cu.address_id
     JOIN city ci ON ci.city_id = a.city_id
+  rows:
+  - {cities: 597}
 
 - id: pagila_011
   question: Which five actors' films have brought in the most payments?
@@ -249,3 +388,9 @@ cases:
     GROUP BY a.actor_id, a.first_name, a.last_name
     ORDER BY revenue DESC, a.actor_id
     LIMIT 5
+  rows:
+  - {first_name: GINA, last_name: DEGENERES, revenue: '3442.49'}
+  - {first_name: MATTHEW, last_name: CARREY, revenue: '2742.19'}
+  - {first_name: MARY, last_name: KEITEL, revenue: '2689.25'}
+  - {first_name: SCARLETT, last_name: DAMON, revenue: '2655.28'}
+  - {first_name: WALTER, last_name: TORN, revenue: '2620.62'}
