@@ -2316,8 +2316,7 @@ join-path fill and the eval wiring they need.
     its columns); a term's column keeps the table to that column plus the keys when nothing else named it.
   - The Pagila fixture has the 15 base tables and 7 views (22 tables, still past 15), not the 29 of the smoke run: the
     pinned dump's payment partitions are not in it.
-  - The model-free Pagila baseline is a follow-up: neither the `realdb` workflow nor the snapshot fixture runs the
-    retrieval mode (it needs the Pagila schema indexed with embeddings), so no floor is recorded.
+  - The model-free Pagila baseline was a follow-up row: C-W5.
 - **Review fixes.** A table an earlier step already chose is never moved to `keys_only` by the selector's pick (a
   vector pick over 40 columns was cut to its keys), and a term's columns are kept apart and unioned in last, so no cut
   drops them. The selector's call carries `metadata["langgraph_node"] = "table_selector"`, so usage, the Pipeline page
@@ -2330,6 +2329,23 @@ join-path fill and the eval wiring they need.
   such as "3,094.78"; pagila_005's rows matched the gold rows, so it failed on faithfulness alone; pagila_004 grouped by title with an extra count column; pagila_007's
   monthly totals differ from the gold rows, cause not yet known). C-W4's goal (recall) is met; answer quality on large
   schemas is row C-W6.
+
+### C-W5
+
+A model-free Pagila retrieval baseline on CI (design 17.5).
+
+- **Where it runs: the `realdb` workflow, not the snapshot fixture.** The fixture's store is a fake, so it can not
+  measure a vector search, and the record gates on a real index. The test bed's Pagila is already in the workflow, and
+  the wide-schema routing test already indexes with local embeddings there, so one more test costs one index of 22
+  tables and no key. `tests/realdb/test_pagila_retrieval.py` (PostgreSQL only) builds a datasource called `pagila`
+  (the id the suite names), indexes it, runs `pagila.yaml` in mode retrieval (selector off, steps 1, 2 and 4) and
+  gates the report against `benchmarks/` with `engine.evals.gate`. A series break or a regression fails it, as
+  `nl2sql eval run --baseline benchmarks` does in the `eval-gates` job.
+- **Recording.** As for every CI baseline (`benchmarks/README.md`, "The recording rule"): the test writes its report to
+  `REALDB_EVAL_OUT`, the workflow uploads it as the `eval-pagila` artifact, and `nl2sql eval publish` records it from
+  the runner's numbers into `benchmarks/retrieval/pagila/`. The `realdb` path filter now also covers
+  `schema_retriever/`, `evaluation/` and that folder, so a retriever change re-runs the baseline.
+- **Baseline.** RESULTS
 
 ## 14. Bugs Wave C fixes
 
@@ -2493,9 +2509,9 @@ New settings sit in `RetrievalSettings` (`config/models.py`): `table_selector` (
 - **Retrieval mode stays model-free**, as its docstring says (glossary matching is an embedding search, not a model
   call), so a CI baseline needs no key: `RETRIEVAL_CHANGES` in `retrieval_recall.py` also sets
   `settings.retrieval.table_selector` to false, `retrieval_settings()` reports it, and the run covers steps 1, 2 and
-  4 and records the floor without the model. The floor has no target; it is a baseline. Whether the Pagila retrieval record can run on CI
-  (it needs the Pagila schema indexed) is the builder's call: through the `realdb` workflow, or from the snapshot
-  fixture. If neither fits in this PR, the suite ships and the baseline is a follow-up row.
+  4 and records the floor without the model. The floor has no target; it is a baseline. It runs through the `realdb`
+  workflow (C-W5): `tests/realdb/test_pagila_retrieval.py` indexes the test bed's Pagila with local embeddings, runs
+  the suite in mode retrieval and gates it against the newest `benchmarks/retrieval/pagila/` record.
 - **An end-to-end run with the model** on the test bed's Pagila (the suite, with the selector on) is run once by the
   owner with a key, after the PR is green. The target is every gold table sent for every question; a miss is
   investigated through the trace's per-table steps before the row is closed. The results go in the built note. It

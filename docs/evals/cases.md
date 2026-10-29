@@ -157,6 +157,11 @@ test bed's Pagila. After you edit a case, point a suite file at the test bed
 and run `regenerate` again, then review the rows, before a full run. Mode
 retrieval needs no rows.
 
+CI runs the model-free floor on every pull request that touches the retriever
+(the `realdb` workflow, `tests/realdb/test_pagila_retrieval.py`) and gates it
+against the recorded baseline in `benchmarks/retrieval/pagila/`. The floor has
+no target; it only must not regress.
+
 ```bash
 nl2sql eval run --mode retrieval --suite pagila.yaml --out eval_pagila.json   # no key: the floor, without the table selector
 nl2sql eval run --mode full --suite pagila.yaml --max-cost 5                  # with the selector: every gold table should be sent
