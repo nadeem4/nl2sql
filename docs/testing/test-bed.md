@@ -137,6 +137,14 @@ PostgreSQL only, and only when `REALDB_WIDE_ROUTING` is `true`: the workflow
 sets it nightly, on demand, and on pull requests that change
 `nl2sql/indexing/` (or the test itself). It skips otherwise.
 
+Table recall is recorded on Pagila too: `tests/realdb/test_pagila_retrieval.py`
+indexes it with local embeddings, runs [the Pagila suite](../evals/cases.md#the-pagila-suite)
+in mode retrieval (no model, no key, the table selector off) and gates it
+against the newest record in `benchmarks/retrieval/pagila/`. The workflow
+uploads its report as the `eval-pagila` artifact, which
+[`nl2sql eval publish` records](https://github.com/nadeem4/nl2sql/blob/main/benchmarks/README.md)
+when the retriever moves on purpose. PostgreSQL only.
+
 ## The `realdb` marker and fixtures
 
 Every test under `packages/nl2sql/tests/realdb/` is marked `realdb`. Its

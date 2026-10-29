@@ -41,6 +41,11 @@ jobs:
               - 'packages/nl2sql/src/nl2sql/storage/**'
               - 'packages/nl2sql/src/nl2sql/schema/**'
               - 'packages/nl2sql/tests/realdb/**'
+              - 'packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/**'
+              - 'packages/nl2sql/src/nl2sql/evaluation/**'
+              - 'packages/nl2sql/src/nl2sql/embeddings/**'
+              - 'packages/nl2sql/src/nl2sql/pipeline/steps.py'
+              - 'benchmarks/retrieval/pagila/**'
               - 'testbed/**'
               - '.github/workflows/realdb.yml'
             wide:
@@ -94,8 +99,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e packages/sdk -e "packages/nl2sql[postgres,mysql,mssql,duckdb]" pytest pytest-randomly
 
+      # The Pagila retrieval baseline test writes its report here (benchmarks/README.md,
+      # "The recording rule"): download it from the artifact to re-record the baseline.
       - name: Run the realdb tests
+        env:
+          REALDB_EVAL_OUT: ${{ runner.temp }}/eval_pagila.json
         run: pytest -m realdb packages/nl2sql/tests/realdb
+
+      - name: Upload the Pagila retrieval report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-pagila
+          path: ${{ runner.temp }}/eval_pagila.json
+          if-no-files-found: warn
 
       - name: Show the test bed's logs
         if: failure()
