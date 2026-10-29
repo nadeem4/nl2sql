@@ -85,7 +85,7 @@ Side effects:
 The user sees the full result as a table; the model's job is to write about it,
 not to copy it. So the prompt carries a preview, and its instructions say:
 
-- every number the answer states comes from the preview rows or from `row_count`;
+- every number the answer states comes from the preview rows or from `row_count`, quoted exactly as the rows hold it: no rounding, truncating or "about" (9712.47 is "9,712.47", not "9,700"); thousands separators and the column's own decimals are fine (C-W6e: pagila_007 matched its gold rows, and the faithfulness scorer failed the rounded revenue);
 - when the preview is `partial`, do not total, average, rank or count over rows it cannot see;
 - do not reproduce the result: say the full result is in the table, and use `format_type` `"table"` only for a few preview rows.
 

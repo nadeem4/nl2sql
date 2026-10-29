@@ -17,6 +17,8 @@ explanation, and put the document *inside* the tool's arguments.
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_SYSTEM_PROMPT
@@ -60,3 +62,37 @@ def test_the_prompt_asks_for_a_tool_call_not_a_json_document():
     assert "DecomposerResponse" in prompt
     assert "top level" in prompt.lower()
     assert "do not wrap" in prompt.lower()
+
+
+# C-W6e: split only when one query cannot express the question. The plan is one
+# flat SELECT (joins, filters, group by, having, order by, limit): no subquery,
+# CTE or window function. pagila_001 ("top 5 films by revenue in the top
+# category") was split into a top-category query and a per-film query that came
+# back as two result sets, one of them unlimited.
+
+
+def test_the_prompt_splits_only_when_one_query_cannot_express_the_question():
+    prompt = DECOMPOSER_SYSTEM_PROMPT.lower()
+
+    assert "only when" in prompt and "one query" in prompt
+    # what one flat query already does is not a reason to split
+    for kept_whole in ("joins", "group_by", "order_by"):
+        assert kept_whole in prompt
+
+
+def test_a_split_that_depends_on_a_ranked_subset_ends_in_one_join_group():
+    prompt = DECOMPOSER_SYSTEM_PROMPT.lower()
+
+    assert "top category" in prompt
+    assert "one join" in prompt
+    assert "post_combine_ops" in prompt
+    # ONE op carries both: the engine does not chain ops, and each unread op is a result
+    assert "one sort op" in prompt and "order_by and limit" in prompt
+    assert "sort, then limit" not in prompt
+    assert "one result set" in prompt
+
+
+def test_the_prompt_promises_nothing_the_plan_cannot_do():
+    words = set(re.findall(r"[a-z_]+", DECOMPOSER_SYSTEM_PROMPT.lower()))
+
+    assert not words & {"cte", "ctes", "window", "nested"}

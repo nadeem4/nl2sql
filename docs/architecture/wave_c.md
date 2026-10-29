@@ -2368,6 +2368,10 @@ The engine's join fixes (design 18.3).
 
 Date differences in plans (design 18.5). `ast_planner/functions.py`: `DATE_DIFF` joins `ALLOWED_FUNCTIONS`; `date_diff(func_name, args)` reads `DATE_DIFF(unit, start, end)` as `(unit, start, end)` (all three None when malformed), and `DIFF_UNITS = ("day",)`. The generator's `elapsed_days(start, end)` builds `DateDiff(end, start, SECOND) / 86400.0`: elapsed days with the fraction kept, a number on every adapter. The SDK's `SQLAlchemyAdapter.render_sql` rewrites the seconds difference where sqlglot's rendering is wrong (MySQL `CAST(TIMESTAMPDIFF(SECOND, ...) AS DOUBLE)`, since an integer over a decimal literal keeps four decimals there; SQL Server `DATEDIFF_BIG(SECOND, CAST(.. AS DATETIME2), ..)`, which also takes `DATE`); the SQLite adapter uses `(JULIANDAY(end) - JULIANDAY(start)) * 86400.0`. Postgres and DuckDB need nothing. Tests: `tests/unit/test_date_diff.py` runs real SQLite and DuckDB (3.87 days, two minutes across midnight, negative, NULL, DATE-only whole numbers) and pins the rendered Postgres, SQL Server and MySQL expressions; `tests/realdb/test_date_diff.py` runs the same cases on the test bed. The logical validator rejects another unit or shape and returns early on it (`_validate_static`, so the error is `INVALID_PLAN_STRUCTURE`, not `VALIDATOR_CRASH`; `DATE_PART` with a bad unit too), and a `-` between two columns typed date or timestamp (`_date_subtraction`: not `TIME`, tables matched by schema when the plan names one). The planner prompt offers it. Only the day unit. Not caught: a date column wrapped in a function, or a date minus a number.
 
+### C-W6e
+
+Prompt fixes from the keyed Pagila rerun (design 18.7). `decomposer/prompts.py`: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final ranking as one sort op carrying `order_by` and `limit`). `answer_synthesizer/prompts.py`: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in `tests/unit/test_decomposer_tool_schema.py` and `tests/unit/test_node_answer_synthesizer.py`; no model call, so the effect shows only in the owner's next keyed run.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2635,3 +2639,27 @@ SQLite, round on Postgres, midnight boundaries elsewhere), and exact elapsed tim
 no dialect; the adapter renders the seconds difference. Only the day unit for now. The logical validator
 rejects any other unit or shape, and a `-` between two date or timestamp columns, naming `DATE_DIFF` in the message
 (validation before generation, so the retry sees it). Docs: planner, generator and adapter pages, `invariants.md`.
+
+### 18.7 C-W6e: split only when needed, quote exact figures
+
+Approved by the owner 2026-10-29 after the keyed Pagila rerun (5 of 9 passed).
+
+- **What the plan can express.** Checked before writing the prompt: `PlanModel` is one flat SELECT (tables, joins, select
+  items, where, group by, having, order by, limit, offset). `Expr` has no subquery kind and `ALLOWED_FUNCTIONS` has no
+  window function, and there are no CTEs. So the owner's premise (a "top N within the top group" question is one query
+  with a subquery, CTE or window) does not hold today, and the prompt does not promise it. "Top category, then its top 5
+  films" still needs two sub-queries.
+- **pagila_001 (decomposer).** The split was not the fault; the combination was. The run returned two result sets (the
+  scorer: "expected one result set, got 2"), one of them 73 unlimited film rows, and the answer hedged. The prompt now
+  says: split only when one query cannot express the question (a flat query already joins, filters, groups, orders and
+  limits), and when a ranked subset must filter another result, combine the two with one `join` group and put the final
+  ranking in `post_combine_ops` on that group as ONE `sort` op with both `order_by` and `limit` (the engine does not
+  chain ops: each op nothing reads is its own result, so a `sort` plus a `limit` op gave two result sets again;
+  `test_decomposer_dag.py` pins both). Genuine multi-datasource and independent multi-part questions
+  still split. Not done: a plan that can nest (subquery or CTE), which would make the split unnecessary; it is a change
+  to the plan, generator and validator, and a separate decision.
+- **pagila_007 (answer).** The rows matched the gold strictly, but the answer wrote "9,700" for 9712.47 and the
+  faithfulness scorer failed it. Instruction 2 now says to quote figures exactly as the rows hold them, with thousands
+  separators and the column's decimals allowed, and no rounding or "about".
+- **Verification.** Prompt-content tests only (no real model). Whether pagila_001 and pagila_007 now pass is the owner's
+  next keyed run.
