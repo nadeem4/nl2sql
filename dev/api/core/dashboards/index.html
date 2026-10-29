@@ -5841,8 +5841,8 @@
 <div class="admonition note">
 <p class="admonition-title">Partly built</p>
 <p>The workspaces, the dashboard store, <code>pin</code>, <code>move</code> and the manual edits work (D1), and so do <code>open</code>,
-<code>refresh</code> and <code>run_scheduled</code> (D2). <code>filter_values</code> and <code>refresh(filters=...)</code> (D2b) and <code>generate</code> and
-<code>suggest_questions</code> (D3) have their final signatures and raise <code>NotImplementedError</code> naming their row.</p>
+<code>refresh</code> and <code>run_scheduled</code> (D2), and <code>generate</code> and <code>suggest_questions</code> (D3). <code>filter_values</code> and
+<code>refresh(filters=...)</code> (D2b) have their final signatures and raise <code>NotImplementedError</code> naming their row.</p>
 </div>
 <h2 id="purpose">Purpose</h2>
 <p><code>engine.workspaces</code> and <code>engine.dashboards</code> (<a href="../../../dashboards/">Dashboards</a>).</p>
@@ -5852,7 +5852,8 @@
 <li><code>packages/nl2sql/src/nl2sql/api/dashboards_api.py</code> (<code>DashboardsAPI</code>, internal)</li>
 <li><code>packages/nl2sql/src/nl2sql/dashboards/models.py</code> (<code>Workspace</code>, <code>Dashboard</code>, <code>Tile</code>, <code>DashboardEdit</code>)</li>
 <li><code>packages/nl2sql/src/nl2sql/dashboards/</code> <code>workspaces.py</code>, <code>api.py</code>, <code>edits.py</code>, <code>store.py</code>, <code>run.py</code> (running the
-  charts) and <code>schedule.py</code> (the logic behind the two faces)</li>
+  charts), <code>schedule.py</code>, and for the starter dashboard <code>roles.py</code>, <code>templates.py</code> and <code>layout.py</code> (the logic
+  behind the two faces)</li>
 </ul>
 <h2 id="public-surface">Public Surface</h2>
 <p>Every method takes <code>user_context</code> keyword-only and required, except <code>run_scheduled</code>, which runs each
@@ -5904,9 +5905,18 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
   The codes are <code>SCHEDULE_IDENTITY_EXPIRED</code>, <code>SCHEDULE_ROLE_REMOVED</code>, <code>SCHEDULE_ACCESS_DENIED</code> (a chart the owner
   can no longer read) and <code>SCHEDULE_HOOK_DENIED</code> (a hook denied a chart; the message names the chart and the
   hook's reason). A <code>now</code> without a timezone is a <code>ValueError</code>.</li>
+<li><strong><code>generate(datasource_id, title=None, workspace_id=None, max_tiles=None)</code></strong> builds the no-model starter
+  dashboard and returns <code>(Dashboard, DashboardRun)</code> (<a href="../../../dashboards/#the-starter-dashboard">how it chooses</a>).
+  The roles come from the indexed snapshot and the glossary, only for tables the caller can read; each template chart
+  runs as the caller (<code>trigger="generate"</code>); the charts whose first run is <code>ok</code> are kept and the others are in
+  <code>DashboardRun.skipped</code> (<code>title</code>, <code>status</code>, <code>reason</code>). The result is saved, owned by the caller, in <code>workspace_id</code>
+  or "General". Raises <code>NotIndexed</code> (names <code>nl2sql index --datasource &lt;id&gt;</code>), <code>NoTiles</code> (no table the caller
+  reaches, or no chart answered), <code>WorkspaceNotFound</code>, and <code>ValueError</code> for <code>max_tiles</code> below 1.
+  <strong><code>suggest_questions(datasource_id, n=5)</code></strong> returns the questions of the first <code>n</code> charts <code>generate</code> would
+  choose and runs and saves nothing (<code>[]</code> when the caller reaches no table; <code>NotIndexed</code> as above).</li>
 <li><strong>A verified chart</strong> keeps its datasource in <code>ChartPlan.verified_datasource_id</code>, required with <code>verified</code>.</li>
 <li><strong>Events.</strong> <code>dashboard.changed</code> (the edit kinds, <code>pinned</code> or <code>deleted</code>, and <code>by</code>), <code>dashboard.schedule_set</code>,
-  <code>dashboard.refreshed</code> (the counts per status), <code>dashboard.schedule_stopped</code> and <code>workspace.changed</code>. They
+  <code>dashboard.generated</code>, <code>dashboard.refreshed</code> (the counts per status), <code>dashboard.schedule_stopped</code> and <code>workspace.changed</code>. They
   carry no titles, names or values.</li>
 <li><strong>Retention.</strong> <code>engine.storage.purge()</code> deletes drafts last edited more than <code>conversations.max_age_days</code> ago;
   saved dashboards are never purged.</li>

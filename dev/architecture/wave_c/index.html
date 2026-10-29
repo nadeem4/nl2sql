@@ -7004,7 +7004,58 @@ the 1,000-line mark. <code>refresh(filters=...)</code> and <code>filter_values</
 <h3 id="d2b">D2b</h3>
 <p>Not built yet.</p>
 <h3 id="d3">D3</h3>
-<p>Not built yet.</p>
+<div class="admonition note">
+<p class="admonition-title">Built (D3): the starter dashboard</p>
+<p><code>engine.dashboards.generate</code> and <code>suggest_questions</code> work. <code>nl2sql/dashboards/roles.py</code> reads each column's role
+(Wave B's <code>derived_roles</code>, then <code>find_roles</code>, then the glossary, which wins) and the dashboard's own reading of
+it; <code>templates.py</code> builds the four templates' typed plans and the filters; <code>layout.py</code> places the kept charts;
+<code>api.py</code> (<code>Dashboards.generate</code>, <code>suggest_questions</code>) runs them through <code>Refresher.run(..., "generate")</code> under
+the lock and saves the dashboard; <code>api/dashboards_api.py</code> gathers what they read.</p>
+<ul>
+<li><strong>Tests:</strong> <code>tests/unit/test_dashboards_d3.py</code> (a hand-built snapshot, canned <code>run_query</code>), two cases in
+  <code>tests/e2e/test_dashboards_fake_llm.py</code> (the real pipeline on the demo databases, as the analyst and as the
+  narrower viewer role: no model call, only readable tables), and <code>test_wave_c_stubs.py</code> lists <code>filter_values</code>
+  alone now.</li>
+<li><strong>Flow.</strong> The first run is part of <code>generate</code>: the chosen charts are saved as a <em>draft</em> (ids <code>t1</code>, <code>t2</code>, ... in
+  the order chosen, so the same snapshot and glossary give the same ids), run once by <code>Refresher.run</code>, and the
+  ones whose first run is <code>ok</code> are kept; the rest are listed in <code>DashboardRun.skipped</code>, their stored results
+  dropped. The kept charts are laid out by the chart kind each one was <strong>drawn</strong> as (a Top N that has more than
+  <code>charts.max_categories</code> bars is a table and goes last), then the draft becomes <code>saved</code>. If nothing answers the
+  draft is deleted and <code>NoTiles</code> is raised; any error also deletes it. <code>tile.chart</code> stays <code>auto</code>.</li>
+<li><strong>The access rule.</strong> <code>generate</code> runs as the caller and reads only the tables the caller's scope allows
+  (<code>test_a_denied_table_is_never_charted_and_never_run</code>, and the same on the demo databases for a narrower role).
+  A caller who reaches the datasource but no table in it gets <code>NoTiles</code> from <code>generate</code> and <code>[]</code> from
+  <code>suggest_questions</code>; a caller who cannot reach the datasource gets <code>NotIndexed</code>, as for a datasource never
+  indexed, and its snapshot is not read.</li>
+</ul>
+<p>Where the code and the design differ, the code won:</p>
+<ul>
+<li><strong><code>COUNT(1)</code>, not <code>COUNT(*)</code>.</strong> A plan writes a star as the column name <code>*</code>, which the validator accepts but the
+  generator quotes (<code>t1."*"</code>), so the database refuses it. The row count is <code>COUNT(1)</code>, the same number.</li>
+<li><strong>Names only.</strong> A chart's question and title use the columns' names humanised; a glossary description's first
+  clause is not used (no description is needed for a good question, and one could carry text a person did not
+  write for a question).</li>
+<li><strong>The reads are gathered in the facade.</strong> <code>nl2sql/dashboards/</code> may not reach <code>ds_registry</code> (the boundary
+  test), so <code>DashboardsAPI._source</code> builds a <code>roles.Source</code> (the snapshot, the adapter's dialect, the caller's
+  <code>scope.allows</code>, the merged glossary, <code>profiler.enum_max_distinct</code>, <code>charts.max_categories</code>) and
+  <code>Dashboards.generate(source, ...)</code> and <code>suggest_questions(source, ...)</code> take it.</li>
+<li><strong>A roles' kind guard.</strong> A <code>money</code> or <code>quantity</code> role makes a measure only on a number column, and <code>date</code> a time
+  only on a temporal column, so a glossary role on a column the chart cannot use is ignored rather than
+  failing at the database.</li>
+<li><strong>Events.</strong> <code>dashboard.refreshed</code> is published only for a dashboard that is kept, not for a draft that is
+  deleted. <code>suggest_questions</code> with <code>n</code> below 1 is a <code>ValueError</code>. Every template plan is held to the validator
+  and generator for postgres, tsql and mysql (<code>test_every_template_plan_validates_and_renders_without_a_star</code>).</li>
+<li><strong>The cap is a prefix.</strong> <code>max_tiles</code> keeps the first charts in the order key totals, trends, top N,
+  distributions; a chart that fails is skipped, not replaced by the next candidate.</li>
+<li><strong>"General" is made before the first run</strong> (the draft needs a workspace); a <code>generate</code> that made it and then
+  keeps nothing deletes it again.</li>
+<li>The filters are defined (<code>DashboardFilter</code>) and stored; applying their values is D2b's.</li>
+<li><strong>For L3:</strong> <code>engine.dashboards.suggest_questions(datasource_id, user_context=..., n=5)</code> (the question texts,
+  nothing run, <code>NotIndexed</code> when the datasource has no index; its message names <code>nl2sql index --datasource &lt;id&gt;</code>).
+  <strong>For D4:</strong> nothing new; a generated dashboard is an ordinary one, and <code>roles.Source</code> / <code>column_roles</code> are the
+  reusable reading of the schema if the chat wants to suggest a chart.</li>
+</ul>
+</div>
 <h3 id="d4">D4</h3>
 <p>Not built yet.</p>
 <h3 id="l1">L1</h3>
