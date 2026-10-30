@@ -17,6 +17,7 @@ each scorer's counts.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
@@ -324,7 +325,8 @@ def score_config(records: List[Dict[str, Any]], passes: int) -> Dict[str, Any]:
     if passes > 1:
         runs: Dict[str, set] = {}
         for r in records:
-            runs.setdefault(_key(r), set()).add((r.get("sql"), r.get("rows_digest")))
+            runs.setdefault(_key(r), set()).add((json.dumps(r.get("sql_by_sub_query") or r.get("sql"), sort_keys=True),
+                                                    r.get("rows_digest")))
         differing = sorted(k for k, seen in runs.items() if len(seen) > 1)
         determinism = {"identical": len(runs) - len(differing), "questions": len(runs),
                        "share": _share(len(runs) - len(differing), len(runs)), "differing": differing}

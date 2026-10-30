@@ -12,7 +12,7 @@ built-ins and any plugin's are listed the same way and named in
 
 | Scorer | Passes when | Applies to | Modes |
 | --- | --- | --- | --- |
-| `result_match` | The rows match the case's `rows` or any `alt_rows` | an `allowed` role on a case with `sql` | full, plans |
+| `result_match` | The run's one terminal result (the combined result of a split question, not a sub-query's scan) matches the case's `rows` or any `alt_rows` | an `allowed` role on a case with `sql` | full, plans |
 | `outcome` | The role got what the case says: an answer (`allowed`), the generic refusal (`refused`), `QUESTION_NOT_ANSWERABLE` (`unanswerable`) or status `needs_clarification` (`clarify`) | every role | full, plans |
 | `retrieval_recall` | The schema retriever sent every one of the case's `tables` and `columns`; the value is the column recall | an `allowed` role with `tables` | full, retrieval |
 | `faithfulness` | Every number and quoted name the answer states is in the result or its counts | a run that wrote an answer | full |
@@ -33,7 +33,9 @@ raises scores the case as an **error**: its `passed` is `None` and the
 message is in `detail["error"]`. The run goes on, and the report counts
 errors apart from failures.
 
-`result_match` compares rows strictly:
+`result_match` scores the run's **terminal result**: what the aggregator saved, which for a question the decomposer split is
+the combined result, not any sub-query's scan. A run with two terminal results fails with "expected one result set, got 2".
+It compares rows strictly:
 
 - column names are ignored, and column order counts;
 - numbers (database decimals too) match within half a cent;
@@ -66,8 +68,9 @@ class CaseRun(BaseModel):      # what a scorer is given
     case: EvalCase
     role: str
     mode: str                  # "full", "plans" or "retrieval"
-    result: QueryResult        # every row, not the capped sample a caller sees
-    rows: list[list[Any]] | None     # the first result set's rows
+    result: QueryResult        # the run's result, with its sub-queries
+    sets: list[RowSample]      # the terminal result sets, every row (the combined result of a split question)
+    rows: list[list[Any]] | None     # the first terminal result set's rows
     columns: list[str]
     retrieval: dict[str, list[str]] | None   # table -> columns the retriever sent
     routed: list[str] | None                 # mode retrieval: datasources, best first

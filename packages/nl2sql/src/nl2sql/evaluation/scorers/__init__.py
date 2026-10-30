@@ -22,7 +22,7 @@ from typing import Any, ClassVar, Dict, FrozenSet, List, Optional, Protocol, Typ
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nl2sql.api.query_api import QueryResult
+from nl2sql.api.query_api import QueryResult, RowSample
 from nl2sql.evaluation.suite import EvalCase
 
 Mode = str  # "full", "plans" or "retrieval"
@@ -53,6 +53,9 @@ class CaseRun(BaseModel):
     role: str
     mode: Mode
     result: QueryResult = Field(default_factory=QueryResult)
+    # The run's terminal result sets: what the aggregator saved, every row. A question the decomposer splits
+    # still has one, the combined result; the sub-queries' scans under it are not result sets (C-W7a).
+    sets: List[RowSample] = Field(default_factory=list)
     # The first result set's rows, every row (not the capped sample a caller sees).
     rows: Optional[List[List[Any]]] = None
     columns: List[str] = Field(default_factory=list)

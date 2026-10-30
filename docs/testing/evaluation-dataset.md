@@ -14,7 +14,7 @@ and runs through [`engine.evals`](../evals/index.md).
 | `packages/nl2sql/src/nl2sql/evaluation/run.py` | The three modes, prices and the cost cap |
 | `packages/nl2sql/src/nl2sql/evaluation/gold_llm.py` | The gold-plan fake LLM that [mode plans](#mode-plans-gold-plans-through-the-code-nodes) runs on |
 | `packages/nl2sql/src/nl2sql/evaluation/scorers/` | The scorer interface and the five built-ins |
-| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `compare_results_lenient`), which `result_match` reads |
+| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `compare_results_lenient`), which `result_match` reads on the run's terminal result (the combined result of a split question, not a sub-query's scan) |
 | `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
 | `packages/nl2sql/src/nl2sql/evaluation/report.py` | The report's boards: accuracy, intervals, pass^k, cost, latency |
 | `packages/nl2sql/src/nl2sql/evaluation/gate.py` | The regression gate's statistics: flips, McNemar's test, the checks |

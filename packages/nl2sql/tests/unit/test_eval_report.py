@@ -195,6 +195,13 @@ def test_determinism_is_the_share_of_questions_with_the_same_sql_and_rows_in_eve
         "identical": 1, "questions": 2, "share": 0.5, "differing": ["b/admin"]}
 
 
+def test_determinism_sees_a_second_sub_query_whose_sql_changes_between_passes():
+    first, second = _rec("a", "pass", pass_no=1), _rec("a", "pass", pass_no=2)
+    first["sql_by_sub_query"] = {"sq1": "SELECT 1", "sq2": "SELECT 2"}
+    second["sql_by_sub_query"] = {"sq1": "SELECT 1", "sq2": "SELECT 3"}
+    assert report.score_config([first, second], passes=2)["determinism"]["differing"] == ["a/admin"]
+
+
 def test_comparison_lists_each_config_and_the_questions_they_disagree_on():
     boards = {
         "good": report.score_config([_rec("a", "pass"), _rec("b", "pass")], passes=1),

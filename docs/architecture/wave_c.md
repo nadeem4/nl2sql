@@ -2382,6 +2382,10 @@ The suite's digest changed, so the Pagila retrieval baseline was re-recorded fro
 
 Full-name alternative for pagila_011 (design 18.8). Data only: `alt_sql` and its `alt_rows` on the case in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f. It was re-recorded from realdb run 40989212254 (`benchmarks/retrieval/pagila/2026-10-30_631c77a_retrieval.json`) because the suite digest changed.
 
+### C-W7a
+
+The eval scores the combined result (design 18.9). `evaluation/run.py`: `_terminal_sets(state, result, store)` reads each result in `result.result_manifest` from the aggregator's `computed_artifacts` (every row, up to `_ALL_ROWS`) as a `RowSample`; `_ask` returns `(result, retrieved, sets)`. `CaseRun` gains `sets` (the terminal result sets; `rows` and `columns` are the first one's). `result_match` counts `len(run.sets)` for "expected one result set, got N"; `faithfulness` checks the answer against `run.sets`; `_digest` and the record's `rows` use them too. The record's `sql` is still the first sub-query's, and a new `sql_by_sub_query` (`{sub-query id: sql}`) keeps every scan's SQL. A run that withheld its results has an empty manifest and so no sets. No change to `QueryResult` or the facade. Tests: `tests/unit/test_eval_scorers.py` (split with one terminal result scored on it, two terminal results still "got 2", a single-query case scores exactly as before, faithfulness on the terminal rows) and `tests/unit/test_eval_run.py` (`_terminal_sets`, a split record).
+
 ### C-W7b
 
 The decomposer rejects an ambiguous post-combine column. Root cause (pagila_001): both sub-queries produced a non-key `total_revenue`; the combine keeps the bare name for the left copy and renames the right one `total_revenue_right`, so the final sort ranked the category total, the same on every row, and returned five unranked films without any error. `aggregation/columns.py`: `ambiguous_columns(operation, inputs, join_keys)` lists the non-key names both sides of a `join` have (empty for `compare`, which diffs by matching names, and for `union`/`standalone`), and `ambiguous_columns_message(...)` words the feedback. `decomposer/node.py` `post_combine_problems` adds one problem per such column an op reads, on the same parse-and-retry path as the missing-column check (one retry, then `PLANNER_FAILED` with the reason). The message names the column, the join keys and both sub-queries, says the left keeps the name and the right becomes `<name>_right`, and asks for distinct names in each `expected_schema`. Rule 12 of the decomposer prompt carries one line on distinct metric names. Tests: `tests/unit/test_decomposer_post_combine_columns.py` (pagila_001 shape rejected and retried, distinct names pass, a key passes, a column the op does not read passes, `compare` exempt, the helper itself). No model call; the effect shows in the owner's next keyed Pagila run.
@@ -2696,3 +2700,31 @@ Approved by the owner 2026-10-29 after the keyed Pagila rerun (5 of 9 passed).
   separators and the column's decimals allowed, and no rounding or "about".
 - **Verification.** Prompt-content tests only (no real model). Whether pagila_001 and pagila_007 now pass is the owner's
   next keyed run.
+
+### 18.9 C-W7: split questions
+
+Found by a model-free investigation of the pagila_001 run (stored results of the keyed Pagila rerun), approved by the owner
+2026-10-29. Two bugs hid each other: the eval could not score a split question at all, and the split question's own
+combination was ambiguous.
+
+- **(a) The scorer counted scans, not results (C-W7a).** `result_match` counted `run.result.sub_queries` that have rows
+  (`evaluation/scorers/result_match.py:32`). Those are the sub-queries' scans, built from `subgraph_outputs`
+  (`api/query_api.py:216-259`). `evaluation/run.py:201-205` set `run.rows` to the first sub-query's rows, and the record's
+  `sql` (`run.py:224`) showed only sub-query A. So every question the decomposer splits reported "expected one result set,
+  got N" and was never scored on its combined result. The terminal results are `result.result_manifest`
+  (`query_api.py:353`) and the aggregator's `result_<node_id>.parquet` artifacts (`aggregator/node.py:82-83, 170-181`). A
+  standalone question with no post-combine aggregate or project writes `result_combine_cg_1`, identical to its scan, so
+  those single-query cases score as before; a one-sub-query group that keeps a post-combine aggregate or project is now
+  scored on the post-op rows, which is the correct reading.
+  **Fix:** the result-set count, `run.rows`, the faithfulness check, the rows digest and the record's `rows` come from the
+  terminal results (`CaseRun.sets`; the determinism check keys on `sql_by_sub_query`). The record keeps every sub-query's SQL as `sql_by_sub_query`; `sql` is still
+  sub-query A's, which for a split is one scan, not the combined result.
+- **(b) The join leaves `total_revenue` ambiguous (C-W7b).** When both sides of a join have a column of the same name, the
+  engine keeps the left one and suffixes the right with `_right` (`aggregation/columns.py:64-69`, and polars'
+  `suffix="_right"` in `aggregation/engines/polars_duckdb.py:238`). A post-combine op that names `total_revenue` therefore
+  reads the left column, which may not be the one the question means. The decomposer already checks a post-op's columns
+  against the combined columns (`decomposer/node.py:136-161`, `post_combine_problems`) but accepts a name that exists on
+  both sides. **Fix:** the decomposer rejects an ambiguous post-op column name so the model retries with a distinct name
+  (built in its own PR).
+- **Verification.** (a) is pinned by unit tests with canned results; whether pagila_001 now passes is the owner's next
+  keyed run, which needs (b) as well.
