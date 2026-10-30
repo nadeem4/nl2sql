@@ -2798,7 +2798,6 @@ columns (`COLUMN_SEARCH_CAP`) is not searched, and the depth-first search (prune
 assignment) stops after `COLUMN_SEARCH_BUDGET` = 10,000 checks, past which it is no match. The lenient path's column
 search uses the same bounded search. A pass always records `lenient: true`.
 
-
 ### 18.12 C-W7e: identifying columns
 
 **Cause.** C-W7c (18.10) told the model to leave helper columns out of a join or compare op's `expected_schema`, as "columns
