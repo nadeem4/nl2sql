@@ -56,6 +56,7 @@ GOOD = _decomposition("customer")
 
 
 def _run(payload):
+    datasource = (payload("") if callable(payload) else payload)["sub_queries"][0]["datasource_id"]
     server = FakeLLMServer([Rule("DecomposerResponse", payload)]).start()
     try:
         llm = WIRES["openai"].build_client("gpt-5.4", 0.0, api_key="-".join(["fake", "decomposer", "key"]),
@@ -65,8 +66,8 @@ def _run(payload):
         state = GraphState(
             user_query=QUESTION,
             datasource_resolver_response=DatasourceResolverResponse(
-                resolved_datasources=[ResolvedDatasource(datasource_id="chinook", metadata={})],
-                allowed_datasource_ids=["chinook"],
+                resolved_datasources=[ResolvedDatasource(datasource_id=datasource, metadata={})],
+                allowed_datasource_ids=[datasource],
             ),
         )
         result = DecomposerNode(ctx)(state)
@@ -120,7 +121,7 @@ def test_without_an_expected_schema_the_columns_are_unknown_and_nothing_is_rejec
 def _ranked(left_columns, right_columns, sort_attribute, operation="join"):
     """Pagila 'top 5 films by revenue in the top category': a subset, its rows, one sort op."""
     def sq(sq_id, columns):
-        return {"id": sq_id, "datasource_id": "chinook", "intent": sq_id, "metrics": [], "filters": [],
+        return {"id": sq_id, "datasource_id": "pagila", "intent": sq_id, "metrics": [], "filters": [],
                 "group_by": [{"attribute": "category"}],
                 "expected_schema": [{"name": c, "dtype": "string"} for c in columns]}
     return {
@@ -190,6 +191,43 @@ def test_a_compare_relies_on_matching_names_and_is_exempt():
     result, prompts = _run(payload)
 
     assert len(prompts) == 1 and not result.get("errors")
+
+
+def test_an_op_reading_both_copies_names_the_one_it_means_and_passes():
+    payload = _ranked(["category", "total_revenue"], ["category", "film", "total_revenue"], "total_revenue")
+    payload["post_combine_ops"][0]["order_by"].append({"attribute": "total_revenue_right", "direction": "desc"})
+
+    result, prompts = _run(payload)
+
+    assert len(prompts) == 1 and not result.get("errors")
+
+
+def test_a_left_key_that_a_right_non_key_column_shares_a_name_with_is_ambiguous():
+    # Joined on left.category = right.film_category; the right side also has a plain 'category'.
+    payload = _ranked(["category", "total_revenue"], ["film_category", "category", "film_revenue"], "category")
+    payload["combine_groups"][0]["join_keys"] = [{"left": "category", "right": "film_category"}]
+
+    result, prompts = _run(payload)
+
+    assert len(prompts) == 2
+    assert "'category' is on both sides of the join on category" in prompts[1]
+
+
+def test_the_message_shows_the_key_without_its_side_qualifier():
+    payload = _ranked(["category", "total_revenue"], ["category", "film", "total_revenue"], "total_revenue")
+    payload["combine_groups"][0]["join_keys"] = [{"left": "left.category", "right": "category"}]
+
+    _, prompts = _run(payload)
+
+    assert "join on category (" in prompts[1] and "left.category" not in prompts[1].split("PREVIOUS ANSWER")[1]
+
+
+def test_ambiguous_columns_with_two_keys_and_a_side_qualified_left_key():
+    from nl2sql.aggregation.columns import ambiguous_columns
+
+    keys = [{"left": "left.a", "right": "a"}, {"left": "b", "right": "right.b"}]
+
+    assert ambiguous_columns("join", [["a", "b", "x", "y"], ["a", "b", "x"]], keys) == ["x"]
 
 
 def test_ambiguous_columns_are_the_non_key_names_on_both_sides_of_a_join():

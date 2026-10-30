@@ -75,7 +75,7 @@ def ambiguous_columns(
     inputs: Sequence[Sequence[str]],
     join_keys: Iterable[Dict[str, Any]],
 ) -> List[str]:
-    """Non-key columns both sides of a ``join`` have.
+    """Right-hand non-key columns a ``join``'s left side also has (the ones suffixed ``_right``).
 
     After the combine the left copy keeps the bare name and the right one
     becomes ``<name>_right``, so a post-combine op reading the bare name reads
@@ -85,9 +85,8 @@ def ambiguous_columns(
     if operation != "join" or len(inputs) < 2:
         return []
     left, right = list(inputs[0]), list(inputs[1])
-    keys = {resolve_key(left, (k or {}).get("left") or "") for k in join_keys}
-    keys |= {resolve_key(right, (k or {}).get("right") or "") for k in join_keys}
-    return [c for c in left if c in right and c not in keys]
+    right_keys = {resolve_key(right, (k or {}).get("right") or "") for k in join_keys}
+    return [c for c in right if c in left and c not in right_keys]
 
 
 def ambiguous_columns_message(column: str, left_id: str, right_id: str, join_on: Sequence[str]) -> str:
