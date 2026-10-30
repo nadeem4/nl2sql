@@ -1,0 +1,143 @@
+{
+  "sub_queries": [
+    {
+      "id": "sq_16bd742f058b",
+      "datasource_id": "pagila",
+      "intent": "the single category with the highest total revenue",
+      "kind": "scan",
+      "metrics": [
+        {
+          "name": "category_revenue",
+          "aggregation": "sum",
+          "description": null
+        }
+      ],
+      "filters": [],
+      "group_by": [
+        {
+          "attribute": "category_name"
+        }
+      ],
+      "order_by": [
+        {
+          "attribute": "category_revenue",
+          "direction": "desc"
+        }
+      ],
+      "limit": 1,
+      "expected_schema": [
+        {
+          "name": "category_name",
+          "dtype": "string",
+          "join_key": true
+        },
+        {
+          "name": "category_revenue",
+          "dtype": "float",
+          "join_key": false
+        }
+      ]
+    },
+    {
+      "id": "sq_33ad64a6c0dc",
+      "datasource_id": "pagila",
+      "intent": "total revenue per film along with the film's category",
+      "kind": "scan",
+      "metrics": [
+        {
+          "name": "film_revenue",
+          "aggregation": "sum",
+          "description": null
+        }
+      ],
+      "filters": [],
+      "group_by": [
+        {
+          "attribute": "film_title"
+        },
+        {
+          "attribute": "category_name"
+        }
+      ],
+      "order_by": [],
+      "limit": null,
+      "expected_schema": [
+        {
+          "name": "film_title",
+          "dtype": "string",
+          "join_key": false
+        },
+        {
+          "name": "category_name",
+          "dtype": "string",
+          "join_key": true
+        },
+        {
+          "name": "film_revenue",
+          "dtype": "float",
+          "join_key": false
+        }
+      ]
+    }
+  ],
+  "combine_groups": [
+    {
+      "group_id": "cg_1",
+      "operation": "join",
+      "inputs": [
+        {
+          "subquery_id": "sq_16bd742f058b",
+          "role": "left"
+        },
+        {
+          "subquery_id": "sq_33ad64a6c0dc",
+          "role": "right"
+        }
+      ],
+      "join_keys": [
+        {
+          "left": "category_name",
+          "right": "category_name",
+          "left_dtype": "string",
+          "right_dtype": "string"
+        }
+      ]
+    }
+  ],
+  "post_combine_ops": [
+    {
+      "op_id": "op_185190baf35b",
+      "target_group_id": "cg_1",
+      "operation": "sort",
+      "filters": [],
+      "metrics": [],
+      "group_by": [],
+      "order_by": [
+        {
+          "attribute": "film_revenue",
+          "direction": "desc"
+        }
+      ],
+      "limit": 5,
+      "expected_schema": [
+        {
+          "name": "film_title",
+          "dtype": "string",
+          "join_key": false
+        },
+        {
+          "name": "category_name",
+          "dtype": "string",
+          "join_key": false
+        },
+        {
+          "name": "film_revenue",
+          "dtype": "float",
+          "join_key": false
+        }
+      ],
+      "metadata": {}
+    }
+  ],
+  "unmapped_subqueries": []
+}

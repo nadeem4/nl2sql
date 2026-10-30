@@ -43,7 +43,8 @@ def _decomposition(operation):
                             "inputs": [{"subquery_id": "sq_music", "role": "left"},
                                        {"subquery_id": "sq_tickets", "role": "right"}],
                             "join_keys": [{"left": "customer_id", "right": "customer_id"}]}],
-        "post_combine_ops": [],
+        "post_combine_ops": [{"op_id": "op1", "target_group_id": "g1", "operation": "project",
+                             "expected_schema": [{"name": "customer_id", "dtype": "int"}]}],
         "unmapped_subqueries": [],
     }
 

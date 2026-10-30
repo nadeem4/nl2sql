@@ -36,6 +36,8 @@ RULES:
    - include join_keys as left/right semantic attribute pairs.
    - each join key is an expected_schema name of its side's sub-query, and that column declares its dtype.
    - join columns that hold the same kind of value: a number or a boolean never joins a date.
+   - every join or compare group has exactly one post_combine_op (a project if nothing else is needed)
+     whose expected_schema lists the answer columns in question order.
 7) post_combine_ops are only for operations across two or more combined sub-queries. A question answered
    by one sub-query puts all of its filters, order_by and limit on that sub-query and emits no post_combine_ops.
 8) expected_schema must be derived strictly from semantic intent (metrics + group_by) and be minimal.
@@ -53,6 +55,8 @@ RULES:
     group carrying both order_by and limit (never a sort op and a separate limit op: each op is its own
     result), so the question is answered by one result set. Name each sub-query's metric differently
     (category_revenue, film_revenue): a name both sides share cannot be told apart after the join.
+    A join or compare group ends in that one op, whose expected_schema lists the answer columns in
+    question order (the entity asked for first, helper columns left out).
 13) No commentary.
 
 OUTPUT FORMAT:
@@ -116,7 +120,9 @@ PREVIOUS ANSWER REJECTED:
 {problems}
 A post-combine operation can only read columns its combine group produces: the expected_schema
 names of the group's sub-queries, minus the right-hand join keys, with any other right-hand name
-the left side also has suffixed "_right". Call the tool again with a corrected decomposition.
+the left side also has suffixed "_right". A join or compare group ends in ONE post-combine operation
+whose expected_schema lists the answer columns in question order (the entity the question asks for
+first, helper columns left out). Call the tool again with a corrected decomposition.
 """
 
 DECOMPOSER_PROMPT = ChatPromptTemplate.from_messages(

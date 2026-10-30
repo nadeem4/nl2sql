@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import duckdb
 import polars as pl
 
-from nl2sql.aggregation.columns import missing_columns_message, post_op_columns, resolve_key
+from nl2sql.aggregation.columns import missing_columns_message, post_op_columns, post_op_schema, resolve_key
 from nl2sql.aggregation.join_keys import DTYPE_CATEGORY, NUMBER, join_dtype
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.execution.artifacts import ArtifactStore
@@ -293,12 +293,13 @@ class PolarsDuckdbEngine:
     def post_op(self, operation: str, frame: Frame, attributes: Dict[str, Any]) -> Frame:
         """Applies one post-combine op, every field it carries, in SQL's order.
 
-        ``operation`` picks the reshaping step (``aggregate`` or ``project``);
+        ``operation`` picks the reshaping step (only ``aggregate`` has one);
         whatever the operation, the op's filters, order_by and limit are then
-        applied, in that order. A filter after an aggregate filters the
-        aggregated rows, as HAVING does. The decomposer's own example is a
-        ``filter`` op carrying ``order_by`` and ``limit``, so applying only the
-        named field dropped them.
+        applied, in that order, and its ``expected_schema`` last: the answer's
+        columns, in order. A filter after an aggregate filters the aggregated
+        rows, as HAVING does. The decomposer's own example is a ``filter`` op
+        carrying ``order_by`` and ``limit``, so applying only the named field
+        dropped them.
         """
         if operation not in {"filter", "aggregate", "project", "sort", "limit"}:
             raise ValueError(f"Unsupported post-combine operation '{operation}'.")
@@ -308,16 +309,21 @@ class PolarsDuckdbEngine:
         rows = frame
         if operation == "aggregate":
             rows = _aggregate(rows, attributes)
-        elif operation == "project":
-            columns = [c.get("name") for c in attributes.get("expected_schema", []) if c.get("name")]
-            rows = rows.select(columns) if columns else rows
         rows = _filter(rows, attributes.get("filters", []))
         order_by = [o for o in attributes.get("order_by", []) if o.get("attribute")]
         if order_by:
             rows = rows.sort([o["attribute"] for o in order_by],
                              descending=[o.get("direction") == "desc" for o in order_by])
         limit = attributes.get("limit")
-        return rows.head(limit) if limit is not None else rows
+        if limit is not None:
+            rows = rows.head(limit)
+        # The op's answer columns, in the order it lists them, last of all: a
+        # filter or sort may read a column the answer leaves out.
+        columns = post_op_schema(attributes)
+        if columns:
+            _check_attributes(rows, columns)
+            rows = rows.select(columns)
+        return rows
 
     def to_rows(self, frame: Frame) -> List[Dict[str, Any]]:
         if isinstance(frame, pl.LazyFrame):

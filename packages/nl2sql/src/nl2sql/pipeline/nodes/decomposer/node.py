@@ -11,7 +11,7 @@ from .schemas import CombineGroup, DecomposerResponse, SubQuery, UnmappedSubQuer
 from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
 from nl2sql.aggregation.columns import (
     RIGHT_SUFFIX, ambiguous_columns, ambiguous_columns_message, combined_columns, input_order,
-    missing_columns_message, post_op_columns, resolve_key,
+    missing_columns_message, post_op_columns, post_op_outputs, post_op_schema, resolve_key,
 )
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
@@ -34,6 +34,9 @@ _FOLDABLE_OPS = {"filter", "sort", "limit"}
 # Combine operations that need both sides: with one input left, the engine
 # would have nothing to join it to.
 _TWO_SIDED = {"join", "compare"}
+
+# How often a rejected decomposition (see ``post_combine_problems``) is asked for again.
+MAX_RETRIES = 2
 
 
 def one_sided_message(group_id: str, operation: str, lost_reasons: List[str]) -> str:
@@ -136,18 +139,62 @@ def mark_join_keys(
     return marked, groups
 
 
+def _schema_missing_message(group_id: str, operation: str) -> str:
+    """Why a join or compare group's op must list the answer's columns."""
+    return (
+        f"The {operation} group '{group_id}' combines two sub-queries, and its post-combine operation has no "
+        f"expected_schema. Without it the answer keeps the combine's column order, helper columns included. "
+        f"List the question's answer columns in expected_schema, in the order the question asks for them, "
+        f"with the entity the question asks for first; leave helper columns out (columns "
+        f"only used to rank or filter, unless the question asks for them). For a compare, name a right-hand column the left side also has with "
+        f"the '{RIGHT_SUFFIX}' suffix."
+    )
+
+
+def _no_op_message(group_id: str, operation: str) -> str:
+    """Why a join or compare group without a post-combine op is refused."""
+    return (
+        f"The {operation} group '{group_id}' needs ONE post-combine operation whose expected_schema lists the "
+        f"answer columns in question order (the entity the question asks for first, helper columns left out). "
+        f"Without one the answer keeps the combine's column order, helper columns included."
+    )
+
+
+def _one_op_message(group_id: str, operation: str, count: int) -> str:
+    """Why a join or compare group may not have several post-combine ops."""
+    return (
+        f"The {operation} group '{group_id}' has {count} post-combine operations. Operations on one group are "
+        f"siblings, not a chain: each reads the whole combined result and becomes its own result set. Use ONE "
+        f"operation carrying the filters, order_by, limit and expected_schema."
+    )
+
+
 def post_combine_problems(response: DecomposerResponse) -> List[str]:
-    """Why each post-combine op cannot run on what its combine group produces.
+    """Why each post-combine op cannot run, or cannot answer, on what its combine group produces.
 
     A sub-query's result columns are its ``expected_schema`` names (the logical
     validator holds every plan to them), so the combined columns follow from
     the decomposition alone, by the engine's own rules
     (``nl2sql.aggregation.columns``). A group with a sub-query that declares no
-    ``expected_schema`` has unknown columns and is not checked.
+    ``expected_schema`` has unknown columns, and its ops' columns are not checked.
+
+    A join or compare group of two or more inputs must end in ONE op that lists
+    the answer's columns in its ``expected_schema``: the engine ends each op in
+    that list, and without one the answer keeps the combine's column order.
     """
     sub_queries = {sq.id: sq for sq in response.sub_queries}
     groups = {g.group_id: g for g in response.combine_groups}
     problems: List[str] = []
+    for group in response.combine_groups:
+        if group.operation not in _TWO_SIDED or len(group.inputs) < 2:
+            continue
+        ops = [op for op in response.post_combine_ops if op.target_group_id == group.group_id]
+        if not ops:
+            problems.append(_no_op_message(group.group_id, group.operation))
+        elif len(ops) > 1:
+            problems.append(_one_op_message(group.group_id, group.operation, len(ops)))
+        elif not post_op_schema(ops[0].model_dump()):
+            problems.append(_schema_missing_message(group.group_id, group.operation))
     for op in response.post_combine_ops:
         group = groups.get(op.target_group_id)
         if group is None:
@@ -158,16 +205,45 @@ def post_combine_problems(response: DecomposerResponse) -> List[str]:
         if not columns or not all(columns):
             continue
         keys = [k.model_dump() for k in group.join_keys]
-        read = post_op_columns(op.operation, op.model_dump())
+        attributes = op.model_dump()
+        read = post_op_columns(op.operation, attributes)
         available = combined_columns(group.operation, columns, keys)
         missing = [c for c in read if c not in available]
         if missing:
             problems.append(missing_columns_message(missing, available))
             continue
+        schema = post_op_schema(attributes)
+        outputs = post_op_outputs(op.operation, attributes, available)
+        if op.operation == "aggregate":
+            after = [a for a in (*(f.attribute for f in op.filters), *(o.attribute for o in op.order_by))
+                     if a and a not in outputs]
+            if after:
+                problems.append(
+                    f"The aggregate post-combine operation on group '{group.group_id}' filters or sorts by "
+                    f"{', '.join(repr(a) for a in after)}, which it no longer has after aggregating. Available "
+                    f"columns after aggregating: {', '.join(outputs) or 'none'}."
+                )
+                continue
+        duplicated = sorted({c for c in schema if schema.count(c) > 1})
+        if duplicated:
+            problems.append(
+                f"The post-combine operation on group '{group.group_id}' lists "
+                f"{', '.join(repr(d) + ' twice' for d in duplicated)} in its expected_schema. List each answer "
+                f"column once."
+            )
+            continue
+        unknown = [c for c in schema if c not in outputs]
+        if unknown:
+            problems.append(
+                f"The post-combine operation on group '{group.group_id}' lists {', '.join(repr(u) for u in unknown)} in its "
+                f"expected_schema, which it cannot produce. Available columns: {', '.join(outputs) or 'none'}."
+            )
+            continue
         join_on = [resolve_key(columns[0], k["left"]) for k in keys]
         for column in ambiguous_columns(group.operation, columns, keys):
             # Reading both '<name>' and '<name>_right' says which copy is meant.
-            if column in read and column + RIGHT_SUFFIX not in read:
+            reads = read + schema
+            if column in reads and column + RIGHT_SUFFIX not in reads:
                 problems.append(ambiguous_columns_message(
                     column, *(sub_queries[i.subquery_id].intent for i in inputs[:2]), join_on))
     return problems
@@ -225,14 +301,14 @@ class DecomposerNode:
         Returns:
             Dict[str, Any]: Dictionary containing 'sub_queries', confidence, reasoning, etc.
         """
-        return self._decompose(state, feedback="")
+        return self._decompose(state, feedback="", retries=0)
 
-    def _decompose(self, state: GraphState, feedback: str) -> Dict[str, Any]:
+    def _decompose(self, state: GraphState, feedback: str, retries: int) -> Dict[str, Any]:
         """One attempt; ``feedback`` is why the previous one was rejected, or empty.
 
         A decomposition is checked before anything runs (see
-        :func:`post_combine_problems`) and, when rejected, asked for once more
-        with the reason. After the decomposer nothing can ask for a new
+        :func:`post_combine_problems`) and, when rejected, asked for again
+        with the reason, up to ``MAX_RETRIES`` times (``retries`` have been spent). After the decomposer nothing can ask for a new
         decomposition, so a post-combine op on a column the combine will not
         produce used to fail in the aggregator, after every scan had run.
         """
@@ -432,10 +508,11 @@ class DecomposerNode:
             )
 
             problems = post_combine_problems(response)
-            if problems and not feedback:
+            if problems and retries < MAX_RETRIES:
                 logger.warning(f"Decomposition rejected, asking again: {' '.join(problems)}")
                 return self._decompose(
-                    state, feedback=DECOMPOSER_RETRY_FEEDBACK.format(problems="\n".join(problems))
+                    state, feedback=DECOMPOSER_RETRY_FEEDBACK.format(problems="\n".join(problems)),
+                    retries=retries + 1,
                 )
             if problems:
                 message = f"Decomposition rejected: {' '.join(problems)}"
