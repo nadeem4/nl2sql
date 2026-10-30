@@ -2400,7 +2400,7 @@ A split answer's columns follow the question (design 18.10). `aggregation/engine
 
 ### C-W7e
 
-Identifying columns stay in a join or compare answer (design 18.12). Wording only, no validation change. `decomposer/prompts.py` gains `ANSWER_COLUMNS`, one phrase that the rule 6 line, the rule 12 line (which also gets a "top 3 drivers by deliveries in the busiest depot" example) and the retry feedback share, and that `decomposer/node.py` uses in the missing-schema and no-op feedback; it replaces "helper columns left out" and "columns only used to rank or filter, unless the question asks for them". Tests: `tests/unit/test_decomposer_answer_columns.py` (`test_the_wording_keeps_the_entity_the_answer_is_about_in_every_place`; the two feedback tests no longer pin the old phrase). No model call; a keyed check (pagila_001) follows.
+Identifying columns stay in a join or compare answer (design 18.12). Wording only, no validation change. `decomposer/prompts.py` gains `ANSWER_COLUMNS`, one phrase that the rule 6 line, the rule 12 line (which also gets a "top 3 drivers by deliveries in the busiest depot" example) and the retry feedback share, and that `decomposer/node.py` uses in the missing-schema and no-op feedback; it replaces "helper columns left out" and "columns only used to rank or filter, unless the question asks for them". Tests: `tests/unit/test_decomposer_answer_columns.py` (`test_the_wording_keeps_the_entity_the_answer_is_about_in_every_place`; the two feedback tests no longer pin the old phrase) and `tests/unit/test_prompts_not_eval_questions.py` (every `prompts.py` module and the table selector shares no 5-word run with an evaluation suite question, and carries none of the banned phrases; its examples are logistics, see 18.12). No model call; a keyed check (pagila_001) follows.
 
 ## 14. Bugs Wave C fixes
 
@@ -2809,7 +2809,7 @@ filter, but it says which category the answer is about, so the answer lost its c
 that say what the answer is about (the entities the question asks for, and the entity a subset was chosen from, such as which
 depot, region or year); leave out only helper figures used purely to rank or select the subset (the depot's total
 deliveries that picked the busiest depot). Rule 12 adds the example "top 3 drivers by deliveries in the busiest depot" (busiest
-means most deliveries): keep driver, deliveries and depot, leave out `depot_total`. Places: rule 6, rule 12, the retry feedback and the two `node.py` feedback messages (no op, no
+means most deliveries): keep driver, `driver_deliveries` and depot, leave out `depot_total`. Places: rule 6, rule 12, the retry feedback and the two `node.py` feedback messages (no op, no
 `expected_schema`). No validation logic changes.
 
 **Prompts off the eval domains.** A worked example that is also a suite question teaches the model the answer and inflates

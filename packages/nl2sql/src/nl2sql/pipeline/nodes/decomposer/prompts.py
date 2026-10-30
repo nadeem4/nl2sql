@@ -64,9 +64,9 @@ RULES:
     result), so the question is answered by one result set. Name each sub-query's metric differently
     (depot_total, driver_deliveries): a name both sides share cannot be told apart after the join.
     A join or compare group ends in that one op, whose expected_schema lists the answer columns in
-    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 3 drivers by deliveries
-    in the busiest depot" keep driver, deliveries and depot, and leave out depot_total, which only
-    picked the depot.
+    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 3 drivers by
+    deliveries in the busiest depot" keep driver, driver_deliveries and depot, and leave out
+    depot_total, which only picked the depot.
 13) No commentary.
 
 OUTPUT FORMAT:

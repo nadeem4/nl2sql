@@ -2,6 +2,10 @@
 
 A worked example in a prompt that is also a suite question teaches the model the answer and
 inflates the keyed check (wave_c.md, 18.12). Examples come from a domain no suite uses.
+
+Every ``prompts.py`` (and ``prompts/`` module) under ``nl2sql``, plus the table selector, is
+checked. The 5-word check catches a copied question, not a paraphrase of one; ``BANNED`` lists
+phrases that overlapped in the past, so they cannot come back.
 """
 from __future__ import annotations
 
@@ -13,32 +17,41 @@ import nl2sql
 import pytest
 import yaml
 
-PROMPT_MODULES = (
-    "nl2sql.pipeline.nodes.decomposer.prompts",
-    "nl2sql.pipeline.nodes.schema_retriever.selector",
-    "nl2sql.pipeline.nodes.ast_planner.prompts",
-    "nl2sql.pipeline.nodes.answer_synthesizer.prompts",
-    "nl2sql.pipeline.nodes.datasource_resolver.prompts",
-    "nl2sql.pipeline.nodes.curated_matcher.prompts",
-    "nl2sql.pipeline.nodes.refiner.prompts",
-)
-SUITES = Path(nl2sql.__file__).parent / "evaluation" / "suites"
+ROOT = Path(nl2sql.__file__).parent
+SUITES = ROOT / "evaluation" / "suites"
 RUN = 5
 BANNED = ("top 5 films", "spent more than 45", "revenue is in payments", "9712")
+
+
+def _module_names() -> list[str]:
+    paths = [*ROOT.rglob("prompts.py"), *(p for d in ROOT.rglob("prompts") if d.is_dir() for p in d.rglob("*.py")),
+             ROOT / "pipeline" / "nodes" / "schema_retriever" / "selector.py"]
+    names = {".".join(("nl2sql", *p.relative_to(ROOT).with_suffix("").parts)).removesuffix(".__init__") for p in paths}
+    return sorted(names)
 
 
 def _words(text: str) -> list[str]:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).split()
 
 
+def _text(value: object) -> str:
+    """A prompt constant's text: a string, or the template text of a LangChain prompt."""
+    if isinstance(value, str):
+        return value
+    template = getattr(value, "template", None)
+    if isinstance(template, str):
+        return template
+    return "\n".join(_text(getattr(m, "prompt", m)) for m in getattr(value, "messages", ()))
+
+
+def _constants(name: str) -> dict[str, str]:
+    module = importlib.import_module(name)
+    texts = {c: _text(v) for c, v in vars(module).items() if c.isupper() and not c.startswith("_")}
+    return {c: t for c, t in texts.items() if len(t) > 40}
+
+
 def _prompts() -> dict[str, str]:
-    found = {}
-    for name in PROMPT_MODULES:
-        module = importlib.import_module(name)
-        for const, value in vars(module).items():
-            if const.isupper() and isinstance(value, str) and len(value) > 40:
-                found[f"{name.split('.')[-2] if name.endswith('prompts') else name.split('.')[-1]}.{const}"] = value
-    return found
+    return {f"{name}.{c}": v for name in _module_names() for c, v in _constants(name).items()}
 
 
 def _questions() -> list[str]:
@@ -54,8 +67,17 @@ def _runs(words: list[str]) -> set[tuple[str, ...]]:
     return {tuple(words[i:i + RUN]) for i in range(len(words) - RUN + 1)}
 
 
-def test_the_guard_reads_prompts_and_questions():
-    assert len(_prompts()) >= 7 and len(_questions()) > 50
+def test_the_guard_finds_the_prompt_modules_and_the_questions():
+    names = _module_names()
+
+    assert "nl2sql.conversations.prompts" in names and "nl2sql.profiler.prompts" in names
+    assert "nl2sql.pipeline.nodes.schema_retriever.selector" in names
+    assert len(_questions()) > 50
+
+
+@pytest.mark.parametrize("name", _module_names())
+def test_every_prompt_module_contributes_a_string_constant(name):
+    assert _constants(name), f"{name} has no prompt text for the guard to check"
 
 
 @pytest.mark.parametrize("name", sorted(_prompts()))
