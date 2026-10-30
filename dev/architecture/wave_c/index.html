@@ -1314,6 +1314,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w7e">
+<span class="md-ellipsis">
+      
+        C-W7e
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1525,6 +1534,15 @@
 <span class="md-ellipsis">
       
         18.11 C-W7d: column order
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1812-c-w7e-identifying-columns-prompts-off-the-eval-domains">
+<span class="md-ellipsis">
+      
+        18.12 C-W7e: identifying columns, prompts off the eval domains
       
     </span>
 </a>
@@ -4304,6 +4322,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w7e">
+<span class="md-ellipsis">
+      
+        C-W7e
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4515,6 +4542,15 @@
 <span class="md-ellipsis">
       
         18.11 C-W7d: column order
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1812-c-w7e-identifying-columns-prompts-off-the-eval-domains">
+<span class="md-ellipsis">
+      
+        18.12 C-W7e: identifying columns, prompts off the eval domains
       
     </span>
 </a>
@@ -8174,6 +8210,8 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
 &lt;p&gt;A split answer's columns follow the question (design 18.10). &lt;code&gt;aggregation/engines/polars_duckdb.py&lt;/code&gt; &lt;code&gt;post_op&lt;/code&gt; now ends every op, whatever its type, in its non-empty &lt;code&gt;expected_schema&lt;/code&gt; (a final &lt;code&gt;select&lt;/code&gt;, after filters, sort and limit, so a sort may use a column the schema drops); &lt;code&gt;project&lt;/code&gt; keeps its meaning with its select moved to the end, which also fixes a project that dropped its own sort column passing validation and failing at collect. &lt;code&gt;aggregation/columns.py&lt;/code&gt;: &lt;code&gt;post_op_columns&lt;/code&gt; is now what an op reads (aggregate inputs, filters, sort), not its schema; new &lt;code&gt;post_op_schema&lt;/code&gt; (the schema names) and &lt;code&gt;post_op_outputs&lt;/code&gt; (an aggregate's group_by and metric names, otherwise the columns it read). &lt;code&gt;decomposer/node.py&lt;/code&gt; &lt;code&gt;post_combine_problems&lt;/code&gt; adds three rejections: an &lt;code&gt;expected_schema&lt;/code&gt; name the op cannot produce; a &lt;code&gt;join&lt;/code&gt;/&lt;code&gt;compare&lt;/code&gt; group of two or more inputs with no op, or whose op has no &lt;code&gt;expected_schema&lt;/code&gt;; and more than one op on such a group. The ambiguous-column check (C-W7b) now also covers the schema names. &lt;code&gt;MAX_RETRIES = 2&lt;/code&gt; replaces the single retry (&lt;code&gt;_decompose(state, feedback, retries)&lt;/code&gt;); it applies to every rejection &lt;code&gt;post_combine_problems&lt;/code&gt; makes, and a third rejected answer ends the run with &lt;code&gt;PLANNER_FAILED&lt;/code&gt;. Rule 12 and the retry feedback of the decomposer prompt carry one line each. Tests: &lt;code&gt;tests/unit/test_decomposer_answer_columns.py&lt;/code&gt; (engine selection after sort/filter, project then sort on a dropped column, aggregate outputs, the new rejections, the retry count, and a replay of the recorded pagila_001 decomposition, &lt;code&gt;tests/fixtures/pagila_001_split_decomposition.json&lt;/code&gt;, through &lt;code&gt;build_execution_dag&lt;/code&gt; and &lt;code&gt;AggregationService&lt;/code&gt; with canned frames, asserting &lt;code&gt;film_title, category_name, film_revenue&lt;/code&gt;); &lt;code&gt;test_decomposer_post_combine_columns.py&lt;/code&gt; and &lt;code&gt;e2e/test_multi_sub_query_fake_llm.py&lt;/code&gt; fixtures now give their join op an &lt;code&gt;expected_schema&lt;/code&gt;. No model call; a keyed check (pagila_001, then the full suite) follows.&lt;/p&gt;
 &lt;h3 id="c-w7d"&gt;C-W7d&lt;/h3&gt;
 &lt;p&gt;&lt;code&gt;result_match&lt;/code&gt; accepts reordered columns (design 18.11). &lt;code&gt;evaluation/evaluator.py&lt;/code&gt;: new &lt;code&gt;ModelEvaluator.column_picks(generated, expected, order_matters)&lt;/code&gt; returns the result column picked for each gold column (or &lt;code&gt;None&lt;/code&gt;): candidates are the result columns whose values equal a gold column's as a multiset under the existing &lt;code&gt;_same_value&lt;/code&gt;, and a depth-first search, pruned by &lt;code&gt;compare_results&lt;/code&gt; on each partial assignment and bounded by &lt;code&gt;COLUMN_SEARCH_BUDGET&lt;/code&gt;, returns the first assignment of distinct columns that passes. &lt;code&gt;column_match&lt;/code&gt; tries the in-order extra-columns check first, then the search, and names the match. &lt;code&gt;compare_results_reordered&lt;/code&gt; (same width) and &lt;code&gt;compare_results_extra_columns&lt;/code&gt; (wider, within &lt;code&gt;lenient_column_cap&lt;/code&gt;) go through &lt;code&gt;column_match&lt;/code&gt;, so the extra-columns rule takes the gold's columns in any order; a result wider than &lt;code&gt;COLUMN_SEARCH_CAP = 12&lt;/code&gt; columns is matched in order only. &lt;code&gt;scorers/result_match.py&lt;/code&gt;: &lt;code&gt;detail.match&lt;/code&gt; is &lt;code&gt;strict&lt;/code&gt;, &lt;code&gt;reordered&lt;/code&gt;, &lt;code&gt;extra columns&lt;/code&gt;, &lt;code&gt;extra columns, reordered&lt;/code&gt; or null; &lt;code&gt;lenient&lt;/code&gt; is true whenever the case passed. Tests: &lt;code&gt;tests/unit/test_evaluation_scoring.py&lt;/code&gt; (reordered pass; a differing or mislabelled column fails; swapped-and-relabelled numeric columns; ordered and unordered row rules; duplicate-valued columns; the bound; the preference for the result's own order) and &lt;code&gt;tests/unit/test_eval_scorers.py&lt;/code&gt; (detail values, alternatives, &lt;code&gt;order_matters&lt;/code&gt;). Updated, because they asserted that a reorder fails: &lt;code&gt;test_extra_columns_do_not_let_reordered_columns_through&lt;/code&gt; (now &lt;code&gt;test_extra_columns_may_come_in_any_order&lt;/code&gt;), &lt;code&gt;test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing&lt;/code&gt; and &lt;code&gt;test_result_match_records_the_lenient_reading_beside_the_strict_one&lt;/code&gt; (now a period-label case). Offline re-score of the stored keyed Pagila runs (no model call): pagila_001 of the C-W7c single-case run now passes as &lt;code&gt;reordered&lt;/code&gt;; no other verdict changes. No gold data changed.&lt;/p&gt;
+&lt;h3 id="c-w7e"&gt;C-W7e&lt;/h3&gt;
+&lt;p&gt;Identifying columns stay in a join or compare answer (design 18.12). Wording only, no validation change. &lt;code&gt;decomposer/prompts.py&lt;/code&gt; gains &lt;code&gt;ANSWER_COLUMNS&lt;/code&gt;, one phrase that the rule 6 line, the rule 12 line (which also gets a "top 3 drivers by deliveries in the busiest depot" example) and the retry feedback share, and that &lt;code&gt;decomposer/node.py&lt;/code&gt; uses in the missing-schema and no-op feedback; it replaces "helper columns left out" and "columns only used to rank or filter, unless the question asks for them". Tests: &lt;code&gt;tests/unit/test_decomposer_answer_columns.py&lt;/code&gt; (&lt;code&gt;test_the_wording_keeps_the_entity_the_answer_is_about_in_every_place&lt;/code&gt;; the two feedback tests no longer pin the old phrase) and &lt;code&gt;tests/unit/test_prompts_not_eval_questions.py&lt;/code&gt; (every &lt;code&gt;prompts.py&lt;/code&gt; module and the table selector shares no 5-word run with an evaluation suite question, and carries none of the banned phrases; its examples are logistics, see 18.12). No model call; a keyed check (pagila_001) follows.&lt;/p&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -8681,6 +8719,32 @@ columns up to &lt;code&gt;lenient_column_cap&lt;/code&gt; pass as before. Only t
 columns (&lt;code&gt;COLUMN_SEARCH_CAP&lt;/code&gt;) is not searched, and the depth-first search (pruned by the row check on each partial
 assignment) stops after &lt;code&gt;COLUMN_SEARCH_BUDGET&lt;/code&gt; = 10,000 checks, past which it is no match. The lenient path's column
 search uses the same bounded search. A pass always records &lt;code&gt;lenient: true&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id="1812-c-w7e-identifying-columns-prompts-off-the-eval-domains"&gt;18.12 C-W7e: identifying columns, prompts off the eval domains&lt;/h3&gt;
+&lt;p&gt;&lt;strong&gt;Cause.&lt;/strong&gt; C-W7c (18.10) told the model to leave helper columns out of a join or compare op's &lt;code&gt;expected_schema&lt;/code&gt;, as "columns
+only used to rank or filter, unless the question asks for them". In a keyed run of pagila_001 ("Top 5 films by revenue in
+the top category") the model took that literally and returned only &lt;code&gt;film_title, film_revenue&lt;/code&gt;. &lt;code&gt;category&lt;/code&gt; was used to
+filter, but it says which category the answer is about, so the answer lost its context.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Decision (owner-approved 2026-10-30).&lt;/strong&gt; Reword every occurrence to one shared phrase (&lt;code&gt;ANSWER_COLUMNS&lt;/code&gt;): keep the columns
+that say what the answer is about (the entities the question asks for, and the entity a subset was chosen from, such as which
+depot, region or year); leave out only helper figures used purely to rank or select the subset (the depot's total
+deliveries that picked the busiest depot). Rule 12 adds the example "top 3 drivers by deliveries in the busiest depot" (busiest
+means most deliveries): keep driver, &lt;code&gt;driver_deliveries&lt;/code&gt; and depot, leave out &lt;code&gt;depot_total&lt;/code&gt;. Places: rule 6, rule 12, the retry feedback and the two &lt;code&gt;node.py&lt;/code&gt; feedback messages (no op, no
+&lt;code&gt;expected_schema&lt;/code&gt;). No validation logic changes.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Prompts off the eval domains.&lt;/strong&gt; A worked example that is also a suite question teaches the model the answer and inflates
+the keyed check, so every example in a prompt now comes from logistics, which no suite uses. Replaced (old text, new text):&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Decomposer rule 11: &lt;code&gt;"the top 5 films by revenue" or "the customers who spent more than 45"&lt;/code&gt; became &lt;code&gt;"the top 3 drivers by
+  deliveries" or "the drivers with more than 40 deliveries"&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Decomposer rule 12: &lt;code&gt;"top 5 films by revenue in the top category"&lt;/code&gt; (the top category, &lt;code&gt;category_revenue&lt;/code&gt;, &lt;code&gt;film_revenue&lt;/code&gt;)
+  became &lt;code&gt;"top 3 drivers by deliveries in the busiest depot"&lt;/code&gt; (the busiest depot, &lt;code&gt;depot_total&lt;/code&gt;, &lt;code&gt;driver_deliveries&lt;/code&gt;).&lt;/li&gt;
+&lt;li&gt;Decomposer line 27: &lt;code&gt;"spent more than 45"&lt;/code&gt; became &lt;code&gt;"more than 40 deliveries"&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Table selector: &lt;code&gt;revenue is in payments, headcount in staff&lt;/code&gt; became &lt;code&gt;fuel cost is in refuels, headcount in crews&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Answer synthesizer: &lt;code&gt;9712.47 is "9,712.47", not "9,700"&lt;/code&gt; became &lt;code&gt;4318.06 is "4,318.06", not "4,300"&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;ANSWER_COLUMNS&lt;/code&gt;: &lt;code&gt;which category, store or year&lt;/code&gt; became &lt;code&gt;which depot, region or year&lt;/code&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;tests/unit/test_prompts_not_eval_questions.py&lt;/code&gt; guards this: no prompt of the decomposer, table selector, ast planner, answer
+synthesizer, datasource resolver, curated matcher or refiner shares a run of 5 normalized words with any question in
+&lt;code&gt;evaluation/suites/*.yaml&lt;/code&gt;, and the phrases "top 5 films", "spent more than 45", "revenue is in payments" and "9712" are absent.&lt;/p&gt;
 
 
 
