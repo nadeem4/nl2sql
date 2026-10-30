@@ -9,7 +9,10 @@ if TYPE_CHECKING:
 from .dag import build_execution_dag
 from .schemas import CombineGroup, DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp, key_column
 from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
-from nl2sql.aggregation.columns import combined_columns, input_order, missing_columns_message, post_op_columns
+from nl2sql.aggregation.columns import (
+    RIGHT_SUFFIX, ambiguous_columns, ambiguous_columns_message, combined_columns, input_order,
+    missing_columns_message, post_op_columns, resolve_key,
+)
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
@@ -154,10 +157,19 @@ def post_combine_problems(response: DecomposerResponse) -> List[str]:
                    if i.subquery_id in sub_queries else [] for i in inputs]
         if not columns or not all(columns):
             continue
-        available = combined_columns(group.operation, columns, [k.model_dump() for k in group.join_keys])
-        missing = [c for c in post_op_columns(op.operation, op.model_dump()) if c not in available]
+        keys = [k.model_dump() for k in group.join_keys]
+        read = post_op_columns(op.operation, op.model_dump())
+        available = combined_columns(group.operation, columns, keys)
+        missing = [c for c in read if c not in available]
         if missing:
             problems.append(missing_columns_message(missing, available))
+            continue
+        join_on = [resolve_key(columns[0], k["left"]) for k in keys]
+        for column in ambiguous_columns(group.operation, columns, keys):
+            # Reading both '<name>' and '<name>_right' says which copy is meant.
+            if column in read and column + RIGHT_SUFFIX not in read:
+                problems.append(ambiguous_columns_message(
+                    column, *(sub_queries[i.subquery_id].intent for i in inputs[:2]), join_on))
     return problems
 
 

@@ -51,7 +51,8 @@ RULES:
     second computes the rows with that subset's attribute in its expected_schema, and one join group
     on that attribute combines them. The final ranking is ONE sort op in post_combine_ops on that
     group carrying both order_by and limit (never a sort op and a separate limit op: each op is its own
-    result), so the question is answered by one result set.
+    result), so the question is answered by one result set. Name each sub-query's metric differently
+    (category_revenue, film_revenue): a name both sides share cannot be told apart after the join.
 13) No commentary.
 
 OUTPUT FORMAT:
