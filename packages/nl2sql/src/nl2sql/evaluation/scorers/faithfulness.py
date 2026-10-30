@@ -19,7 +19,7 @@ class Faithfulness(BuiltinScorer):
         text = answer_text(run.result.final_answer)
         if not text:
             return NOT_APPLICABLE
-        samples = [sq.rows for sq in run.result.sub_queries if sq.rows is not None]
+        samples = run.sets
         check = check_answer(text, columns=[c for s in samples for c in s.columns],
                              rows=[r for s in samples for r in s.rows], question=run.case.question,
                              row_counts=[s.total_rows for s in samples], preview_rows=run.preview_rows)

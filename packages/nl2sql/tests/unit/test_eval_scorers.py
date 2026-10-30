@@ -43,7 +43,7 @@ def _rows_result(rows, status="success", datasource="chinook", answer=None) -> Q
 
 def _run(case, role, result, mode="full", **extra) -> CaseRun:
     samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
-    return CaseRun(case=case, role=role, mode=mode, result=result,
+    return CaseRun(case=case, role=role, mode=mode, result=result, sets=samples,
                    rows=samples[0].rows if samples else None, columns=samples[0].columns if samples else [],
                    **extra)
 
@@ -303,3 +303,58 @@ def test_faithfulness_accepts_the_preview_size_the_run_was_given():
     case = _case({"admin": "allowed"})
     assert Faithfulness().score(_run(case, "admin", result, preview_rows=20)).passed
     assert not Faithfulness().score(_run(case, "admin", result)).passed
+
+
+# --- C-W7a: a question is scored on its terminal result, not on the scans under it ----
+
+
+def _scan(sid, rows):
+    return SubQueryResult(id=sid, status="success", datasource_id="chinook",
+                          rows=RowSample(columns=["c", "n"], rows=rows, total_rows=len(rows)))
+
+
+def _terminal(rows):
+    return RowSample(columns=["c", "n"], rows=rows, total_rows=len(rows))
+
+
+def _split_run(case, terminals, scans, answer=None):
+    result = QueryResult(status="success", final_answer=answer, sub_queries=scans)
+    return CaseRun(case=case, role="admin", mode="full", result=result, sets=terminals,
+                   rows=terminals[0].rows if terminals else None,
+                   columns=terminals[0].columns if terminals else [])
+
+
+def test_a_split_question_with_one_terminal_result_is_scored_on_that_result():
+    case = _case({"admin": "allowed"}, rows=[{"c": "USA", "n": 21}])
+    scans = [_scan("sq1", [["USA", 13]]), _scan("sq2", [["USA", 8]])]
+    score = result_match.score(_split_run(case, [_terminal([["USA", 21]])], scans))
+    assert score.passed is True and score.detail["match"] == "strict"
+
+
+def test_a_split_question_with_a_wrong_terminal_result_fails_on_its_rows_not_on_the_count():
+    case = _case({"admin": "allowed"}, rows=[{"c": "USA", "n": 21}])
+    scans = [_scan("sq1", [["USA", 13]]), _scan("sq2", [["USA", 8]])]
+    score = result_match.score(_split_run(case, [_terminal([["USA", 20]])], scans))
+    assert score.passed is False and "one result set" not in score.detail["reason"]
+
+
+def test_two_terminal_results_still_fail_as_two_result_sets():
+    scans = [_scan("sq1", [["USA", 13]]), _scan("sq2", [["USA", 8]])]
+    both = [_terminal([["USA", 13]]), _terminal([["USA", 8]])]
+    score = result_match.score(_split_run(_case({"admin": "allowed"}), both, scans))
+    assert score.passed is False and score.detail["reason"] == "expected one result set, got 2"
+
+
+def test_a_single_query_case_scores_the_same_as_before():
+    case = _case({"admin": "allowed"})
+    rows = [["USA", 13], ["Canada", 8]]
+    one = result_match.score(_run(case, "admin", _rows_result(rows)))
+    terminal = result_match.score(_split_run(case, [_terminal(rows)], [_scan("sq1", rows)]))
+    assert one == terminal and one.passed is True
+
+
+def test_faithfulness_checks_the_answer_against_the_terminal_result():
+    answer = {"summary": "The total is 21.", "content": ""}
+    scans = [_scan("sq1", [["USA", 13]]), _scan("sq2", [["USA", 8]])]
+    run = _split_run(_case({"admin": "allowed"}), [_terminal([["USA", 21]])], scans, answer=answer)
+    assert Faithfulness().score(run).passed is True

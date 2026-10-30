@@ -1,5 +1,9 @@
 """``result_match``: the rows match the case's ``rows`` or one of its ``alt_rows``.
 
+The rows are the run's terminal result (the combined one for a question the
+decomposer split), not a sub-query's scan; two terminal results fail as "expected
+one result set".
+
 Applies to a role whose outcome is ``allowed``, on a case of kind
 ``answer``: a routing case says where a question goes, not what it returns,
 and is left out of execution accuracy. Column names are
@@ -29,9 +33,8 @@ class ResultMatch(BuiltinScorer):
         if run.rows is None:
             return Score(value=0.0, passed=False, detail={"reason": f"no rows (status '{run.result.status}')",
                                                           "lenient": False})
-        sets = sum(1 for sq in run.result.sub_queries if sq.rows is not None)
-        if sets > 1:
-            return Score(value=0.0, passed=False, detail={"reason": f"expected one result set, got {sets}",
+        if len(run.sets) > 1:
+            return Score(value=0.0, passed=False, detail={"reason": f"expected one result set, got {len(run.sets)}",
                                                           "lenient": False})
         answers = run.case.answers()
         order = run.case.order_matters

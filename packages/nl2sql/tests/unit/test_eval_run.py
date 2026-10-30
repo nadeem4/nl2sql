@@ -51,7 +51,8 @@ class _Asker:
         self.seen.append(SimpleNamespace(case=case.id, role=role, curated=run.curated,
                                          plan_cache=run.settings.pipeline.plan_cache,
                                          names_tables=run.config.policies.refusal_names_tables, run=run))
-        return self.answer(run, case, role), None
+        result = self.answer(run, case, role)
+        return result, None, [sq.rows for sq in result.sub_queries if sq.rows is not None]
 
 
 def _ctx(**attrs):
@@ -328,3 +329,71 @@ def test_the_report_names_each_suite_by_its_digest(monkeypatch, tmp_path):
 def test_an_unknown_mode_is_refused(monkeypatch):
     with pytest.raises(ValueError, match="mode"):
         _run(monkeypatch, [_suite(_case("a"))], mode="tier3")
+
+
+# --- C-W7a: the terminal results, not the scans, are what a case is scored on ----
+
+
+class _Store:
+    """Reads a saved result back: ``node_id`` -> (columns, rows)."""
+
+    def __init__(self, frames):
+        self.frames = frames
+
+    def read_result_frame(self, artifact):
+        columns, rows = self.frames[artifact]
+        return SimpleNamespace(columns=columns, rows=rows, row_count=len(rows))
+
+
+def _state(computed):
+    return {"aggregator_response": SimpleNamespace(computed_artifacts=computed)}
+
+
+def test_terminal_sets_read_the_manifests_results_from_their_artifacts():
+    from nl2sql.api.query_api import QueryResult
+    from nl2sql.execution.artifacts.results import ResultSummary
+
+    result = QueryResult(result_manifest=[ResultSummary(node_id="n1", columns=["t"], row_count=1)])
+    store = _Store({"ref1": (["t"], [(21,)]), "ref2": (["x"], [(0,)])})
+    sets = run_module._terminal_sets(_state({"n1": "ref1", "n2": "ref2"}), result, store)
+    assert [(s.columns, s.rows, s.total_rows) for s in sets] == [(["t"], [[21]], 1)]
+
+
+def test_an_unreadable_terminal_result_is_skipped_with_a_warning_not_a_failed_case():
+    from nl2sql.api.query_api import QueryResult
+    from nl2sql.execution.artifacts.results import ResultSummary
+
+    class Broken:
+        def read_result_frame(self, artifact):
+            raise OSError("disk gone")
+
+    result = QueryResult(result_manifest=[ResultSummary(node_id="n1", columns=["t"], row_count=1)])
+    assert run_module._terminal_sets(_state({"n1": "ref1"}), result, Broken()) == []
+    [warning] = result.warnings
+    assert "n1" in warning.message and "disk gone" in warning.message
+
+
+def test_terminal_sets_are_empty_when_the_run_withheld_its_results():
+    from nl2sql.api.query_api import QueryResult
+
+    assert run_module._terminal_sets(_state({"n1": "ref1"}), QueryResult(), _Store({})) == []
+    assert run_module._terminal_sets({}, QueryResult(), None) == []
+
+
+def test_a_split_case_is_scored_on_its_terminal_rows_and_keeps_every_subquery_sql(monkeypatch):
+    def split(run, case, role):
+        scans = [SubQueryResult(id=i, sql=f"SELECT {i}", datasource_id="db",
+                                rows=RowSample(columns=["n"], rows=[[v]], total_rows=1))
+                 for i, v in (("sq1", 5), ("sq2", 16))]
+        return QueryResult(status="success", sub_queries=scans)
+
+    class Asker(_Asker):
+        def __call__(self, run, case, role):
+            result = super().__call__(run, case, role)[0]
+            return result, None, [RowSample(columns=["n"], rows=[[21]], total_rows=1)]
+
+    report, _, _ = _run(monkeypatch, [_suite(_case("a", rows=[{"n": 21}]))], asker=Asker(split))
+    [record] = report.configs["a"]["results"]
+    assert record["status"] == "pass" and record["rows"] == 1
+    assert record["sql"] == "SELECT sq1"
+    assert record["sql_by_sub_query"] == {"sq1": "SELECT sq1", "sq2": "SELECT sq2"}

@@ -186,7 +186,7 @@ A board holds:
 | `retrieval` | The mean table and column recall over the cases `retrieval_recall` scored, how many were perfect, and how much was sent |
 | `answerability`, `faithfulness`, `tokens_by_node`, `cost`, `latency`, `retries`, `errors_by_code`, `determinism` | As for a single run, summed or averaged over the cases |
 | `models`, `planned_cases`, `completed_cases` | The config's model per node, and the cases the run would make and made |
-| `results` | One record per case run: its `status` and `reason`, every scorer's `score`, the SQL, the answer, the plans, `source` and `generated` |
+| `results` | One record per case run: its `status` and `reason`, every scorer's `score`, the SQL (`sql` is the first sub-query's; for a split question that is one scan, not the combined result, and `sql_by_sub_query` has every sub-query's), the answer, the plans, `source` and `generated` |
 
 Accuracy over 47 cases has an interval about 14 points wide, so two runs are
 compared case by case, not headline to headline. The statistics are in

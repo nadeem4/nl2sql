@@ -321,10 +321,26 @@ def test_an_eval_case_a_hook_ended_leaves_nothing_readable(monkeypatch, store):
 
     runtime = _runtime(monkeypatch, store, [_bind(_deny, ["answer.after"])])
 
-    result, _ = ask_case(runtime, EvalCase.model_construct(id="c1", question="How many?"), "analyst")
+    result, _, sets = ask_case(runtime, EvalCase.model_construct(id="c1", question="How many?"), "analyst")
 
     assert result.errors[0]["error_code"] == "HOOK_DENIED"
+    assert sets == []
     assert _unreadable(_engine(runtime), store, result.trace_id)
+
+
+def test_an_eval_case_with_one_query_reads_back_the_scans_rows_as_its_terminal_result(monkeypatch, store):
+    """C-W7a: a standalone group's saved result is its scan (real aggregator, real store), so the case scores as before."""
+    from nl2sql.api.query_api import RowSample
+    from nl2sql.evaluation.run import _ask as ask_case
+    from nl2sql.evaluation.suite import EvalCase
+
+    runtime = _runtime(monkeypatch, store, [])
+
+    result, _, sets = ask_case(runtime, EvalCase.model_construct(id="c1", question="How many?"), "analyst")
+
+    scan = result.sub_queries[0].rows
+    assert sets == [RowSample(columns=["n"], rows=[[1], [2], [3]], total_rows=3)]
+    assert sets == [scan]
 
 
 def test_run_with_graph_alone_leaves_a_denied_run_unreadable(monkeypatch, store):

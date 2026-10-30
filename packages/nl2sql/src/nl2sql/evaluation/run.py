@@ -39,7 +39,8 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from nl2sql.api.query_api import QueryAPI, QueryResult, result_from_state
+from nl2sql.api.query_api import QueryAPI, QueryResult, RowSample, result_from_state
+from nl2sql.common.errors import ErrorCode, RunWarning
 from nl2sql.common.logger import get_logger
 from nl2sql.config import LLM
 from nl2sql.events.catalog import EvalCase as EvalCaseEvent
@@ -159,8 +160,34 @@ class _Sent(BaseCallbackHandler):
         self.tables = tables
 
 
-def _ask(run: Any, case: EvalCase, role: str) -> Tuple[QueryResult, Optional[Dict[str, List[str]]]]:
-    """One case, asked as ``role``, in a run scope of its own: the result, with every row, and what was retrieved."""
+def _terminal_sets(state: Mapping[str, Any], result: QueryResult, store: Any) -> List[RowSample]:
+    """The run's terminal result sets, every row, read from the aggregator's saved artifacts.
+
+    These, not the sub-queries' scans, are what a case is scored on: a question the decomposer splits has
+    several scans and one combined result. Only results in the run's manifest count, so a run that withheld
+    its results has none.
+    """
+    artifacts = getattr(state.get("aggregator_response"), "computed_artifacts", None) or {}
+    sets = []
+    for summary in result.result_manifest:
+        if store is None or summary.node_id not in artifacts:
+            continue
+        try:
+            frame = store.read_result_frame(artifacts[summary.node_id])
+        except Exception as exc:  # the case is scored without that set, and its cost is still counted
+            result.warnings.append(RunWarning(code=ErrorCode.UNKNOWN_ERROR.value, node="evaluation",
+                                              message=f"Could not read terminal result '{summary.node_id}': {exc}"))
+            continue
+        rows = [list(row) for row in frame.rows]
+        sets.append(RowSample(columns=list(frame.columns), rows=rows[:_ALL_ROWS],
+                              total_rows=int(frame.row_count or len(rows))))
+    return sets
+
+
+def _ask(run: Any, case: EvalCase, role: str
+         ) -> Tuple[QueryResult, Optional[Dict[str, List[str]]], List[RowSample]]:
+    """One case, asked as ``role``, in a run scope of its own: the result, what was retrieved, and the
+    terminal result sets with every row."""
     api = QueryAPI(run)
     user = UserContext(roles=[role])
     scope = api.open_scope(case.question, user_context=user)
@@ -171,15 +198,16 @@ def _ask(run: Any, case: EvalCase, role: str) -> Tuple[QueryResult, Optional[Dic
             # Clarification off: a case measures the default reading, with the same prompt (D58).
             state = run_with_graph(run, case.question, user_context=user, callbacks=[sent], scope=scope,
                                    clarify=False)
-            result = result_from_state(state, artifact_store=getattr(run, "artifact_store", None),
-                                       sample_rows=_ALL_ROWS, knowledge=caller_knowledge(run, state),
-                                       question=case.question)
+            store = getattr(run, "artifact_store", None)
+            result = result_from_state(state, artifact_store=store, sample_rows=_ALL_ROWS,
+                                       knowledge=caller_knowledge(run, state), question=case.question)
+            sets = _terminal_sets(state, result, store)
         except BaseException as exc:
             # A KeyboardInterrupt too: every scope ends with a terminal event.
             scope.fail(f"The run failed: {exc or type(exc).__name__}")
             raise
         api.close_scope(scope, result)
-    return result, sent.tables
+    return result, sent.tables, sets
 
 
 def _measure_retrieval(run: Any, case: EvalCase, role: str) -> Tuple[Dict[str, List[str]], List[str]]:
@@ -188,18 +216,18 @@ def _measure_retrieval(run: Any, case: EvalCase, role: str) -> Tuple[Dict[str, L
     return retrieval_recall.sent(run, case, role), retrieval_recall.routed(run, case.question, limit)
 
 
-def _digest(result: QueryResult) -> str:
-    """A fingerprint of every result set's rows, for the determinism check."""
-    rows = [sq.rows.rows for sq in result.sub_queries if sq.rows is not None]
+def _digest(sets: Sequence[RowSample]) -> str:
+    """A fingerprint of every terminal result set's rows, for the determinism check."""
+    rows = [s.rows for s in sets]
     return hashlib.sha1(json.dumps(rows, default=str).encode()).hexdigest()
 
 
 def _scored(case: EvalCase, role: str, mode: str, scorers: Dict[str, Scorer], result: QueryResult,
             retrieval: Optional[Dict[str, List[str]]] = None, routed: Optional[List[str]] = None,
-            preview_rows: Optional[int] = None) -> Dict[str, Any]:
+            preview_rows: Optional[int] = None, sets: Sequence[RowSample] = ()) -> Dict[str, Any]:
     """Each scorer's score on one run, and the case's status from them."""
-    samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
-    case_run = CaseRun(case=case, role=role, mode=mode, result=result,
+    samples = list(sets)
+    case_run = CaseRun(case=case, role=role, mode=mode, result=result, sets=samples,
                        rows=samples[0].rows if samples else None,
                        columns=samples[0].columns if samples else [], retrieval=retrieval, routed=routed,
                        preview_rows=preview_rows)
@@ -210,20 +238,27 @@ def _scored(case: EvalCase, role: str, mode: str, scorers: Dict[str, Scorer], re
 
 
 def _record(suite: str, case: EvalCase, role: str, pass_no: int, scored: Dict[str, Any],
-            result: Optional[QueryResult], cost: float, latency: float) -> Dict[str, Any]:
-    """One case run's record: the case, its scores, and what the run measured."""
+            result: Optional[QueryResult], cost: float, latency: float,
+            sets: Sequence[RowSample] = ()) -> Dict[str, Any]:
+    """One case run's record: the case, its scores, and what the run measured.
+
+    ``rows`` and ``rows_digest`` are the terminal result's. ``sql`` is the first sub-query's SQL: for a
+    question the decomposer split it is that one scan, not the combined result, so ``sql_by_sub_query`` has
+    every sub-query's.
+    """
     result = result or QueryResult()
     usage = result.usage
     codes = [e.get("error_code") or "UNKNOWN" for e in result.errors]
-    samples = [sq.rows for sq in result.sub_queries if sq.rows is not None]
+    samples = list(sets)
     faithfulness = scored["scores"].get("faithfulness", {})
     return {
         "suite": suite, "id": case.id, "question": case.question, "role": role, "kind": case.kind,
         "expected": case.outcome[role], **scored, "pass": pass_no,
         "tags": list(case.tags), "difficulty": case.difficulty,
         "sql": result.sub_queries[0].sql if result.sub_queries else "",
+        "sql_by_sub_query": {sq.id: sq.sql for sq in result.sub_queries},
         "rows": samples[0].total_rows if samples else None, "gold_rows": len(case.rows or []),
-        "cost": round(cost, 8), "latency_s": round(latency, 4), "rows_digest": _digest(result),
+        "cost": round(cost, 8), "latency_s": round(latency, 4), "rows_digest": _digest(samples),
         "error_codes": codes, "refused_unanswerable": "QUESTION_NOT_ANSWERABLE" in codes,
         "retries": sum(sq.retry_count for sq in result.sub_queries),
         "tokens_by_node": {node: {f: getattr(t, f) for f in ("calls", "input_tokens", "cached_input_tokens",
@@ -401,7 +436,7 @@ def _one(run: Any, job: _Case, mode: str, scorers: Dict[str, Scorer], pass_no: i
     """Ask one case and score it; a run that raises is a failure, not an abort."""
     t0 = time.perf_counter()
     try:
-        result, sent = _ask(run, job.case, job.role)
+        result, sent, sets = _ask(run, job.case, job.role)
     except Exception as exc:  # one broken case must not abort the run
         reason = f"run raised {type(exc).__name__}: {exc}"
         scored = {"status": "fail", "reason": reason, "lenient_status": "fail", "scores": {}}
@@ -410,8 +445,8 @@ def _one(run: Any, job: _Case, mode: str, scorers: Dict[str, Scorer], pass_no: i
         return record, None
     latency = time.perf_counter() - t0
     scored = _scored(job.case, job.role, mode, scorers, result, sent,
-                    preview_rows=run.settings.results.preview_rows)
-    return _record(job.suite, job.case, job.role, pass_no, scored, result, 0.0, latency), result
+                    preview_rows=run.settings.results.preview_rows, sets=sets)
+    return _record(job.suite, job.case, job.role, pass_no, scored, result, 0.0, latency, sets), result
 
 
 def _count_unknown(report: EvalReport, result: Optional[QueryResult]) -> None:
