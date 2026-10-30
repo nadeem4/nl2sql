@@ -6133,7 +6133,7 @@ and runs through <a href="../../evals/"><code>engine.evals</code></a>.</p>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
-<td>Row comparison (<code>compare_results</code>, <code>compare_results_lenient</code>), which <code>result_match</code> reads on the run's terminal result (the combined result of a split question, not a sub-query's scan)</td>
+<td>Row comparison (<code>compare_results</code>, <code>column_picks</code>, <code>compare_results_lenient</code>), which <code>result_match</code> reads on the run's terminal result (the combined result of a split question, not a sub-query's scan)</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/faithfulness.py</code></td>
@@ -6249,9 +6249,12 @@ the <a href="../../evals/scorers/">scorers</a>. For <code>result_match</code> an
 </table>
 <p>Rows are compared by value, in selected column order:</p>
 <ul>
-<li><strong>Names don't count, order does.</strong> Column names and aliases are ignored, so
-  <code>SELECT Country AS c</code> matches a gold <code>Country</code> column, but a swapped column
-  order does not.</li>
+<li><strong>Names and column order don't count.</strong> Column names and aliases are ignored,
+  so <code>SELECT Country AS c</code> matches a gold <code>Country</code> column, and a result whose
+  columns come in another order matches too: each gold column is answered by a
+  distinct result column holding the same values. A mislabelled column fails,
+  because its values differ, unless they equal another gold column's row for row (goals
+  for and against, say): an accepted, rare limit. Rows must still line up across the matched columns.</li>
 <li><strong>Numbers match within 0.005</strong>, because gold values are rounded to two
   decimals.</li>
 <li><strong>A number matches a string that spells it</strong>, within the same tolerance, so
@@ -6280,7 +6283,7 @@ the <a href="../../evals/scorers/">scorers</a>. For <code>result_match</code> an
 <tbody>
 <tr>
 <td><strong>Strict</strong></td>
-<td>The execution match above: the same columns, in the same order, and the same rows; or the same rows with <strong>extra columns</strong> (see below)</td>
+<td>The execution match above: the same columns (in any order) and the same rows; or the same rows with <strong>extra columns</strong> (see below)</td>
 </tr>
 <tr>
 <td><strong>Lenient</strong></td>
@@ -6336,14 +6339,17 @@ are equal: <code>'2009'</code> matches <code>'2009-01-01'</code>, and <code>'201
 <li>Nothing else is normalised. Anything broader belongs in an alternative
   answer, which is reviewed per case and cannot silently widen.</li>
 </ul>
-<p>Extra columns are the one lenient reading that counts as a pass in the strict
-score. A result wider than the gold passes <code>result_match</code> when some choice of
-its columns, <strong>in their own order</strong>, equals the gold under the strict rules
-above (the extra columns may sit anywhere), within the column cap. The record
-says which match it was (<code>detail.match</code>: <code>strict</code> or <code>extra columns</code>).
-Reordered gold columns and period labels never pass this way, with or without
-extra columns; they stay lenient-only. The row count and every row value are
-as strict as before.</p>
+<p>Reordered columns and extra columns are the lenient readings that count as a
+pass in the strict score. A result passes <code>result_match</code> when some choice of
+its columns, <strong>in any order</strong>, equals the gold under the strict rules above; a
+result wider than the gold must also stay within the column cap, and a result
+of more than 12 columns is not searched for a reordering (the in-order match still applies). The record says which
+match it was (<code>detail.match</code>: <code>strict</code>, <code>reordered</code>, <code>extra columns</code> or
+<code>extra columns, reordered</code>). Period labels never pass this way; they stay
+lenient-only. The row count, every row value and, when <code>order_matters</code>, the row
+order are as strict as before. (Column order used to count, C-W6a; C-W7d
+dropped that rule, because a question asks for no column order and Spider-style
+execution checks ignore it.)</p>
 <p>Lenient is a superset of strict by construction: everything strict accepts is
 accepted. It is not partial credit -- a case passes a score or it does
 not -- and there is no model in either score, so both stay reproducible.
