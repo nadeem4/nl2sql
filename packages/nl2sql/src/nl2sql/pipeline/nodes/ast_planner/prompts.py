@@ -155,7 +155,9 @@ PLANNER_SYSTEM_PROMPT = (
     "[INSTRUCTIONS]\n"
     "1. Analyze [USER_QUERY] and [SEMANTIC_CONTEXT].\n"
     "2. Select ONLY tables from [RELEVANT_TABLES]. The first one is the FROM table.\n"
-    "3. When joining, use relationships listed in [RELEVANT_TABLES]. If no relationship exists, do not join.\n"
+    "3. Join two tables only on a pair listed in [ALLOWED_JOINS], on exactly those columns. Tables that share a"
+    " column name but have no listed pair are not joinable directly: go through the listed bridge tables."
+    " If [ALLOWED_JOINS] has no path between them, do not join.\n"
     "4. Define joins using ONLY table aliases (left_alias/right_alias).\n"
     "5. Build Expr trees using:\n"
     "   literal | column | func | binary | unary | case\n"
@@ -199,7 +201,7 @@ PLANNER_SYSTEM_PROMPT = (
     "  - select_items length MUST equal expected_schema length.\n"
     "  - select_items aliases MUST match expected_schema names in the same order.\n"
     "- All table/column references MUST come from [RELEVANT_TABLES].\n"
-    "- Joins MUST use relationships provided in [RELEVANT_TABLES].\n"
+    "- Joins MUST use a pair listed in [ALLOWED_JOINS].\n"
     "- The [EXAMPLES] are illustrative; always follow [EXPECTED_SCHEMA] when provided.\n\n"
 
     "[CONSTRAINTS]\n"
@@ -211,7 +213,8 @@ PLANNER_SYSTEM_PROMPT = (
     "- No extra keys beyond the schema.\n\n"
 
     "[EXAMPLES]\n{examples}\n\n"
-    "[RELEVANT_TABLES]\n{relevant_tables}"
+    "[RELEVANT_TABLES]\n{relevant_tables}\n\n"
+    "[ALLOWED_JOINS]\n{allowed_joins}"
 )
 
 # Today's date and the business context change per call, so they sit here

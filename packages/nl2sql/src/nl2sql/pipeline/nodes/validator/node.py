@@ -33,7 +33,7 @@ from nl2sql.common.logger import get_logger
 from nl2sql.events import publish
 from nl2sql.pipeline.nodes.validator.schemas import LogicalValidatorResponse, ValidationCheck
 from nl2sql.pipeline.nodes.validator.join_keys import join_key_type_errors
-from nl2sql.pipeline.nodes.validator.join_hints import join_hint
+from nl2sql.pipeline.nodes.validator.join_hints import join_hint, normalize_name
 
 
 logger = get_logger("logical_validator")
@@ -113,9 +113,7 @@ class LogicalValidatorNode:
         is a de-quoting step, not a relaxation: ``[album]`` and ``album`` are
         the same identifier, and unrelated identifiers still compare unequal.
         """
-        if not value:
-            return ""
-        return value.lower().split(".")[-1].strip().strip('[]"`')
+        return normalize_name(value)
 
     def _build_allowed_schema(
         self, state: SubgraphExecutionState

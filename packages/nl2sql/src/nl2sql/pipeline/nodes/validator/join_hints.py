@@ -24,6 +24,29 @@ def _edges(relationships: List[Dict[str, Any]], normalize: Callable[[Optional[st
     return edges
 
 
+def normalize_name(value: Optional[str]) -> str:
+    """Reduces an identifier to its bare, comparable form: ``[main].[Album]`` and ``album`` are the same name."""
+    if not value:
+        return ""
+    return value.lower().split(".")[-1].strip().strip('[]"`')
+
+
+def allowed_joins(relationships: List[Dict[str, Any]], normalize: Callable[[Optional[str]], str],
+                  sent: Set[str]) -> List[str]:
+    """Every declared join between two of the tables ``sent``, one equality per line, sorted and without duplicates.
+
+    The planner prompt's ``[ALLOWED_JOINS]`` block. It reads the same edges as the validator's hint, and a key
+    declared from both tables is one line.
+    """
+    lines = set()
+    for a, a_cols, b, b_cols in _edges(relationships, normalize):
+        if a in sent and b in sent:
+            first, second = sorted([(a, a_cols), (b, b_cols)])
+            pairs = sorted(zip(first[1], second[1]))
+            lines.add(" AND ".join(f"{first[0]}.{x} = {second[0]}.{y}" for x, y in pairs))
+    return sorted(lines)
+
+
 def _step(edge: Edge, start: str) -> str:
     """The edge as an equality, written from ``start`` outwards."""
     a, a_cols, b, b_cols = edge

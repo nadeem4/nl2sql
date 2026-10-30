@@ -192,7 +192,7 @@ def test_the_planner_system_message_says_how_to_count_rows():
     from nl2sql.pipeline.nodes.ast_planner.prompts import PLANNER_PROMPT
 
     system = PLANNER_PROMPT.format_messages(
-        examples="", relevant_tables="", expected_schema="", semantic_context="", business_context="{}",
+        examples="", relevant_tables="", allowed_joins="none", expected_schema="", semantic_context="", business_context="{}",
         feedback="", user_query="q", today="2013-12-31",
     )[0].content
 
