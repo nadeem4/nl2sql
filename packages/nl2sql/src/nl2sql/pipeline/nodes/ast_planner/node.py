@@ -9,6 +9,7 @@ from .schemas import PlanAlternative, PlannerAnswer, PlanModel, ASTPlannerRespon
 from nl2sql.events import publish
 from nl2sql.knowledge.render import business_context_of
 from nl2sql.pipeline.nodes.schema_retriever.schema import render_schema_for_prompt
+from nl2sql.pipeline.nodes.validator.join_hints import allowed_joins, normalize_name
 from nl2sql.common.cancellation import RunCancelled
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
@@ -181,6 +182,9 @@ class ASTPlannerNode:
                 return cached
 
             relevant_tables = render_schema_for_prompt(state.relevant_tables)
+            allowed = allowed_joins(
+                [rel for t in state.relevant_tables for rel in (getattr(t, "relationships", None) or [])],
+                normalize_name, {normalize_name(t.name) for t in state.relevant_tables})
 
             feedback = as_planner_feedback(state.errors)
 
@@ -194,6 +198,7 @@ class ASTPlannerNode:
             answer: Optional[PlannerAnswer] = self.chain.invoke(
                 {
                     "relevant_tables": relevant_tables,
+                    "allowed_joins": "\n".join(allowed) or "none",
                     "examples": PLANNER_EXAMPLES,
                     "feedback": feedback,
                     "expected_schema": expected_schema,
