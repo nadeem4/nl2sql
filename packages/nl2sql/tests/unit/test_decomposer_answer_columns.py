@@ -339,4 +339,6 @@ def test_the_wording_keeps_the_entity_the_answer_is_about_in_every_place():
         assert ANSWER_COLUMNS in text
         assert "the entity a subset was chosen from" in text and "used purely to rank or select" in text
         assert "only used to rank or filter" not in text and "helper columns left out" not in text and "leave helper columns out" not in text
-    assert "category_revenue" in rule12 and "category" in rule12.split("Example")[1]
+    example = rule12.split("Example")[1]
+    assert "store_total" in example and "customer, spend and store" in example
+    assert "film" not in DECOMPOSER_SYSTEM_PROMPT and "pagila" not in DECOMPOSER_SYSTEM_PROMPT.lower()

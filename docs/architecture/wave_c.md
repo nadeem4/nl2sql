@@ -2808,6 +2808,7 @@ filter, but it says which category the answer is about, so the answer lost its c
 **Decision (owner-approved 2026-10-30).** Reword every occurrence to one shared phrase (`ANSWER_COLUMNS`): keep the columns
 that say what the answer is about (the entities the question asks for, and the entity a subset was chosen from, such as which
 category, store or year); leave out only helper figures used purely to rank or select the subset (the category's total
-revenue that picked the top category). Rule 12 adds the example: keep `film_title`, `film_revenue` and `category`, leave out
-`category_revenue`. Places: rule 6, rule 12, the retry feedback and the two `node.py` feedback messages (no op, no
+revenue that picked the top category). Rule 12 adds the example "top 3 customers by spend in the busiest store": keep customer, spend and store, leave out
+`store_total`. The prompt names no Pagila question, table or column: its examples (rules 11 and 12) come from a domain no
+evaluation suite uses, so the keyed check cannot be taught the answer. Places: rule 6, rule 12, the retry feedback and the two `node.py` feedback messages (no op, no
 `expected_schema`). No validation logic changes.

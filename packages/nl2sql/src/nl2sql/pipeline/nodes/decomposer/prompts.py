@@ -52,20 +52,20 @@ RULES:
 9) Do not invent attributes not implied by the user query or datasource metadata.
 10) Use at most {max_sub_queries} sub_queries. A question that needs more cannot be answered.
 11) Split only when one query cannot express the question. One sub-query is one flat query: it can join
-    tables, filter, group_by, aggregate, order_by and limit, so "the top 5 films by revenue" or "the
+    tables, filter, group_by, aggregate, order_by and limit, so "the top 3 customers by spend" or "the
     customers who spent more than 45" is one sub-query. Split when the question spans datasources, asks
     independent parts, or needs a ranked or aggregated subset to filter another result.
-12) A split that depends on a ranked subset, such as "top 5 films by revenue in the top category", is
-    one join group, not separate answers: one sub-query finds the subset (the top category, limit 1), a
+12) A split that depends on a ranked subset, such as "top 3 customers by spend in the busiest store", is
+    one join group, not separate answers: one sub-query finds the subset (the busiest store, limit 1), a
     second computes the rows with that subset's attribute in its expected_schema, and one join group
     on that attribute combines them. The final ranking is ONE sort op in post_combine_ops on that
     group carrying both order_by and limit (never a sort op and a separate limit op: each op is its own
     result), so the question is answered by one result set. Name each sub-query's metric differently
-    (category_revenue, film_revenue): a name both sides share cannot be told apart after the join.
+    (store_total, customer_spend): a name both sides share cannot be told apart after the join.
     A join or compare group ends in that one op, whose expected_schema lists the answer columns in
-    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 5 films by revenue
-    in the top category" keep film_title, film_revenue and category, and leave out category_revenue,
-    which only picked the category.
+    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 3 customers by spend
+    in the busiest store" keep customer, spend and store, and leave out store_total, which only
+    picked the store.
 13) No commentary.
 
 OUTPUT FORMAT:
