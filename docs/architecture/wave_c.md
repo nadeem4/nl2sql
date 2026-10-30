@@ -2390,6 +2390,10 @@ The eval scores the combined result (design 18.9). `evaluation/run.py`: `_termin
 
 The decomposer rejects an ambiguous post-combine column. Root cause (pagila_001): both sub-queries produced a non-key `total_revenue`; the combine keeps the bare name for the left copy and renames the right one `total_revenue_right`, so the final sort ranked the category total, the same on every row, and returned five unranked films without any error. `aggregation/columns.py`: `ambiguous_columns(operation, inputs, join_keys)` lists the non-key names both sides of a `join` have (empty for `compare`, which diffs by matching names, and for `union`/`standalone`), and `ambiguous_columns_message(...)` words the feedback. `decomposer/node.py` `post_combine_problems` adds one problem per such column an op reads, on the same parse-and-retry path as the missing-column check (one retry, then `PLANNER_FAILED` with the reason). The message names the column, the join keys and both sub-queries, says the left keeps the name and the right becomes `<name>_right`, and asks for distinct names in each `expected_schema`. Rule 12 of the decomposer prompt carries one line on distinct metric names. Tests: `tests/unit/test_decomposer_post_combine_columns.py` (pagila_001 shape rejected and retried, distinct names pass, a key passes, a column the op does not read passes, `compare` exempt, the helper itself). No model call; the effect shows in the owner's next keyed Pagila run.
 
+### C-W7c
+
+A split answer's columns follow the question (design 18.10). `aggregation/engines/polars_duckdb.py` `post_op` now ends every op, whatever its type, in its non-empty `expected_schema` (a final `select`, after filters, sort and limit, so a sort may use a column the schema drops); `project` keeps its meaning with its select moved to the end, which also fixes a project that dropped its own sort column passing validation and failing at collect. `aggregation/columns.py`: `post_op_columns` is now what an op reads (aggregate inputs, filters, sort), not its schema; new `post_op_schema` (the schema names) and `post_op_outputs` (an aggregate's group_by and metric names, otherwise the columns it read). `decomposer/node.py` `post_combine_problems` adds three rejections: an `expected_schema` name the op cannot produce; a `join`/`compare` group of two or more inputs whose op has no `expected_schema`; and more than one op on such a group. The ambiguous-column check (C-W7b) now also covers the schema names. `MAX_RETRIES = 2` replaces the single retry (`_decompose(state, feedback, retries)`); it applies to every rejection `post_combine_problems` makes, and a third rejected answer ends the run with `PLANNER_FAILED`. Rule 12 and the retry feedback of the decomposer prompt carry one line each. Tests: `tests/unit/test_decomposer_answer_columns.py` (engine selection after sort/filter, project then sort on a dropped column, aggregate outputs, the new rejections, the retry count, and a replay of the recorded pagila_001 decomposition, `tests/fixtures/pagila_001_split_decomposition.json`, through `build_execution_dag` and `AggregationService` with canned frames, asserting `film_title, category_name, film_revenue`); `test_decomposer_post_combine_columns.py` and `e2e/test_multi_sub_query_fake_llm.py` fixtures now give their join op an `expected_schema`. No model call; a keyed check (pagila_001, then the full suite) follows.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2728,3 +2732,32 @@ combination was ambiguous.
   (built in its own PR).
 - **Verification.** (a) is pinned by unit tests with canned results; whether pagila_001 now passes is the owner's next
   keyed run, which needs (b) as well.
+
+### 18.10 C-W7c: answer columns follow the question
+
+**Root cause.** In pagila_001 ("Top 5 films by revenue in the top category") the decomposer's single `sort` op on join
+group `cg_1` carried `expected_schema: [film_title, category_name, film_revenue]`, exactly gold's shape. The engine read
+an op's `expected_schema` only for a `project` op (`polars_duckdb.py` `post_op`, `columns.py` `post_op_columns`), so the
+answer kept the combine order (`category_name, category_revenue, film_title, film_revenue`) and the scorer saw the wrong
+columns. A related bug: a `project` selected its columns before its own sort, so a project that dropped its sort column
+passed validation and failed at collect.
+
+**Design (owner-approved 2026-10-30).**
+
+- **Engine.** Every post-combine op ends in its non-empty `expected_schema`, in that order, after its filters, sort and
+  limit. A sort or filter may read a column the schema drops. An aggregate's schema picks among its group_by and metric
+  names. A schema name the op cannot produce raises with the columns it does have.
+- **Validation before generation.** `post_combine_problems` rejects: (i) an `expected_schema` name the op cannot produce
+  (the combined columns; for an `aggregate`, its group_by plus metric names); (ii) a `join`/`compare` group with two or
+  more inputs whose op has no `expected_schema` (the feedback asks for the answer columns in question order, the entity
+  the question asks for first, helper columns left out, `_right` names for a compare); (iii) more than one op on such a
+  group (ops are siblings, not a chain, and each becomes its own result set, `decomposer/dag.py`), so the feedback asks for
+  ONE op carrying filters, order_by, limit and `expected_schema`. `union` and `standalone` are unchanged: schema optional,
+  several ops allowed. A join group with no op at all is left alone.
+- **Owner's two choices.** Reject and ask again rather than guess the columns, with two retries (`MAX_RETRIES = 2`, was
+  one) because these problems usually need a second look at the shape; and one op per join/compare group rather than
+  chaining ops in the engine.
+- **Prompt.** Rule 12 and the retry feedback each say a join or compare group ends in one op whose `expected_schema`
+  lists the answer columns in question order.
+- **Verification.** Unit tests with canned frames, including a replay of the recorded decomposition; whether pagila_001
+  now passes is a keyed run (then the full suite), asked of the owner first.

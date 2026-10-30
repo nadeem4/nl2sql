@@ -105,14 +105,35 @@ def ambiguous_columns_message(column: str, left_id: str, right_id: str, join_on:
 
 
 def post_op_columns(operation: str, attributes: Dict[str, Any]) -> List[str]:
-    """Every column a post-combine op reads from the combined result."""
+    """Every column a post-combine op reads from the combined result.
+
+    Its aggregate inputs, filters and sort; not its ``expected_schema``, which
+    is what the op ends in (:func:`post_op_schema`), after those have run.
+    """
     return [name for name in (
         *((g or {}).get("attribute") for g in attributes.get("group_by") or []),
         *((m or {}).get("name") for m in attributes.get("metrics") or []),
-        *((c or {}).get("name") for c in attributes.get("expected_schema") or []
-          if operation == "project"),
         *((f or {}).get("attribute") for f in attributes.get("filters") or []),
         *((o or {}).get("attribute") for o in attributes.get("order_by") or []),
+    ) if name]
+
+
+def post_op_schema(attributes: Dict[str, Any]) -> List[str]:
+    """The column names a post-combine op ends in, in order; empty keeps whatever it produced."""
+    return [name for name in ((c or {}).get("name") for c in attributes.get("expected_schema") or []) if name]
+
+
+def post_op_outputs(operation: str, attributes: Dict[str, Any], available: Sequence[str]) -> List[str]:
+    """The columns a post-combine op can end in, given the ``available`` columns it reads.
+
+    An ``aggregate`` leaves its group_by and metric names; any other op keeps
+    every column it was given.
+    """
+    if operation != "aggregate":
+        return list(available)
+    return [name for name in (
+        *((g or {}).get("attribute") for g in attributes.get("group_by") or []),
+        *((m or {}).get("name") for m in attributes.get("metrics") or []),
     ) if name]
 
 

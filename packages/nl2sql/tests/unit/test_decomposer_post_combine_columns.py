@@ -46,7 +46,8 @@ def _decomposition(post_filter_attribute, expected_schema=("customer",)):
                             "join_keys": [{"left": "customer", "right": "customer"}]}],
         "post_combine_ops": [{"op_id": "op1", "target_group_id": "g1", "operation": "filter",
                               "filters": [{"attribute": post_filter_attribute, "operator": "=",
-                                           "value": False}]}],
+                                           "value": False}],
+                              "expected_schema": [{"name": "customer", "dtype": "string"}]}],
         "unmapped_subqueries": [],
     }
 
@@ -91,7 +92,7 @@ def test_a_post_combine_op_on_a_column_the_combine_lacks_is_asked_again():
 def test_a_second_bad_answer_ends_the_run_in_the_decomposer_with_the_reason():
     result, prompts = _run(BAD)
 
-    assert len(prompts) == 2  # one retry, not a loop
+    assert len(prompts) == 3  # two retries (MAX_RETRIES), not a loop
     assert "execution_dag" not in result
     [error] = result["errors"]
     assert error.node == "decomposer"
@@ -131,7 +132,8 @@ def _ranked(left_columns, right_columns, sort_attribute, operation="join"):
                                        {"subquery_id": "sq_film", "role": "right"}],
                             "join_keys": [{"left": "category", "right": "category"}]}],
         "post_combine_ops": [{"op_id": "op1", "target_group_id": "g1", "operation": "sort",
-                              "order_by": [{"attribute": sort_attribute, "direction": "desc"}], "limit": 5}],
+                              "order_by": [{"attribute": sort_attribute, "direction": "desc"}], "limit": 5,
+                              "expected_schema": [{"name": sort_attribute, "dtype": "string"}]}],
         "unmapped_subqueries": [],
     }
 
@@ -156,7 +158,7 @@ def test_a_sorted_column_both_joined_sides_have_is_asked_again():
 def test_a_second_ambiguous_answer_ends_the_run_with_the_reason():
     result, prompts = _run(SHARED)
 
-    assert len(prompts) == 2
+    assert len(prompts) == 3
     assert "execution_dag" not in result
     [error] = result["errors"]
     assert "'total_revenue' is on both sides" in error.message
@@ -209,7 +211,7 @@ def test_a_left_key_that_a_right_non_key_column_shares_a_name_with_is_ambiguous(
 
     result, prompts = _run(payload)
 
-    assert len(prompts) == 2
+    assert len(prompts) == 3
     assert "'category' is on both sides of the join on category" in prompts[1]
 
 

@@ -53,6 +53,8 @@ RULES:
     group carrying both order_by and limit (never a sort op and a separate limit op: each op is its own
     result), so the question is answered by one result set. Name each sub-query's metric differently
     (category_revenue, film_revenue): a name both sides share cannot be told apart after the join.
+    A join or compare group ends in that one op, whose expected_schema lists the answer columns in
+    question order (the entity asked for first, helper columns left out).
 13) No commentary.
 
 OUTPUT FORMAT:
@@ -116,7 +118,9 @@ PREVIOUS ANSWER REJECTED:
 {problems}
 A post-combine operation can only read columns its combine group produces: the expected_schema
 names of the group's sub-queries, minus the right-hand join keys, with any other right-hand name
-the left side also has suffixed "_right". Call the tool again with a corrected decomposition.
+the left side also has suffixed "_right". A join or compare group ends in ONE post-combine operation
+whose expected_schema lists the answer columns in question order (the entity the question asks for
+first, helper columns left out). Call the tool again with a corrected decomposition.
 """
 
 DECOMPOSER_PROMPT = ChatPromptTemplate.from_messages(

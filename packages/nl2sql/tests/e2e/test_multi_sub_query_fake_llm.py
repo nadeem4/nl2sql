@@ -79,6 +79,7 @@ def _join_decomposition(left, right):
         "post_combine_ops": [{
             "op_id": "op1", "target_group_id": "g1", "operation": "sort",
             "order_by": [{"attribute": "music_spend", "direction": "desc"}], "limit": 5,
+            "expected_schema": [{"name": "customer_id", "dtype": "int"}, {"name": "music_spend", "dtype": "float"}],
         }],
         "unmapped_subqueries": [],
     }
