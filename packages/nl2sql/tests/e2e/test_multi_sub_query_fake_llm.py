@@ -233,7 +233,8 @@ TICKET_CUSTOMERS_PLAN = {**OPEN_TICKETS_PLAN, "where": None}
 @pytest.mark.e2e
 def test_a_join_input_cut_short_by_the_row_cap_is_refused(demo_project, tmp_path):
     decomposition = _join_decomposition(LINES_SQ, TICKET_CUSTOMERS_SQ)
-    decomposition["post_combine_ops"] = []
+    decomposition["post_combine_ops"] = [{"op_id": "op1", "target_group_id": "g1", "operation": "project",
+                                          "expected_schema": [{"name": "customer_id", "dtype": "int"}]}]
     rules = _rules(["chinook", "support"], decomposition,
                    [(LINES_INTENT, LINES_PLAN), (TICKET_CUSTOMERS_INTENT, TICKET_CUSTOMERS_PLAN)])
     server, r, doc = _run(demo_project, tmp_path, rules, "multi-sq-capped.yaml",

@@ -48,7 +48,8 @@ def _join(left_columns, right_columns, keys=(("customer_id", "customer_id"),)):
                             "inputs": [{"subquery_id": "sq_music", "role": "left"},
                                        {"subquery_id": "sq_tickets", "role": "right"}],
                             "join_keys": [{"left": left, "right": right} for left, right in keys]}],
-        "post_combine_ops": [],
+        "post_combine_ops": [{"op_id": "op1", "target_group_id": "g1", "operation": "project",
+                             "expected_schema": [{"name": left_columns[0][0], "dtype": "int"}]}],
         "unmapped_subqueries": [],
     }
 

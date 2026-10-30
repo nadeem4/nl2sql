@@ -151,6 +151,15 @@ def _schema_missing_message(group_id: str, operation: str) -> str:
     )
 
 
+def _no_op_message(group_id: str, operation: str) -> str:
+    """Why a join or compare group without a post-combine op is refused."""
+    return (
+        f"The {operation} group '{group_id}' needs ONE post-combine operation whose expected_schema lists the "
+        f"answer columns in question order (the entity the question asks for first, helper columns left out). "
+        f"Without one the answer keeps the combine's column order, helper columns included."
+    )
+
+
 def _one_op_message(group_id: str, operation: str, count: int) -> str:
     """Why a join or compare group may not have several post-combine ops."""
     return (
@@ -180,7 +189,9 @@ def post_combine_problems(response: DecomposerResponse) -> List[str]:
         if group.operation not in _TWO_SIDED or len(group.inputs) < 2:
             continue
         ops = [op for op in response.post_combine_ops if op.target_group_id == group.group_id]
-        if len(ops) > 1:
+        if not ops:
+            problems.append(_no_op_message(group.group_id, group.operation))
+        elif len(ops) > 1:
             problems.append(_one_op_message(group.group_id, group.operation, len(ops)))
         elif ops and not ops[0].expected_schema:
             problems.append(_schema_missing_message(group.group_id, group.operation))

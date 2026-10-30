@@ -167,8 +167,18 @@ def test_a_union_needs_no_schema_and_may_have_several_ops():
     assert post_combine_problems(response) == []
 
 
-def test_a_join_with_no_op_is_left_alone():
-    assert post_combine_problems(_response(ops=[])) == []
+@pytest.mark.parametrize("operation", ["join", "compare"])
+def test_a_join_or_compare_group_with_no_op_is_rejected(operation):
+    [problem] = post_combine_problems(_response(operation=operation, ops=[]))
+
+    assert "needs ONE post-combine operation" in problem and "expected_schema" in problem
+    assert "question order" in problem
+
+
+def test_a_union_with_no_op_is_left_alone():
+    response = _response(operation="union", ops=[], left=("category",), right=("category",), keys=())
+
+    assert post_combine_problems(response) == []
 
 
 def test_a_bare_name_on_both_sides_in_the_schema_is_ambiguous():
