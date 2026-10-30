@@ -2353,7 +2353,7 @@ The eval scorer reads the shapes a real database returns (design 18.2). All in `
 
 - **Faithfulness** (`faithfulness.py`): `Decimal` cells are numbers (values and column sums). A number is also supported when it is the difference between two values of one column; a percentage when it is the ratio or the percent change between two of them (absolute value, the written precision), but only when the answer also writes both operands (review: pairing against every pair of a many-row column supported most small numbers). Nothing more general. The preview size is reachable cleanly, so it is the exact number: `CaseRun.preview_rows` carries `results.preview_rows` (set in `run._one` from the run's settings) and `check_answer(preview_rows=)` accepts exactly that number, nothing when it is unknown.
 - **Comparator** (`evaluator.py`): `Decimal` compares numerically with numeric strings and floats; a `date` or `datetime` compares with its ISO string, and a date-only label with midnight of that day in the other value's own offset, in both directions (two full datetimes compare as instants; a value with no timezone is read as UTC). A `date` object still meets a gold year label through the lenient period rule.
-- **Scoring policy** (`scorers/result_match.py`): the right rows plus extra columns pass. `ModelEvaluator.compare_results_extra_columns` passes a result wider than the gold when some choice of its columns in their own order equals the gold under the strict rules; reordered gold columns and period labels stay lenient-only, wider or not. `detail.match` is `strict`, `extra columns` or null; `detail.lenient` is unchanged. Row count and row values are as strict as before.
+- **Scoring policy** (`scorers/result_match.py`): the right rows plus extra columns pass. `ModelEvaluator.compare_results_extra_columns` passes a result wider than the gold when some choice of its columns in their own order equals the gold under the strict rules; reordered gold columns and period labels stay lenient-only, wider or not (the reordering rule is reversed by C-W7d, design 18.11). `detail.match` is `strict`, `extra columns` or null; `detail.lenient` is unchanged. Row count and row values are as strict as before.
 
 ### C-W6b
 
@@ -2393,6 +2393,10 @@ The decomposer rejects an ambiguous post-combine column. Root cause (pagila_001)
 ### C-W7c
 
 A split answer's columns follow the question (design 18.10). `aggregation/engines/polars_duckdb.py` `post_op` now ends every op, whatever its type, in its non-empty `expected_schema` (a final `select`, after filters, sort and limit, so a sort may use a column the schema drops); `project` keeps its meaning with its select moved to the end, which also fixes a project that dropped its own sort column passing validation and failing at collect. `aggregation/columns.py`: `post_op_columns` is now what an op reads (aggregate inputs, filters, sort), not its schema; new `post_op_schema` (the schema names) and `post_op_outputs` (an aggregate's group_by and metric names, otherwise the columns it read). `decomposer/node.py` `post_combine_problems` adds three rejections: an `expected_schema` name the op cannot produce; a `join`/`compare` group of two or more inputs with no op, or whose op has no `expected_schema`; and more than one op on such a group. The ambiguous-column check (C-W7b) now also covers the schema names. `MAX_RETRIES = 2` replaces the single retry (`_decompose(state, feedback, retries)`); it applies to every rejection `post_combine_problems` makes, and a third rejected answer ends the run with `PLANNER_FAILED`. Rule 12 and the retry feedback of the decomposer prompt carry one line each. Tests: `tests/unit/test_decomposer_answer_columns.py` (engine selection after sort/filter, project then sort on a dropped column, aggregate outputs, the new rejections, the retry count, and a replay of the recorded pagila_001 decomposition, `tests/fixtures/pagila_001_split_decomposition.json`, through `build_execution_dag` and `AggregationService` with canned frames, asserting `film_title, category_name, film_revenue`); `test_decomposer_post_combine_columns.py` and `e2e/test_multi_sub_query_fake_llm.py` fixtures now give their join op an `expected_schema`. No model call; a keyed check (pagila_001, then the full suite) follows.
+
+### C-W7d
+
+`result_match` accepts reordered columns (design 18.11). `evaluation/evaluator.py`: new `ModelEvaluator.column_picks(generated, expected, order_matters)` returns the result column picked for each gold column (or `None`): candidates are the result columns whose values equal a gold column's as a multiset under the existing `_same_value`, and the first assignment of distinct columns whose picked rows pass `compare_results` wins, preferring picks in the result's own column order. `compare_results_reordered` (same width) and `compare_results_extra_columns` (wider, within `lenient_column_cap`) now both go through it, so the extra-columns rule takes the gold's columns in any order. A result wider than `COLUMN_SEARCH_CAP = 12` columns is not searched. `scorers/result_match.py`: `detail.match` is `strict`, `reordered`, `extra columns`, `extra columns, reordered` or null; `lenient` is unchanged. Tests: `tests/unit/test_evaluation_scoring.py` (reordered pass; a differing or mislabelled column fails; swapped-and-relabelled numeric columns; ordered and unordered row rules; duplicate-valued columns; the bound; the preference for the result's own order) and `tests/unit/test_eval_scorers.py` (detail values, alternatives, `order_matters`). Updated, because they asserted that a reorder fails: `test_extra_columns_do_not_let_reordered_columns_through` (now `test_extra_columns_may_come_in_any_order`), `test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing` and `test_result_match_records_the_lenient_reading_beside_the_strict_one` (now a period-label case). Offline re-score of the stored keyed Pagila runs (no model call): pagila_001 of the C-W7c single-case run now passes as `reordered`; no other verdict changes. No gold data changed.
 
 ## 14. Bugs Wave C fixes
 
@@ -2609,7 +2613,7 @@ Scorer only; gold data is untouched.
 2. **Comparator.** `Decimal` equals the number or numeric string it spells (half a cent, as before). A `date` or
    `datetime` equals its ISO string; a date-only label equals the midnight datetime of that day, either way round.
 3. **Policy (owner, 2026-10-29).** A result with the right rows and extra columns passes `result_match`; the detail
-   records which match it was. Row count, row values and column order are not loosened.
+   records which match it was. Row count and row values are not loosened (column order was not either; C-W7d, 18.11, reverses that).
 
 Docs: `docs/testing/evaluation-dataset.md` (strict and lenient accuracy, answer faithfulness).
 
@@ -2762,3 +2766,26 @@ passed validation and failed at collect.
   lists the answer columns in question order.
 - **Verification.** Unit tests with canned frames, including a replay of the recorded decomposition; whether pagila_001
   now passes is a keyed run (then the full suite), asked of the owner first.
+
+### 18.11 C-W7d: column order
+
+**Decision (owner-approved 2026-10-30).** `result_match` passes a result when some permutation of its columns matches the
+case's rows exactly, under the same value comparison as before (`Decimal`, dates and the rest from C-W6a, 18.2). The
+extra-columns rule (18.2, item 3) likewise takes the gold's columns as any subset of the result's columns, in any order,
+not only an ordered subsequence. This reverses the earlier strictness that kept column order.
+
+**Reason.** In pagila_001 the engine returned exactly gold's rows with columns `film, film_revenue, category` against
+gold's `title, category, revenue`. The question asks for no column order, and Spider-style execution checks are
+column-order invariant. A mislabelled column still fails, because its values differ.
+
+**What stays strict.** Every value (numbers within half a cent, dates and strings as before), the row count, and the row
+order where the case has `order_matters`. Rows must line up across the matched columns, so values swapped between rows
+fail. Period labels against dates stay lenient-only. A constant column may stand for any gold column with the same values:
+the columns are matched by values, not names, and duplicate-valued columns are fine.
+
+**How.** Each gold column is matched to an unused result column with an equal multiset of values; the first assignment
+whose picked columns pass `compare_results` wins (`ModelEvaluator.column_picks`). Only candidates with equal values are
+tried, so the search is small. `detail.match` says `reordered` (same width) or `extra columns, reordered`.
+
+**The bound.** A result of more than 12 columns (`COLUMN_SEARCH_CAP`) is not searched: it counts as a strict match or
+fails, as before. The extra-columns cap (`lenient_column_cap`) is unchanged.

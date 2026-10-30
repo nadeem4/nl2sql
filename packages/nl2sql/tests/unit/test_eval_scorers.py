@@ -141,7 +141,9 @@ def test_result_match_fails_an_allowed_case_that_returned_no_rows():
 
 
 def test_result_match_records_the_lenient_reading_beside_the_strict_one():
-    score = result_match.score(_run(_case({"admin": "allowed"}), "admin", _rows_result([[13, "USA"], [8, "Canada"]])))
+    # A period label against a date is lenient-only (C-W7d: a reordering now passes strictly enough to count).
+    case = _case({"admin": "allowed"}, rows=[{"year": "2009", "n": 5}])
+    score = result_match.score(_run(case, "admin", _rows_result([["2009-01-01", 5]])))
     assert score.passed is False and score.detail["lenient"] is True
 
 
@@ -275,12 +277,27 @@ def test_result_match_passes_the_right_rows_with_extra_columns():
 def test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing():
     strict = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([["USA", 13], ["Canada", 8]])))
     assert strict.passed and strict.detail["match"] == "strict"
-    reordered = result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([[13, "USA"], [8, "Canada"]])))
-    assert not reordered.passed and reordered.detail["match"] is None
-    # Wider, but the gold's columns are reordered: still a failure.
-    wide = result_match.score(_run(_case({"a": "allowed"}), "a",
-                                   _rows_result([[13, "USA", "x"], [8, "Canada", "y"]])))
-    assert not wide.passed and wide.detail["lenient"] is True and wide.detail["match"] is None
+    assert result_match.score(_run(_case({"a": "allowed"}), "a", _rows_result([["nope", 13], ["Canada", 8]]))).detail["match"] is None
+
+
+def test_result_match_passes_reordered_columns_and_says_so():
+    case = _case({"a": "allowed"})
+    got = result_match.score(_run(case, "a", _rows_result([[13, "USA"], [8, "Canada"]])))
+    assert got.passed and got.value == 1.0
+    assert got.detail["match"] == "reordered" and got.detail["lenient"] is True
+    wide = result_match.score(_run(case, "a", _rows_result([[13, "USA", "x"], [8, "Canada", "y"]])))
+    assert wide.passed and wide.detail["match"] == "extra columns, reordered"
+    wrong = result_match.score(_run(case, "a", _rows_result([[13, "USA"], [9, "Canada"]])))
+    assert not wrong.passed and wrong.detail["match"] is None
+
+
+def test_result_match_reordering_goes_through_the_alternatives_and_the_order_rule():
+    case = _case({"a": "allowed"}, alt_rows=[[{"n": 1, "c": "x"}, {"n": 2, "c": "y"}]])
+    assert result_match.score(_run(case, "a", _rows_result([["x", 1], ["y", 2]]))).detail["match"] == "reordered"
+    ordered = _case({"a": "allowed"}, order_matters=True)
+    assert not result_match.score(_run(ordered, "a", _rows_result([[8, "Canada"], [13, "USA"]]))).passed
+    loose = _case({"a": "allowed"}, order_matters=False)
+    assert result_match.score(_run(loose, "a", _rows_result([[8, "Canada"], [13, "USA"]]))).passed
 
 
 def test_result_match_with_extra_columns_still_needs_the_right_rows():

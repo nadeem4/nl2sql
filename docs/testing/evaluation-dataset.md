@@ -14,7 +14,7 @@ and runs through [`engine.evals`](../evals/index.md).
 | `packages/nl2sql/src/nl2sql/evaluation/run.py` | The three modes, prices and the cost cap |
 | `packages/nl2sql/src/nl2sql/evaluation/gold_llm.py` | The gold-plan fake LLM that [mode plans](#mode-plans-gold-plans-through-the-code-nodes) runs on |
 | `packages/nl2sql/src/nl2sql/evaluation/scorers/` | The scorer interface and the five built-ins |
-| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `compare_results_lenient`), which `result_match` reads on the run's terminal result (the combined result of a split question, not a sub-query's scan) |
+| `packages/nl2sql/src/nl2sql/evaluation/evaluator.py` | Row comparison (`compare_results`, `column_picks`, `compare_results_lenient`), which `result_match` reads on the run's terminal result (the combined result of a split question, not a sub-query's scan) |
 | `packages/nl2sql/src/nl2sql/evaluation/faithfulness.py` | [Answer faithfulness](#answer-faithfulness): the written answer's numbers and names against the rows |
 | `packages/nl2sql/src/nl2sql/evaluation/report.py` | The report's boards: accuracy, intervals, pass^k, cost, latency |
 | `packages/nl2sql/src/nl2sql/evaluation/gate.py` | The regression gate's statistics: flips, McNemar's test, the checks |
@@ -94,9 +94,11 @@ the [scorers](../evals/scorers.md). For `result_match` and `outcome`:
 
 Rows are compared by value, in selected column order:
 
-- **Names don't count, order does.** Column names and aliases are ignored, so
-  `SELECT Country AS c` matches a gold `Country` column, but a swapped column
-  order does not.
+- **Names and column order don't count.** Column names and aliases are ignored,
+  so `SELECT Country AS c` matches a gold `Country` column, and a result whose
+  columns come in another order matches too: each gold column is answered by a
+  distinct result column holding the same values. A mislabelled column fails,
+  because its values differ. Rows must still line up across the matched columns.
 - **Numbers match within 0.005**, because gold values are rounded to two
   decimals.
 - **A number matches a string that spells it**, within the same tolerance, so
@@ -119,7 +121,7 @@ Every run is scored twice, and the report gives both, strict first.
 
 | Score | What it is |
 | --- | --- |
-| **Strict** | The execution match above: the same columns, in the same order, and the same rows; or the same rows with **extra columns** (see below) |
+| **Strict** | The execution match above: the same columns (in any order) and the same rows; or the same rows with **extra columns** (see below) |
 | **Lenient** | Every gold column is answered by *some* column of the result, wherever it sits |
 
 Strict is the honest headline. Lenient exists because most of what it
@@ -171,14 +173,17 @@ are equal: `'2009'` matches `'2009-01-01'`, and `'2013-02'` matches
 - Nothing else is normalised. Anything broader belongs in an alternative
   answer, which is reviewed per case and cannot silently widen.
 
-Extra columns are the one lenient reading that counts as a pass in the strict
-score. A result wider than the gold passes `result_match` when some choice of
-its columns, **in their own order**, equals the gold under the strict rules
-above (the extra columns may sit anywhere), within the column cap. The record
-says which match it was (`detail.match`: `strict` or `extra columns`).
-Reordered gold columns and period labels never pass this way, with or without
-extra columns; they stay lenient-only. The row count and every row value are
-as strict as before.
+Reordered columns and extra columns are the lenient readings that count as a
+pass in the strict score. A result passes `result_match` when some choice of
+its columns, **in any order**, equals the gold under the strict rules above; a
+result wider than the gold must also stay within the column cap, and a result
+of more than 12 columns is not searched for a reordering. The record says which
+match it was (`detail.match`: `strict`, `reordered`, `extra columns` or
+`extra columns, reordered`). Period labels never pass this way; they stay
+lenient-only. The row count, every row value and, when `order_matters`, the row
+order are as strict as before. (Column order used to count, C-W6a; C-W7d
+dropped that rule, because a question asks for no column order and Spider-style
+execution checks ignore it.)
 
 Lenient is a superset of strict by construction: everything strict accepts is
 accepted. It is not partial credit -- a case passes a score or it does

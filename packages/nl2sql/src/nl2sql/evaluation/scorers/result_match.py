@@ -7,14 +7,16 @@ one result set".
 Applies to a role whose outcome is ``allowed``, on a case of kind
 ``answer``: a routing case says where a question goes, not what it returns,
 and is left out of execution accuracy. Column names are
-ignored, column order is kept, numbers (``Decimal`` too) match within half a
+ignored, numbers (``Decimal`` too) match within half a
 cent, dates match their ISO strings, and row order counts only when the case's
 ``order_matters`` (:meth:`ModelEvaluator.compare_results`). A result with the
-right rows plus extra columns also passes
-(:meth:`ModelEvaluator.compare_results_extra_columns`: the gold's columns in the
-same order, matched strictly). Reordered columns and period labels against dates alone do not pass; they are
-kept in ``detail`` as ``lenient``, with ``match`` naming how the case passed:
-``strict``, ``extra columns`` or none.
+right rows in another column order, or with extra columns, also passes
+(:meth:`ModelEvaluator.column_picks`: each gold column is answered by a distinct
+result column with equal values, so a mislabelled column fails; a result of more
+than 12 columns is not searched). Period labels against dates alone do not pass;
+they are kept in ``detail`` as ``lenient``, with ``match`` naming how the case
+passed: ``strict``, ``reordered``, ``extra columns``, ``extra columns, reordered``
+or none.
 """
 from __future__ import annotations
 
@@ -41,11 +43,18 @@ class ResultMatch(BuiltinScorer):
         strict = any(ModelEvaluator.compare_results(run.rows, a, order_matters=order) for a in answers)
         lenient = strict or any(ModelEvaluator.compare_results_lenient(run.rows, a, order_matters=order)
                                 for a in answers)
-        # The right rows with extra columns pass; a reordering or a period label alone stays lenient-only.
-        wider = not strict and any(ModelEvaluator.compare_results_extra_columns(run.rows, a, order_matters=order)
-                                   for a in answers)
-        passed = strict or wider
-        detail = {"lenient": lenient, "match": "strict" if strict else "extra columns" if wider else None}
+        # The right rows in another column order, or with extra columns, also pass; a period label alone stays lenient-only.
+        picks = None if strict else next((p for p in (ModelEvaluator.column_picks(run.rows, a, order_matters=order)
+                                                      for a in answers) if p is not None), None)
+        passed = strict or picks is not None
+        match = None
+        if strict:
+            match = "strict"
+        elif picks is not None:
+            reordered = list(picks) != sorted(picks)
+            wider = len(run.rows[0]) > len(picks)
+            match = ("extra columns, reordered" if reordered else "extra columns") if wider else "reordered"
+        detail = {"lenient": lenient, "match": match}
         if not passed:
             extra = len(answers) - 1
             alternatives = f" and {extra} alternative{'s' if extra != 1 else ''}" if extra else ""

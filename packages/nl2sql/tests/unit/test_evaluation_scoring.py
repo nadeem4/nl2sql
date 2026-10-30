@@ -13,6 +13,7 @@ from nl2sql.evaluation.suite import SUITES_DIR, load_suite
 compare = ModelEvaluator.compare_results
 lenient = ModelEvaluator.compare_results_lenient
 extra_columns = ModelEvaluator.compare_results_extra_columns
+reordered = ModelEvaluator.compare_results_reordered
 UTC = dt.timezone.utc
 PAGILA = {c.id: c for c in load_suite(SUITES_DIR / "pagila.yaml").cases}
 
@@ -242,9 +243,11 @@ def test_extra_columns_still_need_the_right_rows():
     assert not extra_columns([["USA", 13], ["Canada", 8]], gold, order_matters=True)   # not wider
 
 
-def test_extra_columns_do_not_let_reordered_columns_through():
-    assert not extra_columns([[13, "USA", "x"], [8, "Canada", "y"]],
-                             [{"c": "USA", "n": 13}, {"c": "Canada", "n": 8}], order_matters=True)
+def test_extra_columns_may_come_in_any_order():
+    gold = [{"c": "USA", "n": 13}, {"c": "Canada", "n": 8}]
+    assert extra_columns([[13, "USA", "x"], [8, "Canada", "y"]], gold, order_matters=True)
+    assert extra_columns([["x", 13, "USA"], ["y", 8, "Canada"]], gold, order_matters=True)
+    assert not extra_columns([[13, "USA", "x"], [9, "Canada", "y"]], gold, order_matters=True)
 
 
 def test_extra_columns_do_not_let_a_period_label_through():
@@ -255,3 +258,64 @@ def test_extra_columns_respect_the_column_cap():
     gold = [{"c": "USA"}, {"c": "Canada"}]
     assert extra_columns([["USA", 1, 2], ["Canada", 3, 4]], gold, order_matters=True)
     assert not extra_columns([["USA", 1, 2, 3], ["Canada", 3, 4, 5]], gold, order_matters=True)   # 4 > cap 3
+
+
+# --- C-W7d: the same rows with the columns in another order pass ----
+
+
+def test_reordered_columns_with_the_same_values_pass():
+    gold = [{"title": "A", "category": "X", "revenue": 5}, {"title": "B", "category": "Y", "revenue": 7}]
+    got = [["A", 5, "X"], ["B", 7, "Y"]]
+    assert not compare(got, gold, order_matters=True)
+    assert reordered(got, gold, order_matters=True)
+
+
+def test_reordered_columns_fail_when_one_column_differs():
+    gold = [{"title": "A", "category": "X", "revenue": 5}, {"title": "B", "category": "Y", "revenue": 7}]
+    assert not reordered([["A", 5, "X"], ["B", 8, "Y"]], gold, order_matters=True)
+    assert not reordered([["A", 5, "Z"], ["B", 7, "Y"]], gold, order_matters=True)
+
+
+def test_two_numeric_columns_swapped_and_relabelled_pass_but_different_values_fail():
+    gold = [{"a": 1, "b": 10}, {"a": 2, "b": 20}]
+    assert reordered([[10, 1], [20, 2]], gold, order_matters=True)
+    assert not reordered([[10, 1], [20, 3]], gold, order_matters=True)
+    assert not reordered([[1, 10], [2, 21]], gold, order_matters=True)
+
+
+def test_reordering_keeps_the_row_rules():
+    gold = [{"a": "x", "b": 1}, {"a": "y", "b": 2}]
+    swapped = [[2, "y"], [1, "x"]]
+    assert not reordered(swapped, gold, order_matters=True)       # an ordered case still needs the order
+    assert reordered(swapped, gold, order_matters=False)
+    assert not reordered([[1, "x"]], gold, order_matters=False)   # the row count still counts
+    assert not reordered([[2, "x"], [1, "y"]], gold, order_matters=False)   # values swapped between rows
+
+
+def test_reordering_copes_with_duplicate_valued_columns():
+    gold = [{"a": 1, "b": 1, "c": "x"}, {"a": 2, "b": 2, "c": "y"}]
+    assert reordered([["x", 1, 1], ["y", 2, 2]], gold, order_matters=True)
+    gold = [{"a": 1, "b": 1, "c": "x"}, {"a": 2, "b": 3, "c": "y"}]
+    assert reordered([[1, "x", 1], [3, "y", 2]], gold, order_matters=True)
+    assert not reordered([[1, "x", 1], [3, "y", 4]], gold, order_matters=True)
+
+
+def test_reordering_uses_the_same_value_comparison():
+    gold = [{"d": "2009-01-01", "n": Decimal("5.00")}]
+    assert reordered([[5.004, dt.date(2009, 1, 1)]], gold, order_matters=True)
+
+
+def test_reordering_needs_the_same_width_and_is_bounded():
+    gold = [{"a": 1, "b": 2}]
+    assert not reordered([[1, 2, 3]], gold, order_matters=True)   # wider is the extra-columns rule's
+    wide = {f"c{i}": i for i in range(13)}
+    assert not reordered([list(reversed(list(wide.values())))], [wide], order_matters=True)   # past the bound
+    narrow = {f"c{i}": i for i in range(12)}
+    assert reordered([list(reversed(list(narrow.values())))], [narrow], order_matters=True)
+
+
+def test_column_picks_prefers_the_columns_in_their_own_order():
+    pick = ModelEvaluator.column_picks
+    gold = [{"a": 1, "b": 1}]
+    assert pick([[1, 1, 9]], gold, order_matters=True) == (0, 1)
+    assert pick([[9, 2]], gold, order_matters=True) is None
