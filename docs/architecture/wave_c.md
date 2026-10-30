@@ -2376,7 +2376,11 @@ Prompt fixes from the keyed Pagila rerun (design 18.7). `decomposer/prompts.py`:
 
 Full-name alternatives for pagila_002 and pagila_003 (design 18.6). Data only: `alt_sql` and its regenerated `alt_rows` on the two cases in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` pins that each alternative's rows are the gold's, name for name, in the same order with the same figures.
 
-The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (enchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json, run 40954475050); the older records are untouched.
+The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (`benchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json`, run 40954475050); the older records are untouched.
+
+### C-W6g
+
+Full-name alternative for pagila_011 (design 18.8). Data only: `alt_sql` and its `alt_rows` on the case in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f. It was re-recorded from realdb run 40989212254 (`benchmarks/retrieval/pagila/2026-10-30_631c77a_retrieval.json`) because the suite digest changed.
 
 ## 14. Bugs Wave C fixes
 
@@ -2660,6 +2664,10 @@ were read, it reads the same tables, and ties break on the key.
 Each case gets an `alt_sql`: the gold query with `first_name || ' ' || last_name AS customer` (or `AS actor`), the gold's
 joins, grouping and `customer_id` / `actor_id` tie-break, not the model's aliases or its name-based tie-break. `alt_rows`
 come from `engine.evals.regenerate`, not by hand. The gold data is not changed.
+
+### 18.8 C-W6g: full-name alternative (pagila_011)
+
+Same finding and same fix as 18.6, for the third case of the kind. The keyed run wrote the actor as one `(first_name || ' ') || last_name AS actor` column where the gold has `first_name` and `last_name`; the five actors, their order and their totals are the gold's (Gina Degeneres 3442.49, Matthew Carrey 2742.19, Mary Keitel 2689.25, Scarlett Damon 2655.28, Walter Torn 2620.62). The case gets an `alt_sql` that is the gold query with the concatenated name and the gold's `actor_id` tie-break; the gold data is not changed.
 
 ### 18.7 C-W6e: split only when needed, quote exact figures
 
