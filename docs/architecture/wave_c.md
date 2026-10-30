@@ -2827,3 +2827,5 @@ the keyed check, so every example in a prompt now comes from logistics, which no
 `tests/unit/test_prompts_not_eval_questions.py` guards this: no prompt of the decomposer, table selector, ast planner, answer
 synthesizer, datasource resolver, curated matcher or refiner shares a run of 5 normalized words with any question in
 `evaluation/suites/*.yaml`, and the phrases "top 5 films", "spent more than 45", "revenue is in payments" and "9712" are absent.
+
+Keyed check, 2026-10-30. On main at e52517ed, with claude-opus-5 on the GCP test bed, the full Pagila suite passed 11 of 11 (0 timeouts, 100% table and column recall, p95 43 s), and pagila_001 alone passed 3 of 3. It was the first keyed run with no eval text in the prompts. Earlier keyed runs: 0 of 8 (C-W4), 5 of 9 and 9 of 11 (C-W6), 10 of 11 (C-W7c). Four questions (003, 005, 008, 011) each needed one planner retry for an undeclared join, which roughly doubled their latency; this is tracked as a later fix.
