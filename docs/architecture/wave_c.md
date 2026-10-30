@@ -2398,6 +2398,10 @@ A split answer's columns follow the question (design 18.10). `aggregation/engine
 
 `result_match` accepts reordered columns (design 18.11). `evaluation/evaluator.py`: new `ModelEvaluator.column_picks(generated, expected, order_matters)` returns the result column picked for each gold column (or `None`): candidates are the result columns whose values equal a gold column's as a multiset under the existing `_same_value`, and a depth-first search, pruned by `compare_results` on each partial assignment and bounded by `COLUMN_SEARCH_BUDGET`, returns the first assignment of distinct columns that passes. `column_match` tries the in-order extra-columns check first, then the search, and names the match. `compare_results_reordered` (same width) and `compare_results_extra_columns` (wider, within `lenient_column_cap`) go through `column_match`, so the extra-columns rule takes the gold's columns in any order; a result wider than `COLUMN_SEARCH_CAP = 12` columns is matched in order only. `scorers/result_match.py`: `detail.match` is `strict`, `reordered`, `extra columns`, `extra columns, reordered` or null; `lenient` is true whenever the case passed. Tests: `tests/unit/test_evaluation_scoring.py` (reordered pass; a differing or mislabelled column fails; swapped-and-relabelled numeric columns; ordered and unordered row rules; duplicate-valued columns; the bound; the preference for the result's own order) and `tests/unit/test_eval_scorers.py` (detail values, alternatives, `order_matters`). Updated, because they asserted that a reorder fails: `test_extra_columns_do_not_let_reordered_columns_through` (now `test_extra_columns_may_come_in_any_order`), `test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing` and `test_result_match_records_the_lenient_reading_beside_the_strict_one` (now a period-label case). Offline re-score of the stored keyed Pagila runs (no model call): pagila_001 of the C-W7c single-case run now passes as `reordered`; no other verdict changes. No gold data changed.
 
+### C-W7e
+
+Identifying columns stay in a join or compare answer (design 18.12). Wording only, no validation change. `decomposer/prompts.py` gains `ANSWER_COLUMNS`, one phrase that the rule 6 line, the rule 12 line (which also gets a "top 3 drivers by deliveries in the busiest depot" example) and the retry feedback share, and that `decomposer/node.py` uses in the missing-schema and no-op feedback; it replaces "helper columns left out" and "columns only used to rank or filter, unless the question asks for them". Tests: `tests/unit/test_decomposer_answer_columns.py` (`test_the_wording_keeps_the_entity_the_answer_is_about_in_every_place`; the two feedback tests no longer pin the old phrase) and `tests/unit/test_prompts_not_eval_questions.py` (every `prompts.py` module and the table selector shares no 5-word run with an evaluation suite question, and carries none of the banned phrases; its examples are logistics, see 18.12). No model call; a keyed check (pagila_001) follows.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |
@@ -2793,3 +2797,33 @@ columns up to `lenient_column_cap` pass as before. Only the reordering search is
 columns (`COLUMN_SEARCH_CAP`) is not searched, and the depth-first search (pruned by the row check on each partial
 assignment) stops after `COLUMN_SEARCH_BUDGET` = 10,000 checks, past which it is no match. The lenient path's column
 search uses the same bounded search. A pass always records `lenient: true`.
+
+### 18.12 C-W7e: identifying columns, prompts off the eval domains
+
+**Cause.** C-W7c (18.10) told the model to leave helper columns out of a join or compare op's `expected_schema`, as "columns
+only used to rank or filter, unless the question asks for them". In a keyed run of pagila_001 ("Top 5 films by revenue in
+the top category") the model took that literally and returned only `film_title, film_revenue`. `category` was used to
+filter, but it says which category the answer is about, so the answer lost its context.
+
+**Decision (owner-approved 2026-10-30).** Reword every occurrence to one shared phrase (`ANSWER_COLUMNS`): keep the columns
+that say what the answer is about (the entities the question asks for, and the entity a subset was chosen from, such as which
+depot, region or year); leave out only helper figures used purely to rank or select the subset (the depot's total
+deliveries that picked the busiest depot). Rule 12 adds the example "top 3 drivers by deliveries in the busiest depot" (busiest
+means most deliveries): keep driver, `driver_deliveries` and depot, leave out `depot_total`. Places: rule 6, rule 12, the retry feedback and the two `node.py` feedback messages (no op, no
+`expected_schema`). No validation logic changes.
+
+**Prompts off the eval domains.** A worked example that is also a suite question teaches the model the answer and inflates
+the keyed check, so every example in a prompt now comes from logistics, which no suite uses. Replaced (old text, new text):
+
+- Decomposer rule 11: `"the top 5 films by revenue" or "the customers who spent more than 45"` became `"the top 3 drivers by
+  deliveries" or "the drivers with more than 40 deliveries"`.
+- Decomposer rule 12: `"top 5 films by revenue in the top category"` (the top category, `category_revenue`, `film_revenue`)
+  became `"top 3 drivers by deliveries in the busiest depot"` (the busiest depot, `depot_total`, `driver_deliveries`).
+- Decomposer line 27: `"spent more than 45"` became `"more than 40 deliveries"`.
+- Table selector: `revenue is in payments, headcount in staff` became `fuel cost is in refuels, headcount in crews`.
+- Answer synthesizer: `9712.47 is "9,712.47", not "9,700"` became `4318.06 is "4,318.06", not "4,300"`.
+- `ANSWER_COLUMNS`: `which category, store or year` became `which depot, region or year`.
+
+`tests/unit/test_prompts_not_eval_questions.py` guards this: no prompt of the decomposer, table selector, ast planner, answer
+synthesizer, datasource resolver, curated matcher or refiner shares a run of 5 normalized words with any question in
+`evaluation/suites/*.yaml`, and the phrases "top 5 films", "spent more than 45", "revenue is in payments" and "9712" are absent.
