@@ -1269,6 +1269,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6g">
+<span class="md-ellipsis">
+      
+        C-W6g
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -1435,6 +1444,15 @@
 <span class="md-ellipsis">
       
         18.6 C-W6f: full-name alternatives (pagila_002, pagila_003)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#188-c-w6g-full-name-alternative-pagila_011">
+<span class="md-ellipsis">
+      
+        18.8 C-W6g: full-name alternative (pagila_011)
       
     </span>
 </a>
@@ -4178,6 +4196,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#c-w6g">
+<span class="md-ellipsis">
+      
+        C-W6g
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4344,6 +4371,15 @@
 <span class="md-ellipsis">
       
         18.6 C-W6f: full-name alternatives (pagila_002, pagila_003)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#188-c-w6g-full-name-alternative-pagila_011">
+<span class="md-ellipsis">
+      
+        18.8 C-W6g: full-name alternative (pagila_011)
       
     </span>
 </a>
@@ -8001,7 +8037,9 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
 &lt;p&gt;Prompt fixes from the keyed Pagila rerun (design 18.7). &lt;code&gt;decomposer/prompts.py&lt;/code&gt;: rule 11 (split only when one query cannot express the question) and rule 12 (a split that depends on a ranked subset ends in one join group, with the final ranking as one sort op carrying &lt;code&gt;order_by&lt;/code&gt; and &lt;code&gt;limit&lt;/code&gt;). &lt;code&gt;answer_synthesizer/prompts.py&lt;/code&gt;: instruction 2 quotes figures exactly as the rows hold them. No code change beyond the two prompts. Tests: prompt-content tests in &lt;code&gt;tests/unit/test_decomposer_tool_schema.py&lt;/code&gt; and &lt;code&gt;tests/unit/test_node_answer_synthesizer.py&lt;/code&gt;; no model call, so the effect shows only in the owner's next keyed run.&lt;/p&gt;
 &lt;h3 id="c-w6f"&gt;C-W6f&lt;/h3&gt;
 &lt;p&gt;Full-name alternatives for pagila_002 and pagila_003 (design 18.6). Data only: &lt;code&gt;alt_sql&lt;/code&gt; and its regenerated &lt;code&gt;alt_rows&lt;/code&gt; on the two cases in &lt;code&gt;suites/pagila.yaml&lt;/code&gt;; the gold &lt;code&gt;sql&lt;/code&gt; and &lt;code&gt;rows&lt;/code&gt; are untouched. &lt;code&gt;tests/unit/test_pagila_suite.py&lt;/code&gt; pins that each alternative's rows are the gold's, name for name, in the same order with the same figures.&lt;/p&gt;
-&lt;p&gt;The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (enchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json, run 40954475050); the older records are untouched.&lt;/p&gt;
+&lt;p&gt;The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (&lt;code&gt;benchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json&lt;/code&gt;, run 40954475050); the older records are untouched.&lt;/p&gt;
+&lt;h3 id="c-w6g"&gt;C-W6g&lt;/h3&gt;
+&lt;p&gt;Full-name alternative for pagila_011 (design 18.8). Data only: &lt;code&gt;alt_sql&lt;/code&gt; and its &lt;code&gt;alt_rows&lt;/code&gt; on the case in &lt;code&gt;suites/pagila.yaml&lt;/code&gt;; the gold &lt;code&gt;sql&lt;/code&gt; and &lt;code&gt;rows&lt;/code&gt; are untouched. &lt;code&gt;tests/unit/test_pagila_suite.py&lt;/code&gt; now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f. It was re-recorded from realdb run 40989212254 (&lt;code&gt;benchmarks/retrieval/pagila/2026-10-30_631c77a_retrieval.json&lt;/code&gt;) because the suite digest changed.&lt;/p&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -8408,6 +8446,8 @@ were read, it reads the same tables, and ties break on the key.&lt;/p&gt;
 &lt;p&gt;Each case gets an &lt;code&gt;alt_sql&lt;/code&gt;: the gold query with &lt;code&gt;first_name || ' ' || last_name AS customer&lt;/code&gt; (or &lt;code&gt;AS actor&lt;/code&gt;), the gold's
 joins, grouping and &lt;code&gt;customer_id&lt;/code&gt; / &lt;code&gt;actor_id&lt;/code&gt; tie-break, not the model's aliases or its name-based tie-break. &lt;code&gt;alt_rows&lt;/code&gt;
 come from &lt;code&gt;engine.evals.regenerate&lt;/code&gt;, not by hand. The gold data is not changed.&lt;/p&gt;
+&lt;h3 id="188-c-w6g-full-name-alternative-pagila_011"&gt;18.8 C-W6g: full-name alternative (pagila_011)&lt;/h3&gt;
+&lt;p&gt;Same finding and same fix as 18.6, for the third case of the kind. The keyed run wrote the actor as one &lt;code&gt;(first_name || ' ') || last_name AS actor&lt;/code&gt; column where the gold has &lt;code&gt;first_name&lt;/code&gt; and &lt;code&gt;last_name&lt;/code&gt;; the five actors, their order and their totals are the gold's (Gina Degeneres 3442.49, Matthew Carrey 2742.19, Mary Keitel 2689.25, Scarlett Damon 2655.28, Walter Torn 2620.62). The case gets an &lt;code&gt;alt_sql&lt;/code&gt; that is the gold query with the concatenated name and the gold's &lt;code&gt;actor_id&lt;/code&gt; tie-break; the gold data is not changed.&lt;/p&gt;
 &lt;h3 id="187-c-w6e-split-only-when-needed-quote-exact-figures"&gt;18.7 C-W6e: split only when needed, quote exact figures&lt;/h3&gt;
 &lt;p&gt;Approved by the owner 2026-10-29 after the keyed Pagila rerun (5 of 9 passed).&lt;/p&gt;
 &lt;ul&gt;
