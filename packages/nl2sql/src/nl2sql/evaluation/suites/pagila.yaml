@@ -428,3 +428,20 @@ cases:
   - {first_name: MARY, last_name: KEITEL, revenue: '2689.25'}
   - {first_name: SCARLETT, last_name: DAMON, revenue: '2655.28'}
   - {first_name: WALTER, last_name: TORN, revenue: '2620.62'}
+  alt_sql:
+  - |
+    SELECT a.first_name || ' ' || a.last_name AS actor, SUM(p.amount) AS revenue
+    FROM actor a
+    JOIN film_actor fa ON fa.actor_id = a.actor_id
+    JOIN inventory i ON i.film_id = fa.film_id
+    JOIN rental r ON r.inventory_id = i.inventory_id
+    JOIN payment p ON p.rental_id = r.rental_id
+    GROUP BY a.actor_id, a.first_name, a.last_name
+    ORDER BY revenue DESC, a.actor_id
+    LIMIT 5
+  alt_rows:
+  - - {actor: GINA DEGENERES, revenue: '3442.49'}
+    - {actor: MATTHEW CARREY, revenue: '2742.19'}
+    - {actor: MARY KEITEL, revenue: '2689.25'}
+    - {actor: SCARLETT DAMON, revenue: '2655.28'}
+    - {actor: WALTER TORN, revenue: '2620.62'}
