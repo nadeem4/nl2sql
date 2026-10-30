@@ -2376,11 +2376,11 @@ Prompt fixes from the keyed Pagila rerun (design 18.7). `decomposer/prompts.py`:
 
 Full-name alternatives for pagila_002 and pagila_003 (design 18.6). Data only: `alt_sql` and its regenerated `alt_rows` on the two cases in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` pins that each alternative's rows are the gold's, name for name, in the same order with the same figures.
 
-The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (enchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json, run 40954475050); the older records are untouched.
+The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (`benchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json`, run 40954475050); the older records are untouched.
 
 ### C-W6g
 
-Full-name alternative for pagila_011 (design 18.8). Data only: lt_sql and its lt_rows on the case in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f.
+Full-name alternative for pagila_011 (design 18.8). Data only: `alt_sql` and its `alt_rows` on the case in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f. It was re-recorded from realdb run 40989212254 (`benchmarks/retrieval/pagila/2026-10-30_631c77a_retrieval.json`) because the suite digest changed.
 
 ## 14. Bugs Wave C fixes
 
