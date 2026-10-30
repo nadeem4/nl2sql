@@ -70,6 +70,41 @@ def combined_columns(
     return out
 
 
+def ambiguous_columns(
+    operation: str,
+    inputs: Sequence[Sequence[str]],
+    join_keys: Iterable[Dict[str, Any]],
+) -> List[str]:
+    """Non-key columns both sides of a ``join`` have.
+
+    After the combine the left copy keeps the bare name and the right one
+    becomes ``<name>_right``, so a post-combine op reading the bare name reads
+    the left copy only, whatever the model meant. A ``compare`` is exempt: it
+    relies on matching names to diff the two sides.
+    """
+    if operation != "join" or len(inputs) < 2:
+        return []
+    left, right = list(inputs[0]), list(inputs[1])
+    keys = {resolve_key(left, (k or {}).get("left") or "") for k in join_keys}
+    keys |= {resolve_key(right, (k or {}).get("right") or "") for k in join_keys}
+    return [c for c in left if c in right and c not in keys]
+
+
+def ambiguous_columns_message(column: str, left_id: str, right_id: str, join_on: Sequence[str]) -> str:
+    """Why a post-combine op cannot read ``column``, which both joined sub-queries produce.
+
+    ``left_id`` and ``right_id`` describe the two sides (their intents).
+    """
+    return (
+        f"'{column}' is on both sides of the join on {', '.join(join_on) or 'its keys'} "
+        f"(left: \"{left_id}\", right: \"{right_id}\"): the left one keeps the name and the right "
+        f"one becomes '{column}{RIGHT_SUFFIX}', so a post-combine operation reading '{column}' would "
+        f"silently read only the left one. Give the sub-queries distinct names for it (for example "
+        f"'left_{column}' and 'right_{column}', better ones that say what each measures), renamed in "
+        f"each sub-query's expected_schema, so the operation reads the one you mean."
+    )
+
+
 def post_op_columns(operation: str, attributes: Dict[str, Any]) -> List[str]:
     """Every column a post-combine op reads from the combined result."""
     return [name for name in (

@@ -2382,6 +2382,10 @@ The suite's digest changed, so the Pagila retrieval baseline was re-recorded fro
 
 Full-name alternative for pagila_011 (design 18.8). Data only: `alt_sql` and its `alt_rows` on the case in `suites/pagila.yaml`; the gold `sql` and `rows` are untouched. `tests/unit/test_pagila_suite.py` now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f. It was re-recorded from realdb run 40989212254 (`benchmarks/retrieval/pagila/2026-10-30_631c77a_retrieval.json`) because the suite digest changed.
 
+### C-W7b
+
+The decomposer rejects an ambiguous post-combine column. Root cause (pagila_001): both sub-queries produced a non-key `total_revenue`; the combine keeps the bare name for the left copy and renames the right one `total_revenue_right`, so the final sort ranked the category total, the same on every row, and returned five unranked films without any error. `aggregation/columns.py`: `ambiguous_columns(operation, inputs, join_keys)` lists the non-key names both sides of a `join` have (empty for `compare`, which diffs by matching names, and for `union`/`standalone`), and `ambiguous_columns_message(...)` words the feedback. `decomposer/node.py` `post_combine_problems` adds one problem per such column an op reads, on the same parse-and-retry path as the missing-column check (one retry, then `PLANNER_FAILED` with the reason). The message names the column, the join keys and both sub-queries, says the left keeps the name and the right becomes `<name>_right`, and asks for distinct names in each `expected_schema`. Rule 12 of the decomposer prompt carries one line on distinct metric names. Tests: `tests/unit/test_decomposer_post_combine_columns.py` (pagila_001 shape rejected and retried, distinct names pass, a key passes, a column the op does not read passes, `compare` exempt, the helper itself). No model call; the effect shows in the owner's next keyed Pagila run.
+
 ## 14. Bugs Wave C fixes
 
 | # | Bug | Evidence | Fixed by |

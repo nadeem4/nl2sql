@@ -9,7 +9,9 @@ if TYPE_CHECKING:
 from .dag import build_execution_dag
 from .schemas import CombineGroup, DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp, key_column
 from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
-from nl2sql.aggregation.columns import combined_columns, input_order, missing_columns_message, post_op_columns
+from nl2sql.aggregation.columns import (
+    ambiguous_columns, ambiguous_columns_message, combined_columns, input_order, missing_columns_message, post_op_columns,
+)
 from nl2sql.common.errors import PipelineError, ErrorSeverity, ErrorCode
 from nl2sql.common.logger import get_logger
 from nl2sql.runtime import Runtime
@@ -158,6 +160,14 @@ def post_combine_problems(response: DecomposerResponse) -> List[str]:
         missing = [c for c in post_op_columns(op.operation, op.model_dump()) if c not in available]
         if missing:
             problems.append(missing_columns_message(missing, available))
+            continue
+        keys = [k.model_dump() for k in group.join_keys]
+        read = post_op_columns(op.operation, op.model_dump())
+        for column in ambiguous_columns(group.operation, columns, keys):
+            if column in read:
+                problems.append(ambiguous_columns_message(
+                    column, *(sub_queries[i.subquery_id].intent for i in inputs[:2]),
+                    [k["left"] for k in keys]))
     return problems
 
 
