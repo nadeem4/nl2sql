@@ -1,0 +1,3245 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Reference documentation for the NL2SQL engine, CLI and REST API" name="description"/>
+<meta content="Platform Engineering" name="author"/>
+<link href="../refiner_node/" rel="prev"/>
+<link href="../../../getting_started/" rel="next"/>
+<link href="../../../assets/favicon.svg" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.8.0" name="generator"/>
+<title>Schema Retriever - NL2SQL Platform</title>
+<link href="../../../assets/stylesheets/main.57a0d79d.min.css" rel="stylesheet"/>
+<link href="../../../assets/stylesheets/palette.fb2fffe2.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="purple" data-md-color-primary="teal" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#schemaretrievernode">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="NL2SQL Platform" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            NL2SQL Platform
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Schema Retriever
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="purple" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="lime" data-md-color-media="" data-md-color-primary="teal" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../../overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../getting_started/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../conversations/">
+          
+  
+  
+  Conversations
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../charts/">
+          
+  
+  
+  Charts
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../dashboards/">
+          
+  
+  
+  Dashboards
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../configuration/system/">
+          
+  
+  
+  Configuration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../adapters/">
+          
+  
+  
+  Adapters
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../schema/store/">
+          
+  
+  
+  Schema
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../execution/isolation/">
+          
+  
+  
+  Execution
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../storage/artifact-store/">
+          
+  
+  
+  Storage
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../observability/stack/">
+          
+  
+  
+  Observability
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../security/model/">
+          
+  
+  
+  Security
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../deployment/architecture/">
+          
+  
+  
+  Deployment
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../development/">
+          
+  
+  
+  Development
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../evals/">
+          
+  
+  
+  Evals
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../testing/architecture/">
+          
+  
+  
+  Testing
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../api/">
+          
+  
+  
+  API
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../releases/">
+          
+  
+  
+  Releases
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../../glossary/">
+        
+  
+  
+    
+  
+  Glossary
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="NL2SQL Platform" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="NL2SQL Platform">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    NL2SQL Platform
+  </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../graph_state/">
+<span class="md-ellipsis">
+    
+  
+    Graph State
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../determinism/">
+<span class="md-ellipsis">
+    
+  
+    Determinism
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../invariants/">
+<span class="md-ellipsis">
+    
+  
+    Invariants
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../failure_recovery/">
+<span class="md-ellipsis">
+    
+  
+    Failure + Recovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing + Retrieval
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../curated_answers/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../configuration_v2/">
+<span class="md-ellipsis">
+    
+  
+    Configuration v2 (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../phase2/">
+<span class="md-ellipsis">
+    
+  
+    Phase 2 (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../wave_a/">
+<span class="md-ellipsis">
+    
+  
+    Wave A (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../wave_b/">
+<span class="md-ellipsis">
+    
+  
+    Wave B (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../wave_c/">
+<span class="md-ellipsis">
+    
+  
+    Wave C (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../wave_d/">
+<span class="md-ellipsis">
+    
+  
+    Wave D (design)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_15" id="__nav_2_15_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Subgraphs
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_15_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Subgraphs
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../subgraphs/main_pipeline_graph/">
+<span class="md-ellipsis">
+    
+  
+    Main Pipeline Graph
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../subgraphs/sql_agent/">
+<span class="md-ellipsis">
+    
+  
+    SQL Agent Subgraph
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_2_16" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2_16" id="__nav_2_16_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_2_16_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_16">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../">
+<span class="md-ellipsis">
+    
+  
+    Node Catalog
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../answer_synthesizer_node/">
+<span class="md-ellipsis">
+    
+  
+    Answer Synthesizer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ast_planner_node/">
+<span class="md-ellipsis">
+    
+  
+    AST Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../clarifier_node/">
+<span class="md-ellipsis">
+    
+  
+    Clarifier
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../curated_matcher_node/">
+<span class="md-ellipsis">
+    
+  
+    Curated Matcher
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../datasource_resolver_node/">
+<span class="md-ellipsis">
+    
+  
+    Datasource Resolver
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../decomposer_node/">
+<span class="md-ellipsis">
+    
+  
+    Decomposer
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../engine_aggregator_node/">
+<span class="md-ellipsis">
+    
+  
+    Engine Aggregator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../executor_node/">
+<span class="md-ellipsis">
+    
+  
+    Executor
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../generator_node/">
+<span class="md-ellipsis">
+    
+  
+    Generator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../logical_validator_node/">
+<span class="md-ellipsis">
+    
+  
+    Logical Validator
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../refiner_node/">
+<span class="md-ellipsis">
+    
+  
+    Refiner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Schema Retriever
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#overview">
+<span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#responsibilities">
+<span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#position-in-execution-graph">
+<span class="md-ellipsis">
+      
+        Position in Execution Graph
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inputs">
+<span class="md-ellipsis">
+      
+        Inputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#outputs">
+<span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#internal-flow-step-by-step">
+<span class="md-ellipsis">
+      
+        Internal Flow (Step-by-Step)
+      
+    </span>
+</a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#table-recall-on-large-schemas">
+<span class="md-ellipsis">
+      
+        Table recall on large schemas
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#kept-columns">
+<span class="md-ellipsis">
+      
+        Kept columns
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferred-tables">
+<span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#knowledge">
+<span class="md-ellipsis">
+      
+        Knowledge
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#contracts-interfaces">
+<span class="md-ellipsis">
+      
+        Contracts &amp; Interfaces
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#determinism-guarantees">
+<span class="md-ellipsis">
+      
+        Determinism Guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#error-handling">
+<span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retry-idempotency">
+<span class="md-ellipsis">
+      
+        Retry + Idempotency
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#performance-characteristics">
+<span class="md-ellipsis">
+      
+        Performance Characteristics
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#observability">
+<span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configuration">
+<span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#extension-points">
+<span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#known-limitations">
+<span class="md-ellipsis">
+      
+        Known Limitations
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related-code">
+<span class="md-ellipsis">
+      
+        Related Code
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/pypi/">
+<span class="md-ellipsis">
+    
+  
+    PyPI (Python API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker (REST API)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/source/">
+<span class="md-ellipsis">
+    
+  
+    From Source (Development)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/demo/">
+<span class="md-ellipsis">
+    
+  
+    Demo Data (CLI-first)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/mcp/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../getting_started/launch/">
+<span class="md-ellipsis">
+    
+  
+    Launch
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Conversations
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../conversations/">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../conversations/tools/">
+<span class="md-ellipsis">
+    
+  
+    Chat tools
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Charts
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../charts/">
+<span class="md-ellipsis">
+    
+  
+    Charts
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../charts/diagrams/">
+<span class="md-ellipsis">
+    
+  
+    Diagrams
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Dashboards
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../dashboards/">
+<span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/system/">
+<span class="md-ellipsis">
+    
+  
+    Configuration System
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/datasources/">
+<span class="md-ellipsis">
+    
+  
+    Datasources
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLMs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/hooks/">
+<span class="md-ellipsis">
+    
+  
+    Hooks
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/embeddings/">
+<span class="md-ellipsis">
+    
+  
+    Embeddings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/storage/">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/secrets/">
+<span class="md-ellipsis">
+    
+  
+    Secrets
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/curated/">
+<span class="md-ellipsis">
+    
+  
+    Curated Answers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/knowledge/">
+<span class="md-ellipsis">
+    
+  
+    Knowledge
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/review/">
+<span class="md-ellipsis">
+    
+  
+    Review Queue
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/settings/">
+<span class="md-ellipsis">
+    
+  
+    Settings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/observers/">
+<span class="md-ellipsis">
+    
+  
+    Observers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../configuration/api/">
+<span class="md-ellipsis">
+    
+  
+    REST API settings
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Adapters
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Adapters
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/sdk/">
+<span class="md-ellipsis">
+    
+  
+    SDK Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/sqlalchemy/">
+<span class="md-ellipsis">
+    
+  
+    SQLAlchemy Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/development/">
+<span class="md-ellipsis">
+    
+  
+    Building Adapters
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/duckdb/">
+<span class="md-ellipsis">
+    
+  
+    DuckDB
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/mssql/">
+<span class="md-ellipsis">
+    
+  
+    Microsoft SQL Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/mysql/">
+<span class="md-ellipsis">
+    
+  
+    MySQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/postgres/">
+<span class="md-ellipsis">
+    
+  
+    PostgreSQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../adapters/sqlite/">
+<span class="md-ellipsis">
+    
+  
+    SQLite
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Schema
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../schema/store/">
+<span class="md-ellipsis">
+    
+  
+    Schema Store + Metadata
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../schema/drift/">
+<span class="md-ellipsis">
+    
+  
+    Schema Drift
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../schema/profiler/">
+<span class="md-ellipsis">
+    
+  
+    Schema Profiler
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Execution
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Execution
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../execution/isolation/">
+<span class="md-ellipsis">
+    
+  
+    Execution Isolation + Concurrency
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_11" type="checkbox"/>
+<label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Storage
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_11_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_11">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Storage
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../storage/artifact-store/">
+<span class="md-ellipsis">
+    
+  
+    Artifact Store
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_12" type="checkbox"/>
+<label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Observability
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_12_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_12">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Observability
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/stack/">
+<span class="md-ellipsis">
+    
+  
+    Observability Stack
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/events/">
+<span class="md-ellipsis">
+    
+  
+    Events
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/debugging/">
+<span class="md-ellipsis">
+    
+  
+    Debugging a Run (Traces)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/feedback/">
+<span class="md-ellipsis">
+    
+  
+    Feedback and Signals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../observability/error-handling/">
+<span class="md-ellipsis">
+    
+  
+    Error Handling + Circuit Breaker
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_13" type="checkbox"/>
+<label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Security
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_13_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_13">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Security
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../security/model/">
+<span class="md-ellipsis">
+    
+  
+    Security Model
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../security/multi-tenant/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Tenant Isolation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../security/api-keys/">
+<span class="md-ellipsis">
+    
+  
+    API keys
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_14" type="checkbox"/>
+<label class="md-nav__link" for="__nav_14" id="__nav_14_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_14_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_14">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Deployment
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Deployment Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/docker/">
+<span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/kubernetes/">
+<span class="md-ellipsis">
+    
+  
+    Kubernetes
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../deployment/hosted-demo/">
+<span class="md-ellipsis">
+    
+  
+    Hosted demo
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_15" type="checkbox"/>
+<label class="md-nav__link" for="__nav_15" id="__nav_15_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_15_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_15">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../development/">
+<span class="md-ellipsis">
+    
+  
+    Extending NL2SQL
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../development/releasing/">
+<span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/add-adapter/">
+<span class="md-ellipsis">
+    
+  
+    Add Adapter
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/add-chunk-types/">
+<span class="md-ellipsis">
+    
+  
+    Add Chunk Types
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/extend-planner/">
+<span class="md-ellipsis">
+    
+  
+    Extend Planner
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../extensions/add-execution-backend/">
+<span class="md-ellipsis">
+    
+  
+    Add Execution Backend
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_16" type="checkbox"/>
+<label class="md-nav__link" for="__nav_16" id="__nav_16_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Evals
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_16_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_16">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Evals
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../evals/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../evals/cases/">
+<span class="md-ellipsis">
+    
+  
+    Cases and Suites
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../evals/scorers/">
+<span class="md-ellipsis">
+    
+  
+    Scorers
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../evals/seeding/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Your Own Database
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../testing/evaluation-dataset/">
+<span class="md-ellipsis">
+    
+  
+    The Chinook Suite
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../benchmarks/">
+<span class="md-ellipsis">
+    
+  
+    Benchmark Results
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_17" type="checkbox"/>
+<label class="md-nav__link" for="__nav_17" id="__nav_17_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_17_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_17">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../testing/architecture/">
+<span class="md-ellipsis">
+    
+  
+    Testing Architecture
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../testing/test-bed/">
+<span class="md-ellipsis">
+    
+  
+    Real-Database Test Bed
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18" type="checkbox"/>
+<label class="md-nav__link" for="__nav_18" id="__nav_18_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_18_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_18">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_18_2" id="__nav_18_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Core API (Python)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_18_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_18_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Core API (Python)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/public-facade/">
+<span class="md-ellipsis">
+    
+  
+    Public Facade
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/policies/">
+<span class="md-ellipsis">
+    
+  
+    Policies
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/results/">
+<span class="md-ellipsis">
+    
+  
+    Results
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/conversations/">
+<span class="md-ellipsis">
+    
+  
+    Conversations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/core/dashboards/">
+<span class="md-ellipsis">
+    
+  
+    Dashboards
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_18_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_18_3" id="__nav_18_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    REST API (FastAPI)
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_18_3_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_18_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    REST API (FastAPI)
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/health/">
+<span class="md-ellipsis">
+    
+  
+    Health
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/query/">
+<span class="md-ellipsis">
+    
+  
+    Query
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/datasource/">
+<span class="md-ellipsis">
+    
+  
+    Datasource
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/llm/">
+<span class="md-ellipsis">
+    
+  
+    LLM
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../api/rest/indexing/">
+<span class="md-ellipsis">
+    
+  
+    Indexing
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_19" type="checkbox"/>
+<label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Releases
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_19_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_19">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Releases
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.9.1/">
+<span class="md-ellipsis">
+    
+  
+    0.9.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.9.0/">
+<span class="md-ellipsis">
+    
+  
+    0.9.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.8.0/">
+<span class="md-ellipsis">
+    
+  
+    0.8.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.7.0/">
+<span class="md-ellipsis">
+    
+  
+    0.7.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.6.0/">
+<span class="md-ellipsis">
+    
+  
+    0.6.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.5.0/">
+<span class="md-ellipsis">
+    
+  
+    0.5.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.4.1/">
+<span class="md-ellipsis">
+    
+  
+    0.4.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.4.0/">
+<span class="md-ellipsis">
+    
+  
+    0.4.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.3.0/">
+<span class="md-ellipsis">
+    
+  
+    0.3.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.4/">
+<span class="md-ellipsis">
+    
+  
+    0.2.4
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.3/">
+<span class="md-ellipsis">
+    
+  
+    0.2.3
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.2/">
+<span class="md-ellipsis">
+    
+  
+    0.2.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.1/">
+<span class="md-ellipsis">
+    
+  
+    0.2.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.2.0/">
+<span class="md-ellipsis">
+    
+  
+    0.2.0
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.1.2/">
+<span class="md-ellipsis">
+    
+  
+    0.1.2
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.1.1/">
+<span class="md-ellipsis">
+    
+  
+    0.1.1
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../releases/0.1.0/">
+<span class="md-ellipsis">
+    
+  
+    0.1.0
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../glossary/">
+<span class="md-ellipsis">
+    
+  
+    Glossary
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#overview">
+<span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#responsibilities">
+<span class="md-ellipsis">
+      
+        Responsibilities
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#position-in-execution-graph">
+<span class="md-ellipsis">
+      
+        Position in Execution Graph
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inputs">
+<span class="md-ellipsis">
+      
+        Inputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#outputs">
+<span class="md-ellipsis">
+      
+        Outputs
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#internal-flow-step-by-step">
+<span class="md-ellipsis">
+      
+        Internal Flow (Step-by-Step)
+      
+    </span>
+</a>
+<nav aria-label="Internal Flow (Step-by-Step)" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#table-recall-on-large-schemas">
+<span class="md-ellipsis">
+      
+        Table recall on large schemas
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#kept-columns">
+<span class="md-ellipsis">
+      
+        Kept columns
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#preferred-tables">
+<span class="md-ellipsis">
+      
+        Preferred tables
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#knowledge">
+<span class="md-ellipsis">
+      
+        Knowledge
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#contracts-interfaces">
+<span class="md-ellipsis">
+      
+        Contracts &amp; Interfaces
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#determinism-guarantees">
+<span class="md-ellipsis">
+      
+        Determinism Guarantees
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#error-handling">
+<span class="md-ellipsis">
+      
+        Error Handling
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retry-idempotency">
+<span class="md-ellipsis">
+      
+        Retry + Idempotency
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#performance-characteristics">
+<span class="md-ellipsis">
+      
+        Performance Characteristics
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#observability">
+<span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configuration">
+<span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#extension-points">
+<span class="md-ellipsis">
+      
+        Extension Points
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#known-limitations">
+<span class="md-ellipsis">
+      
+        Known Limitations
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related-code">
+<span class="md-ellipsis">
+      
+        Related Code
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="schemaretrievernode">SchemaRetrieverNode</h1>
+<h2 id="overview">Overview</h2>
+<ul>
+<li>Retrieves schema context for a sub‑query using staged vector search and authoritative snapshots.</li>
+<li>Exists to constrain planning to relevant tables/columns while remaining schema‑grounded.</li>
+<li>Sits at the entry of the SQL agent subgraph.</li>
+<li>Class: <code>SchemaRetrieverNode</code></li>
+<li>Source: <code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
+</ul>
+<hr/>
+<h2 id="responsibilities">Responsibilities</h2>
+<ul>
+<li>Build a semantic query from sub‑query intent, filters, group_by, expected_schema, metrics.</li>
+<li>Retrieve candidate tables/columns/relationships from the run's pinned <code>Retriever</code>.</li>
+<li>Resolve authoritative tables from <code>SchemaStore</code>.</li>
+<li>Fall back to full schema snapshot when retrieval returns no candidates or
+  the search fails; see <a href="#error-handling">Error Handling</a>.</li>
+<li>On a schema past <code>full_snapshot_max_tables</code>, send the tables the question
+  needs, not only the ones nearest its words: the glossary's, a model's picks
+  from a catalog, and the tables that join them; see
+  <a href="#table-recall-on-large-schemas">Table recall on large schemas</a>.</li>
+<li>Keep the columns a join or an answer needs on a table cut to the columns
+  the search returned; see <a href="#kept-columns">Kept columns</a>.</li>
+<li>Rank the datasource's <code>preferred_tables</code> first and set <code>preferred=True</code> on
+  them, on the full-snapshot path and the retrieval path; see
+  <a href="#preferred-tables">Preferred tables</a>.</li>
+<li>Hide every table the caller may not read, on every path. The caller's
+  <code>Scope</code> (<code>ctx.policy_engine.scope(user_context, datasource_id)</code>, the one the
+  logical validator refuses with) filters the snapshot's tables <em>before</em>
+  anything is chosen: the full-snapshot path sends the readable tables only
+  (and compares their count, not the snapshot's, with
+  <code>full_snapshot_max_tables</code>), and the vector searches run with
+  <code>tables=&lt;the readable tables&gt;</code>, so the top <code>k</code> is filled with readable ones.
+  A hidden table's name, columns, keys, statistics and data never reach the
+  prompt or the run trace, and a relationship from a readable table into a
+  hidden one is dropped. See
+  <a href="../../../security/model/#hidden-tables-and-strict-refusal">Security Model</a>.</li>
+<li>The tables it returns keep every statistic, but the planner and refiner
+  prompts render them with <code>render_schema_for_prompt</code> (<code>schema.py</code>), which
+  sends only <code>sample_values</code> and, for date, time and numeric columns other
+  than keys, a <code>range</code> of <code>[min_value, max_value]</code>. See
+  <a href="../ast_planner_node/#prompt-layout-and-caching">AST Planner: prompt layout</a>.</li>
+<li>Read the run's pinned knowledge (the glossary, <code>Runtime.knowledge</code> as
+  <code>pin_index()</code> kept it) and put what the caller may see into the schema block
+  and <code>knowledge_used</code>; see <a href="#knowledge">Knowledge</a>.</li>
+</ul>
+<hr/>
+<h2 id="position-in-execution-graph">Position in Execution Graph</h2>
+<p>Upstream:
+- SQL agent subgraph entry.</p>
+<p>Downstream:
+- <code>ASTPlannerNode</code>, or the end of the sub-query when it returned a
+  non-retryable error (retrieval failed with no snapshot to fall back to).</p>
+<p>Trigger conditions:
+- Always executed as the subgraph entry node.</p>
+<pre class="mermaid"><code>flowchart LR
+    SchemaRetriever[SchemaRetrieverNode] --&gt;|tables| Planner[ASTPlannerNode]
+    SchemaRetriever --&gt;|SCHEMA_RETRIEVAL_FAILED| End([end of sub-query])</code></pre>
+<hr/>
+<h2 id="inputs">Inputs</h2>
+<p>From <code>SubgraphExecutionState</code>:</p>
+<ul>
+<li><code>sub_query</code> (required): includes intent, filters, group_by, expected_schema, metrics, schema_version.</li>
+</ul>
+<p>From <code>Runtime</code>:</p>
+<ul>
+<li><code>knowledge</code> (optional): the run's pinned <code>Knowledge</code>; none means no glossary</li>
+<li><code>settings.knowledge</code>: <code>top_k</code> and <code>block_max_chars</code></li>
+<li><code>llm_registry</code> (optional): the table selector's model, agent <code>table_selector</code>
+  (node name <code>tableselector</code>); asked for on the first selector call only</li>
+<li><code>vector_store</code> (optional)</li>
+<li><code>state</code> (the state store; required for authoritative resolution)</li>
+<li><code>ds_registry</code> (optional): <code>get_preferred_tables(datasource_id)</code>, <code>get_dialect(datasource_id)</code> (for derived date roles)</li>
+</ul>
+<p>Validation performed:</p>
+<ul>
+<li>If <code>sub_query</code> missing, returns empty <code>relevant_tables</code>.</li>
+<li>If no candidates from vector store, falls back to full snapshot.</li>
+</ul>
+<hr/>
+<h2 id="outputs">Outputs</h2>
+<p>Mutations to <code>SubgraphExecutionState</code>:</p>
+<ul>
+<li><code>relevant_tables</code> (list of <code>Table</code>)</li>
+<li><code>knowledge_used</code> (<code>KnowledgeUsed</code>): the terms and rules sent as
+  <code>[BUSINESS_CONTEXT]</code>; absent when none matched, and for a pinned plan</li>
+<li><code>reasoning</code> and <code>warnings</code> in fallback paths</li>
+<li><code>errors</code>: one <code>CRITICAL</code> <code>SCHEMA_RETRIEVAL_FAILED</code> when retrieval failed
+  and there is no snapshot to fall back to</li>
+</ul>
+<p>Side effects:</p>
+<ul>
+<li>Vector store queries.</li>
+<li>Schema store reads.</li>
+<li>None for knowledge: the planner publishes <code>knowledge.used</code> (an operator
+  event, never on the caller's stream) on the sub-query's first prompt that
+  carries <code>knowledge_used</code>. A plan-cache hit sends no prompt, so it publishes
+  nothing, and the sub-query's result reports no <code>knowledge_used</code>.</li>
+</ul>
+<hr/>
+<h2 id="internal-flow-step-by-step">Internal Flow (Step-by-Step)</h2>
+<ol>
+<li>Build semantic query with <code>_build_semantic_query()</code>.</li>
+<li>Resolve schema snapshot via <code>_resolve_snapshot()</code>, and match the glossary's
+   terms once (<code>_matched_terms()</code>); <code>_knowledge_used()</code> sends the same terms.</li>
+<li>Past <code>full_snapshot_max_tables</code> (and not for a pinned plan):</li>
+<li>Retrieve table/metric chunks via <code>retrieve_schema_context()</code>, <code>k = settings.retrieval.table_k</code> (8).</li>
+<li>If no table chunks, retrieve columns via <code>retrieve_column_candidates()</code>, <code>k = table_k</code>.</li>
+<li>If tables are identified, retrieve columns/relationships via <code>retrieve_planning_context()</code>, <code>k = settings.retrieval.planning_k</code> (12).</li>
+<li>Add the matched terms' tables, the table selector's picks and the join-path fill; see
+      <a href="#table-recall-on-large-schemas">Table recall on large schemas</a>.</li>
+<li>Build <code>Table</code> objects with <code>_build_tables_from_snapshot()</code>: each table
+   keeps the columns the searches returned plus its <a href="#kept-columns">kept columns</a>.</li>
+<li>If no tables were found, return full snapshot with warning.</li>
+<li>On exception, see <a href="#error-handling">Error Handling</a>.</li>
+</ol>
+<h3 id="table-recall-on-large-schemas">Table recall on large schemas</h3>
+<p>Wave C, C-W4 (<a href="../../wave_c/#17-c-w4-table-recall-on-large-schemas">design</a>).
+A missing table guarantees a wrong answer; an extra one costs some prompt. On
+Pagila (29 tables) the question "top 5 films by revenue in the top category"
+never got <code>payment</code>: "revenue" is not near that table, and the chain is
+<code>film -&gt; inventory -&gt; rental -&gt; payment</code>. Past <code>full_snapshot_max_tables</code>, the
+tables sent are the union of four steps, per sub-query and per datasource:</p>
+<ol>
+<li><strong>Vector search</strong>, as above.</li>
+<li><strong>Glossary terms.</strong> Each matched term's <code>tables</code>, and the table of each of
+   its <code>columns</code>, are added, and the named columns kept. A table the caller
+   cannot read is never added.</li>
+<li><strong>The table selector</strong>, one model call (<code>settings.retrieval.table_selector</code>,
+   on by default; agent <code>table_selector</code>). The catalog lists every table the
+   caller may read: its name, its description cut to 200 characters, its column
+   names, as JSON values under <code>[TABLES]</code>, with the question, the matched
+   terms and the tables steps 1 and 2 chose. Past
+   <code>settings.retrieval.selector_catalog_max</code> (200) readable tables the catalog
+   is the nearest that many by vector search. The model returns table names;
+   a name not in the catalog is dropped, and an empty answer is fine. A table it
+   picks keeps all its columns, up to 40; a wider one keeps what the planning
+   search returned plus its keys. A failed call (an invalid answer after the
+   agent's parse retries, a provider error) is logged and costs only the
+   selector's tables; a run limit (<code>LimitReached</code>) or a cancel is not swallowed
+   and ends the run. The call counts against <code>max_llm_calls</code> and <code>max_cost_usd</code>.
+   The model is built on the first call, so <code>table_selector: false</code> needs no key.</li>
+<li><strong>Join-path fill.</strong> The tables from steps 1 to 3 are connected through a graph of
+   the tables the caller may read, whose edges are foreign keys and glossary
+   joins: repeatedly the two nearest unconnected groups are joined by a shortest
+   path (an approximate Steiner tree, in <code>join_path.py</code>). A path longer than
+   <code>settings.retrieval.join_path_max_hops</code> (4) is not added. A bridge table
+   keeps its <a href="#kept-columns">kept columns</a> only: key, join columns, label.</li>
+</ol>
+<p>Nothing changes at or below the threshold, or for a pinned plan: every table is
+sent and no selector call is made. The <code>retrieval</code> record lists, for each table
+sent, its <code>qualified</code> name and the <code>steps</code> that added it (<code>vector</code>,
+<code>glossary</code>, <code>selector</code>, <code>join_path</code>), so a missed answer is traced to its cause.
+The selector's model call is recorded under its own step, <code>table_selector</code>, in
+usage and <code>models_by_node</code>, not under <code>schema_retriever</code>. A table already chosen
+by an earlier step is never cut by the selector's pick, and a glossary term's
+columns are always kept.</p>
+<h3 id="kept-columns">Kept columns</h3>
+<p>The <code>planning</code> search returns <code>planning_k</code> (12) entries across all the tables
+found, so a table often arrives with a few columns and none of its keys. On
+Pagila (29 tables), the 0.9.0 smoke test's question about films in the Sports
+category got <code>film</code> without <code>film_id</code> or <code>title</code> and <code>category</code> without <code>name</code>,
+and no join or answer could be validated (bug B103 in
+<a href="../../wave_c/#14-bugs-wave-c-fixes">Wave C, section 14</a>). So a table cut to
+the search's columns also keeps (<code>_kept_columns</code>):</p>
+<ul>
+<li>its primary key;</li>
+<li>both sides of every join it is offered: the constrained columns of its
+  foreign keys and glossary joins into a readable table, and the referred
+  columns of a foreign key or glossary join into it from another table sent,
+  so every relationship in the schema block can be bound;</li>
+<li>its label: a column named <code>name</code> or <code>title</code>, or <code>&lt;table&gt;_name</code> /
+  <code>&lt;table&gt;_title</code> (case ignored). An answer lists or filters by it far more
+  often than the search ranks it.</li>
+</ul>
+<p>A table sent whole (the full-snapshot path, or a table the search named with
+no column) is unchanged.</p>
+<h3 id="preferred-tables">Preferred tables</h3>
+<p>A datasource's <code>preferred_tables</code> (in <code>datasources.yaml</code>, see
+<a href="../../../configuration/datasources/#preferred-tables">Datasources</a>) are
+matched against snapshot tables by bare name or <code>schema.table</code>, case ignored.</p>
+<ul>
+<li>Full snapshot: every preferred table is in the list, first.</li>
+<li>Retrieval: preferred tables the <code>tables</code> search picked come first. A
+  preferred table the search scored but did not pick is added (before the
+  <code>planning</code> search, so its columns and relationships are fetched too) when
+  its similarity is at least the least similar pick's minus
+  <code>PREFERRED_MARGIN</code> (0.05).</li>
+<li>Each preferred <code>Table</code> has <code>preferred=True</code>. <code>render_schema_for_prompt</code>
+  sorts preferred tables first, then by name, and prints <code>"preferred":true</code> on
+  them only; with no preferred tables the block is byte-identical to before.
+  Planner instruction 14 tells the model to plan against a preferred table
+  when it answers the question.</li>
+<li>Being preferred never shows a hidden table: a preferred table the caller's
+  scope denies is left out like any other.</li>
+</ul>
+<h3 id="knowledge">Knowledge</h3>
+<p>Wave B (K2, <a href="../../wave_b/#4-knowledge-in-the-prompts">design</a>). The
+datasource's merged knowledge is first filtered to the caller's scope with
+<code>nl2sql.knowledge.scope.visible</code> (an item naming a table the caller cannot
+read, or whose text mentions one, is left out), then resolved against the
+snapshot by <code>schema_knowledge()</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Field of the schema block</th>
+<th>What is sent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A table's <code>description</code></td>
+<td>The glossary's, else the database's comment (D38). Either is dropped when its text mentions a table the caller cannot read.</td>
+</tr>
+<tr>
+<td>A column's <code>description</code></td>
+<td>The same rule</td>
+</tr>
+<tr>
+<td>A column's <code>role</code></td>
+<td>The glossary's, else the one the snapshot proves: <code>identifier</code> for a primary or foreign key, <code>date</code> for a temporal type (D61)</td>
+</tr>
+<tr>
+<td>A column's <code>unit</code>, <code>grain</code>, <code>values</code></td>
+<td>The glossary's, when it sets them (<code>values</code> on <code>role: enum</code> only)</td>
+</tr>
+<tr>
+<td><code>relationships</code></td>
+<td>The foreign keys into readable tables, plus each glossary join between two readable tables whose names resolve and whose types compare, with its <code>cardinality</code> and <code>"source": "glossary"</code> (D46). The logical validator's join check matches it as it matches a foreign key.</td>
+</tr>
+</tbody>
+</table>
+<p><code>notes</code> are never sent. <code>knowledge_used</code> (<code>nl2sql/knowledge/match.py</code>):</p>
+<ul>
+<li><strong>Terms</strong> whose name or a synonym appears, as whole words with case and
+  punctuation ignored, in the sub-query's intent or the question: 1.0 for the
+  name, 0.9 for a synonym, the best <code>settings.knowledge.top_k</code> (8). Two terms
+  sharing a synonym are both sent; that is how the planner sees an ambiguity.
+  A term the caller sees also matches when its <code>knowledge.term</code> index entry is
+  at least <code>settings.knowledge.match_floor</code> (0.6) similar to the sub-query's
+  intent (<code>Retriever.retrieve_term_candidates</code>), scoring that similarity; if the
+  search fails, terms match by name only.</li>
+<li><strong>Rules</strong> whose <code>tables</code> is empty or names one of the tables sent.</li>
+<li>The denied-name pattern is built once per sub-query, and only the readable
+  tables' comments are checked against it.</li>
+<li>The block is cut to <code>settings.knowledge.block_max_chars</code> (4,000) by
+  <code>fit_business_context</code> (<code>nl2sql/knowledge/render.py</code>): the lowest-scored
+  terms first, then rules from the last; <code>dropped</code> lists what was cut.</li>
+</ul>
+<p>Both hold only items within the caller's scope, since
+<code>SubQueryResult.knowledge_used</code> is returned to the caller.</p>
+<hr/>
+<h2 id="contracts-interfaces">Contracts &amp; Interfaces</h2>
+<p>Implements a LangGraph node callable:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>def __call__(self, state: SubgraphExecutionState) -&gt; Dict[str, Any]
+</code></pre></div>
+<p>Key contracts:</p>
+<ul>
+<li><code>Table</code> / <code>Column</code> (node schema)</li>
+<li><code>SchemaSnapshot</code> (authoritative source)</li>
+</ul>
+<hr/>
+<h2 id="determinism-guarantees">Determinism Guarantees</h2>
+<ul>
+<li>Deterministic snapshot resolution for a fixed <code>schema_version</code>.</li>
+<li>Vector retrieval ranking may be non‑deterministic (MMR).</li>
+</ul>
+<hr/>
+<h2 id="error-handling">Error Handling</h2>
+<ul>
+<li>Exceptions are caught and logged via <code>logger.error</code>.</li>
+<li>With a snapshot (the search failed, e.g. the embedding model could not
+  load), it does what the no-candidates path does: every table the caller may
+  read, a <code>SCHEMA_RETRIEVAL_FAILED</code> <code>RunWarning</code> with a fixed message (the
+  exception detail goes to the log only), and no error. Planning against no
+  tables fails every attempt (bug B105 in
+  <a href="../../wave_c/#14-bugs-wave-c-fixes">Wave C, section 14</a>).</li>
+<li>Without one (the snapshot itself could not be read), it returns empty
+  <code>relevant_tables</code> and a <code>CRITICAL</code> <code>SCHEMA_RETRIEVAL_FAILED</code> error with a
+  fixed message, which is not retryable: the SQL agent ends the sub-query before the planner.</li>
+</ul>
+<hr/>
+<h2 id="retry-idempotency">Retry + Idempotency</h2>
+<ul>
+<li>No internal retry logic.</li>
+<li>Idempotent for fixed vector retrieval output; vector ranking may vary.</li>
+</ul>
+<hr/>
+<h2 id="performance-characteristics">Performance Characteristics</h2>
+<ul>
+<li>Depends on vector store retrieval latency and schema store reads.</li>
+<li>In‑memory processing of candidates and snapshot tables.</li>
+</ul>
+<hr/>
+<h2 id="observability">Observability</h2>
+<ul>
+<li>Logger: <code>schema_retriever</code></li>
+<li>Emits reasoning and warnings on fallback paths.</li>
+<li>Returns a <code>retrieval</code> record in its update (not a state field, so LangGraph
+  drops it; the run trace keeps it): the query text embedded, each search's
+  pool with scores, the MMR picks in order and what was dropped, and the tables
+  and columns sent to the planner, each table with the <code>steps</code> that added it
+  when the schema is past the threshold; or, when the schema is small enough to send
+  whole, <code>skipped: true</code> and why. Column entries of a table the role cannot read
+  keep their name and rank but lose their scores (their embedded text holds
+  sample values). See <a href="../../../observability/debugging/#retrieval">Debugging a run</a>.</li>
+</ul>
+<hr/>
+<h2 id="configuration">Configuration</h2>
+<ul>
+<li><code>settings.retrieval.full_snapshot_max_tables</code>, <code>table_k</code>, <code>planning_k</code>, <code>table_selector</code>, <code>selector_catalog_max</code> and <code>join_path_max_hops</code> (see <a href="../../../configuration/settings/#retrieval">Settings</a>).</li>
+<li>The <code>table_selector</code> agent under <code>llm.agents</code> (see <a href="../../../configuration/llm/#per-node-models">LLM</a>).</li>
+<li>Vector store configuration is set in <code>Runtime</code>.</li>
+</ul>
+<hr/>
+<h2 id="extension-points">Extension Points</h2>
+<ul>
+<li>Modify semantic query construction to include additional signals.</li>
+<li>Replace node in <code>build_sql_agent_graph()</code> for alternative retrieval strategies.</li>
+</ul>
+<hr/>
+<h2 id="known-limitations">Known Limitations</h2>
+<ul>
+<li>No tenant scoping in vector retrieval.</li>
+<li>No caching of retrieved tables across retries.</li>
+<li>Fallback to full schema can be expensive for large schemas. A failed search
+  falls back the same way, with no <code>full_snapshot_max_tables</code> cap, so a very
+  large schema may overflow the context.</li>
+<li>A pruned table keeps its foreign-key columns for joins into any table the
+  caller can read, with no per-table cap; a wide fact table keeps them all.</li>
+<li>The label rule goes by column name, so a label named otherwise
+  (<code>first_name</code>, <code>country</code>) is kept only when the search returns it. It also
+  strips one trailing <code>s</code> from the table name (<code>customers</code> matches
+  <code>customer_name</code>), so other plurals (<code>categories</code> and <code>category_name</code>) miss.</li>
+</ul>
+<hr/>
+<h2 id="related-code">Related Code</h2>
+<ul>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/node.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/selector.py</code> (the prompt, <code>TableSelection</code>)</li>
+<li><code>packages/nl2sql/src/nl2sql/pipeline/nodes/schema_retriever/join_path.py</code></li>
+<li><code>packages/nl2sql/src/nl2sql/indexing/retrieval.py</code></li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "toc.follow", "content.code.copy"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+<script src="../../../assets/javascripts/bundle.c21346df.min.js"></script>
+</body>
+</html>
