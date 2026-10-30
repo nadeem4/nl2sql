@@ -1547,6 +1547,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1813-c-lt4-allowed-joins-up-front">
+<span class="md-ellipsis">
+      
+        18.13 C-LT4: allowed joins up front
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4563,6 +4572,15 @@
 <span class="md-ellipsis">
       
         18.12 C-W7e: identifying columns, prompts off the eval domains
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1813-c-lt4-allowed-joins-up-front">
+<span class="md-ellipsis">
+      
+        18.13 C-LT4: allowed joins up front
       
     </span>
 </a>
@@ -8758,6 +8776,39 @@ the keyed check, so every example in a prompt now comes from logistics, which no
 synthesizer, datasource resolver, curated matcher or refiner shares a run of 5 normalized words with any question in
 &lt;code&gt;evaluation/suites/*.yaml&lt;/code&gt;, and the phrases "top 5 films", "spent more than 45", "revenue is in payments" and "9712" are absent.&lt;/p&gt;
 &lt;p&gt;Keyed check, 2026-10-30. On main at e52517ed, with claude-opus-5 on the GCP test bed, the full Pagila suite passed 11 of 11 (0 timeouts, 100% table and column recall, p95 43 s), and pagila_001 alone passed 3 of 3. It was the first keyed run with no eval text in the prompts. Earlier keyed runs: 0 of 8 (C-W4), 5 of 9 and 9 of 11 (C-W6), 10 of 11 (C-W7c). Four questions (003, 005, 008, 011) each needed one planner retry for an undeclared join, which roughly doubled their latency; this is tracked as a later fix.&lt;/p&gt;
+&lt;h3 id="1813-c-lt4-allowed-joins-up-front"&gt;18.13 C-LT4: allowed joins up front&lt;/h3&gt;
+&lt;p&gt;&lt;strong&gt;Problem.&lt;/strong&gt; In the keyed Pagila run of 18.12, four of eleven questions (003, 005, 008, 011) each needed one planner retry
+because the model invented a join no foreign key declares (&lt;code&gt;film_actor&lt;/code&gt; to &lt;code&gt;inventory&lt;/code&gt;, &lt;code&gt;inventory&lt;/code&gt; to &lt;code&gt;film_category&lt;/code&gt;,
+shortcuts on a shared key). The logical validator rejects that with the join hint of 18.3, and the retry roughly doubles
+the question's latency. The planner saw foreign keys only as each table's own outgoing &lt;code&gt;relationships&lt;/code&gt; inside its JSON
+line, including keys to tables it was not sent, so a path through bridge tables had to be assembled by the model.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Design (owner-agreed 2026-10-30).&lt;/strong&gt; One &lt;code&gt;[ALLOWED_JOINS]&lt;/code&gt; block in the planner's system message, right after
+&lt;code&gt;[RELEVANT_TABLES]&lt;/code&gt;. It lists every declared join whose two tables are both in the sent set, one equality per line, e.g.&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;&lt;a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"&gt;&lt;/a&gt;film.film_id = inventory.film_id
+&lt;a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"&gt;&lt;/a&gt;film.film_id = film_category.film_id
+&lt;a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"&gt;&lt;/a&gt;film_category.category_id = category.category_id
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;ul&gt;
+&lt;li&gt;Bare table names, as the plan writes them (the validator compares bare names too); a multi-column key is one line
+  joined with &lt;code&gt;AND&lt;/code&gt;; a key declared from both tables is one line (each side ordered, so the line does not depend on the
+  key's direction); lines sorted and deduplicated, so the block is byte-stable and stays in the cached prefix
+  (&lt;code&gt;tests/unit/test_prompt_cache_shape.py&lt;/code&gt; holds). With no declared pair the block is the single line &lt;code&gt;none&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Two tables in different schemas that share a bare name are not told apart; this matches the validator's existing bare-name comparison.&lt;/li&gt;
+&lt;li&gt;One shared helper: &lt;code&gt;allowed_joins&lt;/code&gt; in &lt;code&gt;validator/join_hints.py&lt;/code&gt; reads &lt;code&gt;_edges&lt;/code&gt;, the extractor the validator's hint
+  already used, and &lt;code&gt;normalize_name&lt;/code&gt; moved there from the validator so both normalize identically.&lt;/li&gt;
+&lt;li&gt;Instruction 3 and the output contract now say: join two tables only on a pair listed in &lt;code&gt;[ALLOWED_JOINS]&lt;/code&gt;; tables that
+  share a column name but have no listed pair are not joinable directly, go through the listed bridge tables; with no path,
+  do not join. No dialect names and no eval-domain wording (&lt;code&gt;test_prompts_not_eval_questions.py&lt;/code&gt; holds).&lt;/li&gt;
+&lt;li&gt;The validator check and its retry are unchanged (backstop). The per-table JSON is unchanged: the refiner shares it, and
+  nothing showed the duplicated keys to be a problem.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Cost.&lt;/strong&gt; About 12 tokens per declared join; 20 to 30 joins on a 15-table schema is 250 to 400 tokens in the system
+message, written to the cache once per question set and read at the cached rate after.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Built.&lt;/strong&gt; &lt;code&gt;allowed_joins&lt;/code&gt; and &lt;code&gt;normalize_name&lt;/code&gt; in &lt;code&gt;join_hints.py&lt;/code&gt;; the block and rewording in &lt;code&gt;ast_planner/prompts.py&lt;/code&gt;;
+&lt;code&gt;ASTPlannerNode&lt;/code&gt; passes &lt;code&gt;allowed_joins&lt;/code&gt;. Tests: &lt;code&gt;tests/unit/test_planner_allowed_joins.py&lt;/code&gt; (sent-set filtering, dedupe,
+sort, both directions, multi-column, bare names, the prompt's block position, &lt;code&gt;none&lt;/code&gt;, byte stability, shared helper).
+Docs: &lt;code&gt;docs/architecture/nodes/ast_planner_node.md&lt;/code&gt;. Not yet measured: the keyed Pagila rerun (retries for undeclared joins
+should fall to about 0), which needs the owner's yes for the model spend.&lt;/p&gt;
 
 
 

@@ -2963,7 +2963,7 @@ caches a stable prefix of 1,024+ tokens automatically):</p>
 <tbody>
 <tr>
 <td>system (<code>PLANNER_SYSTEM_PROMPT</code>)</td>
-<td>role, instructions, output contract, constraints, <code>PLANNER_EXAMPLES</code>, then <code>[RELEVANT_TABLES]</code></td>
+<td>role, instructions, output contract, constraints, <code>PLANNER_EXAMPLES</code>, then <code>[RELEVANT_TABLES]</code>, then <code>[ALLOWED_JOINS]</code></td>
 <td>only when the schema or the caller's role changes</td>
 </tr>
 <tr>
@@ -2973,6 +2973,15 @@ caches a stable prefix of 1,024+ tokens automatically):</p>
 </tr>
 </tbody>
 </table>
+<p><code>[ALLOWED_JOINS]</code> lists every declared join whose two tables are both in the schema the planner was sent, one equality
+per line (<code>film.film_id = inventory.film_id</code>; a multi-column key is one line joined with <code>AND</code>), with bare table names as
+in the plan, sorted and deduplicated so the block is byte-stable, and <code>none</code> when no pair is joined. Instruction 3 and
+the output contract tell the planner to join only on a listed pair, and to go through the listed bridge tables when two
+tables merely share a column name. The lines come from <code>allowed_joins</code> in <code>validator/join_hints.py</code>, which reads the same
+edges as the validator's join hint, so the prompt and the validator's check cannot disagree; the validator check and its
+retry stay as the backstop. The per-table JSON is unchanged (it still carries each table's own <code>relationships</code>, and the
+refiner shares it); the block adds about 12 tokens per declared join, a few hundred for a 15-table schema, once per
+question in the cached prefix.</p>
 <p><code>[TODAY]</code> is the run date (<code>run_date(today)</code> in <code>common/dates.py</code>, given
 <code>settings.pipeline.today</code>: that date when it is set, else the UTC date), so "this year" or "the last 30 days" resolve to
 real dates rather than a year the model guessed. It is in the human message
