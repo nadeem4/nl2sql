@@ -37,16 +37,22 @@ errors apart from failures.
 the combined result, not any sub-query's scan. A run with two terminal results fails with "expected one result set, got 2".
 It compares rows strictly:
 
-- column names are ignored, and column order counts;
+- column names are ignored, and so is column order: each gold column must be answered by a distinct result column
+  with equal values, so a mislabelled column still fails, unless its values happen to equal another
+  gold column's, row for row (goals for and against, say: an accepted, rare limit);
 - numbers (database decimals too) match within half a cent;
 - dates match their ISO strings, and a date-only label matches that day's midnight in the other value's own offset;
 - row order counts only when `order_matters`;
-- the right rows with extra columns also pass, if the gold's columns keep their
-  order and match strictly (`detail["match"]` is `extra columns`; `strict` for
-  an exact match).
+- the right rows with extra columns also pass, if the gold's columns appear among
+  them, in any order, and match strictly.
+
+`detail["match"]` says how the case passed: `strict` (same columns, same order),
+`reordered` (the same columns in another order), `extra columns`, or
+`extra columns, reordered`. A result of more than 12 columns is not searched for
+reordered columns (the gold's columns in their own order still match, up to the extra-column cap), and the search has a fixed budget of checks, past which it is no match.
 
 It also keeps the lenient reading in `detail["lenient"]`, which accepts
-reordered columns and period labels against dates besides. The
+period labels against dates and extra columns beyond the cap besides. The
 report gives the strict and lenient accuracy side by side. The rules, and
 `faithfulness`'s, are in [the Chinook
 suite](../testing/evaluation-dataset.md#strict-and-lenient-accuracy).
