@@ -143,7 +143,7 @@ def _schema_missing_message(group_id: str, operation: str) -> str:
     """Why a join or compare group's op must list the answer's columns."""
     return (
         f"The {operation} group '{group_id}' combines two sub-queries, and its post-combine operation has no "
-        f"expected_schema. Without it the answer keeps the combine's column order, helper columns included. "
+        f"expected_schema. Without it the answer keeps the combine's column order, helper figures included. "
         f"List the question's answer columns in expected_schema, in the order the question asks for them, "
         f"with the entity the question asks for first; {ANSWER_COLUMNS}. For a compare, name a right-hand column the left side also has with "
         f"the '{RIGHT_SUFFIX}' suffix."
@@ -155,7 +155,7 @@ def _no_op_message(group_id: str, operation: str) -> str:
     return (
         f"The {operation} group '{group_id}' needs ONE post-combine operation whose expected_schema lists the "
         f"answer columns in question order (the entity the question asks for first); {ANSWER_COLUMNS}. "
-        f"Without one the answer keeps the combine's column order, helper columns included."
+        f"Without one the answer keeps the combine's column order, helper figures included."
     )
 
 

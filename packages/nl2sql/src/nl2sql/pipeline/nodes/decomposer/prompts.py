@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 # One phrase, used by the prompt, the retry feedback and the decomposer's own rejections.
 ANSWER_COLUMNS = (
     "keep the columns that say what the answer is about (the entities the question asks for, and the "
-    "entity a subset was chosen from, such as which category, store or year); leave out only helper "
+    "entity a subset was chosen from, such as which depot, region or year); leave out only helper "
     "figures used purely to rank or select the subset"
 )
 
@@ -24,7 +24,7 @@ RULES:
 2) If an intent cannot be mapped to any resolved datasource, emit it under unmapped_subqueries.
 3) SubQueries must contain ONLY semantic intent:
    - metrics
-   - filters (a threshold on a metric, such as "spent more than 45", is a filter too)
+   - filters (a threshold on a metric, such as "more than 40 deliveries", is a filter too)
    - group_by
    - order_by and limit: a question for the most, least, highest, lowest, top N or bottom N
      rows orders by the ranked metric (desc for most/highest/top) and limits to 1 or N
@@ -52,20 +52,21 @@ RULES:
 9) Do not invent attributes not implied by the user query or datasource metadata.
 10) Use at most {max_sub_queries} sub_queries. A question that needs more cannot be answered.
 11) Split only when one query cannot express the question. One sub-query is one flat query: it can join
-    tables, filter, group_by, aggregate, order_by and limit, so "the top 3 customers by spend" or "the
-    customers who spent more than 45" is one sub-query. Split when the question spans datasources, asks
+    tables, filter, group_by, aggregate, order_by and limit, so "the top 3 drivers by deliveries" or "the
+    drivers with more than 40 deliveries" is one sub-query. Split when the question spans datasources, asks
     independent parts, or needs a ranked or aggregated subset to filter another result.
-12) A split that depends on a ranked subset, such as "top 3 customers by spend in the busiest store", is
-    one join group, not separate answers: one sub-query finds the subset (the busiest store, limit 1), a
+12) A split that depends on a ranked subset, such as "top 3 drivers by deliveries in the busiest depot" (the depot with the most
+    deliveries), is
+    one join group, not separate answers: one sub-query finds the subset (the busiest depot, limit 1), a
     second computes the rows with that subset's attribute in its expected_schema, and one join group
     on that attribute combines them. The final ranking is ONE sort op in post_combine_ops on that
     group carrying both order_by and limit (never a sort op and a separate limit op: each op is its own
     result), so the question is answered by one result set. Name each sub-query's metric differently
-    (store_total, customer_spend): a name both sides share cannot be told apart after the join.
+    (depot_total, driver_deliveries): a name both sides share cannot be told apart after the join.
     A join or compare group ends in that one op, whose expected_schema lists the answer columns in
-    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 3 customers by spend
-    in the busiest store" keep customer, spend and store, and leave out store_total, which only
-    picked the store.
+    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 3 drivers by deliveries
+    in the busiest depot" keep driver, deliveries and depot, and leave out depot_total, which only
+    picked the depot.
 13) No commentary.
 
 OUTPUT FORMAT:

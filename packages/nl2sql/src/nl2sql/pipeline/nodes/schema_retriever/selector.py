@@ -31,7 +31,7 @@ DESCRIPTION_MAX = 200
 TABLE_SELECTOR_SYSTEM_PROMPT = """You choose the tables a question needs. A planner writes the query from the tables you choose, so a table you leave out can never be used, while an extra table costs little.
 
 Rules:
-1. Choose every table the question needs: the tables that hold what it measures, the ones it filters or groups by, and any it implies. A measure can sit in a table whose name the question never uses (revenue is in payments, headcount in staff).
+1. Choose every table the question needs: the tables that hold what it measures, the ones it filters or groups by, and any it implies. A measure can sit in a table whose name the question never uses (fuel cost is in refuels, headcount in crews).
 2. When unsure whether a table is needed, include it.
 3. Write each table name exactly as the catalog lists it. Never invent a name.
 4. Do not write joins or columns: the joins between your tables are added afterwards from the foreign keys.

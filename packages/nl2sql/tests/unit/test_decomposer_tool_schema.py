@@ -83,7 +83,7 @@ def test_the_prompt_splits_only_when_one_query_cannot_express_the_question():
 def test_a_split_that_depends_on_a_ranked_subset_ends_in_one_join_group():
     prompt = DECOMPOSER_SYSTEM_PROMPT.lower()
 
-    assert "busiest store" in prompt
+    assert "busiest depot" in prompt
     assert "one join" in prompt
     assert "post_combine_ops" in prompt
     # ONE op carries both: the engine does not chain ops, and each unread op is a result
