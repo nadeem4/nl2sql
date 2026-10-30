@@ -123,3 +123,10 @@ def test_the_join_instructions_point_at_the_allowed_joins_block():
     assert "use relationships listed in [RELEVANT_TABLES]" not in PLANNER_SYSTEM_PROMPT
     assert "Joins MUST use relationships provided in [RELEVANT_TABLES]" not in PLANNER_SYSTEM_PROMPT
 
+
+
+def test_a_multi_column_key_declared_from_both_sides_in_different_orders_is_one_line():
+    rels = [_rel("line", ["order_id", "region"], "orders", ["id", "region_code"]),
+            _rel("orders", ["region_code", "id"], "line", ["region", "order_id"])]
+
+    assert _lines(rels, {"line", "orders"}) == ["line.order_id = orders.id AND line.region = orders.region_code"]

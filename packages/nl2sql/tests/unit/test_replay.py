@@ -35,6 +35,7 @@ def rendered_prompts():
         _render(
             PLANNER_PROMPT,
             relevant_tables="[]",
+            allowed_joins="none",
             examples=PLANNER_EXAMPLES,
             feedback="",
             expected_schema=[],

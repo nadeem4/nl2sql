@@ -2851,6 +2851,7 @@ film_category.category_id = category.category_id
   joined with `AND`; a key declared from both tables is one line (each side ordered, so the line does not depend on the
   key's direction); lines sorted and deduplicated, so the block is byte-stable and stays in the cached prefix
   (`tests/unit/test_prompt_cache_shape.py` holds). With no declared pair the block is the single line `none`.
+- Two tables in different schemas that share a bare name are not told apart; this matches the validator's existing bare-name comparison.
 - One shared helper: `allowed_joins` in `validator/join_hints.py` reads `_edges`, the extractor the validator's hint
   already used, and `normalize_name` moved there from the validator so both normalize identically.
 - Instruction 3 and the output contract now say: join two tables only on a pair listed in `[ALLOWED_JOINS]`; tables that

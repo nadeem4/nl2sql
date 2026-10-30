@@ -42,7 +42,8 @@ def allowed_joins(relationships: List[Dict[str, Any]], normalize: Callable[[Opti
     for a, a_cols, b, b_cols in _edges(relationships, normalize):
         if a in sent and b in sent:
             first, second = sorted([(a, a_cols), (b, b_cols)])
-            lines.add(" AND ".join(f"{first[0]}.{x} = {second[0]}.{y}" for x, y in zip(first[1], second[1])))
+            pairs = sorted(zip(first[1], second[1]))
+            lines.add(" AND ".join(f"{first[0]}.{x} = {second[0]}.{y}" for x, y in pairs))
     return sorted(lines)
 
 
