@@ -41,19 +41,12 @@ class ResultMatch(BuiltinScorer):
         answers = run.case.answers()
         order = run.case.order_matters
         strict = any(ModelEvaluator.compare_results(run.rows, a, order_matters=order) for a in answers)
-        lenient = strict or any(ModelEvaluator.compare_results_lenient(run.rows, a, order_matters=order)
-                                for a in answers)
         # The right rows in another column order, or with extra columns, also pass; a period label alone stays lenient-only.
-        picks = None if strict else next((p for p in (ModelEvaluator.column_picks(run.rows, a, order_matters=order)
-                                                      for a in answers) if p is not None), None)
-        passed = strict or picks is not None
-        match = None
-        if strict:
-            match = "strict"
-        elif picks is not None:
-            reordered = list(picks) != sorted(picks)
-            wider = len(run.rows[0]) > len(picks)
-            match = ("extra columns, reordered" if reordered else "extra columns") if wider else "reordered"
+        kinds = [ModelEvaluator.column_match(run.rows, a, order_matters=order) for a in answers]
+        match = "strict" if strict else next((k for k in kinds if k and k != "strict"), None)
+        passed = match is not None
+        lenient = passed or any(ModelEvaluator.compare_results_lenient(run.rows, a, order_matters=order)
+                                for a in answers)
         detail = {"lenient": lenient, "match": match}
         if not passed:
             extra = len(answers) - 1

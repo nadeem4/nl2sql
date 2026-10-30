@@ -195,16 +195,20 @@ def _column_can_match(got: List[Any], want: List[Any]) -> bool:
     return True
 
 
-# The most columns a result may have for the column search (``column_picks``): the
-# search only tries result columns whose values equal a gold column's, so it is
-# cheap, but past this width a result is not a tidy answer and is not searched.
+# The most columns a result may have for the reordering search (``column_picks``);
+# a wider result is only matched with the gold's columns in their own order.
 COLUMN_SEARCH_CAP = 12
+# The most partial assignments a column search checks; past it the result is a non-match.
+COLUMN_SEARCH_BUDGET = 10_000
 
 
-def _same_column(got: Sequence[Any], want: Sequence[Any]) -> bool:
-    """Whether two columns hold the same values as a multiset, under :func:`_same_value`."""
+def _same_column(got: Sequence[Any], want: Sequence[Any], order_matters: bool = False) -> bool:
+    """Whether two columns hold the same values under :func:`_same_value`: as a multiset, or
+    in the same order when ``order_matters``."""
     if len(got) != len(want):
         return False
+    if order_matters:
+        return all(_same_value(g, w) for g, w in zip(got, want))
     unused = list(got)
     for value in want:
         match = next((i for i, g in enumerate(unused) if _same_value(g, value)), None)
@@ -212,6 +216,34 @@ def _same_column(got: Sequence[Any], want: Sequence[Any]) -> bool:
             return False
         unused.pop(match)
     return True
+
+
+def _assign(candidates: List[List[int]], fits) -> Optional[tuple]:
+    """Depth-first: one unused candidate column per gold column, in the result's own column order.
+
+    ``fits(picks)`` must hold for every partial assignment a full one extends (a necessary
+    condition), which prunes the search; ``COLUMN_SEARCH_BUDGET`` bounds the checks, and past
+    it nothing matches. Returns the first full assignment, or ``None``.
+    """
+    picks: List[int] = []
+    budget = [COLUMN_SEARCH_BUDGET]
+
+    def go(j: int) -> bool:
+        if j == len(candidates):
+            return True
+        for i in candidates[j]:
+            if i in picks:
+                continue
+            if budget[0] <= 0:
+                return False
+            budget[0] -= 1
+            picks.append(i)
+            if fits(picks) and go(j + 1):
+                return True
+            picks.pop()
+        return False
+
+    return tuple(picks) if go(0) else None
 
 
 class ModelEvaluator:
@@ -285,16 +317,16 @@ class ModelEvaluator:
         expected_rows: Sequence[Row],
         order_matters: bool = False,
     ) -> Optional[tuple]:
-        """The result columns that answer the gold's, one per gold column, or ``None``.
+        """The result column picked for each gold column, in any order, or ``None``.
 
         Column names and order are ignored: a gold column is answered by an unused
-        result column whose values equal it (a multiset, under :func:`_same_value`),
-        and the picked columns, in the gold's order, must then equal the gold under
-        :meth:`compare_results`, so the rows still line up and the row order still
-        counts only when ``order_matters``. A result of more than
-        :data:`COLUMN_SEARCH_CAP` columns is not searched. Picks that keep the
-        result's own column order are preferred, so a caller can tell a reordering
-        (``picks != sorted(picks)``) from a plain match.
+        result column whose values equal it (a multiset, or in order when
+        ``order_matters``, under :func:`_same_value`), and the picked columns, in the
+        gold's order, must equal the gold under :meth:`compare_results`, so the rows
+        still line up and row order counts only when ``order_matters``. The search is
+        depth-first, pruned by the same row check on each partial assignment, and
+        bounded: a result of more than :data:`COLUMN_SEARCH_CAP` columns is not searched,
+        and past :data:`COLUMN_SEARCH_BUDGET` checks the answer is a non-match.
         """
         got = [_values(r) for r in generated_rows]
         want = [_values(r) for r in expected_rows]
@@ -304,19 +336,51 @@ class ModelEvaluator:
         if gold_width > width or width > COLUMN_SEARCH_CAP:
             return None
         columns = [_column(got, i) for i in range(width)]
-        candidates = [[i for i in range(width) if _same_column(columns[i], _column(want, j))]
+        candidates = [[i for i in range(width) if _same_column(columns[i], _column(want, j), order_matters)]
                       for j in range(gold_width)]
         if any(not c for c in candidates):
             return None
-        found = None
-        for picks in itertools.product(*candidates):
-            if len(set(picks)) != gold_width:
-                continue
-            if ModelEvaluator.compare_results([[row[i] for i in picks] for row in got], want, order_matters):
-                if list(picks) == sorted(picks):
-                    return picks
-                found = found or picks
-        return found
+
+        def fits(picks: List[int]) -> bool:
+            n = len(picks)
+            return ModelEvaluator.compare_results([[row[i] for i in picks] for row in got],
+                                                  [row[:n] for row in want], order_matters)
+
+        return _assign(candidates, fits)
+
+    @staticmethod
+    def column_match(
+        generated_rows: Sequence[Row],
+        expected_rows: Sequence[Row],
+        order_matters: bool = False,
+    ) -> Optional[str]:
+        """How the result answers the gold's columns: ``strict``, ``reordered``,
+        ``extra columns``, ``extra columns, reordered`` or ``None``.
+
+        A result wider than the gold must stay within :meth:`lenient_column_cap`.
+        The gold's columns in the result's own order are tried first (``extra
+        columns``, whatever the width); only then the reordering search, which is
+        bounded (:meth:`column_picks`).
+        """
+        got = [_values(r) for r in generated_rows]
+        want = [_values(r) for r in expected_rows]
+        if len(got) != len(want) or not want or not got:
+            return None
+        width, gold_width = len(got[0]), len(want[0])
+        if width < gold_width:
+            return None
+        if width == gold_width:
+            if ModelEvaluator.compare_results(generated_rows, expected_rows, order_matters):
+                return "strict"
+            return "reordered" if ModelEvaluator.column_picks(generated_rows, expected_rows, order_matters) else None
+        if width > ModelEvaluator.lenient_column_cap(gold_width):
+            return None
+        if any(ModelEvaluator.compare_results([[row[i] for i in picks] for row in got], want, order_matters)
+               for picks in itertools.combinations(range(width), gold_width)):
+            return "extra columns"
+        if ModelEvaluator.column_picks(generated_rows, expected_rows, order_matters):
+            return "extra columns, reordered"
+        return None
 
     @staticmethod
     def compare_results_reordered(
@@ -324,16 +388,18 @@ class ModelEvaluator:
         expected_rows: Sequence[Row],
         order_matters: bool = False,
     ) -> bool:
-        """Whether the result is the gold's rows with its columns in any order.
+        """Whether the result is the gold's rows with its columns in any order (same width).
 
-        Same width as the gold; see :meth:`column_picks` for the column rule. A
-        mislabelled column still fails, because its values differ.
+        See :meth:`column_picks` for the column rule. A mislabelled column fails
+        because its values differ, unless they happen to equal another gold
+        column's, row for row (goals for and against, say): an accepted, rare
+        limit of a check that ignores names and order.
         """
         got = [_values(r) for r in generated_rows]
         want = [_values(r) for r in expected_rows]
         if not got or not want or len(got[0]) != len(want[0]):
             return False
-        return ModelEvaluator.column_picks(generated_rows, expected_rows, order_matters) is not None
+        return ModelEvaluator.column_match(generated_rows, expected_rows, order_matters) is not None
 
     @staticmethod
     def compare_results_extra_columns(
@@ -345,16 +411,13 @@ class ModelEvaluator:
 
         The result must be wider than the gold, within :meth:`lenient_column_cap`,
         and the gold's columns must appear among its columns, in any order and
-        matched strictly (:meth:`column_picks`). Period labels do not pass.
+        matched strictly (:meth:`column_match`). Period labels do not pass.
         """
         got = [_values(r) for r in generated_rows]
         want = [_values(r) for r in expected_rows]
-        if len(got) != len(want) or not want or not got:
+        if not got or not want or len(got[0]) <= len(want[0]):
             return False
-        width, gold_width = len(got[0]), len(want[0])
-        if width <= gold_width or width > ModelEvaluator.lenient_column_cap(gold_width):
-            return False
-        return ModelEvaluator.column_picks(generated_rows, expected_rows, order_matters) is not None
+        return ModelEvaluator.column_match(generated_rows, expected_rows, order_matters) is not None
 
     @staticmethod
     def lenient_column_cap(gold_columns: int) -> int:
@@ -403,9 +466,9 @@ class ModelEvaluator:
                       for j in range(gold_width)]
         if any(not c for c in candidates):
             return False
-        for picks in itertools.product(*candidates):
-            if len(set(picks)) != gold_width:
-                continue
-            if _rows_match([[row[i] for i in picks] for row in got], want, order_matters):
-                return True
-        return False
+
+        def fits(picks: List[int]) -> bool:
+            n = len(picks)
+            return _rows_match([[row[i] for i in picks] for row in got], [row[:n] for row in want], order_matters)
+
+        return _assign(candidates, fits) is not None

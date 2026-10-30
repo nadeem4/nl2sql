@@ -38,7 +38,8 @@ the combined result, not any sub-query's scan. A run with two terminal results f
 It compares rows strictly:
 
 - column names are ignored, and so is column order: each gold column must be answered by a distinct result column
-  with equal values, so a mislabelled column still fails;
+  with equal values, so a mislabelled column still fails, unless its values happen to equal another
+  gold column's, row for row (goals for and against, say: an accepted, rare limit);
 - numbers (database decimals too) match within half a cent;
 - dates match their ISO strings, and a date-only label matches that day's midnight in the other value's own offset;
 - row order counts only when `order_matters`;
@@ -48,7 +49,7 @@ It compares rows strictly:
 `detail["match"]` says how the case passed: `strict` (same columns, same order),
 `reordered` (the same columns in another order), `extra columns`, or
 `extra columns, reordered`. A result of more than 12 columns is not searched for
-reordered columns.
+reordered columns (the gold's columns in their own order still match, up to the extra-column cap), and the search has a fixed budget of checks, past which it is no match.
 
 It also keeps the lenient reading in `detail["lenient"]`, which accepts
 period labels against dates and extra columns beyond the cap besides. The

@@ -375,3 +375,17 @@ def test_faithfulness_checks_the_answer_against_the_terminal_result():
     scans = [_scan("sq1", [["USA", 13]]), _scan("sq2", [["USA", 8]])]
     run = _split_run(_case({"admin": "allowed"}), [_terminal([["USA", 21]])], scans, answer=answer)
     assert Faithfulness().score(run).passed is True
+
+
+def test_a_reordered_pass_with_a_constant_column_is_lenient_too():
+    case = _case({"a": "allowed"}, rows=[{"cat": "X", "n": 1}, {"cat": "X", "n": 2}])
+    score = result_match.score(_run(case, "a", _rows_result([[1, "X"], [2, "X"]])))
+    assert score.passed and score.detail["match"] == "reordered" and score.detail["lenient"] is True
+
+
+def test_extra_columns_in_order_are_not_called_reordered():
+    case = _case({"a": "allowed"})
+    score = result_match.score(_run(case, "a", _rows_result([["USA", 13, "x"], ["Canada", 8, "y"]])))
+    assert score.detail["match"] == "extra columns"
+    score = result_match.score(_run(case, "a", _rows_result([["x", 13, "USA"], ["y", 8, "Canada"]])))
+    assert score.detail["match"] == "extra columns, reordered"

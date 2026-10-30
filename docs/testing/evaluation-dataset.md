@@ -98,7 +98,8 @@ Rows are compared by value, in selected column order:
   so `SELECT Country AS c` matches a gold `Country` column, and a result whose
   columns come in another order matches too: each gold column is answered by a
   distinct result column holding the same values. A mislabelled column fails,
-  because its values differ. Rows must still line up across the matched columns.
+  because its values differ, unless they equal another gold column's row for row (goals
+  for and against, say): an accepted, rare limit. Rows must still line up across the matched columns.
 - **Numbers match within 0.005**, because gold values are rounded to two
   decimals.
 - **A number matches a string that spells it**, within the same tolerance, so
@@ -177,7 +178,7 @@ Reordered columns and extra columns are the lenient readings that count as a
 pass in the strict score. A result passes `result_match` when some choice of
 its columns, **in any order**, equals the gold under the strict rules above; a
 result wider than the gold must also stay within the column cap, and a result
-of more than 12 columns is not searched for a reordering. The record says which
+of more than 12 columns is not searched for a reordering (the in-order match still applies). The record says which
 match it was (`detail.match`: `strict`, `reordered`, `extra columns` or
 `extra columns, reordered`). Period labels never pass this way; they stay
 lenient-only. The row count, every row value and, when `order_matters`, the row

@@ -2396,7 +2396,7 @@ A split answer's columns follow the question (design 18.10). `aggregation/engine
 
 ### C-W7d
 
-`result_match` accepts reordered columns (design 18.11). `evaluation/evaluator.py`: new `ModelEvaluator.column_picks(generated, expected, order_matters)` returns the result column picked for each gold column (or `None`): candidates are the result columns whose values equal a gold column's as a multiset under the existing `_same_value`, and the first assignment of distinct columns whose picked rows pass `compare_results` wins, preferring picks in the result's own column order. `compare_results_reordered` (same width) and `compare_results_extra_columns` (wider, within `lenient_column_cap`) now both go through it, so the extra-columns rule takes the gold's columns in any order. A result wider than `COLUMN_SEARCH_CAP = 12` columns is not searched. `scorers/result_match.py`: `detail.match` is `strict`, `reordered`, `extra columns`, `extra columns, reordered` or null; `lenient` is unchanged. Tests: `tests/unit/test_evaluation_scoring.py` (reordered pass; a differing or mislabelled column fails; swapped-and-relabelled numeric columns; ordered and unordered row rules; duplicate-valued columns; the bound; the preference for the result's own order) and `tests/unit/test_eval_scorers.py` (detail values, alternatives, `order_matters`). Updated, because they asserted that a reorder fails: `test_extra_columns_do_not_let_reordered_columns_through` (now `test_extra_columns_may_come_in_any_order`), `test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing` and `test_result_match_records_the_lenient_reading_beside_the_strict_one` (now a period-label case). Offline re-score of the stored keyed Pagila runs (no model call): pagila_001 of the C-W7c single-case run now passes as `reordered`; no other verdict changes. No gold data changed.
+`result_match` accepts reordered columns (design 18.11). `evaluation/evaluator.py`: new `ModelEvaluator.column_picks(generated, expected, order_matters)` returns the result column picked for each gold column (or `None`): candidates are the result columns whose values equal a gold column's as a multiset under the existing `_same_value`, and a depth-first search, pruned by `compare_results` on each partial assignment and bounded by `COLUMN_SEARCH_BUDGET`, returns the first assignment of distinct columns that passes. `column_match` tries the in-order extra-columns check first, then the search, and names the match. `compare_results_reordered` (same width) and `compare_results_extra_columns` (wider, within `lenient_column_cap`) go through `column_match`, so the extra-columns rule takes the gold's columns in any order; a result wider than `COLUMN_SEARCH_CAP = 12` columns is matched in order only. `scorers/result_match.py`: `detail.match` is `strict`, `reordered`, `extra columns`, `extra columns, reordered` or null; `lenient` is true whenever the case passed. Tests: `tests/unit/test_evaluation_scoring.py` (reordered pass; a differing or mislabelled column fails; swapped-and-relabelled numeric columns; ordered and unordered row rules; duplicate-valued columns; the bound; the preference for the result's own order) and `tests/unit/test_eval_scorers.py` (detail values, alternatives, `order_matters`). Updated, because they asserted that a reorder fails: `test_extra_columns_do_not_let_reordered_columns_through` (now `test_extra_columns_may_come_in_any_order`), `test_result_match_names_a_strict_match_and_keeps_other_lenient_readings_failing` and `test_result_match_records_the_lenient_reading_beside_the_strict_one` (now a period-label case). Offline re-score of the stored keyed Pagila runs (no model call): pagila_001 of the C-W7c single-case run now passes as `reordered`; no other verdict changes. No gold data changed.
 
 ## 14. Bugs Wave C fixes
 
@@ -2776,7 +2776,8 @@ not only an ordered subsequence. This reverses the earlier strictness that kept 
 
 **Reason.** In pagila_001 the engine returned exactly gold's rows with columns `film, film_revenue, category` against
 gold's `title, category, revenue`. The question asks for no column order, and Spider-style execution checks are
-column-order invariant. A mislabelled column still fails, because its values differ.
+column-order invariant. A mislabelled column still fails, because its values differ, unless they equal another gold column's, row for row
+(goals for and against, say): an accepted, rare limit of a check that ignores names and order.
 
 **What stays strict.** Every value (numbers within half a cent, dates and strings as before), the row count, and the row
 order where the case has `order_matters`. Rows must line up across the matched columns, so values swapped between rows
@@ -2787,5 +2788,8 @@ the columns are matched by values, not names, and duplicate-valued columns are f
 whose picked columns pass `compare_results` wins (`ModelEvaluator.column_picks`). Only candidates with equal values are
 tried, so the search is small. `detail.match` says `reordered` (same width) or `extra columns, reordered`.
 
-**The bound.** A result of more than 12 columns (`COLUMN_SEARCH_CAP`) is not searched: it counts as a strict match or
-fails, as before. The extra-columns cap (`lenient_column_cap`) is unchanged.
+**The bound.** The gold's columns in the result's own order are tried first (`combinations`, as on main), so extra
+columns up to `lenient_column_cap` pass as before. Only the reordering search is bounded: a result of more than 12
+columns (`COLUMN_SEARCH_CAP`) is not searched, and the depth-first search (pruned by the row check on each partial
+assignment) stops after `COLUMN_SEARCH_BUDGET` = 10,000 checks, past which it is no match. The lenient path's column
+search uses the same bounded search. A pass always records `lenient: true`.

@@ -5,6 +5,7 @@ Key-free. Each scorer's verdict on a whole case run is ``test_eval_scorers.py``.
 from __future__ import annotations
 
 import datetime as dt
+import time
 from decimal import Decimal
 
 from nl2sql.evaluation.evaluator import ModelEvaluator
@@ -319,3 +320,50 @@ def test_column_picks_prefers_the_columns_in_their_own_order():
     gold = [{"a": 1, "b": 1}]
     assert pick([[1, 1, 9]], gold, order_matters=True) == (0, 1)
     assert pick([[9, 2]], gold, order_matters=True) is None
+
+
+# --- C-W7d review: a bounded search, the in-order extra-column rule kept, the mirror-image limit ----
+
+
+def _flags(width):
+    """Every column holds {0,1}, but the result's rows do not line up with the gold's."""
+    gold = [{f"c{i}": 0 for i in range(width)}, {f"c{i}": 1 for i in range(width)}]
+    got = [[i % 2 for i in range(width)], [(i + 1) % 2 for i in range(width)]]
+    return got, gold
+
+
+def test_the_search_is_bounded_when_every_column_could_stand_for_every_other():
+    for width in (9, 12):
+        got, gold = _flags(width)
+        start = time.perf_counter()
+        assert not reordered(got, gold, order_matters=False)
+        assert time.perf_counter() - start < 1.0
+
+
+def test_the_search_is_fast_on_a_pass_among_duplicate_columns():
+    for width in (9, 12):
+        gold = [{"k": "a", **{f"c{i}": 0 for i in range(width - 1)}}, {"k": "b", **{f"c{i}": 0 for i in range(width - 1)}}]
+        got = [[0] * (width - 1) + ["a"], [0] * (width - 1) + ["b"]]
+        start = time.perf_counter()
+        assert reordered(got, gold, order_matters=True)
+        assert time.perf_counter() - start < 1.0
+
+
+def test_the_lenient_search_is_bounded_too():
+    got, gold = _flags(10)
+    start = time.perf_counter()
+    assert not lenient(got, gold, order_matters=False)
+    assert time.perf_counter() - start < 1.0
+
+
+def test_extra_columns_in_order_pass_up_to_the_lenient_cap_for_a_wide_gold():
+    gold = [{f"g{i}": i * 10 + r for i in range(7)} for r in range(3)]
+    got = [[i * 10 + r for i in range(7)] + [f"x{r}{k}" for k in range(6)] for r in range(3)]
+    assert len(got[0]) == 13 and ModelEvaluator.lenient_column_cap(7) == 14
+    assert extra_columns(got, gold, order_matters=True)
+
+
+def test_mirror_image_columns_can_pass_swapped():
+    # An accepted, rare limit: two columns equal to each other's values row for row (goals for and against).
+    gold = [{"t": "A", "f": 3, "a": 1}, {"t": "B", "f": 1, "a": 3}]
+    assert reordered([["A", 1, 3], ["B", 3, 1]], gold, order_matters=True)
