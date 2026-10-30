@@ -6290,7 +6290,7 @@ the runs published before 0.7 (<code>docs/benchmarks.md</code>).</p>
 </tr>
 <tr>
 <td><code>results</code></td>
-<td>One record per case run: its <code>status</code> and <code>reason</code>, every scorer's <code>score</code>, the SQL, the answer, the plans, <code>source</code> and <code>generated</code></td>
+<td>One record per case run: its <code>status</code> and <code>reason</code>, every scorer's <code>score</code>, the SQL (<code>sql</code> is the first sub-query's; for a split question that is one scan, not the combined result, and <code>sql_by_sub_query</code> has every sub-query's), the answer, the plans, <code>source</code> and <code>generated</code></td>
 </tr>
 </tbody>
 </table>

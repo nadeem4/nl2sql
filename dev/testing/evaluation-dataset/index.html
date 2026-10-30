@@ -6133,7 +6133,7 @@ and runs through <a href="../../evals/"><code>engine.evals</code></a>.</p>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/evaluator.py</code></td>
-<td>Row comparison (<code>compare_results</code>, <code>compare_results_lenient</code>), which <code>result_match</code> reads</td>
+<td>Row comparison (<code>compare_results</code>, <code>compare_results_lenient</code>), which <code>result_match</code> reads on the run's terminal result (the combined result of a split question, not a sub-query's scan)</td>
 </tr>
 <tr>
 <td><code>packages/nl2sql/src/nl2sql/evaluation/faithfulness.py</code></td>

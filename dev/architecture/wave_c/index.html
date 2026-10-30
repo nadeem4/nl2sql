@@ -1279,6 +1279,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#c-w7a">
+<span class="md-ellipsis">
+      
+        C-W7a
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#c-w7b">
 <span class="md-ellipsis">
       
@@ -1471,6 +1480,15 @@
 <span class="md-ellipsis">
       
         18.7 C-W6e: split only when needed, quote exact figures
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#189-c-w7-split-questions">
+<span class="md-ellipsis">
+      
+        18.9 C-W7: split questions
       
     </span>
 </a>
@@ -4215,6 +4233,15 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="#c-w7a">
+<span class="md-ellipsis">
+      
+        C-W7a
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#c-w7b">
 <span class="md-ellipsis">
       
@@ -4407,6 +4434,15 @@
 <span class="md-ellipsis">
       
         18.7 C-W6e: split only when needed, quote exact figures
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#189-c-w7-split-questions">
+<span class="md-ellipsis">
+      
+        18.9 C-W7: split questions
       
     </span>
 </a>
@@ -8058,6 +8094,8 @@ join-path fill and the eval wiring they need.&lt;/p&gt;
 &lt;p&gt;The suite's digest changed, so the Pagila retrieval baseline was re-recorded from CI's report (&lt;code&gt;benchmarks/retrieval/pagila/2026-10-29_526ff53_retrieval.json&lt;/code&gt;, run 40954475050); the older records are untouched.&lt;/p&gt;
 &lt;h3 id="c-w6g"&gt;C-W6g&lt;/h3&gt;
 &lt;p&gt;Full-name alternative for pagila_011 (design 18.8). Data only: &lt;code&gt;alt_sql&lt;/code&gt; and its &lt;code&gt;alt_rows&lt;/code&gt; on the case in &lt;code&gt;suites/pagila.yaml&lt;/code&gt;; the gold &lt;code&gt;sql&lt;/code&gt; and &lt;code&gt;rows&lt;/code&gt; are untouched. &lt;code&gt;tests/unit/test_pagila_suite.py&lt;/code&gt; now covers 011 with 002 and 003. The suite's digest changes, so the Pagila retrieval baseline is re-recorded from this PR's CI report, as in C-W6f. It was re-recorded from realdb run 40989212254 (&lt;code&gt;benchmarks/retrieval/pagila/2026-10-30_631c77a_retrieval.json&lt;/code&gt;) because the suite digest changed.&lt;/p&gt;
+&lt;h3 id="c-w7a"&gt;C-W7a&lt;/h3&gt;
+&lt;p&gt;The eval scores the combined result (design 18.9). &lt;code&gt;evaluation/run.py&lt;/code&gt;: &lt;code&gt;_terminal_sets(state, result, store)&lt;/code&gt; reads each result in &lt;code&gt;result.result_manifest&lt;/code&gt; from the aggregator's &lt;code&gt;computed_artifacts&lt;/code&gt; (every row, up to &lt;code&gt;_ALL_ROWS&lt;/code&gt;) as a &lt;code&gt;RowSample&lt;/code&gt;; &lt;code&gt;_ask&lt;/code&gt; returns &lt;code&gt;(result, retrieved, sets)&lt;/code&gt;. &lt;code&gt;CaseRun&lt;/code&gt; gains &lt;code&gt;sets&lt;/code&gt; (the terminal result sets; &lt;code&gt;rows&lt;/code&gt; and &lt;code&gt;columns&lt;/code&gt; are the first one's). &lt;code&gt;result_match&lt;/code&gt; counts &lt;code&gt;len(run.sets)&lt;/code&gt; for "expected one result set, got N"; &lt;code&gt;faithfulness&lt;/code&gt; checks the answer against &lt;code&gt;run.sets&lt;/code&gt;; &lt;code&gt;_digest&lt;/code&gt; and the record's &lt;code&gt;rows&lt;/code&gt; use them too. The record's &lt;code&gt;sql&lt;/code&gt; is still the first sub-query's, and a new &lt;code&gt;sql_by_sub_query&lt;/code&gt; (&lt;code&gt;{sub-query id: sql}&lt;/code&gt;) keeps every scan's SQL. A run that withheld its results has an empty manifest and so no sets. No change to &lt;code&gt;QueryResult&lt;/code&gt; or the facade. Tests: &lt;code&gt;tests/unit/test_eval_scorers.py&lt;/code&gt; (split with one terminal result scored on it, two terminal results still "got 2", a single-query case scores exactly as before, faithfulness on the terminal rows) and &lt;code&gt;tests/unit/test_eval_run.py&lt;/code&gt; (&lt;code&gt;_terminal_sets&lt;/code&gt;, a split record).&lt;/p&gt;
 &lt;h3 id="c-w7b"&gt;C-W7b&lt;/h3&gt;
 &lt;p&gt;The decomposer rejects an ambiguous post-combine column. Root cause (pagila_001): both sub-queries produced a non-key &lt;code&gt;total_revenue&lt;/code&gt;; the combine keeps the bare name for the left copy and renames the right one &lt;code&gt;total_revenue_right&lt;/code&gt;, so the final sort ranked the category total, the same on every row, and returned five unranked films without any error. &lt;code&gt;aggregation/columns.py&lt;/code&gt;: &lt;code&gt;ambiguous_columns(operation, inputs, join_keys)&lt;/code&gt; lists the non-key names both sides of a &lt;code&gt;join&lt;/code&gt; have (empty for &lt;code&gt;compare&lt;/code&gt;, which diffs by matching names, and for &lt;code&gt;union&lt;/code&gt;/&lt;code&gt;standalone&lt;/code&gt;), and &lt;code&gt;ambiguous_columns_message(...)&lt;/code&gt; words the feedback. &lt;code&gt;decomposer/node.py&lt;/code&gt; &lt;code&gt;post_combine_problems&lt;/code&gt; adds one problem per such column an op reads, on the same parse-and-retry path as the missing-column check (one retry, then &lt;code&gt;PLANNER_FAILED&lt;/code&gt; with the reason). The message names the column, the join keys and both sub-queries, says the left keeps the name and the right becomes &lt;code&gt;&lt;name&gt;_right&lt;/code&gt;, and asks for distinct names in each &lt;code&gt;expected_schema&lt;/code&gt;. Rule 12 of the decomposer prompt carries one line on distinct metric names. Tests: &lt;code&gt;tests/unit/test_decomposer_post_combine_columns.py&lt;/code&gt; (pagila_001 shape rejected and retried, distinct names pass, a key passes, a column the op does not read passes, &lt;code&gt;compare&lt;/code&gt; exempt, the helper itself). No model call; the effect shows in the owner's next keyed Pagila run.&lt;/p&gt;
 &lt;h2 id="14-bugs-wave-c-fixes"&gt;14. Bugs Wave C fixes&lt;/h2&gt;
@@ -8490,6 +8528,33 @@ come from &lt;code&gt;engine.evals.regenerate&lt;/code&gt;, not by hand. The gol
   separators and the column's decimals allowed, and no rounding or "about".&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;Verification.&lt;/strong&gt; Prompt-content tests only (no real model). Whether pagila_001 and pagila_007 now pass is the owner's
   next keyed run.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id="189-c-w7-split-questions"&gt;18.9 C-W7: split questions&lt;/h3&gt;
+&lt;p&gt;Found by a model-free investigation of the pagila_001 run (stored results of the keyed Pagila rerun), approved by the owner
+2026-10-29. Two bugs hid each other: the eval could not score a split question at all, and the split question's own
+combination was ambiguous.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;(a) The scorer counted scans, not results (C-W7a).&lt;/strong&gt; &lt;code&gt;result_match&lt;/code&gt; counted &lt;code&gt;run.result.sub_queries&lt;/code&gt; that have rows
+  (&lt;code&gt;evaluation/scorers/result_match.py:32&lt;/code&gt;). Those are the sub-queries' scans, built from &lt;code&gt;subgraph_outputs&lt;/code&gt;
+  (&lt;code&gt;api/query_api.py:216-259&lt;/code&gt;). &lt;code&gt;evaluation/run.py:201-205&lt;/code&gt; set &lt;code&gt;run.rows&lt;/code&gt; to the first sub-query's rows, and the record's
+  &lt;code&gt;sql&lt;/code&gt; (&lt;code&gt;run.py:224&lt;/code&gt;) showed only sub-query A. So every question the decomposer splits reported "expected one result set,
+  got N" and was never scored on its combined result. The terminal results are &lt;code&gt;result.result_manifest&lt;/code&gt;
+  (&lt;code&gt;query_api.py:353&lt;/code&gt;) and the aggregator's &lt;code&gt;result_&lt;node_id&gt;.parquet&lt;/code&gt; artifacts (&lt;code&gt;aggregator/node.py:82-83, 170-181&lt;/code&gt;). A
+  standalone question with no post-combine aggregate or project writes &lt;code&gt;result_combine_cg_1&lt;/code&gt;, identical to its scan, so
+  those single-query cases score as before; a one-sub-query group that keeps a post-combine aggregate or project is now
+  scored on the post-op rows, which is the correct reading.
+  &lt;strong&gt;Fix:&lt;/strong&gt; the result-set count, &lt;code&gt;run.rows&lt;/code&gt;, the faithfulness check, the rows digest and the record's &lt;code&gt;rows&lt;/code&gt; come from the
+  terminal results (&lt;code&gt;CaseRun.sets&lt;/code&gt;; the determinism check keys on &lt;code&gt;sql_by_sub_query&lt;/code&gt;). The record keeps every sub-query's SQL as &lt;code&gt;sql_by_sub_query&lt;/code&gt;; &lt;code&gt;sql&lt;/code&gt; is still
+  sub-query A's, which for a split is one scan, not the combined result.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;(b) The join leaves &lt;code&gt;total_revenue&lt;/code&gt; ambiguous (C-W7b).&lt;/strong&gt; When both sides of a join have a column of the same name, the
+  engine keeps the left one and suffixes the right with &lt;code&gt;_right&lt;/code&gt; (&lt;code&gt;aggregation/columns.py:64-69&lt;/code&gt;, and polars'
+  &lt;code&gt;suffix="_right"&lt;/code&gt; in &lt;code&gt;aggregation/engines/polars_duckdb.py:238&lt;/code&gt;). A post-combine op that names &lt;code&gt;total_revenue&lt;/code&gt; therefore
+  reads the left column, which may not be the one the question means. The decomposer already checks a post-op's columns
+  against the combined columns (&lt;code&gt;decomposer/node.py:136-161&lt;/code&gt;, &lt;code&gt;post_combine_problems&lt;/code&gt;) but accepts a name that exists on
+  both sides. &lt;strong&gt;Fix:&lt;/strong&gt; the decomposer rejects an ambiguous post-op column name so the model retries with a distinct name
+  (built in its own PR).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Verification.&lt;/strong&gt; (a) is pinned by unit tests with canned results; whether pagila_001 now passes is the owner's next
+  keyed run, which needs (b) as well.&lt;/li&gt;
 &lt;/ul&gt;
 
 
