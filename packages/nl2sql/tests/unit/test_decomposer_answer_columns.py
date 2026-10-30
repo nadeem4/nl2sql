@@ -11,14 +11,21 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from unittest.mock import MagicMock
+
 import polars as pl
 import pytest
 
 from nl2sql.aggregation.aggregator import AggregationService
 from nl2sql.aggregation.engines.polars_duckdb import PolarsDuckdbEngine
 from nl2sql.pipeline.nodes.decomposer.dag import build_execution_dag
-from nl2sql.pipeline.nodes.decomposer.node import MAX_RETRIES, post_combine_problems
+from nl2sql.pipeline.nodes.decomposer.node import DecomposerNode, post_combine_problems
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse
+from nl2sql.llm.wires import WIRES
+from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolverResponse, ResolvedDatasource
+from nl2sql.pipeline.state import GraphState
+from nl2sql.testing.fake_llm import FakeLLMServer, Rule
+from nl2sql.testing.runtime import fake_runtime
 from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_RETRY_FEEDBACK, DECOMPOSER_SYSTEM_PROMPT
 
 # --- the engine: the schema is the final selection --------------------------------
@@ -193,8 +200,106 @@ def test_a_bare_name_on_both_sides_in_the_schema_is_ambiguous():
 # --- retries and prompt ---------------------------------------------------------------
 
 
-def test_the_decomposer_may_be_asked_again_twice():
-    assert MAX_RETRIES == 2
+def _run(payload):
+    server = FakeLLMServer([Rule("DecomposerResponse", payload)]).start()
+    try:
+        llm = WIRES["openai"].build_client("gpt-5.4", 0.0, api_key="-".join(["fake", "decomposer", "key"]),
+                                           base_url=server.base_url, tags=["decomposer"])
+        ctx = fake_runtime(llm_registry=MagicMock())
+        ctx.llm_registry.get_llm.return_value = llm
+        state = GraphState(
+            user_query="Top 5 films by revenue in the top category",
+            datasource_resolver_response=DatasourceResolverResponse(
+                resolved_datasources=[ResolvedDatasource(datasource_id="ds", metadata={})],
+                allowed_datasource_ids=["ds"]))
+        result = DecomposerNode(ctx)(state)
+    finally:
+        server.stop()
+    return result, len(server.calls)
+
+
+def _payload(response):
+    return response.model_dump(mode="json", exclude_none=True)
+
+
+NO_SCHEMA = _payload(_response(ops=[_op(schema=())]))
+WITH_SCHEMA = _payload(_response())
+
+
+def test_a_rejection_is_asked_again_and_the_third_answer_is_accepted():
+    answers = iter([NO_SCHEMA, NO_SCHEMA, WITH_SCHEMA])
+
+    result, calls = _run(lambda prompt: next(answers))
+
+    assert calls == 3 and not result.get("errors")
+    assert result["execution_dag"] is not None
+
+
+def test_a_rejection_three_times_ends_the_run_with_the_reason():
+    result, calls = _run(NO_SCHEMA)
+
+    assert calls == 3 and "execution_dag" not in result
+    [error] = result["errors"]
+    assert error.error_code.name == "PLANNER_FAILED" and "no expected_schema" in error.message
+
+
+# --- review findings --------------------------------------------------------------------
+
+
+def test_an_aggregate_metric_without_an_aggregation_is_not_an_output():
+    op = _op(operation="aggregate", schema=("category", "film_revenue"),
+             group_by=[{"attribute": "category"}], metrics=[{"name": "film_revenue"}])
+
+    [problem] = post_combine_problems(_response(ops=[op]))
+
+    assert "'film_revenue'" in problem and "cannot produce" in problem
+
+
+def _aggregate(**extra):
+    return _op(operation="aggregate", schema=("category", "film_revenue"),
+               group_by=[{"attribute": "category"}], metrics=[{"name": "film_revenue", "aggregation": "sum"}],
+               **extra)
+
+
+def test_an_aggregate_cannot_sort_or_filter_on_a_column_it_summed_away():
+    for extra in ({"order_by": [{"attribute": "film", "direction": "desc"}]},
+                  {"filters": [{"attribute": "film", "operator": "=", "value": "x"}]}):
+        [problem] = post_combine_problems(_response(ops=[_aggregate(**extra)]))
+
+        assert "'film'" in problem and "after aggregating" in problem and "category, film_revenue" in problem
+
+
+def test_an_aggregate_may_sort_and_filter_on_its_outputs():
+    extra = {"order_by": [{"attribute": "film_revenue", "direction": "desc"}],
+             "filters": [{"attribute": "film_revenue", "operator": ">", "value": 1}]}
+
+    assert post_combine_problems(_response(ops=[_aggregate(**extra)])) == []
+
+
+def test_a_duplicate_name_in_the_schema_is_rejected():
+    [problem] = post_combine_problems(_response(ops=[_op(schema=("film", "film_revenue", "film"))]))
+
+    assert "'film' twice" in problem
+
+
+def test_a_blank_schema_name_counts_as_no_schema():
+    op = _op(schema=("",))
+
+    [problem] = post_combine_problems(_response(ops=[op]))
+
+    assert "no expected_schema" in problem
+
+
+def test_the_missing_schema_feedback_does_not_tell_the_model_to_drop_the_join_key():
+    [problem] = post_combine_problems(_response(ops=[_op(schema=())]))
+
+    assert "join key" not in problem and "only used to rank or filter" in problem
+
+
+def test_the_join_rule_says_every_join_group_has_one_op_with_a_schema():
+    rule = DECOMPOSER_SYSTEM_PROMPT.split("7) post_combine_ops")[0].split("6) For join or compare:")[1]
+
+    assert "exactly one post_combine_op" in rule and "expected_schema" in rule
 
 
 def test_the_prompt_and_the_feedback_say_where_a_join_group_ends():

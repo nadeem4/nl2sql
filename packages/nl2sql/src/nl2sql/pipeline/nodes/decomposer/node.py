@@ -145,8 +145,8 @@ def _schema_missing_message(group_id: str, operation: str) -> str:
         f"The {operation} group '{group_id}' combines two sub-queries, and its post-combine operation has no "
         f"expected_schema. Without it the answer keeps the combine's column order, helper columns included. "
         f"List the question's answer columns in expected_schema, in the order the question asks for them, "
-        f"with the entity the question asks for first; leave helper columns out (the join key, and columns "
-        f"only used to rank or filter). For a compare, name a right-hand column the left side also has with "
+        f"with the entity the question asks for first; leave helper columns out (columns "
+        f"only used to rank or filter, unless the question asks for them). For a compare, name a right-hand column the left side also has with "
         f"the '{RIGHT_SUFFIX}' suffix."
     )
 
@@ -193,7 +193,7 @@ def post_combine_problems(response: DecomposerResponse) -> List[str]:
             problems.append(_no_op_message(group.group_id, group.operation))
         elif len(ops) > 1:
             problems.append(_one_op_message(group.group_id, group.operation, len(ops)))
-        elif ops and not ops[0].expected_schema:
+        elif not post_op_schema(ops[0].model_dump()):
             problems.append(_schema_missing_message(group.group_id, group.operation))
     for op in response.post_combine_ops:
         group = groups.get(op.target_group_id)
@@ -214,6 +214,24 @@ def post_combine_problems(response: DecomposerResponse) -> List[str]:
             continue
         schema = post_op_schema(attributes)
         outputs = post_op_outputs(op.operation, attributes, available)
+        if op.operation == "aggregate":
+            after = [a for a in (*(f.attribute for f in op.filters), *(o.attribute for o in op.order_by))
+                     if a and a not in outputs]
+            if after:
+                problems.append(
+                    f"The aggregate post-combine operation on group '{group.group_id}' filters or sorts by "
+                    f"{', '.join(repr(a) for a in after)}, which it no longer has after aggregating. Available "
+                    f"columns after aggregating: {', '.join(outputs) or 'none'}."
+                )
+                continue
+        duplicated = sorted({c for c in schema if schema.count(c) > 1})
+        if duplicated:
+            problems.append(
+                f"The post-combine operation on group '{group.group_id}' lists "
+                f"{', '.join(repr(d) + ' twice' for d in duplicated)} in its expected_schema. List each answer "
+                f"column once."
+            )
+            continue
         unknown = [c for c in schema if c not in outputs]
         if unknown:
             problems.append(

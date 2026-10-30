@@ -2757,6 +2757,7 @@ passed validation and failed at collect.
 - **Owner's two choices.** Reject and ask again rather than guess the columns, with two retries (`MAX_RETRIES = 2`, was
   one) because these problems usually need a second look at the shape; and one op per join/compare group rather than
   chaining ops in the engine.
+- **Review fixes.** A metric with no aggregation is not an aggregate output; an aggregate's filters and order_by are checked against its outputs (group_by plus metrics), as the engine applies them after aggregating; a duplicate or blank schema name is rejected; the missing-schema feedback no longer tells the model to drop the join key. Rule 6 of the prompt also states the one-op rule for every join or compare group.
 - **Prompt.** Rule 12 and the retry feedback each say a join or compare group ends in one op whose `expected_schema`
   lists the answer columns in question order.
 - **Verification.** Unit tests with canned frames, including a replay of the recorded decomposition; whether pagila_001

@@ -127,13 +127,14 @@ def post_op_outputs(operation: str, attributes: Dict[str, Any], available: Seque
     """The columns a post-combine op can end in, given the ``available`` columns it reads.
 
     An ``aggregate`` leaves its group_by and metric names; any other op keeps
-    every column it was given.
+    every column it was given. A metric without an aggregation is not
+    computed, so it is not an output.
     """
     if operation != "aggregate":
         return list(available)
     return [name for name in (
         *((g or {}).get("attribute") for g in attributes.get("group_by") or []),
-        *((m or {}).get("name") for m in attributes.get("metrics") or []),
+        *((m or {}).get("name") for m in attributes.get("metrics") or [] if (m or {}).get("aggregation")),
     ) if name]
 
 

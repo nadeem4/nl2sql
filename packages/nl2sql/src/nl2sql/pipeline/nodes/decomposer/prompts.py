@@ -36,6 +36,8 @@ RULES:
    - include join_keys as left/right semantic attribute pairs.
    - each join key is an expected_schema name of its side's sub-query, and that column declares its dtype.
    - join columns that hold the same kind of value: a number or a boolean never joins a date.
+   - every join or compare group has exactly one post_combine_op (a project if nothing else is needed)
+     whose expected_schema lists the answer columns in question order.
 7) post_combine_ops are only for operations across two or more combined sub-queries. A question answered
    by one sub-query puts all of its filters, order_by and limit on that sub-query and emits no post_combine_ops.
 8) expected_schema must be derived strictly from semantic intent (metrics + group_by) and be minimal.
