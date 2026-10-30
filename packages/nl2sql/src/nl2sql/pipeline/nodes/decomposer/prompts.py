@@ -4,6 +4,13 @@ from langchain_core.prompts import ChatPromptTemplate
 
 # Cache layout: the system message is the stable instructions, the human
 # message the per-question inputs. The system/human boundary is the cache seam.
+# One phrase, used by the prompt, the retry feedback and the decomposer's own rejections.
+ANSWER_COLUMNS = (
+    "keep the columns that say what the answer is about (the entities the question asks for, and the "
+    "entity a subset was chosen from, such as which category, store or year); leave out only helper "
+    "figures used purely to rank or select the subset"
+)
+
 DECOMPOSER_SYSTEM_PROMPT = """SYSTEM:
 You are a Semantic Query Decomposer. You output ONLY structured semantic intent.
 
@@ -37,7 +44,7 @@ RULES:
    - each join key is an expected_schema name of its side's sub-query, and that column declares its dtype.
    - join columns that hold the same kind of value: a number or a boolean never joins a date.
    - every join or compare group has exactly one post_combine_op (a project if nothing else is needed)
-     whose expected_schema lists the answer columns in question order.
+     whose expected_schema lists the answer columns in question order; <ANSWER_COLUMNS>.
 7) post_combine_ops are only for operations across two or more combined sub-queries. A question answered
    by one sub-query puts all of its filters, order_by and limit on that sub-query and emits no post_combine_ops.
 8) expected_schema must be derived strictly from semantic intent (metrics + group_by) and be minimal.
@@ -56,7 +63,9 @@ RULES:
     result), so the question is answered by one result set. Name each sub-query's metric differently
     (category_revenue, film_revenue): a name both sides share cannot be told apart after the join.
     A join or compare group ends in that one op, whose expected_schema lists the answer columns in
-    question order (the entity asked for first, helper columns left out).
+    question order (the entity asked for first); <ANSWER_COLUMNS>. Example: for "top 5 films by revenue
+    in the top category" keep film_title, film_revenue and category, and leave out category_revenue,
+    which only picked the category.
 13) No commentary.
 
 OUTPUT FORMAT:
@@ -122,8 +131,11 @@ A post-combine operation can only read columns its combine group produces: the e
 names of the group's sub-queries, minus the right-hand join keys, with any other right-hand name
 the left side also has suffixed "_right". A join or compare group ends in ONE post-combine operation
 whose expected_schema lists the answer columns in question order (the entity the question asks for
-first, helper columns left out). Call the tool again with a corrected decomposition.
+first); <ANSWER_COLUMNS>. Call the tool again with a corrected decomposition.
 """
+
+DECOMPOSER_SYSTEM_PROMPT = DECOMPOSER_SYSTEM_PROMPT.replace("<ANSWER_COLUMNS>", ANSWER_COLUMNS)
+DECOMPOSER_RETRY_FEEDBACK = DECOMPOSER_RETRY_FEEDBACK.replace("<ANSWER_COLUMNS>", ANSWER_COLUMNS)
 
 DECOMPOSER_PROMPT = ChatPromptTemplate.from_messages(
     [("system", DECOMPOSER_SYSTEM_PROMPT), ("human", DECOMPOSER_HUMAN_PROMPT)]

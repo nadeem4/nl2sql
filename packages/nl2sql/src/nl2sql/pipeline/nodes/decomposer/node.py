@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 from .dag import build_execution_dag
 from .schemas import CombineGroup, DecomposerResponse, SubQuery, UnmappedSubQuery, PostCombineOp, key_column
-from .prompts import DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
+from .prompts import ANSWER_COLUMNS, DECOMPOSER_PROMPT, DECOMPOSER_RETRY_FEEDBACK
 from nl2sql.aggregation.columns import (
     RIGHT_SUFFIX, ambiguous_columns, ambiguous_columns_message, combined_columns, input_order,
     missing_columns_message, post_op_columns, post_op_outputs, post_op_schema, resolve_key,
@@ -145,8 +145,7 @@ def _schema_missing_message(group_id: str, operation: str) -> str:
         f"The {operation} group '{group_id}' combines two sub-queries, and its post-combine operation has no "
         f"expected_schema. Without it the answer keeps the combine's column order, helper columns included. "
         f"List the question's answer columns in expected_schema, in the order the question asks for them, "
-        f"with the entity the question asks for first; leave helper columns out (columns "
-        f"only used to rank or filter, unless the question asks for them). For a compare, name a right-hand column the left side also has with "
+        f"with the entity the question asks for first; {ANSWER_COLUMNS}. For a compare, name a right-hand column the left side also has with "
         f"the '{RIGHT_SUFFIX}' suffix."
     )
 
@@ -155,7 +154,7 @@ def _no_op_message(group_id: str, operation: str) -> str:
     """Why a join or compare group without a post-combine op is refused."""
     return (
         f"The {operation} group '{group_id}' needs ONE post-combine operation whose expected_schema lists the "
-        f"answer columns in question order (the entity the question asks for first, helper columns left out). "
+        f"answer columns in question order (the entity the question asks for first); {ANSWER_COLUMNS}. "
         f"Without one the answer keeps the combine's column order, helper columns included."
     )
 

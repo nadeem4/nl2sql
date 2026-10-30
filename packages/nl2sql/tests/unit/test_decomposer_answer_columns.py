@@ -26,7 +26,7 @@ from nl2sql.pipeline.nodes.datasource_resolver.schemas import DatasourceResolver
 from nl2sql.pipeline.state import GraphState
 from nl2sql.testing.fake_llm import FakeLLMServer, Rule
 from nl2sql.testing.runtime import fake_runtime
-from nl2sql.pipeline.nodes.decomposer.prompts import DECOMPOSER_RETRY_FEEDBACK, DECOMPOSER_SYSTEM_PROMPT
+from nl2sql.pipeline.nodes.decomposer.prompts import ANSWER_COLUMNS, DECOMPOSER_RETRY_FEEDBACK, DECOMPOSER_SYSTEM_PROMPT
 
 # --- the engine: the schema is the final selection --------------------------------
 
@@ -150,7 +150,7 @@ def test_a_join_or_compare_group_without_a_schema_on_its_op_is_rejected(operatio
     [problem] = post_combine_problems(_response(operation=operation, keys=keys, ops=[_op(schema=())]))
 
     assert "no expected_schema" in problem and "in the order the question asks" in problem
-    assert "helper columns" in problem and "_right" in problem
+    assert "helper figures" in problem and "_right" in problem
 
 
 def test_two_ops_on_a_join_group_are_rejected_in_favour_of_one():
@@ -293,7 +293,7 @@ def test_a_blank_schema_name_counts_as_no_schema():
 def test_the_missing_schema_feedback_does_not_tell_the_model_to_drop_the_join_key():
     [problem] = post_combine_problems(_response(ops=[_op(schema=())]))
 
-    assert "join key" not in problem and "only used to rank or filter" in problem
+    assert "join key" not in problem and "only used to rank or filter" not in problem
 
 
 def test_the_join_rule_says_every_join_group_has_one_op_with_a_schema():
@@ -329,3 +329,14 @@ def test_the_recorded_pagila_001_decomposition_answers_in_the_question_columns()
     [result] = (frame.collect() for frame in out.values())
     assert result.columns == ["film_title", "category_name", "film_revenue"]
     assert result["film_title"].to_list() == ["A", "C", "E", "F", "D"]
+
+def test_the_wording_keeps_the_entity_the_answer_is_about_in_every_place():
+    rule6 = DECOMPOSER_SYSTEM_PROMPT.split("7) post_combine_ops")[0].split("6) For join or compare:")[1]
+    rule12 = DECOMPOSER_SYSTEM_PROMPT.split("12) ")[1].split("13) ")[0]
+    [no_schema] = post_combine_problems(_response(ops=[_op(schema=())]))
+    [no_op] = post_combine_problems(_response(ops=[]))
+    for text in (rule6, rule12, DECOMPOSER_RETRY_FEEDBACK, no_schema, no_op):
+        assert ANSWER_COLUMNS in text
+        assert "the entity a subset was chosen from" in text and "used purely to rank or select" in text
+        assert "only used to rank or filter" not in text and "helper columns left out" not in text and "leave helper columns out" not in text
+    assert "category_revenue" in rule12 and "category" in rule12.split("Example")[1]
