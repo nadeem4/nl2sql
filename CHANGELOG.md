@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.9.1](https://github.com/nadeem4/nl2sql/compare/v0.9.0...v0.9.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **decomposer:** a split answer's columns follow the question (C-W7c) ([#393](https://github.com/nadeem4/nl2sql/issues/393)) ([e39dfe5](https://github.com/nadeem4/nl2sql/commit/e39dfe5b6f14451b1fb4b3ee4d2375ddc4cf031b))
+* **decomposer:** reject a column name both joined sides share (C-W7b) ([#392](https://github.com/nadeem4/nl2sql/issues/392)) ([9678a99](https://github.com/nadeem4/nl2sql/commit/9678a991137339b77edf34e5b5e5ff0496bb88df))
+* **eval:** result_match accepts reordered columns (C-W7d) ([#394](https://github.com/nadeem4/nl2sql/issues/394)) ([453666a](https://github.com/nadeem4/nl2sql/commit/453666a1be080631bbdd471827ab7f859b9bbfa9))
+* **eval:** score a split question on its combined result (C-W7a) ([#391](https://github.com/nadeem4/nl2sql/issues/391)) ([53378a5](https://github.com/nadeem4/nl2sql/commit/53378a5a377137702d30ff536f394daf9449785b))
+* **eval:** score Decimal, dates, extra columns and sums (C-W6a) ([#384](https://github.com/nadeem4/nl2sql/issues/384)) ([d16363a](https://github.com/nadeem4/nl2sql/commit/d16363a9140f7a06db52b2e0b555905130a0f736))
+* **joins:** partitioned tables, allowed-join hints, either join order (C-W6b) ([#386](https://github.com/nadeem4/nl2sql/issues/386)) ([c8ce239](https://github.com/nadeem4/nl2sql/commit/c8ce2398d9ade79e57356c53bc92dc67f8140a7e))
+* **plan:** date differences in plans, compiled per dialect (C-W6d) ([#387](https://github.com/nadeem4/nl2sql/issues/387)) ([1f18849](https://github.com/nadeem4/nl2sql/commit/1f18849a9f64b8c895a3d26996fa788608bbc3eb))
+* **prompts:** keep the columns that say what the answer is about (C-W7e) ([#395](https://github.com/nadeem4/nl2sql/issues/395)) ([e52517e](https://github.com/nadeem4/nl2sql/commit/e52517eddaa8435f62c5be0e0c28c3f432e67827))
+* **prompts:** split only when needed, quote exact figures (C-W6e) ([#388](https://github.com/nadeem4/nl2sql/issues/388)) ([a09f372](https://github.com/nadeem4/nl2sql/commit/a09f372897a348f480080bdceaca712d27e3ffee))
+* **retrieval:** model-picked tables and join-path fill on large schemas (C-W4) ([#378](https://github.com/nadeem4/nl2sql/issues/378)) ([285eaa2](https://github.com/nadeem4/nl2sql/commit/285eaa28a88210d23d6a51618f98abd6033f5ba7))
+
+
+### Documentation
+
+* **release:** notes for 0.9.1 ([#396](https://github.com/nadeem4/nl2sql/issues/396)) ([ec06704](https://github.com/nadeem4/nl2sql/commit/ec06704601b9b600037dc594f97d8b7afb463d67))
+* **wave-d:** start screen with demo or your database, multi-project platform deferred ([#381](https://github.com/nadeem4/nl2sql/issues/381)) ([002ff1f](https://github.com/nadeem4/nl2sql/commit/002ff1fcdfd6f2a226d93049c552f0fe94821670))
+
 ## [0.9.0](https://github.com/nadeem4/nl2sql/compare/v0.8.0...v0.9.0) (2026-10-29)
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nl2sql-engine"
-version = "0.9.0" # x-release-please-version
+version = "0.9.1" # x-release-please-version
 description = "Ask a database questions in English: the model writes a typed query plan, never SQL, and the plan is checked against the schema and the caller's role before any SQL is generated"
 readme = "README.md"
 keywords = ["nl2sql", "text-to-sql", "natural language", "sql", "llm", "langgraph", "sqlglot", "database"]
@@ -32,7 +32,7 @@ dependencies = [
     "langchain-core>=1.6,<2",
     "langchain-openai>=1.6,<2",
     "chromadb>=1.5,<2",
-    "nl2sql-sdk[sqlalchemy]~=0.9.0", # x-release-please-version
+    "nl2sql-sdk[sqlalchemy]~=0.9.1", # x-release-please-version
     "pydantic>=2.0",
     "sqlglot>=23.0.0",
     # For the parquet artifact store. The engine never imports it and polars
