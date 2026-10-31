@@ -1,5 +1,3 @@
-import logging
-
 from typing import Annotated, Any, Dict
 
 from fastapi import APIRouter, Depends, Request
@@ -11,8 +9,6 @@ from nl2sql_api.models.datasource import DatasourceRequest, DatasourceResponse, 
 from nl2sql_api.dependencies import get_datasource_service, get_engine
 from nl2sql_api.services import DatasourceService
 from nl2sql_api.services.datasource import BadRequest
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["datasources"])
 
@@ -51,11 +47,6 @@ def _problems(error: BadRequest) -> RequestRefused:
                           details=[{"loc": p["path"].split("."), "msg": p["message"]} for p in error.problems])
 
 
-def _not_found(datasource_id: str) -> RequestRefused:
-    return RequestRefused(404, "NOT_FOUND", f"No datasource '{datasource_id}'.",
-                          fix="List the datasources with GET /api/v1/datasource.")
-
-
 @router.get("/datasource-types", response_model=Dict[str, Any], summary="List the datasource types",
             dependencies=[Depends(identity.admin)], responses=identity.ADMIN_RESPONSES)
 def datasource_types(
@@ -87,8 +78,8 @@ def test_datasource(
 
 @router.post("/datasource", response_model=DatasourceResponse, summary="Add a datasource",
              responses={**identity.ADMIN_RESPONSES, **PROBLEMS_422,
-                        409: {**ERROR_RESPONSE, "description": "`save` found the datasource's file changed on "
-                                                               "disk since the engine loaded it."}},
+                        409: {**ERROR_RESPONSE, "description": "The id is taken, or `save` found the "
+                                                               "datasource's file changed on disk."}},
              openapi_extra=_body_docs(DatasourceRequest, ADD_EXAMPLE))
 def add_datasource(
     service: DatasourceSvc,
@@ -112,14 +103,7 @@ def add_datasource(
     except BadRequest as e:
         raise _problems(e) from None
     except NL2SQLError:
-        raise  # a named refusal (a literal secret, a stale file, a bad connection) says its own status and fix
-    except ValueError as e:
-        # An id that is taken, or a connection or index that does not validate. The text can carry the connection
-        # string, password included, so it is logged and never returned.
-        logger.warning("A datasource was not added: %s", e)
-        raise RequestRefused(422, "INVALID_REQUEST", "The datasource could not be added.",
-                             fix="Use an id that is not taken and a connection the adapter accepts; "
-                                 "the reason is in the server log.") from None
+        raise  # a named refusal (a taken id, a literal secret, a stale file, a bad connection) says its own status
 
 
 @router.get("/datasource", response_model=Dict[str, Any], summary="List datasources")
@@ -132,27 +116,25 @@ def list_datasources(
     return {"datasources": service.list_datasources()}
 
 
-@router.get("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Get a datasource")
+NOT_FOUND_404 = {404: {**ERROR_RESPONSE, "description": "No datasource has that id."}}
+
+
+@router.get("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Get a datasource",
+            responses=NOT_FOUND_404)
 def get_datasource(
     datasource_id: str,
     service: DatasourceSvc,
 ):
     """One configured datasource, as the list shows it, or 404 when it is not configured."""
-    try:
-        return service.get_datasource(datasource_id)
-    except ValueError:
-        raise _not_found(datasource_id) from None
+    return service.get_datasource(datasource_id)
 
 
 @router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Remove a datasource",
-               dependencies=[Depends(identity.admin)], responses=identity.ADMIN_RESPONSES)
+               dependencies=[Depends(identity.admin)], responses={**identity.ADMIN_RESPONSES, **NOT_FOUND_404})
 def remove_datasource(
     datasource_id: str,
     service: DatasourceSvc,
 ):
     """Take a datasource out of the engine and close its connections (404 for an unknown id). It is not
     removed from the config file, and its index entries stay until the next full index. Admin only."""
-    try:
-        return service.remove_datasource(datasource_id)
-    except ValueError:
-        raise _not_found(datasource_id) from None
+    return service.remove_datasource(datasource_id)

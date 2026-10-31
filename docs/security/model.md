@@ -21,7 +21,8 @@ depends on the client:
   role for everyone (`static`) or the local operator (`none`, the default). It
   answers `HTTP 401` when there is no identity, and never reads the request
   body. Headers from a peer outside `trusted_from` are ignored. With
-  `auth: none` the request must be made straight to localhost (a `Host` that is
+  `auth: none` the request must be made straight to localhost (a connecting peer
+  that is not loopback, such as a published container port, a `Host` that is
   not loopback, or an `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header, is a
   `403`, so a same-host proxy or a DNS-rebinding page is not the operator), and
   `nl2sql-api serve` refuses to bind a non-loopback host. The routes that change

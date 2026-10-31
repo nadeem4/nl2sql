@@ -98,7 +98,16 @@ def _http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
 
 
 async def _internal_handler(request: Request, exc: Exception) -> JSONResponse:
-    return _internal(request, exc)
+    """An unhandled exception. Starlette runs this outside every middleware, the CORS one included, so the browser
+    would see a network error instead of the envelope; the allowed origin is echoed here, as the CORS middleware does."""
+    response = _internal(request, exc)
+    config = getattr(getattr(request.app.state, "engine", None), "config", None)
+    origin = request.headers.get("origin")
+    if config is not None and origin and origin in config.api.cors_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+    return response
 
 
 class RequestIdMiddleware:
