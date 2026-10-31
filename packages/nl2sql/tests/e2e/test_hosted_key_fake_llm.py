@@ -46,6 +46,8 @@ def test_the_visitors_key_answers_the_question_and_lands_nowhere(demo_project, t
     # visitor's key as the bearer token, no key anywhere on the server.
     provider = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     point_llm_config_at(project, provider.base_url)
+    # A visitor's key never rides to the operator's endpoint, so the stand-in is reached through the SDK's own variable.
+    monkeypatch.setenv("OPENAI_BASE_URL", provider.base_url)
 
     for name in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
@@ -117,6 +119,8 @@ def test_a_step_on_another_provider_sends_that_providers_key_to_that_endpoint(
     copy_demo(demo_project, project)
     provider = FakeLLMServer(RULES_COUNT_CUSTOMERS).start()
     point_llm_config_at(project, provider.base_url)
+    # A visitor's key never rides to the operator's endpoint, so the stand-in is reached through the SDK's own variable.
+    monkeypatch.setenv("OPENAI_BASE_URL", provider.base_url)
     # Anthropic's endpoint is its preset's, exactly as in production; here the
     # preset points at the stand-in's Anthropic-shaped half.
     preset = llm_registry.PROVIDER_PRESETS["anthropic"]
