@@ -163,10 +163,10 @@ def test_a_fresh_file_applies_all_seven_migrations(tmp_path):
 
 
 def test_store_version_3_is_rejected():
-    assert INTERFACE_VERSIONS["store"] == 4
+    assert INTERFACE_VERSIONS["store"] == 5
     registry = Registry.empty()
     registry.add_store("old", type("Store", (), {"interface_version": 3}))
-    with pytest.raises(RegistryError, match="store interface 3; this engine needs 4"):
+    with pytest.raises(RegistryError, match="store interface 3; this engine needs 5"):
         registry.load("store", "old")
     for name in ("chroma", "sqlite", "files", "local"):
-        assert Registry.default().load("store", name).interface_version == 4, name
+        assert Registry.default().load("store", name).interface_version == 5, name

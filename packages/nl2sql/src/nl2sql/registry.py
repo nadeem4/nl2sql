@@ -37,7 +37,7 @@ GROUPS: Dict[str, str] = {
 
 # The interface version this engine was built for, per kind. Anything else is
 # a load error: there are no minor versions and no window for old ones.
-INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 4,
+INTERFACE_VERSIONS: Dict[str, int] = {"adapter": 2, "llm": 2, "embeddings": 2, "secrets": 1, "store": 5,
                                    "policy_check": 1, "observer": 1, "hook": 1, "scorer": 1,
                                    "knowledge_source": 1, "chat_tool": 1}
 

@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from nl2sql.charts.spec import ChartData, ChartSpec, ColumnKind, Encoding
 from nl2sql.charts.takeaway import takeaway
+from nl2sql.common.errors import ChartNotSupported
 from nl2sql.config import ChartSettings
 from nl2sql.pipeline.nodes.ast_planner.functions import AGGREGATE_FUNCTIONS, date_operation
 from nl2sql.pipeline.nodes.ast_planner.schemas import PlanModel
@@ -81,7 +82,7 @@ def choose(*, columns: List[str], kinds: Dict[str, ColumnKind], rows: List[List[
     """The chart for ``rows`` (at most ``settings.max_points``, the first rows of a result of ``row_count``).
 
     ``cut`` says the result was cut at the datasource row limit: it counts as truncated, like a ``max_points`` cut.
-    ``kind`` forces one the data can draw, else ``ValueError`` names the ones it can.
+    ``kind`` forces one the data can draw, else ``ChartNotSupported`` (a ``ValueError``) names the ones it can.
     """
     kinds, measures, sums = _refine(columns, kinds, plan)
     dims = [c for c in columns if c not in measures]
@@ -122,7 +123,7 @@ def choose(*, columns: List[str], kinds: Dict[str, ColumnKind], rows: List[List[
         chosen = kind
     else:
         drawable = ", ".join(k for k in order if k in drafts)
-        raise ValueError(f"This result cannot be drawn as '{kind}'; it can be drawn as: {drawable}.")
+        raise ChartNotSupported(f"This result cannot be drawn as '{kind}'; it can be drawn as: {drawable}.")
 
     draft = drafts[chosen]
     spec = ChartSpec(
