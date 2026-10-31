@@ -214,14 +214,14 @@ jobs:
       - name: Build docs (strict)
         run: python -m mkdocs build --strict --site-dir /tmp/site
 
-  # The playground's unit tests (node --test) and its production build. The
-  # build writes the single page that ships inside the nl2sql package; its size
-  # goes to the job summary so growth shows up in review.
+  # The web app's unit tests (node --test) and its production build. The build
+  # writes the page nl2sql-api serves (index.html and its chunks); its size goes
+  # to the job summary so growth shows up in review.
   web:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: web/playground
+        working-directory: nl2sql-ui
     steps:
       - uses: actions/checkout@v4
 
@@ -230,7 +230,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: web/playground/package-lock.json
+          cache-dependency-path: nl2sql-ui/package-lock.json
 
       - run: npm ci
 
@@ -240,8 +240,8 @@ jobs:
 
       - name: Built page size
         run: |
-          size=$(wc -c < ../../packages/nl2sql/src/nl2sql/cli/demo/playground/static/index.html)
-          echo "Built playground page: ${size} bytes" >> "$GITHUB_STEP_SUMMARY"
+          size=$(du -sb ../packages/api/src/nl2sql_api/web/static | cut -f1)
+          echo "Built web app (nl2sql-ui): ${size} bytes" >> "$GITHUB_STEP_SUMMARY"
 
   build:
     runs-on: ubuntu-latest

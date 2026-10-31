@@ -1,6 +1,15 @@
-# nl2sql playground UI
+# nl2sql-ui
 
-The React source for the page `nl2sql demo` serves.
+The React source of the web app. It talks to `nl2sql-api` through `src/api/http.js` (JSON and Server-Sent
+Events, with the tab's API key and model keys). Until X1b, `nl2sql demo` still serves the older single page
+committed in the engine package.
+
+## Layout
+
+`src/lib/` pure helpers, `src/components/` pieces shared by pages (`JobProgress`, `SqlCard`, `IndexPanel`, ...),
+`src/outputs/` what a result or tool output renders as, `src/pages/` one file per route (the Wave D pages are stubs
+until their row), `src/connect/`, `src/chat/`, `src/api/` one client file per area, `src/styles/` the stylesheet in
+cascade order (`index.css`), `src/router.js` the hash routes.
 
 ## Pages
 
@@ -43,7 +52,7 @@ is marked `off`; opening it is how you read the reason
 page that is off. Settings keeps its nav item unmarked and shows two blocks
 that write only to this tab's `sessionStorage`, never to the server:
 
-- `#hosted-key-heading`, one key per provider (`src/hostedKey.js`), in a
+- `#hosted-key-heading`, one key per provider (`src/pages/hostedKey.js`), in a
   raised card: a provider choice (OpenAI, Anthropic, OpenRouter, each saying
   "key set" or "none"), a 44px mono `#hosted-key` and **Use this key**. A pasted
   key is kept under the provider its own prefix names, even when another card
@@ -56,7 +65,7 @@ that write only to this tab's `sessionStorage`, never to the server:
   `X-NL2SQL-Api-Key-<provider>` header on `/api/ask`. With exactly one key the
   bare `X-NL2SQL-Api-Key` goes too, so the simple path is byte for byte what it
   was.
-- `#hosted-models`, **Model for each step** (`src/hostedModels.js`), a
+- `#hosted-models`, **Model for each step** (`src/pages/hostedModels.js`), a
   `<details>` card, open from the start at 1060px and wider (where it sits
   beside the key card) and shut on a narrower window; its summary says what the
   steps will use. Each
@@ -73,7 +82,7 @@ succeed or fail; the copy on the page says exactly that, plus the limits from
 ratings are off, and the retrieval inspector stays on. See
 [Hosted demo](../../docs/deployment/hosted-demo.md).
 
-**Hosted, before a key** (`needsKey` in `src/firstRun.js`: `meta.hosted` and
+**Hosted, before a key** (`needsKey` in `src/pages/firstRun.js`: `meta.hosted` and
 nothing in this tab's `sessionStorage`), the Ask page opens with `#first-run`
 above the question box: the pitch and `#first-run-why` (`firstRunCopy`), then
 the guided questions as chips headed **Try a recorded run**, moved up from
@@ -86,7 +95,7 @@ when there are recordings and open when there are none: a provider choice,
 only, **Sent** in a header with each question, **Never** written to disk, logs
 or traces). The provider follows the key's own prefix once one is typed, as the
 server reads it, and the key is kept exactly as the Settings form keeps it
-(`writeKeyFor` in `src/hostedKey.js`); the keyboard then moves to `#question`.
+(`writeKeyFor` in `src/pages/hostedKey.js`); the keyboard then moves to `#question`.
 **Nothing is disabled** (`lockControls`): a recorded guided question answers
 from its recording, and the answer header carries a **Recorded run** badge
 (`#recorded-badge`, `recordedBadge`) whose title says it was not run just now;
@@ -104,7 +113,7 @@ Back and Forward, and that routing touches nothing but the hash.
 
 ## Home
 
-`#/` (`src/Home.jsx`, its words in `src/home.js` so `npm test` can hold each
+`#/` (`src/pages/Home.jsx`, its words in `src/pages/home.js` so `npm test` can hold each
 claim against what the playground does). Top to bottom:
 
 - **The hero**: the one eyebrow on the page (**Questions in, rows out**), the
@@ -128,7 +137,7 @@ claim against what the playground does). Top to bottom:
 - **More**: run it locally (`pip install "nl2sql-engine[demo]"`, `nl2sql demo`),
   the docs, the source; then a footer.
 
-**Clips** (`src/Clip.jsx`): a muted, looping, inline webm over its poster in
+**Clips** (`src/pages/Clip.jsx`): a muted, looping, inline webm over its poster in
 the one raised card, with a 44px Pause / Play button. It follows
 `prefers-color-scheme`, swapping to the `-dark` recording and poster; under
 reduced motion it holds the poster until Play. A clip with no video yet (the
@@ -174,7 +183,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   reads are marked `in plan` with an accent bar; tables the role was refused
   are marked `refused for <role>`. On a wide window the rail scrolls on its own:
   its scroll is contained, its scrollbar is thin, and a fade shows only on an
-  edge that has more past it (`src/railFade.js`). It reserves no scrollbar
+  edge that has more past it (`src/pages/railFade.js`). It reserves no scrollbar
   gutter: `scrollbar-gutter: stable` beside the thin scrollbar left Chrome
   painting over the first number on a line (the table count, the first index
   stat). The rail's headings (Database, Search index) are small uppercase
@@ -209,7 +218,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   engine shows `#index-folder-warning`.
 - **Status pill** (`.status`, top bar, on the same row as the wordmark and the
   nav at 1061px and wider): the mode in a few words, from `modeStatus` in
-  `src/status.js`, with a green dot when a question can be answered live and an
+  `src/pages/status.js`, with a green dot when a question can be answered live and an
   amber one when it cannot. **Live · configured model**; **Replay mode · 12 of
   20 recorded** (`recorded_questions` from `/api/meta`) or **Replay mode · No
   recordings**; hosted, **Hosted demo · Recorded runs** (or **Hosted demo · No
@@ -217,7 +226,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   then **Hosted demo · OpenAI key in this tab** (or **2 keys**). The sentence
   the old mode line carried -- how many questions replay answers and how to
   get a key, or whose key answers and the hosted limits (`hostedNote` in
-  `src/firstRun.js`) -- is kept whole as the pill's `title` and as
+  `src/pages/firstRun.js`) -- is kept whole as the pill's `title` and as
   visually-hidden text a screen reader reads. A question replay has no answer
   for shows "No recorded answer for this question. Add an API key to ask it
   live." (`replay_miss` from `/api/ask`).
@@ -229,7 +238,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   pile, one `.guided-group` per datasource headed by its id (`#guided-<ds>`,
   always in the page, visually hidden with a single database). Under 640px the
   row is a horizontal scroll-snap strip of 44px chips. `chipRow` in
-  `src/runState.js` picks the chips; `src/questions.js` does the grouping and
+  `src/lib/runState.js` picks the chips; `src/pages/questions.js` does the grouping and
   falls back to the flat `questions` list when a server sends no
   `question_groups`. With a single database the question box names it; with
   several it does not, because the resolver picks. An empty box with a key
@@ -271,7 +280,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   (`cancel_when_disconnected` in `app.py`, an `nl2sql.CancellationToken`
   underneath): no further step or model call starts. A stopped question still
   counts toward the hosted limits, which charge it on arrival. The answer
-  header says so (`stoppedNote` in `src/runState.js`).
+  header says so (`stoppedNote` in `src/lib/runState.js`).
 - **The answer header** (`#pane-question`, the first block of the run): before
   a question, one line saying the answer will lead here. Once asked, the
   question with its role tag, then the answer sentence at 28px (the largest
@@ -280,10 +289,10 @@ with `record: clips` runs the same script in CI and opens a pull request.
   item is a button that scrolls to its station and focuses it; none is a hash
   link, because the hash is the router's. A refusal gets the same header
   ("Refused at the checks. No SQL was written."). `answerHead` and
-  `statusStrip` in `src/runState.js` decide the words. On the Ask page
+  `statusStrip` in `src/lib/runState.js` decide the words. On the Ask page
   `#page-title` is visually hidden, kept for `aria-labelledby`.
 - **Faults**: a failed run turns the header into the fault card, a 3px
-  `--fault` rule on the raised card. `describeFault` in `src/faults.js` gives
+  `--fault` rule on the raised card. `describeFault` in `src/pages/faults.js` gives
   the headline (the only `role="alert"`), the body and an action, such as
   **Replace the key** to `#/settings` for `PROVIDER_AUTH_FAILED`; **Ask again**
   sits beside it, and the provider's own reply (`provider_response`) is folded
@@ -305,21 +314,21 @@ with `record: clips` runs the same script in CI and opens a pull request.
   (`#answered-from`, from each sub-query's `datasource_id` in `/api/ask` via
   `answeredDatasources`); with one there is nothing for the resolver to have
   picked, so the line is not printed.
-- **SQL and rows** are raised cards. The SQL card (`src/SqlCard.jsx`) has a
+- **SQL and rows** are raised cards. The SQL card (`src/components/SqlCard.jsx`) has a
   header strip, **Generated SQL** and the plan it came from (`from plan 2` after
   a retry), a **Copy** button (the clipboard, or the text selected where the
   browser refuses; it reads "Copied" for about 1.4s), numbered lines and a
   keyword tint: keywords, function names and numbers take `--kw`, `--fn` and
-  `--num`. The tint comes from `src/sqlHighlight.js`, a small tokenizer with no
+  `--num`. The tint comes from `src/lib/sqlHighlight.js`, a small tokenizer with no
   library, rendered as React text so the SQL is never parsed as markup; a long
-  line scrolls inside the card. The rows card (`src/RowsTable.jsx`) reads the
+  line scrolls inside the card. The rows card (`src/outputs/RowsTable.jsx`) reads the
   run's saved results from `result_manifest` in `/api/ask`, never the sample
   in `sub_queries[].rows`. With more than one result it opens with one tab per
   result (`#rows-tabs`, the database switcher's segmented control, each tab
   **Result 1**, **Result 2** with its row count and the internal `node_id`
   only as the tooltip; arrow keys move between them); with one there are no
   tabs. Picking a tab starts that result at its first page and fetches its
-  own rows (`rowsView` in `src/results.js`). The head says **Result** and the whole result's row count
+  own rows (`rowsView` in `src/outputs/results.js`). The head says **Result** and the whole result's row count
   (`#rows-total`) and offers **Download CSV** (`#rows-csv`), a plain link to
   `GET /api/query/{trace_id}/results/{node_id}.csv?role=`, so the file is every row,
   streamed by the server. A result cut at its row ceiling gets one line under
@@ -346,7 +355,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   `subQueryHeads`), and the rail marks the tables of all of them.
 - **Cost & time**: five figures (total time, waiting on the model, model calls,
   input tokens with the cached count, cost). With **Debug** on, a per-node
-  ledger follows (`src/Ledger.jsx`): one row per node that ran, in execution
+  ledger follows (`src/components/Ledger.jsx`): one row per node that ran, in execution
   order, code nodes included, with calls, input, cached and output tokens
   (reasoning too when any node spent some), LLM time and node wall-clock time.
   Beside each node time is a 72x6px bar sized to the slowest node: a model
@@ -385,7 +394,7 @@ with `record: clips` runs the same script in CI and opens a pull request.
   page's content is `#pipeline-panel`): every step of a run in order, in three
   phases -- Understand the question, Answer each sub-query (the SQL agent and
   its own steps in a dashed bracket) and Combine and explain -- cut from the
-  step list itself by `pipelinePhases` in `src/pipelinePhases.js`. The five
+  step list itself by `pipelinePhases` in `src/pages/pipelinePhases.js`. The five
   steps a model decides are raised rows with a round mark and a model chip;
   code steps are compact rows with a square mark, under a legend (asks a model,
   code, did not run, skipped; `stepStates`). Each step gives its name in plain
@@ -404,8 +413,8 @@ with `record: clips` runs the same script in CI and opens a pull request.
   after a recorded run, each model chip instead names the model the recordings
   were made with (`recorded_with` from `GET /api/pipeline`), tagged
   **recorded** (`recordingShown`, `stepChip`), never the config's fallback
-  model; a live run is never tagged. `src/pipeline.js` and
-  `src/pipelinePhases.js` do the joining and `npm test` covers them. The Debug
+  model; a live run is never tagged. `src/pages/pipeline.js` and
+  `src/pages/pipelinePhases.js` do the joining and `npm test` covers them. The Debug
   drill-down is unchanged; this page is the overview, not a replacement.
 
 - **Retrieval** (`#nav-retrieval` in the header nav, route `#/retrieval`; the
@@ -456,62 +465,51 @@ nothing is computed server-side for the page.
 ## Rebuild
 
 ```bash
-cd web/playground
+cd nl2sql-ui
 npm install
 npm test
 npm run build
 ```
 
-`npm run build` writes a single self-contained `index.html` (JS, CSS and fonts
-inlined by `vite-plugin-singlefile`) into:
+`npm run build` writes `index.html` and hashed chunks to `packages/api/src/nl2sql_api/web/static/`. That folder is
+not committed: `nl2sql-api`'s image and wheel build it fresh, and CI's `web` job builds it to check it.
 
-```
-packages/nl2sql/src/nl2sql/cli/demo/playground/static/index.html
-```
-
-**That build output is committed on purpose.** The wheel has to contain the
-finished page so `pip install "nl2sql-engine[demo]"` followed by `nl2sql demo`
-works with no Node installed, and so CI never needs a JavaScript toolchain. The
-trade is that a UI change is not live until you rebuild and commit the result --
-if you edit anything under `src/`, run `npm run build` and commit
-`static/index.html` in the same change.
-
-`npm test` runs the pure helpers in `src/run.js` (SQL line breaks, the per-node
-ledger, refused-table parsing, the trace drill-down helpers), `src/runState.js`
+`npm test` runs the pure helpers in `src/components/run.js` (SQL line breaks, the per-node
+ledger, refused-table parsing, the trace drill-down helpers), `src/lib/runState.js`
 (each station's state, live and queued while busy, its head, the answer
 header and its strip, the gate's timeline and reason, which error the fault
 box explains, Ask turning into Stop, the elapsed counter, the chip row),
-`src/faults.js` (the fault box's words and action for each provider error), `src/settings.js`
+`src/pages/faults.js` (the fault box's words and action for each provider error), `src/lib/settings.js`
 (model options, which nodes changed, which chosen models run without a
-temperature), `src/indexHealth.js` (entry counts in plain words, the status
+temperature), `src/components/indexHealth.js` (entry counts in plain words, the status
 line, relative build times), `src/router.js` (which page a hash names, the nav
-rows, and the router over `hashchange`), `src/home.js` (the home page's words,
+rows, and the router over `hashchange`), `src/pages/home.js` (the home page's words,
 its five steps, the sample question it asks and the facts it may claim),
-`src/questions.js` (the guided
-questions grouped by datasource), `src/firstRun.js` (what the hosted demo offers a
+`src/pages/questions.js` (the guided
+questions grouped by datasource), `src/pages/firstRun.js` (what the hosted demo offers a
 visitor with no key: the recorded questions, the badge, the key prompt on a
 miss, and whose key answers once there is one),
-`src/status.js` (what the top bar's status pill says in each mode, and the
+`src/pages/status.js` (what the top bar's status pill says in each mode, and the
 sentence it stands for),
-`src/datasources.js` (the
+`src/connect/datasources.js` (the
 databases the switcher offers, whether it is a segmented control or a select,
-and which one a run was answered from), `src/pipelinePhases.js` (the Pipeline
+and which one a run was answered from), `src/pages/pipelinePhases.js` (the Pipeline
 page's three phases, each step's state and the waterfall bars),
-`src/railFade.js` (which edges of the rail fade), `src/hostedKey.js` (also the
+`src/pages/railFade.js` (which edges of the rail fade), `src/pages/hostedKey.js` (also the
 key's masked tail, the provider cards and a key pasted under the wrong
-provider), `src/indexHealth.js` (also the rail's one-line index summary and
+provider), `src/components/indexHealth.js` (also the rail's one-line index summary and
 when it opens itself),
-`src/retrieval.js` (the MMR summary line, picks
-in order, entries passed over, the copyable text form), `src/sqlHighlight.js`
-(the SQL card's tokenizer), `src/artifacts.js` (the rows bar and the ledger and
-pool bars, numeric columns), `src/results.js` (the result tabs, the page and
+`src/pages/retrieval.js` (the MMR summary line, picks
+in order, entries passed over, the copyable text form), `src/lib/sqlHighlight.js`
+(the SQL card's tokenizer), `src/lib/artifacts.js` (the rows bar and the ledger and
+pool bars, numeric columns), `src/outputs/results.js` (the result tabs, the page and
 CSV URLs, Previous and Next, the range line, the cut notice, the sub-query
-heads) and `src/feedback.js`
+heads) and `src/chat/feedback.js`
 (when a run can be rated, the request body, the saved line) with Node's built-in test runner; there is no test dependency.
 
 ## Look
 
-`src/styles.css` is the one stylesheet, built on tokens declared on `:root`
+`src/styles/` is the stylesheet (`index.css` lists its files in cascade order; `base.css` holds the tokens), built on tokens declared on `:root`
 (light) and again under `prefers-color-scheme: dark`:
 
 - **Colour** (Porcelain): `--paper`, `--surface`, `--raised`, `--well`, three

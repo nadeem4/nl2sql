@@ -15,7 +15,7 @@ Two copies are written, and a test holds them byte-identical:
     wheel, so ``pip install "nl2sql-engine[demo]"`` has it too.
 
 The card borrows the playground's bundled fonts, so run ``npm ci`` in
-``web/playground`` first, then::
+``nl2sql-ui`` first, then::
 
     python scripts/render_social_card.py
 
@@ -75,7 +75,7 @@ def inline_assets(html: str, base: pathlib.Path) -> str:
             return match.group(0)
         path = (base / reference).resolve()
         if not path.is_file():
-            raise SystemExit(f"{reference} is missing. Run `npm ci` in web/playground first.")
+            raise SystemExit(f"{reference} is missing. Run `npm ci` in nl2sql-ui first.")
         media = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         return f'url("data:{media};base64,{base64.b64encode(path.read_bytes()).decode("ascii")}")'
 

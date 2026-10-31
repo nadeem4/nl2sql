@@ -1277,8 +1277,37 @@ and adding its row's tests. The G3b callbacks and tokens are not built yet, so t
 `ctx.progress` into whatever the facade offers then. `overrides.py`: `parse_override(headers, request_llm=)` and the
 `llm_override` dependency (`X-NL2SQL-Api-Key-<provider>`, `X-NL2SQL-Models`; 403 when `api.request_llm` is off, 422
 for a malformed models header, `MissingProviderKey` for a model without the request's own key); A1 and A2a pass it as
-`llm_override=`. Golden files `ApiError.json` and `Job.json` live in `web/playground/src/api/fixtures/` (D0b moves
-them to `nl2sql-ui/src/api/fixtures/`); regenerate with `python packages/api/tests/test_web_fixtures.py`.
+`llm_override=`. Golden files `ApiError.json` and `Job.json` live in `nl2sql-ui/src/api/fixtures/` (D0b moved
+them there); regenerate with `python packages/api/tests/test_web_fixtures.py`.
+
+**D0b (web foundation).** `web/playground` is now `nl2sql-ui` (D225; no `web/` folder is left). Shared code moved by
+the ownership table: `src/lib/` (`runState`, `sqlHighlight`, `settings`, `artifacts`, `plan`), `src/components/`
+(`IndexPanel`, `indexHealth`, `NodeInspector`, `run`, `SqlCard`, `Ledger`, and the new `JobProgress.jsx` with its
+`jobProgress.js`, `jobState(job)`, plus `PageStub.jsx`), `src/outputs/` (`RowsTable`, `results`, and the new `Output.jsx`
+stub with `output.js`, `rendererFor(output)`: chart, mermaid, markdown, json, else text), `src/connect/` (`SchemaPanel`,
+`datasources`), `src/chat/` (`Feedback`, `feedback`), `src/pages/` (Home, Clip, Pipeline, Retrieval, Settings and their
+helpers, plus `Chat`, `Dashboards`, `Connect`, `Knowledge`, `Approvals`, `Evals`, `Trace` as lazy stubs: W1 owns
+Approvals and Trace, W2b Dashboards, W3 Connect and Knowledge, W4a Evals). `AskParts`, `Panes`, `stream.js`, `App.jsx`,
+`router.js`, `main.jsx` stay. **Transport:** `src/api/http.js` exports `request(method, path, body)` and
+`stream(path, body, onEvent, signal)` (paths are relative to `/api/v1`), `createHttp({fetch, storage})` for tests,
+`ApiError` (`status`, `code`, `message`, `fix`, `details`, `requestId`; status 0 and code `NETWORK` when the server is
+unreachable, code `HTTP_<status>` when the answer is not the envelope), and `readApiKey`/`writeApiKey` (the bearer key,
+`sessionStorage` under `nl2sql.ui.apiKey`). Every call also sends the tab's `X-NL2SQL-Api-Key-<provider>` and
+`X-NL2SQL-Models` headers, read with the existing `hostedKey.js` and `hostedModels.js`. `stream` is a GET without a
+body and a POST with one; `onEvent({event, data})` gets `data` parsed as JSON when it is. `src/api/sse.js` is the frame
+parser (`createSseParser`), `src/api/jobs.js` the shared job calls (`getJob`, `cancelJob`, `followJob(id, onProgress,
+signal)` over `job.progress` and `job.finished`). `src/api/routes.test.js` checks every `request("METHOD", path)` and
+every `stream(path, ...) // METHOD` in `src/api/*.js` against `packages/api/openapi.json`. **Router:** the new routes
+`chat`, `dashboards` (optional id), `connect`, `knowledge`, `approvals`, `evals`, `trace` (required id) are `stub: true`
+pages, left out of the nav until their row removes the flag; `routeFromHash` returns `{page, param}` and
+`router.route()` the current one. **Styles:** `src/styles.css` became `src/styles/` (`index.css` lists the files in
+cascade order; `base.css` holds the tokens; the rest are `ask-run`, `settings`, `retrieval`, `responsive`, `pages`,
+`artifacts`, `ask-page`, `home`), rules moved verbatim and `styles.test.js` reads them as before. **Build:** `vite build`
+writes `index.html` and hashed chunks (no single-file plugin) to `packages/api/src/nl2sql_api/web/static/`, ignored by
+git; `packages/api/pyproject.toml` carries it as package data of `nl2sql_api.web`. The old engine playground is
+unchanged: it serves the single page still committed under `packages/nl2sql/.../playground/static/`, which is no longer
+rebuilt, until X1b deletes it. `test.yml`'s `web` job and `CONTRIBUTING.md` use the new paths, and the fixtures test writes
+to `nl2sql-ui/src/api/fixtures/`.
 
 ### Session batches
 

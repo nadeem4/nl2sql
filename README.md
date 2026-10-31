@@ -633,7 +633,7 @@ fails with the rule's own name. The reasoning behind each is in
 
 Repository layout: `packages/nl2sql` (engine, CLI, adapters),
 `packages/api` (REST API), `packages/sdk` (the SDK: the adapter contract),
-`web/playground` (the playground's React source), `docs/` (MkDocs site),
+`nl2sql-ui` (the web app's React source), `docs/` (MkDocs site),
 `benchmarks/` (recorded benchmark runs), `examples/`.
 
 MIT licensed ([LICENSE](LICENSE)). The Chinook sample database and other

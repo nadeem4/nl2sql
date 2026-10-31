@@ -158,14 +158,15 @@ CLIP_TYPES = {"webm": "video/webm", "jpg": "image/jpeg"}
 # served from a pip install, so a repository-relative path would not resolve.
 PIPELINE_DOCS = "https://github.com/nadeem4/nl2sql/blob/main/docs/architecture/pipeline.md"
 
-# Shown when the page has not been built. The React source lives in
-# `web/playground`; `npm run build` writes into STATIC_DIR and the result is
-# committed so a pip install needs no Node.
+# Shown when the page has not been built. The page in STATIC_DIR is the old
+# single-file build, committed so a pip install needs no Node; its source moved
+# to `nl2sql-ui` (D0b), whose build now goes to nl2sql-api, so this folder is
+# no longer rebuilt until X1b deletes this server.
 _MISSING_PAGE = (
     "<!doctype html><html><head><title>nl2sql playground</title></head>"
     "<body><div id=\"root\">The playground page has not been built. "
     "Run <code>npm install &amp;&amp; npm run build</code> in "
-    "<code>web/playground</code>.</div></body></html>"
+    "<code>nl2sql-ui</code>.</div></body></html>"
 )
 
 

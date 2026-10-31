@@ -396,7 +396,7 @@ written: export the proposals and edit by hand. See
 - Facade: `packages/nl2sql/src/nl2sql/api/curated_api.py`
 - Command: `packages/nl2sql/src/nl2sql/cli/commands/curated.py`
 - The demo's verified queries: `CHINOOK_VERIFIED_QUERIES` in `packages/nl2sql/src/nl2sql/datasets/chinook.py`
-- The playground badge: `verifiedSource()` in `web/playground/src/results.js`
+- The playground badge: `verifiedSource()` in `nl2sql-ui/src/outputs/results.js`
 - Matching and running: `packages/nl2sql/src/nl2sql/pipeline/nodes/curated_matcher/`
 - Proposals from feedback: `packages/nl2sql/src/nl2sql/feedback/proposals.py`; the review queue and the
   canonical writer: `packages/nl2sql/src/nl2sql/review/`
