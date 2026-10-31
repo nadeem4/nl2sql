@@ -93,6 +93,23 @@ OPENAI_API_KEY=sk-... pytest -m integration
 The `llm`-marked tests fail, rather than skip, without `OPENAI_API_KEY`. That
 is expected, not a regression.
 
+### The web playground
+
+The playground's unit tests use Node's built-in runner, and CI's `web` job runs
+them on every pull request, then builds the page and writes its size to the job
+summary. To reproduce it:
+
+```bash
+cd web/playground
+npm ci
+npm test
+npm run build
+```
+
+The build rewrites the committed page under
+`packages/nl2sql/src/nl2sql/cli/demo/playground/static/`; commit that file only
+when you changed the playground.
+
 ### Real databases
 
 Tests marked `realdb` run against real PostgreSQL, MySQL and SQL Server
