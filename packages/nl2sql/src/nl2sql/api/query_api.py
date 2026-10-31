@@ -601,7 +601,7 @@ class QueryAPI:
                  ) -> Tuple[Optional[List[Approval]], Optional[PipelineError]]:
         """``approvals`` with each request id replaced by its grant, and, for an id that cannot run, the error that
         ends the run before the graph (``APPROVAL_NOT_GRANTED``)."""
-        if not approvals or all(isinstance(a, Approval) for a in approvals):
+        if not approvals or not any(isinstance(a, str) for a in approvals):
             return approvals, None
         resolved, problem = Approvals(self._ctx).resolve(approvals, user=user)
         if problem is not None:
