@@ -18,7 +18,7 @@ import re
 from typing import Any, Iterator, NamedTuple, Optional
 from urllib.parse import urlsplit
 
-from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError
+from nl2sql.common.errors import ErrorCode, ErrorSeverity, PipelineError, ReplayMiss
 
 from .providers import PROVIDER_LABELS, UPSTREAMS
 from .registry import PROVIDER_PRESETS
@@ -142,11 +142,13 @@ def _by_status(status: int, reason: str, p: str):
 def classify_provider_error(exc: BaseException) -> Optional[ProviderFailure]:
     """What the provider did, or None when ``exc`` is not a provider's answer.
 
-    Looks through ``exc`` and what it was raised from for an OpenAI or
+    Looks through ``exc`` and what it was raised from for a ``ReplayMiss`` or an OpenAI or
     Anthropic SDK error. A 400 is left alone: it is a request the engine built
     wrongly (or a model refusing a parameter), which its node explains better.
     """
     for candidate in _chain(exc):
+        if isinstance(candidate, ReplayMiss):  # the replay provider has no recording: not a vendor's answer
+            return ProviderFailure(ErrorCode.REPLAY_MISS, PROVIDER_LABELS["replay"], candidate.message, "")
         sdk = _sdk_of(candidate)
         if sdk is None:
             continue

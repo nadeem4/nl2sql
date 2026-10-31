@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Union
 
 from nl2sql.runtime import Runtime, _config_agent_names
 
@@ -62,6 +62,15 @@ class LLMAPI:
         from nl2sql.llm.providers import describe_providers
 
         return describe_providers(self._ctx.registry)
+
+    def recorded(self, questions: Sequence[str]) -> List[str]:
+        """The ``questions`` the ``replay`` provider can answer, in the order asked.
+
+        A question is covered when the recordings hold a first answer for it, so a
+        keyless run of it succeeds; one that is not ends in ``REPLAY_MISS``. The
+        demo's start screen reads this to say which questions work with no key.
+        """
+        return self._ctx.registry.load("llm", "replay").store.covered(questions)
 
     def prices(self) -> Dict[str, Any]:
         """The prices every model call is costed with: the dated table with ``llm.prices`` applied.

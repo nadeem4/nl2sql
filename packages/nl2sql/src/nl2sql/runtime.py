@@ -436,6 +436,12 @@ class Runtime:
         self._publish_knowledge(error)
         return error
 
+    def add_knowledge_source(self, source: Any) -> Optional[str]:
+        """Adds a knowledge source to ``config`` and loads the sources again; returns the load error, if any."""
+        with self._lock:
+            self._config = self._config.model_copy(update={"knowledge": [*self._config.knowledge, source]})
+        return self.reload_knowledge()
+
     def replace_curated(self, curated: Any, *, sha256: Optional[str]) -> None:
         """Swap in the ``curated`` section an accept just wrote, with its file's new hash, as one step.
 

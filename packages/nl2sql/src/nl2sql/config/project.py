@@ -70,6 +70,8 @@ def default_llm(provider: str) -> LLM:
     """The ``LLM`` a new config starts with for ``provider``: its default model, and no key."""
     from nl2sql.llm.providers import DEFAULT_MODELS, default_temperature_for
 
+    if provider == "replay":  # answers from the recordings packaged with the engine; the model name is a label
+        return LLM(provider="replay", model="recorded")
     if provider not in DEFAULT_MODELS:
         raise ValueError(f"'{provider}' has no default model to start a config with. "
                          f"Choose one of: {', '.join(sorted(DEFAULT_MODELS))}.")
@@ -169,6 +171,37 @@ def init_project(
         for name in _plan(config, folder, False, extra, headers=headers)[0]:
             (folder / name).unlink(missing_ok=True)
     return write_project(config, folder, extra=extra, headers=headers)
+
+
+def prepare_demo(folder: PathLike, *, provider: Optional[str] = None) -> Path:
+    """The demo project in ``folder``: written the first time, indexed when its index is missing; returns ``nl2sql.yaml``.
+
+    A folder that already holds an ``nl2sql.yaml`` is used as it is. A new one
+    is written by ``init_project(demo=True)`` with ``provider``, by default the
+    first provider whose key variable is set, else ``replay``: a demo with no
+    key answers its guided questions from the recordings that ship with the
+    engine. Indexing calls no model.
+    """
+    folder = Path(folder)
+    config_path = folder / "nl2sql.yaml"
+    if not config_path.exists():
+        init_project(folder, demo=True, provider=provider or _demo_provider())
+    _index_if_missing(config_path)
+    return config_path
+
+
+def _demo_provider() -> str:
+    from nl2sql.llm.providers import DEFAULT_MODELS, KEYED_PROVIDERS, api_key_from_env
+
+    return next((name for name in KEYED_PROVIDERS if name in DEFAULT_MODELS and api_key_from_env(name)), "replay")
+
+
+def _index_if_missing(config_path: Path) -> None:
+    from nl2sql.public_api import NL2SQL
+
+    with NL2SQL(load_config(config_path)) as engine:
+        if engine.index.health()["status"] != "ok":
+            engine.index.build()
 
 
 # Packaged suites that are for the test bed, not the demo: the demo has no database of that name to run them on.

@@ -25,7 +25,9 @@ class DatasourceInfo:
     connected to it, ``failed`` when it did not (``reason`` says why), and
     ``unchecked`` before either ran. ``connection`` is the configured
     connection with every secret masked. A failed datasource has no
-    ``capabilities``: nothing is routed to it.
+    ``capabilities``: nothing is routed to it. ``sample_questions`` are the
+    datasource's own, then the glossary ``examples`` a person accepted (not
+    scoped to a caller: a caller-facing route filters by the datasource).
     """
 
     id: str
@@ -35,6 +37,7 @@ class DatasourceInfo:
     capabilities: List[str] = field(default_factory=list)
     connection: Dict[str, Any] = field(default_factory=dict)
     reason: Optional[str] = None
+    sample_questions: List[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

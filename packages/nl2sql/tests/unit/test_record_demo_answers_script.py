@@ -44,28 +44,6 @@ def test_a_key_already_exported_wins_over_the_file(tmp_path, monkeypatch):
     assert _load().recording_key(env) == FAKE_CLAUDE
 
 
-def test_the_key_is_passed_to_the_demo_and_beats_another_provider_s_exported_key(tmp_path, monkeypatch):
-    """The demo is given the Claude key as --api-key would give it, so an
-    exported OpenAI key cannot be picked first; the environment is left as it is."""
-    import os
-
-    _clear(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
-    monkeypatch.setenv("OPENAI_API_KEY", FAKE_OPENAI)
-    seen = {}
-
-    def _demo(**kwargs):
-        seen.update(kwargs)
-        raise SystemExit(1)
-
-    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _demo)
-
-    _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(tmp_path / "out.json")])
-
-    assert seen["api_key"] == FAKE_CLAUDE and seen["record"] is True
-    assert os.environ["OPENAI_API_KEY"] == FAKE_OPENAI
-
-
 def test_no_key_records_nothing_and_says_so_without_running(tmp_path, monkeypatch, capsys):
     _clear(monkeypatch)
     out = tmp_path / "out.json"
@@ -84,119 +62,58 @@ def test_without_the_anthropic_extra_it_says_what_to_install_without_running(tmp
     _clear(monkeypatch)
     monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
     monkeypatch.setitem(sys.modules, "langchain_anthropic", None)  # find_spec reports it missing
-    ran = []
-    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", lambda **kwargs: ran.append(kwargs))
     out = tmp_path / "out.json"
 
     status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out)])
 
     assert status == 2
-    assert not ran
     assert not out.exists()
     assert 'pip install "nl2sql-engine[anthropic]"' in capsys.readouterr().err
-
-
-def test_a_failed_demo_run_fails_the_script_and_writes_nothing(tmp_path, monkeypatch, capsys):
-    """`demo --record` stops when indexing fails; the script must not report success."""
-    _clear(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
-
-    def _failing(**kwargs):
-        raise SystemExit(1)
-
-    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _failing)
-    out = tmp_path / "out.json"
-
-    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out)])
-
-    assert status == 1
-    assert not out.exists()
-    assert "Nothing was recorded" in capsys.readouterr().err
-
-
-def _recording_demo(answered):
-    """A `demo --record` that recorded only ``answered`` and exited 1 for the rest, as it now does."""
-    from nl2sql.llm.replay import Recording, ReplayStore
-
-    def _demo(directory, **kwargs):
-        directory.mkdir(parents=True, exist_ok=True)
-        ReplayStore([Recording("DecomposerResponse", q, {}) for q in answered]).save(directory / "recordings.json")
-        raise SystemExit(1)
-
-    return _demo
-
-
-def test_failed_questions_are_listed_and_fail_the_script(tmp_path, monkeypatch, capsys):
-    """A real run said "Recorded 20 of 20" with 10 failed runs."""
-    from nl2sql.datasets.demo import DEMO_QUESTIONS
-    from nl2sql.llm.replay import ReplayStore
-
-    _clear(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
-    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _recording_demo(DEMO_QUESTIONS[:1]))
-    out = tmp_path / "out.json"
-
-    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out),
-                           "--dir", str(tmp_path / "demo")])
-
-    assert status == 1
-    assert ReplayStore.load(out).covered(DEMO_QUESTIONS) == DEMO_QUESTIONS[:1]
-    printed = capsys.readouterr().out
-    assert f"Recorded 1 of {len(DEMO_QUESTIONS)}" in printed
-    for question in DEMO_QUESTIONS[1:]:
-        assert f"not recorded: {question}" in printed
-
-
-def test_recordings_left_from_an_earlier_run_are_not_taken_for_this_one(tmp_path, monkeypatch, capsys):
-    from nl2sql.datasets.demo import DEMO_QUESTIONS
-    from nl2sql.llm.replay import Recording, ReplayStore
-
-    _clear(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
-    project = tmp_path / "demo"
-    project.mkdir()
-    stale = project / "recordings.json"
-    ReplayStore([Recording("DecomposerResponse", q, {}) for q in DEMO_QUESTIONS]).save(stale)
-    import os
-    os.utime(stale, (1_000_000_000, 1_000_000_000))
-
-    def _stopped(**kwargs):
-        raise SystemExit(1)
-
-    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _stopped)
-    out = tmp_path / "out.json"
-
-    status = _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(out),
-                           "--dir", str(project)])
-
-    assert status == 1
-    assert not out.exists()
-    assert "Nothing was recorded" in capsys.readouterr().err
-
-
-def test_output_is_made_safe_before_the_demo_writes_anything(tmp_path, monkeypatch):
-    """The script is an entry point of its own: `main()` of the CLI never runs.
-
-    Redirected to a file on Windows, stdout is cp1252 and the demo's first
-    check mark killed indexing.
-    """
-    _clear(monkeypatch)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", FAKE_CLAUDE)
-    calls = []
-    monkeypatch.setattr("nl2sql.cli.console.configure_output_encoding", lambda: calls.append("configured"))
-
-    def _demo(**kwargs):
-        calls.append("demo")
-        raise SystemExit(1)
-
-    monkeypatch.setattr("nl2sql.cli.commands.demo.demo_command", _demo)
-
-    _load().main(["--env-file", str(tmp_path / "missing.env"), "--out", str(tmp_path / "out.json")])
-
-    assert calls == ["configured", "demo"]
 
 
 def test_by_default_it_writes_the_file_the_engine_ships():
     module = _load()
 
-    assert module.OUT.as_posix().endswith("packages/nl2sql/src/nl2sql/cli/demo/recordings/chinook.json")
+    assert module.OUT.as_posix().endswith("packages/nl2sql/src/nl2sql/datasets/recordings/chinook.json")
+
+
+class _Result:
+    def __init__(self, ok):
+        self.status = "success" if ok else "error"
+        self.final_answer = {"summary": "ok"} if ok else None
+        self.errors = [] if ok else [{"message": "boom"}]
+
+
+def test_record_script_writes_the_store(tmp_path):
+    """The recorder keeps what the upstream answered for the questions whose runs succeeded, and the file replays.
+
+    The upstream is the replay provider over a small store: no key, no network.
+    """
+    from pydantic import BaseModel
+
+    from nl2sql.llm.providers import ResolvedAgent
+    from nl2sql.llm.replay import Recorder, Recording, ReplayProvider, ReplayStore
+    from nl2sql.llm.wires import structured
+
+    class Thing(BaseModel):
+        count: int
+
+    good, bad = "How many customers are there?", "Which genre sold the most?"
+    upstream = ReplayProvider(ReplayStore([Recording("Thing", good, {"count": 59}),
+                                           Recording("Thing", bad, {"count": 1})]))
+    recorder = Recorder(upstream, provider="anthropic")
+    client = recorder.create(ResolvedAgent(name="default", model="claude-opus-5", temperature=None))
+
+    class Engine:
+        def run_query(self, question, user_context=None):
+            structured(client, Thing).invoke(f"[USER_QUERY]\n{question}\n")
+            return _Result(question == good)
+
+    recorded = _load().record_answers(Engine(), recorder, [good, bad])
+    out = tmp_path / "out.json"
+    recorder.store.save(out)
+
+    assert recorded == [good]
+    saved = ReplayStore.load(out)
+    assert [(r.name, r.when) for r in saved._recordings] == [("Thing", good)]
+    assert (saved.provider, saved.model) == ("anthropic", "claude-opus-5")

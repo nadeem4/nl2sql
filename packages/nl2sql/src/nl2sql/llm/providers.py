@@ -82,7 +82,8 @@ def looks_like_api_key(key: Optional[str]) -> bool:
 # Each provider as a person names it: in the settings panel, and in the message
 # of an error the provider caused (``nl2sql.llm.failures``).
 PROVIDER_LABELS: Dict[str, str] = {"openai": "OpenAI", "anthropic": "Anthropic", "openrouter": "OpenRouter",
-                                   "ollama": "Ollama", "openai_compatible": "OpenAI-compatible"}
+                                   "ollama": "Ollama", "openai_compatible": "OpenAI-compatible",
+                                   "replay": "Recorded answers"}
 
 OPENAI_ENV = PROVIDER_PRESETS["openai"].api_key_env
 OPENROUTER_ENV = PROVIDER_PRESETS["openrouter"].api_key_env

@@ -41,11 +41,12 @@ def test_llm_interface_is_version_2():
         assert provider.structured_output in ("tool_calling", "json_schema", "json_mode")
 
 
-def test_built_in_llm_providers_are_openai_anthropic_openai_compatible_and_its_presets():
+def test_built_in_llm_providers_are_openai_anthropic_openai_compatible_its_presets_and_replay():
     declared = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]["entry-points"]["nl2sql.llms"]
 
-    assert set(declared) == {"openai", "anthropic", "openai_compatible", "openrouter", "ollama"}
-    assert set(LLM_PROVIDERS) == set(PROVIDER_PRESETS) == set(declared)
+    assert set(declared) == {"openai", "anthropic", "openai_compatible", "openrouter", "ollama", "replay"}
+    # `replay` is a provider of its own, not a preset: it has no key variable, no endpoint and no client library.
+    assert set(LLM_PROVIDERS) == set(PROVIDER_PRESETS) == set(declared) - {"replay"}
     assert {name for name, p in PROVIDER_PRESETS.items() if p.preset_of} == {"openrouter", "ollama"}
     assert {p.preset_of for p in PROVIDER_PRESETS.values() if p.preset_of} == {"openai_compatible"}
 

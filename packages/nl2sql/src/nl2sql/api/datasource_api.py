@@ -6,7 +6,7 @@ import hashlib
 import threading
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from pydantic import BaseModel, SecretStr
 
@@ -59,6 +59,39 @@ class DatasourcesAPI:
                 not validate (no value is shown), or its adapter cannot be built.
         """
         self._ctx.add_datasource(datasource)
+
+    def add_demo(self, *, user_context: Optional[UserContext] = None,
+                 on_datasource: Optional[Callable[[Any], None]] = None):
+        """Add the three sample databases and the demo glossary as ordinary datasources, then index them.
+
+        The databases are opened read-only from the folder the package installed
+        them in. One already configured is left as it is, so a second call
+        indexes again and adds nothing. ``on_datasource`` goes to
+        ``index.build`` (an ``IndexProgress`` per datasource). With
+        ``user_context`` the caller needs an admin role.
+
+        Returns:
+            The ``RebuildResult`` of the build over the demo's datasources.
+
+        Raises:
+            PermissionError: ``user_context`` has no admin role.
+        """
+        from nl2sql.api.indexing_api import IndexAPI
+        from nl2sql.config import KnowledgeSourceConfig, demo_config
+        from nl2sql.datasets import DEMO_GLOSSARY_PATH
+
+        if user_context is not None:
+            self._admin(user_context)
+        demo = demo_config()
+        have = {d.id for d in self._ctx.config.datasources}
+        for datasource in demo.datasources:
+            if datasource.id not in have:
+                self._ctx.add_datasource(datasource)
+        glossary = KnowledgeSourceConfig(type="yaml", path=DEMO_GLOSSARY_PATH.as_posix())
+        if not any(getattr(k, "path", None) == glossary.model_dump().get("path")
+                   for k in self._ctx.config.knowledge):
+            self._ctx.add_knowledge_source(glossary)
+        return IndexAPI(self._ctx).build([d.id for d in demo.datasources], on_datasource=on_datasource)
 
     def remove(self, datasource_id: str) -> None:
         """Take a datasource out of routing and out of ``engine.config``, and close its pool.
@@ -277,7 +310,14 @@ class DatasourcesAPI:
         kind = datasource.type or getattr(adapter, "title", None) or type(adapter).__name__
         return DatasourceInfo(id=datasource.id, type=kind, description=datasource.description, status=status,
                               capabilities=capabilities, connection=mask_connection_args(datasource.connection),
-                              reason=reason)
+                              reason=reason, sample_questions=self._sample_questions(datasource))
+
+    def _sample_questions(self, datasource: Datasource) -> List[str]:
+        """The datasource's own ``sample_questions``, then the accepted glossary ``examples`` not already there."""
+        found = list(datasource.sample_questions)
+        knowledge = getattr(self._ctx, "knowledge", None)
+        examples = knowledge.get(datasource.id).examples if knowledge is not None else []
+        return found + [e for e in examples if e not in found]
 
 
 def _secret_literals(connection: Any, secret_fields: Any = ()) -> List[str]:
