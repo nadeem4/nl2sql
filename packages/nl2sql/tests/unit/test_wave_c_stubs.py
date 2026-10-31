@@ -71,7 +71,8 @@ def test_the_namespaces_are_built_once_and_import_nl2sql_stays_light(engine):
 
 def test_stubs_keep_the_signatures_the_design_gives(engine):
     ask = inspect.signature(engine.conversations.ask).parameters
-    assert list(ask) == ["conversation_id", "text", "user_context", "choice", "execute", "cancellation_token"]
+    assert list(ask) == ["conversation_id", "text", "user_context", "choice", "execute", "cancellation_token",
+                         "llm_override"]
     assert ask["user_context"].kind is inspect.Parameter.KEYWORD_ONLY and ask["text"].default is None
     refresh = inspect.signature(engine.dashboards.refresh).parameters
     assert list(refresh) == ["dashboard_id", "user_context", "tile_id", "filters", "approvals"]
