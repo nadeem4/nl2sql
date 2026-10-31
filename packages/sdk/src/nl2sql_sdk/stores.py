@@ -377,6 +377,23 @@ class StateStore(Store, Protocol):
 
     def list_api_keys(self) -> List[dict]: ...
 
+    # -- approvals (Wave D, D215). A document has ``id`` (the approval request's id), ``status`` (``pending``,
+    # ``granted`` or ``denied``), ``created_at`` and ``updated_at`` (ISO 8601; a stamp with no zone is UTC).
+
+    def put_approval(self, doc: dict) -> None:
+        """Store ``doc``, replacing the approval with its ``id``."""
+        ...
+
+    def get_approval(self, request_id: str) -> Optional[dict]: ...
+
+    def list_approvals(self, status: Optional[str] = None) -> List[dict]:
+        """The approvals with ``status`` (all when None), newest (``created_at``) first."""
+        ...
+
+    def purge_approvals(self, older_than: datetime) -> int:
+        """Delete the approvals last updated before ``older_than``; return how many."""
+        ...
+
     def lock(self, name: str, ttl_s: int) -> ContextManager[None]:
         """A lease on ``name``, held for the ``with`` block. It expires after ``ttl_s`` if its holder dies.
 

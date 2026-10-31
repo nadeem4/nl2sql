@@ -8,7 +8,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, List
 
-from nl2sql.common.errors import WorkspaceNotEmpty
+from nl2sql.common.errors import InvalidArgument, WorkspaceNotEmpty
 from nl2sql.conversations.store import Owner
 from nl2sql.dashboards.models import DEFAULT_WORKSPACE_NAME, Workspace
 from nl2sql.dashboards.store import DashboardStore, owner_for
@@ -61,9 +61,9 @@ class Workspaces:
     def _unique(self, name: str, owner: Owner, keep: str = "") -> str:
         name = name.strip()
         if not name:
-            raise ValueError("A workspace name cannot be empty.")
+            raise InvalidArgument("A workspace name cannot be empty.")
         if any(w.name.casefold() == name.casefold() and w.id != keep for w in self._store.workspaces(owner)):
-            raise ValueError(f"This owner already has a workspace named '{name}'.")
+            raise InvalidArgument(f"This owner already has a workspace named '{name}'.")
         return name
 
     def _changed(self, workspace: Workspace, change: str, user: UserContext) -> None:

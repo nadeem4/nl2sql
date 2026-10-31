@@ -23,6 +23,7 @@ from typing import Any, Dict, Iterator, List, Mapping, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from nl2sql.charts.spec import ColumnKind
+from nl2sql.common.errors import NL2SQLError
 
 # The most rows one page returns; a larger page size is cut to this.
 MAX_RESULT_PAGE_SIZE = 1000
@@ -105,9 +106,11 @@ class ResultPage(BaseModel):
     next_offset: Optional[int] = None
 
 
-class ResultNotFound(LookupError):
+class ResultNotFound(NL2SQLError, LookupError):
     """No such result for this caller: an unknown request id, another caller's or another tenant's, or an id that
     is not a plain token."""
+
+    code, status = "NOT_FOUND", 404
 
 
 def _plain(value: Any) -> bool:

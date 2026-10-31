@@ -41,22 +41,27 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Dict, Iterator, Mapping, NamedTuple, Optional, Tuple
 
+from nl2sql.common.errors import NL2SQLError
+
 __all__ = ["MissingProviderKey", "RequestLLMs", "current_api_key", "current_api_keys",
            "current_request_llms", "use_api_key", "use_request_llms"]
 
 
-class MissingProviderKey(Exception):
+class MissingProviderKey(NL2SQLError):
     """A step is on a provider this request brought no key for.
 
     It names the step and the provider and quotes no key, so the playground can
     turn it into a refusal a visitor can act on.
     """
 
+    code, status = "MISSING_PROVIDER_KEY", 422
+
     def __init__(self, agent: str, provider: str) -> None:
         self.agent = agent
         self.provider = provider
         super().__init__(f"No API key was supplied for provider '{provider}', "
-                         f"which step '{agent}' is set to run on.")
+                         f"which step '{agent}' is set to run on.",
+                         fix=f"Send a key for '{provider}' or drop the model choice for '{agent}'.")
 
 
 class RequestLLMs(NamedTuple):

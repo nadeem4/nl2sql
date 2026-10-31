@@ -582,3 +582,25 @@ def test_a_null_max_age_keeps_drafts(make):
 
     assert "dashboards" not in engine.storage.purge()
     assert engine.dashboards.get("ancient", user_context=ANA)
+
+
+def test_argument_errors_are_named_and_still_value_errors(engine):
+    from nl2sql.common.errors import InvalidArgument, NL2SQLError
+
+    seed(engine, "saved", status="saved")
+    seed(engine, "empty", tiles=[])
+    workspace(engine, "Sales")
+    cases = [
+        lambda: engine.dashboards.pin("saved", user_context=ANA),
+        lambda: engine.dashboards.pin("empty", user_context=ANA),
+        lambda: engine.dashboards.list(user_context=ANA, status="nope"),
+        lambda: engine.dashboards.edit("saved", [RenameTile(tile_id="t1", title="  ")], user_context=ANA),
+        lambda: engine.dashboards.edit("saved", [RemoveTile(tile_id="nope")], user_context=ANA),
+        lambda: engine.workspaces.create("  ", user_context=ANA),
+        lambda: engine.workspaces.create("Sales", user_context=ANA),
+    ]
+    for case in cases:
+        with pytest.raises(InvalidArgument) as caught:
+            case()
+        assert isinstance(caught.value, ValueError) and isinstance(caught.value, NL2SQLError)
+        assert (caught.value.status, caught.value.code) == (422, "INVALID_ARGUMENT")

@@ -211,6 +211,20 @@ def _conversations_dashboards_and_keys(connection: sqlite3.Connection) -> None:
     """)
 
 
+def _approvals(connection: sqlite3.Connection) -> None:
+    """Wave D: stored approval requests and their grants, one JSON document per request id (D215)."""
+    _script(connection, """
+        CREATE TABLE IF NOT EXISTS approvals (
+            id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            doc_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals (status, created_at);
+    """)
+
+
 MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0001_adopt_0_5_tables", _adopt_0_5),
     ("0002_feedback_datasources_and_source", _feedback_datasources_and_source),
@@ -218,6 +232,7 @@ MIGRATIONS: List[Tuple[str, Callable[[sqlite3.Connection], None]]] = [
     ("0004_schema_diffs", _schema_diffs),
     ("0005_proposals", _proposals),
     ("0006_conversations_dashboards_and_keys", _conversations_dashboards_and_keys),
+    ("0007_approvals", _approvals),
 ]
 
 # -- feedback columns --------------------------------------------------------------
@@ -734,6 +749,38 @@ class SqliteState:
     @_locked
     def list_api_keys(self) -> List[Dict[str, Any]]:
         return [json.loads(row[0]) for row in self._conn().execute("SELECT row_json FROM api_keys ORDER BY id;")]
+
+    # -- approvals ---------------------------------------------------------------
+
+    @_locked
+    def put_approval(self, doc: Dict[str, Any]) -> None:
+        """Stores ``doc``, replacing the approval with its ``id``."""
+        connection = self._conn()
+        with connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO approvals (id, status, created_at, updated_at, doc_json) "
+                "VALUES (?, ?, ?, ?, ?);",
+                (doc["id"], doc["status"], _stamp(doc["created_at"]), _stamp(doc["updated_at"]), json.dumps(doc)))
+
+    @_locked
+    def get_approval(self, request_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn().execute("SELECT doc_json FROM approvals WHERE id = ?;", (request_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    @_locked
+    def list_approvals(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        sql, values = "SELECT doc_json FROM approvals", []
+        if status is not None:
+            sql += " WHERE status = ?"
+            values.append(status)
+        rows = self._conn().execute(sql + " ORDER BY created_at DESC, id;", values).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    @_locked
+    def purge_approvals(self, older_than: datetime) -> int:
+        connection = self._conn()
+        with connection:
+            return connection.execute("DELETE FROM approvals WHERE updated_at < ?;", (_utc(older_than),)).rowcount
 
     # -- the lock ----------------------------------------------------------------
 

@@ -145,7 +145,7 @@ def test_migration_6_adopts_a_0_8_state_file(tmp_path):
         connection.execute("INSERT INTO plan_cache VALUES ('q', 'ds', 'v1', '{}', 0);")
 
     state = SqliteState(path)
-    assert state.migrate() == ["0006_conversations_dashboards_and_keys"]
+    assert state.migrate() == ["0006_conversations_dashboards_and_keys", "0007_approvals"]
     assert state.migrate() == []
     assert state.get_plan("q", "ds", "v1") == "{}", "0.8's rows are kept"
     state.put_conversation(_conversation("c1"))
@@ -156,9 +156,9 @@ def test_migration_6_adopts_a_0_8_state_file(tmp_path):
     assert {"conversations", "workspaces", "dashboards", "tile_runs", "api_keys"} <= tables
 
 
-def test_a_fresh_file_applies_all_six_migrations(tmp_path):
+def test_a_fresh_file_applies_all_seven_migrations(tmp_path):
     state = SqliteState(tmp_path / "state.db")
-    assert len(state.migrate()) == 6 == len(MIGRATIONS)
+    assert len(state.migrate()) == 7 == len(MIGRATIONS)
     state.close()
 
 

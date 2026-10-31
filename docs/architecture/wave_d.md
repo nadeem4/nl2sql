@@ -1203,6 +1203,24 @@ flowchart TD
 | X1b | **Cutover: delete the old playground.** Delete `nl2sql/cli/demo/` (the playground, `llm_config.py`, `stamp.py`, `defaults.py`) and the engine's package data for it; `STILL_IMPORTED_FROM_INSIDE` emptied and deleted; the playground's Python tests replaced by the API's; `README.md`, `packages/nl2sql/README.md`, `packages/api/README.md`, `CLAUDE.md`. Mostly deletions, so it may pass 1,000 changed lines: deleted lines carry no review weight, and splitting a deletion would leave a half-deleted playground on `main`. | X1a | `test_apps_always_pass_the_caller`, `test_still_imported_from_inside_is_gone` (the public-only test with no exceptions), the `fresh-install` job still green | `CLAUDE.md` (the facade rule's exception list is gone), `CONTRIBUTING.md` |
 | R1 | **Owner: re-record, rehearse, browser pass.** Not an agent PR. The owner runs Actions → **Record demo answers** with `record: answers` (the guided questions, the scripted follow-ups and the clarification question, on the key the workflow holds), reviews and merges its PR, then `record: clips` for the home page clips on the new server. Then the scratch-Space rehearsal of X1a again, and the short browser pass (section 5). Pre-approved by the owner; no agent runs any of it. | X1b | The workflow's own checks; `test_replay_covered` (G2b) on the re-recorded store | the release's `docs/releases/` page |
 
+### Built notes
+
+**D0a-1 (engine shapes and the `mode:` key).** `NL2SQLError` (`code`, `message`, `fix`, `status`) now lives in
+`common/errors.py`; `common/exceptions.py` re-exports it, so there is one class. The named exceptions derive from
+it and keep their built-in parent. New: `NotAuthorized` (403, also a `PermissionError`), `ApprovalNotFound` (404)
+and `InvalidArgument` (422, a `ValueError`), which replaces the plain `ValueError` the dashboard and workspace
+methods raised for a wrong argument (`dashboards/api.py`, `edits.py`, `filters.py`, `workspaces.py`; pydantic
+validators in `dashboards/models.py` stay `ValueError`). `ReviewError` maps its code to a status. `ErrorCode.REPLAY_MISS` and
+`APPROVAL_NOT_GRANTED` are fatal. `Api` gained `auth`, `proxy` (`ApiProxy`), `static_role` and `request_llm`;
+the old three fields stay until D0a-2. `settings.approvals.max_age_hours` (24). `LLMOverride(keys, models)` is a
+frozen dataclass in `nl2sql/llm/override.py` (`keys` is left out of `repr`). The state store gained
+`put_approval(doc)`, `get_approval(request_id)`, `list_approvals(status=None)` and `purge_approvals(older_than)`
+over plain JSON documents (`id` is the request id; `status` is `pending`, `granted` or `denied`; `created_at`
+and `updated_at`), migration `0007_approvals`; the store `interface_version` stays 4 (decision for the owner: bump
+it to 5 when G3a uses the methods). `mode:` is `Config.mode`; `nl2sql.config.mode.resolve_mode(flag, env, file)`
+is pure and raises `ValueError` for an unknown value. Exported from `nl2sql`: `NL2SQLError`, `NotAuthorized`,
+`InvalidArgument`, `ApprovalNotFound`, `DashboardBusy`, `MissingProviderKey`, `LLMOverride`, `resolve_mode`.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below

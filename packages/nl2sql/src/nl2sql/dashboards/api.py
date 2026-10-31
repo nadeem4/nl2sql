@@ -14,7 +14,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from nl2sql.common.errors import NoTiles, WorkspaceNotEmpty
+from nl2sql.common.errors import InvalidArgument, NoTiles, WorkspaceNotEmpty
 from nl2sql.conversations.models import Conversation
 from nl2sql.conversations.store import ConversationStore, Owner
 from nl2sql.dashboards.edits import Applied, EditEnv, _title, apply_edits, plan_from_step
@@ -62,7 +62,7 @@ class Dashboards:
     def list(self, *, user_context: UserContext, workspace_id: Optional[str] = None,
              status: str = "saved") -> List[DashboardInfo]:
         if status not in _STATUSES:
-            raise ValueError(f"status must be one of {', '.join(_STATUSES)}, not '{status}'.")
+            raise InvalidArgument(f"status must be one of {', '.join(_STATUSES)}, not '{status}'.")
         infos = []
         for d in self._store.list(self._owner(user_context)):
             if d.status != status or (workspace_id is not None and d.workspace_id != workspace_id):
@@ -105,9 +105,9 @@ class Dashboards:
         with self._refresher.locked(dashboard_id):
             dashboard = self._store.get(dashboard_id, owner)
             if dashboard.status == "saved":
-                raise ValueError(f"Dashboard '{dashboard_id}' is already saved.")
+                raise InvalidArgument(f"Dashboard '{dashboard_id}' is already saved.")
             if not dashboard.tiles:
-                raise ValueError("An empty draft cannot be pinned: add a chart first.")
+                raise InvalidArgument("An empty draft cannot be pinned: add a chart first.")
             if workspace_id is not None:
                 target = self._store.workspace(workspace_id, owner)
             else:
@@ -130,7 +130,7 @@ class Dashboards:
         if not edits:
             return dashboard
         if conversation is not None and (conversation.tenant_id, conversation.user_id) != owner:
-            raise ValueError("That conversation is not the caller's: its answers cannot be added to a dashboard.")
+            raise InvalidArgument("That conversation is not the caller's: its answers cannot be added to a dashboard.")
         # Under the refresh lock: a refresh that finished after ``set_filters`` would store results that ignore
         # the new filters.
         checks = sum(1 for e in edits if e.kind in ("add_tile", "replace_plan"))  # each runs a no-execute check
@@ -161,7 +161,7 @@ class Dashboards:
         run = self._refresher.check([tile], user)[tile.id]
         if run.status not in SERVES:
             why = (run.error or {}).get("message") or f"the check ended {run.status}"
-            raise ValueError(f"The plan of the chart '{tile.title}' was refused ({why}). Nothing was saved.")
+            raise InvalidArgument(f"The plan of the chart '{tile.title}' was refused ({why}). Nothing was saved.")
 
     def rename(self, dashboard_id: str, title: str, *, user_context: UserContext) -> Dashboard:
         return self.edit(dashboard_id, [RenameDashboard(title=title)], user_context=user_context)
@@ -241,7 +241,7 @@ class Dashboards:
         dashboard = self._store.get(dashboard_id, self._owner(user_context))
         f = filtering.find(dashboard.filters, filter_id)
         if not 1 <= limit <= filtering.MAX_VALUES_LIMIT:
-            raise ValueError(f"limit must be between 1 and {filtering.MAX_VALUES_LIMIT}, not {limit}.")
+            raise InvalidArgument(f"limit must be between 1 and {filtering.MAX_VALUES_LIMIT}, not {limit}.")
         return self._refresher.values(f, user_context, limit)
 
     @staticmethod
@@ -250,7 +250,7 @@ class Dashboards:
             return list(dashboard.tiles)
         chosen = [t for t in dashboard.tiles if t.id == tile_id]
         if not chosen:
-            raise ValueError(f"No chart '{tile_id}' in this dashboard.")
+            raise InvalidArgument(f"No chart '{tile_id}' in this dashboard.")
         return chosen
 
     def _last_runs(self, dashboard: Dashboard) -> Dict[str, TileRun]:
@@ -261,7 +261,7 @@ class Dashboards:
 
     def run_scheduled(self, *, now: Optional[datetime] = None) -> List[DashboardRun]:
         if now is not None and now.utcoffset() is None:
-            raise ValueError("now must carry a timezone, such as datetime.now(timezone.utc).")
+            raise InvalidArgument("now must carry a timezone, such as datetime.now(timezone.utc).")
         now = now or datetime.now(timezone.utc)
         done: List[DashboardRun] = []
         for doc in self._ctx.state.list_scheduled_dashboards():
@@ -349,7 +349,7 @@ class Dashboards:
     def suggest_questions(self, source: Source, *, n: int = 5) -> List[str]:
         """The questions of the first ``n`` charts ``generate`` would choose. Nothing runs and nothing is saved."""
         if n < 1:
-            raise ValueError("n must be at least 1.")
+            raise InvalidArgument("n must be at least 1.")
         try:
             return [c.question for c in self._chosen_templates(source, None)][:n]
         except NoTiles:
@@ -357,7 +357,7 @@ class Dashboards:
 
     def _chosen_templates(self, source: Source, max_tiles: Optional[int]) -> List[Candidate]:
         if max_tiles is not None and max_tiles < 1:
-            raise ValueError("max_tiles must be at least 1.")
+            raise InvalidArgument("max_tiles must be at least 1.")
         tables = column_roles(source)
         if not tables:
             raise NoTiles(f"'{source.datasource_id}' has no table you can read, so there is nothing to chart.")

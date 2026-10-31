@@ -18,6 +18,27 @@ trust_body_role: false          # accept "role" in the request body (dev only)
 cors_origins: [https://app.example.com]
 ```
 
+Wave D adds the fields below. The engine validates them now; `nl2sql-api` starts reading them when its identity replaces `auth.py` (D0a-2), which also deletes `role_header`, `role` and `trust_body_role`.
+
+```yaml
+auth: none                      # api_keys | proxy | static | none (default none)
+proxy:                          # auth: proxy only
+  trusted_from: [127.0.0.1/32, "::1/128"]
+  user_header: X-Forwarded-User
+  tenant_header: null           # null: settings.tenant_id
+  roles_header: X-NL2SQL-Roles
+static_role: null               # auth: static only
+request_llm: false              # callers may send their own key and models
+```
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `auth` | `none` | How a caller is identified: `api_keys`, `proxy`, `static` or `none`. |
+| `proxy.trusted_from` | loopback | CIDRs the proxy connects from; its headers are honoured only from these. |
+| `proxy.user_header`, `proxy.tenant_header`, `proxy.roles_header` | `X-Forwarded-User`, none, `X-NL2SQL-Roles` | The headers the proxy sets. |
+| `static_role` | none | The one role of every request under `auth: static`. |
+| `request_llm` | `false` | Whether callers may send their own provider key and models per request. |
+
 | Field | Default | Meaning |
 | --- | --- | --- |
 | `role_header` | none | The header a trusted, authenticating proxy sets with the caller's roles (comma-separated). Only configure it when the proxy overwrites that header on every request, or any client can pick its own role. |

@@ -44,6 +44,8 @@ PUBLIC_SURFACE = {
     "ConversationNotFound", "ConversationBusy", "DashboardNotFound", "WorkspaceNotFound", "NotIndexed", "NoTiles",
     "WorkspaceNotEmpty", "ScheduleTooFrequent", "SecretValueInConfig",
     "ConnectionInvalid",
+    "NL2SQLError", "NotAuthorized", "InvalidArgument", "ApprovalNotFound", "DashboardBusy", "MissingProviderKey",
+    "LLMOverride", "resolve_mode",
 }
 
 

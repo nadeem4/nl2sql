@@ -191,7 +191,7 @@ def test_migrate_applies_each_migration_once(tmp_path):
     state.close()
 
     assert applied and applied == sorted(applied)
-    assert applied[-3:] == ["0004_schema_diffs", "0005_proposals", "0006_conversations_dashboards_and_keys"]
+    assert applied[-3:] == ["0005_proposals", "0006_conversations_dashboards_and_keys", "0007_approvals"]
     assert again == []
 
 
