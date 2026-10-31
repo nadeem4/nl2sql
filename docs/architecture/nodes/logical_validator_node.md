@@ -161,13 +161,15 @@ Side effects:
    - `_date_operations()` rejects a date function whose unit is not `year`,
      `quarter`, `month` or `day`, or whose shape is not `(unit literal, date)`,
      with `INVALID_PLAN_STRUCTURE`; the message states the portable forms.
-   - `_label_without_key()` rejects a group-by item that is not a plain column
-     but references two or more distinct columns of one table (a concatenated
+   - `_label_without_key()` rejects a group-by item that joins text (`||` or
+     `CONCAT`) from two or more distinct columns of one table (a concatenated
      name, say) when a primary-key column of that table is not also grouped as
      a plain column: two rows sharing the label would merge into one group. The
      retryable `INVALID_PLAN_STRUCTURE` message names the missing key. One
-     column, a date part, a label grouped with its key, and a table with no
-     known primary key are not rejected (C-W8).
+     column, a date part, arithmetic, `COALESCE`, `DATE_DIFF`, a label grouped
+     with its key, and a table with no known primary key are not rejected.
+     Plain `GROUP BY first_name, last_name` without the key passes (an accepted
+     limit; C-W8).
    - `_unsupported_operators()` rejects a binary `op` the generator's
      `SqlVisitor` cannot render, with `INVALID_PLAN_STRUCTURE`. The schema's
      `op` Literal admits `NOT`, which belongs on a unary expression; every

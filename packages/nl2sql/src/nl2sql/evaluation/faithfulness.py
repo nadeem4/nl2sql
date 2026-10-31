@@ -15,9 +15,9 @@ numbers and the quoted or bold names out of the answer and checks each one:
   inside text cells count as values
   (the year of ``2009-01-01``), and so do numbers in the question (``top 5``,
   ``in 2013``);
-* rank and position numbers (``places 2 through 5``, ``rank 2``, ``top 5``,
-  ``3 of 7``) are positions, not figures, and are not checked (a figure written
-  next to a rank still is);
+* rank and position numbers (``places 2 through 5``, ``rank 2``) are positions,
+  not figures, and are not checked while none is above the rows shown (a figure
+  written next to a rank, ``top 10`` on three rows, and ``900 of 1297`` still are);
 * ordinals (``2nd``), list markers (``1.``), identifiers (``chinook_001``,
   ``MPEG-4``, ``#7``) and the month and day of a date are not read as numbers;
 * a name is checked only when the answer quotes it or puts it in bold, and is
@@ -37,12 +37,11 @@ _NUMBER = re.compile(
     r"(?<![\w.,#\-])(?P<num>-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)(?P<pct>\s?%|\s?percent\b)?(?!\w|\.\d)"
 )
 _LIST_MARKER = re.compile(r"^(\s*)\d+[.)](?=\s)", re.MULTILINE)
-# A position, not a data claim: "places 2 through 5", "rank 2", "top 5", "3 of 7" (when 3 <= 7).
+# A position, not a data claim: "places 2 through 5", "rank 2" (when no number is above the rows shown).
 _POSITION = re.compile(
-    r"\b(?:places?|ranks?|positions?|spots?)\s+\d+(?:\s*(?:through|thru|to|and|[-–])\s*\d+)?|\btop\s+\d+\b",
+    r"\b(?:places?|ranks?|positions?|spots?)\s+(\d+)(?:\s*(?:through|thru|to|and|[-–])\s*(\d+))?",
     re.IGNORECASE,
 )
-_N_OF_M = re.compile(r"(?<![\w.,#\-])(\d+)(\s+of\s+)(\d+)\b", re.IGNORECASE)
 _QUOTED = re.compile(r"\"([^\"\n]{2,60})\"|“([^”\n]{2,60})”|\*\*([^*\n]{2,60})\*\*")
 _MAX_ENTITY_WORDS = 6
 
@@ -55,11 +54,16 @@ class WrittenNumber:
     percent: bool
 
 
-def _without_positions(text: str) -> str:
-    """``text`` with rank and position numbers blanked, so they are not read as figures."""
-    text = _POSITION.sub(" ", text)
-    return _N_OF_M.sub(
-        lambda m: (" " if int(m.group(1)) <= int(m.group(3)) else m.group(1)) + m.group(2) + m.group(3), text)
+def _without_positions(text: str, shown: int) -> str:
+    """``text`` with rank and position numbers blanked, so they are not read as figures.
+
+    Only a position that exists is blanked: none of its numbers is above ``shown``,
+    the most rows any result set has or the preview holds.
+    """
+    def blank(m: "re.Match[str]") -> str:
+        return " " if all(int(g) <= shown for g in m.groups() if g) else m.group(0)
+
+    return _POSITION.sub(blank, text)
 
 
 def extract_numbers(text: str) -> List[WrittenNumber]:
@@ -163,7 +167,8 @@ def check_answer(text: Optional[str], *, columns: Sequence[str], rows: Sequence[
             values.append(sum(column))
             columns_of_numbers.append(column)
 
-    numbers = extract_numbers(_without_positions(text or ""))
+    shown = max([len(rows), *row_counts, preview_rows or 0])
+    numbers = extract_numbers(_without_positions(text or "", shown))
     derived = _derived(columns_of_numbers, numbers)
     unsupported_numbers = [n.text for n in numbers if not _supported(n, values, derived)]
 

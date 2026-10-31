@@ -190,11 +190,10 @@ def test_the_preview_size_is_supported_only_when_given():
 # --- rank and position numbers are not data claims ---------------------------------
 
 @pytest.mark.parametrize("text", [
-    "The films in places 2 through 5 follow closely.",
-    "Places 2-5 follow closely.",
+    "The films in places 2 through 3 follow closely.",
+    "Places 2-3 follow closely.",
     "Rank 2 is Latin.",
     "Latin is #2 and Metal is #3.",
-    "It is 2 of 3 genres shown.",
     "Showing the top 3.",
 ])
 def test_rank_and_position_numbers_are_not_checked(text):
@@ -205,7 +204,21 @@ def test_rank_and_position_numbers_are_not_checked(text):
     "Rock has 1,300 tracks.",
     "Latin places 2 with 580 tracks.",
     "Rank 2 is Latin with 580 tracks.",
-    "There are 7 of 3 genres.",
 ])
 def test_a_figure_next_to_a_rank_still_fails_when_invented(text):
     assert not _check(text, question="Which genres have the most tracks?")["faithful"]
+
+
+def test_a_position_above_the_row_count_is_still_checked():
+    assert not _check("The top 10 genres are Rock, Latin and Metal.")["faithful"]
+    assert not _check("Rank 15 is Metal.")["faithful"]
+    assert _check("The top 3 genres are Rock, Latin and Metal.")["faithful"]
+
+
+def test_n_of_m_is_a_figure_unless_supported():
+    assert not _check("Rock holds 900 of 1297 tracks.")["faithful"]
+
+
+def test_the_synthesizer_example_is_not_a_real_range():
+    from nl2sql.pipeline.nodes.answer_synthesizer.prompts import ANSWER_SYNTHESIZER_PROMPT
+    assert "10,000" not in ANSWER_SYNTHESIZER_PROMPT and "11,500" not in ANSWER_SYNTHESIZER_PROMPT

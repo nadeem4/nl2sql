@@ -419,8 +419,9 @@ Some numbers and names are never checked:
 - **Not numbers:** ordinals (`2nd`), list markers (`1.` at the start of a
   line), numbers glued to a word or identifier (`chinook_001`, `MPEG-4`,
   `#7`), the month and day of a date, and rank or position numbers
-  (`places 2 through 5`, `rank 2`, `top 5`, `3 of 7`). A figure written
-  next to a rank (`places 2 with 580 tracks`) is still checked.
+  (`places 2 through 5`, `rank 2`) that are not above the rows shown. A figure
+  written next to a rank (`places 2 with 580 tracks`), `top 10` or `rank 15` on
+  three rows, and `900 of 1297` are still checked.
 - **Names only when quoted or bold.** Bold spans with a digit, ending in `:`
   (`**Note:**`), or longer than six words are skipped, so the name check
   flags little it should not.
