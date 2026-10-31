@@ -1850,7 +1850,8 @@
               "index",
               "profile",
               "eval",
-              "dashboard"
+              "dashboard",
+              "demo"
             ],
             "title": "Kind",
             "type": "string"

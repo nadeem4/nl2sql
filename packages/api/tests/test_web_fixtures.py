@@ -6,6 +6,7 @@ Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. D0b moves 
 import json
 import pathlib
 import sys
+import time
 import tempfile
 from datetime import datetime, timedelta, timezone
 from itertools import count
@@ -43,8 +44,10 @@ def build() -> dict:
             job = jobs.submit("index", IndexJob(datasource_ids=["chinook"]), UserContext(user_id="ann"),
                               lambda ctx: (ctx.progress("chinook", 1, 1),
                                            IndexResult(ok=True, stats=[{"datasource_id": "chinook"}]))[1])
+            deadline = time.monotonic() + 5
             while jobs.get(job.id, UserContext(user_id="ann")).status != "succeeded":
-                pass
+                assert time.monotonic() < deadline, "the fixture job did not finish"
+                time.sleep(0.005)
             return {"ApiError.json": error.json(), "Job.json": client.get(f"/api/v1/jobs/{job.id}").json()}
         finally:
             jobs.close()

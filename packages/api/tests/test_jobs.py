@@ -3,11 +3,12 @@ import asyncio
 import json
 import threading
 import time
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import Request
 
-from nl2sql import UserContext
+from nl2sql import NL2SQLError, UserContext
 from nl2sql_api import identity
 from nl2sql_api.errors import RequestRefused
 from nl2sql_api.jobs import DashboardJob, IndexJob, IndexResult, Jobs
@@ -63,7 +64,8 @@ def test_api_runs_one_worker(jobs):
     for user in (ANN, BOB, ROOT):
         _index(jobs, user, lambda ctx: release.wait(5))
     wait_for(lambda: any(t.name == "nl2sql-jobs" for t in threading.enumerate()))
-    assert sum(t.name == "nl2sql-jobs" for t in threading.enumerate()) == 1
+    mine = [t for t in threading.enumerate() if t.name == "nl2sql-jobs" and t is jobs._worker]
+    assert len(mine) == 1
     release.set()
 
 
@@ -114,10 +116,10 @@ def test_job_events_hold_no_worker_thread(jobs):
     async def wait_quietly():
         stream = jobs.stream(job.id)
         assert hasattr(stream, "__anext__"), "the stream must be an async generator"
-        before = threading.active_count()
+        before = set(threading.enumerate())
         pending = asyncio.ensure_future(stream.__anext__())
         await asyncio.sleep(0.1)  # several polls with nothing to send
-        assert threading.active_count() == before
+        assert set(threading.enumerate()) <= before, "a waiting stream started a thread"
         pending.cancel()
         release.set()
 
@@ -184,6 +186,49 @@ def test_a_failed_job_carries_an_error_and_no_exception_text(jobs):
     wait_for(lambda: jobs.get(job.id, ANN).status == "failed")
     error = jobs.get(job.id, ANN).error
     assert error.code == "INTERNAL" and "hunter2" not in error.message
+
+
+def test_a_failed_job_never_carries_a_server_error_message(jobs):
+    def run(ctx):
+        raise NL2SQLError("could not connect to postgresql://admin:hunter2@db/sales")
+
+    job = _index(jobs, ANN, run)
+    wait_for(lambda: jobs.get(job.id, ANN).status == "failed")
+    error = jobs.get(job.id, ANN).error
+    assert error.code == "INTERNAL" and "hunter2" not in error.message and "hunter2" not in error.fix
+
+
+def test_a_refusal_keeps_its_message_and_details(jobs):
+    def run(ctx):
+        raise RequestRefused(409, "CONFLICT", "Already there.", details=[{"loc": ["x"], "msg": "dup"}])
+
+    job = _index(jobs, ANN, run)
+    wait_for(lambda: jobs.get(job.id, ANN).status == "failed")
+    error = jobs.get(job.id, ANN).error
+    assert error.code == "CONFLICT" and error.message == "Already there." and error.details == [{"loc": ["x"], "msg": "dup"}]
+
+
+def test_a_cancel_after_the_runner_returned_keeps_the_job_succeeded():
+    returned, holder = threading.Event(), {}
+
+    def clock():
+        if returned.is_set() and "cancelled" not in holder:
+            holder["cancelled"] = holder["jobs"].cancel(holder["id"], ANN)  # arrives after the runner finished
+        return datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    manager = Jobs(poll_s=0.01, clock=clock)
+    holder["jobs"] = manager
+    try:
+        def run(ctx):
+            returned.set()
+            return IndexResult(ok=True)
+
+        holder["id"] = job_id = _index(manager, ANN, run).id
+        wait_for(lambda: manager.get(job_id, ANN).status in ("succeeded", "cancelled", "failed"))
+        done = manager.get(job_id, ANN)
+        assert done.status == "succeeded" and done.result.ok is True
+    finally:
+        manager.close()
 
 
 def test_only_the_last_jobs_are_kept():

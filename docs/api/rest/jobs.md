@@ -15,7 +15,7 @@ queue. Another user's job is a `404`; an admin sees every caller's.
 | Field | Holds |
 |---|---|
 | `id` | 22 url-safe characters |
-| `kind` | `index`, `profile`, `eval` or `dashboard` |
+| `kind` | `index`, `profile`, `eval`, `dashboard` or `demo` |
 | `status` | `queued`, `running`, `succeeded`, `failed` or `cancelled` |
 | `params` | The request body that started it, typed per kind |
 | `created_by` | The caller's user id |
