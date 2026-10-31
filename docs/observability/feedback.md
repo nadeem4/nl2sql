@@ -29,6 +29,10 @@ produced. A run the playground did not answer is refused with `404`.
 | `GET /api/feedback` | Whether feedback is on (and why not), the counts and the last 50 ratings. The ratings are returned only where the gate below passes. |
 | `POST /api/feedback` | `{"trace_id", "rating": "up" \| "down", "note"}`. Local only, the same gate as Settings, Rebuild and the Retrieval inspector: on a non-loopback `--host` it answers `403` unless `nl2sql demo --allow-settings`, and it refuses another site's page (a foreign `Origin`), a non-loopback hostname and anything but JSON. |
 
+A rating needs a kept trace (`engine.feedback.record` reads the run's own
+trace), so on the default `settings.traces.mode: on_failure` only failed runs
+can be rated; set `always` to rate successful ones.
+
 Feedback is available in the playground that `nl2sql demo` starts, and on by
 default. `settings.feedback.enabled: false` turns it off: the control then says so and
 `POST /api/feedback` answers `403`.
@@ -193,6 +197,13 @@ proposal = engine.feedback.correct(result.trace_id, sql="SELECT SUM(Total) AS re
 The fix is checked as the corrector before anything is queued, and a check
 that fails raises `CorrectionRefused` (a `ValueError`) with a `code` and the
 check's own `messages`; the command prints them and exits 1.
+
+Only the caller who asked the run may correct it: `user_context` reads the
+trace as `engine.traces.get` does, so another caller's run is `no_run` and is
+never rated down, and a rating with no kept trace is not readable by a caller.
+`nl2sql feedback correct` is an operator tool and passes `as_operator=True`: it
+reads any run (and falls back to its rating), while `--as` still sets the scope
+the fix is checked against.
 
 | Step | What happens | Refused as |
 | --- | --- | --- |

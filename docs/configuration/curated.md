@@ -333,6 +333,8 @@ A thumbs-up on a generated answer is a candidate verified query: a real
 question, and SQL a person said was right. `engine.feedback.record(trace_id,
 "up", user_context=...)` files it in the [review queue](review.md) as a `verified_query`
 proposal; it reaches the curated section only when an admin accepts it.
+Rating needs a kept trace, so on the default `settings.traces.mode: on_failure`
+only failed runs can be rated; set `always` to rate successful ones.
 
 ```bash
 nl2sql review list --kind verified_query --as admin

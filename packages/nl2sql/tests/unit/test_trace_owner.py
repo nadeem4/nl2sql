@@ -166,9 +166,51 @@ def test_record_rejects_an_unknown_rating():
 
 # ---------------------------------------------------------------- charts
 
-def test_chart_with_another_users_trace_is_not_found():
+def test_chart_with_another_users_trace_is_not_found(tmp_path):
     from nl2sql.api.results_api import ResultsAPI
+    from nl2sql.execution.artifacts import ArtifactStore
+    from nl2sql.execution.dag import ExecutionDAG, LogicalEdge, LogicalNode
+    from nl2sql.pipeline.nodes.aggregator.node import EngineAggregatorNode
+    from nl2sql.pipeline.nodes.decomposer.schemas import SubQuery
+    from nl2sql.pipeline.state import GraphState
+    from nl2sql.pipeline.subgraphs.schemas import SubgraphOutput
+    from nl2sql.storage.local import LocalResults
+    from nl2sql_sdk.contracts import ResultFrame
 
-    ctx = fake_runtime()
+    ann, bob = UserContext(user_id="ann", roles=["analyst"]), UserContext(user_id="bob", roles=["analyst"])
+    store = ArtifactStore(LocalResults(str(tmp_path)), path_template="<tenant_id>/<request_id>/<sub_query_id>.parquet")
+    ctx = fake_runtime(settings={"tenant_id": "t1"}, artifact_store=store)
+    ref = store.create_artifact_ref(ResultFrame.from_row_dicts([{"month": "2024-01", "revenue": 100}]),
+                                    {"tenant_id": "t1", "request_id": "run-1", "sub_query_id": "sq1"})
+    dag = ExecutionDAG(
+        nodes=[LogicalNode(node_id="sq1", kind="scan", inputs=[]),
+               LogicalNode(node_id="combine_g1", kind="combine", inputs=["sq1"],
+                           attributes={"operation": "standalone", "join_keys": []})],
+        edges=[LogicalEdge(edge_id="e1", from_id="sq1", to_id="combine_g1")])
+    output = SubgraphOutput(subgraph_id="sg1", sub_query=SubQuery(id="sq1", datasource_id="d", intent="i"),
+                            artifact=ref)
+    EngineAggregatorNode(ctx)(GraphState(trace_id="run-1", user_query="q", execution_dag=dag,
+                                         artifact_refs={"sq1": ref}, subgraph_outputs={"sg1": output},
+                                         user_context=ann))
+
     with pytest.raises(ResultNotFound):
-        ResultsAPI(ctx).chart("run-1", user_context=BOB)
+        ResultsAPI(ctx).chart("run-1", user_context=bob)
+    assert ResultsAPI(ctx).chart("run-1", user_context=ann).data.trace_id == "run-1"
+
+
+# ---------------------------------------------------------------- a capped trace
+
+def test_a_truncated_sql_is_rated_but_not_proposed(tmp_path):
+    from nl2sql.tracing.document import TRUNCATED
+
+    ctx = fake_runtime(state=_state(tmp_path))
+    doc = _trace("run-1", ResultOwner.of(ANN, ctx.tenant_id).model_dump())
+    doc["result"]["sub_queries"][0]["sql"] = f"SELECT 1 ... {TRUNCATED} 900 more characters"
+    ctx.traces.write("run-1", doc)
+    api = FeedbackAPI(ctx)
+    proposed = []
+    api._propose = lambda stored: proposed.append(stored)  # type: ignore[method-assign]
+
+    stored = api.record("run-1", "up", user_context=ANN)
+
+    assert stored["rating"] == "up" and proposed == []

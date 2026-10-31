@@ -77,6 +77,7 @@ class FeedbackAPI:
               note: Optional[str] = None) -> Dict[str, Any]:
         """Store the rating of a run whose result the caller already holds (a correction, which has checked its caller)."""
         from nl2sql.feedback import rated_row, run_record, run_signals
+        from nl2sql.tracing.document import TRUNCATED
         from nl2sql.tracing.trace import engine_info
 
         body = result.model_dump(mode="json") if hasattr(result, "model_dump") else dict(result)
@@ -93,14 +94,17 @@ class FeedbackAPI:
                 row["sql"] = []
         stored = self._ctx.state.add_feedback(rated_row(row, rating, note))
         try:
-            self._propose(stored)
+            # A trace caps long fields, so a capped SQL is not the run's SQL: rate it, never propose it.
+            if not any(TRUNCATED in statement for statement in stored.get("sql") or []):
+                self._propose(stored)
         except Exception as e:  # the rating is stored; a queue that cannot take the proposal never fails it
             logger.warning("The thumbs-up of run %s was stored, but its verified-query proposal was not filed: %s",
                            stored.get("trace_id"), e)
         return stored
 
     def correct(self, trace_id: str, *, sql: Optional[str] = None, plan: Any = None, question: Optional[str] = None,
-                note: Optional[str] = None, user_context: "UserContext") -> "Proposal":
+                note: Optional[str] = None, user_context: "UserContext",
+                as_operator: bool = False) -> "Proposal":
         """Correct run ``trace_id`` with a fix, checked, as a ``verified_query`` proposal (wave_b.md, section 10).
 
         Exactly one of ``sql`` (one read-only query) or ``plan`` (a
@@ -110,6 +114,11 @@ class FeedbackAPI:
         the generator; the SQL read-only, within the caller's scope, through
         the ``execute.before`` hooks, and run once. It reaches ``curated.yaml``
         only when an admin accepts it (``engine.proposals.accept``).
+
+        Only the caller who asked the run may correct it: another caller's run is
+        ``no_run`` and is never rated down. ``as_operator=True`` (the trusted in-process
+        ``nl2sql feedback correct``; never a REST caller) reads any run, still checking
+        the fix against ``user_context``'s scope.
 
         Returns:
             The ``Proposal`` (origin ``correction``) as the queue stored it.
@@ -122,7 +131,7 @@ class FeedbackAPI:
         from nl2sql.feedback.corrections import correct
 
         return correct(self._ctx, trace_id, sql=sql, plan=plan, question=question, note=note,
-                       user_context=user_context, rate=self._rate)
+                       user_context=user_context, rate=self._rate, as_operator=as_operator)
 
     def list(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Every rating, newest first; at most ``limit`` of them."""

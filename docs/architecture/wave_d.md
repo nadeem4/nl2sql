@@ -1326,7 +1326,16 @@ its caller) and by tests that need a rating row; nothing outside the engine call
 here: the design says `traces.get` returns `None`; `record` raises `TraceNotFound` (design's `test_record_of_another_users_run_is_not_found`).
 The old engine playground's `/api/feedback` now remembers only each answered run's role and rates through `record`; its
 `/api/trace/{id}` still reads as the operator (it goes with X1b). `chart` and `dashboards` already passed the caller (C-W2),
-so no change there; `test_chart_with_another_users_trace_is_not_found` covers `chart` by trace id.
+so no change there; `test_chart_with_another_users_trace_is_not_found` covers `chart` by trace id (Ann's result written
+first, Bob gets `ResultNotFound`, Ann does not). The design's `test_manifest_records_the_asker` and
+`test_another_users_result_is_not_found` are `test_the_manifest_records_who_asked` and
+`test_another_callers_trace_id_is_not_found` in `test_results_owner.py`. `engine.feedback.correct` follows the same owner
+rule (Opus review): it reads the trace through `TracesAPI.get` as `user_context`, so another caller's run is `no_run` and is
+never rated down, and the rating-row fallback exists only for the operator. `user_context=None` cannot be the operator here
+because the scope checks need a real `UserContext`, so `correct(..., as_operator=True)` is a separate keyword; `nl2sql
+feedback correct` passes it and keeps `--as` for the scope. `record` stores a rating but files no thumbs-up proposal when the
+trace's SQL carries the `[truncated]` marker (`TRUNCATED`). The `on_failure` default stays: only failed runs can be rated until
+`traces.mode: always` (said in `observability/feedback.md` and `configuration/curated.md`).
 
 ### Session batches
 

@@ -95,13 +95,21 @@ def _run_tables(ctx: Any, datasource_id: str, sql: str) -> List[Tuple[str, str]]
                                           "role.") from None
 
 
-def _find_run(ctx: Any, trace_id: str, user: Any) -> _Run:
-    """The run, after the corrector's scope is checked over everything it read (see the module docstring)."""
+def _find_run(ctx: Any, trace_id: str, user: Any, as_operator: bool = False) -> _Run:
+    """The run, after the corrector's scope is checked over everything it read (see the module docstring).
+
+    Read as the corrector: another user's run is ``no_run``, as a missing one, and a rating
+    without a kept trace is not readable. ``as_operator`` (the CLI) reads any run, and may
+    fall back to its rating.
+    """
+    from nl2sql.api.traces_api import TracesAPI
     from nl2sql.tracing.document import validate_trace_id
 
-    rating = next((row for row in ctx.state.list_feedback() if row.get("trace_id") == trace_id), None)
+    rating = None
+    if as_operator:
+        rating = next((row for row in ctx.state.list_feedback() if row.get("trace_id") == trace_id), None)
     try:
-        trace = ctx.traces.get(validate_trace_id(trace_id))
+        trace = TracesAPI(ctx).get(validate_trace_id(trace_id), user_context=None if as_operator else user)
     except (ValueError, OSError):
         trace = None
     if trace is not None:
@@ -338,10 +346,14 @@ def _ran(ctx: Any, datasource_id: str, sql: str) -> Dict[str, Any]:
 
 
 def correct(ctx: Any, trace_id: str, *, sql: Optional[str], plan: Any, question: Optional[str],
-            note: Optional[str], user_context: Any, rate: Callable[..., Any]):
+            note: Optional[str], user_context: Any, rate: Callable[..., Any],
+            as_operator: bool = False):
     """Check the fix of run ``trace_id`` as ``user_context`` and file it as a proposal; see the module docstring.
 
-    ``rate`` is ``engine.feedback._rate``, which rates the run ``down``.
+    ``rate`` is ``engine.feedback._rate``, which rates the run ``down``. The run is read as
+    ``user_context``: only its asker may correct it. ``as_operator`` (``nl2sql feedback
+    correct``, a trusted in-process tool) reads any run; the scope checks still use
+    ``user_context``.
 
     Returns:
         The ``Proposal`` as the queue stored it.
@@ -358,7 +370,7 @@ def correct(ctx: Any, trace_id: str, *, sql: Optional[str], plan: Any, question:
     user = caller(user_context)
     if (sql is None) == (plan is None):
         raise ValueError("Give exactly one fix: sql or plan.")
-    run = _find_run(ctx, trace_id, user)
+    run = _find_run(ctx, trace_id, user, as_operator)
     _rate_down(ctx, run, user, note, rate)
     asked = " ".join((question or run.question).split())
     if not asked:
