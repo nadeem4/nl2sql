@@ -85,7 +85,7 @@ def _result(trace_id="t1", sql=SQL, datasource="shop", status="success", source=
 
 
 def _thumbs_up(engine, question="What is the revenue?", **result):
-    engine.feedback.record(_result(**result), question=question, role="admin", rating="up")
+    engine.feedback._rate(_result(**result), question=question, role="admin", rating="up")
     [proposal] = [p for p in engine.proposals.list(user_context=ADMIN, kind="verified_query")
                   if p.target == question]
     return proposal
@@ -397,7 +397,7 @@ def test_a_failed_proposal_never_fails_the_rating(engine, monkeypatch, caplog):
         raise RuntimeError("the queue is down")
 
     monkeypatch.setattr(queue, "propose", broken)
-    row = engine.feedback.record(_result(), question="What is the revenue?", role="admin", rating="up")
+    row = engine.feedback._rate(_result(), question="What is the revenue?", role="admin", rating="up")
 
     assert row["rating"] == "up"
     assert "the queue is down" in caplog.text
@@ -533,7 +533,7 @@ def test_thumbs_up_creates_one_proposal_per_change(engine):
     for skipped in (dict(rating="down"), dict(source="verified"), dict(status="error"),
                     dict(sql="SELECT 1; SELECT 2", datasource="shop")):
         rating = skipped.pop("rating", "up")
-        engine.feedback.record(_result(trace_id="t9", **skipped), question="Other?", role="admin", rating=rating)
+        engine.feedback._rate(_result(trace_id="t9", **skipped), question="Other?", role="admin", rating=rating)
     assert len(engine.proposals.list(user_context=ADMIN)) == 1
 
     changed = _thumbs_up(engine, trace_id="t3", sql="SELECT SUM(total) FROM orders WHERE total > 0")

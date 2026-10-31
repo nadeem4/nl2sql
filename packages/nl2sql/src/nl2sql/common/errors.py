@@ -282,6 +282,12 @@ class ApprovalNotFound(NL2SQLError, LookupError):
     code, status = "NOT_FOUND", 404
 
 
+class TraceNotFound(NL2SQLError, LookupError):
+    """No such run for this caller: an unknown trace id, a run another caller asked, or one whose trace was not kept."""
+
+    code, status = "NOT_FOUND", 404
+
+
 class DatasourceNotFound(NL2SQLError, ValueError):
     """No datasource is configured with that id."""
 

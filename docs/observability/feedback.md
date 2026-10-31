@@ -153,8 +153,8 @@ engine.evals.regenerate("feedback_gold_drafts.yaml")
 ## Proposing verified queries: the review queue
 
 A thumbs-up on a *generated* answer also files a `verified_query` proposal in
-the [review queue](../configuration/review.md): `engine.feedback.record(...,
-rating="up")` keeps the rating and, when the run qualifies, proposes the
+the [review queue](../configuration/review.md): `engine.feedback.record(trace_id,
+"up", user_context=...)` keeps the rating and, when the run qualifies, proposes the
 question and the run's SQL for `curated.yaml`. Nothing is written until an
 admin accepts it:
 

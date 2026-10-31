@@ -180,24 +180,28 @@ thumbs up and down are built on it. See
 
 | method | does |
 | --- | --- |
-| `record(result, *, question, role, rating, note=None) -> dict` | Rate one run, `"up"` or `"down"`, with an optional note (cut to 280 characters). `result` is the run's `QueryResult` or its JSON. The stored row is built from it and from the run's trace when one was kept; never rows, the answer, error messages or keys, and a run refused for the role keeps no SQL. A later rating of the same run replaces the earlier one. A thumbs-up on a generated answer of one datasource with one read-only statement also files a `verified_query` proposal in the [review queue](../../configuration/review.md). Returns the row; raises `ValueError` for another rating or a result with no `trace_id`. |
 | `list(limit=None) -> list[dict]` | Every rating, newest first. |
+| `record(trace_id, rating, *, user_context, note=None) -> dict` | Rate one run, `"up"` or `"down"`, with an optional note (280 characters). The engine reads the run's own trace as `user_context`, so only the caller who asked the run can rate it; another caller's run, an unknown id or a run whose trace was not kept (`settings.traces.mode`) is `TraceNotFound` (a `LookupError`, 404). The stored row (question, roles, status, SQL, datasources, error codes, counters, models, engine version; never rows or the answer) comes from the trace. A thumbs-up on a qualifying answer also files a `verified_query` proposal. `TypeError` for a missing `user_context`. |
 | `stats(*, traces=None) -> dict` | Rates over the ratings plus the traces in `traces` (default: the engine's traces folder): feedback, refusals, refiner retries, validator failures, errors, and the plan cache's hit rate. |
 | `export(path) -> dict` | Write the thumbs-up runs to `path` as draft gold entries for review; `{"written", "skipped"}`. Raises `ValueError` for the gold set's own path. |
 | `clear() -> int` | Delete every rating; returns how many. |
 | `correct(trace_id, *, sql=None, plan=None, question=None, note=None, user_context) -> Proposal` | Correct a run with exactly one fix: `sql` (one read-only query) or `plan` (a `PlanModel` or its JSON). The run is rated `down` with `note` unless it already is; the fix is checked as `user_context` and filed in the [review queue](../../configuration/review.md) as a `verified_query` proposal (origin `correction`). Raises `CorrectionRefused` (a `ValueError`, with `code` and `messages`) when a check fails. See [Correcting an answer](../../observability/feedback.md#correcting-an-answer-nl2sql-feedback-correct). |
 
 ```python
-result = engine.run_query("How many customers are there?")
-engine.feedback.record(result, question="How many customers are there?", role="admin", rating="up")
+result = engine.run_query("How many customers are there?", user_context=user)
+engine.feedback.record(result.trace_id, "up", user_context=user)
 engine.feedback.stats()["feedback"]   # {'up': 1, 'down': 0, 'up_rate': 1.0, 'down_rate': 0.0}
 ```
 
 ### Traces
 
-`engine.traces.get(trace_id)` returns one recorded run's trace document, or
-`None` when none was kept (which runs are kept is `settings.traces.mode`, and
-for how long the trace store's `max_age_days`). It reads through the trace
+`engine.traces.get(trace_id, *, user_context=None)` returns one recorded run's trace document, or
+`None` when none was kept. A trace records who asked the run (`owner`, as a result manifest does);
+with a `user_context`, only that asker reads it, and another caller's run (or a trace with no
+recorded asker) is `None`. With no `user_context`, the caller is the trusted in-process operator
+and reads any run, as `nl2sql trace` does; the REST API, MCP and the terminal app always pass the caller.
+Which runs are kept is `settings.traces.mode`, and
+for how long the trace store's `max_age_days`. It reads through the trace
 store, `storage.traces` (the `files` store reads only `<storage.path>/traces`),
 and the id must be a plain token (letters, digits, `-` and `_`), so no id can
 name a file elsewhere: anything else raises `ValueError`, as does a file in
@@ -238,7 +242,7 @@ engine.index.inspect("top customers", k=4, user_context=admin)["picks"]
 Clients import everything they need from `nl2sql` itself, never from an engine
 submodule: `NL2SQL`, `QueryResult`, `SubQueryResult`, `RowSample`,
 `AnswerSource`, `ResultSummary`, `ResultManifest`, `ResultPage`,
-`ResultNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`,
+`ResultNotFound`, `TraceNotFound`, `MAX_RESULT_PAGE_SIZE`, `QuestionUsage`,
 `UserContext`, `CancellationToken`, `configure_logging`,
 `TraceContextFilter`, the event types (`Event`, `Observer`), a run's ending
 (`RunStop`, `ApprovalRequest`, `Approval`, `VerifiedRef`), what the namespaces

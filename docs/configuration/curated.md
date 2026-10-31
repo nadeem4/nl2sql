@@ -330,8 +330,8 @@ data team, never by the package) the planner should reach for first. See
 ## From feedback to verified queries
 
 A thumbs-up on a generated answer is a candidate verified query: a real
-question, and SQL a person said was right. `engine.feedback.record(...,
-rating="up")` files it in the [review queue](review.md) as a `verified_query`
+question, and SQL a person said was right. `engine.feedback.record(trace_id,
+"up", user_context=...)` files it in the [review queue](review.md) as a `verified_query`
 proposal; it reaches the curated section only when an admin accepts it.
 
 ```bash

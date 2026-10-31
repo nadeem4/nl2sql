@@ -616,11 +616,30 @@ A conversation outlives the request that began it. If it carried the starter's r
 
 ---
 
+## Results Belong to Their Asker
+
+### Definition
+A run records who asked it, `(tenant_id, user_id)` plus the sorted roles of an anonymous asker (`ResultOwner`), in its result manifest and in its trace (`owner`). Every read of the run's rows takes the caller as a required `user_context` and answers only that asker: `engine.results.manifest`, `page`, `csv` and `chart`. `engine.traces.get(trace_id, *, user_context=None)` answers only that asker too, with `None` for another caller's run (and for a trace that records no asker); `engine.feedback.record(trace_id, rating, *, user_context)` reads the trace as the caller and raises `TraceNotFound` for another caller's run. No `user_context` on `traces.get` is the trusted in-process operator, as `nl2sql trace` and `nl2sql run` need and as Wave A's approvals trust the context an in-process caller passes; the REST API, MCP and the terminal app always pass the caller. A trace id appears in events, traces and logs, so it is never the access check.
+
+### Enforcement Points
+- `ResultOwner.of` in `nl2sql.execution.artifacts.results`: the one rule for who an owner is, used by the manifest writer, the results reader, the trace writer (`write_run_trace`) and `TracesAPI.get`
+- `ResultReader` (manifest check on every read) and `TracesAPI.get` (owner check) behind `engine.results` and `engine.traces`
+- `FeedbackAPI.record`: reads the run through `TracesAPI.get` with the caller
+- `test_trace_records_the_asker`, `test_another_users_trace_is_not_found`, `test_cli_trace_reads_any_run`, `test_ownerless_trace_is_read_only_by_the_operator`, `test_record_of_another_users_run_is_not_found` and `test_record_requires_a_caller` in `packages/nl2sql/tests/unit/test_trace_owner.py`; `test_another_callers_trace_id_is_not_found` and `test_a_manifest_with_no_asker_recorded_is_refused` in `packages/nl2sql/tests/unit/test_results_owner.py`
+
+### Failure Behavior
+`ResultNotFound` for results, `None` from `traces.get` and `TraceNotFound` from `feedback.record`, the same as for a missing run, so nothing says the run exists. A trace written before the trace recorded its asker has none: only the operator reads it, and it cannot be rated through `record`.
+
+### Why It Exists
+Anyone who saw a trace id (it is in every event, log line and audit row) could otherwise read the rows, the SQL and the question of a run another user asked, or rate it.
+
+---
+
 ## Categories
 
 - **State**: Plan Model Is Strict and Read-Only; Context Requires Vector Store and Schema Store Configuration
 - **Execution**: SQL Execution Requires SQL, Datasource, and Capability; Execution DAG Must Be Valid and Acyclic; Aggregation Requires Scan Artifacts and Single-Input Post Nodes; Pipeline Execution Is Time-Bounded
-- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller
+- **Security**: Policy Enforcement Is Namespaced and Fail-Closed; Datasource Access Is Policy-Gated; Plan Model Is Strict and Read-Only; Verified SQL Is Human-Authored, Read-Only and Parameter-Bound; Hooks Modify Before the Validator, Deny After; Only an Accept Writes a Person's File; Saved Answers Run as the Caller; Results Belong to Their Asker
 - **Determinism**: Expected Schema Must Match Select List; Joins Must Be Valid and Schema-Backed
 - **Resource bounds**: SQL Generation Enforces a Row Limit Cap; The Answer Model Sees a Preview, Never the Whole Result; Context Requires Vector Store and Schema Store Configuration
 - **Boundaries**: Package Boundaries Are One-Way; Importing nl2sql Is Light; An Engine Owns Its Config: No Process Globals; Dialect Knowledge Lives in the Adapter

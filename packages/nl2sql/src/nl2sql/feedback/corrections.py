@@ -341,7 +341,7 @@ def correct(ctx: Any, trace_id: str, *, sql: Optional[str], plan: Any, question:
             note: Optional[str], user_context: Any, rate: Callable[..., Any]):
     """Check the fix of run ``trace_id`` as ``user_context`` and file it as a proposal; see the module docstring.
 
-    ``rate`` is ``engine.feedback.record``, which rates the run ``down``.
+    ``rate`` is ``engine.feedback._rate``, which rates the run ``down``.
 
     Returns:
         The ``Proposal`` as the queue stored it.

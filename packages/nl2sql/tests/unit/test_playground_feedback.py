@@ -43,6 +43,16 @@ class _Engine(NL2SQL):
 
     def run_query(self, natural_language, datasource_id=None, execute=True, user_context=None,
                   cancellation_token=None):
+        # The trace a real run keeps, with its asker: a rating reads it back as the role it was asked as.
+        from nl2sql.execution.artifacts.results import ResultOwner
+
+        self._runtime.traces.write(TRACE_ID, {
+            "trace_format_version": 1, "trace_id": TRACE_ID, "nodes": [],
+            "owner": ResultOwner.of(user_context, None).model_dump(),
+            "request": {"question": natural_language, "roles": list(user_context.roles)},
+            "result": {"trace_id": TRACE_ID, "status": "success",
+                       "sub_queries": [{"id": "sq1", "sql": "SELECT COUNT(*) FROM Customer",
+                                        "status": "success"}]}})
         return QueryResult(trace_id=TRACE_ID, status="success", sub_queries=[SubQueryResult(
             id="sq1", sql="SELECT COUNT(*) FROM Customer", status="success")])
 

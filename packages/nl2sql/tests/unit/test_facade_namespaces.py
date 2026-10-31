@@ -348,7 +348,7 @@ def _answered(trace_id=TRACE_ID, sql="SELECT COUNT(*) FROM customers", codes=())
 
 def test_feedback_record_stores_what_the_run_returned(tmp_path):
     with _engine(tmp_path, llm=LLM_WITH_PLANNER) as engine:
-        saved = engine.feedback.record(_answered(), question="How many customers?", role="viewer",
+        saved = engine.feedback._rate(_answered(), question="How many customers?", role="viewer",
                                        rating="down", note="wrong number")
         [row] = engine.feedback.list()
 
@@ -363,7 +363,7 @@ def test_feedback_record_reads_the_runs_trace_and_keeps_no_sql_for_a_refused_run
     _write_trace(engine, nodes=[{"node": "logical_validator", "status": "error"}],
                  result={"errors": [{"error_code": "SECURITY_VIOLATION"}], "sub_queries": []})
 
-    engine.feedback.record(_answered(), question="q", role="viewer", rating="down")
+    engine.feedback._rate(_answered(), question="q", role="viewer", rating="down")
     [row] = engine.feedback.list()
 
     assert row["validator_failures"] == 1
@@ -372,14 +372,14 @@ def test_feedback_record_reads_the_runs_trace_and_keeps_no_sql_for_a_refused_run
 
 def test_feedback_list_is_newest_first_and_takes_a_limit(engine):
     for trace_id in ("first", "second"):
-        engine.feedback.record(_answered(trace_id), question=trace_id, role="admin", rating="up")
+        engine.feedback._rate(_answered(trace_id), question=trace_id, role="admin", rating="up")
 
     assert [r["trace_id"] for r in engine.feedback.list()] == ["second", "first"]
     assert len(engine.feedback.list(limit=1)) == 1
 
 
 def test_feedback_stats_counts_the_ratings_and_the_traces(engine):
-    engine.feedback.record(_answered("rated"), question="q", role="admin", rating="up")
+    engine.feedback._rate(_answered("rated"), question="q", role="admin", rating="up")
     _write_trace(engine, "traced", result={"errors": [{"error_code": "QUESTION_NOT_ANSWERABLE"}]})
 
     stats = engine.feedback.stats()
@@ -392,8 +392,8 @@ def test_feedback_stats_counts_the_ratings_and_the_traces(engine):
 def test_feedback_export_writes_draft_cases(engine, tmp_path):
     from nl2sql.evaluation.suite import load_suite
 
-    engine.feedback.record(_answered("one"), question="How many customers?", role="admin", rating="up")
-    engine.feedback.record(_answered("two"), question="Bad", role="admin", rating="down")
+    engine.feedback._rate(_answered("one"), question="How many customers?", role="admin", rating="up")
+    engine.feedback._rate(_answered("two"), question="Bad", role="admin", rating="down")
 
     report = engine.feedback.export(tmp_path / "drafts.yaml")
 
@@ -441,7 +441,7 @@ def test_feedback_export_never_writes_over_approved_cases(engine, tmp_path):
 
 
 def test_feedback_clear_empties_the_table(engine):
-    engine.feedback.record(_answered(), question="q", role="admin", rating="up")
+    engine.feedback._rate(_answered(), question="q", role="admin", rating="up")
 
     assert engine.feedback.clear() == 1
     assert engine.feedback.list() == []

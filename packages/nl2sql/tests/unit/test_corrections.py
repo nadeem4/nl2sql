@@ -276,7 +276,7 @@ def test_a_run_on_a_datasource_the_caller_cannot_read_is_refused_without_naming_
 
 def test_a_caller_denied_the_original_sqls_tables_cannot_correct_it(engine):
     trace_id = _run(engine, question="What do we pay?", sql="SELECT SUM(amount) AS pay FROM salaries")
-    engine.feedback.record({"trace_id": trace_id, "status": "success", "sub_queries": []},
+    engine.feedback._rate({"trace_id": trace_id, "status": "success", "sub_queries": []},
                            question="What do we pay?", role="admin", rating="up")
 
     with pytest.raises(CorrectionRefused) as error:
@@ -290,7 +290,7 @@ def test_a_caller_denied_the_original_sqls_tables_cannot_correct_it(engine):
 
 
 def test_a_rated_run_on_a_denied_table_cannot_be_corrected(engine):
-    engine.feedback.record({"trace_id": "t9", "status": "success",
+    engine.feedback._rate({"trace_id": "t9", "status": "success",
                             "sub_queries": [{"sql": "SELECT amount FROM salaries", "datasource_id": "shop"}]},
                            question="What do we pay?", role="admin", rating="up")
 
@@ -328,7 +328,7 @@ def test_correct_needs_a_caller_and_exactly_one_fix(engine):
 
 def test_correction_records_a_down_rating(engine):
     trace_id = _run(engine)
-    engine.feedback.record({"trace_id": trace_id, "status": "success", "sub_queries": []},
+    engine.feedback._rate({"trace_id": trace_id, "status": "success", "sub_queries": []},
                            question=QUESTION, role="admin", rating="up")
 
     engine.feedback.correct(trace_id, sql=FIX, note="Revenue is the order total.", user_context=ADMIN)
@@ -340,7 +340,7 @@ def test_correction_records_a_down_rating(engine):
 
 def test_down_rating_already_recorded_is_kept(engine):
     trace_id = _run(engine)
-    engine.feedback.record({"trace_id": trace_id, "status": "success", "sub_queries": []},
+    engine.feedback._rate({"trace_id": trace_id, "status": "success", "sub_queries": []},
                            question=QUESTION, role="admin", rating="down", note="Wrong column.")
 
     engine.feedback.correct(trace_id, sql=FIX, note="Use total.", user_context=ADMIN)
@@ -350,7 +350,7 @@ def test_down_rating_already_recorded_is_kept(engine):
 
 
 def test_rated_run_without_a_trace_can_be_corrected(engine):
-    engine.feedback.record({"trace_id": "t9", "status": "success",
+    engine.feedback._rate({"trace_id": "t9", "status": "success",
                             "sub_queries": [{"sql": WRONG_SQL, "datasource_id": "shop"}]},
                            question=QUESTION, role="admin", rating="down")
 

@@ -28,18 +28,18 @@ class FeedbackAPI:
     def __init__(self, ctx: Runtime):
         self._ctx = ctx
 
-    def record(self, result: Union[Mapping[str, Any], Any], *, question: str, role: str, rating: str,
+    def record(self, trace_id: str, rating: str, *, user_context: "UserContext",
                note: Optional[str] = None) -> Dict[str, Any]:
-        """Rate one run: ``"up"`` or ``"down"``, with an optional note (cut to 280 characters).
+        """Rate one run, by its ``trace_id``: ``"up"`` or ``"down"``, with an optional note (cut to 280 characters).
 
-        ``result`` is the run's ``QueryResult``, or its JSON. What is stored is
-        built from it and from the run's trace, when one was kept (the trace
-        also sees validator rejections a retry fixed): the question, the role,
-        the status, the SQL, the datasources, the error codes, the counters,
-        the provider and model each model step ran on, and the engine version.
-        Never rows, the written answer, error messages or keys; a run refused
-        for the role keeps no SQL. A later rating of the same run replaces the
-        earlier one.
+        The engine reads the run's own trace, as ``user_context``: only the caller who
+        asked the run may rate it, and a run another caller asked is the same
+        ``TraceNotFound`` as a missing one. What is stored is built from that trace: the
+        question, the caller's roles, the status, the SQL, the datasources, the error
+        codes, the counters (the trace also sees validator rejections a retry fixed), the
+        provider and model each model step ran on, and the engine version. Never rows,
+        the written answer, error messages or keys; a run refused for the role keeps no
+        SQL. A later rating of the same run replaces the earlier one.
 
         A thumbs-up on a generated answer of one datasource with one read-only
         SQL statement also files a ``verified_query`` proposal in the review
@@ -51,8 +51,31 @@ class FeedbackAPI:
             The stored row.
 
         Raises:
-            ValueError: ``rating`` is not ``"up"`` or ``"down"``, or the result has no ``trace_id``.
+            TraceNotFound: no such run for this caller, or its trace was not kept
+                (``settings.traces.mode``).
+            TypeError: ``user_context`` is not a ``UserContext``.
+            ValueError: ``rating`` is not ``"up"`` or ``"down"``, or ``trace_id`` is not a plain token.
         """
+        from nl2sql.api.traces_api import TracesAPI
+        from nl2sql.common.errors import TraceNotFound
+        from nl2sql.feedback import RATINGS
+
+        if user_context is None:
+            raise TypeError("user_context is required: pass the caller's UserContext. Only the caller who asked "
+                            "a run may rate it.")
+        if rating not in RATINGS:
+            raise ValueError(f"A rating is 'up' or 'down', not {rating!r}.")
+        trace = TracesAPI(self._ctx).get(trace_id, user_context=user_context)
+        if trace is None:
+            raise TraceNotFound(f"No run '{trace_id}' for this caller, or its trace was not kept.")
+        request = trace.get("request") or {}
+        return self._rate({**(trace.get("result") or {}), "trace_id": trace_id},
+                          question=request.get("question") or "", role=",".join(user_context.roles),
+                          rating=rating, note=note)
+
+    def _rate(self, result: Union[Mapping[str, Any], Any], *, question: str, role: str, rating: str,
+              note: Optional[str] = None) -> Dict[str, Any]:
+        """Store the rating of a run whose result the caller already holds (a correction, which has checked its caller)."""
         from nl2sql.feedback import rated_row, run_record, run_signals
         from nl2sql.tracing.trace import engine_info
 
@@ -99,7 +122,7 @@ class FeedbackAPI:
         from nl2sql.feedback.corrections import correct
 
         return correct(self._ctx, trace_id, sql=sql, plan=plan, question=question, note=note,
-                       user_context=user_context, rate=self.record)
+                       user_context=user_context, rate=self._rate)
 
     def list(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Every rating, newest first; at most ``limit`` of them."""
