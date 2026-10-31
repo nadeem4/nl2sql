@@ -1556,6 +1556,15 @@
     </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1814-c-w8-grouping-keys-exact-figures-rank-ordinals">
+<span class="md-ellipsis">
+      
+        18.14 C-W8: grouping keys, exact figures, rank ordinals
+      
+    </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -4581,6 +4590,15 @@
 <span class="md-ellipsis">
       
         18.13 C-LT4: allowed joins up front
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1814-c-w8-grouping-keys-exact-figures-rank-ordinals">
+<span class="md-ellipsis">
+      
+        18.14 C-W8: grouping keys, exact figures, rank ordinals
       
     </span>
 </a>
@@ -8809,6 +8827,36 @@ message, written to the cache once per question set and read at the cached rate 
 sort, both directions, multi-column, bare names, the prompt's block position, &lt;code&gt;none&lt;/code&gt;, byte stability, shared helper).
 Docs: &lt;code&gt;docs/architecture/nodes/ast_planner_node.md&lt;/code&gt;. Not yet measured: the keyed Pagila rerun (retries for undeclared joins
 should fall to about 0), which needs the owner's yes for the model spend.&lt;/p&gt;
+&lt;h3 id="1814-c-w8-grouping-keys-exact-figures-rank-ordinals"&gt;18.14 C-W8: grouping keys, exact figures, rank ordinals&lt;/h3&gt;
+&lt;p&gt;&lt;strong&gt;Problem.&lt;/strong&gt; In the keyed Pagila run of 18.13 (main at c34db812, 8 of 11), three failures were answer accuracy, not retrieval.
+(a) pagila_003: the plan grouped by a computed label (&lt;code&gt;first_name || ' ' || last_name&lt;/code&gt;) without the actor's key, so two actors
+with the same name became one group; the gold groups by &lt;code&gt;actor_id&lt;/code&gt;. (b) pagila_007: the answer prose said the figure "stays
+close to 10,000 to 11,400", bounds no row holds; the faithfulness check failed it correctly. (c) pagila_011: the prose said
+"places 2 through 5"; the check read the rank 2 as an unsupported figure (a false positive).&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Design (owner-approved 2026-10-30, one PR).&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Validator rule (validation before generation).&lt;/strong&gt; &lt;code&gt;_label_without_key&lt;/code&gt; in &lt;code&gt;validator/node.py&lt;/code&gt; rejects a group-by item that
+  composes text with &lt;code&gt;||&lt;/code&gt; or &lt;code&gt;CONCAT&lt;/code&gt; over two or more distinct columns of one table alias, when some primary-key column of
+  that table is not also grouped as a plain column of the same alias. The error is &lt;code&gt;INVALID_PLAN_STRUCTURE&lt;/code&gt;, so the planner
+  retries; it names the missing key and says to group by the key as well as the label (the key, not just separate plain
+  columns). Arithmetic (&lt;code&gt;a - b&lt;/code&gt;), &lt;code&gt;COALESCE&lt;/code&gt;, &lt;code&gt;CASE&lt;/code&gt;, date functions such as &lt;code&gt;DATE_DIFF&lt;/code&gt; of two columns, grouping by one
+  column, and a label together with its table's key stay allowed (adding a key to those would put every row in its own
+  group); a table with no known primary key (&lt;code&gt;Table.primary_key&lt;/code&gt; empty) is not judged. The table is matched by its schema
+  name as well as its bare name, as &lt;code&gt;_date_subtraction&lt;/code&gt; does. Accepted limit: plain &lt;code&gt;GROUP BY first_name, last_name&lt;/code&gt; without
+  the key still passes. No planner prompt change: the message is enough for the retry to converge.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Answer prompt.&lt;/strong&gt; Instruction 2 of the answer synthesizer now says to cite only figures that appear in the rows, and never
+  a rounded, approximate or invented range or bound; to describe a spread, name the actual lowest and highest values or use
+  words without numbers. The example is off the eval domains (&lt;code&gt;test_prompts_not_eval_questions.py&lt;/code&gt; holds).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Faithfulness check.&lt;/strong&gt; &lt;code&gt;check_answer&lt;/code&gt; blanks rank and position numbers before reading figures: &lt;code&gt;place(s)/rank(s)/position(s)/spot(s) N&lt;/code&gt;
+  with an optional &lt;code&gt;through&lt;/code&gt;, &lt;code&gt;to&lt;/code&gt;, &lt;code&gt;and&lt;/code&gt; or dash range, and only when no number in it is above the rows shown (the most
+  rows any result set has, or the preview size). Nothing else is loosened: &lt;code&gt;top N&lt;/code&gt; and &lt;code&gt;N of M&lt;/code&gt; are ordinary figures again,
+  so &lt;code&gt;top 10&lt;/code&gt; or &lt;code&gt;Rank 15&lt;/code&gt; on three rows, &lt;code&gt;900 of 1297&lt;/code&gt;, and a figure beside a rank (&lt;code&gt;places 2 with 580 tracks&lt;/code&gt;) still fail.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Built.&lt;/strong&gt; Tests: &lt;code&gt;tests/unit/test_validator_group_by_label.py&lt;/code&gt; (rejects the &lt;code&gt;||&lt;/code&gt; and &lt;code&gt;CONCAT&lt;/code&gt; label without the key, accepts it with the key,
+a single column, a date part, arithmetic, &lt;code&gt;COALESCE&lt;/code&gt;, &lt;code&gt;DATE_DIFF&lt;/code&gt;, a table with no known key, and matches by schema), &lt;code&gt;tests/unit/test_answer_faithfulness.py&lt;/code&gt; (rank forms pass,
+invented figures beside a rank still fail), &lt;code&gt;tests/unit/test_node_answer_synthesizer.py&lt;/code&gt; (the prompt text). Docs: the
+validator, answer synthesizer and evaluation pages. Not yet measured: the keyed Pagila rerun (needs the owner's yes for the
+model spend).&lt;/p&gt;
 
 
 

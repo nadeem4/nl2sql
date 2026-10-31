@@ -2967,6 +2967,15 @@ was validated, not only what failed. The names are fixed and always in this orde
 <li><code>_date_operations()</code> rejects a date function whose unit is not <code>year</code>,
      <code>quarter</code>, <code>month</code> or <code>day</code>, or whose shape is not <code>(unit literal, date)</code>,
      with <code>INVALID_PLAN_STRUCTURE</code>; the message states the portable forms.</li>
+<li><code>_label_without_key()</code> rejects a group-by item that joins text (<code>||</code> or
+     <code>CONCAT</code>) from two or more distinct columns of one table (a concatenated
+     name, say) when a primary-key column of that table is not also grouped as
+     a plain column: two rows sharing the label would merge into one group. The
+     retryable <code>INVALID_PLAN_STRUCTURE</code> message names the missing key. One
+     column, a date part, arithmetic, <code>COALESCE</code>, <code>DATE_DIFF</code>, a label grouped
+     with its key, and a table with no known primary key are not rejected.
+     Plain <code>GROUP BY first_name, last_name</code> without the key passes (an accepted
+     limit; C-W8).</li>
 <li><code>_unsupported_operators()</code> rejects a binary <code>op</code> the generator's
      <code>SqlVisitor</code> cannot render, with <code>INVALID_PLAN_STRUCTURE</code>. The schema's
      <code>op</code> Literal admits <code>NOT</code>, which belongs on a unary expression; every

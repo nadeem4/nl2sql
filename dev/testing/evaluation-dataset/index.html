@@ -6686,7 +6686,10 @@ with no model (<code>nl2sql/evaluation/faithfulness.py</code>).</p>
 <ul>
 <li><strong>Not numbers:</strong> ordinals (<code>2nd</code>), list markers (<code>1.</code> at the start of a
   line), numbers glued to a word or identifier (<code>chinook_001</code>, <code>MPEG-4</code>,
-  <code>#7</code>), and the month and day of a date.</li>
+  <code>#7</code>), the month and day of a date, and rank or position numbers
+  (<code>places 2 through 5</code>, <code>rank 2</code>) that are not above the rows shown. A figure
+  written next to a rank (<code>places 2 with 580 tracks</code>), <code>top 10</code> or <code>rank 15</code> on
+  three rows, and <code>900 of 1297</code> are still checked.</li>
 <li><strong>Names only when quoted or bold.</strong> Bold spans with a digit, ending in <code>:</code>
   (<code>**Note:**</code>), or longer than six words are skipped, so the name check
   flags little it should not.</li>
