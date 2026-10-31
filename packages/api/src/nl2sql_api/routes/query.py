@@ -1,12 +1,13 @@
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import iterate_in_threadpool
 from typing import Annotated
 from nl2sql import CancellationToken, Event, ResultNotFound, ResultPage, UserContext
-from nl2sql_api import auth
+from nl2sql_api import identity
+from nl2sql_api.errors import ERROR_RESPONSE, RequestRefused
 from nl2sql_api.models.query import QueryRequest, QueryResponse
 from nl2sql_api.dependencies import get_query_service
 from nl2sql_api.services import QueryService
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["query"])
 
 QuerySvc = Annotated[QueryService, Depends(get_query_service)]
-Caller = Annotated[UserContext, Depends(auth.get_user_context)]
+Caller = Annotated[UserContext, Depends(identity.caller)]
 
 
 # Synchronous on purpose: the pipeline performs blocking LLM and database calls,
@@ -25,7 +26,7 @@ Caller = Annotated[UserContext, Depends(auth.get_user_context)]
     "/query",
     response_model=QueryResponse,
     summary="Ask a question",
-    responses={401: {"description": "No role for this request (see the auth settings)."}},
+    responses=identity.AUTH_RESPONSES,
 )
 def execute_query(
     payload: QueryRequest,
@@ -37,18 +38,13 @@ def execute_query(
     Returns, per sub-query, the plan, the validation checks, the SQL and a capped row
     sample, plus the written answer, errors, timings and token usage. A pipeline
     failure (a refusal included) comes back with status 200 and `status: "error"`.
-    `execute: false` plans and validates without running SQL. The RBAC role comes
-    from a trusted proxy header (`NL2SQL_API_ROLE_HEADER`) or a static role
-    (`NL2SQL_API_ROLE`); the body's `user_context` counts only with the dev flag
-    `NL2SQL_API_TRUST_BODY_ROLE=true`. No role is a 401.
+    `execute: false` plans and validates without running SQL. The caller (user,
+    tenant and roles) comes from the source `api.auth` names, never from the
+    body; no identity is a 401.
     """
-    try:
-        return service.execute_query(payload, user_context)
-    except Exception:
-        # Pipeline failures are reported in QueryResponse.errors with a 200; reaching
-        # here means something genuinely unexpected broke.
-        logger.exception("Unexpected failure while executing query")
-        raise HTTPException(status_code=500, detail="Failed to execute query.")
+    # Pipeline failures are reported in QueryResponse.errors with a 200; anything raised
+    # here is unexpected and becomes the 500 envelope.
+    return service.execute_query(payload, user_context)
 
 
 # Proxies (nginx, a Space's) buffer a response unless told not to, which would
@@ -72,7 +68,7 @@ def _stream_failed() -> Event:
                              "`node.started`, `node.finished`, `result.manifest`, `answer.delta`, "
                              "`sanity.flagged`, `run.limit_reached`, then one `run.finished` (its "
                              "`data.result` is the `/query` response) or `run.failed`."},
-        401: {"description": "No role for this request (see the auth settings)."},
+        **identity.AUTH_RESPONSES,
     },
 )
 def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller):
@@ -112,8 +108,8 @@ def stream_query(payload: QueryRequest, service: QuerySvc, user_context: Caller)
     return StreamingResponse(body(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
-_NOT_FOUND = {404: {"description": "No such run or result for this caller."},
-              401: {"description": "No role for this request (see the auth settings)."}}
+_NOT_FOUND = {404: {**ERROR_RESPONSE, "description": "No such run or result for this caller."},
+              **identity.AUTH_RESPONSES}
 
 
 # Declared before the page route: `{result_id}` would otherwise match `x.csv`.
@@ -133,7 +129,7 @@ def export_result_csv(request_id: str, result_id: str, service: QuerySvc, user_c
     try:
         chunks = service.export_result_csv(request_id, result_id, user_context)
     except ResultNotFound:
-        raise HTTPException(status_code=404, detail="No such result.")
+        raise RequestRefused(404, "NOT_FOUND", "No such result.") from None
     return StreamingResponse(
         chunks,
         media_type="text/csv; charset=utf-8",
@@ -164,4 +160,4 @@ def get_result_page(
     try:
         return service.get_result_page(request_id, result_id, offset=offset, limit=limit, user_context=user_context)
     except ResultNotFound:
-        raise HTTPException(status_code=404, detail="No such result.")
+        raise RequestRefused(404, "NOT_FOUND", "No such result.") from None

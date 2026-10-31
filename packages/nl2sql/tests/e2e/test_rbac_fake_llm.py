@@ -170,21 +170,21 @@ def test_an_unknown_role_is_refused_cleanly(demo_project, tmp_path):
 def test_an_unknown_or_empty_role_list_is_refused_cleanly_through_the_api(demo_project, monkeypatch, role,
                                                                          tmp_path):
     """An unknown role reaches the engine and is refused; no role at all never
-    reaches it: the API's auth dependency answers 401 first."""
+    reaches it: the identity dependency answers 401 first."""
     from fastapi.testclient import TestClient
 
     pytest.importorskip("nl2sql_api")
     from nl2sql_api.main import app
 
     server = _serve(demo_project, _top_customers_rules(), "rbac-api.yaml", store=tmp_path,
-                    api={"role_header": "X-NL2SQL-Role"})
+                    api={"auth": "proxy"})
     monkeypatch.setenv("NL2SQL_CONFIG", str(demo_project / "rbac-api.yaml"))
     for key, value in _env().items():
         monkeypatch.setenv(key, value)
     try:
-        with TestClient(app) as client:
-            response = client.post("/api/v1/query", json={"natural_language": QUESTION},
-                                   headers={"X-NL2SQL-Role": role})
+        with TestClient(app, client=("127.0.0.1", 50000)) as client:
+            headers = {"X-Forwarded-User": "ann", "X-NL2SQL-Roles": role} if role else {}
+            response = client.post("/api/v1/query", json={"natural_language": QUESTION}, headers=headers)
     finally:
         server.stop()
 

@@ -48,7 +48,7 @@ def _env(monkeypatch, demo_project, env):
 
     path = demo_project / "fake.yaml"
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    document["api"] = {"role": "admin"}
+    document["api"] = {"auth": "static", "static_role": "admin"}
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     for key, value in env.items():
         monkeypatch.setenv(key, value)

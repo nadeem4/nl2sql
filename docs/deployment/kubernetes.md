@@ -33,11 +33,11 @@ files (`results/`). Mount one persistent volume and point `storage.path` at it
   `required: true` that cannot connect stops the pod, so a readiness gate on
   the process is enough; any other datasource that fails is logged and left
   out.
-- If you run `nl2sql-api`, set the role source in the `api` section
-  (`api.role_header` behind an authenticating ingress, or `api.role`) and the
-  admin roles (`policies.admin_roles`, default `[admin]`): pod traffic is not
-  loopback, so without them the admin routes answer HTTP 403. See
-  [Admin routes](../api/rest/index.md#admin-routes).
+- If you run `nl2sql-api`, set `api.auth` (`proxy` behind an authenticating
+  ingress with `api.proxy.trusted_from` the ingress's CIDR, or `api_keys`) and
+  the admin roles (`policies.admin_roles`, default `[admin]`): pod traffic is not
+  the local operator, so under the default `none` every route answers HTTP 403.
+  See [Admin routes](../api/rest/index.md#admin-routes).
 - Configure observability exporters as observers in the `observers` section
   (an `otel` observer with its `endpoint`, with `nl2sql-engine[otel]`
   installed; see [Observers](../configuration/observers.md#otel)), and set

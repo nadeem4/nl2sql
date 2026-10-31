@@ -1,53 +1,60 @@
 import asyncio
 import contextlib
 import logging
-from typing import Tuple
+from contextlib import asynccontextmanager
+from importlib import import_module
+from importlib.metadata import PackageNotFoundError, version
+from typing import Optional, Tuple
 
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
-from importlib.metadata import PackageNotFoundError, version
 
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from .routes import query, health, datasource, llm, indexing
 from nl2sql import NL2SQL, configure_logging, load_env_file
-from .auth import warn_if_body_role_trusted
+from nl2sql_api import errors
 
 logger = logging.getLogger("nl2sql_api")
 
+# One router per namespace, each in routes/<name>.py, all registered under /api/v1. A route is added to its
+# namespace's file, never here; web serves the page at / and the rest are under /api/v1. datasource, indexing and
+# llm hold the routes of datasources, index and settings until their rows move them.
+NAMESPACES = ("health", "query", "approvals", "conversations", "dashboards", "workspaces", "datasources",
+              "datasource", "index", "indexing", "knowledge", "evals", "settings", "llm", "web")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # nl2sql.yaml is NL2SQL_CONFIG's file, else ./nl2sql.yaml. The .env next
-    # to it is loaded first and never overrides a variable already set.
-    load_env_file()
-    # The library no longer configures logging on import, so the application
-    # entry point owns it - before anything that logs is constructed, at
-    # NL2SQL_LOG_LEVEL (else INFO), as text or, with NL2SQL_LOG_FORMAT=json, JSON lines.
-    configure_logging()
-    engine = NL2SQL.from_config()
-    # Refuse to start when a required datasource cannot connect (EngineNotReady);
-    # an optional one that fails leaves the API serving the others.
-    try:
-        engine.check()
-    except Exception:
+
+def _lifespan(config_path: Optional[str]):
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # nl2sql.yaml is config_path, else NL2SQL_CONFIG's file, else ./nl2sql.yaml. The .env next
+        # to it is loaded first and never overrides a variable already set.
+        load_env_file(config_path)
+        # The library no longer configures logging on import, so the application
+        # entry point owns it - before anything that logs is constructed, at
+        # NL2SQL_LOG_LEVEL (else INFO), as text or, with NL2SQL_LOG_FORMAT=json, JSON lines.
+        configure_logging()
+        engine = NL2SQL.from_config(config_path)
+        # Refuse to start when a required datasource cannot connect (EngineNotReady);
+        # an optional one that fails leaves the API serving the others.
+        try:
+            engine.check()
+        except Exception:
+            engine.close()
+            raise
+        app.state.engine = engine
+        # Retention: once now, then once a day while the API serves.
+        await asyncio.to_thread(_purge, engine)
+        purging = asyncio.create_task(purge_daily(engine))
+        # Dashboard schedules run only inside a long-running process; this is one (wave_c.md, D132).
+        scheduling = asyncio.create_task(run_schedules(engine))
+        yield
+        for task in (purging, scheduling):
+            task.cancel()
+        for task in (purging, scheduling):
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         engine.close()
-        raise
-    warn_if_body_role_trusted(engine.config.api)
-    app.state.engine = engine
-    # Retention: once now, then once a day while the API serves.
-    await asyncio.to_thread(_purge, engine)
-    purging = asyncio.create_task(purge_daily(engine))
-    # Dashboard schedules run only inside a long-running process; this is one (wave_c.md, D132).
-    scheduling = asyncio.create_task(run_schedules(engine))
-    yield
-    for task in (purging, scheduling):
-        task.cancel()
-    for task in (purging, scheduling):
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-    engine.close()
+    return lifespan
 
 
 # How often the API applies retention (engine.storage.purge()) after the purge at startup.
@@ -138,16 +145,16 @@ class ConfigCORSMiddleware:
         await self._for(origins)(scope, receive, send)
 
 
-app = FastAPI(
-    title="NL2SQL API",
-    version=_app_version(),
-    lifespan=lifespan,
-)
+def create_app(config_path: Optional[str] = None) -> FastAPI:
+    """The API over a new engine, built from ``config_path`` (else ``NL2SQL_CONFIG``, else ``./nl2sql.yaml``) when
+    the app starts. Tests that never start it override ``get_engine``."""
+    app = FastAPI(title="NL2SQL API", version=_app_version(), lifespan=_lifespan(config_path))
+    for name in NAMESPACES:
+        app.include_router(import_module(f"nl2sql_api.routes.{name}").router, prefix="" if name == "web" else "/api/v1")
+    errors.install(app)
+    app.add_middleware(ConfigCORSMiddleware)
+    return app
 
-app.include_router(query.router, prefix="/api/v1")
-app.include_router(health.router, prefix="/api/v1")
-app.include_router(datasource.router, prefix="/api/v1")
-app.include_router(llm.router, prefix="/api/v1")
-app.include_router(indexing.router, prefix="/api/v1")
 
-app.add_middleware(ConfigCORSMiddleware)
+# What ``uvicorn nl2sql_api.main:app`` serves; ``nl2sql-api serve`` builds its own with ``--config``.
+app = create_app()

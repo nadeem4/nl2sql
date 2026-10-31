@@ -11,8 +11,8 @@ stops it from starting; any other one that fails is left out.
 
 ```bash
 pip install nl2sql-api
-NL2SQL_CONFIG=nl2sql-demo/nl2sql.yaml nl2sql-api --host 127.0.0.1 --port 8000 [--reload]
-# or: python -m nl2sql_api.server ..., or: uvicorn nl2sql_api.main:app
+nl2sql-api serve --config nl2sql-demo/nl2sql.yaml --port 8000     # 127.0.0.1, one worker
+# or: python -m nl2sql_api serve ..., or: NL2SQL_CONFIG=... uvicorn nl2sql_api.main:app
 ```
 
 Interactive docs: Swagger UI at `/docs`, ReDoc at `/redoc`, the schema at
@@ -23,19 +23,19 @@ ignores it:
 
 ```yaml
 api:
-  role_header: X-NL2SQL-Role     # a header a trusted proxy sets on every request
-  role: null                     # or one static role for every request
-  trust_body_role: false         # local testing only: the body's user_context
+  auth: static                   # api_keys | proxy | static | none (default none)
+  static_role: admin             # auth: static only
   cors_origins: []               # browser origins allowed to call the API
 ```
 
-The API does not authenticate callers and never takes the RBAC role from the
-request body unless `api.trust_body_role` is on (it logs a warning). With no
-role source, `/api/v1/query` and `/api/v1/query/stream` answer HTTP 401.
+`api.auth` picks who is asking; the request body never carries the caller. With no
+identity the routes answer HTTP 401. Under the default `none` only a request made
+straight to `localhost` is answered, and `serve` refuses to bind another host.
+Every error is one envelope, `{"error": {"code", "message", "fix", "details", "request_id"}}`,
+with the request id also in the `X-Request-ID` header.
 
 The routes that change datasources, LLMs or the index need a role listed in
-`policies.admin_roles` (default `[admin]`), else HTTP 403. With no role setting
-at all they answer loopback clients only.
+`policies.admin_roles` (default `[admin]`), else HTTP 403.
 
 The Docker image (`packages/api/Dockerfile`) reads `/etc/nl2sql/nl2sql.yaml`:
 mount a config folder there, and a volume for `storage.path`.
@@ -46,6 +46,8 @@ mount a config folder there, and a volume for `storage.path`.
 - `POST /api/v1/query/stream` - The same, as Server-Sent Events: each step as it runs, the result manifest, the answer as it is written, then the `/query` response
 - `GET /api/v1/health` - Liveness check
 - `GET /api/v1/ready` - Readiness check (does not yet check dependencies)
+- `GET /api/v1/meta` - The mode, the identity source and `request_llm` (no caller needed)
+- `GET /api/v1/about` - What the engine is
 - `GET /api/v1/datasource-types` - The adapters the engine can name, each with its connection schema (admin only)
 - `POST /api/v1/datasource/test` - Test a connection without registering it; returns the failed stage and the fix (admin only)
 - `POST /api/v1/datasource` - Register a datasource in the running process (`config` is one `datasources` entry: `id`, `type`, `connection`, ...); `save: true` also writes `datasources/<id>.yaml` with secrets as references; a body that does not validate is a 422 listing each problem by path

@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 import yaml
 from pydantic import BaseModel, SecretStr
 
-from nl2sql.common.errors import SecretValueInConfig
+from nl2sql.common.errors import InvalidArgument, SecretValueInConfig
 from nl2sql.config.models import Datasource, is_secret_key
 
 _REFERENCE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_-]*:[^{}]+\}")
@@ -68,7 +68,7 @@ class EnvSecrets:
         name = env_name(path)
         owner = self._owners.get(name)
         if owner is not None and owner[1] != where:
-            raise ValueError(f"{where} and {owner[1]} both map to the environment variable {name}. "
+            raise InvalidArgument(f"{where} and {owner[1]} both map to the environment variable {name}. "
                              "Rename one of the datasources or fields; a value is never overwritten.")
         self._owners[name] = (path, where)
         self.values[name] = value
@@ -164,7 +164,7 @@ def check_file_name(datasource_id: str) -> str:
     """``datasource_id`` as a file name in ``datasources/``, or a ``ValueError``."""
     if (not _FILE_ID.fullmatch(datasource_id) or datasource_id.endswith(".")
             or datasource_id.split(".")[0].lower() in _WINDOWS_DEVICES):
-        raise ValueError(f"The datasource id '{datasource_id}' cannot be a file name in datasources/: use letters, "
+        raise InvalidArgument(f"The datasource id '{datasource_id}' cannot be a file name in datasources/: use letters, "
                          "digits, '_', '-' and '.', start with a letter or digit, and avoid a Windows device name "
                          "such as con or aux.")
     return f"{datasource_id}.yaml"

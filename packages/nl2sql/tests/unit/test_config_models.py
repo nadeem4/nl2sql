@@ -313,7 +313,7 @@ def test_settings_keep_todays_validation(update):
 
 def test_api_defaults():
     api = Api()
-    assert (api.role_header, api.role, api.trust_body_role, api.cors_origins) == (None, None, False, [])
+    assert (api.auth, api.static_role, api.request_llm, api.cors_origins) == ("none", None, False, [])
 
 
 def test_api_in_code_rejects_unknown_keys():

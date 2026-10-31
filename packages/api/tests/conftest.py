@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nl2sql import UserContext
-from nl2sql_api.auth import get_user_context, require_admin
+from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 from nl2sql.testing.config import make_config
@@ -64,8 +64,8 @@ def api_client(tmp_path):
     ``TestClient`` is used without its context manager so the app lifespan (which
     would construct a real NL2SQL engine) never runs. With ``authenticated``
     (the default) the caller holds the ``admin`` role; pass False to exercise
-    the real ``get_user_context`` dependency. ``sections`` are written into the
-    engine's ``nl2sql.yaml`` (``api=...``, ``policies=...``), as ``make_config`` takes them.
+    the real ``identity.caller`` dependency. ``sections`` are written into the
+    engine's ``nl2sql.yaml`` (``api=...``, ``policies=...``, ``mode=...``), as ``make_config`` takes them.
     """
     clients = []
 
@@ -74,9 +74,9 @@ def api_client(tmp_path):
         app.dependency_overrides[get_engine] = lambda: engine
         app.state.engine = engine
         if authenticated:
-            app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])
-            app.dependency_overrides[require_admin] = lambda: UserContext(roles=["admin"])
-        client = TestClient(app)
+            app.dependency_overrides[identity.caller] = lambda: UserContext(roles=["admin"])
+            app.dependency_overrides[identity.admin] = lambda: UserContext(roles=["admin"])
+        client = TestClient(app, raise_server_exceptions=False)
         clients.append(client)
         return client, engine
 

@@ -46,18 +46,18 @@ path: "${env:NL2SQL_DATA_DIR}"
 
 ```yaml
 # api.yaml (nl2sql.yaml has  api: { file: api.yaml })
-role: admin             # one static role for every request
+auth: static
+static_role: admin      # one role for every request
 ```
 
-`api.role` pins the RBAC role for every request; without a role source the
-query route answers HTTP 401. See [Caller role](../api/rest/index.md#caller-role)
+`api.auth: static` pins the RBAC role for every request; the default, `none`,
+answers only requests made straight to `localhost`, so a request through a
+published Docker port is HTTP 403. See [Identity](../api/rest/index.md#identity)
 and [API settings](../configuration/api.md).
 
 The routes that register datasources or LLMs and build or clear the index need a
-role listed in `policies.admin_roles` (default `[admin]`), so `role: admin`
-above allows them. Without any role setting they answer loopback clients only,
-and a request through a published Docker port does not come from loopback: it
-gets HTTP 403. See [Admin routes](../api/rest/index.md#admin-routes).
+role listed in `policies.admin_roles` (default `[admin]`), so `static_role: admin`
+above allows them. See [Admin routes](../api/rest/index.md#admin-routes).
 
 ## Run the API
 

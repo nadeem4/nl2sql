@@ -10,7 +10,6 @@ Source: `packages/api/src/nl2sql_api/models/query.py`
 | `natural_language` | `str` | yes | User query. |
 | `datasource_id` | `Optional[str]` | no | Datasource override. |
 | `execute` | `bool` | no | Execute SQL against datasource (default `true`). |
-| `user_context` | `Optional[Dict[str, Any]]` | no | Ignored unless `api.trust_body_role` is `true` (local testing only); then an RBAC payload such as `{"roles": ["admin"]}`. See [Caller role](index.md#caller-role). |
 
 ### `SubQueryResponse`
 
@@ -102,8 +101,8 @@ Request model: `QueryRequest`
 Response model: `QueryResponse`
 
 Execution flow:
-- The `get_user_context` dependency supplies the caller's `UserContext` (see
-  [Caller role](index.md#caller-role)); with no role it answers `HTTP 401`
+- The `identity.caller` dependency supplies the caller's `UserContext` (see
+  [Identity](index.md#identity)); with no identity it answers `HTTP 401`
   before the engine runs.
 - Delegates to `engine.run_query(...)`, which returns a `QueryResult`.
 - Returns that `QueryResult` as a `QueryResponse` (its subclass); there is no field mapping.
@@ -244,7 +243,7 @@ data: {"name": "run.finished", ..., "data": {"status": "success", "duration_s": 
 
 ```bash
 curl -N -X POST http://localhost:8000/api/v1/query/stream \
-  -H "Content-Type: application/json" -H "X-NL2SQL-Role: admin" \
+  -H "Content-Type: application/json" -H "Authorization: Bearer $NL2SQL_KEY" \
   -d '{"natural_language": "Who are the top 5 customers by revenue?"}'
 ```
 
@@ -281,7 +280,7 @@ reads the rows lazily from the result's parquet artifact: only the slice asked f
 is read. A page past the end has no rows.
 
 ```bash
-curl -H "X-NL2SQL-Role: admin"   "http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&limit=100"
+curl -H "Authorization: Bearer $NL2SQL_KEY"   "http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&limit=100"
 ```
 
 ```json
@@ -309,16 +308,11 @@ and streams each slice out, so the result is never built in memory on the server
   token (letters, digits, `_` and `-`, so no `/`, `.` or `..`) are all
   `HTTP 404`, so a caller cannot tell one from the other or reach a path outside
   the run's folder.
-- The REST API has no per-user identity yet: the static or header role gives
-  a caller roles and no `user_id`, so every REST run is anonymous. A REST run
-  is readable by any REST caller of the same tenant with the same roles, and
-  by no caller with other roles: a `viewer` holding an `admin` run's trace id
-  gets `HTTP 404`. API keys are for the MCP server only and give REST callers
-  no `user_id`. See [Who can read a run](../core/results.md#who-can-read-a-run).
-- With the dev flag `api.trust_body_role: true`, the request body's
-  `user_context` picks the caller's `user_id` and `tenant_id` as well as its
-  roles, so a client can read any user's run by naming that user. Use it for
-  local testing only.
+- A caller with a `user_id` (an API key, or a proxy that sets the user header) reads only its own runs. A
+  `static` caller has roles and no `user_id`, so its runs are anonymous: readable by any caller of the same tenant with the same
+  roles, and by no caller with other roles: a `viewer` holding an `admin` run's trace id
+  gets `HTTP 404`. See [Who can read a run](../core/results.md#who-can-read-a-run).
+- The request body never names the caller: `user_context` is not a field of `POST /query`.
 
 ## Tests
 
@@ -330,9 +324,9 @@ and for an anonymous run read with other roles, and `HTTP 401` without a role.
 `packages/api/tests/test_query_routes.py` and
 `packages/api/tests/test_query_response_shape.py` cover this endpoint with FastAPI's
 `TestClient` and a stubbed engine (`get_engine` dependency override) and a stubbed
-caller (`get_user_context` override, role `admin`), so no datasource, LLM or
-network access is required. `packages/api/tests/test_auth.py` covers the role
-sources and the 401.
+caller (`identity.caller` override, role `admin`), so no datasource, LLM or
+network access is required. `packages/api/tests/test_identity.py` covers the
+identity sources and the 401.
 
 `packages/api/tests/test_query_stream_route.py` covers the stream route the same
 way: the content type, the events in order, a `run.finished` whose `result` equals

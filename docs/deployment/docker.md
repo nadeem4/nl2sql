@@ -47,14 +47,13 @@ and left out of routing. Mark the datasources the service cannot run without
 
 ## API roles
 
-`nl2sql-api` does not authenticate callers. Its `api` section says where the
-RBAC role comes from (`api.role_header`, a header an authenticating proxy sets,
-or a static `api.role`), and `policies.admin_roles` (default `[admin]`) says
-which roles may change datasources, LLMs and the index. With no role source,
-queries answer HTTP 401 and the admin routes answer HTTP 403, because a request
-through a published port does not come from loopback. See
+`nl2sql-api` identifies callers from `api.auth` (`api_keys`, `proxy`, `static`
+or `none`), and `policies.admin_roles` (default `[admin]`) says which roles may
+change datasources, LLMs and the index. Under the default `none`, only a
+request made straight to `localhost` is answered, and a request through a
+published port is a `403`, so set `api.auth` for a container. See
 [API settings](../configuration/api.md),
-[Caller role](../api/rest/index.md#caller-role) and
+[Identity](../api/rest/index.md#identity) and
 [Admin routes](../api/rest/index.md#admin-routes).
 
 ## Notes

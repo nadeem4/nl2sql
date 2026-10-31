@@ -7,6 +7,7 @@ section 2.
 """
 from __future__ import annotations
 
+import ipaddress
 import re
 import types
 import typing
@@ -21,6 +22,7 @@ from typing_extensions import Annotated
 
 from nl2sql_sdk import ConnectionModel, IndexScope, Limits
 
+from nl2sql.common.errors import DatasourceExists, DatasourceNotFound
 from nl2sql.config.curated import CuratedDatasource
 from nl2sql.policies.patterns import parse_pattern
 
@@ -734,20 +736,24 @@ class ApiProxy(_Model):
     tenant_header: Optional[str] = None  # None: settings.tenant_id
     roles_header: str = "X-NL2SQL-Roles"
 
+    @field_validator("trusted_from")
+    @classmethod
+    def _networks(cls, values: List[str]) -> List[str]:
+        for value in values:
+            try:
+                ipaddress.ip_network(value, strict=False)
+            except ValueError:
+                raise ValueError(f"'{value}' is not an IP address or CIDR network (for example 10.0.0.0/8)") from None
+        return values
+
 
 class Api(_Model):
-    """``nl2sql-api``'s own settings. The engine validates them and never reads them.
-
-    ``role_header``, ``role`` and ``trust_body_role`` go when ``nl2sql-api``'s identity replaces ``auth.py`` (D0a-2).
-    """
+    """``nl2sql-api``'s own settings. The engine validates them and never reads them."""
 
     auth: Literal["api_keys", "proxy", "static", "none"] = "none"
     proxy: ApiProxy = Field(default_factory=ApiProxy)
     static_role: Optional[str] = None  # auth: static only
     request_llm: bool = False  # callers may send their own key and models (D210)
-    role_header: Optional[str] = None
-    role: Optional[str] = None
-    trust_body_role: bool = False
     cors_origins: List[str] = Field(default_factory=list)
 
 
@@ -860,11 +866,11 @@ class Config(_Model):
     def with_datasource(self, datasource: Datasource) -> "Config":
         """A copy of this config with ``datasource`` added. Its id must be new."""
         if any(d.id == datasource.id for d in self.datasources):
-            raise ValueError(f"a datasource with id '{datasource.id}' is already configured")
+            raise DatasourceExists(f"a datasource with id '{datasource.id}' is already configured")
         return self.model_copy(update={"datasources": [*self.datasources, datasource]})
 
     def without_datasource(self, datasource_id: str) -> "Config":
         """A copy of this config without the datasource ``datasource_id``, which must be configured."""
         if not any(d.id == datasource_id for d in self.datasources):
-            raise ValueError(f"Unknown datasource ID: {datasource_id}")
+            raise DatasourceNotFound(f"Unknown datasource ID: {datasource_id}")
         return self.model_copy(update={"datasources": [d for d in self.datasources if d.id != datasource_id]})

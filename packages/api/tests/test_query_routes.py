@@ -106,7 +106,8 @@ def test_unexpected_failure_is_a_500_without_internal_detail(api_client):
     response = client.post("/api/v1/query", json={"natural_language": "revenue by region"})
 
     assert response.status_code == 500
-    assert "hunter2" not in response.json()["detail"]
+    assert "hunter2" not in response.text
+    assert response.json()["error"]["request_id"]
 
 
 def test_invalid_payload_is_a_422(api_client):

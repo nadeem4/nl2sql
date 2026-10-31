@@ -38,7 +38,7 @@ Issues = "https://github.com/nadeem4/nl2sql/issues"
 Demo = "https://nl2sql.codewithnk.com"
 
 [project.scripts]
-nl2sql-api = "nl2sql_api.server:main"
+nl2sql-api = "nl2sql_api.serve:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

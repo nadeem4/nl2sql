@@ -14,15 +14,21 @@ depends on the client:
 
 - CLI: `nl2sql run --role <id>`, defaulting to `admin`.
 - Python API: `UserContext(roles=[...])`, whatever the calling code passes.
-- REST API: the `get_user_context` dependency
-  (`packages/api/src/nl2sql_api/auth.py`). It reads a header set by a trusted
-  proxy (`api.role_header` in `nl2sql.yaml`) or a static role (`api.role`), and
-  answers `HTTP 401` when neither gives one. The body's `user_context` counts
-  only with the dev flag `api.trust_body_role: true`, which logs a
-  warning at startup. See [Caller role](../api/rest/index.md#caller-role).
-  The routes that change datasources, LLMs or the index also need one of the
-  roles in `policies.admin_roles` (default `[admin]`), else `HTTP 403`; with no
-  role source configured they answer loopback clients only. See
+- REST API: the `identity.caller` dependency
+  (`packages/api/src/nl2sql_api/identity.py`) resolves one `UserContext` from the
+  source `api.auth` names: an API key (`api_keys`), the user, tenant and roles
+  headers of a proxy that connects from `api.proxy.trusted_from` (`proxy`), one
+  role for everyone (`static`) or the local operator (`none`, the default). It
+  answers `HTTP 401` when there is no identity, and never reads the request
+  body. Headers from a peer outside `trusted_from` are ignored. With
+  `auth: none` the request must be made straight to localhost (a connecting peer
+  that is not loopback, such as a published container port, a `Host` that is
+  not loopback, or an `X-Forwarded-For`, `Forwarded` or `X-Real-IP` header, is a
+  `403`, so a same-host proxy or a DNS-rebinding page is not the operator), and
+  `nl2sql-api serve` refuses to bind a non-loopback host. The routes that change
+  datasources, LLMs or the index also need one of the roles in
+  `policies.admin_roles` (default `[admin]`), else `HTTP 403`. See
+  [Identity](../api/rest/index.md#identity) and
   [Admin routes](../api/rest/index.md#admin-routes).
 
 - API keys: `engine.api_keys` makes bearer tokens that each carry the user,

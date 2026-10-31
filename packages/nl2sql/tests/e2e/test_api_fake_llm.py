@@ -14,13 +14,13 @@ from .recordings_chinook import RULES_COUNT_CUSTOMERS, RULES_TOP_CUSTOMERS  # no
 
 
 def _serve_api(demo_project, server, env, monkeypatch, store, settings=None):
-    """Point ``nl2sql-api`` at a config on ``server``; the role comes from a proxy header, as a deployment would.
+    """Point ``nl2sql-api`` at a config on ``server``; the identity comes from proxy headers, as a deployment would.
 
     ``store`` (the test's ``tmp_path``) gets a private copy of the demo's index
     and state store: tests sharing the demo's ``state.db`` raced on it.
     """
     config = project_config(demo_project, "api-fake.yaml", llm=fake_llm_section(server.base_url),
-                            api={"role_header": "X-NL2SQL-Role"}, settings=settings,
+                            api={"auth": "proxy"}, settings=settings,
                             storage=private_storage(demo_project, store))
     for key, value in env.items():
         monkeypatch.setenv(key, value)
@@ -37,11 +37,11 @@ def test_query_route_returns_sql(demo_project, fake_llm, monkeypatch, tmp_path):
     _serve_api(demo_project, server, env, monkeypatch, tmp_path)
 
     # The context manager runs the lifespan, which constructs the real engine.
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         response = client.post(
             "/api/v1/query",
             json={"natural_language": "How many customers are there?"},
-            headers={"X-NL2SQL-Role": "admin"},
+            headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"},
         )
 
     assert response.status_code == 200, response.text
@@ -71,11 +71,11 @@ def test_a_denied_query_reports_the_denial_first(demo_project, fake_llm, monkeyp
     server, env = fake_llm(RULES_TOP_CUSTOMERS)
     _serve_api(demo_project, server, env, monkeypatch, tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         response = client.post(
             "/api/v1/query",
             json={"natural_language": "Who are the top customers by total spend?"},
-            headers={"X-NL2SQL-Role": "viewer"},
+            headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "viewer"},
         )
 
     assert response.status_code == 200, response.text
@@ -101,11 +101,11 @@ def test_an_unanswerable_question_is_refused_after_one_model_call(demo_project, 
     server, env = fake_llm([unanswerable] + RULES_COUNT_CUSTOMERS)
     _serve_api(demo_project, server, env, monkeypatch, tmp_path)
 
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         response = client.post(
             "/api/v1/query",
             json={"natural_language": "What is the weather in Paris?"},
-            headers={"X-NL2SQL-Role": "admin"},
+            headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"},
         )
 
     assert response.status_code == 200, response.text
@@ -192,14 +192,14 @@ def test_usage_reaches_query_result_and_the_rest_response(demo_project, fake_llm
     _serve_api(demo_project, server, env, monkeypatch, tmp_path,
                settings={"pipeline": {"retries": {"base_delay_s": 0, "jitter_s": 0}}})
 
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         # The Python API: the engine the REST route delegates to.
         result = app.state.engine.run_query(
             "How many customers are there?", user_context=UserContext(roles=["admin"]))
         response = client.post(
             "/api/v1/query",
             json={"natural_language": "How many customers are there?"},
-            headers={"X-NL2SQL-Role": "admin"},
+            headers={"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"},
         )
 
     assert isinstance(result, QueryResult)

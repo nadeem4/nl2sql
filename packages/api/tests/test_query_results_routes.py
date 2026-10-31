@@ -19,7 +19,7 @@ from nl2sql.execution.artifacts.results import ResultOwner
 from nl2sql.execution.artifacts import ArtifactStore
 from nl2sql.storage.local import LocalResults
 from nl2sql.testing.config import make_config
-from nl2sql_api.auth import get_user_context
+from nl2sql_api import identity
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 
@@ -47,7 +47,7 @@ def client(tmp_path):
     engine._runtime = SimpleNamespace(config=make_config(tmp_path / "project"), closed=False,
                                       tenant_id="t1", artifact_store=store)
     app.dependency_overrides[get_engine] = lambda: engine
-    app.dependency_overrides[get_user_context] = lambda: ANN
+    app.dependency_overrides[identity.caller] = lambda: ANN
     with_client = TestClient(app)
     yield with_client
     app.dependency_overrides.clear()
@@ -195,7 +195,7 @@ def test_a_run_is_readable_only_by_the_caller_who_asked_it(monkeypatch, client, 
 
     for other in (UserContext(user_id="bob", roles=["admin"]), UserContext(roles=["admin"]),
                   UserContext(user_id="ann", tenant_id="t2", roles=["admin"])):
-        app.dependency_overrides[get_user_context] = lambda other=other: other
+        app.dependency_overrides[identity.caller] = lambda other=other: other
         response = client.get(path)
         assert response.status_code == 404, other
         assert "n1" not in response.text
@@ -203,27 +203,28 @@ def test_a_run_is_readable_only_by_the_caller_who_asked_it(monkeypatch, client, 
 
 @pytest.mark.parametrize("suffix", ["", ".csv"])
 def test_an_anonymous_run_is_readable_only_with_the_same_roles(monkeypatch, client, suffix):
-    """REST callers carry roles and no user id (``nl2sql_api.auth``), so a run is bound to its tenant and roles:
+    """REST callers carry roles and no user id (``nl2sql_api.identity``), so a run is bound to its tenant and roles:
     a viewer holding an admin run's trace id must not read rows its own policies would hide."""
     from nl2sql.hooks import Allow
 
-    app.dependency_overrides[get_user_context] = lambda: UserContext(roles=["admin"])
+    app.dependency_overrides[identity.caller] = lambda: UserContext(roles=["admin"])
     body = _ran(monkeypatch, client, lambda ctx: Allow())
     path = f"/api/v1/query/{body['trace_id']}/results/combine_g1{suffix}"
     assert client.get(path).status_code == 200
 
     for other in (UserContext(roles=["viewer"]), UserContext(roles=["admin", "viewer"])):
-        app.dependency_overrides[get_user_context] = lambda other=other: other
+        app.dependency_overrides[identity.caller] = lambda other=other: other
         response = client.get(path)
         assert response.status_code == 404, other
         assert "n1" not in response.text
 
 
 def test_the_routes_need_a_role_like_query_does(client):
-    app.dependency_overrides.pop(get_user_context)
+    app.dependency_overrides.pop(identity.caller)
 
-    assert client.get("/api/v1/query/run-1/results/combine_g1").status_code == 401
-    assert client.get("/api/v1/query/run-1/results/combine_g1.csv").status_code == 401
+    # api.auth is none here and the client's Host is not localhost: not the local operator, so no identity.
+    assert client.get("/api/v1/query/run-1/results/combine_g1").status_code == 403
+    assert client.get("/api/v1/query/run-1/results/combine_g1.csv").status_code == 403
 
 
 def test_the_query_response_carries_the_result_manifest_not_rows(api_client):

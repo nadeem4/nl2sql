@@ -189,6 +189,7 @@ nav:
       - Datasource: api/rest/datasource.md
       - LLM: api/rest/llm.md
       - Indexing: api/rest/indexing.md
+      - Errors: api/rest/errors.md
   - Releases:
     - Overview: releases/index.md
     - "0.9.1": releases/0.9.1.md
