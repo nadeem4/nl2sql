@@ -1,9 +1,8 @@
 """The admin routes (anything that changes datasources, LLMs or the index) need an admin role.
 
-The role comes from the same sources as ``/query`` (``nl2sql_api.auth``, the
-``api`` section of ``nl2sql.yaml``). A request is admin when one of its roles is
-in ``policies.admin_roles`` (default ``admin``). With no role source configured
-at all, admin routes answer loopback clients only.
+The role comes from the same source as ``/query`` (``nl2sql_api.identity``, ``api.auth`` in ``nl2sql.yaml``). A
+request is admin when one of its roles is in ``policies.admin_roles`` (default ``admin``). With ``api.auth: none``
+the admin routes answer the local operator only: a request made directly to localhost.
 """
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,6 +30,13 @@ ADMIN_ROUTES = [
     ("delete", "/api/v1/index", None),
 ]
 ADMIN_IDS = [f"{method.upper()} {path}" for method, path, _ in ADMIN_ROUTES]
+
+PROXY = {"auth": "proxy", "proxy": {"trusted_from": ["127.0.0.1/32", "203.0.113.7/32"]}}
+
+
+def _as(roles):
+    return {"X-Forwarded-User": "ann", "X-NL2SQL-Roles": roles}
+
 
 READ_ONLY_ROUTES = ["/api/v1/health", "/api/v1/datasource", "/api/v1/index/status"]
 
@@ -73,7 +79,7 @@ def make_client(tmp_path):
     def _make(host="testclient", **sections):
         engine = AdminEngine(make_config(tmp_path / f"project-{len(clients)}", **sections))
         app.dependency_overrides[get_engine] = lambda: engine
-        client = TestClient(app, client=(host, 50000))
+        client = TestClient(app, base_url="http://localhost", client=(host, 50000))
         clients.append(client)
         return client, engine
 
@@ -91,42 +97,40 @@ def _call(client, method, path, body, headers=None):
 
 
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
-def test_no_role_source_refuses_a_remote_client(make_client, method, path, body):
-    client, engine = make_client(host="203.0.113.7")
-    response = _call(client, method, path, body)
+def test_auth_none_refuses_a_foreign_host_header(make_client, method, path, body):
+    client, engine = make_client()
+    response = _call(client, method, path, body, headers={"Host": "example.com"})
     assert response.status_code == 403, response.text
-    detail = response.json()["detail"]
-    for name in ("api.role_header", "api.role", "policies.admin_roles"):
-        assert name in detail
+    assert "api.auth" in response.json()["error"]["message"]
     assert engine.calls == []
 
 
-@pytest.mark.parametrize("host", ["127.0.0.1", "::1", "localhost"])
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "[::1]"])
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
-def test_no_role_source_allows_a_loopback_client(make_client, method, path, body, host):
-    client, _ = make_client(host=host)
-    response = _call(client, method, path, body)
+def test_auth_none_allows_the_local_operator(make_client, method, path, body, host):
+    client, _ = make_client()
+    response = _call(client, method, path, body, headers={"Host": host})
     assert response.status_code == 200, response.text
 
 
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
-def test_a_role_that_is_not_admin_is_a_403_even_from_loopback(make_client, method, path, body):
-    client, engine = make_client(host="127.0.0.1", api={"role": "analyst"})
+def test_a_role_that_is_not_admin_is_a_403(make_client, method, path, body):
+    client, engine = make_client(api={"auth": "static", "static_role": "analyst"})
     response = _call(client, method, path, body)
     assert response.status_code == 403, response.text
-    assert "policies.admin_roles" in response.json()["detail"]
+    assert "policies.admin_roles" in response.json()["error"]["fix"]
     assert engine.calls == []
 
 
 @pytest.mark.parametrize("method,path,body", ADMIN_ROUTES, ids=ADMIN_IDS)
 def test_the_admin_role_is_accepted(make_client, method, path, body):
-    client, _ = make_client(host="203.0.113.7", api={"role_header": "X-NL2SQL-Role"})
-    response = _call(client, method, path, body, headers={"X-NL2SQL-Role": "viewer, admin"})
+    client, _ = make_client(host="203.0.113.7", api=PROXY)
+    response = _call(client, method, path, body, headers=_as("viewer, admin"))
     assert response.status_code == 200, response.text
 
 
-def test_a_configured_header_that_is_missing_is_a_401(make_client):
-    client, engine = make_client(host="127.0.0.1", api={"role_header": "X-NL2SQL-Role"})
+def test_a_proxy_request_without_a_user_header_is_a_401(make_client):
+    client, engine = make_client(host="127.0.0.1", api=PROXY)
     assert client.post("/api/v1/index-all").status_code == 401
     assert engine.calls == []
 
@@ -134,31 +138,29 @@ def test_a_configured_header_that_is_missing_is_a_401(make_client):
 def test_the_admin_roles_come_from_the_policies(make_client, monkeypatch):
     # NL2SQL_API_ADMIN_ROLES is not read any more: policies.admin_roles is the list.
     monkeypatch.setenv("NL2SQL_API_ADMIN_ROLES", "admin")
-    client, _ = make_client(api={"role_header": "X-NL2SQL-Role"},
-                            policies={"allow_all": True, "admin_roles": ["ops", "owner"]})
-    assert client.post("/api/v1/index-all", headers={"X-NL2SQL-Role": "owner"}).status_code == 200
-    assert client.post("/api/v1/index-all", headers={"X-NL2SQL-Role": "admin"}).status_code == 403
+    client, _ = make_client(api=PROXY, policies={"allow_all": True, "admin_roles": ["ops", "owner"]})
+    assert client.post("/api/v1/index-all", headers=_as("owner")).status_code == 200
+    assert client.post("/api/v1/index-all", headers=_as("admin")).status_code == 403
 
 
-def test_the_dev_flag_takes_the_admin_role_from_the_body(make_client):
-    client, engine = make_client(api={"trust_body_role": True})
+def test_the_body_never_carries_the_role(make_client):
+    client, engine = make_client(api={"auth": "static", "static_role": "viewer"})
     body = {"config": DATASOURCE, "user_context": {"roles": ["admin"]}}
-    assert client.post("/api/v1/datasource", json=body).status_code == 200
-    assert engine.calls == ["add"]
+    assert client.post("/api/v1/datasource", json=body).status_code == 403
+    assert engine.calls == []
 
 
 @pytest.mark.parametrize("path", READ_ONLY_ROUTES)
 def test_read_only_routes_stay_open(make_client, path):
-    client, _ = make_client(host="203.0.113.7")
+    client, _ = make_client(api={"auth": "static", "static_role": "viewer"})
     assert client.get(path).status_code == 200
 
 
 def test_a_failed_add_datasource_does_not_echo_the_exception(make_client):
-    client, engine = make_client(host="127.0.0.1")
+    client, engine = make_client()
     engine.datasources._answers["add"] = RuntimeError(
         "could not connect to postgresql://app:hunter2@db.internal:5432/sales")
     response = client.post("/api/v1/datasource", json={"config": {**DATASOURCE, "id": "sales"}})
     assert response.status_code == 500
-    detail = response.json()["detail"]
-    assert "hunter2" not in detail and "db.internal" not in detail
-    assert "server log" in detail
+    assert "hunter2" not in response.text and "db.internal" not in response.text
+    assert response.json()["error"]["request_id"]

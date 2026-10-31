@@ -1,10 +1,12 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends, Request
-from typing import Dict, Any, Annotated
+from typing import Annotated, Any, Dict
 
-from nl2sql import NL2SQL, ReviewError, UserContext
-from nl2sql_api import auth
+from fastapi import APIRouter, Depends, Request
+
+from nl2sql import NL2SQL, NL2SQLError, UserContext
+from nl2sql_api import identity
+from nl2sql_api.errors import ERROR_RESPONSE, RequestRefused
 from nl2sql_api.models.datasource import DatasourceRequest, DatasourceResponse, DatasourceTestRequest
 from nl2sql_api.dependencies import get_datasource_service, get_engine
 from nl2sql_api.services import DatasourceService
@@ -26,11 +28,12 @@ ADD_EXAMPLE = {
 
 async def _json_body(request: Request) -> Any:
     """The request's JSON, whatever it is. Not FastAPI's own body model, whose 422 echoes the input: a body that is
-    not JSON or not an object is answered with this project's `{path, message}` list, no input in it."""
+    not JSON or not an object is answered with the error envelope, no input in it."""
     try:
         return await request.json()
     except Exception:
-        raise HTTPException(status_code=422, detail=[{"path": "", "message": "The body is not valid JSON."}]) from None
+        raise RequestRefused(422, "INVALID_REQUEST", "The body is not valid JSON.",
+                             details=[{"loc": ["body"], "msg": "The body is not valid JSON."}]) from None
 
 
 def _body_docs(model: Any, example: Dict[str, Any]) -> Dict[str, Any]:
@@ -38,12 +41,23 @@ def _body_docs(model: Any, example: Dict[str, Any]) -> Dict[str, Any]:
         "schema": model.model_json_schema(), "examples": {"postgres": {"value": example}}}}}}
 
 
-PROBLEMS_422 = {422: {"description": "The body does not validate: `detail` lists each problem as `{path, message}` "
-                                     "(never a value), or says why the datasource could not be added or saved."}}
+PROBLEMS_422 = {422: {**ERROR_RESPONSE, "description": "The body does not validate: `error.details` lists each "
+                                                       "problem as `{loc, msg}` (never a value)."}}
+
+
+def _problems(error: BadRequest) -> RequestRefused:
+    return RequestRefused(422, "INVALID_REQUEST", "The datasource does not validate.",
+                          fix="Fix the fields listed in details.",
+                          details=[{"loc": p["path"].split("."), "msg": p["message"]} for p in error.problems])
+
+
+def _not_found(datasource_id: str) -> RequestRefused:
+    return RequestRefused(404, "NOT_FOUND", f"No datasource '{datasource_id}'.",
+                          fix="List the datasources with GET /api/v1/datasource.")
 
 
 @router.get("/datasource-types", response_model=Dict[str, Any], summary="List the datasource types",
-            dependencies=[Depends(auth.require_admin)], responses=auth.ADMIN_RESPONSES)
+            dependencies=[Depends(identity.admin)], responses=identity.ADMIN_RESPONSES)
 def datasource_types(
     service: DatasourceSvc,
 ):
@@ -51,15 +65,11 @@ def datasource_types(
     `installed`, an `install_hint` when a driver is missing and the JSON Schema of its connection
     (`connection_schema`), which is the Connect a database form: a secret field is `format: password`.
     Admin only."""
-    try:
-        return {"types": service.datasource_types()}
-    except Exception:
-        logger.exception("Failed to list the datasource types")
-        raise HTTPException(status_code=500, detail="Failed to list the datasource types. The cause is in the server log.")
+    return {"types": service.datasource_types()}
 
 
 @router.post("/datasource/test", response_model=Dict[str, Any], summary="Test a datasource",
-             dependencies=[Depends(auth.require_admin)], responses={**auth.ADMIN_RESPONSES, **PROBLEMS_422},
+             dependencies=[Depends(identity.admin)], responses={**identity.ADMIN_RESPONSES, **PROBLEMS_422},
              openapi_extra=_body_docs(DatasourceTestRequest, {"config": ADD_EXAMPLE["config"]}))
 def test_datasource(
     service: DatasourceSvc,
@@ -72,21 +82,17 @@ def test_datasource(
     try:
         return service.test_datasource(payload)
     except BadRequest as e:
-        raise HTTPException(status_code=422, detail=e.problems)
-    except Exception:
-        logger.exception("Failed to test a datasource")
-        raise HTTPException(status_code=500, detail="Failed to test the datasource. The cause is in the server log.")
+        raise _problems(e) from None
 
 
 @router.post("/datasource", response_model=DatasourceResponse, summary="Add a datasource",
-             responses={**auth.ADMIN_RESPONSES, **PROBLEMS_422,
-                        409: {"description": "`save` found the datasource's file changed on disk since the "
-                                             "engine loaded it."}},
+             responses={**identity.ADMIN_RESPONSES, **PROBLEMS_422,
+                        409: {**ERROR_RESPONSE, "description": "`save` found the datasource's file changed on "
+                                                               "disk since the engine loaded it."}},
              openapi_extra=_body_docs(DatasourceRequest, ADD_EXAMPLE))
 def add_datasource(
-    request: Request,
     service: DatasourceSvc,
-    user: UserContext = Depends(auth.require_admin),
+    user: UserContext = Depends(identity.admin),
     engine: NL2SQL = Depends(get_engine),
     payload: Any = Depends(_json_body),
 ):
@@ -96,26 +102,24 @@ def add_datasource(
 
     With `"save": true` it is also written to `datasources/<id>.yaml` beside `nl2sql.yaml`, and `file` says
     where. A secret is never written into the YAML: a `${env:VAR}` or other reference is kept as it is, and a
-    literal is written to the `.env` as `${env:NL2SQL_...}` only on a fresh local install (no role source
-    configured, loopback client); anywhere else it is a 422. A save that fails leaves nothing registered.
+    literal is written to the `.env` as `${env:NL2SQL_...}` only when `api.auth` is `none` (the local operator);
+    anywhere else it is a 422. A save that fails leaves nothing registered.
 
     A body that does not validate, a typo included, is a 422 listing each problem by its path, never a value.
     """
     try:
-        return service.add_datasource(payload, by=user, env_file=auth.is_fresh_local_install(request, engine))
+        return service.add_datasource(payload, by=user, env_file=identity.is_local_operator(engine))
     except BadRequest as e:
-        raise HTTPException(status_code=422, detail=e.problems)
-    except ReviewError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
-    except ValueError as e:  # an id that is taken, a connection or index that does not validate, a secret literal
-        raise HTTPException(status_code=422, detail=str(e))
-    except Exception:
-        # The exception can carry the connection string, password included: log it, never return it.
-        logger.exception("Failed to add a datasource")
-        raise HTTPException(status_code=500,
-                            detail="Failed to add the datasource. The cause is in the server log.")
+        raise _problems(e) from None
+    except NL2SQLError:
+        raise  # a named refusal (a literal secret, a stale file, a bad connection) says its own status and fix
+    except ValueError as e:
+        # An id that is taken, or a connection or index that does not validate. The text can carry the connection
+        # string, password included, so it is logged and never returned.
+        logger.warning("A datasource was not added: %s", e)
+        raise RequestRefused(422, "INVALID_REQUEST", "The datasource could not be added.",
+                             fix="Use an id that is not taken and a connection the adapter accepts; "
+                                 "the reason is in the server log.") from None
 
 
 @router.get("/datasource", response_model=Dict[str, Any], summary="List datasources")
@@ -125,10 +129,7 @@ def list_datasources(
     """Every configured datasource as `{"datasources": [...]}`: its `id`, `type`, `description`,
     `status` (`ready`, `failed` with a `reason`, or `unchecked`), `capabilities` and `connection`,
     with every secret masked."""
-    try:
-        return {"datasources": service.list_datasources()}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"datasources": service.list_datasources()}
 
 
 @router.get("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Get a datasource")
@@ -139,14 +140,12 @@ def get_datasource(
     """One configured datasource, as the list shows it, or 404 when it is not configured."""
     try:
         return service.get_datasource(datasource_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise _not_found(datasource_id) from None
 
 
 @router.delete("/datasource/{datasource_id}", response_model=Dict[str, Any], summary="Remove a datasource",
-               dependencies=[Depends(auth.require_admin)], responses=auth.ADMIN_RESPONSES)
+               dependencies=[Depends(identity.admin)], responses=identity.ADMIN_RESPONSES)
 def remove_datasource(
     datasource_id: str,
     service: DatasourceSvc,
@@ -155,7 +154,5 @@ def remove_datasource(
     removed from the config file, and its index entries stay until the next full index. Admin only."""
     try:
         return service.remove_datasource(datasource_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise _not_found(datasource_id) from None

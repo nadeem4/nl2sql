@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,13 +9,6 @@ class QueryRequest(BaseModel):
     natural_language: str
     datasource_id: Optional[str] = None
     execute: bool = True
-    user_context: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description=(
-            "Ignored unless NL2SQL_API_TRUST_BODY_ROLE=true (local testing only); "
-            "the role otherwise comes from the API's auth settings."
-        ),
-    )
 
 
 class SubQueryResponse(SubQueryResult):

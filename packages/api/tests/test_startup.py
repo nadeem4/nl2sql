@@ -23,7 +23,7 @@ def _project(tmp_path, *, required):
         {"id": "shop", "type": "sqlite", "connection": {"database": "shop.db"}},
         {"id": "lost", "type": "sqlite", "connection": {"database": "no/such/folder/lost.db"},
          "required": required},
-    ], api={"role": "viewer"})
+    ], api={"auth": "static", "static_role": "viewer"})
     return tmp_path / "nl2sql.yaml"
 
 
@@ -46,7 +46,7 @@ def test_the_api_starts_degraded_from_its_config_and_loads_the_env_file(tmp_path
         with TestClient(app) as client:
             engine = app.state.engine
             assert engine.config.folder == tmp_path.absolute()
-            assert engine.config.api.role == "viewer"
+            assert engine.config.api.static_role == "viewer"
             assert client.get("/api/v1/health").status_code == 200
         assert engine.closed
         assert os.environ["NL2SQL_API_TEST_FROM_FILE"] == "file"

@@ -86,7 +86,7 @@ def test_optional_sections_default_when_absent(tmp_path):
     assert cfg.curated is None
     assert cfg.secrets.providers == []
     assert cfg.settings.pipeline.timeout_s == 60
-    assert cfg.api.role_header is None
+    assert cfg.api.auth == "none"
 
 
 def test_missing_required_section_is_named(tmp_path):
@@ -372,8 +372,8 @@ def test_unknown_agent_name_suggests_the_node_name(tmp_path):
 
 
 def test_api_section_rejects_unknown_keys(tmp_path):
-    error = load_error(write(tmp_path, "nl2sql.yaml", MINIMAL + "api: { role_headr: X-Role }\n"))
-    assert problems_of(error) == [("nl2sql.yaml", "api.role_headr", "Unknown key. Did you mean 'role_header'?")]
+    error = load_error(write(tmp_path, "nl2sql.yaml", MINIMAL + "api: { static_rol: analyst }\n"))
+    assert problems_of(error) == [("nl2sql.yaml", "api.static_rol", "Unknown key. Did you mean 'static_role'?")]
 
 
 # ---------------------------------------------------------------- the error report

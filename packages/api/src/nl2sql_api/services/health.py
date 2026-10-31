@@ -6,13 +6,6 @@ class HealthService:
     def __init__(self, engine: NL2SQL):
         self.engine = engine
 
-    def health_check(self) -> dict:
-        """Perform health check."""
-        return {
-            "success": True,
-            "message": "NL2SQL API is running"
-        }
-
     def readiness_check(self) -> dict:
         """Perform readiness check."""
         # Add actual readiness checks (database connections, etc.)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 class DatasourceTestRequest(BaseModel):
@@ -8,8 +8,6 @@ class DatasourceTestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     config: Dict[str, Any]
-    # Read by `auth.get_user_context` under the dev flag `api.trust_body_role`; the route itself ignores it.
-    user_context: Optional[Dict[str, Any]] = None
 
 
 class DatasourceRequest(DatasourceTestRequest):

@@ -14,6 +14,11 @@ from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 
 ROUTE = "/api/v1/settings/llm"
+PROXY = {"auth": "proxy"}
+
+
+def _as(role):
+    return {"X-Forwarded-User": "ann", "X-NL2SQL-Roles": role}
 NEW_LLM = {"provider": "openai", "model": "gpt-other", "api_key": "sk-test",
            "agents": {"ast_planner": {"model": "gpt-planner"}}}
 
@@ -27,7 +32,7 @@ def make_client(tmp_path):
                           llm={"provider": "openai", "model": "gpt-test", "api_key": "sk-test"}, **sections)
         engine = NL2SQL(cfg.model_copy(update={"embeddings": Embeddings(instance=DeterministicFakeEmbedding(size=8))}))
         app.dependency_overrides[get_engine] = lambda: engine
-        client = TestClient(app, client=(host, 50000))
+        client = TestClient(app, base_url="http://localhost", client=(host, 50000))
         made.append((client, engine))
         return client, engine
 
@@ -39,31 +44,31 @@ def make_client(tmp_path):
 
 
 def test_put_settings_llm_requires_admin(make_client):
-    client, engine = make_client(api={"role_header": "X-NL2SQL-Role"})
+    client, engine = make_client(api=PROXY)
 
     assert client.put(ROUTE, json=NEW_LLM).status_code == 401
-    assert client.put(ROUTE, json=NEW_LLM, headers={"X-NL2SQL-Role": "analyst"}).status_code == 403
+    assert client.put(ROUTE, json=NEW_LLM, headers=_as("analyst")).status_code == 403
     assert engine.config.llm.model == "gpt-test"
 
-    response = client.put(ROUTE, json=NEW_LLM, headers={"X-NL2SQL-Role": "admin"})
+    response = client.put(ROUTE, json=NEW_LLM, headers=_as("admin"))
     assert response.status_code == 200, response.text
     assert engine.config.llm.model == "gpt-other"
 
 
-def test_put_settings_llm_from_a_remote_client_without_a_role_source_is_refused(make_client):
-    client, engine = make_client(host="203.0.113.7")
+def test_put_settings_llm_from_a_foreign_host_under_auth_none_is_refused(make_client):
+    client, engine = make_client()
 
-    assert client.put(ROUTE, json=NEW_LLM).status_code == 403
+    assert client.put(ROUTE, json=NEW_LLM, headers={"Host": "example.com"}).status_code == 403
     assert engine.config.llm.model == "gpt-test"
 
 
 def test_put_settings_llm_returns_the_change_without_keys(make_client):
-    client, _ = make_client(api={"role_header": "X-NL2SQL-Role"})
+    client, _ = make_client(api=PROXY)
 
-    response = client.put(ROUTE, json=NEW_LLM, headers={"X-NL2SQL-Role": "admin"})
+    response = client.put(ROUTE, json=NEW_LLM, headers=_as("admin"))
 
     body = response.json()
-    assert body["by"] == {"user_id": None, "roles": ["admin"], "via": "api"}
+    assert body["by"] == {"user_id": "ann", "roles": ["admin"], "via": "api"}
     assert body["changes"]["default"] == {"old": "openai/gpt-test", "new": "openai/gpt-other"}
     assert body["changes"]["ast_planner"] == {"old": "openai/gpt-test", "new": "openai/gpt-planner"}
     assert "sk-test" not in response.text
@@ -75,7 +80,7 @@ def test_put_settings_llm_returns_422_with_the_config_error(make_client):
     response = client.put(ROUTE, json={"provider": "openai", "model": "gpt-other", "agents": {"ast_planer": {}}})
 
     assert response.status_code == 422, response.text
-    detail = response.json()["detail"]
+    detail = response.json()["error"]["message"]
     assert "llm.agents.ast_planer" in detail and "Did you mean 'ast_planner'?" in detail
     assert engine.config.llm.model == "gpt-test"
 

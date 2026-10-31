@@ -11,12 +11,19 @@ from dotenv import dotenv_values
 from fastapi.testclient import TestClient
 
 from nl2sql import NL2SQL
-from nl2sql.config import Api, default_llm, starter_config, write_project
+from nl2sql.config import Api, default_llm
+from nl2sql.config.models import ApiProxy, starter_config, write_project
 from nl2sql_api.dependencies import get_engine
 from nl2sql_api.main import app
 
 PASSWORD = "pw-literal-4242"
-ROLE = {"X-NL2SQL-Role": "admin"}
+ROLE = {"X-Forwarded-User": "ann", "X-NL2SQL-Roles": "admin"}
+PROXY = Api(auth="proxy", proxy=ApiProxy(trusted_from=["127.0.0.1/32", "203.0.113.7/32"]))
+
+
+def _problems(response):
+    """The 422's details as {dotted path: message}."""
+    return {".".join(problem["loc"]): problem["msg"] for problem in response.json()["error"]["details"]}
 
 
 @pytest.fixture
@@ -29,7 +36,7 @@ def connect(tmp_path):
         write_project(config, folder)
         engine = NL2SQL.from_config(folder / "nl2sql.yaml")
         app.dependency_overrides[get_engine] = lambda: engine
-        client = TestClient(app, client=(host, 50000))
+        client = TestClient(app, base_url="http://localhost", client=(host, 50000))
         made.append((client, engine))
         return client, engine, folder
 
@@ -115,7 +122,7 @@ def test_test_route_with_a_typo_is_a_422_naming_the_path(connect):
     response = client.post("/api/v1/datasource/test", json={"config": _sqlite(folder, sampel_questions=["x"])})
 
     assert response.status_code == 422
-    assert "config.sampel_questions" in [problem["path"] for problem in response.json()["detail"]]
+    assert "config.sampel_questions" in _problems(response)
 
 
 # ---------------------------------------------------------------- add
@@ -139,7 +146,7 @@ def test_add_without_a_config_is_a_422(connect):
     response = client.post("/api/v1/datasource", json={"save": True})
 
     assert response.status_code == 422
-    assert "config" in [problem["path"] for problem in response.json()["detail"]]
+    assert "config" in _problems(response)
 
 
 def test_add_with_an_unknown_body_key_is_a_422(connect):
@@ -148,7 +155,7 @@ def test_add_with_an_unknown_body_key_is_a_422(connect):
     response = client.post("/api/v1/datasource", json={"config": _sqlite(folder), "sav": True})
 
     assert response.status_code == 422
-    assert "sav" in [problem["path"] for problem in response.json()["detail"]]
+    assert "sav" in _problems(response)
 
 
 def test_add_with_a_taken_id_is_a_422(connect):
@@ -158,7 +165,8 @@ def test_add_with_a_taken_id_is_a_422(connect):
     response = client.post("/api/v1/datasource", json={"config": _sqlite(folder)})
 
     assert response.status_code == 422
-    assert "shop" in response.json()["detail"]
+    assert response.json()["error"]["code"] == "INVALID_REQUEST"
+    assert "shop.db" not in response.text, "the engine's own text is logged, not returned"
 
 
 def test_add_without_save_writes_no_file(connect):
@@ -190,16 +198,17 @@ def test_save_on_a_fresh_local_install_writes_env(connect):
 
 def test_save_refuses_a_literal_secret_off_loopback(connect):
     # a role source is configured, so this is not the fresh local install: a literal secret never reaches a file
-    client, engine, folder = connect(api=Api(role_header="X-NL2SQL-Role"))
+    client, engine, folder = connect(api=PROXY)
 
     for host in ("127.0.0.1", "203.0.113.7"):
-        client = TestClient(app, client=(host, 50000))
+        client = TestClient(app, base_url="http://localhost", client=(host, 50000))
         response = client.post("/api/v1/datasource", json={"config": _postgres(password=PASSWORD), "save": True},
                                headers=ROLE)
 
         assert response.status_code == 422, response.text
-        assert "password" in response.json()["detail"] and PASSWORD not in response.text
-        assert "${env:" in response.json()["detail"]
+        message = response.json()["error"]["message"] + response.json()["error"]["fix"]
+        assert "password" in message and PASSWORD not in response.text
+        assert "${env:" in message
     assert engine.datasources.list() == [], "a datasource that was not saved is not left registered"
     assert list((folder / "datasources").iterdir()) == []
     assert not (folder / ".env").exists()
@@ -207,7 +216,7 @@ def test_save_refuses_a_literal_secret_off_loopback(connect):
 
 def test_save_with_a_reference_works_off_loopback(connect, monkeypatch):
     monkeypatch.setenv("SALES_DB_PW", "from-the-environment")
-    client, engine, folder = connect(host="203.0.113.7", api=Api(role_header="X-NL2SQL-Role"))
+    client, engine, folder = connect(host="203.0.113.7", api=PROXY)
 
     response = client.post("/api/v1/datasource",
                            json={"config": _postgres(password="${env:SALES_DB_PW}"), "save": True}, headers=ROLE)
@@ -225,7 +234,7 @@ def test_save_over_a_file_changed_since_load_is_a_409(connect):
     response = client.post("/api/v1/datasource", json={"config": _sqlite(folder), "save": True})
 
     assert response.status_code == 409, response.text
-    assert "changed on disk" in response.json()["detail"]
+    assert "changed on disk" in response.json()["error"]["message"]
     assert engine.datasources.list() == []
     assert (folder / "datasources" / "shop.yaml").read_text(encoding="utf-8") == "type: sqlite\n"
 
@@ -238,9 +247,9 @@ def test_a_body_that_is_not_an_object_is_our_422_and_echoes_nothing(connect, pat
         response = client.post(path, content=content, headers={"Content-Type": "application/json"})
 
         assert response.status_code == 422, response.text
-        detail = response.json()["detail"]
-        assert [set(problem) for problem in detail] == [{"path", "message"}]
-        assert detail[0]["path"] == "" and "object" in detail[0]["message"]
+        details = response.json()["error"]["details"]
+        assert [set(problem) for problem in details] == [{"loc", "msg"}]
+        assert details[0]["loc"] == [""] and "object" in details[0]["msg"]
         assert "PWLEAK-77" not in response.text and "input" not in response.text
 
 
@@ -252,8 +261,8 @@ def test_a_body_that_is_not_json_is_our_422_and_echoes_nothing(connect, path):
                            headers={"Content-Type": "application/json"})
 
     assert response.status_code == 422, response.text
-    detail = response.json()["detail"]
-    assert [set(problem) for problem in detail] == [{"path", "message"}]
+    details = response.json()["error"]["details"]
+    assert [set(problem) for problem in details] == [{"loc", "msg"}]
     assert "PWLEAK-77" not in response.text and "input" not in response.text
 
 
@@ -263,21 +272,21 @@ def test_a_connection_that_does_not_validate_is_the_same_path_message_list(conne
     response = client.post("/api/v1/datasource", json={"config": _postgres(passwrd="PWLEAK-77", port="not-a-port")})
 
     assert response.status_code == 422, response.text
-    problems = {problem["path"]: problem["message"] for problem in response.json()["detail"]}
+    problems = _problems(response)
     assert {"config.connection.passwrd", "config.connection.port"} <= set(problems)
     assert "passwrd" in problems["config.connection.passwrd"] and "password" in problems["config.connection.passwrd"]
     assert "PWLEAK-77" not in response.text and "not-a-port" not in response.text
     assert engine.datasources.list() == []
 
 
-def test_a_forwarded_request_is_not_the_fresh_local_install(connect):
+def test_a_forwarded_request_is_not_the_local_operator(connect):
     client, engine, folder = connect()
 
     for header in ({"X-Forwarded-For": "203.0.113.7"}, {"Forwarded": "for=203.0.113.7"}, {"X-Real-IP": "203.0.113.7"}):
         response = client.post("/api/v1/datasource", json={"config": _postgres(password=PASSWORD), "save": True},
                                headers=header)
 
-        assert response.status_code == 422, (header, response.text)
+        assert response.status_code == 403, (header, response.text)
         assert PASSWORD not in response.text
     assert engine.datasources.list() == []
     assert not (folder / ".env").exists()
@@ -305,5 +314,5 @@ def test_save_of_a_taken_env_name_is_a_422(connect, monkeypatch):
     response = client.post("/api/v1/datasource", json={"config": second, "save": True})
 
     assert response.status_code == 422, response.text
-    assert "NL2SQL_MY_DB_PASSWORD" in response.json()["detail"] and PASSWORD not in response.text
+    assert "NL2SQL_MY_DB_PASSWORD" in response.json()["error"]["message"] and PASSWORD not in response.text
     assert [d.id for d in engine.datasources.list()] == ["my-db"]

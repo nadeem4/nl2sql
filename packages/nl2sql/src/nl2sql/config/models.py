@@ -736,18 +736,12 @@ class ApiProxy(_Model):
 
 
 class Api(_Model):
-    """``nl2sql-api``'s own settings. The engine validates them and never reads them.
-
-    ``role_header``, ``role`` and ``trust_body_role`` go when ``nl2sql-api``'s identity replaces ``auth.py`` (D0a-2).
-    """
+    """``nl2sql-api``'s own settings. The engine validates them and never reads them."""
 
     auth: Literal["api_keys", "proxy", "static", "none"] = "none"
     proxy: ApiProxy = Field(default_factory=ApiProxy)
     static_role: Optional[str] = None  # auth: static only
     request_llm: bool = False  # callers may send their own key and models (D210)
-    role_header: Optional[str] = None
-    role: Optional[str] = None
-    trust_body_role: bool = False
     cors_origins: List[str] = Field(default_factory=list)
 
 
