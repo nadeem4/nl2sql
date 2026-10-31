@@ -238,9 +238,9 @@ def test_the_build_pointer_records_the_knowledge_hash():
 
 
 def test_every_built_in_store_is_interface_4():
-    assert INTERFACE_VERSIONS["store"] == 4
+    assert INTERFACE_VERSIONS["store"] == 5
     for name in ("chroma", "sqlite", "files", "local"):
-        assert Registry.default().load("store", name).interface_version == 4
+        assert Registry.default().load("store", name).interface_version == 5
 
 
 # ---------------------------------------------------------------- the adapter's optional methods (SDK)

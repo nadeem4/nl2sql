@@ -17,7 +17,7 @@ from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 from nl2sql.api.query_api import QueryAPI, QueryResult
 from nl2sql.api.results_api import ResultsAPI
 from nl2sql.charts.spec import ChartSpec, ColumnKind
-from nl2sql.common.errors import ErrorCode
+from nl2sql.common.errors import ErrorCode, NL2SQLError
 from nl2sql.dashboards.filters import Active, plain, supply, values_plan
 from nl2sql.dashboards.models import Dashboard, DashboardFilter, DashboardRun, Tile, TileRun, TileStatus
 from nl2sql.dashboards.store import DashboardStore
@@ -36,8 +36,10 @@ KEEPS_LAST = ("needs_approval", "stopped", "error")
 SERVES = ("ok", "empty", "needs_approval")
 
 
-class DashboardBusy(ValueError):
+class DashboardBusy(NL2SQLError, ValueError):
     """The dashboard is being refreshed (or edited) by another caller or process."""
+
+    code, status = "CONFLICT", 409
 
 
 def lock_name(dashboard_id: str) -> str:

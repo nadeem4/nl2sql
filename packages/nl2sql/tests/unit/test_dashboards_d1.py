@@ -16,7 +16,7 @@ from nl2sql import NL2SQL, UserContext
 from nl2sql.api.dashboards_api import DashboardsAPI
 from nl2sql.api.workspaces_api import WorkspacesAPI
 from nl2sql.charts.spec import ChartData, ChartSpec, Encoding
-from nl2sql.common.errors import DashboardNotFound, ScheduleTooFrequent, WorkspaceNotEmpty, WorkspaceNotFound
+from nl2sql.common.errors import (ChartNotSupported, DashboardNotFound, ScheduleTooFrequent, WorkspaceNotEmpty, WorkspaceNotFound)
 from nl2sql.dashboards.models import (
     Arrange, ChartPlan, Dashboard, DashboardFilter, EDIT_KINDS, RemoveTile, RenameDashboard, RenameTile, SetFilters,
     Tile, TileArrangement, TileLayout, TileRun,
@@ -314,7 +314,7 @@ def test_set_tile_chart_the_data_cannot_draw_is_an_error(engine):
         "no result stored yet: nothing to check against"
     put_run(engine, "t1", chart=bar())
 
-    with pytest.raises(ValueError, match=r"cannot be drawn as 'line'; it can be drawn as: bar, table"):
+    with pytest.raises(ChartNotSupported, match=r"cannot be drawn as 'line'; it can be drawn as: bar, table"):
         engine.dashboards.set_tile_chart("d1", "t1", "line", user_context=ANA)
     assert engine.dashboards.get("d1", user_context=ANA).tiles[0].chart == "line", "refused: unchanged"
     assert engine.dashboards.set_tile_chart("d1", "t1", "table", user_context=ANA).tiles[0].chart == "table"
@@ -582,3 +582,36 @@ def test_a_null_max_age_keeps_drafts(make):
 
     assert "dashboards" not in engine.storage.purge()
     assert engine.dashboards.get("ancient", user_context=ANA)
+
+
+def test_dashboard_argument_errors_are_named_and_keep_valueerror(engine):
+    from nl2sql.common.errors import InvalidArgument, NL2SQLError, NotPinnable, UnknownFilter, UnknownTile
+
+    seed(engine, "saved", status="saved")
+    seed(engine, "empty", tiles=[])
+    seed(engine, "d1")
+    put_run(engine, "t1", chart=bar())
+    workspace(engine, "Sales")
+    cases = [
+        (lambda: engine.dashboards.pin("saved", user_context=ANA), NotPinnable, "NOT_PINNABLE"),
+        (lambda: engine.dashboards.pin("empty", user_context=ANA), NotPinnable, "NOT_PINNABLE"),
+        (lambda: engine.dashboards.list(user_context=ANA, status="nope"), InvalidArgument, "INVALID_ARGUMENT"),
+        (lambda: engine.dashboards.edit("saved", [RenameTile(tile_id="t1", title="  ")], user_context=ANA),
+         InvalidArgument, "INVALID_ARGUMENT"),
+        (lambda: engine.dashboards.edit("saved", [RemoveTile(tile_id="nope")], user_context=ANA),
+         UnknownTile, "UNKNOWN_TILE"),
+        (lambda: engine.dashboards.set_tile_chart("d1", "t1", "line", user_context=ANA),
+         ChartNotSupported, "CHART_NOT_SUPPORTED"),
+        (lambda: engine.dashboards.refresh("d1", tile_id="nope", user_context=ANA), UnknownTile, "UNKNOWN_TILE"),
+        (lambda: engine.dashboards.refresh("d1", filters={"nope": ["x"]}, user_context=ANA),
+         UnknownFilter, "UNKNOWN_FILTER"),
+        (lambda: engine.workspaces.create("  ", user_context=ANA), InvalidArgument, "INVALID_ARGUMENT"),
+        (lambda: engine.workspaces.create("Sales", user_context=ANA), InvalidArgument, "INVALID_ARGUMENT"),
+    ]
+    for case, cls, code in cases:
+        with pytest.raises(cls) as caught:
+            case()
+        assert isinstance(caught.value, (ValueError, InvalidArgument, NL2SQLError))
+        assert (caught.value.status, caught.value.code) == (422, code)
+    for cls in (NotPinnable, ChartNotSupported, UnknownTile, UnknownFilter):
+        assert issubclass(cls, InvalidArgument) and issubclass(cls, ValueError)

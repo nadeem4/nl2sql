@@ -103,6 +103,10 @@ AgentName = Literal[
 ]
 
 
+Mode = Literal["demo", "your_data", "hosted"]
+"""What a project is for: the bundled demo, the owner's own data, or a hosted public demo (D229)."""
+
+
 class _Model(BaseModel):
     """Strict, frozen, and a secret never prints.
 
@@ -553,6 +557,12 @@ class ReviewSettings(_Model):
     max_age_days: PositiveInt = 365  # decided proposals are purged after this
 
 
+class ApprovalSettings(_Model):
+    """Stored approval grants (read from Wave D's G3a; docs/architecture/wave_d.md, "Approvals over REST")."""
+
+    max_age_hours: PositiveInt = 24  # a request and its grant are purged this long after their last change
+
+
 class ChartSettings(_Model):
     """How a result becomes a chart (read from K1; docs/architecture/wave_c.md, section 5)."""
 
@@ -581,6 +591,7 @@ class Settings(_Model):
     profiler: ProfilerSettings = Field(default_factory=ProfilerSettings)
     review: ReviewSettings = Field(default_factory=ReviewSettings)
     charts: ChartSettings = Field(default_factory=ChartSettings)
+    approvals: ApprovalSettings = Field(default_factory=ApprovalSettings)
 
 
 # ---------------------------------------------------------------- observers, hooks, evals
@@ -715,9 +726,25 @@ class Mcp(_Model):
 
 # ---------------------------------------------------------------- api
 
-class Api(_Model):
-    """``nl2sql-api``'s own settings. The engine validates them and never reads them."""
+class ApiProxy(_Model):
+    """``api.proxy``: the headers a trusted proxy sets (``api.auth: proxy``)."""
 
+    trusted_from: List[str] = Field(default_factory=lambda: ["127.0.0.1/32", "::1/128"])  # CIDRs it connects from
+    user_header: str = "X-Forwarded-User"
+    tenant_header: Optional[str] = None  # None: settings.tenant_id
+    roles_header: str = "X-NL2SQL-Roles"
+
+
+class Api(_Model):
+    """``nl2sql-api``'s own settings. The engine validates them and never reads them.
+
+    ``role_header``, ``role`` and ``trust_body_role`` go when ``nl2sql-api``'s identity replaces ``auth.py`` (D0a-2).
+    """
+
+    auth: Literal["api_keys", "proxy", "static", "none"] = "none"
+    proxy: ApiProxy = Field(default_factory=ApiProxy)
+    static_role: Optional[str] = None  # auth: static only
+    request_llm: bool = False  # callers may send their own key and models (D210)
     role_header: Optional[str] = None
     role: Optional[str] = None
     trust_body_role: bool = False
@@ -750,6 +777,9 @@ class Config(_Model):
     chat_tools: Optional[List[str]] = None
     dashboards: Dashboards = Field(default_factory=Dashboards)
     mcp: Mcp = Field(default_factory=Mcp)
+    # What this project is for (D229): demo, your_data or hosted. NL2SQL_MODE and the launcher flags override it
+    # at the entry point (resolve_mode); the engine reads no environment.
+    mode: Mode = "your_data"
 
     # The folder of the nl2sql.yaml this config was loaded from, set by
     # load_config and kept by every copy; None when it was built in code.

@@ -65,6 +65,8 @@ charts:                       # read from release 0.9 (Wave C)
   max_points: 1000
   max_categories: 20
   max_series: 5
+approvals:                    # Wave D: accepted now, read when stored grants land (G3a)
+  max_age_hours: 24
 ```
 
 Unknown keys are errors, as everywhere in the config. The demo
@@ -228,6 +230,14 @@ Release 0.9 ([Wave C](../architecture/wave_c.md)). `engine.results.chart` reads 
 | `charts.max_points` | `1000` | The most rows charted. A longer result is read up to this and flagged `truncated`; a line chart becomes a table rather than drop points silently. |
 | `charts.max_categories` | `20` | The most categories a bar chart draws; more is a table. |
 | `charts.max_series` | `5` | The most lines in one line chart (measures, or values of a category split into lines). |
+
+## `approvals`
+
+Wave D ([design](../architecture/wave_d.md)). Accepted and validated now; stored approval grants read it.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `approvals.max_age_hours` | `24` | A stored approval request, and the grant on it, is purged this long after its last change. |
 
 ## `conversations` and `dashboards`
 

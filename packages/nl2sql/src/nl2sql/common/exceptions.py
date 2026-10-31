@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from nl2sql.common.errors import PipelineError
+from nl2sql.common.errors import NL2SQLError, PipelineError
 
-
-class NL2SQLError(Exception):
-    """Base exception for all NL2SQL errors."""
-    pass
+__all__ = ["NL2SQLError", "PipelineExecutionError"]
 
 
 class PipelineExecutionError(NL2SQLError):

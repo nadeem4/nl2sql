@@ -14,7 +14,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 from nl2sql.charts.choose import choose
 from nl2sql.charts.spec import ChartSpec, ColumnKind
-from nl2sql.common.errors import ScheduleTooFrequent, WorkspaceNotFound
+from nl2sql.common.errors import InvalidArgument, ScheduleTooFrequent, UnknownTile, WorkspaceNotFound
 from nl2sql.config.models import ChartSettings
 from nl2sql.conversations.models import Conversation
 from nl2sql.dashboards.models import (
@@ -63,7 +63,7 @@ def apply_edits(dashboard: Dashboard, edits: Sequence[DashboardEdit], env: EditE
 def _title(text: str, what: str) -> str:
     text = text.strip()
     if not text:
-        raise ValueError(f"A {what} title cannot be empty.")
+        raise InvalidArgument(f"A {what} title cannot be empty.")
     return text
 
 
@@ -71,7 +71,7 @@ def _tile(dashboard: Dashboard, tile_id: str) -> Tile:
     for tile in dashboard.tiles:
         if tile.id == tile_id:
             return tile
-    raise ValueError(f"No chart '{tile_id}' in this dashboard.")
+    raise UnknownTile(f"No chart '{tile_id}' in this dashboard.")
 
 
 def _with_tile(dashboard: Dashboard, tile_id: str, **changes) -> Dashboard:
@@ -123,7 +123,7 @@ def _arrange(d: Dashboard, e: Arrange, env: EditEnv, out: Applied) -> Dashboard:
     for item in e.layouts:
         _tile(d, item.tile_id)
         if item.tile_id in places:
-            raise ValueError(f"Chart '{item.tile_id}' is arranged more than once.")
+            raise InvalidArgument(f"Chart '{item.tile_id}' is arranged more than once.")
         places[item.tile_id] = TileLayout(x=item.x, y=item.y, w=item.w, h=item.h)
     tiles = [t.model_copy(update={"layout": places[t.id]}) if t.id in places else t for t in d.tiles]
     tiles.sort(key=lambda t: (t.layout.y, t.layout.x))  # layout order: the order charts run and read in
@@ -134,12 +134,12 @@ def _set_filters(d: Dashboard, e: SetFilters, env: EditEnv, out: Applied) -> Das
     seen: Set[str] = set()
     for f in e.filters:
         if f.id in seen:
-            raise ValueError(f"Filter id '{f.id}' is used twice.")
+            raise InvalidArgument(f"Filter id '{f.id}' is used twice.")
         seen.add(f.id)
         if len(f.column.split(".")) != 4 or not all(f.column.split(".")):
-            raise ValueError(f"Filter '{f.id}': the column must be 'datasource.schema.table.column', not '{f.column}'.")
+            raise InvalidArgument(f"Filter '{f.id}': the column must be 'datasource.schema.table.column', not '{f.column}'.")
         if f.op == "between" and f.kind not in ("number", "temporal"):
-            raise ValueError(f"Filter '{f.id}': a 'between' filter needs a number or temporal column, not {f.kind}.")
+            raise InvalidArgument(f"Filter '{f.id}': a 'between' filter needs a number or temporal column, not {f.kind}.")
     if e.filters != d.filters:  # a filter changes what every chart shows
         out.dropped.update(t.id for t in d.tiles)
     return d.model_copy(update={"filters": list(e.filters)})
@@ -172,14 +172,14 @@ def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, Chart
     else:
         turn = next((t for t in conversation.turns if t.index == ref.turn), None)
     if turn is None:
-        raise ValueError(f"There is no turn {ref.turn or 'yet'} in this conversation.")
+        raise InvalidArgument(f"There is no turn {ref.turn or 'yet'} in this conversation.")
     asks = [s for s in turn.steps if s.call.name == "ask" and s.result is not None]  # as the chart tool counts
     if ref.step > len(asks):
-        raise ValueError(f"Turn {ref.turn} has {len(asks)} answer(s) to build a chart from; there is no step {ref.step}.")
+        raise InvalidArgument(f"Turn {ref.turn} has {len(asks)} answer(s) to build a chart from; there is no step {ref.step}.")
     step = asks[ref.step - 1]
     result = step.result
     if step.status != "ok" or result is None:
-        raise ValueError(f"Step {ref.step} of turn {ref.turn} did not answer ({step.status}); a chart needs an answer.")
+        raise InvalidArgument(f"Step {ref.step} of turn {ref.turn} did not answer ({step.status}); a chart needs an answer.")
     if result.source.type == "verified":
         plan = ChartPlan(verified=VerifiedRef(id=result.source.id or "", params=dict(result.source.params or {})),
                          verified_datasource_id=result.source.datasource_id)
@@ -188,7 +188,7 @@ def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, Chart
         missing = [] if result.decomposition is None else [
             s.id for s in result.decomposition.sub_queries if s.id not in plans]
         if result.decomposition is None or missing:
-            raise ValueError(f"Step {ref.step} of turn {ref.turn} kept no plan to build a chart from.")
+            raise InvalidArgument(f"Step {ref.step} of turn {ref.turn} kept no plan to build a chart from.")
         plan = ChartPlan(decomposition=result.decomposition.model_dump(mode="json"),
                          plans={s.id: plans[s.id] for s in result.decomposition.sub_queries})
     return step.question or "", plan
@@ -196,7 +196,7 @@ def plan_from_step(conversation: Conversation, ref: StepRef) -> Tuple[str, Chart
 
 def _from_step(env: EditEnv, kind: str, ref: StepRef) -> Tuple[str, ChartPlan]:
     if env.step is None or env.check is None:
-        raise ValueError(f"The '{kind}' edit exists only in a conversation: it takes the plan from an answer the "
+        raise InvalidArgument(f"The '{kind}' edit exists only in a conversation: it takes the plan from an answer the "
                          "conversation holds (the dashboard_edit chat tool).")
     return env.step(ref)
 

@@ -94,7 +94,10 @@ class ErrorCode(str, Enum):
     UNKNOWN_CHAT_TOOL = "UNKNOWN_CHAT_TOOL"
     # A dashboard chart's stored plan no longer validates (the schema changed); fixing it is a chat turn.
     TILE_NEEDS_FIXING = "TILE_NEEDS_FIXING"
-
+    # Wave D (docs/architecture/wave_d.md). The replay provider has no recording for the question.
+    REPLAY_MISS = "REPLAY_MISS"
+    # A request id passed as an approval that is unknown, denied or not yet granted.
+    APPROVAL_NOT_GRANTED = "APPROVAL_NOT_GRANTED"
 
 
 FATAL_ERRORS = {
@@ -131,6 +134,9 @@ FATAL_ERRORS = {
     ErrorCode.MODEL_STEP_INVALID,
     ErrorCode.CONVERSATION_TOO_LONG,
     ErrorCode.TILE_NEEDS_FIXING,
+    # Wave D: no recording, or an approval nobody granted, is not helped by planning again.
+    ErrorCode.REPLAY_MISS,
+    ErrorCode.APPROVAL_NOT_GRANTED,
 }
 
 SAFE_ERROR_MESSAGES = {
@@ -218,52 +224,138 @@ class RunWarning(BaseModel):
                    detail={"recovered": True} if recovered else {})
 
 
-# ---------------------------------------------------------------- Wave C facade exceptions
-# (docs/architecture/wave_c.md, section 11). On nl2sql-api a LookupError is a 404 and a ValueError a 422.
+# ---------------------------------------------------------------- the facade's exceptions
+# docs/architecture/wave_d.md, "One base class (D202)". Each named exception derives from NL2SQLError and keeps the
+# built-in it always had, so ``except LookupError`` still works. ``status`` is the HTTP status it means.
 
 
-class ConversationNotFound(LookupError):
+class NL2SQLError(Exception):
+    """The base of every named exception the engine raises on purpose.
+
+    ``code`` is a stable machine-readable name, ``message`` what went wrong, ``fix`` what to do about it
+    (or None) and ``status`` the HTTP status it means (404, 409, 422 or 403; 500 for the base). A subclass sets
+    ``code`` and ``status`` as class attributes; an instance may override any of the three. ``str()`` is the
+    message.
+    """
+
+    code: str = "INTERNAL"
+    status: int = 500
+
+    def __init__(self, message: str = "", *, fix: Optional[str] = None, code: Optional[str] = None,
+                 status: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.fix = fix
+        if code is not None:
+            self.code = code
+        if status is not None:
+            self.status = status
+
+
+class ConversationNotFound(NL2SQLError, LookupError):
     """No such conversation, or it is not the caller's: the two are the same (D105)."""
 
+    code, status = "NOT_FOUND", 404
 
-class ConversationBusy(LookupError):
+
+class ConversationBusy(NL2SQLError, LookupError):
     """The conversation is already running a turn (its state-store lock is held)."""
 
+    code, status = "CONFLICT", 409
 
-class DashboardNotFound(LookupError):
+
+class DashboardNotFound(NL2SQLError, LookupError):
     """No such dashboard, or it is not the caller's."""
 
+    code, status = "NOT_FOUND", 404
 
-class WorkspaceNotFound(LookupError):
+
+class WorkspaceNotFound(NL2SQLError, LookupError):
     """No such workspace, or it is not the caller's."""
 
+    code, status = "NOT_FOUND", 404
 
-class NotIndexed(ValueError):
+
+class ApprovalNotFound(NL2SQLError, LookupError):
+    """No such approval request, or one the caller may not see."""
+
+    code, status = "NOT_FOUND", 404
+
+
+class NotAuthorized(NL2SQLError, PermissionError):
+    """The caller holds no role that may do this (an approver, an admin)."""
+
+    code, status = "NOT_AUTHORIZED", 403
+
+
+class InvalidArgument(NL2SQLError, ValueError):
+    """An argument of a facade call is wrong (an empty name, a duplicate, a bad status); the message says which."""
+
+    code, status = "INVALID_ARGUMENT", 422
+
+
+class NotPinnable(InvalidArgument):
+    """``pin`` of a dashboard that is already saved, or of an empty draft."""
+
+    code = "NOT_PINNABLE"
+
+
+class ChartNotSupported(InvalidArgument):
+    """``set_tile_chart`` to a kind the tile's result cannot be drawn as; the message names the kinds it can."""
+
+    code = "CHART_NOT_SUPPORTED"
+
+
+class UnknownTile(InvalidArgument):
+    """A chart id the dashboard does not have."""
+
+    code = "UNKNOWN_TILE"
+
+
+class UnknownFilter(InvalidArgument):
+    """A filter id the dashboard does not have."""
+
+    code = "UNKNOWN_FILTER"
+
+
+class NotIndexed(NL2SQLError, ValueError):
     """A datasource has no live index build; the message names the command that builds it."""
 
+    code, status = "NOT_INDEXED", 422
 
-class NoTiles(ValueError):
+
+class NoTiles(NL2SQLError, ValueError):
     """The starter dashboard has nothing to chart; the message names what is missing."""
 
+    code, status = "NO_TILES", 422
 
-class WorkspaceNotEmpty(ValueError):
+
+class WorkspaceNotEmpty(NL2SQLError, ValueError):
     """A workspace that still holds dashboards cannot be deleted."""
 
+    code, status = "WORKSPACE_NOT_EMPTY", 422
 
-class ScheduleTooFrequent(ValueError):
+
+class ScheduleTooFrequent(NL2SQLError, ValueError):
     """A schedule below dashboards.min_refresh_minutes."""
 
+    code, status = "SCHEDULE_TOO_FREQUENT", 422
 
-class SecretValueInConfig(ValueError):
+
+class SecretValueInConfig(NL2SQLError, ValueError):
     """A secret value would be written into YAML; secrets are written as references (D122)."""
 
+    code, status = "SECRET_VALUE_IN_CONFIG", 422
 
-class ConnectionInvalid(ValueError):
+
+class ConnectionInvalid(NL2SQLError, ValueError):
     """A datasource's ``connection`` does not validate against its adapter's connection model.
 
     ``str()`` is one line per problem; ``problems`` lists each as ``{"path", "message"}`` (``connection.port``),
     never a value, for a caller that shows them per field.
     """
+
+    code, status = "CONNECTION_INVALID", 422
 
     def __init__(self, problems: "list[dict[str, str]]"):
         self.problems = problems

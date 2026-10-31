@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from nl2sql.common.errors import NL2SQLError
 from nl2sql_sdk.stores import Proposal
 
 
@@ -38,11 +39,13 @@ class ReviewErrorCode(str, Enum):
     NOT_FOUND = "NOT_FOUND"  # no such proposal, or one the caller's scope cannot see
 
 
-class ReviewError(Exception):
-    """The review queue refused: ``code`` says why and ``fix`` what to do."""
+_REVIEW_STATUS = {ReviewErrorCode.NOT_FOUND: 404, ReviewErrorCode.FILE_CHANGED: 409,
+                  ReviewErrorCode.NOT_AUTHORIZED: 403, ReviewErrorCode.NOT_WRITABLE: 403}
+
+
+class ReviewError(NL2SQLError):
+    """The review queue refused: ``code`` says why and ``fix`` what to do. ``status`` is the HTTP status it means."""
 
     def __init__(self, code: ReviewErrorCode, message: str, *, fix: Optional[str] = None):
-        self.code = code
-        self.message = message
-        self.fix = fix
-        super().__init__(f"{message} {fix}" if fix else message)
+        super().__init__(message, fix=fix, code=code, status=_REVIEW_STATUS[code])
+        self.args = (f"{message} {fix}" if fix else message,)

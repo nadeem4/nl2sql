@@ -15,6 +15,7 @@ from decimal import Decimal
 from functools import reduce
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
+from nl2sql.common.errors import InvalidArgument, UnknownFilter
 from nl2sql.dashboards.models import ChartPlan, DashboardFilter
 from nl2sql.pipeline.nodes.ast_planner.schemas import Expr, OrderItem, PlanModel, SelectItem, TableRef
 from nl2sql.pipeline.nodes.decomposer.schemas import DecomposerResponse, SubQuery
@@ -49,12 +50,12 @@ class Active:
 
 
 def find(filters: Sequence[DashboardFilter], filter_id: str) -> DashboardFilter:
-    """The dashboard's filter ``filter_id``; a ``ValueError`` naming the ids it has when there is none."""
+    """The dashboard's filter ``filter_id``; an ``UnknownFilter`` naming the ids it has when there is none."""
     for f in filters:
         if f.id == filter_id:
             return f
     ids = ", ".join(f"'{f.id}'" for f in filters) or "none"
-    raise ValueError(f"No filter '{filter_id}' in this dashboard; its filters: {ids}.")
+    raise UnknownFilter(f"No filter '{filter_id}' in this dashboard; its filters: {ids}.")
 
 
 def activate(filters: Sequence[DashboardFilter], given: Optional[Mapping[str, Any]]) -> List[Active]:
@@ -74,14 +75,14 @@ def activate(filters: Sequence[DashboardFilter], given: Optional[Mapping[str, An
 def _checked(f: DashboardFilter, values: Any) -> List[Any]:
     name = f"Filter '{f.id}' ({f.label})"
     if not isinstance(values, (list, tuple)):
-        raise ValueError(f"{name} takes a list of values.")
+        raise InvalidArgument(f"{name} takes a list of values.")
     if f.op == "between" and len(values) != 2:
-        raise ValueError(f"{name} takes exactly two values, the first and the last of the range.")
+        raise InvalidArgument(f"{name} takes exactly two values, the first and the last of the range.")
     if f.op == "in" and not 1 <= len(values) <= MAX_IN_VALUES:
-        raise ValueError(f"{name} takes 1 to {MAX_IN_VALUES} values, not {len(values)}.")
+        raise InvalidArgument(f"{name} takes 1 to {MAX_IN_VALUES} values, not {len(values)}.")
     for value in values:
         if not _fits(f.kind, value):
-            raise ValueError(f"{name} takes {_EXPECTED[f.kind]} values, not {value!r}.")
+            raise InvalidArgument(f"{name} takes {_EXPECTED[f.kind]} values, not {value!r}.")
     return list(values)
 
 

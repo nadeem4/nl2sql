@@ -145,7 +145,7 @@ def test_migration_6_adopts_a_0_8_state_file(tmp_path):
         connection.execute("INSERT INTO plan_cache VALUES ('q', 'ds', 'v1', '{}', 0);")
 
     state = SqliteState(path)
-    assert state.migrate() == ["0006_conversations_dashboards_and_keys"]
+    assert state.migrate() == ["0006_conversations_dashboards_and_keys", "0007_approvals"]
     assert state.migrate() == []
     assert state.get_plan("q", "ds", "v1") == "{}", "0.8's rows are kept"
     state.put_conversation(_conversation("c1"))
@@ -156,17 +156,17 @@ def test_migration_6_adopts_a_0_8_state_file(tmp_path):
     assert {"conversations", "workspaces", "dashboards", "tile_runs", "api_keys"} <= tables
 
 
-def test_a_fresh_file_applies_all_six_migrations(tmp_path):
+def test_a_fresh_file_applies_all_seven_migrations(tmp_path):
     state = SqliteState(tmp_path / "state.db")
-    assert len(state.migrate()) == 6 == len(MIGRATIONS)
+    assert len(state.migrate()) == 7 == len(MIGRATIONS)
     state.close()
 
 
 def test_store_version_3_is_rejected():
-    assert INTERFACE_VERSIONS["store"] == 4
+    assert INTERFACE_VERSIONS["store"] == 5
     registry = Registry.empty()
     registry.add_store("old", type("Store", (), {"interface_version": 3}))
-    with pytest.raises(RegistryError, match="store interface 3; this engine needs 4"):
+    with pytest.raises(RegistryError, match="store interface 3; this engine needs 5"):
         registry.load("store", "old")
     for name in ("chroma", "sqlite", "files", "local"):
-        assert Registry.default().load("store", name).interface_version == 4, name
+        assert Registry.default().load("store", name).interface_version == 5, name

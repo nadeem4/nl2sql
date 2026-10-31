@@ -36,7 +36,7 @@ file at `<storage.path>/state.db`; any store implementing
 `nl2sql_sdk.stores.StateStore` can take its place. The same store holds the
 plan cache, the playground's answer ratings, the review queue, conversations,
 workspaces, dashboards with their last chart results, API keys and the index
-build lock. The interface is version 4.
+build lock. The interface is version 5.
 
 ### Snapshots are immutable
 
@@ -103,7 +103,7 @@ table, and the engine applies the pending ones when it starts
 came later; migration 3 adds the immutability trigger and the `locks` table;
 migration 4 adds the `schema_diffs` table; migration 5 adds the `proposals`
 table, the review queue (release 0.8, [Wave B](../architecture/wave_b.md#5-the-review-queue));
-migration 6 adds Wave C's five tables, below. A 0.8 `state.db` is migrated in
+migration 6 adds Wave C's five tables, below; migration 7 adds the `approvals` table (Wave D), below. A 0.8 `state.db` is migrated in
 place and keeps its rows.
 
 ### Conversations, dashboards and API keys
@@ -126,6 +126,16 @@ Stored chart results hold rows, so they sit in the owner's private state store
 and open only after the access check.
 
 Each document's timestamps are ISO 8601; a stamp with no zone is read as UTC.
+
+### Approvals
+
+Wave D ([D215](../architecture/wave_d.md)). `StateStore` version 5 adds the approval methods, one JSON document per
+approval request, in the `approvals` table that migration 7 creates (`CREATE TABLE IF NOT EXISTS`, so it is safe to
+run again).
+
+| Table (migration 7) | Methods | Filtered on | Notes |
+| --- | --- | --- | --- |
+| `approvals` | `put_approval(doc)`, `get_approval(request_id)`, `list_approvals(status=None)`, `decide_approval(request_id, status, *, by, at=None)`, `purge_approvals(older_than)` | `id` (the request id), `status` (`pending`, `granted`, `denied`), `created_at`, `updated_at` | `list_approvals` is newest (`created_at`) first. `decide_approval` changes only a `pending` request, under the store lock, so a late deny never overwrites a grant; it returns the stored document, or `None` for an unknown id. `purge_approvals` deletes by `updated_at` whatever the status. |
 
 ### The lock
 
