@@ -2462,8 +2462,8 @@ before its PR starts.
 The owner's note that Wave C ships "the REST API" is read as the Connect
 routes and the schedule runner in `nl2sql-api`; the conversation and
 dashboard REST routes stay in Wave D (D121), as the first draft had them.
-[`wave_d.md`](wave_d.md) designs those routes and needs a pass to match this
-page (see its note).
+[`wave_d.md`](wave_d.md) designs those routes and follows this page as revised
+(see its note).
 
 ## 17. C-W4: table recall on large schemas
 
