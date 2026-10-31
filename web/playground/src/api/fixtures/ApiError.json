@@ -1,9 +1,0 @@
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "details": [],
-    "fix": null,
-    "message": "No such job.",
-    "request_id": null
-  }
-}
