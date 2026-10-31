@@ -3255,6 +3255,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#approvals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approvals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-lock" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5988,6 +5999,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#approvals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approvals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-lock" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6088,7 +6110,7 @@ file at <code>&lt;storage.path&gt;/state.db</code>; any store implementing
 <code>nl2sql_sdk.stores.StateStore</code> can take its place. The same store holds the
 plan cache, the playground's answer ratings, the review queue, conversations,
 workspaces, dashboards with their last chart results, API keys and the index
-build lock. The interface is version 4.</p>
+build lock. The interface is version 5.</p>
 <h3 id="snapshots-are-immutable">Snapshots are immutable</h3>
 <p><code>put_snapshot(snapshot)</code> stores a snapshot as a new row and returns its
 <code>schema_version</code>, <code>YYYYMMDDhhmmss_&lt;hash8&gt;</code> (the time it was stored, and a hash
@@ -6144,7 +6166,7 @@ table, and the engine applies the pending ones when it starts
 came later; migration 3 adds the immutability trigger and the <code>locks</code> table;
 migration 4 adds the <code>schema_diffs</code> table; migration 5 adds the <code>proposals</code>
 table, the review queue (release 0.8, <a href="../../architecture/wave_b/#5-the-review-queue">Wave B</a>);
-migration 6 adds Wave C's five tables, below. A 0.8 <code>state.db</code> is migrated in
+migration 6 adds Wave C's five tables, below; migration 7 adds the <code>approvals</code> table (Wave D), below. A 0.8 <code>state.db</code> is migrated in
 place and keeps its rows.</p>
 <h3 id="conversations-dashboards-and-api-keys">Conversations, dashboards and API keys</h3>
 <p>Release 0.9 (<a href="../../architecture/wave_c/#10-the-registry-and-the-state-store-after-wave-c">Wave C</a>).
@@ -6197,6 +6219,28 @@ them arrived in C1 and D1 to D4.</p>
 <p>Stored chart results hold rows, so they sit in the owner's private state store
 and open only after the access check.</p>
 <p>Each document's timestamps are ISO 8601; a stamp with no zone is read as UTC.</p>
+<h3 id="approvals">Approvals</h3>
+<p>Wave D (<a href="../../architecture/wave_d/">D215</a>). <code>StateStore</code> version 5 adds the approval methods, one JSON document per
+approval request, in the <code>approvals</code> table that migration 7 creates (<code>CREATE TABLE IF NOT EXISTS</code>, so it is safe to
+run again).</p>
+<table>
+<thead>
+<tr>
+<th>Table (migration 7)</th>
+<th>Methods</th>
+<th>Filtered on</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>approvals</code></td>
+<td><code>put_approval(doc)</code>, <code>get_approval(request_id)</code>, <code>list_approvals(status=None)</code>, <code>decide_approval(request_id, status, *, by, at=None)</code>, <code>purge_approvals(older_than)</code></td>
+<td><code>id</code> (the request id), <code>status</code> (<code>pending</code>, <code>granted</code>, <code>denied</code>), <code>created_at</code>, <code>updated_at</code></td>
+<td><code>list_approvals</code> is newest (<code>created_at</code>) first. <code>decide_approval</code> changes only a <code>pending</code> request, under the store lock, so a late deny never overwrites a grant; it returns the stored document, or <code>None</code> for an unknown id. <code>purge_approvals</code> deletes by <code>updated_at</code> whatever the status.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="the-lock">The lock</h3>
 <p><code>lock(name, ttl_s)</code> is a lease held for a <code>with</code> block: in the <code>sqlite</code> store,
 a <code>locks</code> row taken in a <code>BEGIN IMMEDIATE</code> transaction, with an expiry. Every

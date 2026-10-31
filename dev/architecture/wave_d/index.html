@@ -955,6 +955,15 @@
 <nav aria-label="14. PR plan" class="md-nav">
 <ul class="md-nav__list">
 <li class="md-nav__item">
+<a class="md-nav__link" href="#built-notes">
+<span class="md-ellipsis">
+      
+        Built notes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="#session-batches">
 <span class="md-ellipsis">
       
@@ -3460,6 +3469,15 @@
 </a>
 <nav aria-label="14. PR plan" class="md-nav">
 <ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#built-notes">
+<span class="md-ellipsis">
+      
+        Built notes
+      
+    </span>
+</a>
+</li>
 <li class="md-nav__item">
 <a class="md-nav__link" href="#session-batches">
 <span class="md-ellipsis">
@@ -6554,6 +6572,29 @@ in exactly one part.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="built-notes">Built notes</h3>
+<p><strong>D0a-1 (engine shapes and the <code>mode:</code> key).</strong> <code>NL2SQLError</code> (<code>code</code>, <code>message</code>, <code>fix</code>, <code>status</code>) now lives in
+<code>common/errors.py</code>; <code>common/exceptions.py</code> re-exports it, so there is one class. The named exceptions derive from
+it and keep their built-in parent. New: <code>NotAuthorized</code> (403, also a <code>PermissionError</code>), <code>ApprovalNotFound</code> (404)
+and <code>InvalidArgument</code> (422, a <code>ValueError</code>), which replaces the plain <code>ValueError</code> the dashboard and workspace
+methods raised for a wrong argument (<code>dashboards/api.py</code>, <code>edits.py</code>, <code>filters.py</code>, <code>workspaces.py</code>; pydantic
+validators in <code>dashboards/models.py</code> stay <code>ValueError</code>). <code>ReviewError</code> maps its code to a status. <code>ErrorCode.REPLAY_MISS</code> and
+<code>APPROVAL_NOT_GRANTED</code> are fatal. <code>Api</code> gained <code>auth</code>, <code>proxy</code> (<code>ApiProxy</code>), <code>static_role</code> and <code>request_llm</code>;
+the old three fields stay until D0a-2. <code>settings.approvals.max_age_hours</code> (24). <code>LLMOverride(keys, models)</code> is a
+frozen dataclass in <code>nl2sql/llm/override.py</code> (<code>keys</code> is left out of <code>repr</code>). The state store gained
+<code>put_approval(doc)</code>, <code>get_approval(request_id)</code>, <code>list_approvals(status=None)</code>, <code>decide_approval</code> and <code>purge_approvals(older_than)</code>
+over plain JSON documents (<code>id</code> is the request id; <code>status</code> is <code>pending</code>, <code>granted</code> or <code>denied</code>; <code>created_at</code>
+and <code>updated_at</code>), migration <code>0007_approvals</code>; <code>decide_approval(request_id, status, *, by, at=None)</code> (atomic: it
+changes only a <code>pending</code> request and returns an already decided one unchanged), and the store <code>interface_version</code> is
+raised to 5 (registry and the four built-in stores), so a version 4 third-party store is refused at load. <code>mode:</code> is <code>Config.mode</code>; <code>nl2sql.config.mode.resolve_mode(flag, env, file)</code>
+is pure and raises <code>ValueError</code> for an unknown value. Exported from <code>nl2sql</code>: <code>NL2SQLError</code>, <code>NotAuthorized</code>,
+<code>InvalidArgument</code> and its four subclasses <code>NotPinnable</code>, <code>ChartNotSupported</code>, <code>UnknownTile</code> and <code>UnknownFilter</code>
+(each its own <code>code</code>, still 422 and a <code>ValueError</code>; <code>set_tile_chart</code> to a kind the result cannot draw now raises
+<code>ChartNotSupported</code>), <code>ApprovalNotFound</code>, <code>DashboardBusy</code>, <code>MissingProviderKey</code>, <code>LLMOverride</code>, <code>resolve_mode</code>.
+Facade argument checks outside the dashboard and workspace methods still raise bare builtins
+(<code>conversations/api.py</code>, <code>api/api_keys_api.py</code>'s <code>PermissionError</code>, <code>api/datasource_api.py</code>, <code>api/knowledge_api.py</code>):
+each A-row converts the ones raised by the facade methods it routes into named <code>NL2SQLError</code>s (for example
+<code>PermissionError</code> becomes <code>NotAuthorized</code>), so D0a-2's <code>test_no_route_returns_exception_text</code> finds none left.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at

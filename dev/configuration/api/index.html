@@ -5835,6 +5835,52 @@ settings. It is optional. The engine validates it like every other section
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">trust_body_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">          </span><span class="c1"># accept "role" in the request body (dev only)</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">cors_origins</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">https</span><span class="p p-Indicator">:</span><span class="nv">//app.example.com</span><span class="p p-Indicator">]</span>
 </code></pre></div>
+<p>Wave D adds the fields below. The engine validates them now; <code>nl2sql-api</code> starts reading them when its identity replaces <code>auth.py</code> (D0a-2), which also deletes <code>role_header</code>, <code>role</code> and <code>trust_body_role</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">none</span><span class="w">                      </span><span class="c1"># api_keys | proxy | static | none (default none)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">proxy</span><span class="p">:</span><span class="w">                          </span><span class="c1"># auth: proxy only</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">trusted_from</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">127.0.0.1/32</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"::1/128"</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">user_header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">X-Forwarded-User</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">tenant_header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">           </span><span class="c1"># null: settings.tenant_id</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">roles_header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">X-NL2SQL-Roles</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nt">static_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">               </span><span class="c1"># auth: static only</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nt">request_llm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">              </span><span class="c1"># callers may send their own key and models</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auth</code></td>
+<td><code>none</code></td>
+<td>How a caller is identified: <code>api_keys</code>, <code>proxy</code>, <code>static</code> or <code>none</code>.</td>
+</tr>
+<tr>
+<td><code>proxy.trusted_from</code></td>
+<td>loopback</td>
+<td>CIDRs the proxy connects from; its headers are honoured only from these.</td>
+</tr>
+<tr>
+<td><code>proxy.user_header</code>, <code>proxy.tenant_header</code>, <code>proxy.roles_header</code></td>
+<td><code>X-Forwarded-User</code>, none, <code>X-NL2SQL-Roles</code></td>
+<td>The headers the proxy sets.</td>
+</tr>
+<tr>
+<td><code>static_role</code></td>
+<td>none</td>
+<td>The one role of every request under <code>auth: static</code>.</td>
+</tr>
+<tr>
+<td><code>request_llm</code></td>
+<td><code>false</code></td>
+<td>Whether callers may send their own provider key and models per request.</td>
+</tr>
+</tbody>
+</table>
 <table>
 <thead>
 <tr>
@@ -5885,7 +5931,7 @@ already set. It calls <code>engine.check()</code> before it accepts requests: a
 <code>required</code> datasource that fails, or datasources configured and none ready,
 stops it with <code>EngineNotReady</code>; an optional one that fails leaves it serving
 the others. See <a href="../system/#startup-check-and-required">Startup</a>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>/etc/nl2sql/nl2sql.yaml<span class="w"> </span>uvicorn<span class="w"> </span>nl2sql_api.main:app
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>/etc/nl2sql/nl2sql.yaml<span class="w"> </span>uvicorn<span class="w"> </span>nl2sql_api.main:app
 </code></pre></div>
 <p>The <code>NL2SQL_API_*</code> variables of 0.4 are not read; see
 <a href="../system/#from-04">From 0.4</a>.</p>
