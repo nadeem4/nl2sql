@@ -46,18 +46,21 @@ _MAX_HINTED_COLUMNS = 15
 REFUSAL_MESSAGE = "You do not have permission to see the data this question requires."
 
 
+def _walk(node: Optional[Expr]):
+    """An expression and every expression nested in it."""
+    if not node:
+        return
+    yield node
+    for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
+        yield from _walk(child)
+    for when in node.whens:
+        yield from _walk(when.condition)
+        yield from _walk(when.result)
+
+
 def _plan_exprs(plan: PlanModel):
     """Every expression node in the plan, nested ones included."""
-    def walk(node: Optional[Expr]):
-        if not node:
-            return
-        yield node
-        for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
-            yield from walk(child)
-        for when in node.whens:
-            yield from walk(when.condition)
-            yield from walk(when.result)
-
+    walk = _walk
     roots = [s.expr for s in plan.select_items] + [g.expr for g in plan.group_by]
     roots += [o.expr for o in plan.order_by] + [j.condition for j in plan.joins]
     roots += [plan.where, plan.having]
@@ -649,6 +652,44 @@ class LogicalValidatorNode:
         return None
 
     @staticmethod
+    def _label_without_key(state: SubgraphExecutionState, plan: PlanModel) -> Optional[PipelineError]:
+        """Rejects a group-by label built from several columns of one table, without that table's key.
+
+        ``first_name || last_name`` alone puts two people who share a name in one
+        group. Grouping by one column, or by a date part, is not a label of this
+        kind; a table with no known primary key is not judged.
+        """
+        plain = {(g.expr.alias, (g.expr.column_name or "").lower())
+                 for g in plan.group_by if g.expr.kind == "column"}
+        for g in plan.group_by:
+            if g.expr.kind == "column":
+                continue
+            by_alias: Dict[str, Set[str]] = {}
+            for node in _walk(g.expr):
+                if node.kind == "column":
+                    by_alias.setdefault(node.alias or "", set()).add((node.column_name or "").lower())
+            for alias, columns in by_alias.items():
+                if len(columns) < 2:
+                    continue
+                ref = next((t for t in plan.tables if t.alias == alias), None)
+                table = next((t for t in state.relevant_tables
+                              if ref and (t.name or "").lower().split(".")[-1] == (ref.name or "").lower()), None)
+                key = [k for k in (table.primary_key if table else None) or []]
+                missing = [k for k in key if (alias, k.lower()) not in plain]
+                if missing:
+                    return PipelineError(
+                        node="logical_validator",
+                        message=(
+                            f"GROUP BY a label built from several columns of '{ref.name}' would merge different "
+                            f"rows that share that label. Also group by its key ({', '.join(missing)}), "
+                            "keeping the label in the select list."
+                        ),
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                    )
+        return None
+
+    @staticmethod
     def _unsupported_functions(plan: PlanModel) -> List[PipelineError]:
         """Rejects every function name outside the plan language's list.
 
@@ -807,6 +848,10 @@ class LogicalValidatorNode:
         subtraction_err = self._date_subtraction(state, plan)
         if subtraction_err:
             errors.append(subtraction_err)
+
+        label_err = self._label_without_key(state, plan)
+        if label_err:
+            errors.append(label_err)
 
         if state.sub_query and state.sub_query.expected_schema:
             expected_names = [c.name for c in state.sub_query.expected_schema if c.name]

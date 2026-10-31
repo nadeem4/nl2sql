@@ -2868,3 +2868,33 @@ message, written to the cache once per question set and read at the cached rate 
 sort, both directions, multi-column, bare names, the prompt's block position, `none`, byte stability, shared helper).
 Docs: `docs/architecture/nodes/ast_planner_node.md`. Not yet measured: the keyed Pagila rerun (retries for undeclared joins
 should fall to about 0), which needs the owner's yes for the model spend.
+
+### 18.14 C-W8: grouping keys, exact figures, rank ordinals
+
+**Problem.** In the keyed Pagila run of 18.13 (main at c34db812, 8 of 11), three failures were answer accuracy, not retrieval.
+(a) pagila_003: the plan grouped by a computed label (`first_name || ' ' || last_name`) without the actor's key, so two actors
+with the same name became one group; the gold groups by `actor_id`. (b) pagila_007: the answer prose said the figure "stays
+close to 10,000 to 11,400", bounds no row holds; the faithfulness check failed it correctly. (c) pagila_011: the prose said
+"places 2 through 5"; the check read the rank 2 as an unsupported figure (a false positive).
+
+**Design (owner-approved 2026-10-30, one PR).**
+
+- **Validator rule (validation before generation).** `_label_without_key` in `validator/node.py` rejects a group-by item that
+  is not a plain column (a concatenation, a function, a case) when it references two or more distinct columns of one table
+  alias and some primary-key column of that table is not also grouped as a plain column of the same alias. The error is
+  `INVALID_PLAN_STRUCTURE`, so the planner retries; it names the missing key and says to also group by it while keeping the
+  label in the select list. Grouping by one column, by a date part of one column, or by a label together with its table's key
+  stays allowed; a table with no known primary key (`Table.primary_key` empty) is not judged. No planner prompt change: the
+  message is enough for the retry to converge.
+- **Answer prompt.** Instruction 2 of the answer synthesizer now says to cite only figures that appear in the rows, and never
+  a rounded, approximate or invented range or bound; to describe a spread, name the actual lowest and highest values or use
+  words without numbers. The example is off the eval domains (`test_prompts_not_eval_questions.py` holds).
+- **Faithfulness check.** `check_answer` blanks rank and position numbers before reading figures: `place(s)/rank(s)/position(s)/spot(s) N`
+  with an optional `through`, `to`, `and` or dash range, `top N`, and `N of M` when N is not more than M. Nothing else is
+  loosened: a figure written beside a rank (`places 2 with 580 tracks`) and an `N of M` with N above M still fail.
+
+**Built.** Tests: `tests/unit/test_validator_group_by_label.py` (rejects the label without the key, accepts it with the key,
+a single column, a date part, and a table with no known key), `tests/unit/test_answer_faithfulness.py` (rank forms pass,
+invented figures beside a rank still fail), `tests/unit/test_node_answer_synthesizer.py` (the prompt text). Docs: the
+validator, answer synthesizer and evaluation pages. Not yet measured: the keyed Pagila rerun (needs the owner's yes for the
+model spend).
