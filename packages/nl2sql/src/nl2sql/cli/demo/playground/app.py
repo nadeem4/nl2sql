@@ -68,7 +68,7 @@ is computed here that the engine does not already return. The only state is
 the settings panel's (see ``settings.py``): the current mode, and the gate that
 keeps a settings change from landing under a running question; and the index
 panel's (see ``index_panel.py``): the one rebuild that may be running; and the
-last runs it answered, so a rating is stored with what the server returned
+last runs it answered (their roles), so a rating is stored from the run's own trace
 rather than what a page claims (``engine.feedback.record``).
 
 It is a client of the facade like any other: everything it reads from the
@@ -92,7 +92,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
-from nl2sql import CancellationToken, Event, QueryResult, ResultNotFound, UserContext
+from nl2sql import CancellationToken, Event, QueryResult, ResultNotFound, TraceNotFound, UserContext
 
 from nl2sql.cli.demo.playground.hosted import FEEDBACK_MESSAGE, REBUILD_MESSAGE, Hosted, Replay
 from nl2sql.cli.demo.playground.index_panel import IndexPanel
@@ -286,19 +286,6 @@ def _datasource_ids(engine, dataset: str) -> List[str]:
     return ids or [dataset]
 
 
-# What a remembered run keeps of its result: what a rating stores, and no rows.
-_RATED_FIELDS = ("trace_id", "status", "errors", "source", "usage")
-_RATED_SUB_QUERY_FIELDS = ("sql", "datasource_id", "retry_count", "plan_source", "validation")
-
-
-def _rated_part(body: Dict[str, Any]) -> Dict[str, Any]:
-    """The part of a run's result ``engine.feedback.record`` reads; never its rows or answer."""
-    kept = {key: body.get(key) for key in _RATED_FIELDS}
-    kept["sub_queries"] = [{key: s.get(key) for key in _RATED_SUB_QUERY_FIELDS}
-                           for s in body.get("sub_queries") or [] if isinstance(s, dict)]
-    return kept
-
-
 async def cancel_when_disconnected(request: Request, token: CancellationToken,
                                    interval: float = DISCONNECT_POLL_SECONDS) -> None:
     """Cancels ``token`` once the client that asked has gone.
@@ -364,8 +351,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
     app.state.settings_panel = panel
     app.state.index_panel = index_panel
     app.state.hosted = hosted
-    # trace id -> the run as a rating would store it: question, role, result; never its rows.
-    recent: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+    # trace id -> the role the run was asked as. A rating reads the run's own trace (``engine.feedback.record``).
+    recent: "OrderedDict[str, str]" = OrderedDict()
     recent_lock = threading.Lock()
 
     def feedback_guard(request: Request) -> None:
@@ -386,9 +373,8 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         trace_id = body.get("trace_id")
         if not trace_id or _feedback_off_reason(panel):
             return
-        run = {"result": _rated_part(body), "question": req.question, "role": req.role}
         with recent_lock:
-            recent[trace_id] = run
+            recent[trace_id] = req.role
             recent.move_to_end(trace_id)
             while len(recent) > RECENT_RUNS:
                 recent.popitem(last=False)
@@ -664,13 +650,16 @@ def build_app(engine, questions: List[str], roles: List[str], mode: str, dataset
         server's own record of the run; the page sends only the id, the rating
         and the note."""
         with recent_lock:
-            run = recent.get(req.trace_id)
-        if run is None:
+            role = recent.get(req.trace_id)
+        if role is None:
             raise HTTPException(status_code=404,
                                 detail="Ask a question first: feedback rates a run this playground answered.")
-        # The engine reads the run's trace too: it sees validator rejections a retry fixed.
-        saved = engine.feedback.record(run["result"], question=run["question"], role=run["role"],
-                                       rating=req.rating, note=req.note)
+        # The engine reads the run's own trace, as the role it was asked as.
+        try:
+            saved = engine.feedback.record(req.trace_id, req.rating, user_context=UserContext(roles=[role]),
+                                           note=req.note)
+        except TraceNotFound:
+            raise HTTPException(status_code=404, detail="That run's trace was not kept, so it cannot be rated.")
         return {"saved": saved, "counts": _counts(engine.feedback.list())}
 
     @app.get("/api/pipeline")

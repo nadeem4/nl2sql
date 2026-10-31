@@ -464,6 +464,19 @@ def _approval_request() -> ApprovalRequest:
                                  approver_roles=["admin"])
 
 
+def test_retry_with_a_granted_id(engine, model, server, runs):
+    need = _approval_request()
+    runs.respond = lambda question, kwargs: result(question, status="needs_approval", approvals_needed=[need])
+    conversation = started(engine)
+    model.say(ask("Show customers"))
+    engine.conversations.ask(conversation.id, "Show customers", user_context=ANA)
+    runs.respond = lambda question, kwargs: result(question, summary="Here they are.")
+
+    engine.conversations.retry(conversation.id, user_context=ANA, approvals=[need.id])
+
+    assert runs.calls[-1]["approvals"] == [need.id]  # run_query resolves the id
+
+
 def test_retry_with_approvals_runs_the_last_ask_question(engine, model, server, runs):
     need = _approval_request()
     runs.respond = lambda question, kwargs: result(question, status="needs_approval", approvals_needed=[need])

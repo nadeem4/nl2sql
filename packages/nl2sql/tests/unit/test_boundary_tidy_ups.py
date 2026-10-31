@@ -100,7 +100,6 @@ def test_every_error_code_is_raised_or_is_a_declared_refusal():
 # Wave D's are added by D0a-1 (wave_d.md, section 14).
 DECLARED_AHEAD: dict = {
     "REPLAY_MISS": "G2b",
-    "APPROVAL_NOT_GRANTED": "G3a",
 }
 
 

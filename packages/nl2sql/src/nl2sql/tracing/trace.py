@@ -109,13 +109,15 @@ def _failed(outcome: str, result: Dict[str, Any], nodes: Iterable[Dict[str, Any]
 
 def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, finished_at: str,
                 duration_s: float, outcome: str, recorder, usage, ctx: Any, state: Dict[str, Any],
-                error: Optional[str] = None, events: Iterable[Any] = ()) -> Dict[str, Any]:
+                error: Optional[str] = None, events: Iterable[Any] = (),
+                owner: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """The whole trace document, capped and redacted.
 
     ``events`` are the run's bus events so far (its ``RunScope.events``); the
     document lists every one but ``answer.delta``, whose text the result
     holds whole. ``run.finished`` is published after the trace is written,
-    so the list ends before it.
+    so the list ends before it. ``owner`` is who asked (``ResultOwner``, as the
+    result manifest records it); ``engine.traces.get`` answers only that caller.
     """
     from nl2sql.api.query_api import result_from_state  # query_api imports the runtime
     from nl2sql.knowledge.scope import caller_knowledge
@@ -154,6 +156,7 @@ def build_trace(*, trace_id: str, request: Dict[str, Any], started_at: str, fini
         "outcome": outcome,
         "failed": _failed(outcome, result, nodes),
         "error": error,
+        "owner": owner,
         "request": request,
         "engine": engine_info(),
         "llm": {"configured": _llm_configs(ctx), "by_node": by_node},

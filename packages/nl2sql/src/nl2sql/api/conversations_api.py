@@ -5,7 +5,7 @@ method takes the caller keyword-only and required (D105, D130), so an app that f
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Union
 
 from nl2sql.conversations.api import Conversations
 from nl2sql.conversations.models import Conversation, ConversationInfo, Turn
@@ -53,9 +53,11 @@ class ConversationsAPI:
                                     llm_override=llm_override)
 
     def retry(self, conversation_id: str, *, user_context: UserContext,
-              approvals: Sequence["Approval"] = (), llm_override: Optional["LLMOverride"] = None) -> Turn:
+              approvals: Sequence[Union["Approval", str]] = (), llm_override: Optional["LLMOverride"] = None) -> Turn:
         """Re-runs the last ``ask`` step's question as a new turn of kind ``retry``, with no model call of the
-        conversation's own (the run's steps use ``llm_override`` when given)."""
+        conversation's own (the run's steps use ``llm_override`` when given).
+
+        ``approvals`` are ``Approval`` objects or request ids (``engine.approvals``, D215); ``run_query`` resolves them."""
         return self._service.retry(conversation_id, user_context=user_context, approvals=approvals,
                                    llm_override=llm_override)
 

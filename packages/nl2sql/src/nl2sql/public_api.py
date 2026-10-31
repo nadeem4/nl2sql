@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterator, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from nl2sql.api.api_keys_api import ApiKeysAPI
+    from nl2sql.approvals.api import Approvals
     from nl2sql.api.chat_tools_api import ChatToolsAPI
     from nl2sql.api.conversations_api import ConversationsAPI
     from nl2sql.api.curated_api import CuratedAPI
@@ -191,6 +192,15 @@ class NL2SQL:
         return KnowledgeAPI(self._runtime)
 
     @cached_property
+    def approvals(self) -> "Approvals":
+        """Stored approval requests and their grants: ``list``, ``grant``, ``deny``. A ``needs_approval`` run stores
+        its requests; an approver grants one by id, and the asker's re-run (``run_query``, ``stream_query``,
+        ``conversations.retry``, ``dashboards.refresh``) names the id in ``approvals``."""
+        from nl2sql.approvals.api import Approvals
+
+        return Approvals(self._runtime)
+
+    @cached_property
     def proposals(self) -> "ProposalsAPI":
         """The review queue: ``list``, ``get``, ``accept``, ``reject``, ``export``, ``apply``."""
         from nl2sql.api.proposals_api import ProposalsAPI
@@ -321,7 +331,7 @@ class NL2SQL:
                   user_context: Optional["UserContext"] = None,
                   cancellation_token: Optional["CancellationToken"] = None,
                   plan: Optional["SuppliedPlan"] = None,
-                  approvals: Optional[Sequence["Approval"]] = None, clarify: bool = True,
+                  approvals: Optional[Sequence[Union["Approval", str]]] = None, clarify: bool = True,
                   choice: Optional["ClarificationChoice"] = None, answer: bool = True,
                   llm_override: Optional["LLMOverride"] = None) -> "QueryResult":
         """Answer ``question``: plan, check, generate and run the SQL, and write the answer.
@@ -379,7 +389,7 @@ class NL2SQL:
                      user_context: Optional["UserContext"] = None,
                      cancellation_token: Optional["CancellationToken"] = None,
                      plan: Optional["SuppliedPlan"] = None,
-                     approvals: Optional[Sequence["Approval"]] = None,
+                     approvals: Optional[Sequence[Union["Approval", str]]] = None,
                      clarify: bool = True, choice: Optional["ClarificationChoice"] = None,
                      answer: bool = True, llm_override: Optional["LLMOverride"] = None) -> Iterator["Event"]:
         """
