@@ -31,18 +31,20 @@ inspect one search of it, and measure schema drift.
 ### index.build
 
 Signature:
-`build(datasource_ids=None, *, on_progress=None, on_datasource=None) -> RebuildResult`
+`build(datasource_ids=None, *, on_progress=None, on_datasource=None, cancellation_token=None) -> RebuildResult`
 
 | name | meaning |
 | --- | --- |
 | `datasource_ids` | Only these datasources; every configured one when `None`. |
 | `on_progress` | Called with a sentence before each step. |
 | `on_datasource` | Called with an `IndexProgress` as each datasource starts, is done or fails. |
+| `cancellation_token` | A `CancellationToken`. Cancel it to stop between datasources: the one in flight finishes, the rest are not touched. |
 
 Returns a `RebuildResult`: `ok` (every requested datasource's new entries are
 live), `stats` (one dict per indexed datasource: `datasource_id`,
-`schema_version` and the entry counts), `empty` and `errors` (`datasource_id`,
-`error`).
+`schema_version` and the entry counts), `empty`, `errors` (`datasource_id`,
+`error`) and `cancelled` (the token stopped the build; `ok` is then false and
+the datasources before the stop are live).
 
 `IndexProgress` is a frozen dataclass, exported from `nl2sql`, that serves a
 console line and a job's status record alike:

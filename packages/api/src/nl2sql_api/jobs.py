@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 from pydantic import BaseModel
 
 from nl2sql import (CancellationToken, Dashboard, DashboardRun, EvalReport, NL2SQLError, ProfileReport,
-                    UserContext)
+                    RunCancelled, UserContext)
 from nl2sql_api.errors import ApiError, RequestRefused
 from nl2sql_api.sse import KEEP_ALIVE, frame
 
@@ -244,6 +244,8 @@ class Jobs:
         result, error = None, None
         try:
             result = entry.run(JobContext(entry.token, report))
+        except RunCancelled:  # a cancel: the token is set, so the job ends cancelled below, with no error
+            pass
         except RequestRefused as exc:
             error = ApiError(code=exc.code, message=exc.message, fix=exc.fix, details=exc.details)
         except NL2SQLError as exc:

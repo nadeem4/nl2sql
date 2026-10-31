@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Optional, Sequence, Union
 
 if TYPE_CHECKING:
+    from nl2sql.common.cancellation import CancellationToken
     from nl2sql.config import LLM
     from nl2sql.evaluation.gate import GateResult
     from nl2sql.evaluation.regenerate import RegenerateReport
@@ -64,6 +65,7 @@ class EvalsAPI:
         max_cost_usd: Optional[float] = None,
         on_case: Optional[Callable[[str, Dict[str, Any], float], None]] = None,
         clarify: bool = False,
+        cancellation_token: Optional["CancellationToken"] = None,
     ) -> "EvalReport":
         """Run every approved case, once per role in its ``outcome`` map, ``passes`` times.
 
@@ -88,6 +90,9 @@ class EvalsAPI:
                 record and the dollars spent so far.
             clarify: Run the cases whose outcome is ``clarify``. Off by default;
                 Wave B's clarification is what such a case expects.
+            cancellation_token: Cancel it to stop between cases: the case in
+                flight finishes, no other starts, and the report says
+                ``stopped: "cancelled"`` with what was scored.
 
         Returns:
             The ``EvalReport``: one board per LLM config.
@@ -108,7 +113,7 @@ class EvalsAPI:
             scorers=list(scorers if scorers is not None else cfg.scorers),
             curated=cfg.curated if curated is None else curated, passes=passes,
             max_cost_usd=max_cost_usd if max_cost_usd is not None else cfg.max_cost_usd,
-            on_case=on_case, clarify=clarify)
+            on_case=on_case, clarify=clarify, cancellation_token=cancellation_token)
         if mode == "retrieval" and getattr(self._ctx, "embedding_info", None) is not None:
             # Recall depends on the embedder: a record names the one that measured it.
             info = self._ctx.embedding_info

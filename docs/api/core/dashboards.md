@@ -97,13 +97,17 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   The codes are `SCHEDULE_IDENTITY_EXPIRED`, `SCHEDULE_ROLE_REMOVED`, `SCHEDULE_ACCESS_DENIED` (a chart the owner
   can no longer read) and `SCHEDULE_HOOK_DENIED` (a hook denied a chart; the message names the chart and the
   hook's reason). A `now` without a timezone is a `ValueError`.
-- **`generate(datasource_id, title=None, workspace_id=None, max_tiles=None)`** builds the no-model starter
+- **`generate(datasource_id, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)`** builds the no-model starter
   dashboard and returns `(Dashboard, DashboardRun)` ([how it chooses](../../dashboards/index.md#the-starter-dashboard)).
   The roles come from the indexed snapshot and the glossary, only for tables the caller can read; each template chart
   runs as the caller (`trigger="generate"`); the charts whose first run is `ok` are kept and the others are in
   `DashboardRun.skipped` (`title`, `status`, `reason`). The result is saved, owned by the caller, in `workspace_id`
   or "General". Raises `NotIndexed` (names `nl2sql index --datasource <id>`), `NoTiles` (no table the caller
   reaches, or no chart answered), `WorkspaceNotFound`, and `ValueError` for `max_tiles` below 1.
+  `on_tile` is called with a `TileProgress` (`title`, `status`, `done`, `total`) after each chart ran. Cancelling
+  `cancellation_token` stops before the next chart and raises `nl2sql.RunCancelled`; the dashboard is not saved, no
+  tile result is stored, and no draft or workspace this call made is left (a chart that already ran keeps its query
+  trace, as any question does).
   **`suggest_questions(datasource_id, n=5)`** returns the questions of the first `n` charts `generate` would
   choose and runs and saves nothing (`[]` when the caller reaches no table; `NotIndexed` as above).
 - **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`, required with `verified`.
@@ -126,5 +130,5 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
 | `dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -> DashboardRun` | D2, `filters` D2b |
 | `dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100) -> list` | D2b |
 | `dashboards.run_scheduled(*, now=None) -> list[DashboardRun]` | D2 |
-| `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None)` | D3 |
+| `dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)` | D3, `on_tile` and `cancellation_token` G3b |
 | `dashboards.suggest_questions(datasource_id, *, user_context, n=5) -> list[str]` | D3 |

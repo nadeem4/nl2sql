@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from nl2sql.common.cancellation import CancellationToken
 from nl2sql.api.query_api import AnswerSource, QueryResult, RowSample, SubQueryResult
 from nl2sql.config import LLM
 from nl2sql.evaluation import run as run_module
@@ -397,3 +398,33 @@ def test_a_split_case_is_scored_on_its_terminal_rows_and_keeps_every_subquery_sq
     assert record["status"] == "pass" and record["rows"] == 1
     assert record["sql"] == "SELECT sq1"
     assert record["sql_by_sub_query"] == {"sq1": "SELECT sq1", "sq2": "SELECT sq2"}
+
+
+def test_a_cancelled_run_stops_between_cases_and_says_so(monkeypatch):
+    token = CancellationToken()
+    report, asker, _ = _run(monkeypatch, [_suite(_case("a"), _case("b"))], cancellation_token=token,
+                            on_case=lambda name, record, spent: token.cancel())
+
+    assert [s.case for s in asker.seen] == ["a"]
+    assert report.stopped == "cancelled" and report.configs["a"]["completed_cases"] == 1
+
+
+def test_a_cancelled_plans_run_stops_between_cases(monkeypatch):
+    plan = {"tables": [{"name": "T", "alias": "t1"}],
+            "select_items": [{"alias": "n", "expr": {"kind": "column", "alias": "t1", "column_name": "n"}}]}
+    monkeypatch.setattr(run_module, "GoldPlanLLM", _FakeGold)
+    token = CancellationToken()
+    report, _, _ = _run(monkeypatch, [_suite(_case("a", plan=plan), _case("b", plan=plan))], mode="plans",
+                        scorers=("result_match",), cancellation_token=token,
+                        on_case=lambda name, record, spent: token.cancel())
+
+    assert report.stopped == "cancelled" and report.configs["plans"]["completed_cases"] == 1
+
+
+def test_a_cancelled_retrieval_run_stops_between_cases(monkeypatch):
+    monkeypatch.setattr(run_module, "_measure_retrieval", lambda run, case, role: ({}, []))
+    token = CancellationToken()
+    report, _, _ = _run(monkeypatch, [_suite(_case("a"), _case("b"))], mode="retrieval", scorers=("retrieval_recall",),
+                        cancellation_token=token, on_case=lambda name, record, spent: token.cancel())
+
+    assert report.stopped == "cancelled" and report.configs["retrieval"]["completed_cases"] == 1

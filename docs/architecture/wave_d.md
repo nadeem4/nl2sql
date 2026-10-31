@@ -1309,6 +1309,33 @@ unchanged: it serves the single page still committed under `packages/nl2sql/.../
 rebuilt, until X1b deletes it. `test.yml`'s `web` job and `CONTRIBUTING.md` use the new paths, and the fixtures test writes
 to `nl2sql-ui/src/api/fixtures/`.
 
+**G3b (progress, cancellation, readiness).** Every long facade call now reports its items and stops between them,
+so a job (D0a-3's `JobContext`: `ctx.progress(step, done, total)` and `ctx.token`) can pass `ctx.token` as
+`cancellation_token=` and a callback that calls `ctx.progress`. **What a cancel does:** the item in flight finishes, no
+other starts. `index.build(..., cancellation_token=)` returns its `RebuildResult` with the new `cancelled=True` and
+`ok=False` (the datasources before the stop are live, the rest untouched). `knowledge.profile(..., on_datasource=,
+cancellation_token=)` returns the `ProfileReport`s so far; `on_datasource` gets each `ProfileReport` as its datasource
+finishes (an unindexed one included). `evals.run(..., cancellation_token=)` returns its `EvalReport` with
+`stopped="cancelled"` when cases were left unrun (all three modes; `on_case` already existed).
+`dashboards.generate(..., on_tile=, cancellation_token=)` calls `on_tile(TileProgress(title, status, done, total))`
+(new, exported from `nl2sql`; `total` is the number of charts the starter chose, which the job cannot know) after each
+chart, and a cancel raises `nl2sql.RunCancelled` (exported) before the next chart, leaving no draft, no stored tile
+result and no workspace the call made (the same cleanup as any failure; a chart's own query is not interrupted, as the
+row says "between items"). `RunCancelled` is not an `NL2SQLError`; the job manager catches it, logs nothing and ends the job
+`cancelled`. `index.build` also checks the token before the embedding-model load. Shapes for later rows: **G2b's `engine.add_demo()`** passes
+`on_datasource=` (an `IndexProgress` callback, unchanged) to `index.build`; **A2b, A3 and A4a's job routes** call
+`engine.dashboards.generate(..., on_tile=, cancellation_token=ctx.token)`, `engine.index.build(ids, on_datasource=,
+cancellation_token=ctx.token)`, `engine.knowledge.profile(ids, user_context=, draft=, max_cost_usd=, on_datasource=,
+cancellation_token=ctx.token)` and `engine.evals.run(..., on_case=, cancellation_token=ctx.token)`; **A4a's `/ready`**
+calls `engine.check()` (which raises `EngineNotReady` with its `.report` for a failed required datasource, so the
+route reads `error.report` then) and judges the report with `CheckReport.ready(keys_optional=)` and, for an admin,
+`CheckReport.problems()`. `ready` also requires one datasource ready (as `check()` does), counts `stale` as ready, and
+treats a failed optional datasource as a problem only. `problems()` is `list[str]`: one line per failed datasource
+(`Datasource 'x' (required) failed at auth.`), per agent whose key does not resolve and for an index that is not `ok`
+or `stale`; it carries no reason text, which can echo a secret. `index.refresh` has no token (not in the row).
+The code on `main` matched the design except that `index.build` and `evals.run` had their callbacks already, as the
+facade-gaps row says.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below

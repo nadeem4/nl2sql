@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 if TYPE_CHECKING:
+    from nl2sql.common.cancellation import CancellationToken
     from nl2sql.clarify.models import ClarificationChoice
     from nl2sql.knowledge.models import DatasourceKnowledgeView, KnowledgeSourceInfo
     from nl2sql.policies import UserContext
@@ -156,7 +157,9 @@ class KnowledgeAPI:
         return self.sources(user_context=caller)
 
     def profile(self, datasource_ids: Optional[Sequence[str]] = None, *, user_context: "UserContext",
-                draft: bool = False, max_cost_usd: Optional[float] = None) -> List["ProfileReport"]:
+                draft: bool = False, max_cost_usd: Optional[float] = None,
+                on_datasource: Optional[Callable[["ProfileReport"], None]] = None,
+                cancellation_token: Optional["CancellationToken"] = None) -> List["ProfileReport"]:
         """Profile each datasource's live snapshot, probing only the tables the caller reaches, and file what
         it finds as proposals (``origin: profiler``): joins the database does not declare (by name, type and a
         bounded value-overlap probe) and heuristic column roles. Nothing is written but the review queue (D38).
@@ -174,6 +177,9 @@ class KnowledgeAPI:
         ``stopped_by: "cost_cap"`` with what it drafted so far. With no model for the agent, nothing is drafted
         and each report says so in ``issues``.
 
+        ``on_datasource`` gets each datasource's report as it finishes. Cancel ``cancellation_token`` to stop
+        between datasources: the one in flight finishes, and the reports so far are returned.
+
         Raises:
             TypeError: ``user_context`` is not a ``UserContext``.
             ValueError: a datasource is not configured, or ``max_cost_usd`` is not positive.
@@ -182,7 +188,8 @@ class KnowledgeAPI:
         from nl2sql.profiler.run import profile
 
         caller = _caller(user_context)
-        return profile(self._ctx, self._ids(datasource_ids), caller, draft=draft, max_cost_usd=max_cost_usd)
+        return profile(self._ctx, self._ids(datasource_ids), caller, draft=draft, max_cost_usd=max_cost_usd,
+                       on_datasource=on_datasource, cancellation_token=cancellation_token)
 
     def save_choice(self, choice: "ClarificationChoice", *, user_context: "UserContext",
                     term: Optional[str] = None) -> "Proposal":
