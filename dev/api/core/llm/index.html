@@ -6209,11 +6209,19 @@ agent, listing the agents.</p>
 <p>Each LLM provider this engine can use: the built-ins whose client library is
 installed, and any a plugin or <code>Registry.add_llm</code> registered. Each has <code>name</code>,
 <code>label</code>, <code>key_variable</code> (the environment variable it reads its key from;
-<code>None</code> for one that needs no key, such as <code>ollama</code>) and <code>key_present</code> (whether
-that variable is set). Never the key.</p>
+<code>None</code> for one that needs no key, such as <code>ollama</code>), <code>key_present</code> (whether
+that variable is set), <code>models</code> (the verified models, <code>[]</code> when none are
+known) and <code>key_shape</code> (<code>pattern</code>, <code>min_length</code> and <code>prefix</code> of a key, for a
+form to check one before sending it). Never the key.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">engine</span><span class="o">.</span><span class="n">llm</span><span class="o">.</span><span class="n">providers</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False}</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="c1"># {'name': 'anthropic', 'label': 'Anthropic', 'key_variable': 'ANTHROPIC_API_KEY', 'key_present': False,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1">#  'models': ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'],</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1">#  'key_shape': {'pattern': '^[A-Za-z0-9_-]{20,}$', 'min_length': 20, 'prefix': 'sk-ant-'}}</span>
 </code></pre></div>
+<p><code>nl2sql.provider_for_key(key) -&gt; str</code> names the provider a key belongs to
+(from its prefix), and <code>nl2sql.provider_keys_in_environment() -&gt; dict[str, str]</code>
+maps each keyed provider whose variable is set to its key (print only a masked
+form). Both are top-level exports, so an app never imports <code>nl2sql.llm.providers</code>.</p>
 <h3 id="llmprices">llm.prices</h3>
 <p>Signature:
 <code>prices() -&gt; dict</code></p>

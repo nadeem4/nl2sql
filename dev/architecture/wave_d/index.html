@@ -6760,6 +6760,23 @@ id would otherwise fail every chart alike. The signature widening is <code>Union
 <code>NL2SQL.run_query</code> and <code>stream_query</code>. A2a's retry route and A2b's refresh route pass the body's <code>approval_ids</code> straight
 through as <code>approvals=</code>; A1 maps <code>ApprovalNotFound</code> to 404 and <code>NotAuthorized</code> to 403, and the run's
 <code>APPROVAL_NOT_GRANTED</code> shows as the result's error. T1 reads <code>engine.approvals.list(...)</code>.</p>
+<p><strong>G2a (per-request overrides, providers catalogue).</strong> <code>llm_override: Optional[LLMOverride] = None</code> is the last keyword of
+<code>NL2SQL.run_query</code>, <code>stream_query</code>, <code>conversations.ask</code>, <code>stream</code> and <code>retry</code> (and of <code>QueryAPI.run_query</code> and
+<code>stream_query</code> under them). It runs through <code>llm/request_key.py</code>, which already held the machinery (D210 is the
+existing <code>RequestLLMs</code> and <code>use_request_llms</code>, not a model-profiles design): <code>RequestLLMs.from_override(override)</code>
+builds the bound value and enforces the key rule (a model on a provider with no key in <code>override.keys</code> raises
+<code>MissingProviderKey</code>, at the call, before anything runs; provider names are lower-cased), and
+<code>use_llm_override(override)</code> is the context manager (None binds nothing, so a conversation turn's override reaches
+every run it asks for). A stream binds in its own run thread (<code>stream_query</code>, the conversation stream's worker), and
+refuses at the call, not at the first <code>next()</code>. <code>LLMRegistry</code> was not changed: <code>get_llm</code> already builds each step's
+client from <code>current_request_llms()</code>, caches nothing, and a replay provider (G2b) sits behind the same call, so for G2b
+"an override key replaces replay for one call" is a matter of its provider honouring a bound key. Unknown agent names
+in <code>models</code> are ignored, as the registry always has. A provider with no <code>api_key_env</code> (the built-ins, else the engine's registry) in <code>keys</code> or <code>models</code> raises <code>InvalidArgument</code>; a caller's key, with or without a model, drops the operator's <code>base_url</code> and <code>headers</code>; an empty <code>LLMOverride</code> binds nothing; <code>key_shape</code> is <code>None</code> for a provider with no key variable. <code>engine.llm.providers()</code> entries gained <code>models</code> (the
+<code>VERIFIED_MODELS</code> names) and <code>key_shape</code> (<code>pattern</code>, <code>min_length</code>, <code>prefix</code>), computed in
+<code>llm/providers.describe_providers</code>. <code>nl2sql.provider_for_key</code> and the new <code>nl2sql.provider_keys_in_environment() -&gt;
+dict[provider, key]</code> are top-level exports. The old playground (<code>cli/demo/playground/</code>) still imports <code>nl2sql.llm.*</code>
+directly; it is deleted by X1b, so it was not rewritten. Code on main wins over the row's file list: <code>api/llm_api.py</code>
+and <code>registry.py</code> needed no change beyond the docstring, and <code>api/types.py</code> was not touched.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at

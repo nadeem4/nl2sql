@@ -5937,16 +5937,16 @@ earlier question.</p>
 <td>C1</td>
 </tr>
 <tr>
-<td><code>ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None) -&gt; Turn</code></td>
-<td>C1</td>
+<td><code>ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None, llm_override=None) -&gt; Turn</code></td>
+<td>C1, G2a</td>
 </tr>
 <tr>
-<td><code>stream(conversation_id, text=None, *, user_context, choice=None, execute=True) -&gt; Iterator[Event]</code></td>
-<td>C1</td>
+<td><code>stream(conversation_id, text=None, *, user_context, choice=None, execute=True, llm_override=None) -&gt; Iterator[Event]</code></td>
+<td>C1, G2a</td>
 </tr>
 <tr>
-<td><code>retry(conversation_id, *, user_context, approvals=()) -&gt; Turn</code></td>
-<td>C1; <code>approvals</code> are <code>Approval</code> objects or granted request ids (D215)</td>
+<td><code>retry(conversation_id, *, user_context, approvals=(), llm_override=None) -&gt; Turn</code></td>
+<td>C1, G2a; <code>approvals</code> are <code>Approval</code> objects or granted request ids (D215)</td>
 </tr>
 <tr>
 <td><code>ask_only(conversation_id, question, *, user_context, choice=None) -&gt; QueryResult</code></td>

@@ -2594,6 +2594,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#per-request-keys-and-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-request keys and models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#replacing-the-llm-at-runtime" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6193,6 +6204,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#per-request-keys-and-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-request keys and models
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#replacing-the-llm-at-runtime" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6963,6 +6985,35 @@ build one client.</p>
 the engine started is used only once the LLM is set again.</p>
 <p>Genuine misconfiguration fails immediately: an unknown provider, or an agent
 with no model.</p>
+<h2 id="per-request-keys-and-models">Per-request keys and models</h2>
+<p>A caller can bring its own key, and its own model for a step, for one call
+(D210): <code>llm_override=LLMOverride(keys={"anthropic": key}, models={"ast_planner": ("anthropic", "claude-opus-5")})</code>
+on <code>run_query</code>, <code>stream_query</code>, and a conversation's <code>ask</code>, <code>stream</code> and
+<code>retry</code>. <code>keys</code> maps a provider to the caller's key; <code>models</code> maps an agent
+name (the node name, such as <code>ast_planner</code>) to <code>(provider, model)</code>.</p>
+<ul>
+<li><strong>Only providers that read an API key can be chosen.</strong> A key or a model for a provider with no key variable
+  (<code>ollama</code>, <code>openai_compatible</code>, a plugin whose <code>api_key_env</code> is unset) raises <code>InvalidArgument</code>: those are
+  reached by the operator's endpoint and credentials, which a caller may not borrow. A caller's key, with or without a model,
+  never inherits the operator's <code>base_url</code> or <code>headers</code>, even on the configured provider.</li>
+<li><strong>A model runs only on a key the caller sent.</strong> A step the override puts on
+  a provider with no key in <code>keys</code> raises <code>MissingProviderKey</code> at the call,
+  before anything runs, so a caller's choice never lands on the operator's
+  account. A step the override does not name runs on the caller's key for its
+  configured provider if sent, else the caller's first key, else the call
+  fails <code>MissingProviderKey</code>.</li>
+<li><strong>The keys live for the call.</strong> They are never written to the environment,
+  to a file or to a cache (each step's client is built for the call and kept
+  nowhere), and the trace masks them like any other secret. <code>repr</code> of an
+  <code>LLMOverride</code> leaves <code>keys</code> out.</li>
+<li><strong>A conversation turn</strong> binds the override for the whole turn: the model's
+  own steps and every run it asks for.</li>
+<li><strong>Over REST</strong>, <code>X-NL2SQL-Api-Key-&lt;provider&gt;</code> and <code>X-NL2SQL-Models</code> become
+  the override only where <code>api.request_llm: true</code> (<code>nl2sql_api/overrides.py</code>).</li>
+</ul>
+<p><code>engine.llm.providers()</code> lists what a form needs to offer the choice: each
+provider's label, verified models and key shape; see
+<a href="../../api/core/llm/#llmproviders">LLM</a>.</p>
 <h2 id="replacing-the-llm-at-runtime">Replacing the LLM at runtime</h2>
 <p><code>engine.llm.replace</code> swaps the whole <code>llm</code> section at once, while the engine
 runs:</p>
