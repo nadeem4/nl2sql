@@ -528,3 +528,13 @@ def test_the_04_methods_are_gone(engine, name):
 
 def test_datasources_has_no_get_adapter(engine):
     assert not hasattr(engine.datasources, "get_adapter")
+
+
+def test_a_token_cancelled_before_the_build_stops_before_the_model_loads(engine):
+    token = CancellationToken()
+    token.cancel()
+    steps = []
+
+    result = engine.index.build(on_progress=steps.append, cancellation_token=token)
+
+    assert result.cancelled and not result.ok and steps == []

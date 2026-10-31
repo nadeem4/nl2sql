@@ -409,6 +409,18 @@ def test_a_cancelled_run_stops_between_cases_and_says_so(monkeypatch):
     assert report.stopped == "cancelled" and report.configs["a"]["completed_cases"] == 1
 
 
+def test_a_cancelled_plans_run_stops_between_cases(monkeypatch):
+    plan = {"tables": [{"name": "T", "alias": "t1"}],
+            "select_items": [{"alias": "n", "expr": {"kind": "column", "alias": "t1", "column_name": "n"}}]}
+    monkeypatch.setattr(run_module, "GoldPlanLLM", _FakeGold)
+    token = CancellationToken()
+    report, _, _ = _run(monkeypatch, [_suite(_case("a", plan=plan), _case("b", plan=plan))], mode="plans",
+                        scorers=("result_match",), cancellation_token=token,
+                        on_case=lambda name, record, spent: token.cancel())
+
+    assert report.stopped == "cancelled" and report.configs["plans"]["completed_cases"] == 1
+
+
 def test_a_cancelled_retrieval_run_stops_between_cases(monkeypatch):
     monkeypatch.setattr(run_module, "_measure_retrieval", lambda run, case, role: ({}, []))
     token = CancellationToken()

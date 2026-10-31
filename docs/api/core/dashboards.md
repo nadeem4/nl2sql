@@ -105,8 +105,9 @@ dashboard as its stored owner. Another owner's workspace or dashboard is `Worksp
   or "General". Raises `NotIndexed` (names `nl2sql index --datasource <id>`), `NoTiles` (no table the caller
   reaches, or no chart answered), `WorkspaceNotFound`, and `ValueError` for `max_tiles` below 1.
   `on_tile` is called with a `TileProgress` (`title`, `status`, `done`, `total`) after each chart ran. Cancelling
-  `cancellation_token` stops before the next chart and raises `nl2sql.common.cancellation.RunCancelled`; nothing is
-  saved, and no draft or workspace this call made is left.
+  `cancellation_token` stops before the next chart and raises `nl2sql.RunCancelled`; the dashboard is not saved, no
+  tile result is stored, and no draft or workspace this call made is left (a chart that already ran keeps its query
+  trace, as any question does).
   **`suggest_questions(datasource_id, n=5)`** returns the questions of the first `n` charts `generate` would
   choose and runs and saves nothing (`[]` when the caller reaches no table; `NotIndexed` as above).
 - **A verified chart** keeps its datasource in `ChartPlan.verified_datasource_id`, required with `verified`.

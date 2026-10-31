@@ -39,7 +39,7 @@ _EXPORTS = {
     "nl2sql.llm.request_key": ("MissingProviderKey",),
     "nl2sql.llm.override": ("LLMOverride",),
     "nl2sql.config.mode": ("resolve_mode",),
-    "nl2sql.common.cancellation": ("CancellationToken",),
+    "nl2sql.common.cancellation": ("CancellationToken", "RunCancelled"),
     "nl2sql_sdk.policy": ("UserContext",),
     "nl2sql.registry": ("Registry",),
     # The config, and what building an engine from it reports.
@@ -97,6 +97,7 @@ __all__ = [
     "PipelineError",
     "RunWarning",
     "CancellationToken",
+    "RunCancelled",
     "UserContext",
     "SubQueryResult",
     "RowSample",

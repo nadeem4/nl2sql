@@ -1319,10 +1319,10 @@ finishes (an unindexed one included). `evals.run(..., cancellation_token=)` retu
 `stopped="cancelled"` when cases were left unrun (all three modes; `on_case` already existed).
 `dashboards.generate(..., on_tile=, cancellation_token=)` calls `on_tile(TileProgress(title, status, done, total))`
 (new, exported from `nl2sql`; `total` is the number of charts the starter chose, which the job cannot know) after each
-chart, and a cancel raises `nl2sql.common.cancellation.RunCancelled` before the next chart, leaving no draft, no stored
+chart, and a cancel raises `nl2sql.RunCancelled` (exported) before the next chart, leaving no draft, no stored tile
 result and no workspace the call made (the same cleanup as any failure; a chart's own query is not interrupted, as the
-row says "between items"). `RunCancelled` is not an `NL2SQLError`, so the job manager logs it, and still ends the job
-`cancelled` because the token is set. Shapes for later rows: **G2b's `engine.add_demo()`** passes
+row says "between items"). `RunCancelled` is not an `NL2SQLError`; the job manager catches it, logs nothing and ends the job
+`cancelled`. `index.build` also checks the token before the embedding-model load. Shapes for later rows: **G2b's `engine.add_demo()`** passes
 `on_datasource=` (an `IndexProgress` callback, unchanged) to `index.build`; **A2b, A3 and A4a's job routes** call
 `engine.dashboards.generate(..., on_tile=, cancellation_token=ctx.token)`, `engine.index.build(ids, on_datasource=,
 cancellation_token=ctx.token)`, `engine.knowledge.profile(ids, user_context=, draft=, max_cost_usd=, on_datasource=,

@@ -131,6 +131,9 @@ def rebuild_index(
 def _build(ctx, adapters, result: RebuildResult, *, refresh: bool,
            say: Callable[[str], None], tell: Callable[["IndexProgress"], None],
            token: Optional["CancellationToken"] = None) -> None:
+    if token is not None and token.is_cancelled():  # before the slow first-run model download
+        result.cancelled = True
+        return
     say(MODEL_STEP)
     # Embeddings load lazily; warming them here puts the one slow,
     # first-run-only download under its own step.
