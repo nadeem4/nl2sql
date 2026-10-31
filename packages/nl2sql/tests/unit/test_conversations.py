@@ -966,3 +966,63 @@ def test_a_step_that_ends_stopped_through_the_stream_stores_the_turn(engine, mod
     stored = events[-1].data["stored"]
     assert stored["status"] == "stopped" and stored["steps"][0]["status"] == "stopped"
     assert len(engine.conversations.get(conversation.id, user_context=ANA).turns) == 1
+
+
+# ------------------------------------------------------------------ llm_override (G2a, D210)
+
+_OVERRIDE_KEY = "-".join(["sk", "proj", "turnoverride" + "a" * 24 + "9f3e"])
+
+
+def _override():
+    from nl2sql import LLMOverride
+
+    return LLMOverride(keys={"openai": _OVERRIDE_KEY})
+
+
+def _record_override(runs):
+    from nl2sql.llm.request_key import current_request_llms
+
+    bound: List[Any] = []
+    runs.gate = lambda: bound.append(current_request_llms())
+    return bound
+
+
+def test_ask_stream_and_retry_bind_the_override_for_the_whole_turn(engine, model, runs):
+    from nl2sql.llm.request_key import current_request_llms
+
+    bound = _record_override(runs)
+    conversation = started(engine)
+    model.say(ask("q"), reply("one"), ask("q"), reply("two"))
+
+    engine.conversations.ask(conversation.id, "q", user_context=ANA, llm_override=_override())
+    list(engine.conversations.stream(conversation.id, "q again", user_context=ANA, llm_override=_override()))
+    engine.conversations.retry(conversation.id, user_context=ANA, llm_override=_override())
+
+    assert [b and dict(b.keys) for b in bound] == [{"openai": _OVERRIDE_KEY}] * 3
+    assert current_request_llms() is None
+
+
+def test_a_turn_without_an_override_binds_nothing(engine, model, runs):
+    bound = _record_override(runs)
+    conversation = started(engine)
+    model.say(ask("q"), reply("one"))
+
+    engine.conversations.ask(conversation.id, "q", user_context=ANA)
+
+    assert bound == [None]
+
+
+def test_a_model_override_without_its_key_is_refused_before_the_turn(engine, model, server, runs):
+    from nl2sql import LLMOverride, MissingProviderKey
+
+    conversation = started(engine)
+    refused = LLMOverride(keys={"openai": _OVERRIDE_KEY}, models={"conversation": ("anthropic", "claude-opus-5")})
+
+    for call in (lambda: engine.conversations.ask(conversation.id, "q", user_context=ANA, llm_override=refused),
+                 lambda: engine.conversations.stream(conversation.id, "q", user_context=ANA, llm_override=refused),
+                 lambda: engine.conversations.retry(conversation.id, user_context=ANA, llm_override=refused)):
+        with pytest.raises(MissingProviderKey):
+            call()
+
+    assert server.calls == [] and runs.calls == []
+    assert engine.conversations.get(conversation.id, user_context=ANA).turns == []

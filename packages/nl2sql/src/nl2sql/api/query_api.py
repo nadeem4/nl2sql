@@ -10,6 +10,7 @@ import contextvars
 import logging
 import queue
 import threading
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Iterable, Iterator, Literal, Mapping, Sequence, Tuple
 
@@ -24,6 +25,8 @@ from nl2sql_sdk.events import Event
 from nl2sql.hooks import hooks_of
 from nl2sql.hooks.approval import Approval, ApprovalRequest
 from nl2sql.limits import Budget, RunStop
+from nl2sql.llm.override import LLMOverride
+from nl2sql.llm.request_key import RequestLLMs, use_llm_override, use_request_llms
 from nl2sql.execution.artifacts.results import ResultSummary
 from nl2sql.execution.contracts import ArtifactRef
 from nl2sql.pipeline.events import RunEvents
@@ -511,6 +514,7 @@ class QueryAPI:
         clarify: bool = True,
         choice: Optional[ClarificationChoice] = None,
         answer: bool = True,
+        llm_override: Optional[LLMOverride] = None,
     ) -> QueryResult:
         """
         Execute a natural language query against the database.
@@ -550,6 +554,8 @@ class QueryAPI:
             answer: False skips the answer synthesizer: no prose is written,
                 ``final_answer`` is None and the run makes no model call for it
                 (a dashboard refresh re-runs stored plans this way).
+            llm_override: The caller's own keys and models for this call only (D210);
+                see ``NL2SQL.run_query``. None keeps the caller's context, if it bound one.
 
         Returns:
             A :class:`QueryResult` built from the pipeline graph state.
@@ -558,7 +564,18 @@ class QueryAPI:
             ValueError: at the call, before anything runs: ``datasource_id``
                 is not the plan's datasource, a chosen plan comes with
                 approvals, or ``choice`` comes with a ``plan`` or a ``pinned``.
+            MissingProviderKey: ``llm_override`` puts a step on a provider it sent no key for.
         """
+        with use_llm_override(llm_override):
+            return self._run_query(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
+                                   cancellation_token=cancellation_token, scope=scope, plan=plan,
+                                   approvals=approvals, pinned=pinned, clarify=clarify, choice=choice, answer=answer)
+
+    def _run_query(self, question: str, *, datasource_id: Optional[str], execute: bool,
+                   user_context: Optional[UserContext], cancellation_token: Optional[CancellationToken],
+                   scope: Optional[RunScope], plan: Optional[SuppliedPlan], approvals: Optional[Sequence[Approval]],
+                   pinned: Optional[PinnedRun], clarify: bool, choice: Optional[ClarificationChoice],
+                   answer: bool) -> QueryResult:
         pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         scope = scope or self.open_scope(question, datasource_id=datasource_id, execute=execute,
                                          user_context=user_context)
@@ -669,6 +686,7 @@ class QueryAPI:
         clarify: bool = True,
         choice: Optional[ClarificationChoice] = None,
         answer: bool = True,
+        llm_override: Optional[LLMOverride] = None,
     ) -> Iterator[Event]:
         """
         Run a question as :meth:`run_query` does, yielding its events as they are published.
@@ -697,19 +715,23 @@ class QueryAPI:
         (internal) is the allow-list; Wave C's conversation stream adds its
         own events to it. ``plan``, ``approvals``, ``pinned``, ``choice`` and ``answer`` are as
         for :meth:`run_query`, and refused the same way, at the call; so is ``clarify``.
+        ``llm_override`` is as for :meth:`run_query`; it is bound in the run's own thread, and a model chosen
+        without its provider's key is refused at the call.
         """
+        llms = RequestLLMs.from_override(llm_override) if llm_override is not None else None
         if scope is not None and scope.closed:
             raise ValueError("This run's scope is already closed; a stream needs an open one.")
         pinned, refusal = self._pin_choice(question, choice, plan, pinned, approvals, datasource_id, user_context)
         return self._stream(question, datasource_id=datasource_id, execute=execute, user_context=user_context,
                             token=cancellation_token or CancellationToken(), opened=scope, allowed=frozenset(names),
-                            pinned=pinned, approvals=approvals, clarify=clarify, answer=answer, refusal=refusal)
+                            pinned=pinned, approvals=approvals, clarify=clarify, answer=answer, refusal=refusal,
+                            llms=llms)
 
     def _stream(self, question: str, *, datasource_id: Optional[str], execute: bool,
                 user_context: Optional[UserContext], token: CancellationToken, opened: Optional[RunScope],
                 allowed: frozenset, pinned: Optional[PinnedRun] = None,
                 approvals: Optional[Sequence[Approval]] = None, clarify: bool = True, answer: bool = True,
-                refusal: Optional[PipelineError] = None) -> Iterator[Event]:
+                refusal: Optional[PipelineError] = None, llms: Optional[RequestLLMs] = None) -> Iterator[Event]:
         """:meth:`stream_query`'s run, on a thread of its own, and the events it hands over."""
         events: "queue.Queue[Optional[Event]]" = queue.Queue()
         terminal_sent = threading.Event()
@@ -767,7 +789,11 @@ class QueryAPI:
             finally:
                 events.put(None)
 
-        worker = threading.Thread(target=contextvars.copy_context().run, args=(run,),
+        def bound_run() -> None:
+            with use_request_llms(llms) if llms is not None else nullcontext():
+                run()
+
+        worker = threading.Thread(target=contextvars.copy_context().run, args=(bound_run,),
                                   name="nl2sql-stream", daemon=True)
         worker.start()
         finished = False

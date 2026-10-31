@@ -23,9 +23,9 @@ earlier question.
 | Method | Row |
 |---|---|
 | `start(*, user_context, datasource_id=None, dashboard_id=None) -> Conversation` | C1 |
-| `ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None) -> Turn` | C1 |
-| `stream(conversation_id, text=None, *, user_context, choice=None, execute=True) -> Iterator[Event]` | C1 |
-| `retry(conversation_id, *, user_context, approvals=()) -> Turn` | C1 |
+| `ask(conversation_id, text=None, *, user_context, choice=None, execute=True, cancellation_token=None, llm_override=None) -> Turn` | C1, G2a |
+| `stream(conversation_id, text=None, *, user_context, choice=None, execute=True, llm_override=None) -> Iterator[Event]` | C1, G2a |
+| `retry(conversation_id, *, user_context, approvals=(), llm_override=None) -> Turn` | C1, G2a |
 | `ask_only(conversation_id, question, *, user_context, choice=None) -> QueryResult` | C1 |
 | `get(conversation_id, *, user_context) -> Conversation` | C1 |
 | `list(*, user_context, limit=20) -> list[ConversationInfo]` | C1 |

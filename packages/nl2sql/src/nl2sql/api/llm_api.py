@@ -48,13 +48,16 @@ class LLMAPI:
         return listed[agent]
 
     def providers(self) -> List[Dict[str, Any]]:
-        """Each LLM provider this engine can use: ``name``, ``label``, ``key_variable`` and ``key_present``.
+        """Each LLM provider this engine can use: ``name``, ``label``, ``key_variable``, ``key_present``, ``models``
+        and ``key_shape``.
 
         The built-ins whose client library is installed, and any provider a
         plugin or ``Registry.add_llm`` registered. ``key_variable`` is the
         environment variable the provider reads its key from (None for one that
         needs no key, such as ``ollama``); ``key_present`` says whether it is
-        set. Never the key.
+        set. ``models`` lists the verified models (empty when none are known) and ``key_shape`` gives the
+        ``pattern`` a key matches, its ``min_length`` and the ``prefix`` of the provider's keys (or None), for a
+        form to check a key before sending it. Never the key.
         """
         from nl2sql.llm.providers import describe_providers
 
