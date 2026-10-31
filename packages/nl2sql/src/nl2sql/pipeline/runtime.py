@@ -29,6 +29,7 @@ from nl2sql.pipeline.state import GraphState
 from nl2sql.pipeline.timing import NodeTimingCallback
 from nl2sql.services.callbacks.token_handler import TokenUsageCallback
 from nl2sql.tracing.recorder import TraceRecorder
+from nl2sql.execution.artifacts.results import ResultOwner
 from nl2sql.tracing.trace import write_run_trace
 
 if TYPE_CHECKING:
@@ -287,6 +288,7 @@ def run_with_graph(
             state=out,
             error=error,
             events=list(scope.events) if scope is not None else [],
+            owner=ResultOwner.of(initial_state.user_context, ctx.tenant_id).model_dump(),
         )
         if path:
             out["trace_path"] = path

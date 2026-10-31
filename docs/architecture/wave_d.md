@@ -315,8 +315,8 @@ a manifest with no owner is refused for every caller
 with no `user_id` also has its sorted roles recorded and must match them, so
 an anonymous `viewer` cannot read an anonymous `admin` run. So the results
 half of the steps below (the `None` operator in 2 and 3, and the results
-part of 6) does not apply; traces (`engine.traces.get`) remain this
-section's.
+part of 6) does not apply; traces (`engine.traces.get`) were this
+section's, built by G1.
 
 B13 is fixed in the engine (D204), so the facade, the API, MCP and the
 terminal app all get it:
@@ -1308,6 +1308,34 @@ git; `packages/api/pyproject.toml` carries it as package data of `nl2sql_api.web
 unchanged: it serves the single page still committed under `packages/nl2sql/.../playground/static/`, which is no longer
 rebuilt, until X1b deletes it. `test.yml`'s `web` job and `CONTRIBUTING.md` use the new paths, and the fixtures test writes
 to `nl2sql-ui/src/api/fixtures/`.
+
+**G1 (results bound to the user, ratings).** The results half was built by Wave C's C-W2 (see the B13 note), so G1 is the
+trace and the rating. `build_trace(..., owner=)` records the asker as the top-level `owner` of the trace document, the same
+`ResultOwner` (`tenant_id`, `user_id`, sorted `roles` for an anonymous asker) that the manifest writer records, worked out by
+`ResultOwner.of` in `pipeline/runtime.py`'s `_done`. `engine.traces.get(trace_id, *, user_context=None)` returns the
+document only when `owner` equals the caller's (`ResultOwner.of(user_context, ctx.tenant_id)`); another caller's run, and a
+trace with no `owner` (written before this change), is `None` for a caller, and `user_context=None` is the operator that
+reads any run (`nl2sql trace` is unchanged). A `user_context` that is not a `UserContext` is a `TypeError`.
+`engine.feedback.record(trace_id, rating, *, user_context, note=None)` replaces `record(result, *, question, role, rating,
+note=None)`: it reads the trace as the caller and stores the same row as before (question from `request.question`, role
+the caller's roles joined by a comma, the rest from the trace's `result` and nodes); another caller's run, an unknown id, or
+a trace that was not kept (`settings.traces.mode` is `on_failure` or `off`) is the new `nl2sql.TraceNotFound`
+(`NL2SQLError`, `LookupError`, `NOT_FOUND`, 404); a missing or `None` `user_context` is a `TypeError`. The old result-based
+path is `FeedbackAPI._rate(result, *, question, role, rating, note)`, private, used by `correct` (which has already checked
+its caller) and by tests that need a rating row; nothing outside the engine calls it. Code on `main` wins over the doc
+here: the design says `traces.get` returns `None`; `record` raises `TraceNotFound` (design's `test_record_of_another_users_run_is_not_found`).
+The old engine playground's `/api/feedback` now remembers only each answered run's role and rates through `record`; its
+`/api/trace/{id}` still reads as the operator (it goes with X1b). `chart` and `dashboards` already passed the caller (C-W2),
+so no change there; `test_chart_with_another_users_trace_is_not_found` covers `chart` by trace id (Ann's result written
+first, Bob gets `ResultNotFound`, Ann does not). The design's `test_manifest_records_the_asker` and
+`test_another_users_result_is_not_found` are `test_the_manifest_records_who_asked` and
+`test_another_callers_trace_id_is_not_found` in `test_results_owner.py`. `engine.feedback.correct` follows the same owner
+rule (Opus review): it reads the trace through `TracesAPI.get` as `user_context`, so another caller's run is `no_run` and is
+never rated down, and the rating-row fallback exists only for the operator. `user_context=None` cannot be the operator here
+because the scope checks need a real `UserContext`, so `correct(..., as_operator=True)` is a separate keyword; `nl2sql
+feedback correct` passes it and keeps `--as` for the scope. `record` stores a rating but files no thumbs-up proposal when the
+trace's SQL carries the `[truncated]` marker (`TRUNCATED`). The `on_failure` default stays: only failed runs can be rated until
+`traces.mode: always` (said in `observability/feedback.md` and `configuration/curated.md`).
 
 **G3b (progress, cancellation, readiness).** Every long facade call now reports its items and stops between them,
 so a job (D0a-3's `JobContext`: `ctx.progress(step, done, total)` and `ctx.token`) can pass `ctx.token` as

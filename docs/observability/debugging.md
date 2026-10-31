@@ -50,7 +50,8 @@ Where the file went is reported back:
 - `QueryResult.trace_path` (Python API) and `trace_path` in the REST `/query`
   response: the path, or `null` when no trace was written or the trace store is
   not the `files` store. `trace_id` is in the file name, and
-  `engine.traces.get(trace_id)` reads the trace from any store.
+  `engine.traces.get(trace_id)` reads the trace from any store. A trace records its asker (`owner`); with a
+  `user_context` only that asker reads it, and with none the caller is the in-process operator (`nl2sql trace`).
 - `nl2sql run` prints `Trace written to <path>`.
 - The playground shows a **Download trace** link under Cost & time when Debug is on.
 

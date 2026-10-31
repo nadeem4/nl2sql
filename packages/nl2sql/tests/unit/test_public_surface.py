@@ -12,7 +12,7 @@ PUBLIC_SURFACE = {
     # Events
     "Event", "Observer",
     # Saved results
-    "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "MAX_RESULT_PAGE_SIZE",
+    "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "TraceNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return
     "DatasourceInfo", "DatasourceType", "IndexProgress", "TileProgress", "LLMChange",
     # Schema drift
