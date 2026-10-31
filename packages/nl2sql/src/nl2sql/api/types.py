@@ -70,6 +70,20 @@ class IndexProgress:
     reason: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class TileProgress:
+    """One chart's step in ``engine.dashboards.generate``, handed to its ``on_tile`` callback after the chart ran.
+
+    ``status`` is the chart's run status (``ok``, ``error``, ...); ``done`` of ``total`` counts the charts the
+    starter chose, so the caller can draw a bar without knowing how many that is.
+    """
+
+    title: str
+    status: str
+    done: int
+    total: int
+
+
 class Candidate(StrictModel):
     """A database `engine.datasources.scan()` found, with the connection fields it could fill in (D120).
 

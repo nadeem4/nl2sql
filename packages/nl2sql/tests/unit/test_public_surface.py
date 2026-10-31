@@ -8,13 +8,13 @@ import nl2sql
 PUBLIC_SURFACE = {
     # The engine and its questions
     "NL2SQL", "QueryResult", "SubQueryResult", "RowSample", "AnswerSource",
-    "CancellationToken", "UserContext", "QuestionUsage", "RunStop", "ApprovalRequest", "Approval", "VerifiedRef", "SuppliedPlan",
+    "CancellationToken", "RunCancelled", "UserContext", "QuestionUsage", "RunStop", "ApprovalRequest", "Approval", "VerifiedRef", "SuppliedPlan",
     # Events
     "Event", "Observer",
     # Saved results
     "ResultSummary", "ResultManifest", "ResultPage", "ResultNotFound", "MAX_RESULT_PAGE_SIZE",
     # What the namespaces return
-    "DatasourceInfo", "DatasourceType", "IndexProgress", "LLMChange",
+    "DatasourceInfo", "DatasourceType", "IndexProgress", "TileProgress", "LLMChange",
     # Schema drift
     "DriftReport", "DriftImpact", "SchemaDiff", "SchemaVersionInfo",
     # Errors

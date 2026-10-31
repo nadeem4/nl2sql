@@ -59,6 +59,29 @@ class CheckReport:
         """Every datasource is ready, every key resolves and the index is built."""
         return all(d.status == "ready" for d in self.datasources) and not self.llm and self.index == "ok"
 
+    def ready(self, *, keys_optional: bool) -> bool:
+        """Whether the engine can answer now: what ``GET /ready`` reports (D208).
+
+        Every required datasource is ready and at least one datasource is, every agent's key resolves unless
+        ``keys_optional`` (a caller brings its own, or every agent is on ``replay``), and the index is ``ok``
+        or ``stale`` (a glossary changed since the build; it still answers). An optional datasource that failed
+        does not make the engine not ready; ``problems()`` still lists it.
+        """
+        up = [d for d in self.datasources if d.status == "ready"]
+        required_down = any(d.required and d.status == "failed" for d in self.datasources)
+        return bool(up) and not required_down and (keys_optional or not self.llm) and self.index in ("ok", "stale")
+
+    def problems(self) -> List[str]:
+        """What is wrong, one line each, safe to show an administrator: each failed datasource and its stage, each
+        agent whose key does not resolve, and the index status unless it is ``ok`` or ``stale``. Never a reason's
+        text, which can echo a connection string or a key; ``str(report)`` has it for the operator."""
+        lines = [f"Datasource '{d.id}'{' (required)' if d.required else ''} failed"
+                 f"{f' at {d.stage}' if d.stage else ''}." for d in self.datasources if d.status == "failed"]
+        lines += [f"Agent '{agent}' has no API key that resolves." for agent in self.llm]
+        if self.index not in ("ok", "stale"):
+            lines.append(f"The index is {self.index}.")
+        return lines
+
     def __str__(self) -> str:
         lines = ["Datasources:"]
         lines += [f"  {line}" for d in self.datasources for line in str(d).splitlines()] or ["  none"]

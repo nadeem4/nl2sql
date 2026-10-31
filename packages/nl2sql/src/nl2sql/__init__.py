@@ -15,7 +15,7 @@ from .public_api import NL2SQL
 # import engine submodules.
 _EXPORTS = {
     "nl2sql.api.query_api": ("QueryResult", "AnswerSource", "SubQueryResult", "RowSample"),
-    "nl2sql.api.types": ("DatasourceInfo", "DatasourceType", "IndexProgress", "Candidate", "ApiKey"),
+    "nl2sql.api.types": ("DatasourceInfo", "DatasourceType", "IndexProgress", "TileProgress", "Candidate", "ApiKey"),
     # Schema drift (engine.index.check, versions, diff).
     "nl2sql.schema.drift": ("DriftReport", "SchemaVersionInfo"),
     "nl2sql.schema.impact": ("DriftImpact",),
@@ -40,7 +40,7 @@ _EXPORTS = {
     "nl2sql.llm.override": ("LLMOverride",),
     "nl2sql.llm.providers": ("provider_for_key", "provider_keys_in_environment"),
     "nl2sql.config.mode": ("resolve_mode",),
-    "nl2sql.common.cancellation": ("CancellationToken",),
+    "nl2sql.common.cancellation": ("CancellationToken", "RunCancelled"),
     "nl2sql_sdk.policy": ("UserContext",),
     "nl2sql.registry": ("Registry",),
     # The config, and what building an engine from it reports.
@@ -98,6 +98,7 @@ __all__ = [
     "PipelineError",
     "RunWarning",
     "CancellationToken",
+    "RunCancelled",
     "UserContext",
     "SubQueryResult",
     "RowSample",
@@ -151,6 +152,7 @@ __all__ = [
     "DatasourceInfo",
     "DatasourceType",
     "IndexProgress",
+    "TileProgress",
     "DriftReport",
     "DriftImpact",
     "SchemaDiff",

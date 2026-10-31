@@ -12,8 +12,10 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from nl2sql.api.types import TileProgress
+from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import InvalidArgument, NoTiles, NotPinnable, UnknownTile, WorkspaceNotEmpty
 from nl2sql.conversations.models import Conversation
 from nl2sql.conversations.store import ConversationStore, Owner
@@ -310,9 +312,13 @@ class Dashboards:
     # ------------------------------------------------------------ the starter dashboard (D3)
 
     def generate(self, source: Source, *, user_context: UserContext, title: Optional[str] = None,
-                 workspace_id: Optional[str] = None, max_tiles: Optional[int] = None) -> Tuple[Dashboard, DashboardRun]:
+                 workspace_id: Optional[str] = None, max_tiles: Optional[int] = None,
+                 on_tile: Optional[Callable[[TileProgress], None]] = None,
+                 token: Optional[CancellationToken] = None) -> Tuple[Dashboard, DashboardRun]:
         """The no-model starter (D115): the template charts for ``source``, each run as the caller, the ones that
-        answered kept, laid out and saved whole. A generated dashboard is an ordinary one."""
+        answered kept, laid out and saved whole. A generated dashboard is an ordinary one. ``on_tile`` hears of
+        each chart as it ran; a cancelled ``token`` raises ``RunCancelled`` before the next chart, and the draft
+        and a workspace this call made are removed, as for any failure."""
         owner = self._owner(user_context)
         if workspace_id is not None:
             self._store.workspace(workspace_id, owner)  # before anything runs
@@ -329,10 +335,19 @@ class Dashboards:
                           workspace_id=workspace.id, status="draft", tenant_id=owner[0], user_id=owner[1], tiles=tiles,
                           created_at=now, updated_at=now)
         self._store.put(draft)
+        ran = 0
+
+        def tile_ran(tile: Tile, result: TileRun) -> None:
+            nonlocal ran
+            ran += 1
+            if on_tile is not None:
+                on_tile(TileProgress(title=tile.title, status=result.status, done=ran, total=len(draft.tiles)))
+
         try:
             with self._refresher.locked(draft.id, len(tiles)):
                 dashboard, run = self._keep(draft, self._refresher.run(draft, draft.tiles, user_context, "generate",
-                                                                      announce=False), by_id)
+                                                                      announce=False, on_tile=tile_ran, token=token),
+                                            by_id)
         except BaseException:
             self._store.delete(draft.id)  # nothing half-made is left behind
             if made:

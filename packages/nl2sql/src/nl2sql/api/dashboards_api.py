@@ -9,8 +9,10 @@ runs each dashboard as its stored owner (D134).
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
+from nl2sql.api.types import TileProgress
+from nl2sql.common.cancellation import CancellationToken
 from nl2sql.common.errors import NotIndexed
 from nl2sql.common.planned import arrives_with
 from nl2sql.conversations.models import Conversation
@@ -212,7 +214,8 @@ class DashboardsAPI:
 
     def generate(self, datasource_id: str, *, user_context: UserContext, title: Optional[str] = None,
                  workspace_id: Optional[str] = None,
-                 max_tiles: Optional[int] = None) -> Tuple[Dashboard, DashboardRun]:
+                 max_tiles: Optional[int] = None, on_tile: Optional[Callable[[TileProgress], None]] = None,
+                 cancellation_token: Optional[CancellationToken] = None) -> Tuple[Dashboard, DashboardRun]:
         """The no-model starter (D115): charts chosen from the column roles, run as the caller, laid out and saved.
 
         Needs an index, not a profile. Each column's role comes from Wave B's rules over the indexed snapshot, and a
@@ -224,6 +227,10 @@ class DashboardsAPI:
         on first use) with a filter on the time column the trends use and on the dimensions the distributions use.
         No model is called.
 
+        ``on_tile`` gets a :class:`~nl2sql.TileProgress` after each chart ran (its title, status and ``done`` of
+        ``total``). Cancel ``cancellation_token`` to stop between charts: the chart in flight finishes and the call
+        raises ``RunCancelled`` with nothing saved, no draft and no workspace it made.
+
         Raises:
             NotIndexed: the datasource has no index, or the caller cannot reach it (the same error, so the answer says
                 nothing about a datasource the caller may not see); the message names the command.
@@ -232,7 +239,8 @@ class DashboardsAPI:
             ValueError: ``max_tiles`` is below 1.
         """
         return self._service.generate(self._source(datasource_id, user_context), user_context=user_context,
-                                      title=title, workspace_id=workspace_id, max_tiles=max_tiles)
+                                      title=title, workspace_id=workspace_id, max_tiles=max_tiles, on_tile=on_tile,
+                                      token=cancellation_token)
 
     def suggest_questions(self, datasource_id: str, *, user_context: UserContext, n: int = 5) -> List[str]:
         """The questions of the first ``n`` charts ``generate`` would choose, without running them (nothing is
