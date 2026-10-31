@@ -2868,3 +2868,36 @@ message, written to the cache once per question set and read at the cached rate 
 sort, both directions, multi-column, bare names, the prompt's block position, `none`, byte stability, shared helper).
 Docs: `docs/architecture/nodes/ast_planner_node.md`. Not yet measured: the keyed Pagila rerun (retries for undeclared joins
 should fall to about 0), which needs the owner's yes for the model spend.
+
+### 18.14 C-W8: grouping keys, exact figures, rank ordinals
+
+**Problem.** In the keyed Pagila run of 18.13 (main at c34db812, 8 of 11), three failures were answer accuracy, not retrieval.
+(a) pagila_003: the plan grouped by a computed label (`first_name || ' ' || last_name`) without the actor's key, so two actors
+with the same name became one group; the gold groups by `actor_id`. (b) pagila_007: the answer prose said the figure "stays
+close to 10,000 to 11,400", bounds no row holds; the faithfulness check failed it correctly. (c) pagila_011: the prose said
+"places 2 through 5"; the check read the rank 2 as an unsupported figure (a false positive).
+
+**Design (owner-approved 2026-10-30, one PR).**
+
+- **Validator rule (validation before generation).** `_label_without_key` in `validator/node.py` rejects a group-by item that
+  composes text with `||` or `CONCAT` over two or more distinct columns of one table alias, when some primary-key column of
+  that table is not also grouped as a plain column of the same alias. The error is `INVALID_PLAN_STRUCTURE`, so the planner
+  retries; it names the missing key and says to group by the key as well as the label (the key, not just separate plain
+  columns). Arithmetic (`a - b`), `COALESCE`, `CASE`, date functions such as `DATE_DIFF` of two columns, grouping by one
+  column, and a label together with its table's key stay allowed (adding a key to those would put every row in its own
+  group); a table with no known primary key (`Table.primary_key` empty) is not judged. The table is matched by its schema
+  name as well as its bare name, as `_date_subtraction` does. Accepted limit: plain `GROUP BY first_name, last_name` without
+  the key still passes. No planner prompt change: the message is enough for the retry to converge.
+- **Answer prompt.** Instruction 2 of the answer synthesizer now says to cite only figures that appear in the rows, and never
+  a rounded, approximate or invented range or bound; to describe a spread, name the actual lowest and highest values or use
+  words without numbers. The example is off the eval domains (`test_prompts_not_eval_questions.py` holds).
+- **Faithfulness check.** `check_answer` blanks rank and position numbers before reading figures: `place(s)/rank(s)/position(s)/spot(s) N`
+  with an optional `through`, `to`, `and` or dash range, and only when no number in it is above the rows shown (the most
+  rows any result set has, or the preview size). Nothing else is loosened: `top N` and `N of M` are ordinary figures again,
+  so `top 10` or `Rank 15` on three rows, `900 of 1297`, and a figure beside a rank (`places 2 with 580 tracks`) still fail.
+
+**Built.** Tests: `tests/unit/test_validator_group_by_label.py` (rejects the `||` and `CONCAT` label without the key, accepts it with the key,
+a single column, a date part, arithmetic, `COALESCE`, `DATE_DIFF`, a table with no known key, and matches by schema), `tests/unit/test_answer_faithfulness.py` (rank forms pass,
+invented figures beside a rank still fail), `tests/unit/test_node_answer_synthesizer.py` (the prompt text). Docs: the
+validator, answer synthesizer and evaluation pages. Not yet measured: the keyed Pagila rerun (needs the owner's yes for the
+model spend).

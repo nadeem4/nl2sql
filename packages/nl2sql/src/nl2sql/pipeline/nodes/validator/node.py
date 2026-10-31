@@ -46,18 +46,21 @@ _MAX_HINTED_COLUMNS = 15
 REFUSAL_MESSAGE = "You do not have permission to see the data this question requires."
 
 
+def _walk(node: Optional[Expr]):
+    """An expression and every expression nested in it."""
+    if not node:
+        return
+    yield node
+    for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
+        yield from _walk(child)
+    for when in node.whens:
+        yield from _walk(when.condition)
+        yield from _walk(when.result)
+
+
 def _plan_exprs(plan: PlanModel):
     """Every expression node in the plan, nested ones included."""
-    def walk(node: Optional[Expr]):
-        if not node:
-            return
-        yield node
-        for child in (*node.args, node.left, node.right, node.expr, node.else_expr):
-            yield from walk(child)
-        for when in node.whens:
-            yield from walk(when.condition)
-            yield from walk(when.result)
-
+    walk = _walk
     roots = [s.expr for s in plan.select_items] + [g.expr for g in plan.group_by]
     roots += [o.expr for o in plan.order_by] + [j.condition for j in plan.joins]
     roots += [plan.where, plan.having]
@@ -649,6 +652,59 @@ class LogicalValidatorNode:
         return None
 
     @staticmethod
+    def _label_without_key(state: SubgraphExecutionState, plan: PlanModel) -> Optional[PipelineError]:
+        """Rejects a group-by text label (``||`` or CONCAT) of several columns of one table, without that table's key.
+
+        ``first_name || last_name`` alone puts two people who share a name in one
+        group. Arithmetic, COALESCE, date functions, one column and a table with
+        no known primary key are not judged. Accepted limit: plain
+        ``GROUP BY first_name, last_name`` without the key passes.
+        """
+        plain = {(g.expr.alias, (g.expr.column_name or "").lower())
+                 for g in plan.group_by if g.expr.kind == "column"}
+        for g in plan.group_by:
+            if g.expr.kind == "column":
+                continue
+            by_alias: Dict[str, Set[str]] = {}
+            for node in _walk(g.expr):
+                is_concat = (node.kind == "binary" and node.op == "||") or \
+                    (node.kind == "func" and str(node.func_name).strip().upper() == "CONCAT")
+                if not is_concat:
+                    continue
+                for operand in _walk(node):
+                    if operand.kind == "column":
+                        by_alias.setdefault(operand.alias or "", set()).add((operand.column_name or "").lower())
+            for alias, columns in by_alias.items():
+                if len(columns) < 2:
+                    continue
+                ref = next((t for t in plan.tables if t.alias == alias), None)
+                table = None
+                for candidate in state.relevant_tables if ref else []:
+                    name = (candidate.name or "").lower()
+                    wanted = (ref.name or "").lower()
+                    if ref.schema_name:
+                        matches = name == f"{ref.schema_name}.{wanted}".lower()
+                    else:
+                        matches = name.split(".")[-1] == wanted
+                    if matches:
+                        table = candidate
+                        break
+                key = [k for k in (table.primary_key if table else None) or []]
+                missing = [k for k in key if (alias, k.lower()) not in plain]
+                if missing:
+                    return PipelineError(
+                        node="logical_validator",
+                        message=(
+                            f"GROUP BY a label joined from several columns of '{ref.name}' would merge different "
+                            f"rows that share that label. Group by the key ({', '.join(missing)}) as well as the "
+                            "label (the key, not just separate plain columns), keeping the label in the select list."
+                        ),
+                        severity=ErrorSeverity.ERROR,
+                        error_code=ErrorCode.INVALID_PLAN_STRUCTURE,
+                    )
+        return None
+
+    @staticmethod
     def _unsupported_functions(plan: PlanModel) -> List[PipelineError]:
         """Rejects every function name outside the plan language's list.
 
@@ -807,6 +863,10 @@ class LogicalValidatorNode:
         subtraction_err = self._date_subtraction(state, plan)
         if subtraction_err:
             errors.append(subtraction_err)
+
+        label_err = self._label_without_key(state, plan)
+        if label_err:
+            errors.append(label_err)
 
         if state.sub_query and state.sub_query.expected_schema:
             expected_names = [c.name for c in state.sub_query.expected_schema if c.name]

@@ -20,7 +20,7 @@ Data Notes (checks on the result: values the question filtered on that do not ex
 
 Instructions:
 1. Answer the question in a concise summary.
-2. Every number you state must come from the preview rows or from row_count, quoted exactly as the rows hold it. Do not round, truncate or soften it ("about", "roughly", "nearly"): 4318.06 is "4,318.06", not "4,300". Thousands separators and the column's own decimals are fine. When the preview is partial, do not total, average, rank or count over rows you cannot see: give row_count and describe what the preview shows.
+2. Every number you state must come from the preview rows or from row_count, quoted exactly as the rows hold it. Do not round, truncate or soften it ("about", "roughly", "nearly"): 4318.06 is "4,318.06", not "4,300". Thousands separators and the column's own decimals are fine. Cite only figures that appear in the rows: never a rounded, approximate or invented range or bound ("stays between 300 and 350" when no row holds those numbers); to describe a spread, name the actual lowest and highest values, or use words without numbers. When the preview is partial, do not total, average, rank or count over rows you cannot see: give row_count and describe what the preview shows.
 3. The user sees the full result as a table under your answer. Do not reproduce it; when there are more than a few rows, say the full result is in the table. Prefer format "text" or "list"; use "table" only for a few preview rows that answer the question directly.
 4. If the result limit says the result was cut short, say it was cut at that many rows and that the user should narrow the question. Never present a cut result as complete.
 5. If results contain error messages, explain them clearly.

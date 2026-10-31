@@ -146,3 +146,12 @@ def test_the_answer_prompt_quotes_figures_exactly_as_the_rows_hold_them():
     assert "do not round" in prompt
     assert "thousands separators" in prompt
     assert 'soften it ("about", "roughly", "nearly")' in prompt
+
+
+def test_the_answer_prompt_forbids_invented_ranges_and_bounds():
+    from nl2sql.pipeline.nodes.answer_synthesizer.prompts import ANSWER_SYNTHESIZER_PROMPT
+
+    prompt = ANSWER_SYNTHESIZER_PROMPT.lower()
+
+    assert "only figures that appear in the rows" in prompt
+    assert "range" in prompt and "bound" in prompt
