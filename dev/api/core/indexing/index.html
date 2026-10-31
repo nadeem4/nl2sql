@@ -6212,7 +6212,7 @@ inspect one search of it, and measure schema drift.</p>
 <h2 id="public-surface">Public Surface</h2>
 <h3 id="indexbuild">index.build</h3>
 <p>Signature:
-<code>build(datasource_ids=None, *, on_progress=None, on_datasource=None) -&gt; RebuildResult</code></p>
+<code>build(datasource_ids=None, *, on_progress=None, on_datasource=None, cancellation_token=None) -&gt; RebuildResult</code></p>
 <table>
 <thead>
 <tr>
@@ -6233,12 +6233,17 @@ inspect one search of it, and measure schema drift.</p>
 <td><code>on_datasource</code></td>
 <td>Called with an <code>IndexProgress</code> as each datasource starts, is done or fails.</td>
 </tr>
+<tr>
+<td><code>cancellation_token</code></td>
+<td>A <code>CancellationToken</code>. Cancel it to stop between datasources: the one in flight finishes, the rest are not touched.</td>
+</tr>
 </tbody>
 </table>
 <p>Returns a <code>RebuildResult</code>: <code>ok</code> (every requested datasource's new entries are
 live), <code>stats</code> (one dict per indexed datasource: <code>datasource_id</code>,
-<code>schema_version</code> and the entry counts), <code>empty</code> and <code>errors</code> (<code>datasource_id</code>,
-<code>error</code>).</p>
+<code>schema_version</code> and the entry counts), <code>empty</code>, <code>errors</code> (<code>datasource_id</code>,
+<code>error</code>) and <code>cancelled</code> (the token stopped the build; <code>ok</code> is then false and
+the datasources before the stop are live).</p>
 <p><code>IndexProgress</code> is a frozen dataclass, exported from <code>nl2sql</code>, that serves a
 console line and a job's status record alike:</p>
 <table>

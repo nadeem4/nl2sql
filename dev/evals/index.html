@@ -6169,8 +6169,8 @@ configures the regression gate, which compares a run with a baseline.</p>
 <td>The suites <code>evals.yaml</code> names, or the one file at <code>path</code>, as <code>EvalSuite</code>s</td>
 </tr>
 <tr>
-<td><code>engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False)</code></td>
-<td>Runs every approved case once per role in its <code>outcome</code> map, <code>passes</code> times, and returns an <code>EvalReport</code></td>
+<td><code>engine.evals.run(suites=None, *, mode="full", llm=None, cases=None, roles=None, scorers=None, curated=None, passes=1, max_cost_usd=None, on_case=None, clarify=False, cancellation_token=None)</code></td>
+<td>Runs every approved case once per role in its <code>outcome</code> map, <code>passes</code> times, and returns an <code>EvalReport</code>. Cancelling <code>cancellation_token</code> stops before the next case and the report says <code>stopped: "cancelled"</code></td>
 </tr>
 <tr>
 <td><code>engine.evals.gate(report, baseline)</code></td>

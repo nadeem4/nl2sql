@@ -6046,13 +6046,17 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
   The codes are <code>SCHEDULE_IDENTITY_EXPIRED</code>, <code>SCHEDULE_ROLE_REMOVED</code>, <code>SCHEDULE_ACCESS_DENIED</code> (a chart the owner
   can no longer read) and <code>SCHEDULE_HOOK_DENIED</code> (a hook denied a chart; the message names the chart and the
   hook's reason). A <code>now</code> without a timezone is a <code>ValueError</code>.</li>
-<li><strong><code>generate(datasource_id, title=None, workspace_id=None, max_tiles=None)</code></strong> builds the no-model starter
+<li><strong><code>generate(datasource_id, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)</code></strong> builds the no-model starter
   dashboard and returns <code>(Dashboard, DashboardRun)</code> (<a href="../../../dashboards/#the-starter-dashboard">how it chooses</a>).
   The roles come from the indexed snapshot and the glossary, only for tables the caller can read; each template chart
   runs as the caller (<code>trigger="generate"</code>); the charts whose first run is <code>ok</code> are kept and the others are in
   <code>DashboardRun.skipped</code> (<code>title</code>, <code>status</code>, <code>reason</code>). The result is saved, owned by the caller, in <code>workspace_id</code>
   or "General". Raises <code>NotIndexed</code> (names <code>nl2sql index --datasource &lt;id&gt;</code>), <code>NoTiles</code> (no table the caller
   reaches, or no chart answered), <code>WorkspaceNotFound</code>, and <code>ValueError</code> for <code>max_tiles</code> below 1.
+  <code>on_tile</code> is called with a <code>TileProgress</code> (<code>title</code>, <code>status</code>, <code>done</code>, <code>total</code>) after each chart ran. Cancelling
+  <code>cancellation_token</code> stops before the next chart and raises <code>nl2sql.RunCancelled</code>; the dashboard is not saved, no
+  tile result is stored, and no draft or workspace this call made is left (a chart that already ran keeps its query
+  trace, as any question does).
   <strong><code>suggest_questions(datasource_id, n=5)</code></strong> returns the questions of the first <code>n</code> charts <code>generate</code> would
   choose and runs and saves nothing (<code>[]</code> when the caller reaches no table; <code>NotIndexed</code> as above).</li>
 <li><strong>A verified chart</strong> keeps its datasource in <code>ChartPlan.verified_datasource_id</code>, required with <code>verified</code>.</li>
@@ -6105,8 +6109,8 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 <td>D2</td>
 </tr>
 <tr>
-<td><code>dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None)</code></td>
-<td>D3</td>
+<td><code>dashboards.generate(datasource_id, *, user_context, title=None, workspace_id=None, max_tiles=None, on_tile=None, cancellation_token=None)</code></td>
+<td>D3, <code>on_tile</code> and <code>cancellation_token</code> G3b</td>
 </tr>
 <tr>
 <td><code>dashboards.suggest_questions(datasource_id, *, user_context, n=5) -&gt; list[str]</code></td>

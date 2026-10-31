@@ -5994,8 +5994,10 @@ index or a file until a person with an admin role accepts it.</p>
 datasources. From Python:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">reports</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">knowledge</span><span class="o">.</span><span class="n">profile</span><span class="p">(</span><span class="n">user_context</span><span class="o">=</span><span class="n">UserContext</span><span class="p">(</span><span class="n">roles</span><span class="o">=</span><span class="p">[</span><span class="s2">"admin"</span><span class="p">]))</span>
 </code></pre></div>
-<p><code>profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None)</code>
-returns one <code>ProfileReport</code> per datasource the caller reaches:</p>
+<p><code>profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None, on_datasource=None, cancellation_token=None)</code>
+returns one <code>ProfileReport</code> per datasource the caller reaches. <code>on_datasource</code> is called with each report as its
+datasource finishes, and cancelling <code>cancellation_token</code> stops before the next datasource (the one in flight
+finishes) and returns the reports so far:</p>
 <table>
 <thead>
 <tr>

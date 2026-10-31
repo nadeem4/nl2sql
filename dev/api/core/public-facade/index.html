@@ -6241,6 +6241,16 @@ the environment, so two engines in one process share nothing. The CLI,
 that does not resolve), <code>index</code>, and <code>ok</code>, true when every datasource is
 ready, every key resolves and the index is built. <code>str(report)</code> is a readable
 summary.</p>
+<p>Two methods judge a report for a caller that serves traffic (<code>GET /ready</code>, <code>nl2sql doctor</code>):</p>
+<ul>
+<li><code>ready(*, keys_optional: bool) -&gt; bool</code>: every <code>required</code> datasource is ready and at least one is, every key
+  resolves unless <code>keys_optional</code> (a caller brings its own key, or every agent is on <code>replay</code>), and the index is
+  <code>ok</code> or <code>stale</code> (a glossary changed since the build; it still answers). A failed optional datasource does not make
+  the engine not ready.</li>
+<li><code>problems() -&gt; list[str]</code>: one line per failed datasource (its id and stage), per agent whose key does not
+  resolve, and the index status unless <code>ok</code> or <code>stale</code>. Safe to show an administrator: it never carries a
+  reason's text, which can echo a connection string or a key.</li>
+</ul>
 <p>Building an engine is cheap and has no side effects outside <code>storage.path</code>, so
 it suits tests and notebooks. Startup policy belongs to the entry point: call
 <code>check()</code> straight after building the engine, refuse to start on
@@ -6432,7 +6442,7 @@ submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</
 <code>UserContext</code>, <code>CancellationToken</code>, <code>configure_logging</code>,
 <code>TraceContextFilter</code>, the event types (<code>Event</code>, <code>Observer</code>), a run's ending
 (<code>RunStop</code>, <code>ApprovalRequest</code>, <code>Approval</code>, <code>VerifiedRef</code>), what the namespaces
-return (<code>DatasourceInfo</code>, <code>DatasourceType</code>, <code>IndexProgress</code>, <code>LLMChange</code>), the config (<code>Config</code>,
+return (<code>DatasourceInfo</code>, <code>DatasourceType</code>, <code>IndexProgress</code>, <code>TileProgress</code>, <code>LLMChange</code>), the config (<code>Config</code>,
 <code>load_config</code>, <code>load_env_file</code>, <code>ConfigError</code>, <code>Registry</code> and the section
 classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>AgentLLM</code>, <code>Embeddings</code>, <code>Policies</code>,
 <code>Role</code>, <code>Storage</code>, <code>StoreConfig</code>, <code>Secrets</code>, <code>Curated</code>, <code>Settings</code>,

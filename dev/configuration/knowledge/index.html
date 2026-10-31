@@ -6282,8 +6282,8 @@ plan cache: the next question plans again.</p>
 <td>The knowledge-source items the caller may see as one canonical <code>glossary.yaml</code>, returned and, with <code>path</code>, written there. It refuses to write over a config file or a knowledge source's own file. Derived roles and database comments are not exported.</td>
 </tr>
 <tr>
-<td><code>engine.knowledge.profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None)</code></td>
-<td>Probes the indexed schema for joins the database does not declare and for column roles, and files them in the <a href="../review/">review queue</a>; one <code>ProfileReport</code> per datasource the caller reaches. See <a href="../../schema/profiler/">Schema Profiler</a>. <code>draft=True</code> also drafts table and column descriptions with the <code>profiler</code> model, as proposals, under <code>max_cost_usd</code>.</td>
+<td><code>engine.knowledge.profile(datasource_ids=None, *, user_context, draft=False, max_cost_usd=None, on_datasource=None, cancellation_token=None)</code></td>
+<td>Probes the indexed schema for joins the database does not declare and for column roles, and files them in the <a href="../review/">review queue</a>; one <code>ProfileReport</code> per datasource the caller reaches. See <a href="../../schema/profiler/">Schema Profiler</a>. <code>draft=True</code> also drafts table and column descriptions with the <code>profiler</code> model, as proposals, under <code>max_cost_usd</code>. <code>on_datasource</code> is called with each datasource's <code>ProfileReport</code> as it finishes; cancelling <code>cancellation_token</code> stops before the next datasource and returns the reports so far.</td>
 </tr>
 <tr>
 <td><code>engine.knowledge.reload(*, user_context)</code></td>

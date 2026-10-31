@@ -6686,6 +6686,32 @@ git; <code>packages/api/pyproject.toml</code> carries it as package data of <cod
 unchanged: it serves the single page still committed under <code>packages/nl2sql/.../playground/static/</code>, which is no longer
 rebuilt, until X1b deletes it. <code>test.yml</code>'s <code>web</code> job and <code>CONTRIBUTING.md</code> use the new paths, and the fixtures test writes
 to <code>nl2sql-ui/src/api/fixtures/</code>.</p>
+<p><strong>G3b (progress, cancellation, readiness).</strong> Every long facade call now reports its items and stops between them,
+so a job (D0a-3's <code>JobContext</code>: <code>ctx.progress(step, done, total)</code> and <code>ctx.token</code>) can pass <code>ctx.token</code> as
+<code>cancellation_token=</code> and a callback that calls <code>ctx.progress</code>. <strong>What a cancel does:</strong> the item in flight finishes, no
+other starts. <code>index.build(..., cancellation_token=)</code> returns its <code>RebuildResult</code> with the new <code>cancelled=True</code> and
+<code>ok=False</code> (the datasources before the stop are live, the rest untouched). <code>knowledge.profile(..., on_datasource=,
+cancellation_token=)</code> returns the <code>ProfileReport</code>s so far; <code>on_datasource</code> gets each <code>ProfileReport</code> as its datasource
+finishes (an unindexed one included). <code>evals.run(..., cancellation_token=)</code> returns its <code>EvalReport</code> with
+<code>stopped="cancelled"</code> when cases were left unrun (all three modes; <code>on_case</code> already existed).
+<code>dashboards.generate(..., on_tile=, cancellation_token=)</code> calls <code>on_tile(TileProgress(title, status, done, total))</code>
+(new, exported from <code>nl2sql</code>; <code>total</code> is the number of charts the starter chose, which the job cannot know) after each
+chart, and a cancel raises <code>nl2sql.RunCancelled</code> (exported) before the next chart, leaving no draft, no stored tile
+result and no workspace the call made (the same cleanup as any failure; a chart's own query is not interrupted, as the
+row says "between items"). <code>RunCancelled</code> is not an <code>NL2SQLError</code>; the job manager catches it, logs nothing and ends the job
+<code>cancelled</code>. <code>index.build</code> also checks the token before the embedding-model load. Shapes for later rows: <strong>G2b's <code>engine.add_demo()</code></strong> passes
+<code>on_datasource=</code> (an <code>IndexProgress</code> callback, unchanged) to <code>index.build</code>; <strong>A2b, A3 and A4a's job routes</strong> call
+<code>engine.dashboards.generate(..., on_tile=, cancellation_token=ctx.token)</code>, <code>engine.index.build(ids, on_datasource=,
+cancellation_token=ctx.token)</code>, <code>engine.knowledge.profile(ids, user_context=, draft=, max_cost_usd=, on_datasource=,
+cancellation_token=ctx.token)</code> and <code>engine.evals.run(..., on_case=, cancellation_token=ctx.token)</code>; <strong>A4a's <code>/ready</code></strong>
+calls <code>engine.check()</code> (which raises <code>EngineNotReady</code> with its <code>.report</code> for a failed required datasource, so the
+route reads <code>error.report</code> then) and judges the report with <code>CheckReport.ready(keys_optional=)</code> and, for an admin,
+<code>CheckReport.problems()</code>. <code>ready</code> also requires one datasource ready (as <code>check()</code> does), counts <code>stale</code> as ready, and
+treats a failed optional datasource as a problem only. <code>problems()</code> is <code>list[str]</code>: one line per failed datasource
+(<code>Datasource 'x' (required) failed at auth.</code>), per agent whose key does not resolve and for an index that is not <code>ok</code>
+or <code>stale</code>; it carries no reason text, which can echo a secret. <code>index.refresh</code> has no token (not in the row).
+The code on <code>main</code> matched the design except that <code>index.build</code> and <code>evals.run</code> had their callbacks already, as the
+facade-gaps row says.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at
