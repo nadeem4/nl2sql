@@ -67,6 +67,8 @@ class StorageAPI:
                 counts[slot] = store.purge(now - timedelta(days=days))
         counts["proposals"] = self._ctx.state.purge_proposals(
             now - timedelta(days=self._ctx.settings.review.max_age_days))
+        counts["approvals"] = self._ctx.state.purge_approvals(
+            now - timedelta(hours=self._ctx.settings.approvals.max_age_hours))
         days = self._ctx.config.conversations.max_age_days
         if days is not None:
             cutoff = now - timedelta(days=days)

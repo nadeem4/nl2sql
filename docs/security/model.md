@@ -154,7 +154,13 @@ user who produced it is left to a multi-user deployment.
   an `Approval` on the re-run: the request unedited, the same question and
   asker, the hash of the SQL generated again, and an approver holding one
   of the hook's configured roles. An `Approval` is not signed: it is trusted
-  as far as the `user_context` the caller passes. See
+  as far as the `user_context` the caller passes. Over HTTP the engine keeps the
+  requests itself: a `needs_approval` run stores them, an approver holding one of the hook's
+  roles grants or denies one by id (`engine.approvals`, `NotAuthorized` otherwise), and the
+  asker's re-run names the id; a grant becomes the same `Approval`, so these checks are
+  unchanged, and it is reusable for 24 hours (`settings.approvals.max_age_hours`), after
+  which it expires and `engine.storage.purge()` deletes it. A denied, unknown, waiting or
+  expired id ends the run `APPROVAL_NOT_GRANTED`. See
   [Query API → Approval](../api/core/query.md#approval).
 - **Results belong to their asker**: a run's manifest records who asked,
   `(tenant_id, user_id)`, plus the sorted roles of an anonymous asker, and every read of its rows (`engine.results`, the

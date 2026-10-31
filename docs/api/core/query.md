@@ -39,7 +39,7 @@ Parameters:
 | `user_context` | `Optional[UserContext]` | no | RBAC context. Omitted (or `None`), the run starts with an empty `UserContext`, a caller with no roles, and RBAC treats it exactly as it treats any roles list it has no policy for. Pass one with a role to be granted anything. |
 | `cancellation_token` | `Optional[CancellationToken]` | no | A token (`from nl2sql import CancellationToken`) the caller cancels from another thread to stop the run. No further step and no further model call starts once it is cancelled; the step in flight finishes, and the result carries one `CANCELLED` error. The playground cancels it when the browser drops the request. |
 | `plan` | `Optional[SuppliedPlan]` | no | A plan the caller holds (`from nl2sql import SuppliedPlan`): a whole run (`decomposition` and `plans`), or a verified query (`verified` and `verified_datasource_id`). See [Running a plan you hold](#running-a-plan-you-hold). A `datasource_id` passed with it must be the datasource of every sub-query of the plan, or the call raises `ValueError` before anything runs. |
-| `approvals` | `Optional[Sequence[Approval]]` | no | Approvals for an earlier run's `approvals_needed`. See [Approval](#approval). |
+| `approvals` | `Optional[Sequence[Union[Approval, str]]]` | no | Approvals for an earlier run's `approvals_needed`: `Approval` objects, or request ids granted through `engine.approvals`. See [Approval](#approval). |
 | `clarify` | `bool` | no | Default `True`: a question the planner reads two or three ways ends `needs_clarification` with the options instead of running the most likely one. `False` runs the most likely reading and lists the others as assumptions. The prompts are the same either way. See [Clarification](#clarification). |
 | `choice` | `Optional[ClarificationChoice]` | no | The caller's pick from an earlier run's `clarification` (`from nl2sql import ClarificationChoice`: `request`, `option_id`). Ask the same question as the same caller: the chosen option's plan runs through the validator and the generator without routing, decomposing or planning. See [Asking again](#asking-again). Not with `plan` or `approvals`. |
 | `answer` | `bool` | no | Default `True`. `False` skips the answer synthesizer: the run ends at the aggregator, `final_answer` is `None` and no model is called to write prose. With `plan=` that is a run with no model call at all, which is how a dashboard refresh re-runs a stored plan. The rows, the SQL and the explanation are the same. See [Running without an answer](#running-without-an-answer). |
@@ -126,6 +126,27 @@ if result.status == "needs_approval":
     approvals = [Approval(request=r, by=approver) for r in result.approvals_needed]
     result = engine.run_query(question, user_context=asker, approvals=approvals)
 ```
+
+Request ids are the other way, for an approver and an asker who are different callers at
+different times (over HTTP). A run that ends `needs_approval` stores each request; an approver
+grants it by id, and the asker's re-run names the id:
+
+```python
+result = engine.run_query(question, user_context=asker)          # needs_approval, requests stored
+[record] = engine.approvals.list(user_context=approver)          # status="pending" by default
+engine.approvals.grant(record.id, by=approver)                   # NotAuthorized without an approver role
+result = engine.run_query(question, user_context=asker, approvals=[record.id])
+```
+
+`list(*, user_context, status="pending")` shows the requests the caller's roles may approve and the
+caller's own; `grant(request_id, *, by)` and `deny(request_id, *, by, reason=None)` return the
+`ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `reason`);
+a request already decided is returned as it is, and an unknown or expired id is `ApprovalNotFound`.
+A grant is reusable for any re-run of that request (same question, asker, plan and SQL) until it
+expires (`settings.approvals.max_age_hours`, 24, counted from the last change). An id that is
+unknown, still waiting, denied or expired ends the run with `APPROVAL_NOT_GRANTED` before the graph
+runs. `stream_query`, `conversations.retry` and `dashboards.refresh` take ids the same way (a
+refresh with a bad id raises `ApprovalNotFound` before any chart runs).
 
 The engine, not the hook, checks each approval. An approval pins nothing when
 its request was edited (its `id` no longer matches), its `sql` is not the SQL

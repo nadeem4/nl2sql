@@ -65,7 +65,7 @@ charts:                       # read from release 0.9 (Wave C)
   max_points: 1000
   max_categories: 20
   max_series: 5
-approvals:                    # Wave D: accepted now, read when stored grants land (G3a)
+approvals:                    # Wave D: stored approval grants (G3a)
   max_age_hours: 24
 ```
 
@@ -233,11 +233,11 @@ Release 0.9 ([Wave C](../architecture/wave_c.md)). `engine.results.chart` reads 
 
 ## `approvals`
 
-Wave D ([design](../architecture/wave_d.md)). Accepted and validated now; stored approval grants read it.
+Wave D ([design](../architecture/wave_d.md)). Read by stored approval grants (`engine.approvals`).
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `approvals.max_age_hours` | `24` | A stored approval request, and the grant on it, is purged this long after its last change. |
+| `approvals.max_age_hours` | `24` | A stored approval request, and the grant on it, expires, and is purged, this long after its last change. |
 
 ## `conversations` and `dashboards`
 

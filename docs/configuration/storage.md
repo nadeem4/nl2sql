@@ -91,9 +91,10 @@ superseded) decided more than `settings.review.max_age_days` (365) ago, and the
 [conversations](../conversations/index.md#ownership-and-retention) last updated more than
 `conversations.max_age_days` (30) ago, and the [draft dashboards](../dashboards/index.md) last edited
 more than that long ago (saved dashboards are never purged), and
-returns the counts, `{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "dashboards": 1, "audit": 1}`
+returns the counts, `{"traces": 3, "results": 12, "proposals": 4, "approvals": 0, "conversations": 2, "dashboards": 1, "audit": 1}`
 (no `audit` when the engine runs no audit observer, no `conversations` or `dashboards` when `max_age_days` is null). Open
-proposals are never purged. It publishes the counts as the
+proposals are never purged. `approvals` counts the stored approval requests and grants last changed more than
+`settings.approvals.max_age_hours` (24) ago. It publishes the counts as the
 [`retention.purged` event](../observability/events.md#the-catalog), which the
 audit observer writes. A
 plugin trace or results store is purged when it has a `max_age_days`

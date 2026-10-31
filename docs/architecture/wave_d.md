@@ -1336,6 +1336,28 @@ or `stale`; it carries no reason text, which can echo a secret. `index.refresh` 
 The code on `main` matched the design except that `index.build` and `evals.run` had their callbacks already, as the
 facade-gaps row says.
 
+**G3a (stored approval grants).** `nl2sql/approvals/api.py`: `Approvals(ctx)`, which is `engine.approvals`, and
+`ApprovalRecord` (`id`, `status`, `request`, `created_at`, `updated_at`, `decided_by`, `approver` (the granting
+`UserContext`, with the roles it held), `reason`), exported from `nl2sql`. `list(*, user_context, status="pending")` shows
+the requests the caller's roles may approve (the hook's approver roles, else `policies.admin_roles`; `allow_all` makes no
+approver) and the caller's own; `grant(request_id, *, by)` and `deny(request_id, *, by, reason=None)` raise
+`NotAuthorized` without an approver role and `ApprovalNotFound` for an unknown or expired id, and return a request
+already decided as it is. `submit(requests)` and `resolve(items, *, user)` are internal (the run's side). **Where the
+design differs:** the hooks runner is unchanged. `QueryAPI` resolves request ids before the graph (`_granted`), so a
+granted id becomes the `Approval` the runner already checks; a denied, unknown, waiting or expired id ends the run
+`APPROVAL_NOT_GRANTED` with the graph never started, in `run_query` and `stream_query` alike (the `Approval` objects
+pass through untouched). A `needs_approval` run stores its requests as pending in `run_query` and in `stream_query`
+(`_store_requests`); a request already stored is left alone, and an expired one becomes pending again. A grant
+is valid until `updated_at + settings.approvals.max_age_hours`, which `storage.purge()` also deletes (`counts["approvals"]`).
+The grant stores the approver's `UserContext` beside the SDK store's `decided_by` (a second write after the atomic
+`decide_approval`; the store interface is unchanged). `conversations.retry` and `ConversationsAPI.retry` take
+`Sequence[Union[Approval, str]]` and pass them to `run_query`; `dashboards.refresh` (the facade only) resolves ids first with
+`resolve_refresh_approvals(ctx, approvals, user)` and raises `ApprovalNotFound` before any chart runs, because a bad
+id would otherwise fail every chart alike. The signature widening is `Union[Approval, str]` on those four methods and
+`NL2SQL.run_query` and `stream_query`. A2a's retry route and A2b's refresh route pass the body's `approval_ids` straight
+through as `approvals=`; A1 maps `ApprovalNotFound` to 404 and `NotAuthorized` to 403, and the run's
+`APPROVAL_NOT_GRANTED` shows as the result's error. T1 reads `engine.approvals.list(...)`.
+
 ### Session batches
 
 One session builds one batch: about five PRs, stacked in the order below
