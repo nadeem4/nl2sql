@@ -1,6 +1,6 @@
 """Records the playground home page's clips: one per feature, light and dark.
 
-The home page (``web/playground/src/Home.jsx``) shows a short clip of each page
+The home page (``nl2sql-ui/src/pages/Home.jsx``) shows a short clip of each page
 it describes -- Ask, Pipeline, Retrieval. This script boots the demo in hosted
 mode with no key at all, drives each page in headless Chromium, and writes a
 muted webm and a poster jpg per feature and theme into

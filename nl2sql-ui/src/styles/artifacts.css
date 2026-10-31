@@ -1,0 +1,164 @@
+/* ---- Data artifacts ----
+   The SQL, the rows, the cost ledger and the retrieval pool, each read as a
+   finished artifact: the SQL and the rows are raised cards with a header or a
+   foot strip, and every magnitude is an inline 6px track and fill beside its
+   number, sized against its own set (the column's largest value, the slowest
+   node, the pool's range). A model's bar takes the accent; code's is dimmed
+   ink. The SQL tint holds 4.5:1 on --raised in both themes. */
+
+:root { --kw: #8c1d2e; --fn: #1f5fa8; --num: #6b3fb0; }
+@media (prefers-color-scheme: dark) {
+  :root { --kw: #f08a9b; --fn: #8ab4f8; --num: #c7a2ff; }
+}
+
+.art { overflow: hidden; min-width: 0; }
+.art-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-5); min-height: 44px;
+  border-bottom: 1px solid var(--hair);
+}
+.art-label { font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.art-meta { font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-2); }
+.art-head .inspect-close, .art-foot .inspect-close { margin-left: auto; font-family: var(--sans); }
+.art-scroll { overflow: auto; max-height: 420px; }
+.art-scroll:focus-visible { outline-offset: -2px; }
+.art-foot {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-5); min-height: 44px;
+  font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-2);
+  border-top: 1px solid var(--hair); background: var(--surface);
+}
+
+/* SQL: numbered lines from a CSS counter, so a copy never picks them up. */
+.sql-code {
+  margin: 0; padding: var(--sp-4) var(--sp-5); counter-reset: line;
+  font-size: var(--fs-2); line-height: 1.7; color: var(--ink);
+  overflow-x: auto; white-space: pre; tab-size: 2;
+}
+.sql-code:focus-visible { outline-offset: -2px; }
+.sql-line { counter-increment: line; }
+.sql-line::before {
+  content: counter(line); display: inline-block; width: 2ch; margin-right: var(--sp-4);
+  text-align: right; color: var(--ink-3); user-select: none;
+}
+.tk-kw { color: var(--kw); }
+.tk-fn { color: var(--fn); }
+.tk-num { color: var(--num); }
+
+/* Rows: the table fills the card, 38px rows, a header that sticks. */
+.rows-table, .ledger-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.rows-table th {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  padding: var(--sp-2) var(--sp-5); text-align: left; white-space: nowrap;
+  font-family: var(--mono); font-weight: var(--fw-regular); font-size: var(--fs-1); color: var(--ink-2);
+  border-bottom: 1px solid var(--rule);
+}
+.rows-table td {
+  height: 38px; padding: 0 var(--sp-5); white-space: nowrap;
+  font-size: var(--fs-2); font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--hair);
+}
+.rows-table tbody tr:last-child td { border-bottom: 0; }
+.rows-table th.num, .rows-table td.num { text-align: right; }
+.rows-table td.num { font-family: var(--mono); }
+.rows-table td.null { font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); }
+.rows-table td.barcell-td { width: 50%; min-width: 180px; }
+.barcell { display: grid; grid-template-columns: minmax(48px, 1fr) var(--num-w, 7ch); gap: var(--sp-3); align-items: center; }
+.barcell > span:last-child { text-align: right; }
+
+/* Several results: the segmented control, on the card's own ground. */
+.rows-tabs { margin: var(--sp-3) var(--sp-5) 0; }
+.rows-tabs .seg-opt { gap: var(--sp-2); border: 0; background: transparent; }
+.rows-tabs .seg-opt[data-on] { background: var(--raised); }
+.rows-tab-n { color: var(--ink-3); }
+/* A result cut at its row ceiling: one line under the head, in the warn ink. */
+.rows-cut {
+  margin: 0; padding: var(--sp-2) var(--sp-5); border-bottom: 1px solid var(--hair);
+  font-size: var(--fs-2); color: var(--warn); background: var(--warn-soft);
+}
+.rows-wait { display: grid; gap: var(--sp-3); padding: var(--sp-5); }
+.rows-error { margin: 0; padding: var(--sp-3) var(--sp-5); font-size: var(--fs-2); color: var(--fault); }
+.rows-table td.rows-empty { font-family: var(--sans); color: var(--ink-3); }
+.art-scroll[data-busy] { opacity: .55; transition: opacity var(--dur-state) ease; }
+.rows-pager { display: inline-flex; gap: var(--sp-1); margin-left: auto; }
+.rows-pager .inspect-close { margin-left: 0; font-family: var(--sans); }
+.rows-pager .inspect-close:disabled { color: var(--ink-3); opacity: .6; }
+
+/* Several sub-queries: each plan and each SQL card under its own head. */
+.sub-block + .sub-block { margin-top: var(--sp-5); }
+.sub-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); margin: 0 0 var(--sp-2); font-size: var(--fs-1); color: var(--ink-3); }
+.sub-head b { font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; }
+.sub-head span { font-family: var(--mono); color: var(--ink-2); }
+
+/* One bar for every magnitude: a 6px track and its fill. */
+.bar { display: block; height: 6px; border-radius: 99px; background: var(--well); overflow: hidden; }
+.bar i {
+  display: block; height: 100%; width: calc(var(--share, 0) * 100%); min-width: 2px;
+  border-radius: 99px; background: var(--accent); transform-origin: left center;
+}
+.bar.neg i { background: var(--ink-2); }
+.bar.dim i { background: var(--ink-3); opacity: .6; }
+
+/* Cost and time: five figures, then (Debug) the ledger. */
+.totals { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: var(--sp-4); }
+.totals div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 2px; min-width: 0; }
+.totals dt { font-size: var(--fs-1); color: var(--ink-2); }
+.totals dd { margin: 0; font-family: var(--mono); font-size: var(--fs-4); font-variant-numeric: tabular-nums; }
+
+.art-ledger { margin-top: var(--sp-4); }
+.art-ledger .art-scroll { max-height: none; }
+.ledger-table { font-family: var(--mono); font-size: var(--fs-1); }
+.ledger-table th, .ledger-table td { padding: var(--sp-2) var(--sp-3); text-align: right; white-space: nowrap; border-bottom: 1px solid var(--hair); font-variant-numeric: tabular-nums; }
+.ledger-table thead th { font-weight: var(--fw-regular); color: var(--ink-2); background: var(--surface); border-bottom-color: var(--rule); }
+.ledger-table thead th:first-child, .ledger-table tbody th, .ledger-table tfoot th { text-align: left; }
+.ledger-table tbody th { font-weight: var(--fw-regular); }
+.ledger-table tr.code .node, .ledger-table tr.code .node-link { color: var(--ink-2); }
+.ledger-table tr[data-depth="1"] th { padding-left: 34px; }
+.ledger-table tr[data-depth="1"] th::before {
+  content: ""; display: inline-block; width: 8px; height: 1px; background: var(--rule-strong); margin: 0 8px 3px -16px;
+}
+.ledger-table tr[data-picked] > th { box-shadow: inset 2px 0 0 var(--accent); }
+.ledger-table .tag {
+  margin-left: var(--sp-2); padding: 1px 6px; border-radius: 4px;
+  font-family: var(--sans); font-size: var(--fs-1); font-weight: var(--fw-bold);
+  color: var(--warn); background: var(--warn-soft);
+}
+.ledger-table .tag.quiet { padding: 0; background: none; color: var(--ink-3); font-weight: var(--fw-regular); }
+.ledger-table tfoot th, .ledger-table tfoot td { border-top: 1px solid var(--rule-strong); border-bottom: 0; font-weight: var(--fw-bold); background: var(--surface); }
+.ledger-table tfoot th { font-family: var(--sans); }
+.timecell { display: inline-grid; grid-template-columns: 72px 7ch; gap: var(--sp-3); align-items: center; }
+.timecell > span:last-child { text-align: right; }
+
+/* Retrieval: similarity across the pool's own range, picks as chips. */
+.simcell { display: inline-grid; grid-template-columns: 56px 5ch; gap: var(--sp-2); align-items: center; }
+.simcell > span:last-child { text-align: right; }
+.pool tbody tr:not([data-picked]) .bar i { background: var(--rule-strong); }
+.chip-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); font-size: var(--fs-2); color: var(--ink-2); max-width: 1120px; }
+ol.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: chip; }
+ol.chips li {
+  counter-increment: chip; display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 2px var(--sp-2); border: 1px solid var(--rule); border-radius: 6px; background: var(--surface);
+}
+ol.chips.picks li::before { content: counter(chip); font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); }
+ol.chips code { font-size: var(--fs-1); color: var(--ink); }
+ol.chips.picks li { border-color: color-mix(in srgb, var(--accent) 45%, var(--rule)); }
+
+#inspect-title:focus { outline: none; }
+#inspect-title:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bar i { animation: grow var(--dur-data) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
+  .inspect { animation: arrive var(--dur-enter) var(--ease-out) both; }
+}
+
+@media (max-width: 640px) {
+  .art-head, .art-foot { padding-left: var(--sp-4); }
+  .rows-cut, .rows-error { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  .rows-tabs { margin-left: var(--sp-4); margin-right: var(--sp-4); }
+  .sql-code { padding: var(--sp-3) var(--sp-4); }
+  .rows-table th, .rows-table td { padding-left: var(--sp-3); padding-right: var(--sp-3); }
+  .rows-table td { height: 44px; }
+  .rows-table td.barcell-td { min-width: 150px; }
+}
+/* ---- end Data artifacts ---- */
+

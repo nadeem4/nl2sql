@@ -1,7 +1,7 @@
 """The golden files the web app's node tests read: ``ApiError`` and ``Job`` (docs/architecture/wave_d.md, "Testing").
 
 Each is a real response of this API, so a route change that makes one stale fails here, as ``openapi.json``'s test does.
-Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. D0b moves the folder with the app.
+Rewrite them with ``python packages/api/tests/test_web_fixtures.py``. They live in ``nl2sql-ui/src/api/fixtures/``.
 """
 import json
 import pathlib
@@ -20,7 +20,7 @@ from nl2sql_api.dependencies import get_engine
 from nl2sql_api.jobs import IndexJob, IndexResult, Jobs
 from nl2sql_api.main import create_app
 
-FIXTURES = pathlib.Path(__file__).resolve().parents[3] / "web" / "playground" / "src" / "api" / "fixtures"
+FIXTURES = pathlib.Path(__file__).resolve().parents[3] / "nl2sql-ui" / "src" / "api" / "fixtures"
 START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 

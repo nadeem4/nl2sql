@@ -1,0 +1,86 @@
+/* ---------- hover, only where hover is real ----------
+   On touch, an emulated hover sticks after a tap; these never apply there. */
+
+@media (hover: hover) {
+  a:hover { text-decoration-color: currentColor; }
+  .nav-link:hover { color: var(--ink); border-bottom-color: var(--rule-strong); }
+  .nav-link[aria-current="page"]:hover { border-bottom-color: var(--accent); }
+  .nav[data-ind] .nav-link[aria-current="page"]:hover { border-bottom-color: transparent; }
+  .nav-link:hover .nav-off { color: var(--ink-2); }
+
+  .ask:hover:not(:disabled), .first-run-go:hover, .index-rebuild.is-primary:hover:not(:disabled),
+  .settings-save:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--accent-fill), var(--paper) 18%);
+    border-color: color-mix(in oklab, var(--accent-fill), var(--paper) 18%);
+  }
+  .index-rebuild:not(.is-primary):hover:not(:disabled), .rate-btn:hover:not(:disabled) {
+    border-color: var(--ink); background: var(--surface);
+  }
+  .inspect-close:hover:not(:disabled) { color: var(--ink); background: var(--well); }
+
+  .guided-q:hover:not(:disabled) { background: var(--well); }
+  .table-head:hover .table-name { color: var(--accent); }
+  .index-warning a:hover, .index-warning .linkish:hover { text-decoration-thickness: 2px; }
+  .rate-choice:hover { border-color: var(--rule-strong); }
+  .node-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+  .fold summary:hover { color: var(--accent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask, .first-run-go, .index-rebuild, .settings-save, .rate-btn, .inspect-close,
+  .nav-link, .guided-q, .rate-choice, summary::before, .caret { transition: none; }
+}
+
+/* ---------- narrow windows ---------- */
+
+@media (max-width: 1060px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "composer" "run" "rail";
+    grid-template-rows: auto;
+  }
+  .rail { position: static; max-height: none; overflow: visible; border-right: 0; margin: var(--sp-5) 0 0; padding: var(--sp-5) 0 0; border-top: 1px solid var(--rule); }
+  .settings-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  :root { --gutter: var(--sp-4); }
+  /* Four names fit across a phone, so the nav stays a nav. */
+  .nav-link { padding: var(--sp-2) 10px; font-size: var(--fs-2); }
+  .nav ul { gap: 0; justify-content: space-between; }
+  .topbar { column-gap: var(--sp-3); }
+  /* The mark and the status share the first row; the tabs take the second. */
+  .wordmark-sub { display: none; }
+  .status { min-width: 0; }
+  .page-head { padding-top: var(--sp-5); }
+  .composer { padding: var(--sp-4); }
+  .ask { margin-left: 0; width: 100%; }
+  .ask kbd { display: none; }
+  .spine { padding-left: 26px; }
+  .spine::before { left: 5px; }
+  .mark { left: -26px; }
+  .station[data-state="skipped"]::before { left: -21px; }
+  .steps { padding-left: 26px; }
+  .step[data-depth="1"] { padding-left: 14px; }
+  .step[data-depth="1"]::before { left: -17px; width: 10px; }
+  .step-kind { margin-left: 0; }
+  #pane-validation .mark { left: -30px; }
+  #pane-validation .station-body { padding: var(--sp-3) var(--sp-4); }
+  .station h3 { min-width: 0; }
+  .checks { grid-template-columns: max-content minmax(0, 1fr); }
+  .check-msg { grid-column: 2; margin-bottom: var(--sp-1); }
+  .model-rows li { grid-template-columns: minmax(0, 1fr); row-gap: 6px; }
+  .settings-foot { flex-wrap: wrap; }
+  .knob input[type="range"] { width: 100%; }
+  .knob-lambda { width: 100%; }
+  .rate-entry { flex-direction: column; }
+}
+
+@media (pointer: coarse) {
+  .nav-link { min-height: 44px; align-items: center; }
+  .guided-q { min-height: 44px; padding-block: var(--sp-2); }
+  .chip, .table-head, .strip-item { min-height: 44px; }
+  .check { min-height: 44px; }
+  .check input[type="checkbox"] { width: 20px; height: 20px; }
+}
+

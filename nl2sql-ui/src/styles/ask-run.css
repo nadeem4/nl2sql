@@ -1,0 +1,339 @@
+/* ---------- composer ---------- */
+
+.composer { padding: var(--sp-5); }
+
+/* The hosted demo before a key: the one thing a new visitor has to do, said
+   above the question box rather than after a click that would fail. Quiet
+   ground, one filled control, and nothing else competing. */
+.first-run {
+  margin-bottom: var(--sp-5); padding: var(--sp-4) var(--sp-4) var(--sp-4);
+  background: var(--accent-soft); border-radius: var(--r-well);
+  max-width: 68ch; display: grid; gap: var(--sp-2); justify-items: start;
+}
+.first-run h3 { font-size: var(--fs-4); letter-spacing: -0.012em; }
+.first-run p { font-size: var(--fs-2); color: var(--ink-2); text-wrap: pretty; }
+.first-run-go { margin-top: var(--sp-1); }
+
+.question-label { display: block; font-weight: var(--fw-bold); font-size: var(--fs-3); margin-bottom: var(--sp-2); }
+
+textarea {
+  display: block; width: 100%; min-height: 64px; resize: vertical;
+  padding: var(--sp-3) var(--sp-4); font-size: var(--fs-4); line-height: 1.4;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--rule-strong); border-radius: var(--r-well);
+}
+textarea::placeholder { color: var(--ink-3); }
+textarea:focus-visible { outline-offset: 0; border-color: var(--focus); }
+textarea:disabled { background: var(--well); color: var(--ink-3); border-color: var(--rule); cursor: default; }
+
+.controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3) var(--sp-5); margin-top: var(--sp-3); }
+.field { display: flex; align-items: center; gap: var(--sp-2); }
+.field label, .check { font-size: var(--fs-2); color: var(--ink-2); }
+select {
+  appearance: none; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+  padding: 5px 30px 5px 10px; font-family: var(--mono); font-size: var(--fs-2);
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%), linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px; background-repeat: no-repeat;
+}
+.check { display: inline-flex; align-items: center; gap: var(--sp-2); cursor: pointer; }
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent-fill); cursor: pointer; }
+.check .hint { color: var(--ink-3); font-size: var(--fs-1); }
+
+.ask { margin-left: auto; }
+
+/* ---------- rail: guided questions and the database ---------- */
+
+/* The rail's headings are labels, like YOUR QUESTION: the content leads, not the title. */
+.rail h2 {
+  font-size: var(--fs-1); font-weight: var(--fw-bold); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3);
+  margin-bottom: var(--sp-3); display: flex; align-items: baseline; gap: var(--sp-2);
+}
+.rail h2 code { text-transform: none; letter-spacing: 0; color: var(--ink-2); }
+
+/* With three databases registered, twenty guided questions read as one pile
+   unless each says which database it asks about. The name is the quiet mono
+   the rail uses for a datasource; with a single database there is nothing to
+   tell apart, so no name is printed. */
+.guided { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--hair); }
+.guided h3 { font-size: var(--fs-2); font-weight: var(--fw-medium); color: var(--ink-2); margin-bottom: var(--sp-1); }
+.guided-group + .guided-group { margin-top: var(--sp-3); }
+.guided-source {
+  margin: 0 0 2px; font-size: var(--fs-1); font-weight: var(--fw-regular); color: var(--ink-3);
+}
+.guided ul { list-style: none; margin: 0; padding: 0; columns: 3 260px; column-gap: var(--sp-6); }
+.guided li { break-inside: avoid; }
+.guided-q {
+  display: block; width: calc(100% + 8px); text-align: left;
+  background: none; border: 0; border-radius: var(--r-control);
+  padding: var(--sp-1) var(--sp-2); margin-left: calc(-1 * var(--sp-2)); font-size: var(--fs-2); line-height: 1.4; color: var(--ink);
+  transition: background-color var(--dur-state) ease;
+}
+.guided-q:disabled { color: var(--ink-3); }
+
+.schema .ds { font-size: var(--fs-2); color: var(--ink-2); font-weight: var(--fw-regular); }
+/* With three databases the rail is a choice, not a label: the same quiet
+   select the composer uses for a role, on the line under the heading. With
+   one there is nothing to choose and none of this is printed. */
+.schema-pick { display: flex; align-items: center; gap: var(--sp-2); margin: -2px 0 var(--sp-3); }
+.schema-pick label { font-size: var(--fs-2); color: var(--ink-2); }
+.schema-sum { font-size: var(--fs-2); color: var(--ink-2); margin: calc(-1 * var(--sp-1)) 0 var(--sp-3); }
+.schema-cross { font-size: var(--fs-1); color: var(--ink-3); margin: calc(-1 * var(--sp-1)) 0 var(--sp-3); max-width: 42ch; }
+.tables { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.tables > li { border-bottom: 1px solid var(--rule); }
+.table-head {
+  display: grid; grid-template-columns: 14px auto 1fr auto; column-gap: 6px; align-items: baseline;
+  width: 100%; background: none; border: 0; padding: var(--sp-2) 2px; text-align: left;
+}
+.caret {
+  width: 6px; height: 6px; border-right: 1.5px solid var(--ink-3); border-bottom: 1.5px solid var(--ink-3);
+  transform: translateY(-2px) rotate(-45deg); transition: transform var(--dur-state) ease; justify-self: center;
+}
+.table-head[aria-expanded="true"] .caret { transform: translateY(-3px) rotate(45deg); }
+.table-name { font-family: var(--mono); font-size: var(--fs-2); }
+.table-rows { grid-column: 4; font-family: var(--mono); font-size: var(--fs-1); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.refs { grid-column: 2 / -1; font-size: var(--fs-1); color: var(--ink-3); }
+.flag {
+  grid-column: 3; justify-self: start; font-size: var(--fs-1); font-weight: var(--fw-bold); color: var(--accent);
+  padding: 0 6px; border-radius: 4px; background: var(--accent-soft);
+}
+li[data-flag] .table-name { font-weight: var(--fw-bold); }
+li[data-flag="used"] { box-shadow: inset 2px 0 0 var(--accent); }
+li[data-flag="used"] .table-head, li[data-flag="denied"] .table-head { padding-left: var(--sp-2); }
+li[data-flag="denied"] { box-shadow: inset 2px 0 0 var(--ink); }
+li[data-flag="denied"] .flag { color: var(--ink); background: var(--well); }
+
+.table-body { padding: 2px 0 var(--sp-3) 22px; }
+.cols { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
+.cols th, .cols td { padding: 2px 10px 2px 0; text-align: left; vertical-align: baseline; font-weight: var(--fw-regular); }
+.col-name { font-family: var(--mono); white-space: nowrap; }
+.col-type { font-family: var(--mono); color: var(--ink-2); }
+.col-null { color: var(--ink-3); white-space: nowrap; }
+.pk { margin-left: 6px; font-family: var(--sans); font-size: var(--fs-1); font-weight: var(--fw-bold); color: var(--accent); }
+.fks { list-style: none; margin: var(--sp-2) 0 0; padding: 0; font-size: var(--fs-1); color: var(--ink-2); }
+.fks li { padding: 1px 0; }
+.fks code { color: var(--ink); font-size: var(--fs-1); }
+
+/* ---------- rail: the search index ----------
+   Sits above the Database because the two are easy to confuse: the Database
+   reads the schema snapshot and can look fine while the index is empty. When
+   healthy it is a quiet ledger; when not, it takes the fault colour and its
+   Rebuild becomes the one filled button in the rail. */
+
+.index { margin-bottom: var(--sp-5); padding-bottom: var(--sp-4); border-bottom: 1px solid var(--rule); }
+.index .ds { font-size: var(--fs-2); color: var(--ink-2); font-weight: var(--fw-regular); }
+.index-sources { font-size: var(--fs-2); color: var(--ink-2); margin: calc(-1 * var(--sp-1)) 0 var(--sp-3); max-width: 42ch; }
+.index-status { font-size: var(--fs-2); color: var(--ink-2); margin: calc(-1 * var(--sp-1)) 0 var(--sp-3); max-width: 42ch; }
+.index[data-status="empty"] .index-status,
+.index[data-status="missing"] .index-status,
+.index[data-status="stale"] .index-status { color: var(--fault); font-weight: var(--fw-bold); }
+
+.index-problems { margin: 0 0 var(--sp-3); padding: var(--sp-2) var(--sp-3); list-style: none; background: var(--fault-soft); border-radius: var(--r-well); font-size: var(--fs-2); color: var(--ink); display: grid; gap: var(--sp-1); }
+.index-problems li { overflow-wrap: anywhere; }
+
+.index-counts { margin: 0 0 var(--sp-3); display: grid; grid-template-columns: repeat(4, minmax(0, max-content)); gap: var(--sp-2) var(--sp-5); }
+.index-counts div { display: flex; flex-direction: column-reverse; }
+.index-counts dt { font-size: var(--fs-1); color: var(--ink-2); }
+.index-counts dd { margin: 0; font-family: var(--mono); font-size: var(--fs-4); font-variant-numeric: tabular-nums; }
+
+.index-meta { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-4); font-size: var(--fs-1); color: var(--ink-3); margin-bottom: var(--sp-3); }
+.index-meta code { color: var(--ink-2); font-size: var(--fs-1); }
+.index-folder { margin-bottom: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--rule-strong); font-size: var(--fs-2); color: var(--ink); max-width: 46ch; }
+
+.index-action { display: grid; gap: var(--sp-2); justify-items: start; }
+.index-help { font-size: var(--fs-1); color: var(--ink-2); max-width: 46ch; }
+.index-help code { white-space: nowrap; }
+.index-rebuild { margin-top: var(--sp-1); }
+
+.index-progress { margin: var(--sp-3) 0 0; padding: 0 0 0 18px; font-size: var(--fs-2); color: var(--ink-2); display: grid; gap: 3px; }
+.index-progress li[data-current] { color: var(--ink); font-weight: var(--fw-bold); }
+.index-progress .working { margin-left: 2px; }
+.index .fault { margin: var(--sp-3) 0 0; font-size: var(--fs-2); }
+
+/* The page-wide warning: the only thing above the fold that says questions
+   will fail, because the rail sits below the run on a narrow window. */
+.index-warning {
+  margin: var(--sp-4) 0 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-well);
+  background: var(--fault-soft); color: var(--fault); font-size: var(--fs-3); max-width: 96ch;
+}
+.index-warning strong { font-weight: var(--fw-bold); }
+/* On the Ask page Rebuild is a jump to the button in the rail, so it is a
+   button too; from another page it is a link back to that page. */
+.index-warning a, .index-warning .linkish {
+  background: none; border: 0; padding: 0; font: inherit;
+  color: inherit; font-weight: var(--fw-bold); text-decoration: underline 1px; text-underline-offset: 3px;
+  text-decoration-color: currentColor;
+}
+.index-warning code { color: var(--ink); }
+
+/* ---------- the run: one spine, six stations ---------- */
+
+.spine { position: relative; padding-left: 34px; }
+/* The rail the question travels down. */
+.spine::before {
+  content: ""; position: absolute; left: 9px; top: 14px; bottom: 18px;
+  width: 2px; background: var(--rule);
+}
+
+.station { position: relative; padding: var(--sp-4) 0 var(--sp-5); }
+.station + .station { border-top: 1px solid var(--rule); }
+.mark {
+  position: absolute; left: -30px; top: 21px; width: 12px; height: 12px;
+  background: var(--paper); border: 2px solid var(--rule-strong); border-radius: 2px;
+}
+.station[data-state="done"] .mark { background: var(--accent); border-color: var(--accent); }
+.station[data-state="held"] .mark { border-color: var(--accent); }
+.station[data-state="skipped"] .mark { border-style: dashed; }
+
+.station-head { display: flex; align-items: baseline; gap: var(--sp-4); flex-wrap: wrap; }
+.station h3 { font-size: var(--fs-3); min-width: 7.5rem; }
+.station-note { color: var(--ink-2); font-size: var(--fs-2); max-width: 70ch; }
+.station[data-state="idle"] h3, .station[data-state="skipped"] h3 { color: var(--ink-2); }
+.station-body { margin-top: var(--sp-3); }
+
+/* The gate: the checks station spans the spine with a heavier bar, and its
+   body is raised. */
+#pane-validation { border-top: 2px solid var(--ink); }
+#pane-validation .station-body { padding: var(--sp-4) var(--sp-5); }
+#pane-validation .mark { width: 20px; left: -34px; height: 8px; top: 23px; border-radius: 1px; }
+#pane-validation[data-state="idle"] .mark, #pane-validation[data-state="busy"] .mark { background: var(--ink); border-color: var(--ink); }
+#pane-validation[data-state="stopped"] .mark { background: var(--accent); border-color: var(--accent); }
+
+/* Past a refusal the spine goes dashed: nothing travelled down it. */
+.station[data-state="skipped"]::before {
+  content: ""; position: absolute; left: -25px; top: -1px; bottom: 0; width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--paper) 0 4px, var(--rule-strong) 4px 8px);
+}
+
+.working { margin-left: var(--sp-3); color: var(--accent); font-weight: var(--fw-bold); }
+@media (prefers-reduced-motion: no-preference) {
+  .working::after { content: "\2026"; display: inline-block; margin-left: 2px; animation: breathe 1.2s var(--ease-in-out) infinite; }
+  .station[data-state="busy"] .mark { animation: breathe 1.4s var(--ease-in-out) infinite; }
+  @keyframes breathe { 50% { opacity: .35; } }
+}
+
+/* Question */
+.asked { font-size: var(--fs-4); line-height: 1.35; font-weight: var(--fw-medium); letter-spacing: -0.01em; max-width: 60ch; text-wrap: balance; }
+.asked-meta { margin-top: var(--sp-2); color: var(--ink-2); font-size: var(--fs-2); }
+.asked-meta strong { font-family: var(--mono); font-weight: var(--fw-regular); color: var(--ink); font-size: var(--fs-2); }
+
+.notice, .fault { margin: var(--sp-1) 0 var(--sp-3); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-well); font-size: var(--fs-3); max-width: 80ch; }
+.notice { background: var(--well); color: var(--ink); }
+.fault { background: var(--fault-soft); color: var(--fault); overflow-wrap: anywhere; }
+
+/* Plan: the model's clauses, set like a query form */
+.plan { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--sp-5); row-gap: 6px; }
+.clause { display: contents; }
+.plan dt { color: var(--ink-2); font-size: var(--fs-2); padding-top: 1px; }
+.plan dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.plan code { font-size: var(--fs-2); overflow-wrap: anywhere; }
+.reasoning { margin-top: var(--sp-3); color: var(--ink-2); font-size: var(--fs-2); font-style: italic; max-width: 70ch; }
+
+/* Checks: a pass is --ok green, kept apart from the accent. */
+.checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); column-gap: var(--sp-4); row-gap: 6px; }
+.checks li { display: contents; }
+.check-result { font-size: var(--fs-2); font-weight: var(--fw-bold); color: var(--ok); }
+.check-name { font-weight: var(--fw-medium); font-size: var(--fs-3); }
+.check-msg { color: var(--ink-2); font-size: var(--fs-2); }
+.checks li[data-passed="false"] .check-result { color: var(--ink); text-decoration: underline 2px var(--accent); text-underline-offset: 4px; }
+.checks li[data-passed="false"] .check-msg { color: var(--ink); }
+
+.verdict { margin-bottom: var(--sp-4); padding: var(--sp-3) var(--sp-4); background: var(--accent-soft); border-radius: var(--r-well); max-width: 76ch; }
+.verdict-head { font-size: var(--fs-4); font-weight: var(--fw-bold); letter-spacing: -0.01em; margin-bottom: var(--sp-1); }
+.verdict code { font-size: var(--fs-2); font-weight: var(--fw-bold); }
+
+.retry { margin-bottom: var(--sp-4); padding-left: var(--sp-4); border-left: 2px solid var(--rule-strong); color: var(--ink-2); font-size: var(--fs-2); max-width: 80ch; display: grid; gap: 2px; }
+.retry strong { color: var(--ink); }
+.retry .quote { color: var(--ink); font-family: var(--mono); font-size: var(--fs-2); }
+
+/* Rows */
+.answer { font-size: var(--fs-4); font-weight: var(--fw-medium); margin-bottom: var(--sp-3); letter-spacing: -0.01em; max-width: 60ch; }
+.table-scroll { overflow: auto; max-height: 380px; border: 1px solid var(--rule); border-radius: var(--r-well); background: var(--surface); }
+.grid { border-collapse: separate; border-spacing: 0; width: 100%; font-size: var(--fs-2); }
+.grid th, .grid td { padding: 6px var(--sp-4); text-align: left; white-space: nowrap; border-bottom: 1px solid var(--rule); }
+.grid thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--surface);
+  font-family: var(--mono); font-weight: var(--fw-regular); font-size: var(--fs-1); color: var(--ink-2);
+  border-bottom-color: var(--rule-strong);
+}
+.grid tbody tr:last-child > * { border-bottom: 0; }
+.grid td { font-family: var(--mono); font-size: var(--fs-1); }
+.grid th.num { text-align: right; }
+.grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.grid td.null { color: var(--ink-3); }
+
+.footnote { margin-top: var(--sp-3); font-size: var(--fs-2); color: var(--ink-2); }
+
+/* Rating the answer: after the run, below the spine's last station, with no
+   mark of its own. It is the reader's verdict, not a pipeline step. A pressed
+   rating takes the accent. */
+.rate { margin-top: var(--sp-1); padding: var(--sp-4) 0 var(--sp-1); border-top: 1px solid var(--rule); }
+.rate-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3) var(--sp-4); }
+.rate-head h3 { font-size: var(--fs-3); font-weight: var(--fw-bold); }
+.rate-buttons { display: inline-flex; gap: var(--sp-2); }
+.rate-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: var(--fw-bold); }
+.rate-btn:disabled { color: var(--ink-3); border-color: var(--rule); }
+.rate-saved { font-size: var(--fs-2); color: var(--ink-2); }
+.rate-note { margin-top: var(--sp-3); display: grid; gap: var(--sp-2); max-width: 60ch; }
+.rate-note label { font-size: var(--fs-2); color: var(--ink-2); }
+.rate-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.rate-choice {
+  padding: var(--sp-1) 10px; font-size: var(--fs-2); color: var(--ink); background: var(--well);
+  border: 1px solid transparent; border-radius: var(--r-control);
+  transition: border-color var(--dur-state) ease;
+}
+.rate-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.rate-entry { display: flex; gap: var(--sp-2); }
+.rate-entry input {
+  flex: 1; min-width: 0; padding: 6px 10px; font: inherit; font-size: var(--fs-2); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+}
+.rate-entry input::placeholder { color: var(--ink-3); }
+.rate-help, .rate-off { margin-top: var(--sp-3); font-size: var(--fs-1); color: var(--ink-3); max-width: 80ch; }
+.rate-help code { font-size: var(--fs-1); color: var(--ink-2); }
+
+/* Node drill-down: a node name in the ledger opens that node's record from the
+   run trace. The accent marks the node being read, as it marks the tables a
+   plan reads. */
+.trace-line { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px var(--sp-4); font-size: var(--fs-2); color: var(--ink-2); max-width: 90ch; }
+.download { font-weight: var(--fw-bold); }
+.node-link {
+  background: none; border: 0; padding: 0; color: var(--ink); text-align: left;
+  text-decoration: underline dotted var(--rule-strong); text-underline-offset: 3px;
+}
+.node-link[aria-pressed="true"] { color: var(--accent); font-weight: var(--fw-bold); text-decoration: none; }
+
+.inspect { margin-top: var(--sp-4); padding: var(--sp-4) var(--sp-5) var(--sp-5); }
+.inspect-head { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.inspect-head h4 { margin: 0; font-size: var(--fs-3); font-weight: var(--fw-bold); }
+.inspect-head .mono { font-size: var(--fs-3); }
+.inspect-sum { color: var(--ink-2); font-size: var(--fs-2); }
+.inspect-close { margin-left: auto; }
+.inspect-run { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--hair); display: grid; gap: var(--sp-2); min-width: 0; }
+.run-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-4); font-size: var(--fs-2); color: var(--ink-2); }
+.run-head strong { color: var(--ink); font-weight: var(--fw-bold); }
+.run-head code { color: var(--ink); font-size: var(--fs-1); }
+.run-status { font-size: var(--fs-1); font-weight: var(--fw-bold); color: var(--ok); }
+.inspect-run[data-status="error"] .run-status, .inspect-run[data-status="unfinished"] .run-status { color: var(--fault); }
+.inspect-run[data-status="warning"] .run-status { color: var(--warn); }
+
+.problems { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: var(--sp-3); row-gap: var(--sp-1); font-size: var(--fs-2); }
+.problems li { display: contents; }
+.problem-kind { font-size: var(--fs-1); font-weight: var(--fw-bold); color: var(--ink-2); }
+.problems li[data-kind="error"] .problem-kind, .problem-text[data-kind="error"] { color: var(--fault); }
+.problem-text { overflow-wrap: anywhere; }
+
+.llm-call { display: grid; gap: 6px; padding-left: var(--sp-3); border-left: 2px solid var(--accent-soft); }
+.llm-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3); font-size: var(--fs-2); font-weight: var(--fw-bold); }
+.llm-head span { font-weight: var(--fw-regular); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.llm-head .mono { font-size: var(--fs-1); }
+
+.fold summary { font-size: var(--fs-2); color: var(--ink); padding: 2px 0; }
+.fold-meta { margin-left: 10px; font-size: var(--fs-1); color: var(--ink-3); }
+.blob {
+  margin: 6px 0 var(--sp-1); padding: 10px var(--sp-3); background: var(--well); border-radius: var(--r-well);
+  font-size: var(--fs-1); line-height: 1.55; max-height: 360px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+

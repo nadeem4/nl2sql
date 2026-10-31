@@ -1,0 +1,68 @@
+/* ---------- settings: its own page ----------
+   It keeps the rail's quiet vocabulary (rules, wells, mono for names). */
+
+.settings-grid {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: var(--sp-7); row-gap: var(--sp-6);
+  max-width: 1120px;
+}
+.settings-block h3 { font-size: var(--fs-3); margin-bottom: var(--sp-2); }
+.settings-current { font-size: var(--fs-2); color: var(--ink-2); margin-bottom: var(--sp-4); }
+.settings-current code { color: var(--ink); }
+.settings-keys { list-style: none; padding: 0; display: grid; gap: 2px; }
+.settings-label { display: block; font-size: var(--fs-2); color: var(--ink-2); margin-bottom: 6px; }
+.settings-row { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
+.settings-row input {
+  flex: 1 1 220px; min-width: 0; min-height: 36px; padding: 6px 10px;
+  font-family: var(--mono); font-size: var(--fs-2);
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--rule-strong); border-radius: var(--r-control);
+}
+.settings-row input:focus-visible { outline-offset: 0; border-color: var(--focus); }
+.settings-help { margin-top: var(--sp-2); font-size: var(--fs-2); color: var(--ink-2); max-width: 68ch; }
+.settings-help code, .settings-current code { white-space: nowrap; }
+.settings-status { margin-top: 6px; font-size: var(--fs-2); color: var(--ok); font-weight: var(--fw-bold); }
+.settings-status:empty { display: none; }
+.settings-block .fault { margin-top: var(--sp-2); }
+
+/* A key's "Clear it": a button that reads as a link. */
+.settings-keys .linkish {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
+  text-decoration: underline 1px; text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.model-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.model-rows li {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, max-content);
+  column-gap: var(--sp-5); align-items: center; padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule);
+}
+.model-rows label { display: grid; gap: 1px; }
+.model-step { font-weight: var(--fw-bold); font-size: var(--fs-3); }
+.model-does { font-size: var(--fs-2); color: var(--ink-2); }
+.model-rows select { width: 100%; }
+.model-rows select:disabled { color: var(--ink-3); background-image: none; }
+.model-rows select[aria-invalid="true"] { border-color: var(--rule-strong); }
+.model-unavailable {
+  grid-column: 1 / -1; margin-top: 6px; padding-left: var(--sp-3); border-left: 2px solid var(--rule-strong);
+  font-size: var(--fs-2); color: var(--ink); max-width: 72ch;
+}
+.settings-warn {
+  margin-top: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--warn);
+  font-size: var(--fs-2); color: var(--ink); max-width: 72ch;
+}
+.settings-foot { margin-top: var(--sp-4); align-items: flex-start; flex-wrap: nowrap; }
+.settings-foot .settings-help { margin-top: var(--sp-2); }
+
+/* The hosted demo's per-step models: shut until asked for, because one key and
+   the defaults is the whole of the simple path. The summary says what the
+   steps will use, so it is worth opening only when that is not what you want. */
+.step-models > summary { padding: 6px 0; }
+.step-models-title { font-size: var(--fs-3); font-weight: var(--fw-bold); letter-spacing: -0.01em; }
+.step-models-summary { margin-left: 10px; font-size: var(--fs-2); color: var(--ink-2); }
+.step-models[open] > summary { border-bottom: 1px solid var(--rule); margin-bottom: var(--sp-3); }
+.step-models .model-rows { margin-top: var(--sp-3); }
+
+.settings-off { max-width: 76ch; padding: var(--sp-3) var(--sp-4); background: var(--well); border-radius: var(--r-well); }
+.settings-off h3 { font-size: var(--fs-3); margin-bottom: var(--sp-1); }
+.settings-off p { font-size: var(--fs-2); color: var(--ink-2); }
+

@@ -555,7 +555,7 @@ The card is rendered from `scripts/social_card.html`, which uses the
 playground's own colours and both of its typefaces. Edit that file, then:
 
 ```bash
-cd web/playground && npm ci && cd ../..   # the fonts the card borrows
+cd nl2sql-ui && npm ci && cd ..   # the fonts the card borrows
 python scripts/render_social_card.py
 ```
 
@@ -580,7 +580,7 @@ outline. Its one copy is `docs/assets/favicon.svg`; the playground inlines it,
 this site uses it as its favicon, and the card redraws it in the light colours.
 See [the playground README][playground-readme] for where each copy lives.
 
-[playground-readme]: https://github.com/nadeem4/nl2sql/blob/main/web/playground/README.md#the-mark
+[playground-readme]: https://github.com/nadeem4/nl2sql/blob/main/nl2sql-ui/README.md#the-mark
 
 ## Running it locally instead
 
