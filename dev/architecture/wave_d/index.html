@@ -2766,6 +2766,18 @@
 </a>
 </li>
 <li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/jobs/">
+<span class="md-ellipsis">
+    
+  
+    Jobs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
 <a class="md-nav__link" href="../../api/rest/errors/">
 <span class="md-ellipsis">
     
@@ -4397,7 +4409,7 @@ terminal app all get it:</p>
 generator over the in-memory job and holds no thread.</p>
 <h3 id="jobs">Jobs</h3>
 <div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="c1"># nl2sql_api/jobs.py</span>
-<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="n">JobKind</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"index"</span><span class="p">,</span> <span class="s2">"profile"</span><span class="p">,</span> <span class="s2">"eval"</span><span class="p">,</span> <span class="s2">"dashboard"</span><span class="p">]</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="n">JobKind</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">"index"</span><span class="p">,</span> <span class="s2">"profile"</span><span class="p">,</span> <span class="s2">"eval"</span><span class="p">,</span> <span class="s2">"dashboard"</span><span class="p">,</span> <span class="s2">"demo"</span><span class="p">]</span>
 <a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>
 <a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">JobProgress</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
 <a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a>    <span class="n">at</span><span class="p">:</span> <span class="n">datetime</span>
@@ -6451,21 +6463,21 @@ in exactly one part.</p>
 </tr>
 <tr>
 <td>A2b</td>
-<td><strong>Dashboards and workspaces routes,</strong> thin over <code>engine.dashboards</code> and <code>engine.workspaces</code> as Wave C ships them (<a href="#the-routes">the routes</a>). Files: <code>routes/dashboards.py</code>, <code>routes/workspaces.py</code>, <code>models/dashboards.py</code>, the <code>starter-questions</code> route, fixtures (<code>Dashboard</code>, <code>DashboardView</code> with its runs).</td>
+<td><strong>Dashboards and workspaces routes,</strong> thin over <code>engine.dashboards</code> and <code>engine.workspaces</code> as Wave C ships them (<a href="#the-routes">the routes</a>). Files: <code>routes/dashboards.py</code>, <code>routes/workspaces.py</code>, <code>models/dashboards.py</code>, the <code>starter-questions</code> route, <code>POST /jobs/dashboard</code> in <code>routes/jobs.py</code> (<code>202</code>, submitting a runner to <code>app.state.jobs</code>), fixtures (<code>Dashboard</code>, <code>DashboardView</code> with its runs).</td>
 <td>D0a-3, G1, G3a, G3b</td>
 <td><code>test_generate_is_a_job_with_tile_progress</code>, <code>test_open_serves_stored_results_and_runs_nothing</code>, <code>test_refresh_with_filters</code>, <code>test_filter_values</code>, <code>test_set_filters_and_schedule</code>, <code>test_schedule_too_frequent_is_422</code>, <code>test_edit_routes_call_the_named_methods</code>, <code>test_arrange_layout</code>, <code>test_remove_a_tile</code>, <code>test_pin_a_draft_whole_into_a_workspace</code>, <code>test_pin_a_saved_dashboard_is_422</code>, <code>test_move_to_another_workspace</code>, <code>test_delete_a_dashboard</code>, <code>test_busy_dashboard_is_409</code>, <code>test_other_users_dashboard_is_404</code>, <code>test_workspace_create_rename_delete</code>, <code>test_delete_a_non_empty_workspace_is_422</code>, <code>test_starter_questions_need_a_caller</code></td>
 <td>new <code>api/rest/dashboards.md</code> (dashboards and workspaces, with its nav entry)</td>
 </tr>
 <tr>
 <td>A3</td>
-<td><strong>Datasources, Connect, index, drift, knowledge routes.</strong> Files: <code>routes/datasources.py</code> (replaces <code>routes/datasource.py</code>), <code>routes/index.py</code> (replaces <code>routes/indexing.py</code>), <code>routes/knowledge.py</code>, <code>models/datasources.py</code>, fixtures (<code>Proposal</code>, <code>DriftReport</code>); delete <code>services/datasource.py</code>, <code>services/indexing.py</code>.</td>
+<td><strong>Datasources, Connect, index, drift, knowledge routes.</strong> Files: <code>routes/datasources.py</code> (replaces <code>routes/datasource.py</code>), <code>routes/index.py</code> (replaces <code>routes/indexing.py</code>), <code>POST /jobs/index</code> and <code>POST /jobs/profile</code> in <code>routes/jobs.py</code> (<code>202</code>, submitting a runner to <code>app.state.jobs</code>), <code>routes/knowledge.py</code>, <code>models/datasources.py</code>, fixtures (<code>Proposal</code>, <code>DriftReport</code>); delete <code>services/datasource.py</code>, <code>services/indexing.py</code>.</td>
 <td>D0a-3, G2b, G3b</td>
 <td><code>test_types_route_carries_connection_schemas</code>, <code>test_test_route_registers_nothing</code>, <code>test_save_uses_wave_cs_writer_with_env_file_only_on_fresh_local_install</code>, <code>test_save_on_a_read_only_config_is_its_own_error</code>, <code>test_index_job_progress_per_datasource</code>, <code>test_drift_check_route_is_admin</code>, <code>test_inspect_route</code>, <code>test_schema_route_hides_denied_tables</code>, <code>test_datasources_list_has_sample_questions_in_scope</code>, <code>test_knowledge_show_as_caller</code>, <code>test_profile_job_creates_proposals_on_the_server_key</code>, <code>test_accept_many_with_edits</code>, <code>test_accept_and_reject_need_admin</code>, <code>test_accept_file_changed_is_409</code>, <code>test_file_starter_questions_as_examples</code>, <code>test_save_choice_creates_a_term_proposal</code></td>
 <td><code>api/rest/datasource.md</code> (renamed <code>datasources.md</code>), <code>api/rest/indexing.md</code>, new <code>api/rest/knowledge.md</code> (with its nav entry)</td>
 </tr>
 <tr>
 <td>A4a</td>
-<td><strong>Evals, settings, API keys, <code>/ready</code>, <code>/meta</code>.</strong> Files: <code>routes/evals.py</code>, <code>routes/settings.py</code> (replaces <code>routes/llm.py</code>), <code>routes/health.py</code> (<code>/ready</code> on <code>CheckReport.ready</code>, <code>/meta</code> filled, with the mode from the engine's config), fixtures (<code>Job</code> with an <code>EvalReport</code>, <code>/meta</code>); the <code>demo</code> job kind (<code>POST /jobs/demo</code>, D237), delete <code>services/llm.py</code>, <code>services/health.py</code>.</td>
+<td><strong>Evals, settings, API keys, <code>/ready</code>, <code>/meta</code>.</strong> Files: <code>routes/evals.py</code>, <code>routes/settings.py</code> (replaces <code>routes/llm.py</code>), <code>routes/health.py</code> (<code>/ready</code> on <code>CheckReport.ready</code>, <code>/meta</code> filled, with the mode from the engine's config), fixtures (<code>Job</code> with an <code>EvalReport</code>, <code>/meta</code>); <code>POST /jobs/eval</code> and <code>POST /jobs/demo</code> (D237) in <code>routes/jobs.py</code> (<code>202</code>, submitting a runner to <code>app.state.jobs</code>), delete <code>services/llm.py</code>, <code>services/health.py</code>.</td>
 <td>D0a-3, G2a, G2b, G3b</td>
 <td><code>test_eval_job_is_admin_only</code>, <code>test_demo_job_adds_the_samples_and_indexes_them</code>, <code>test_demo_job_is_admin</code>, <code>test_providers_route_has_no_key</code>, <code>test_replace_llm_is_admin</code>, <code>test_api_key_token_returned_once</code>, <code>test_ready_*</code> (section 3), <code>test_meta_without_a_caller_lists_no_datasource</code>, <code>test_meta_lists_sample_questions_and_recorded</code>, <code>test_meta_reports_the_mode</code></td>
 <td><code>api/rest/llm.md</code> (renamed <code>settings.md</code>), new <code>api/rest/evals.md</code> (with its nav entry), <code>api/rest/health.md</code></td>
@@ -6626,6 +6638,26 @@ IP networks (a bad one is a config error). Under <code>api.auth: none</code> the
 <code>Host</code>. A 500 from an unhandled exception carries the CORS headers of a configured origin. <code>QueryRequest.user_context</code> and <code>DatasourceTestRequest.user_context</code>
 are gone with <code>trust_body_role</code>. <code>/health</code> answers <code>{status, version: {engine, api}}</code>, <code>/meta</code> the mode, auth source and
 <code>request_llm</code>, <code>/about</code> <code>engine.about()</code>; <code>/ready</code> is unchanged. <code>packages/api/openapi.json</code> is the snapshot.</p>
+<p><strong>D0a-3 (SSE, jobs, overrides, fixtures).</strong> <code>sse.py</code>: <code>event_stream(open_events, request, *, token=None, heartbeat_s=15)</code>
+(the iterator runs in the thread pool; a <code>: keep-alive</code> comment while quiet; on disconnect it cancels <code>token</code> and closes
+the iterator, in the thread pool too, so cleanup that blocks never stalls the event loop), plus <code>frame(name, data)</code>, <code>KEEP_ALIVE</code> and <code>SSE_HEADERS</code>; <code>/query/stream</code> still has its own copy until A1
+moves it. <code>jobs.py</code>: <code>Jobs</code> (one daemon thread named <code>nl2sql-jobs</code>, the last 100 jobs, <code>submit(kind, params, user,
+runner)</code>, <code>get</code>, <code>list</code>, <code>cancel</code>, <code>stream</code>, <code>close</code>), <code>Job</code>, <code>JobProgress</code>, the four <code>*Job</code> parameter models,
+<code>IndexResult</code> (<code>ok</code>, <code>stats</code>, <code>empty</code>, <code>failed</code>: ids only, the reason stays in the log) and <code>DashboardJobResult</code>. A
+failed job carries a refusal's own message and details, any other error's code and message only when its status is
+below 500, and otherwise the generic <code>INTERNAL</code> error (the text is in the log); a cancel that arrives after the runner
+returned changes nothing, so the job stays <code>succeeded</code> with its result. <code>close()</code> waits 5 s for the running job, and
+no job honours its cancel token until G3b, so on shutdown the engine can close under a job that is still running. A
+runner is <code>fn(JobContext)</code>: <code>ctx.progress(step, done, total)</code> and <code>ctx.token</code>. <code>app.state.jobs</code> is made in the lifespan;
+<code>dependencies.get_jobs</code> hands it out; <code>identity.is_admin(user, engine)</code> is new. <code>routes/jobs.py</code> has <code>GET /jobs</code>,
+<code>GET /jobs/{id}</code>, <code>DELETE /jobs/{id}</code> and <code>GET /jobs/{id}/events</code> (<code>job.progress</code>, then <code>job.finished</code>); the
+<code>POST /jobs/&lt;kind&gt;</code> routes belong to A2b (dashboard), A3 (index, profile) and A4a (eval, demo), each submitting a runner
+and adding its row's tests. The G3b callbacks and tokens are not built yet, so those rows pass <code>ctx.token</code> and
+<code>ctx.progress</code> into whatever the facade offers then. <code>overrides.py</code>: <code>parse_override(headers, request_llm=)</code> and the
+<code>llm_override</code> dependency (<code>X-NL2SQL-Api-Key-&lt;provider&gt;</code>, <code>X-NL2SQL-Models</code>; 403 when <code>api.request_llm</code> is off, 422
+for a malformed models header, <code>MissingProviderKey</code> for a model without the request's own key); A1 and A2a pass it as
+<code>llm_override=</code>. Golden files <code>ApiError.json</code> and <code>Job.json</code> live in <code>web/playground/src/api/fixtures/</code> (D0b moves
+them to <code>nl2sql-ui/src/api/fixtures/</code>); regenerate with <code>python packages/api/tests/test_web_fixtures.py</code>.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at
