@@ -6025,7 +6025,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
   that no longer validates or parses; the refiner is never asked), <code>denied</code>, <code>needs_approval</code> (its requests in
   <code>approvals_needed</code>; the stored result is kept), <code>stopped</code> (a cap; the remaining charts are <code>stopped</code> and keep
   theirs) and <code>error</code> (returned, not stored: the chart keeps its last good result). It raises <code>DashboardBusy</code> (a <code>ValueError</code>) while the dashboard is being refreshed or
-  edited, and <code>ValueError</code> for a <code>tile_id</code> the dashboard does not have.</li>
+  edited, <code>ApprovalNotFound</code> for a request id in <code>approvals</code> that is unknown, waiting, denied or expired (nothing runs), and <code>ValueError</code> for a <code>tile_id</code> the dashboard does not have.</li>
 <li><strong><code>filters</code></strong> maps filter ids to values (D117): <code>refresh(dashboard_id, filters={"country": ["Brazil"]})</code>. Each
   value is checked against the filter's kind first (<code>number</code>, <code>temporal</code> as <code>YYYY-MM-DD</code> or
   <code>YYYY-MM-DDTHH:MM[:SS[.ffffff]]</code> with an optional <code>Z</code> or <code>+HH:MM</code>, <code>boolean</code>, <code>text</code>; <code>in</code> takes 1 to 100 values,
@@ -6098,7 +6098,7 @@ dashboard as its stored owner. Another owner's workspace or dashboard is <code>W
 </tr>
 <tr>
 <td><code>dashboards.refresh(dashboard_id, *, user_context, tile_id=None, filters=None, approvals=()) -&gt; DashboardRun</code></td>
-<td>D2, <code>filters</code> D2b</td>
+<td>D2, <code>filters</code> D2b; <code>approvals</code> are <code>Approval</code> objects or granted request ids (D236)</td>
 </tr>
 <tr>
 <td><code>dashboards.filter_values(dashboard_id, filter_id, *, user_context, limit=100) -&gt; list</code></td>

@@ -6739,6 +6739,27 @@ treats a failed optional datasource as a problem only. <code>problems()</code> i
 or <code>stale</code>; it carries no reason text, which can echo a secret. <code>index.refresh</code> has no token (not in the row).
 The code on <code>main</code> matched the design except that <code>index.build</code> and <code>evals.run</code> had their callbacks already, as the
 facade-gaps row says.</p>
+<p><strong>G3a (stored approval grants).</strong> Review fixes (PR #410): requests are tenant-bound (<code>list</code>, <code>grant</code> and <code>deny</code> never see another tenant's request, and a run's id of another tenant's request does not resolve); a caller with no <code>user_id</code> owns nothing; <code>approver</code> is excluded from what callers see; a granted record with no approver is still waiting, and a later <code>grant</code> fills it in. <code>nl2sql/approvals/api.py</code>: <code>Approvals(ctx)</code>, which is <code>engine.approvals</code>, and
+<code>ApprovalRecord</code> (<code>id</code>, <code>status</code>, <code>request</code>, <code>created_at</code>, <code>updated_at</code>, <code>decided_by</code>, <code>approver</code> (the granting
+<code>UserContext</code>, with the roles it held), <code>reason</code>), exported from <code>nl2sql</code>. <code>list(*, user_context, status="pending")</code> shows
+the requests the caller's roles may approve (the hook's approver roles, else <code>policies.admin_roles</code>; <code>allow_all</code> makes no
+approver) and the caller's own; <code>grant(request_id, *, by)</code> and <code>deny(request_id, *, by, reason=None)</code> raise
+<code>NotAuthorized</code> without an approver role and <code>ApprovalNotFound</code> for an unknown or expired id, and return a request
+already decided as it is. <code>submit(requests)</code> and <code>resolve(items, *, user)</code> are internal (the run's side). <strong>Where the
+design differs:</strong> the hooks runner is unchanged. <code>QueryAPI</code> resolves request ids before the graph (<code>_granted</code>), so a
+granted id becomes the <code>Approval</code> the runner already checks; a denied, unknown, waiting or expired id ends the run
+<code>APPROVAL_NOT_GRANTED</code> with the graph never started, in <code>run_query</code> and <code>stream_query</code> alike (the <code>Approval</code> objects
+pass through untouched). A <code>needs_approval</code> run stores its requests as pending in <code>run_query</code> and in <code>stream_query</code>
+(<code>_store_requests</code>); a request already stored is left alone, and an expired one becomes pending again. A grant
+is valid until <code>updated_at + settings.approvals.max_age_hours</code>, which <code>storage.purge()</code> also deletes (<code>counts["approvals"]</code>).
+The grant stores the approver's <code>UserContext</code> beside the SDK store's <code>decided_by</code> (a second write after the atomic
+<code>decide_approval</code>; the store interface is unchanged). <code>conversations.retry</code> and <code>ConversationsAPI.retry</code> take
+<code>Sequence[Union[Approval, str]]</code> and pass them to <code>run_query</code>; <code>dashboards.refresh</code> (the facade only) resolves ids first with
+<code>resolve_refresh_approvals(ctx, approvals, user)</code> and raises <code>ApprovalNotFound</code> before any chart runs, because a bad
+id would otherwise fail every chart alike. The signature widening is <code>Union[Approval, str]</code> on those four methods and
+<code>NL2SQL.run_query</code> and <code>stream_query</code>. A2a's retry route and A2b's refresh route pass the body's <code>approval_ids</code> straight
+through as <code>approvals=</code>; A1 maps <code>ApprovalNotFound</code> to 404 and <code>NotAuthorized</code> to 403, and the run's
+<code>APPROVAL_NOT_GRANTED</code> shows as the result's error. T1 reads <code>engine.approvals.list(...)</code>.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at

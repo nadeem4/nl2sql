@@ -5946,7 +5946,7 @@ earlier question.</p>
 </tr>
 <tr>
 <td><code>retry(conversation_id, *, user_context, approvals=()) -&gt; Turn</code></td>
-<td>C1</td>
+<td>C1; <code>approvals</code> are <code>Approval</code> objects or granted request ids (D215)</td>
 </tr>
 <tr>
 <td><code>ask_only(conversation_id, question, *, user_context, choice=None) -&gt; QueryResult</code></td>

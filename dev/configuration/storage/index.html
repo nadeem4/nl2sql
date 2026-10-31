@@ -6083,9 +6083,10 @@ superseded) decided more than <code>settings.review.max_age_days</code> (365) ag
 <a href="../../conversations/#ownership-and-retention">conversations</a> last updated more than
 <code>conversations.max_age_days</code> (30) ago, and the <a href="../../dashboards/">draft dashboards</a> last edited
 more than that long ago (saved dashboards are never purged), and
-returns the counts, <code>{"traces": 3, "results": 12, "proposals": 4, "conversations": 2, "dashboards": 1, "audit": 1}</code>
+returns the counts, <code>{"traces": 3, "results": 12, "proposals": 4, "approvals": 0, "conversations": 2, "dashboards": 1, "audit": 1}</code>
 (no <code>audit</code> when the engine runs no audit observer, no <code>conversations</code> or <code>dashboards</code> when <code>max_age_days</code> is null). Open
-proposals are never purged. It publishes the counts as the
+proposals are never purged. <code>approvals</code> counts the stored approval requests and grants last changed more than
+<code>settings.approvals.max_age_hours</code> (24) ago. It publishes the counts as the
 <a href="../../observability/events/#the-catalog"><code>retention.purged</code> event</a>, which the
 audit observer writes. A
 plugin trace or results store is purged when it has a <code>max_age_days</code>

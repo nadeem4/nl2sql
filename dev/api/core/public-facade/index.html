@@ -4768,6 +4768,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#approvals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approvals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#storage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6050,6 +6061,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#approvals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Approvals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#storage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6413,14 +6435,20 @@ store, <code>storage.traces</code> (the <code>files</code> store reads only <cod
 and the id must be a plain token (letters, digits, <code>-</code> and <code>_</code>), so no id can
 name a file elsewhere: anything else raises <code>ValueError</code>, as does a file in
 another trace format.</p>
+<h3 id="approvals">Approvals</h3>
+<p><code>engine.approvals</code> keeps the approval requests a <code>needs_approval</code> run raised and their grants:
+<code>list(*, user_context, status="pending")</code>, <code>grant(request_id, *, by)</code>, <code>deny(request_id, *, by,
+reason=None)</code>. The asker's re-run names a granted id in <code>approvals=</code> of <code>run_query</code>, <code>stream_query</code>,
+<code>conversations.retry</code> and <code>dashboards.refresh</code>. See <a href="../query/#approval">Query API → Approval</a>.</p>
 <h3 id="storage">Storage</h3>
 <p><code>engine.storage.info()</code> returns each store slot's <code>type</code> and <code>location</code> (and
 <code>max_age_days</code> for the traces and results stores that have it) and the current
 index <code>namespace</code>. <code>engine.storage.purge()</code> deletes the traces and results
 older than their store's <code>max_age_days</code>, and the audit observer's day files
 older than its own, and the review queue's decided proposals older than
-<code>settings.review.max_age_days</code>, and returns the counts,
-<code>{"traces": 3, "results": 12, "proposals": 4, "audit": 1}</code>, which it also publishes as
+<code>settings.review.max_age_days</code>, and the stored approvals older than
+<code>settings.approvals.max_age_hours</code>, and returns the counts,
+<code>{"traces": 3, "results": 12, "proposals": 4, "approvals": 0, "audit": 1}</code>, which it also publishes as
 <code>retention.purged</code>. See
 <a href="../../../configuration/storage/#retention">Storage → Retention</a>.</p>
 <p><code>engine.traces.replay(trace)</code> re-runs a recorded question, answering every LLM
@@ -6445,7 +6473,7 @@ submodule: <code>NL2SQL</code>, <code>QueryResult</code>, <code>SubQueryResult</
 <code>ResultNotFound</code>, <code>TraceNotFound</code>, <code>MAX_RESULT_PAGE_SIZE</code>, <code>QuestionUsage</code>,
 <code>UserContext</code>, <code>CancellationToken</code>, <code>configure_logging</code>,
 <code>TraceContextFilter</code>, the event types (<code>Event</code>, <code>Observer</code>), a run's ending
-(<code>RunStop</code>, <code>ApprovalRequest</code>, <code>Approval</code>, <code>VerifiedRef</code>), what the namespaces
+(<code>RunStop</code>, <code>ApprovalRequest</code>, <code>Approval</code>, <code>ApprovalRecord</code>, <code>VerifiedRef</code>), what the namespaces
 return (<code>DatasourceInfo</code>, <code>DatasourceType</code>, <code>IndexProgress</code>, <code>TileProgress</code>, <code>LLMChange</code>), the config (<code>Config</code>,
 <code>load_config</code>, <code>load_env_file</code>, <code>ConfigError</code>, <code>Registry</code> and the section
 classes <code>Datasource</code>, <code>Limits</code>, <code>LLM</code>, <code>AgentLLM</code>, <code>Embeddings</code>, <code>Policies</code>,

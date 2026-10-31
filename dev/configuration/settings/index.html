@@ -6217,7 +6217,7 @@ different settings.</p>
 <a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="w">  </span><span class="nt">max_points</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
 <a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a><span class="w">  </span><span class="nt">max_categories</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
 <a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a><span class="w">  </span><span class="nt">max_series</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
-<a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="nt">approvals</span><span class="p">:</span><span class="w">                    </span><span class="c1"># Wave D: accepted now, read when stored grants land (G3a)</span>
+<a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a><span class="nt">approvals</span><span class="p">:</span><span class="w">                    </span><span class="c1"># Wave D: stored approval grants (G3a)</span>
 <a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a><span class="w">  </span><span class="nt">max_age_hours</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24</span>
 </code></pre></div>
 <p>Unknown keys are errors, as everywhere in the config. The demo
@@ -6626,7 +6626,7 @@ accepted and validated now; the Wave B change named with each reads it.</p>
 </tbody>
 </table>
 <h2 id="approvals"><code>approvals</code></h2>
-<p>Wave D (<a href="../../architecture/wave_d/">design</a>). Accepted and validated now; stored approval grants read it.</p>
+<p>Wave D (<a href="../../architecture/wave_d/">design</a>). Read by stored approval grants (<code>engine.approvals</code>).</p>
 <table>
 <thead>
 <tr>
@@ -6639,7 +6639,7 @@ accepted and validated now; the Wave B change named with each reads it.</p>
 <tr>
 <td><code>approvals.max_age_hours</code></td>
 <td><code>24</code></td>
-<td>A stored approval request, and the grant on it, is purged this long after its last change.</td>
+<td>A stored approval request, and the grant on it, expires, and is purged, this long after its last change.</td>
 </tr>
 </tbody>
 </table>
