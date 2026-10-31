@@ -5046,6 +5046,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#get-apiv1meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1about" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/about
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5159,6 +5181,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
   
 
     
@@ -5839,6 +5889,28 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#get-apiv1meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/meta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1about" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/about
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -5862,17 +5934,18 @@
 
 
 <h1 id="health-api">Health API</h1>
+<p>Source: <code>packages/api/src/nl2sql_api/routes/health.py</code>. None of these routes needs a caller except <code>/about</code>.</p>
 <h2 id="endpoints">Endpoints</h2>
 <h3 id="get-apiv1health"><code>GET /api/v1/health</code></h3>
-<p>Source: <code>packages/api/src/nl2sql_api/routes/health.py</code></p>
-<p>Response model: <code>SuccessResponse</code></p>
-<p>Returns:
-<code>{"success": true, "message": "NL2SQL API is running"}</code></p>
+<p>Liveness. Returns <code>{"status": "ok", "version": {"engine": "&lt;nl2sql-engine&gt;", "api": "&lt;nl2sql-api&gt;"}}</code>.</p>
 <h3 id="get-apiv1ready"><code>GET /api/v1/ready</code></h3>
-<p>Source: <code>packages/api/src/nl2sql_api/routes/health.py</code></p>
-<p>Response model: <code>SuccessResponse</code></p>
-<p>Returns:
-<code>{"success": true, "message": "NL2SQL API is ready"}</code></p>
+<p>Readiness. Returns <code>{"success": true, "data": null, "message": "NL2SQL API is ready"}</code>. It does not yet check
+datasources, the LLM or the index.</p>
+<h3 id="get-apiv1meta"><code>GET /api/v1/meta</code></h3>
+<p>What the web app needs before it has an identity: <code>{"mode": "demo" | "your_data" | "hosted", "auth": "api_keys" |
+"proxy" | "static" | "none", "request_llm": false}</code>. No caller is needed.</p>
+<h3 id="get-apiv1about"><code>GET /api/v1/about</code></h3>
+<p><code>engine.about()</code>: the engine version and its pipeline steps. Needs a caller.</p>
 
 
 

@@ -5354,6 +5354,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -7049,15 +7077,15 @@ start from.</p>
 <tbody>
 <tr>
 <td><code>NL2SQL_API_ROLE_HEADER</code></td>
-<td><code>api.role_header</code></td>
+<td><code>api.proxy.roles_header</code> with <code>api.auth: proxy</code> (0.10)</td>
 </tr>
 <tr>
 <td><code>NL2SQL_API_ROLE</code></td>
-<td><code>api.role</code></td>
+<td><code>api.static_role</code> with <code>api.auth: static</code> (0.10)</td>
 </tr>
 <tr>
 <td><code>NL2SQL_API_TRUST_BODY_ROLE</code></td>
-<td><code>api.trust_body_role</code></td>
+<td>removed in 0.10: a request body never carries the caller</td>
 </tr>
 <tr>
 <td><code>NL2SQL_API_CORS_ORIGINS</code> (comma-separated)</td>

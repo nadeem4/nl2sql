@@ -5277,6 +5277,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -6103,12 +6131,6 @@
 <td>no</td>
 <td>Execute SQL against datasource (default <code>true</code>).</td>
 </tr>
-<tr>
-<td><code>user_context</code></td>
-<td><code>Optional[Dict[str, Any]]</code></td>
-<td>no</td>
-<td>Ignored unless <code>api.trust_body_role</code> is <code>true</code> (local testing only); then an RBAC payload such as <code>{"roles": ["admin"]}</code>. See <a href="../#caller-role">Caller role</a>.</td>
-</tr>
 </tbody>
 </table>
 <h3 id="subqueryresponse"><code>SubQueryResponse</code></h3>
@@ -6379,8 +6401,8 @@ response" disclosure. The codes are listed under
 <p>Request model: <code>QueryRequest</code></p>
 <p>Response model: <code>QueryResponse</code></p>
 <p>Execution flow:
-- The <code>get_user_context</code> dependency supplies the caller's <code>UserContext</code> (see
-  <a href="../#caller-role">Caller role</a>); with no role it answers <code>HTTP 401</code>
+- The <code>identity.caller</code> dependency supplies the caller's <code>UserContext</code> (see
+  <a href="../#identity">Identity</a>); with no identity it answers <code>HTTP 401</code>
   before the engine runs.
 - Delegates to <code>engine.run_query(...)</code>, which returns a <code>QueryResult</code>.
 - Returns that <code>QueryResult</code> as a <code>QueryResponse</code> (its subclass); there is no field mapping.</p>
@@ -6547,7 +6569,7 @@ operator's, through <code>engine.events.subscribe</code>.</p>
 <a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a>data: {"name": "run.finished", ..., "data": {"status": "success", "duration_s": 6.2, ..., "result": {"sub_queries": [...], "final_answer": {...}, "status": "success", ...}}}
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:8000/api/v1/query/stream<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-NL2SQL-Role: admin"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$NL2SQL_KEY</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"natural_language": "Who are the top 5 customers by revenue?"}'</span>
 </code></pre></div>
 <p>What streams token by token: only the answer. The answer model is asked to stream
@@ -6606,7 +6628,7 @@ before its next step or model call.</p>
 <p>Response model: <code>ResultPage</code>. Delegates to <code>engine.results.page(...)</code>, which
 reads the rows lazily from the result's parquet artifact: only the slice asked for
 is read. A page past the end has no rows.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-NL2SQL-Role: admin"</span><span class="w">   </span><span class="s2">"http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&amp;limit=100"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$NL2SQL_KEY</span><span class="s2">"</span><span class="w">   </span><span class="s2">"http://localhost:8000/api/v1/query/0f1c.../results/combine_g1?offset=100&amp;limit=100"</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span><span class="nt">"request_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0f1c..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"result_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"combine_g1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"customer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"revenue"</span><span class="p">],</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w"> </span><span class="nt">"rows"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"acme"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">],</span><span class="w"> </span><span class="p">[</span><span class="s2">"globex"</span><span class="p">,</span><span class="w"> </span><span class="mi">40</span><span class="p">]],</span><span class="w"> </span><span class="nt">"offset"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="nt">"limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
@@ -6629,16 +6651,11 @@ and streams each slice out, so the result is never built in memory on the server
   token (letters, digits, <code>_</code> and <code>-</code>, so no <code>/</code>, <code>.</code> or <code>..</code>) are all
   <code>HTTP 404</code>, so a caller cannot tell one from the other or reach a path outside
   the run's folder.</li>
-<li>The REST API has no per-user identity yet: the static or header role gives
-  a caller roles and no <code>user_id</code>, so every REST run is anonymous. A REST run
-  is readable by any REST caller of the same tenant with the same roles, and
-  by no caller with other roles: a <code>viewer</code> holding an <code>admin</code> run's trace id
-  gets <code>HTTP 404</code>. API keys are for the MCP server only and give REST callers
-  no <code>user_id</code>. See <a href="../../core/results/#who-can-read-a-run">Who can read a run</a>.</li>
-<li>With the dev flag <code>api.trust_body_role: true</code>, the request body's
-  <code>user_context</code> picks the caller's <code>user_id</code> and <code>tenant_id</code> as well as its
-  roles, so a client can read any user's run by naming that user. Use it for
-  local testing only.</li>
+<li>A caller with a <code>user_id</code> (an API key, or a proxy that sets the user header) reads only its own runs. A
+  <code>static</code> caller has roles and no <code>user_id</code>, so its runs are anonymous: readable by any caller of the same tenant with the same
+  roles, and by no caller with other roles: a <code>viewer</code> holding an <code>admin</code> run's trace id
+  gets <code>HTTP 404</code>. See <a href="../../core/results/#who-can-read-a-run">Who can read a run</a>.</li>
+<li>The request body never names the caller: <code>user_context</code> is not a field of <code>POST /query</code>.</li>
 </ul>
 <h2 id="tests">Tests</h2>
 <p><code>packages/api/tests/test_query_results_routes.py</code> covers the result routes over the
@@ -6648,9 +6665,9 @@ and for an anonymous run read with other roles, and <code>HTTP 401</code> withou
 <p><code>packages/api/tests/test_query_routes.py</code> and
 <code>packages/api/tests/test_query_response_shape.py</code> cover this endpoint with FastAPI's
 <code>TestClient</code> and a stubbed engine (<code>get_engine</code> dependency override) and a stubbed
-caller (<code>get_user_context</code> override, role <code>admin</code>), so no datasource, LLM or
-network access is required. <code>packages/api/tests/test_auth.py</code> covers the role
-sources and the 401.</p>
+caller (<code>identity.caller</code> override, role <code>admin</code>), so no datasource, LLM or
+network access is required. <code>packages/api/tests/test_identity.py</code> covers the
+identity sources and the 401.</p>
 <p><code>packages/api/tests/test_query_stream_route.py</code> covers the stream route the same
 way: the content type, the events in order, a <code>run.finished</code> whose <code>result</code> equals
 the <code>/query</code> response, the 401 and the <code>run.failed</code> event. <code>packages/nl2sql/tests/e2e/test_stream_fake_llm.py</code>

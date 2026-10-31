@@ -5193,6 +5193,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5945,14 +5973,13 @@ the container (<code>EngineNotReady</code> in the log); any other one that fails
 and left out of routing. Mark the datasources the service cannot run without
 <code>required: true</code>, so the orchestrator restarts a container that started broken.</p>
 <h2 id="api-roles">API roles</h2>
-<p><code>nl2sql-api</code> does not authenticate callers. Its <code>api</code> section says where the
-RBAC role comes from (<code>api.role_header</code>, a header an authenticating proxy sets,
-or a static <code>api.role</code>), and <code>policies.admin_roles</code> (default <code>[admin]</code>) says
-which roles may change datasources, LLMs and the index. With no role source,
-queries answer HTTP 401 and the admin routes answer HTTP 403, because a request
-through a published port does not come from loopback. See
+<p><code>nl2sql-api</code> identifies callers from <code>api.auth</code> (<code>api_keys</code>, <code>proxy</code>, <code>static</code>
+or <code>none</code>), and <code>policies.admin_roles</code> (default <code>[admin]</code>) says which roles may
+change datasources, LLMs and the index. Under the default <code>none</code>, only a
+request made straight to <code>localhost</code> is answered, and a request through a
+published port is a <code>403</code>, so set <code>api.auth</code> for a container. See
 <a href="../../configuration/api/">API settings</a>,
-<a href="../../api/rest/#caller-role">Caller role</a> and
+<a href="../../api/rest/#identity">Identity</a> and
 <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
 <h2 id="notes">Notes</h2>
 <ul>

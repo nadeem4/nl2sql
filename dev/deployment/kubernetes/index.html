@@ -5171,6 +5171,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5894,11 +5922,11 @@ files (<code>results/</code>). Mount one persistent volume and point <code>stora
   <code>required: true</code> that cannot connect stops the pod, so a readiness gate on
   the process is enough; any other datasource that fails is logged and left
   out.</li>
-<li>If you run <code>nl2sql-api</code>, set the role source in the <code>api</code> section
-  (<code>api.role_header</code> behind an authenticating ingress, or <code>api.role</code>) and the
-  admin roles (<code>policies.admin_roles</code>, default <code>[admin]</code>): pod traffic is not
-  loopback, so without them the admin routes answer HTTP 403. See
-  <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
+<li>If you run <code>nl2sql-api</code>, set <code>api.auth</code> (<code>proxy</code> behind an authenticating
+  ingress with <code>api.proxy.trusted_from</code> the ingress's CIDR, or <code>api_keys</code>) and
+  the admin roles (<code>policies.admin_roles</code>, default <code>[admin]</code>): pod traffic is not
+  the local operator, so under the default <code>none</code> every route answers HTTP 403.
+  See <a href="../../api/rest/#admin-routes">Admin routes</a>.</li>
 <li>Configure observability exporters as observers in the <code>observers</code> section
   (an <code>otel</code> observer with its <code>endpoint</code>, with <code>nl2sql-engine[otel]</code>
   installed; see <a href="../../configuration/observers/#otel">Observers</a>), and set

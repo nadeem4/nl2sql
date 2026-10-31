@@ -2765,6 +2765,18 @@
   </span>
 </a>
 </li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/rest/errors/">
+<span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+</a>
+</li>
 </ul>
 </nav>
 </li>
@@ -6595,6 +6607,25 @@ Facade argument checks outside the dashboard and workspace methods still raise b
 (<code>conversations/api.py</code>, <code>api/api_keys_api.py</code>'s <code>PermissionError</code>, <code>api/datasource_api.py</code>, <code>api/knowledge_api.py</code>):
 each A-row converts the ones raised by the facade methods it routes into named <code>NL2SQLError</code>s (for example
 <code>PermissionError</code> becomes <code>NotAuthorized</code>), so D0a-2's <code>test_no_route_returns_exception_text</code> finds none left.</p>
+<p><strong>D0a-2 (errors, identity, serve, app factory).</strong> <code>nl2sql_api/errors.py</code> holds the envelope (<code>ApiError</code>, <code>ErrorBody</code>,
+<code>ERROR_RESPONSE</code> for a route's <code>responses=</code>), <code>RequestRefused(status, code, message, *, fix, details, headers)</code> (an
+<code>NL2SQLError</code> a route or dependency raises for its own refusal, with a message it wrote), the handlers (an <code>NL2SQLError</code>
+maps to its status and code; a status of 500 or more that is not a <code>RequestRefused</code>, and anything else, is a 500
+<code>INTERNAL</code> that names a request id and logs the cause under it), and <code>RequestIdMiddleware</code>, which sets
+<code>X-Request-ID</code> on every response. <code>identity.py</code> replaces <code>auth.py</code>: <code>caller</code> and <code>admin</code> (sync dependencies),
+<code>check_bind(auth, host)</code> and <code>StartRefused</code>, <code>AUTH_RESPONSES</code> and <code>ADMIN_RESPONSES</code>, and <code>is_local_operator(engine)</code>,
+which the add-datasource route uses for the D122 <code>.env</code> decision. <code>admin</code> checks <code>policies.admin_roles</code> only
+(<code>allow_all</code> does not make an admin). <code>serve.py</code> is <code>nl2sql-api serve [--config] [--host] [--port]</code> (one worker, no
+reload; it exits with a one-line message on a bad config or a refused bind); <code>server.py</code> is gone. <code>main.create_app</code>
+mounts one router module per namespace; <code>app = create_app()</code> stays for <code>uvicorn nl2sql_api.main:app</code> (and the existing
+Dockerfile, which K1 replaces). <code>routes/datasource.py</code>, <code>indexing.py</code> and <code>llm.py</code> keep their names (the row names them)
+beside the empty <code>datasources.py</code>, <code>index.py</code> and <code>settings.py</code>. The engine raises <code>DatasourceNotFound</code> (404) and <code>DatasourceExists</code> (409), both still <code>ValueError</code>s and exported from
+<code>nl2sql</code>, for an unknown or taken datasource id, so <code>routes/datasource.py</code> has no <code>except ValueError</code>; the writer's
+clashing env name and unusable file name are <code>InvalidArgument</code> (422). <code>api.proxy.trusted_from</code> entries are validated as
+IP networks (a bad one is a config error). Under <code>api.auth: none</code> the connecting peer must be loopback as well as the
+<code>Host</code>. A 500 from an unhandled exception carries the CORS headers of a configured origin. <code>QueryRequest.user_context</code> and <code>DatasourceTestRequest.user_context</code>
+are gone with <code>trust_body_role</code>. <code>/health</code> answers <code>{status, version: {engine, api}}</code>, <code>/meta</code> the mode, auth source and
+<code>request_llm</code>, <code>/about</code> <code>engine.about()</code>; <code>/ready</code> is unchanged. <code>packages/api/openapi.json</code> is the snapshot.</p>
 <h3 id="session-batches">Session batches</h3>
 <p>One session builds one batch: about five PRs, stacked in the order below
 (each branch starts from the one before it), at most two or three open at

@@ -5182,6 +5182,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/rest/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -5919,16 +5947,16 @@ Write one with <code>nl2sql init</code> (see
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"${env:NL2SQL_DATA_DIR}"</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># api.yaml (nl2sql.yaml has  api: { file: api.yaml })</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin</span><span class="w">             </span><span class="c1"># one static role for every request</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">static_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin</span><span class="w">      </span><span class="c1"># one role for every request</span>
 </code></pre></div>
-<p><code>api.role</code> pins the RBAC role for every request; without a role source the
-query route answers HTTP 401. See <a href="../../api/rest/#caller-role">Caller role</a>
+<p><code>api.auth: static</code> pins the RBAC role for every request; the default, <code>none</code>,
+answers only requests made straight to <code>localhost</code>, so a request through a
+published Docker port is HTTP 403. See <a href="../../api/rest/#identity">Identity</a>
 and <a href="../../configuration/api/">API settings</a>.</p>
 <p>The routes that register datasources or LLMs and build or clear the index need a
-role listed in <code>policies.admin_roles</code> (default <code>[admin]</code>), so <code>role: admin</code>
-above allows them. Without any role setting they answer loopback clients only,
-and a request through a published Docker port does not come from loopback: it
-gets HTTP 403. See <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
+role listed in <code>policies.admin_roles</code> (default <code>[admin]</code>), so <code>static_role: admin</code>
+above allows them. See <a href="../../api/rest/#admin-routes">Admin routes</a>.</p>
 <h2 id="run-the-api">Run the API</h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/my-project:/etc/nl2sql:ro"</span><span class="w"> </span><span class="se">\</span>

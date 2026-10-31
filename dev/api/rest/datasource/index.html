@@ -5266,6 +5266,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -6071,8 +6099,7 @@
 </tr>
 </tbody>
 </table>
-<p>A key the model does not know is an error, so a typo is found, not ignored. (<code>user_context</code> is the one extra key
-the body may hold: <code>api.trust_body_role</code> reads the caller from it.)</p>
+<p>A key the model does not know is an error, so a typo is found, not ignored. The body never carries the caller.</p>
 <h3 id="datasourcerequest"><code>DatasourceRequest</code></h3>
 <p><code>DatasourceTestRequest</code> and:</p>
 <table>
@@ -6164,24 +6191,26 @@ exact values: a validation message such as <code>connection.password: Field requ
 - With <code>"save": true</code>, then <code>engine.datasources.save(id, by=caller, env_file=...)</code> writes
   <code>datasources/&lt;id&gt;.yaml</code> beside <code>nl2sql.yaml</code> (see <a href="../../../configuration/datasources/#saving-a-datasource">Saving a datasource</a>).
   <strong>A secret is never written into the YAML.</strong> A reference (<code>${env:VAR}</code>, <code>${vault:path}</code>) is written as it is.
-  A literal is written to the <code>.env</code> beside <code>nl2sql.yaml</code> as <code>${env:NL2SQL_&lt;ID&gt;_&lt;KEY&gt;}</code> only on a fresh local
-  install: no role source is configured (<code>api.role_header</code>, <code>api.role</code>, <code>api.trust_body_role</code>), the client is
-  on loopback and the request carries no <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code> header (a reverse proxy on
-  the same host would make every client look local). Anywhere else a literal secret with <code>save: true</code> is a <code>422</code> that asks for a <code>${env:...}</code> reference.
+  A literal is written to the <code>.env</code> beside <code>nl2sql.yaml</code> as <code>${env:NL2SQL_&lt;ID&gt;_&lt;KEY&gt;}</code> only when
+  <code>api.auth</code> is <code>none</code>, which answers only a request made straight to localhost (a <code>Host</code> that is not
+  loopback, or an <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code> header, is already a <code>403</code>). Under any other <code>api.auth</code> a literal secret with <code>save: true</code> is a <code>422</code> that asks for a <code>${env:...}</code> reference.
   If the save fails, the datasource is taken out again: nothing is left running that was not saved.</p>
 <p>Errors:
-- No role -&gt; <code>HTTP 401</code>; a role not in <code>policies.admin_roles</code> -&gt; <code>HTTP 403</code>.
-- A body that does not validate, a typo included -&gt; <code>HTTP 422</code> and <code>detail</code> is a list of
-  <code>{"path": "config.sampel_questions", "message": "Extra inputs are not permitted"}</code>, one per problem, each
-  naming its path in the body and never a value. That includes a body that is not a JSON object or not JSON at
-  all (<code>[{"path": "", "message": "The body must be a JSON object."}]</code>, no input echoed), and a <code>connection</code> that
+- Every error is the <a href="../errors/">error envelope</a>. No identity -&gt; <code>HTTP 401</code>; a role not in <code>policies.admin_roles</code> -&gt; <code>HTTP 403</code>.
+- A body that does not validate, a typo included -&gt; <code>HTTP 422</code> and <code>error.details</code> is a list of
+  <code>{"loc": ["config", "sampel_questions"], "msg": "Extra inputs are not permitted"}</code>, one per problem, each
+  naming its place in the body and never a value. That includes a body that is not a JSON object or not JSON at
+  all (<code>[{"loc": [""], "msg": "The body must be a JSON object."}]</code>, no input echoed), and a <code>connection</code> that
   does not validate against the adapter's model (<code>config.connection.passwrd</code>, <code>config.connection.port</code>).
-- An id that is already taken, a literal secret that cannot be written, or two secrets that map to one
-  environment variable -&gt; <code>HTTP 422</code> with the reason as text (it names fields, never values).
+- A literal secret that cannot be written (<code>SecretValueInConfig</code>) or a connection the adapter rejects (<code>ConnectionInvalid</code>) -&gt; <code>HTTP 422</code>
+  with the engine's message and <code>fix</code>. An id that is already taken, or two secrets that map to one environment variable,
+  is a bare <code>ValueError</code> in the engine today: it is <code>HTTP 422</code> <code>INVALID_REQUEST</code> with a fixed message, and the reason is in the server log
+  (a later row gives the engine a named exception for it).
+- An unknown id on <code>GET</code> or <code>DELETE /datasource/{id}</code> -&gt; <code>HTTP 404</code> <code>NOT_FOUND</code>.
 - <code>save</code> found <code>datasources/&lt;id&gt;.yaml</code> changed on disk since the engine loaded it, or a new file that already
   exists -&gt; <code>HTTP 409</code>; reload the engine and try again.
-- Any other failure to add -&gt; <code>HTTP 500</code> with a generic message. The exception, which can hold the connection
-  string, is logged server-side and never returned.</p>
+- Any other failure -&gt; <code>HTTP 500</code> <code>INTERNAL</code> naming a request id. The exception, which can hold the connection
+  string, is logged server-side under that id and never returned.</p>
 <h3 id="get-apiv1datasource"><code>GET /api/v1/datasource</code></h3>
 <p>Response: <code>{"datasources": [...]}</code>, <code>engine.datasources.list()</code>: every
 configured datasource with its <code>id</code>, <code>type</code>, <code>description</code>, <code>status</code>

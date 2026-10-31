@@ -5080,10 +5080,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#caller-role" class="md-nav__link">
+  <a href="#identity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Caller role
+        Identity
       
     </span>
   </a>
@@ -5242,6 +5242,34 @@
     
   
     Indexing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
   
 
     
@@ -5984,10 +6012,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#caller-role" class="md-nav__link">
+  <a href="#identity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Caller role
+        Identity
       
     </span>
   </a>
@@ -6055,7 +6083,10 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
 <li>The package imports the engine only through the top-level <code>nl2sql</code> namespace
   (<code>from nl2sql import NL2SQL, QueryResult, UserContext, configure_logging, ...</code>),
   never an engine submodule. <code>packages/api/tests/test_architecture.py</code> enforces it.</li>
-<li>Routers are included under <code>/api/v1</code>.</li>
+<li><code>create_app(config_path=None)</code> builds the app: one router module per namespace (<code>health</code>, <code>query</code>, <code>approvals</code>,
+  <code>conversations</code>, <code>dashboards</code>, <code>workspaces</code>, <code>datasources</code>, <code>datasource</code>, <code>index</code>, <code>indexing</code>, <code>knowledge</code>, <code>evals</code>,
+  <code>settings</code>, <code>llm</code>, <code>web</code>) under <code>/api/v1</code> (<code>web</code> at the root), and <code>errors.install</code> for the
+  <a href="errors/">error envelope</a>. <code>nl2sql_api.main:app</code> is <code>create_app()</code> for <code>uvicorn nl2sql_api.main:app</code>.</li>
 <li>CORS is restricted to the origins in <code>api.cors_origins</code>
   (see <a href="#cors-origins">CORS origins</a>); with none configured, no cross-origin
   browser access is allowed.</li>
@@ -6066,16 +6097,16 @@ engine over HTTP. Implementation lives in <code>packages/api/src/nl2sql_api/</co
 <li><code>get_engine(request)</code> returns the singleton <code>NL2SQL</code> instance.</li>
 <li>Service providers (<code>DatasourceService</code>, <code>QueryService</code>, <code>LLMService</code>,
   <code>IndexingService</code>, <code>HealthService</code>) are created per-request with the engine.</li>
-<li><code>get_user_context(request)</code> (in <code>nl2sql_api/auth.py</code>) returns the caller's
-  <code>UserContext</code>; see <a href="#caller-role">Caller role</a>.</li>
-<li><code>require_admin(request)</code> (same module) guards the routes that change
-  datasources, LLMs or the index; see <a href="#admin-routes">Admin routes</a>.</li>
+<li><code>identity.caller</code> (in <code>nl2sql_api/identity.py</code>) returns the caller's
+  <code>UserContext</code>; see <a href="#identity">Identity</a>.</li>
+<li><code>identity.admin</code> guards the routes that change datasources, LLMs or the
+  index; see <a href="#admin-routes">Admin routes</a>.</li>
 </ul>
 <h2 id="interactive-docs">Interactive docs</h2>
 <p>FastAPI serves Swagger UI at <code>/docs</code>, ReDoc at <code>/redoc</code> and the OpenAPI schema at
 <code>/openapi.json</code>, with a summary, description and tag on every route. Start the
 server on a config:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">NL2SQL_CONFIG</span><span class="o">=</span>nl2sql-demo/nl2sql.yaml<span class="w"> </span>nl2sql-api<span class="w"> </span>--host<span class="w"> </span><span class="m">127</span>.0.0.1<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w">   </span><span class="c1"># then open http://localhost:8000/docs</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nl2sql-api<span class="w"> </span>serve<span class="w"> </span>--config<span class="w"> </span>nl2sql-demo/nl2sql.yaml<span class="w"> </span>--port<span class="w"> </span><span class="m">8000</span><span class="w">   </span><span class="c1"># one worker, 127.0.0.1; then open http://localhost:8000/docs</span>
 </code></pre></div>
 <h2 id="api-index">API Index</h2>
 <table>
@@ -6090,7 +6121,7 @@ server on a config:</p>
 <tr>
 <td><a href="health/">Health</a></td>
 <td><code>routes/health.py</code></td>
-<td>Liveness/readiness checks.</td>
+<td>Liveness (<code>/health</code>), readiness (<code>/ready</code>), <code>/meta</code> (mode, auth source, <code>request_llm</code>; no caller) and <code>/about</code>.</td>
 </tr>
 <tr>
 <td><a href="query/">Query</a></td>
@@ -6112,25 +6143,29 @@ server on a config:</p>
 <td><code>routes/indexing.py</code></td>
 <td>Index management and status.</td>
 </tr>
+<tr>
+<td><a href="errors/">Errors</a></td>
+<td><code>errors.py</code></td>
+<td>The one error envelope and the request id.</td>
+</tr>
 </tbody>
 </table>
+<p>The routers <code>approvals</code>, <code>conversations</code>, <code>dashboards</code>, <code>workspaces</code>, <code>datasources</code>, <code>index</code>, <code>knowledge</code>, <code>evals</code>, <code>settings</code> and <code>web</code> are empty
+for now: later rows fill them. The committed contract is <code>packages/api/openapi.json</code>; <code>test_openapi_snapshot_is_current</code>
+fails when a route changes without it (rewrite it with <code>python packages/api/tests/test_openapi_snapshot.py</code>).</p>
 <h2 id="error-handling">Error Handling</h2>
-<p>FastAPI routers wrap most failures in <code>HTTPException(status_code=500, detail=str(e))</code>.
-Datasource and delete endpoints, and <code>GET /api/v1/llm/{agent}</code>, map <code>ValueError</code> to <code>HTTP 404</code>.
-<code>PUT /api/v1/settings/llm</code> answers a config error as <code>HTTP 422</code> with its text.</p>
-<p><code>POST /api/v1/query</code> is the exception: pipeline errors are returned as a normal
-<code>HTTP 200</code> inside <code>QueryResponse.errors</code>, and an unexpected failure returns a
-generic <code>HTTP 500</code> with the traceback logged server-side rather than returned.
-<code>POST /api/v1/datasource</code> does the same for an unexpected failure: its exception can carry a connection
-string, password included, so the response says only that it failed and the
-cause goes to the server log. A body that does not validate is a <code>HTTP 422</code> that lists each problem by its
-path, never a value (the Connect routes, see <a href="datasource/">Datasources</a>).</p>
+<p>Every non-2xx response is the <a href="errors/">error envelope</a>,
+<code>{"error": {"code", "message", "fix", "details", "request_id"}}</code>. Only the facade's own <code>NL2SQLError</code> (and its named
+subclasses) is mapped to its status; anything else, a built-in <code>ValueError</code>, <code>KeyError</code>, <code>PermissionError</code> or a
+pydantic <code>ValidationError</code> included, is a <code>500</code> that names a request id and never the exception's text. Routes carry
+no <code>except Exception</code>.</p>
+<p><code>POST /api/v1/query</code> still returns pipeline errors as a normal <code>HTTP 200</code> inside <code>QueryResponse.errors</code>.</p>
 <p>Route handlers that call blocking engine code are declared with <code>def</code> rather than
 <code>async def</code>, so Starlette runs them in its threadpool instead of blocking the
 event loop.</p>
 <h2 id="configuration">Configuration</h2>
 <p>The REST API is configured by the same <code>nl2sql.yaml</code> as the engine. Beyond the
-runtime server options in <code>nl2sql_api.server</code> (<code>--host</code>, <code>--port</code>, <code>--reload</code>),
+runtime server options of <code>nl2sql-api serve</code> (<code>--config</code>, <code>--host</code>, <code>--port</code>; one worker, no reload),
 its own settings are the <code>api</code> section of that file (see
 <a href="../../configuration/api/">The <code>api</code> section</a>), and the admin roles are
 <code>policies.admin_roles</code>. The engine validates the <code>api</code> section and never reads it.</p>
@@ -6151,47 +6186,51 @@ restarting the server.</p>
 <p>This setting governs the browser same-origin policy only. Non-browser clients --
 <code>curl</code>, server-side callers, the Python SDK -- do not send an <code>Origin</code> header and
 are unaffected by it; use authentication and network controls to restrict those.</p>
-<h3 id="caller-role">Caller role</h3>
-<p>The engine enforces RBAC; the API only decides which role a request carries. It
-does not authenticate callers, and it never takes the role from the request body
-unless a dev flag says so. The <code>get_user_context</code> dependency reads, first match
-wins:</p>
+<h3 id="identity">Identity</h3>
+<p>The engine enforces RBAC; the API decides who is asking. <code>api.auth</code> picks one source, and every request resolves one
+<code>UserContext</code> through the <code>identity.caller</code> dependency. The request body is never read for it.</p>
 <table>
 <thead>
 <tr>
-<th><code>api</code> key</th>
-<th>Role source</th>
+<th><code>api.auth</code></th>
+<th>Identity</th>
+<th>No identity</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>role_header</code></td>
-<td>The name of a header a trusted proxy sets, e.g. <code>X-NL2SQL-Role</code>. Comma-separated values are several roles. Configure it only when the proxy authenticates the caller and overwrites the header on every request; otherwise any client can pick its own role.</td>
+<td><code>api_keys</code></td>
+<td><code>Authorization: Bearer &lt;key&gt;</code>, verified by <code>engine.api_keys.verify</code>: the key's user, tenant and roles.</td>
+<td><code>401</code> with <code>WWW-Authenticate: Bearer</code></td>
 </tr>
 <tr>
-<td><code>role</code></td>
-<td>One static role for every request, e.g. <code>admin</code> for a single-tenant deployment or the demo.</td>
+<td><code>proxy</code></td>
+<td>The <code>api.proxy.user_header</code>, <code>tenant_header</code> (else <code>settings.tenant_id</code>) and <code>roles_header</code> (comma-separated), honoured only from a peer in <code>api.proxy.trusted_from</code>.</td>
+<td><code>401</code> (also for a peer outside <code>trusted_from</code>, whose headers are ignored)</td>
 </tr>
 <tr>
-<td><code>trust_body_role</code></td>
-<td><code>true</code> takes <code>user_context</code> from the request body. For local testing only: any client can choose any role. The server logs a warning at startup when it is on.</td>
+<td><code>static</code></td>
+<td>One role, <code>api.static_role</code>, for every request, with no user id.</td>
+<td><code>401</code> when <code>static_role</code> is unset</td>
+</tr>
+<tr>
+<td><code>none</code> (default)</td>
+<td>The local operator: <code>user_id: "local"</code> with the <code>policies.admin_roles</code>.</td>
+<td><code>403</code> unless the request is made straight to localhost</td>
 </tr>
 </tbody>
 </table>
-<p>With no role from any of them, <code>POST /api/v1/query</code> and the result routes answer <code>HTTP 401</code> with a
-message naming these keys; the engine never runs.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># api.yaml for the demo: every request runs as admin.</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin</span>
+<p>Under <code>none</code>, <code>nl2sql-api serve</code> refuses to bind a host that is not loopback (D205), and a request whose <code>Host</code> is not
+<code>localhost</code>, <code>127.0.0.1</code> or <code>[::1]</code>, or that carries <code>X-Forwarded-For</code>, <code>Forwarded</code> or <code>X-Real-IP</code>, is a <code>403</code>, so a
+reverse proxy on the same host or a DNS-rebinding page is not taken for the operator.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># api.yaml behind an authenticating proxy at 10.0.0.5.</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">proxy</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> trusted_from</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10.0.0.5/32</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># api.yaml behind an authenticating proxy that sets X-NL2SQL-Role.</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">role_header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">X-NL2SQL-Role</span>
-</code></pre></div>
-<p>This is a seam, not an auth provider: to integrate one, override the
-<code>get_user_context</code> dependency (<code>app.dependency_overrides[get_user_context] = ...</code>)
-or put the provider in the proxy.</p>
+<p>A test or an embedding app overrides <code>identity.caller</code> and <code>identity.admin</code> with <code>app.dependency_overrides</code>.</p>
 <h3 id="admin-routes">Admin routes</h3>
 <p>The routes that change the running process need an admin role, checked by the
-<code>require_admin</code> dependency in <code>nl2sql_api/auth.py</code>:</p>
+<code>identity.admin</code> dependency:</p>
 <ul>
 <li><code>POST /api/v1/datasource</code> and <code>DELETE /api/v1/datasource/{datasource_id}</code></li>
 <li>The Connect routes <code>GET /api/v1/datasource-types</code> and <code>POST /api/v1/datasource/test</code></li>
@@ -6214,27 +6253,16 @@ or put the provider in the proxy.</p>
 </tr>
 </tbody>
 </table>
-<p>The roles come from the same sources as <a href="#caller-role">Caller role</a>. A request
-whose roles include one in <code>policies.admin_roles</code> is let through; one with
-roles but none of them admin is <code>HTTP 403</code>; one with no role is <code>HTTP 401</code>.</p>
-<p>With <strong>none</strong> of <code>api.role_header</code>, <code>api.role</code> or <code>api.trust_body_role</code> set,
-admin routes answer only clients on loopback (<code>127.0.0.1</code>, <code>::1</code>) and return
-<code>HTTP 403</code> to everyone else, with a message naming the keys to set. A fresh local install can still register and
-index datasources, and a port published by mistake does not hand them out.
-Two consequences:</p>
-<ul>
-<li>In Docker, a request through a published port arrives from the bridge
-  gateway, not loopback, so admin routes need a role setting there.</li>
-<li>A reverse proxy on the same host makes every request look like loopback.
-  Behind one, configure <code>api.role_header</code>.</li>
-</ul>
-<p>The read-only routes (<code>/health</code>, <code>/ready</code>, <code>GET /datasource</code>, <code>GET /llm</code>, which
+<p>A caller whose roles include one in <code>policies.admin_roles</code> is let through; one with
+roles but none of them admin is <code>HTTP 403</code>; one with no identity is <code>HTTP 401</code>. The check
+uses <code>admin_roles</code> alone, so <code>policies.allow_all</code> does not make a caller an admin.</p>
+<p>The read-only routes (<code>/health</code>, <code>/ready</code>, <code>/meta</code>, <code>GET /datasource</code>, <code>GET /llm</code>, which
 never returns API keys, and <code>GET /index/status</code>) need no role.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># The proxy sets X-NL2SQL-Role; only "ops" may change datasources and the index.</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># api.yaml</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">role_header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">X-NL2SQL-Role</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># policies.yaml (with the roles)</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="nt">admin_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ops</span><span class="p p-Indicator">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># The proxy sets X-NL2SQL-Roles; only "ops" may change datasources and the index.</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># api.yaml</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">auth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># policies.yaml (with the roles)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="nt">admin_roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">ops</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 
 
